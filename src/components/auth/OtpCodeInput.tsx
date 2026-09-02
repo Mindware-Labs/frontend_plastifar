@@ -58,7 +58,7 @@ export function OtpCodeInput({
 
   return (
     <div>
-      <div className="flex justify-between gap-2.5 sm:gap-3">
+      <div className="flex justify-center gap-2.5">
         {digits.map((digit, index) => (
           <input
             key={index}
@@ -73,7 +73,7 @@ export function OtpCodeInput({
             onChange={(e) => handleChange(index, e.target.value)}
             onKeyDown={(e) => handleKeyDown(index, e)}
             onPaste={handlePaste}
-            className={`h-14 w-full max-w-[56px] rounded-xl border bg-white text-center font-heading text-xl font-semibold text-ink outline-none transition-[border-color,box-shadow] duration-200 ease-out ${
+            className={`h-12 w-12 shrink-0 rounded-edge border bg-white text-center font-heading text-lg font-semibold text-ink caret-brand-red outline-none transition-[border-color,box-shadow] duration-200 ease-out ${
               error
                 ? "border-brand-red shadow-[0_0_0_4px_rgba(228,0,43,0.09)]"
                 : "border-line hover:border-zinc-300 focus:border-brand-red focus:shadow-[0_0_0_4px_rgba(228,0,43,0.09)]"

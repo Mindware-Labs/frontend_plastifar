@@ -153,7 +153,11 @@ export function ResetPasswordPage() {
           : "Ingresa el código de 6 dígitos que recibiste por correo"
       }
     >
-      <form onSubmit={codeForm.handleSubmit(onSubmitCode)} noValidate className="flex flex-col gap-5">
+      <form
+        onSubmit={codeForm.handleSubmit(onSubmitCode)}
+        noValidate
+        className="-mt-3.5 flex flex-col gap-5"
+      >
         {formError && <AuthAlert>{formError}</AuthAlert>}
 
         {prefillEmail ? (
@@ -172,7 +176,7 @@ export function ResetPasswordPage() {
         )}
 
         <div>
-          <label className="mb-2 block text-[13px] font-semibold uppercase tracking-[0.08em] text-ink">
+          <label className="mb-2.5 block text-center text-[15px] font-semibold uppercase tracking-[0.08em] text-ink">
             Código
           </label>
           <Controller
