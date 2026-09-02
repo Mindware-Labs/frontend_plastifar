@@ -6,6 +6,7 @@ import type {
   LoginRequest,
   LoginResponse,
   ResetPasswordRequest,
+  VerifyPasswordRequest,
   VerifyResetCodeRequest,
 } from "../types/api";
 
@@ -30,6 +31,12 @@ export const authApi = {
 
   resetPassword: (data: ResetPasswordRequest) =>
     apiRequest<ApiMessage>("/api/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  verifyPassword: (data: VerifyPasswordRequest) =>
+    apiRequest<void>("/api/auth/verify-password", {
       method: "POST",
       body: JSON.stringify(data),
     }),

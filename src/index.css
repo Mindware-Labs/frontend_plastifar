@@ -26,6 +26,9 @@
   --color-muted: #8a8a90;
   --color-faint: #9a9aa0;
   --color-fill: #f1f1f3;
+  /* Ambar de apoyo: solo estados intermedios en pantalla (fuerza media,
+     prioridad alta). No es un color institucional. */
+  --color-warn: #c2760a;
 
   /* Radio unico de los controles: casi recto, coherente con el trazo
      industrial del logotipo. Un solo lugar donde ajustarlo. */

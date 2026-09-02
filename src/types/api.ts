@@ -26,6 +26,10 @@ export interface ResetPasswordRequest {
   newPassword: string;
 }
 
+export interface VerifyPasswordRequest {
+  password: string;
+}
+
 export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;

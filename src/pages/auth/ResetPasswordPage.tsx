@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Lock, LockKeyhole, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
@@ -10,6 +10,8 @@ import { AuthAlert } from "../../components/auth/AuthAlert";
 import { AuthButton } from "../../components/auth/AuthButton";
 import { AuthField, AuthPasswordField } from "../../components/auth/AuthField";
 import { AuthToast } from "../../components/auth/AuthToast";
+import { PasswordStrength } from "../../components/ui/PasswordStrength";
+import { evaluatePassword, passwordSchema } from "../../lib/password";
 import { OtpCodeInput } from "../../components/auth/OtpCodeInput";
 import { AuthLayout } from "../../layouts/AuthLayout";
 
@@ -19,20 +21,18 @@ const codeSchema = z.object({
 });
 type CodeFormValues = z.infer<typeof codeSchema>;
 
-const passwordSchema = z
+// Las reglas viven en lib/password.ts, junto al medidor de fuerza y a la
+// politica del servidor: un solo sitio donde cambiarlas.
+const passwordFormSchema = z
   .object({
-    newPassword: z
-      .string()
-      .min(8, "Mínimo 8 caracteres")
-      .regex(/[a-zA-Z]/, "Debe incluir al menos una letra")
-      .regex(/[0-9]/, "Debe incluir al menos un número"),
+    newPassword: passwordSchema,
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Las contraseñas no coinciden",
     path: ["confirmPassword"],
   });
-type PasswordFormValues = z.infer<typeof passwordSchema>;
+type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 
 type Step = "code" | "password" | "done";
 type ToastState = { message: string; variant: "error" | "success" };
@@ -60,7 +60,12 @@ export function ResetPasswordPage() {
     defaultValues: { email: prefillEmail },
   });
 
-  const passwordForm = useForm<PasswordFormValues>({ resolver: zodResolver(passwordSchema) });
+  const passwordForm = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordFormSchema),
+    defaultValues: { newPassword: "", confirmPassword: "" },
+  });
+
+  const newPassword = useWatch({ control: passwordForm.control, name: "newPassword" }) ?? "";
 
   useEffect(() => {
     if (step !== "code" || resendCooldown <= 0) return;
@@ -164,9 +169,12 @@ export function ResetPasswordPage() {
             {...passwordForm.register("confirmPassword")}
           />
 
+          <PasswordStrength value={newPassword} className="-mt-1" />
+
           <AuthButton
             type="submit"
             isLoading={passwordForm.formState.isSubmitting}
+            disabled={!evaluatePassword(newPassword).isValid}
             className="mt-1"
           >
             {passwordForm.formState.isSubmitting ? "Actualizando…" : "Actualizar contraseña"}

@@ -19,6 +19,14 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  // El efecto de montaje no debe depender de onClose: si el padre recrea esa
+  // funcion en cada render, el efecto se reiniciaria y devolveria el foco al
+  // primer campo en mitad del tecleo.
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const originalOverflow = document.body.style.overflow;
@@ -33,7 +41,7 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
+        closeRef.current();
         return;
       }
       if (event.key !== "Tab" || !panel) return;
@@ -60,7 +68,7 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
       document.body.style.overflow = originalOverflow;
       previouslyFocused?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div

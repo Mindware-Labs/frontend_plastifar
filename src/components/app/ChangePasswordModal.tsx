@@ -1,80 +1,109 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import { tokenStore } from "../../api/tokenStore";
+import { evaluatePassword, passwordSchema } from "../../lib/password";
 import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
-import { TextField, type FieldState } from "../ui/Field";
+import { PasswordField, type FieldState } from "../ui/Field";
 import { Modal } from "../ui/Modal";
+import { PasswordStrength } from "../ui/PasswordStrength";
 
-// Espejo de PasswordPolicy.cs: si cambia alla, cambia aqui.
-const schema = z
+const currentSchema = z.object({
+  currentPassword: z.string().min(1, "Escribe tu contraseña actual"),
+});
+type CurrentFormValues = z.infer<typeof currentSchema>;
+
+const newSchema = z
   .object({
-    currentPassword: z.string().min(1, "Escribe tu contraseña actual"),
-    newPassword: z
-      .string()
-      .min(8, "Mínimo 8 caracteres")
-      .max(128, "Máximo 128 caracteres")
-      .regex(/[a-zA-Z]/, "Debe incluir al menos una letra")
-      .regex(/[0-9]/, "Debe incluir al menos un número"),
+    newPassword: passwordSchema,
     confirmPassword: z.string().min(1, "Repite la nueva contraseña"),
   })
   .refine((values) => values.newPassword === values.confirmPassword, {
     message: "Las contraseñas no coinciden",
     path: ["confirmPassword"],
-  })
-  .refine((values) => values.newPassword !== values.currentPassword, {
-    message: "La nueva contraseña debe ser distinta de la actual",
-    path: ["newPassword"],
+  });
+type NewFormValues = z.infer<typeof newSchema>;
+
+type Step = "actual" | "nueva" | "listo";
+
+/**
+ * Cambio de contrasena en dos pasos: primero se confirma la actual contra el
+ * servidor y solo entonces se pide la nueva. Asi nadie escribe una contrasena
+ * nueva para descubrir al final que la actual estaba mal.
+ */
+export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState<Step>("actual");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const currentForm = useForm<CurrentFormValues>({
+    resolver: zodResolver(currentSchema),
+    mode: "onTouched",
   });
 
-type FormValues = z.infer<typeof schema>;
+  const newForm = useForm<NewFormValues>({
+    resolver: zodResolver(newSchema),
+    mode: "onTouched",
+    defaultValues: { newPassword: "", confirmPassword: "" },
+  });
 
-export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
-  const [formError, setFormError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
+  // useWatch en vez de form.watch: se suscribe al campo sin romper la memoizacion.
+  const newPassword = useWatch({ control: newForm.control, name: "newPassword" }) ?? "";
+  const strength = evaluatePassword(newPassword);
 
-  const {
-    register,
-    handleSubmit,
-    setError,
-    setFocus,
-    formState: { errors, touchedFields, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), mode: "onTouched" });
+  // Al cambiar de paso el foco va al primer campo del paso nuevo.
+  useEffect(() => {
+    if (step === "nueva") newForm.setFocus("newPassword");
+  }, [step, newForm]);
 
-  function stateOf(field: keyof FormValues): FieldState {
-    if (errors[field]) return "error";
-    return touchedFields[field] ? "valid" : "idle";
+  async function onSubmitCurrent(values: CurrentFormValues) {
+    setFormError(null);
+    try {
+      await authApi.verifyPassword({ password: values.currentPassword });
+      setCurrentPassword(values.currentPassword);
+      setStep("nueva");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) {
+        currentForm.setError("currentPassword", { message: err.message });
+        currentForm.setFocus("currentPassword");
+        return;
+      }
+      setFormError(
+        err instanceof ApiError ? err.message : "No se pudo verificar la contraseña",
+      );
+    }
   }
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmitNew(values: NewFormValues) {
     setFormError(null);
     try {
       await authApi.changePassword({
-        currentPassword: values.currentPassword,
+        currentPassword,
         newPassword: values.newPassword,
         // Esta sesión sobrevive; el servidor cierra las demás.
         refreshToken: tokenStore.getRefreshToken(),
       });
-      setDone(true);
+      setStep("listo");
     } catch (err) {
-      // Cada rechazo del servidor se marca en el campo que lo provoca, no en un
-      // aviso general: "no es correcta" es la actual, "distinta de la actual" es la nueva.
       if (err instanceof ApiError) {
         const message = err.message.toLowerCase();
 
+        // La actual dejó de ser válida entre un paso y otro: se vuelve al principio.
         if (message.includes("no es correcta")) {
-          setError("currentPassword", { message: err.message });
-          setFocus("currentPassword");
+          setStep("actual");
+          setCurrentPassword("");
+          currentForm.setError("currentPassword", { message: err.message });
           return;
         }
 
         if (message.includes("distinta") || message.includes("debe tener")) {
-          setError("newPassword", { message: err.message });
-          setFocus("newPassword");
+          newForm.setError("newPassword", { message: err.message });
+          newForm.setFocus("newPassword");
           return;
         }
       }
@@ -83,7 +112,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  if (done) {
+  if (step === "listo") {
     return (
       <Modal
         eyebrow="Mi cuenta"
@@ -103,61 +132,113 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     );
   }
 
+  if (step === "actual") {
+    return (
+      <Modal
+        eyebrow="Mi cuenta · Paso 1 de 2"
+        title="Confirma tu contraseña"
+        description="Antes de cambiarla, escribe la contraseña con la que entras hoy."
+        onClose={onClose}
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="current-password-form"
+              isLoading={currentForm.formState.isSubmitting}
+            >
+              Continuar
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="current-password-form"
+          onSubmit={currentForm.handleSubmit(onSubmitCurrent)}
+          noValidate
+          className="flex flex-col gap-4"
+        >
+          {formError && <Alert variant="error">{formError}</Alert>}
+
+          <PasswordField
+            label="Contraseña actual"
+            autoComplete="current-password"
+            required
+            error={currentForm.formState.errors.currentPassword?.message}
+            {...currentForm.register("currentPassword")}
+          />
+        </form>
+      </Modal>
+    );
+  }
+
+  const confirmState: FieldState =
+    newForm.formState.errors.confirmPassword
+      ? "error"
+      : newForm.formState.touchedFields.confirmPassword
+        ? "valid"
+        : "idle";
+
   return (
     <Modal
-      eyebrow="Mi cuenta"
-      title="Cambiar contraseña"
-      description="Al guardar se cierran tus otras sesiones abiertas. Esta se mantiene."
+      eyebrow="Mi cuenta · Paso 2 de 2"
+      title="Crea una contraseña"
+      description="Debe cumplir todos los requisitos. Al guardar se cierran tus otras sesiones."
       onClose={onClose}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setFormError(null);
+              setStep("actual");
+            }}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Atrás
           </Button>
-          <Button type="submit" form="change-password-form" isLoading={isSubmitting}>
+          <Button
+            type="submit"
+            form="new-password-form"
+            isLoading={newForm.formState.isSubmitting}
+            // Igual que la referencia: no se puede enviar hasta cumplir las cuatro reglas.
+            disabled={!strength.isValid}
+          >
             Guardar contraseña
           </Button>
         </>
       }
     >
       <form
-        id="change-password-form"
-        onSubmit={handleSubmit(onSubmit)}
+        id="new-password-form"
+        onSubmit={newForm.handleSubmit(onSubmitNew)}
         noValidate
         className="flex flex-col gap-4"
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <TextField
-          label="Contraseña actual"
-          type="password"
-          autoComplete="current-password"
-          required
-          state={stateOf("currentPassword")}
-          error={errors.currentPassword?.message}
-          {...register("currentPassword")}
-        />
-
-        <TextField
+        <PasswordField
           label="Nueva contraseña"
-          type="password"
           autoComplete="new-password"
           required
-          state={stateOf("newPassword")}
-          error={errors.newPassword?.message}
-          hint="Al menos 8 caracteres, con una letra y un número."
-          {...register("newPassword")}
+          state={strength.isValid ? "valid" : "idle"}
+          error={newForm.formState.errors.newPassword?.message}
+          {...newForm.register("newPassword")}
         />
 
-        <TextField
+        <PasswordField
           label="Repetir nueva contraseña"
-          type="password"
           autoComplete="new-password"
           required
-          state={stateOf("confirmPassword")}
-          error={errors.confirmPassword?.message}
-          {...register("confirmPassword")}
+          state={confirmState}
+          error={newForm.formState.errors.confirmPassword?.message}
+          {...newForm.register("confirmPassword")}
         />
+
+        <PasswordStrength value={newPassword} className="mt-1" />
       </form>
     </Modal>
   );

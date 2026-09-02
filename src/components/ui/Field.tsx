@@ -1,5 +1,5 @@
-import { AlertCircle, Check } from "lucide-react";
-import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from "react";
+import { AlertCircle, Check, Eye, EyeOff } from "lucide-react";
+import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { controlBase, controlSizes, stateClasses, type FieldState } from "./fieldStyles";
 import { Select, type SelectOption } from "./Select";
 
@@ -95,6 +95,54 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
     </FieldShell>
   );
 });
+
+interface PasswordFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
+  label: string;
+  error?: string;
+  hint?: ReactNode;
+  state?: FieldState;
+}
+
+/** Campo de contrasena con interruptor de visibilidad; el resto, igual que TextField. */
+export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
+  function PasswordField(
+    { label, error, hint, state = "idle", id, className = "", required, ...props },
+    ref,
+  ) {
+    const generated = useId();
+    const [visible, setVisible] = useState(false);
+    const fieldId = id ?? props.name ?? generated;
+    const resolved: FieldState = error ? "error" : state;
+
+    return (
+      <FieldShell id={fieldId} label={label} error={error} hint={hint} required={required}>
+        <div className="relative">
+          <input
+            ref={ref}
+            id={fieldId}
+            type={visible ? "text" : "password"}
+            aria-invalid={resolved === "error"}
+            aria-describedby={describedBy(fieldId, error, hint)}
+            className={`${controlBase} ${stateClasses[resolved]} ${controlSizes.md} pl-3 pr-10
+              placeholder:text-zinc-400 ${className}`}
+            {...props}
+          />
+          <button
+            type="button"
+            onClick={() => setVisible((current) => !current)}
+            // Fuera del recorrido con Tab: es una ayuda visual, no un paso del formulario.
+            tabIndex={-1}
+            aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+            className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center
+              rounded-edge text-muted transition-colors hover:bg-fill hover:text-ink"
+          >
+            {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+      </FieldShell>
+    );
+  },
+);
 
 interface SelectFieldProps {
   label: string;
