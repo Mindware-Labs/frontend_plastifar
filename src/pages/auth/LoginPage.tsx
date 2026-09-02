@@ -8,7 +8,7 @@ import { ApiError } from "../../api/client";
 import { AuthButton } from "../../components/auth/AuthButton";
 import { AuthField, AuthPasswordField } from "../../components/auth/AuthField";
 import { AuthToast } from "../../components/auth/AuthToast";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 import { AuthLayout } from "../../layouts/AuthLayout";
 
 const schema = z.object({

@@ -1,24 +1,9 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { authApi } from "../api/auth";
-import { apiRequest } from "../api/client";
+import { refreshSession } from "../api/client";
 import { tokenStore } from "../api/tokenStore";
 import { decodeAccessToken } from "../lib/jwt";
-import type { LoginResponse } from "../types/api";
-
-interface AuthUser {
-  staffId: number;
-  email: string;
-  isAdmin: boolean;
-}
-
-interface AuthContextValue {
-  user: AuthUser | null;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import { AuthContext, type AuthUser } from "./useAuth";
 
 function userFromToken(accessToken: string | null): AuthUser | null {
   if (!accessToken) return null;
@@ -36,26 +21,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() =>
     userFromToken(tokenStore.getAccessToken()),
   );
-  const [isLoading, setIsLoading] = useState(true);
+  // Solo hay algo que restaurar si quedo un refresh token de una visita anterior.
+  const [isLoading, setIsLoading] = useState(() => tokenStore.getRefreshToken() !== null);
 
   useEffect(() => tokenStore.subscribe(() => setUser(userFromToken(tokenStore.getAccessToken()))), []);
 
   useEffect(() => {
-    // Al cargar la app, intenta restaurar la sesion con el refresh token guardado.
-    const refreshToken = tokenStore.getRefreshToken();
-    if (!refreshToken) {
-      setIsLoading(false);
-      return;
-    }
-
-    apiRequest<LoginResponse>(
-      "/api/auth/refresh",
-      { method: "POST", body: JSON.stringify({ refreshToken }) },
-      false,
-    )
-      .then((response) => tokenStore.setTokens(response.accessToken, response.refreshToken))
-      .catch(() => tokenStore.setTokens(null, null))
-      .finally(() => setIsLoading(false));
+    if (!tokenStore.getRefreshToken()) return;
+    // refreshSession comparte una sola peticion: el doble montaje de StrictMode
+    // no dispara dos rotaciones del mismo token.
+    refreshSession().finally(() => setIsLoading(false));
   }, []);
 
   async function login(email: string, password: string) {
@@ -79,10 +54,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");
-  return ctx;
 }

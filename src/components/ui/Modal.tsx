@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 interface ModalProps {
   title: string;
@@ -15,9 +16,14 @@ interface ModalProps {
 const focusableSelector =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/**
+ * Dialogo modal del panel. Se monta en un portal sobre document.body para que
+ * ningun ancestro con transform o overflow lo recorte ni lo desplace.
+ */
 export function Modal({ title, eyebrow, description, onClose, footer, children }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const descriptionId = useId();
 
   // El efecto de montaje no debe depender de onClose: si el padre recrea esa
   // funcion en cada render, el efecto se reiniciaria y devolveria el foco al
@@ -70,7 +76,7 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
     };
   }, []);
 
-  return (
+  return createPortal(
     <div
       className="animate-plf-scrim-in fixed inset-0 z-50 flex items-center justify-center
         bg-ink/45 px-4 py-8 backdrop-blur-[2px]"
@@ -83,6 +89,7 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         className="animate-plf-modal-in flex max-h-full w-full max-w-lg flex-col overflow-hidden
           rounded-edge border border-line bg-white
           shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]"
@@ -101,7 +108,9 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
               {title}
             </h2>
             {description && (
-              <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">{description}</p>
+              <p id={descriptionId} className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
+                {description}
+              </p>
             )}
           </div>
 
@@ -124,6 +133,7 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

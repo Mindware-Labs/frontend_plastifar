@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { CircleAlert, ShieldCheck, X } from "lucide-react";
 import { createPortal } from "react-dom";
 
@@ -27,11 +27,17 @@ export function AuthToast({
   variant = "error",
   duration = DEFAULT_DURATION,
 }: AuthToastProps) {
+  // onDismiss suele ser una flecha nueva en cada render: se lee por ref para que
+  // el temporizador dependa solo del mensaje y no se reinicie sin motivo.
+  const onDismissRef = useRef(onDismiss);
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  });
+
   useEffect(() => {
     if (!message) return;
-    const timer = setTimeout(onDismiss, duration);
+    const timer = setTimeout(() => onDismissRef.current(), duration);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reinicia el timer cada vez que cambia el mensaje mostrado
   }, [message, duration]);
 
   if (!message) return null;

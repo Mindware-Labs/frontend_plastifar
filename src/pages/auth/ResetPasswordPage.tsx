@@ -234,9 +234,9 @@ export function ResetPasswordPage() {
         )}
 
         <div>
-          <label className="mb-2.5 block text-center text-[15px] font-semibold uppercase tracking-[0.08em] text-ink">
+          <p className="mb-2.5 text-center text-[15px] font-semibold uppercase tracking-[0.08em] text-ink">
             Código
-          </label>
+          </p>
           <Controller
             control={codeForm.control}
             name="code"

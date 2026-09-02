@@ -1,19 +1,23 @@
+import type { ReactNode } from "react";
+
 interface BadgeProps {
-  variant?: "neutral" | "success" | "red" | "green";
-  children: React.ReactNode;
+  /** red = privilegio (administrador); green = propio del cliente; neutral = base. */
+  tone?: "neutral" | "red" | "green";
+  children: ReactNode;
 }
 
-const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
-  neutral: "bg-zinc-100 text-zinc-600",
-  success: "bg-green-50 text-brand-green",
-  red: "bg-red-50 text-brand-red",
-  green: "bg-green-50 text-brand-green",
+const tones: Record<NonNullable<BadgeProps["tone"]>, string> = {
+  neutral: "bg-fill text-brand-gray",
+  red: "bg-brand-red/8 text-brand-red-dark",
+  green: "bg-brand-green/8 text-brand-green",
 };
 
-export function Badge({ variant = "neutral", children }: BadgeProps) {
+/** Pastilla de categoria en tablas: 22 px de alto, sin borde, fondo al 8 %. */
+export function Badge({ tone = "neutral", children }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${variantClasses[variant]}`}
+      className={`inline-flex h-[22px] items-center whitespace-nowrap rounded-full px-2.5
+        text-[11.5px] font-semibold ${tones[tone]}`}
     >
       {children}
     </span>

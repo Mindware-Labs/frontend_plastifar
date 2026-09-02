@@ -1,28 +1,24 @@
-import {
-  ChevronDown,
-  ChevronsUpDown,
-  ChevronUp,
-  LogOut,
-  Pencil,
-  Plus,
-  Trash2,
-  UserX,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { ApiError } from "../../api/client";
+import { LogOut, Pencil, Plus, Trash2, UserX } from "lucide-react";
+import { useEffect, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
+import { Badge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
+import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
-import { useAuth } from "../../context/AuthContext";
+import { StatusDot } from "../../components/ui/StatusDot";
+import { useAuth } from "../../context/useAuth";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePagedList } from "../../hooks/usePagedList";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
 import { StaffModal } from "./StaffModal";
 
@@ -44,14 +40,11 @@ const columns: { key: SortKey; label: string }[] = [
   { key: "estado", label: "Estado" },
 ];
 
-const headClass =
-  "px-3.5 py-2.5 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint";
-
 export function StaffPage() {
   const { user } = useAuth();
+  const isAdmin = Boolean(user?.isAdmin);
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   // Confirmacion propia del panel; null = ninguna pendiente.
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(
@@ -63,13 +56,9 @@ export function StaffPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("todos");
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
-    key: "nombre",
-    dir: "asc",
-  });
-  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "nombre", dir: "asc" });
   const [pageSize, setPageSize] = useState(10);
-  const [reloadKey, setReloadKey] = useState(0);
+  const debouncedSearch = useDebouncedValue(search).trim();
 
   useEffect(() => {
     departmentsApi
@@ -78,64 +67,22 @@ export function StaffPage() {
       .catch(() => setDepartments([]));
   }, []);
 
-  // Se escribe letra a letra: se espera a que pare para consultar.
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // Cambiar de criterio invalida la pagina actual: siempre se vuelve a la primera.
-  const criteria = `${debouncedSearch}|${departmentId}|${filter}|${sort.key}|${sort.dir}|${pageSize}`;
-  const [lastCriteria, setLastCriteria] = useState(criteria);
-  if (criteria !== lastCriteria) {
-    setLastCriteria(criteria);
-    setPage(1);
-  }
-
-  const query = useMemo<StaffQuery>(
-    () => ({
-      page,
+  const { data, isStale, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
+    fetch: staffApi.list,
+    criteria: {
       pageSize,
-      search: debouncedSearch.trim() || undefined,
+      search: debouncedSearch || undefined,
       departmentId: departmentId === "todos" ? undefined : departmentId,
       status: filter,
       sort: sort.key,
       dir: sort.dir,
-    }),
-    [page, pageSize, debouncedSearch, departmentId, filter, sort],
-  );
+    },
+    fallbackError: "No se pudo cargar el personal",
+  });
 
-  const queryKey = `${JSON.stringify(query)}|${reloadKey}`;
-  const [snapshot, setSnapshot] = useState<{ key: string; data: StaffListResponse } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    staffApi
-      .list(query)
-      .then((data) => {
-        if (cancelled) return;
-        setSnapshot({ key: queryKey, data });
-        setError(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : "No se pudo cargar el personal");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [query, queryKey]);
-
-  const data = snapshot?.data ?? null;
-  const isStale = snapshot !== null && snapshot.key !== queryKey;
   const rows = data?.items ?? [];
   const counts = data?.counts;
-
-  // Borrar la ultima fila de la ultima pagina deja la pagina fuera de rango.
-  if (data && data.totalPages > 0 && page > data.totalPages) setPage(data.totalPages);
+  const unfiltered = filter === "todos" && departmentId === "todos" && !debouncedSearch;
 
   function departmentName(id: number) {
     return departments.find((d) => d.id === id)?.name ?? "—";
@@ -151,20 +98,14 @@ export function StaffPage() {
     );
   }
 
-  /** Tras cada cambio se relee la pagina: totales y contadores vienen del servidor. */
-  function refresh() {
-    setReloadKey((value) => value + 1);
-  }
-
   /** Desactivar y eliminar nunca aplican sobre uno mismo; editar si. */
   function canManage(member: StaffResponse) {
-    return Boolean(user?.isAdmin) && member.id !== user?.staffId;
+    return isAdmin && member.id !== user?.staffId;
   }
 
   /** El error sube al dialogo, que lo muestra sin cerrarse. */
   async function runOnRow(id: number, action: () => Promise<void>) {
     setBusyId(id);
-    setError(null);
     try {
       await action();
       refresh();
@@ -236,18 +177,11 @@ export function StaffPage() {
             : "Cargando el personal con acceso al sistema…"
         }
         action={
-          user?.isAdmin && (
-            <button
-              type="button"
-              onClick={() => setModal("nuevo")}
-              className="flex h-8 items-center gap-2 rounded-edge bg-brand-red px-3.5 font-heading text-[11.5px]
-                font-semibold uppercase tracking-[0.06em] text-white
-                shadow-[0_10px_20px_-12px_rgba(228,0,43,0.55)]
-                transition-[filter,transform] hover:brightness-105 active:translate-y-px"
-            >
+          isAdmin && (
+            <Button size="sm" onClick={() => setModal("nuevo")}>
               <Plus className="h-[15px] w-[15px]" />
               Agregar personal
-            </button>
+            </Button>
           )
         }
       />
@@ -276,7 +210,7 @@ export function StaffPage() {
           ]}
         />
 
-        <span className="mx-1 h-5 w-px bg-line" />
+        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
         {filters.map(({ key, label, countKey }) => (
           <FilterChip
@@ -295,156 +229,109 @@ export function StaffPage() {
         </div>
       )}
 
-      {/* Sin tarjeta: la tabla es la pagina. Solo filetes horizontales. */}
-      <div>
-        {snapshot === null ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
-        ) : (
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-line [&>th:first-child]:pl-0 [&>th:last-child]:pr-0">
-                    {columns.map(({ key, label }) => (
-                      <th key={key} className={headClass}>
-                        <button
-                          type="button"
-                          onClick={() => toggleSort(key)}
-                          className="inline-flex items-center gap-1.5 transition-colors hover:text-ink"
-                        >
-                          {label}
-                          {sort.key !== key ? (
-                            <ChevronsUpDown className="h-3 w-3" />
-                          ) : sort.dir === "asc" ? (
-                            <ChevronUp className="h-3 w-3 text-brand-red" />
-                          ) : (
-                            <ChevronDown className="h-3 w-3 text-brand-red" />
-                          )}
-                        </button>
-                      </th>
-                    ))}
-                    <th className={`${headClass} w-36 text-right`}>Acciones</th>
-                  </tr>
-                </thead>
+      {data === null ? (
+        <div className="flex justify-center py-16">
+          <Spinner />
+        </div>
+      ) : (
+        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <DataTable>
+            <thead>
+              <HeadRow>
+                {columns.map(({ key, label }) => (
+                  <Th
+                    key={key}
+                    sort={{ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) }}
+                  >
+                    {label}
+                  </Th>
+                ))}
+                {isAdmin && <Th className="w-36 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-                <tbody>
-                  {rows.map((member) => (
-                    <tr
-                      key={member.id}
-                      className={`border-b border-line-soft transition-colors last:border-0
-                        hover:bg-canvas [&>td:first-child]:pl-0 [&>td:last-child]:pr-0
-                        ${busyId === member.id ? "opacity-50" : ""}`}
-                    >
-                      <td className="px-3.5 py-2.5">
-                        <span className="flex items-center gap-2.5">
-                          <Avatar name={fullName(member)} seed={member.id} />
-                          <span className="whitespace-nowrap text-[13px] font-medium text-ink">
-                            {fullName(member)}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="px-3.5 py-2.5 text-[12.5px] text-brand-gray">
-                        {member.email}
-                      </td>
-                      <td className="px-3.5 py-2.5 text-[12.5px] text-brand-gray">
-                        {departmentName(member.primaryDepartmentId)}
-                      </td>
-                      <td className="px-3.5 py-2.5">
-                        {member.isAdmin ? (
-                          <span
-                            className="inline-flex h-[22px] items-center rounded-full bg-brand-red/8 px-2.5
-                              text-[11.5px] font-semibold text-brand-red-dark"
-                          >
-                            Administrador
-                          </span>
-                        ) : (
-                          <span
-                            className="inline-flex h-[22px] items-center rounded-full bg-fill px-2.5
-                              text-[11.5px] font-semibold text-brand-gray"
-                          >
-                            Staff
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3.5 py-2.5">
-                        <span className="inline-flex items-center gap-[7px] whitespace-nowrap text-[12.5px] text-brand-gray">
-                          <span
-                            className={`h-[7px] w-[7px] shrink-0 rounded-full ${
-                              member.isActive ? "bg-brand-green" : "bg-zinc-300"
-                            }`}
-                          />
-                          {member.isActive ? "Activo" : "Inactivo"}
-                        </span>
-                      </td>
-                      <td className="px-3.5 py-2.5">
-                        {user?.isAdmin && (
-                          <div className="flex items-center justify-end gap-1">
+            <tbody>
+              {rows.map((member) => (
+                <Row key={member.id} busy={busyId === member.id}>
+                  <Td>
+                    <span className="flex items-center gap-2.5">
+                      <Avatar name={fullName(member)} seed={member.id} />
+                      <span className="whitespace-nowrap text-[13px] font-medium text-ink">
+                        {fullName(member)}
+                      </span>
+                    </span>
+                  </Td>
+                  <Td className="text-[12.5px] text-brand-gray">{member.email}</Td>
+                  <Td className="text-[12.5px] text-brand-gray">
+                    {departmentName(member.primaryDepartmentId)}
+                  </Td>
+                  <Td>
+                    {member.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
+                  </Td>
+                  <Td>
+                    <StatusDot active={member.isActive} />
+                  </Td>
+                  {isAdmin && (
+                    <Td>
+                      <div className="flex items-center justify-end gap-1">
+                        <RowAction
+                          label={`Editar a ${fullName(member)}`}
+                          icon={Pencil}
+                          onClick={() => setModal(member)}
+                          disabled={busyId === member.id}
+                        />
+                        {member.isActive && canManage(member) && (
+                          <>
                             <RowAction
-                              label={`Editar a ${fullName(member)}`}
-                              icon={Pencil}
-                              onClick={() => setModal(member)}
+                              label={`Cerrar las sesiones de ${fullName(member)}`}
+                              icon={LogOut}
+                              onClick={() => askRevokeSessions(member)}
                               disabled={busyId === member.id}
                             />
-                            {member.isActive && canManage(member) && (
-                              <>
-                                <RowAction
-                                  label={`Cerrar las sesiones de ${fullName(member)}`}
-                                  icon={LogOut}
-                                  onClick={() => askRevokeSessions(member)}
-                                  disabled={busyId === member.id}
-                                />
-                                <RowAction
-                                  label={`Desactivar a ${fullName(member)}`}
-                                  icon={UserX}
-                                  onClick={() => askDeactivate(member)}
-                                  disabled={busyId === member.id}
-                                />
-                              </>
-                            )}
-                            {canManage(member) && (
-                              <RowAction
-                                label={`Eliminar a ${fullName(member)}`}
-                                icon={Trash2}
-                                onClick={() => askDelete(member)}
-                                disabled={busyId === member.id}
-                                danger
-                              />
-                            )}
-                          </div>
+                            <RowAction
+                              label={`Desactivar a ${fullName(member)}`}
+                              icon={UserX}
+                              onClick={() => askDeactivate(member)}
+                              disabled={busyId === member.id}
+                            />
+                          </>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        {canManage(member) && (
+                          <RowAction
+                            label={`Eliminar a ${fullName(member)}`}
+                            icon={Trash2}
+                            onClick={() => askDelete(member)}
+                            disabled={busyId === member.id}
+                            danger
+                          />
+                        )}
+                      </div>
+                    </Td>
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
 
-            {rows.length === 0 && (
-              <div className="py-14 text-center">
-                <p className="text-[13.5px] text-faint">
-                  {counts?.all === 0 && filter === "todos"
-                    ? "Todavía no hay personal registrado."
-                    : "Ningún colaborador coincide con este filtro o búsqueda."}
-                </p>
-              </div>
-            )}
+          {rows.length === 0 && (
+            <p className="py-14 text-center text-[13.5px] text-faint">
+              {unfiltered
+                ? "Todavía no hay personal registrado."
+                : "Ningún colaborador coincide con este filtro o búsqueda."}
+            </p>
+          )}
 
-            {data && (
-              <Pagination
-                page={data.page}
-                pageSize={data.pageSize}
-                total={data.total}
-                totalPages={data.totalPages}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                noun="colaboradores"
-              />
-            )}
-          </div>
-        )}
-      </div>
+          <Pagination
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+            totalPages={data.totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="colaboradores"
+          />
+        </div>
+      )}
 
       {confirmation && (
         <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />

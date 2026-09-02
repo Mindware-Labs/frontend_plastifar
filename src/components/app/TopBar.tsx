@@ -1,7 +1,7 @@
 import { ChevronDown, KeyRound, LogOut } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "../Logo";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 
 /**

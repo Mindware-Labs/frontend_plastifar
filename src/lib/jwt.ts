@@ -11,9 +11,10 @@ interface AccessTokenClaims {
 
 export function decodeAccessToken(token: string): AccessTokenClaims | null {
   try {
-    const payload = token.split(".")[1];
-    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(json) as AccessTokenClaims;
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    // atob devuelve bytes, no texto: se decodifican como UTF-8 por si el correo lleva acentos.
+    const bytes = Uint8Array.from(atob(payload), (char) => char.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes)) as AccessTokenClaims;
   } catch {
     return null;
   }

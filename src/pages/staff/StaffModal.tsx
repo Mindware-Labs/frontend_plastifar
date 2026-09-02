@@ -8,7 +8,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 import type { DepartmentResponse, StaffResponse } from "../../types/api";
 
 const schema = z.object({
@@ -208,7 +208,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
         </div>
 
         {isSelf ? (
-          <Alert variant="error">
+          <Alert variant="info">
             Estás editando tu propio usuario: no puedes quitarte los permisos de administrador ni
             desactivarte.
           </Alert>

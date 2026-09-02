@@ -91,17 +91,15 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
       setStep("listo");
     } catch (err) {
       if (err instanceof ApiError) {
-        const message = err.message.toLowerCase();
-
         // La actual dejó de ser válida entre un paso y otro: se vuelve al principio.
-        if (message.includes("no es correcta")) {
+        if (err.code === "wrong_current_password") {
           setStep("actual");
           setCurrentPassword("");
           currentForm.setError("currentPassword", { message: err.message });
           return;
         }
 
-        if (message.includes("distinta") || message.includes("debe tener")) {
+        if (err.code === "same_password" || err.code === "weak_password") {
           newForm.setError("newPassword", { message: err.message });
           newForm.setFocus("newPassword");
           return;
