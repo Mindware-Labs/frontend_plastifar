@@ -12,4 +12,6 @@ export const staffApi = {
 
   deactivate: (id: number) =>
     apiRequest<void>(`/api/staff/${id}/deactivate`, { method: "POST" }),
+
+  remove: (id: number) => apiRequest<void>(`/api/staff/${id}`, { method: "DELETE" }),
 };

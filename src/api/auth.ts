@@ -5,6 +5,7 @@ import type {
   LoginRequest,
   LoginResponse,
   ResetPasswordRequest,
+  VerifyResetCodeRequest,
 } from "../types/api";
 
 export const authApi = {
@@ -16,6 +17,12 @@ export const authApi = {
 
   forgotPassword: (data: ForgotPasswordRequest) =>
     apiRequest<ApiMessage>("/api/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  verifyResetCode: (data: VerifyResetCodeRequest) =>
+    apiRequest<ApiMessage>("/api/auth/verify-reset-code", {
       method: "POST",
       body: JSON.stringify(data),
     }),

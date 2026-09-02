@@ -1,4 +1,4 @@
-import { Plus, UserX } from "lucide-react";
+import { Plus, Trash2, UserX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
@@ -47,6 +47,27 @@ export function StaffPage() {
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo desactivar el usuario");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDelete(member: StaffResponse) {
+    if (
+      !confirm(
+        `¿Eliminar permanentemente a ${member.firstName} ${member.lastName}? Esta acción no se puede deshacer.`,
+      )
+    ) {
+      return;
+    }
+
+    setBusyId(member.id);
+    setError(null);
+    try {
+      await staffApi.remove(member.id);
+      setStaff((prev) => prev?.filter((s) => s.id !== member.id) ?? null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar el usuario");
     } finally {
       setBusyId(null);
     }
@@ -122,16 +143,30 @@ export function StaffPage() {
                   </td>
                   {user?.isAdmin && (
                     <td className="px-6 py-3.5 text-right">
-                      {member.isActive && member.id !== user.staffId && (
-                        <button
-                          onClick={() => handleDeactivate(member)}
-                          disabled={busyId === member.id}
-                          aria-label={`Desactivar a ${member.firstName}`}
-                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-brand-red disabled:opacity-50"
-                        >
-                          <UserX className="h-4 w-4" />
-                        </button>
-                      )}
+                      <div className="flex justify-end gap-1">
+                        {member.isActive && member.id !== user.staffId && (
+                          <button
+                            onClick={() => handleDeactivate(member)}
+                            disabled={busyId === member.id}
+                            aria-label={`Desactivar a ${member.firstName}`}
+                            title="Desactivar"
+                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-brand-red disabled:opacity-50"
+                          >
+                            <UserX className="h-4 w-4" />
+                          </button>
+                        )}
+                        {member.id !== user.staffId && (
+                          <button
+                            onClick={() => handleDelete(member)}
+                            disabled={busyId === member.id}
+                            aria-label={`Eliminar a ${member.firstName}`}
+                            title="Eliminar"
+                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-brand-red disabled:opacity-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
