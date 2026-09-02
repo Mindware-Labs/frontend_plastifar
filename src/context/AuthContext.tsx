@@ -65,8 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function logout() {
     const refreshToken = tokenStore.getRefreshToken();
-    tokenStore.setTokens(null, null);
+
+    // Se avisa al servidor ANTES de limpiar: al reves, la llamada salia sin
+    // credenciales, el 401 se tragaba en silencio y el refresh token seguia
+    // vivo hasta vencer. Si la red falla igual se cierra la sesion local.
     if (refreshToken) await authApi.logout(refreshToken).catch(() => {});
+
+    tokenStore.setTokens(null, null);
   }
 
   return (

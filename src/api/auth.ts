@@ -1,6 +1,7 @@
 import { apiRequest } from "./client";
 import type {
   ApiMessage,
+  ChangePasswordRequest,
   ForgotPasswordRequest,
   LoginRequest,
   LoginResponse,
@@ -29,6 +30,12 @@ export const authApi = {
 
   resetPassword: (data: ResetPasswordRequest) =>
     apiRequest<ApiMessage>("/api/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  changePassword: (data: ChangePasswordRequest) =>
+    apiRequest<ApiMessage>("/api/auth/change-password", {
       method: "POST",
       body: JSON.stringify(data),
     }),

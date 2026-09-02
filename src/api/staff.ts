@@ -33,6 +33,9 @@ export const staffApi = {
       body: JSON.stringify(data),
     }),
 
+  revokeSessions: (id: number) =>
+    apiRequest<void>(`/api/staff/${id}/revoke-sessions`, { method: "POST" }),
+
   deactivate: (id: number) =>
     apiRequest<void>(`/api/staff/${id}/deactivate`, { method: "POST" }),
 

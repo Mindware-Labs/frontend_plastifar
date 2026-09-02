@@ -1,4 +1,13 @@
-import { ChevronDown, ChevronsUpDown, ChevronUp, Pencil, Plus, Trash2, UserX } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronsUpDown,
+  ChevronUp,
+  LogOut,
+  Pencil,
+  Plus,
+  Trash2,
+  UserX,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
@@ -10,6 +19,7 @@ import { Avatar } from "../../components/ui/Avatar";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
+import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/AuthContext";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
@@ -161,6 +171,26 @@ export function StaffPage() {
     }
   }
 
+  async function handleRevokeSessions(member: StaffResponse) {
+    if (
+      !confirm(
+        `¿Cerrar las sesiones abiertas de ${fullName(member)}? Tendrá que volver a iniciar sesión.`,
+      )
+    ) {
+      return;
+    }
+
+    setBusyId(member.id);
+    setError(null);
+    try {
+      await staffApi.revokeSessions(member.id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudieron cerrar las sesiones");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function handleDelete(member: StaffResponse) {
     if (
       !confirm(`¿Eliminar permanentemente a ${fullName(member)}? Esta acción no se puede deshacer.`)
@@ -207,26 +237,20 @@ export function StaffPage() {
 
       {/* Criterios: departamento y pastillas de estado */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <select
-            value={departmentId}
-            onChange={(event) =>
-              setDepartmentId(event.target.value === "todos" ? "todos" : Number(event.target.value))
-            }
-            aria-label="Filtrar por departamento"
-            className="h-8 appearance-none rounded-edge border border-line-strong bg-white pl-3 pr-8
-              text-[12.5px] font-medium text-brand-gray outline-none transition-colors
-              hover:border-zinc-400 focus:border-brand-red"
-          >
-            <option value="todos">Todos los departamentos</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2.5 top-2 h-4 w-4 text-faint" />
-        </div>
+        <Select
+          size="sm"
+          className="w-[220px]"
+          aria-label="Filtrar por departamento"
+          value={String(departmentId)}
+          onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+          options={[
+            { value: "todos", label: "Todos los departamentos" },
+            ...departments.map((department) => ({
+              value: String(department.id),
+              label: department.name,
+            })),
+          ]}
+        />
 
         <span className="mx-1 h-5 w-px bg-line" />
 
@@ -277,7 +301,7 @@ export function StaffPage() {
                         </button>
                       </th>
                     ))}
-                    <th className={`${headClass} w-28 text-right`}>Acciones</th>
+                    <th className={`${headClass} w-36 text-right`}>Acciones</th>
                   </tr>
                 </thead>
 
@@ -340,12 +364,20 @@ export function StaffPage() {
                               disabled={busyId === member.id}
                             />
                             {member.isActive && canManage(member) && (
-                              <RowAction
-                                label={`Desactivar a ${fullName(member)}`}
-                                icon={UserX}
-                                onClick={() => handleDeactivate(member)}
-                                disabled={busyId === member.id}
-                              />
+                              <>
+                                <RowAction
+                                  label={`Cerrar las sesiones de ${fullName(member)}`}
+                                  icon={LogOut}
+                                  onClick={() => handleRevokeSessions(member)}
+                                  disabled={busyId === member.id}
+                                />
+                                <RowAction
+                                  label={`Desactivar a ${fullName(member)}`}
+                                  icon={UserX}
+                                  onClick={() => handleDeactivate(member)}
+                                  disabled={busyId === member.id}
+                                />
+                              </>
                             )}
                             {canManage(member) && (
                               <RowAction

@@ -6,12 +6,16 @@ import { ApiError } from "../../api/client";
 import { rolesApi } from "../../api/roles";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
+import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import type { RoleResponse } from "../../types/api";
 
 const schema = z.object({
-  name: z.string().min(2, "Mínimo 2 caracteres"),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Al menos 2 caracteres")
+    .max(60, "Máximo 60 caracteres"),
   isActive: z.boolean(),
 });
 
@@ -31,11 +35,19 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    setError,
+    setFocus,
+    formState: { errors, touchedFields, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: "onTouched",
     defaultValues: { name: role?.name ?? "", isActive: role?.isActive ?? true },
   });
+
+  function stateOf(field: keyof FormValues): FieldState {
+    if (errors[field]) return "error";
+    return touchedFields[field] ? "valid" : "idle";
+  }
 
   async function onSubmit(values: FormValues) {
     setFormError(null);
@@ -53,47 +65,59 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
       }
       onClose();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError("name", { message: err.message });
+        setFocus("name");
+        return;
+      }
+
       const fallback = isEdit ? "No se pudo guardar el rol" : "No se pudo crear el rol";
       setFormError(err instanceof ApiError ? err.message : fallback);
     }
   }
 
   return (
-    <Modal title={isEdit ? "Editar rol" : "Nuevo rol"} onClose={onClose}>
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+    <Modal
+      eyebrow="Personal · Roles"
+      title={isEdit ? "Editar rol" : "Nuevo rol"}
+      description="Los roles agrupan permisos y se asignan al personal por departamento."
+      onClose={onClose}
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" form="role-form" isLoading={isSubmitting}>
+            {isEdit ? "Guardar cambios" : "Crear rol"}
+          </Button>
+        </>
+      }
+    >
+      <form id="role-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <Input
+        <TextField
           label="Nombre del rol"
           placeholder="Ej. Supervisor de Calidad"
+          required
+          state={stateOf("name")}
           error={errors.name?.message}
+          hint="Se ve en el listado y al asignar accesos: usa un nombre que se entienda solo."
           {...register("name")}
         />
 
         {isEdit && (
-          <label className="flex items-center gap-2 text-sm text-zinc-700">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-zinc-300 text-brand-red focus:ring-brand-red"
-              {...register("isActive")}
-            />
-            Activo (asignable a personal)
-          </label>
+          <CheckboxField
+            label="Activo"
+            description="Si se desmarca, el rol deja de poder asignarse a nuevo personal."
+            {...register("isActive")}
+          />
         )}
 
-        <div className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3.5 py-3 text-xs text-zinc-500">
+        <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
           Los permisos del rol se configuran en un paso posterior, cuando existan las entidades
           sobre las que aplican (tickets, departamentos, etc.).
-        </div>
-
-        <div className="mt-2 flex justify-end gap-3">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear rol"}
-          </Button>
-        </div>
+        </p>
       </form>
     </Modal>
   );

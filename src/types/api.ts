@@ -26,6 +26,13 @@ export interface ResetPasswordRequest {
   newPassword: string;
 }
 
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  /** Sesion actual: se conserva viva mientras las demas se cierran. */
+  refreshToken: string | null;
+}
+
 export interface StaffResponse {
   id: number;
   firstName: string;

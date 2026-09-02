@@ -14,6 +14,17 @@ function notify() {
   listeners.forEach((listener) => listener());
 }
 
+// Otra pestana puede rotar el refresh token o cerrar sesion. Sin escuchar el
+// evento "storage", esta pestana seguiria usando un token ya rotado y provocaria
+// una falsa alarma de reutilizacion en el servidor.
+window.addEventListener("storage", (event) => {
+  if (event.key !== REFRESH_KEY) return;
+
+  refreshToken = event.newValue;
+  if (!event.newValue) accessToken = null; // cerraron sesion en otra pestana
+  notify();
+});
+
 export const tokenStore = {
   getAccessToken: () => accessToken,
   getRefreshToken: () => refreshToken,

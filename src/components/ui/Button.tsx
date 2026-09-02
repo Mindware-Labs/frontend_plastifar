@@ -6,11 +6,12 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  primary: "bg-brand-red text-white hover:bg-brand-red-dark focus-visible:outline-brand-red",
+  primary:
+    "bg-brand-red text-white shadow-[0_10px_20px_-12px_rgba(228,0,43,0.55)] hover:brightness-105 active:translate-y-px",
   secondary:
-    "bg-white text-brand-gray border border-zinc-300 hover:bg-zinc-50 focus-visible:outline-brand-gray",
-  danger: "bg-white text-brand-red border border-brand-red hover:bg-red-50 focus-visible:outline-brand-red",
-  ghost: "bg-transparent text-brand-gray hover:bg-zinc-100 focus-visible:outline-brand-gray",
+    "border border-line-strong bg-white text-brand-gray hover:bg-canvas hover:text-ink",
+  danger: "border border-brand-red bg-white text-brand-red hover:bg-red-50",
+  ghost: "text-brand-gray hover:bg-fill hover:text-ink",
 };
 
 export function Button({
@@ -24,13 +25,16 @@ export function Button({
   return (
     <button
       disabled={disabled || isLoading}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold
-        transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
-        disabled:cursor-not-allowed disabled:opacity-60 ${variantClasses[variant]} ${className}`}
+      className={`inline-flex h-9 items-center justify-center gap-2 rounded-edge px-4
+        font-heading text-[11.5px] font-semibold uppercase tracking-[0.06em]
+        transition-[filter,background-color,color,transform] outline-none
+        focus-visible:ring-3 focus-visible:ring-brand-red/25
+        disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:brightness-100
+        ${variantClasses[variant]} ${className}`}
       {...props}
     >
       {isLoading && (
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
       )}
       {children}
     </button>

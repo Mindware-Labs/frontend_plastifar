@@ -1,7 +1,8 @@
-import { ChevronDown, LogOut, Search, User } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "../Logo";
 import { useAuth } from "../../context/AuthContext";
+import { ChangePasswordModal } from "./ChangePasswordModal";
 
 interface TopBarProps {
   search: string;
@@ -16,6 +17,7 @@ interface TopBarProps {
 export function TopBar({ search, onSearchChange }: TopBarProps) {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,11 +97,19 @@ export function TopBar({ search, onSearchChange }: TopBarProps) {
               <p className="truncate font-heading text-[12.5px] font-semibold text-ink">{local}</p>
               <p className="mt-0.5 truncate text-[11.5px] text-faint">{user?.email}</p>
             </div>
-            <span className="flex items-center gap-2.5 rounded-edge px-2.5 py-2 text-[13px] text-zinc-400">
-              <User className="h-4 w-4" />
-              Mi perfil
-              <span className="ml-auto text-[10px] uppercase tracking-wide">Pronto</span>
-            </span>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                setChangingPassword(true);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-2 text-left text-[13px]
+                text-brand-gray transition-colors hover:bg-fill hover:text-ink"
+            >
+              <KeyRound className="h-4 w-4" />
+              Cambiar contraseña
+            </button>
             <button
               type="button"
               role="menuitem"
@@ -113,6 +123,8 @@ export function TopBar({ search, onSearchChange }: TopBarProps) {
           </div>
         )}
       </div>
+
+      {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
     </header>
   );
 }
