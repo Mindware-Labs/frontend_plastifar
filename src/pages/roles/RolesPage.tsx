@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { rolesApi, type RoleQuery } from "../../api/roles";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { useAppSearch } from "../../components/app/useAppSearch";
 import { Alert } from "../../components/ui/Alert";
+import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
+import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/AuthContext";
 import type { RoleListResponse, RoleResponse } from "../../types/api";
@@ -27,13 +28,16 @@ const headClass =
 
 export function RolesPage() {
   const { user } = useAuth();
-  const search = useAppSearch();
 
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(
+    null,
+  );
   // null = cerrado, "nuevo" = alta, un RoleResponse = edicion de esa fila.
   const [modal, setModal] = useState<"nuevo" | RoleResponse | null>(null);
 
+  const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("todos");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -103,19 +107,31 @@ export function RolesPage() {
     return Boolean(user?.isAdmin) && !role.isSystem;
   }
 
-  async function handleDelete(role: RoleResponse) {
-    if (!confirm(`¿Eliminar el rol "${role.name}"?`)) return;
-
-    setBusyId(role.id);
-    setError(null);
-    try {
-      await rolesApi.remove(role.id);
-      refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo eliminar el rol");
-    } finally {
-      setBusyId(null);
-    }
+  function askDelete(role: RoleResponse) {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      eyebrow: "Personal · Roles",
+      title: "Eliminar rol",
+      description: (
+        <>
+          Se eliminará el rol <strong className="font-semibold text-ink">{role.name}</strong>. Esta
+          acción no se puede deshacer. Si ya está asignado a alguien, desactívalo en su lugar.
+        </>
+      ),
+      confirmLabel: "Eliminar",
+      // El error sube al diálogo, que lo muestra sin cerrarse.
+      onConfirm: async () => {
+        setBusyId(role.id);
+        setError(null);
+        try {
+          await rolesApi.remove(role.id);
+          refresh();
+        } finally {
+          setBusyId(null);
+        }
+      },
+    });
   }
 
   return (
@@ -144,6 +160,15 @@ export function RolesPage() {
       />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Buscar por nombre de rol…"
+          className="w-[240px]"
+        />
+
+        <span className="mx-1 h-5 w-px bg-line" />
+
         {filters.map(({ key, label, countKey }) => (
           <FilterChip
             key={key}
@@ -227,7 +252,7 @@ export function RolesPage() {
                             <RowAction
                               label={`Eliminar el rol ${role.name}`}
                               icon={Trash2}
-                              onClick={() => handleDelete(role)}
+                              onClick={() => askDelete(role)}
                               disabled={busyId === role.id}
                               danger
                             />
@@ -264,6 +289,10 @@ export function RolesPage() {
           </div>
         )}
       </div>
+
+      {confirmation && (
+        <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />
+      )}
 
       {modal !== null && (
         <RoleModal

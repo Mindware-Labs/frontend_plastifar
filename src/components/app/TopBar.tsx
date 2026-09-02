@@ -1,20 +1,15 @@
-import { ChevronDown, KeyRound, LogOut, Search } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "../Logo";
 import { useAuth } from "../../context/AuthContext";
 import { ChangePasswordModal } from "./ChangePasswordModal";
-
-interface TopBarProps {
-  search: string;
-  onSearchChange: (value: string) => void;
-}
 
 /**
  * Cabecera global (64 px) del panel interno, segun el lienzo
  * design/dashboard/Main.dc.html: logotipo, buscador global, y menu de la
  * persona conectada. Sin controles decorativos: todo lo que se ve, funciona.
  */
-export function TopBar({ search, onSearchChange }: TopBarProps) {
+export function TopBar() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
@@ -44,22 +39,6 @@ export function TopBar({ search, onSearchChange }: TopBarProps) {
   return (
     <header className="flex h-16 items-center gap-7 border-b border-line bg-white px-8">
       <Logo height={24} className="shrink-0" />
-
-      <label
-        className="flex h-[38px] max-w-[420px] flex-1 cursor-text items-center gap-2.5 rounded-edge
-          border border-transparent bg-canvas px-3.5 transition-colors
-          focus-within:border-brand-red/45 focus-within:bg-white focus-within:ring-3 focus-within:ring-brand-red/8"
-      >
-        <Search className="h-4 w-4 shrink-0 text-faint" />
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar por nombre o correo…"
-          aria-label="Buscar"
-          className="w-full bg-transparent text-[13.5px] text-ink outline-none placeholder:text-zinc-400"
-        />
-      </label>
 
       <div className="flex-1" />
 

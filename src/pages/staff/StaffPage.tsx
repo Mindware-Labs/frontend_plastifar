@@ -13,12 +13,13 @@ import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { useAppSearch } from "../../components/app/useAppSearch";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
+import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
+import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/AuthContext";
@@ -48,14 +49,18 @@ const headClass =
 
 export function StaffPage() {
   const { user } = useAuth();
-  const search = useAppSearch();
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  // Confirmacion propia del panel; null = ninguna pendiente.
+  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(
+    null,
+  );
   // null = cerrado, "nuevo" = alta, un StaffResponse = edicion de esa fila.
   const [modal, setModal] = useState<"nuevo" | StaffResponse | null>(null);
 
+  const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("todos");
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
@@ -73,7 +78,7 @@ export function StaffPage() {
       .catch(() => setDepartments([]));
   }, []);
 
-  // El buscador global escribe letra a letra: se espera a que pare para consultar.
+  // Se escribe letra a letra: se espera a que pare para consultar.
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -156,58 +161,70 @@ export function StaffPage() {
     return Boolean(user?.isAdmin) && member.id !== user?.staffId;
   }
 
-  async function handleDeactivate(member: StaffResponse) {
-    if (!confirm(`¿Desactivar a ${fullName(member)}?`)) return;
-
-    setBusyId(member.id);
+  /** El error sube al dialogo, que lo muestra sin cerrarse. */
+  async function runOnRow(id: number, action: () => Promise<void>) {
+    setBusyId(id);
     setError(null);
     try {
-      await staffApi.deactivate(member.id);
+      await action();
       refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo desactivar el usuario");
     } finally {
       setBusyId(null);
     }
   }
 
-  async function handleRevokeSessions(member: StaffResponse) {
-    if (
-      !confirm(
-        `¿Cerrar las sesiones abiertas de ${fullName(member)}? Tendrá que volver a iniciar sesión.`,
-      )
-    ) {
-      return;
-    }
-
-    setBusyId(member.id);
-    setError(null);
-    try {
-      await staffApi.revokeSessions(member.id);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudieron cerrar las sesiones");
-    } finally {
-      setBusyId(null);
-    }
+  function askDeactivate(member: StaffResponse) {
+    setConfirmation({
+      tone: "warn",
+      icon: UserX,
+      eyebrow: "Personal",
+      title: "Desactivar colaborador",
+      description: (
+        <>
+          <strong className="font-semibold text-ink">{fullName(member)}</strong> dejará de poder
+          iniciar sesión y sus sesiones abiertas se cerrarán. La cuenta y su historial se conservan,
+          y puedes reactivarla cuando quieras.
+        </>
+      ),
+      confirmLabel: "Desactivar",
+      onConfirm: () => runOnRow(member.id, () => staffApi.deactivate(member.id)),
+    });
   }
 
-  async function handleDelete(member: StaffResponse) {
-    if (
-      !confirm(`¿Eliminar permanentemente a ${fullName(member)}? Esta acción no se puede deshacer.`)
-    ) {
-      return;
-    }
+  function askRevokeSessions(member: StaffResponse) {
+    setConfirmation({
+      tone: "warn",
+      icon: LogOut,
+      eyebrow: "Personal",
+      title: "Cerrar sesiones",
+      description: (
+        <>
+          Se cerrarán todas las sesiones abiertas de{" "}
+          <strong className="font-semibold text-ink">{fullName(member)}</strong>, en cualquier
+          dispositivo. La cuenta sigue activa: podrá volver a entrar con su contraseña.
+        </>
+      ),
+      confirmLabel: "Cerrar sesiones",
+      onConfirm: () => runOnRow(member.id, () => staffApi.revokeSessions(member.id)),
+    });
+  }
 
-    setBusyId(member.id);
-    setError(null);
-    try {
-      await staffApi.remove(member.id);
-      refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo eliminar el usuario");
-    } finally {
-      setBusyId(null);
-    }
+  function askDelete(member: StaffResponse) {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      eyebrow: "Personal",
+      title: "Eliminar colaborador",
+      description: (
+        <>
+          Se eliminará permanentemente a{" "}
+          <strong className="font-semibold text-ink">{fullName(member)}</strong>. Esta acción no se
+          puede deshacer. Si ya tiene actividad registrada en el sistema, desactívalo en su lugar.
+        </>
+      ),
+      confirmLabel: "Eliminar",
+      onConfirm: () => runOnRow(member.id, () => staffApi.remove(member.id)),
+    });
   }
 
   return (
@@ -235,8 +252,15 @@ export function StaffPage() {
         }
       />
 
-      {/* Criterios: departamento y pastillas de estado */}
+      {/* Criterios: busqueda, departamento y pastillas de estado */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Buscar por nombre o correo…"
+          className="w-[240px]"
+        />
+
         <Select
           size="sm"
           className="w-[220px]"
@@ -368,13 +392,13 @@ export function StaffPage() {
                                 <RowAction
                                   label={`Cerrar las sesiones de ${fullName(member)}`}
                                   icon={LogOut}
-                                  onClick={() => handleRevokeSessions(member)}
+                                  onClick={() => askRevokeSessions(member)}
                                   disabled={busyId === member.id}
                                 />
                                 <RowAction
                                   label={`Desactivar a ${fullName(member)}`}
                                   icon={UserX}
-                                  onClick={() => handleDeactivate(member)}
+                                  onClick={() => askDeactivate(member)}
                                   disabled={busyId === member.id}
                                 />
                               </>
@@ -383,7 +407,7 @@ export function StaffPage() {
                               <RowAction
                                 label={`Eliminar a ${fullName(member)}`}
                                 icon={Trash2}
-                                onClick={() => handleDelete(member)}
+                                onClick={() => askDelete(member)}
                                 disabled={busyId === member.id}
                                 danger
                               />
@@ -421,6 +445,10 @@ export function StaffPage() {
           </div>
         )}
       </div>
+
+      {confirmation && (
+        <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />
+      )}
 
       {modal !== null && (
         <StaffModal
