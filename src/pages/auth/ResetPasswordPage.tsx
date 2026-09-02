@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, KeyRound, Lock, LockKeyhole, Mail } from "lucide-react";
+import { ArrowLeft, Lock, LockKeyhole, Mail } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
@@ -9,6 +9,7 @@ import { ApiError } from "../../api/client";
 import { AuthAlert } from "../../components/auth/AuthAlert";
 import { AuthButton } from "../../components/auth/AuthButton";
 import { AuthField, AuthPasswordField } from "../../components/auth/AuthField";
+import { OtpCodeInput } from "../../components/auth/OtpCodeInput";
 import { AuthLayout } from "../../layouts/AuthLayout";
 
 const codeSchema = z.object({
@@ -170,20 +171,23 @@ export function ResetPasswordPage() {
           />
         )}
 
-        <AuthField
-          label="Código de verificación"
-          placeholder="000000"
-          type="text"
-          inputMode="numeric"
-          maxLength={6}
-          autoComplete="one-time-code"
-          autoFocus
-          icon={<KeyRound className="h-[18px] w-[18px]" />}
-          className="font-heading font-semibold tracking-[0.42em] placeholder:font-normal"
-          style={{ fontSize: "19px" }}
-          error={codeForm.formState.errors.code?.message}
-          {...codeForm.register("code")}
-        />
+        <div>
+          <label className="mb-2 block text-[13px] font-semibold uppercase tracking-[0.08em] text-ink">
+            Código
+          </label>
+          <Controller
+            control={codeForm.control}
+            name="code"
+            render={({ field, fieldState }) => (
+              <OtpCodeInput
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                error={fieldState.error?.message}
+                autoFocus
+              />
+            )}
+          />
+        </div>
 
         <AuthButton type="submit" isLoading={codeForm.formState.isSubmitting} className="mt-1">
           {codeForm.formState.isSubmitting ? "Verificando…" : "Verificar código"}
