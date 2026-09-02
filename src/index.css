@@ -20,6 +20,7 @@
   /* Neutros de interfaz (no institucionales: soporte de pantalla) */
   --color-ink: #1b1b1d;
   --color-canvas: #f5f5f6;
+  --color-line: #e7e7ea;
 
   /* Radio unico de los controles: casi recto, coherente con el trazo
      industrial del logotipo. Un solo lugar donde ajustarlo. */

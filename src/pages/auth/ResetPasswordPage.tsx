@@ -160,6 +160,7 @@ export function ResetPasswordPage() {
         ) : (
           <AuthField
             label="Correo corporativo"
+            placeholder="nombre@plastifar.com"
             type="email"
             inputMode="email"
             autoComplete="username"
@@ -171,6 +172,7 @@ export function ResetPasswordPage() {
 
         <AuthField
           label="Código de verificación"
+          placeholder="000000"
           type="text"
           inputMode="numeric"
           maxLength={6}

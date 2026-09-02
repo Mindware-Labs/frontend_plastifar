@@ -1,61 +1,65 @@
 import type { ReactNode } from "react";
-import { BrandPanel } from "../components/auth/BrandPanel";
 import { Logo } from "../components/Logo";
 
-export function AuthLayout({
-  title,
-  subtitle,
-  children,
-}: {
+interface AuthLayoutProps {
   title: string;
   subtitle?: ReactNode;
+  /** Bloque bajo el formulario: separador, avisos, enlaces de vuelta. */
+  footer?: ReactNode;
   children: ReactNode;
-}) {
+}
+
+/**
+ * Estructura del area de autenticacion.
+ *
+ * Una sola columna centrada, sin panel lateral: el aro del isotipo, ampliado
+ * y al 10 % de opacidad, es lo que estructura el espacio. La marca aparece una
+ * sola vez y en su version reducida —el isotipo, autorizado por el manual para
+ * uso digital pequeno— porque aqui no compite con nada.
+ */
+export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen bg-canvas lg:grid lg:min-h-screen lg:grid-cols-[minmax(0,46%)_minmax(0,54%)] xl:grid-cols-[minmax(0,44%)_minmax(0,56%)]">
-      <BrandPanel />
+    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-canvas px-5 py-14 sm:px-6">
+      {/* Aros concentricos: eco geometrico del isotipo, no el isotipo */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-1/2 h-[980px] w-[980px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-brand-red/10" />
+        <div className="absolute left-1/2 top-1/2 h-[1360px] w-[1360px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-brand-green/10" />
+        <div className="absolute left-1/2 top-[-320px] h-[640px] w-[900px] -translate-x-1/2 rounded-full bg-brand-red/[0.09] blur-[110px]" />
+        <div className="absolute inset-x-0 bottom-0 h-80 bg-linear-to-t from-canvas to-transparent" />
+      </div>
 
-      <main className="relative flex min-h-screen flex-col px-6 py-9 sm:px-10 lg:px-12">
-        {/* Halo tenue del rojo institucional: da temperatura al blanco sin ensuciarlo */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(62%_46%_at_100%_0%,rgba(228,0,43,0.05),transparent_68%)]"
-        />
-
-        {/* Filete rojo/verde + marca: cabecera solo para pantallas sin panel lateral */}
-        <div className="relative lg:hidden">
-          <div className="mx-auto mb-7 flex h-1 w-20 overflow-hidden">
-            <div className="w-2/3 bg-brand-red" />
-            <div className="w-1/3 bg-brand-green" />
-          </div>
+      <main className="relative w-full max-w-[408px]">
+        <header className="animate-plf-rise text-center">
           <div className="flex justify-center">
-            <Logo height={30} />
+            <Logo variant="isotipo" height={62} />
           </div>
+
+          <h1 className="mt-[26px] text-balance font-heading text-[30px] font-bold leading-[1.12] tracking-[-0.03em] text-ink">
+            {title}
+          </h1>
+
+          {subtitle && (
+            <p className="mx-auto mt-2.5 max-w-[36ch] text-[14px] leading-relaxed text-zinc-500">
+              {subtitle}
+            </p>
+          )}
+        </header>
+
+        <div className="animate-plf-rise mt-[34px]" style={{ animationDelay: "90ms" }}>
+          {children}
         </div>
 
-        <div className="relative flex flex-1 items-center justify-center">
-          <div className="w-full max-w-[400px] py-12">
-            <header className="animate-plf-rise text-center">
-              <h1 className="font-heading text-[30px] font-bold leading-[1.15] tracking-[-0.025em] text-ink sm:text-[32px]">
-                {title}
-              </h1>
-              {subtitle && (
-                <p className="mx-auto mt-2.5 max-w-[34ch] text-[14.5px] leading-relaxed text-zinc-500">
-                  {subtitle}
-                </p>
-              )}
-            </header>
-
-            <div className="animate-plf-rise mt-9" style={{ animationDelay: "90ms" }}>
-              {children}
-            </div>
+        {footer && (
+          <div className="animate-plf-rise mt-[30px]" style={{ animationDelay: "150ms" }}>
+            {footer}
           </div>
-        </div>
-
-        <footer className="relative text-center text-[11.5px] tracking-wide text-zinc-400">
-          © {new Date().getFullYear()} Plastifar, S.A. · Todos los derechos reservados
-        </footer>
+        )}
       </main>
+
+      <p className="relative mt-14 text-center text-[11.5px] leading-relaxed tracking-[0.04em] text-zinc-400">
+        © {new Date().getFullYear()} Plastifar, S.A. · Autopista Duarte Km. 13½ · Santo Domingo,
+        República Dominicana
+      </p>
     </div>
   );
 }

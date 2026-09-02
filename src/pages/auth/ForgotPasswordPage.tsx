@@ -47,6 +47,7 @@ export function ForgotPasswordPage() {
 
         <AuthField
           label="Correo corporativo"
+          placeholder="nombre@plastifar.com"
           type="email"
           inputMode="email"
           autoComplete="username"

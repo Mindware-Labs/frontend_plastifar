@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Lock, Mail, ShieldCheck } from "lucide-react";
+import { Lock, Mail } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -43,12 +43,31 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout title="Iniciar sesión" subtitle="Accede al panel interno de Plastifar">
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
+    <AuthLayout
+      title="Iniciar sesión"
+      subtitle="Panel interno de Plastifar, S.A."
+      footer={
+        <>
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1 bg-line" />
+            <span className="font-heading text-[9.5px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
+              Acceso restringido
+            </span>
+            <span className="h-px flex-1 bg-line" />
+          </div>
+          <p className="mt-4 text-center text-[12.5px] leading-relaxed text-zinc-500">
+            ¿Aún no tienes acceso?{" "}
+            <span className="font-medium text-brand-gray">Solicítalo a tu administrador.</span>
+          </p>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3">
         {formError && <AuthAlert>{formError}</AuthAlert>}
 
         <AuthField
           label="Correo corporativo"
+          placeholder="Correo corporativo"
           type="email"
           inputMode="email"
           autoComplete="username"
@@ -58,44 +77,26 @@ export function LoginPage() {
           {...register("email")}
         />
 
-        <div>
-          <AuthPasswordField
-            label="Contraseña"
-            autoComplete="current-password"
-            icon={<Lock className="h-[18px] w-[18px]" />}
-            error={errors.password?.message}
-            {...register("password")}
-          />
-          <div className="mt-3 flex justify-end">
+        <AuthPasswordField
+          label="Contraseña"
+          autoComplete="current-password"
+          icon={<Lock className="h-[18px] w-[18px]" />}
+          error={errors.password?.message}
+          action={
             <Link
               to="/forgot-password"
-              className="rounded text-[13px] font-medium text-brand-red underline-offset-4 transition-colors hover:text-brand-red-dark hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+              className="ml-auto rounded text-[12.5px] font-medium text-zinc-500 underline-offset-4 transition-colors hover:text-brand-red hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
             >
               ¿Olvidaste tu contraseña?
             </Link>
-          </div>
-        </div>
+          }
+          {...register("password")}
+        />
 
-        <AuthButton type="submit" isLoading={isSubmitting} className="mt-1">
+        <AuthButton type="submit" isLoading={isSubmitting} className="mt-1.5">
           {isSubmitting ? "Verificando…" : "Entrar"}
         </AuthButton>
       </form>
-
-      <div className="mt-9 flex items-center gap-4">
-        <span className="h-px flex-1 bg-gradient-to-r from-transparent to-zinc-200" />
-        <span className="flex items-center gap-1.5 text-[11.5px] font-medium uppercase tracking-[0.14em] text-zinc-400">
-          <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
-          Acceso restringido
-        </span>
-        <span className="h-px flex-1 bg-gradient-to-l from-transparent to-zinc-200" />
-      </div>
-
-      <p className="mt-5 text-center text-[13px] leading-relaxed text-zinc-500">
-        Uso exclusivo del personal autorizado de Plastifar.
-        <br />
-        ¿Aún no tienes acceso?{" "}
-        <span className="font-medium text-brand-gray">Solicítalo a tu administrador.</span>
-      </p>
     </AuthLayout>
   );
 }
