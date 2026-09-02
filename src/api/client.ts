@@ -51,6 +51,16 @@ async function safeJson(response: Response): Promise<unknown> {
   }
 }
 
+/** Arma el query string omitiendo lo vacio, para no enviar filtros sin valor. */
+export function toQuery(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  }
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},

@@ -1,8 +1,22 @@
-import { apiRequest } from "./client";
-import type { CreateRoleRequest, RoleResponse, UpdateRoleRequest } from "../types/api";
+import { apiRequest, toQuery } from "./client";
+import type {
+  CreateRoleRequest,
+  RoleListResponse,
+  RoleResponse,
+  UpdateRoleRequest,
+} from "../types/api";
+
+export interface RoleQuery {
+  page: number;
+  pageSize: number;
+  search?: string;
+  /** todos | activos | sistema | personalizados */
+  status?: string;
+  dir?: "asc" | "desc";
+}
 
 export const rolesApi = {
-  list: () => apiRequest<RoleResponse[]>("/api/roles"),
+  list: (query: RoleQuery) => apiRequest<RoleListResponse>(`/api/roles${toQuery({ ...query })}`),
 
   create: (data: CreateRoleRequest) =>
     apiRequest<RoleResponse>("/api/roles", {
