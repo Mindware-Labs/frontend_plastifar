@@ -12,20 +12,87 @@
   /* Plastifar Brandbook 2026 — Pantone 185 C / 348 C / 369 C / Cool Gray 11 C */
   --color-brand-red: #e4002b;
   --color-brand-red-dark: #b8001f;
+  --color-brand-red-light: #f0234a;
   --color-brand-green: #007c39;
   --color-brand-bio: #63a70c;
   --color-brand-gray: #515151;
+
+  /* Neutros de interfaz (no institucionales: soporte de pantalla) */
+  --color-ink: #1b1b1d;
+  --color-canvas: #f5f5f6;
+
+  /* Radio unico de los controles: casi recto, coherente con el trazo
+     industrial del logotipo. Un solo lugar donde ajustarlo. */
+  --radius-edge: 2px;
 
   --font-heading: "Montserrat", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Poppins", ui-sans-serif, system-ui, sans-serif;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-body);
   color: var(--color-brand-gray);
-  background-color: #f4f4f5;
+  background-color: var(--color-canvas);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--color-brand-red) 18%, transparent);
+  color: var(--color-ink);
+}
+
+/* El autocompletado de Chrome pinta el input de amarillo y rompe la tarjeta:
+   se neutraliza con una sombra interior blanca y una transicion inalcanzable. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-ink);
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  caret-color: var(--color-ink);
+  transition: background-color 9999s ease-out 0s;
+}
+
+/* --- Movimiento --- */
+
+@keyframes plf-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -22px, 0) scale(1.035); }
+}
+
+@keyframes plf-drift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(18px, 14px, 0); }
+}
+
+@keyframes plf-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes plf-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-plf-float { animation: plf-float 16s ease-in-out infinite; }
+.animate-plf-drift { animation: plf-drift 20s ease-in-out infinite; }
+.animate-plf-rise { animation: plf-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-fade { animation: plf-fade 1.1s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-plf-float,
+  .animate-plf-drift,
+  .animate-plf-rise,
+  .animate-plf-fade {
+    animation: none !important;
+  }
 }

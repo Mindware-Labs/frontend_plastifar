@@ -1,14 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ArrowLeft, KeyRound, Lock, LockKeyhole, Mail } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
 import { ApiError } from "../../api/client";
-import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
-import { PasswordInput } from "../../components/ui/PasswordInput";
+import { AuthAlert } from "../../components/auth/AuthAlert";
+import { AuthButton } from "../../components/auth/AuthButton";
+import { AuthField, AuthPasswordField } from "../../components/auth/AuthField";
 import { AuthLayout } from "../../layouts/AuthLayout";
 
 const codeSchema = z.object({
@@ -33,6 +33,9 @@ const passwordSchema = z
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 type Step = "code" | "password" | "done";
+
+const backLinkClass =
+  "inline-flex items-center gap-1.5 rounded text-[13.5px] font-medium text-brand-gray transition-colors hover:text-brand-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red";
 
 export function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -78,12 +81,12 @@ export function ResetPasswordPage() {
   if (step === "done") {
     return (
       <AuthLayout title="Contraseña actualizada">
-        <Alert variant="success">
+        <AuthAlert variant="success">
           Tu contraseña se actualizó correctamente. Ya puedes iniciar sesión.
-        </Alert>
-        <Button className="mt-6 w-full" onClick={() => navigate("/login", { replace: true })}>
+        </AuthAlert>
+        <AuthButton className="mt-6" onClick={() => navigate("/login", { replace: true })}>
           Ir a iniciar sesión
-        </Button>
+        </AuthButton>
       </AuthLayout>
     );
   }
@@ -91,41 +94,51 @@ export function ResetPasswordPage() {
   if (step === "password") {
     return (
       <AuthLayout title="Nueva contraseña" subtitle={`Código verificado para ${verified?.email}`}>
-        <form onSubmit={passwordForm.handleSubmit(onSubmitPassword)} className="flex flex-col gap-4">
-          {formError && <Alert variant="error">{formError}</Alert>}
+        <form
+          onSubmit={passwordForm.handleSubmit(onSubmitPassword)}
+          noValidate
+          className="flex flex-col gap-5"
+        >
+          {formError && <AuthAlert>{formError}</AuthAlert>}
 
-          <PasswordInput
+          <AuthPasswordField
             label="Nueva contraseña"
             autoComplete="new-password"
+            autoFocus
+            icon={<Lock className="h-[18px] w-[18px]" />}
             error={passwordForm.formState.errors.newPassword?.message}
             {...passwordForm.register("newPassword")}
           />
-          <PasswordInput
+          <AuthPasswordField
             label="Confirmar contraseña"
             autoComplete="new-password"
+            icon={<LockKeyhole className="h-[18px] w-[18px]" />}
             error={passwordForm.formState.errors.confirmPassword?.message}
             {...passwordForm.register("confirmPassword")}
           />
 
-          <Button
+          <AuthButton
             type="submit"
             isLoading={passwordForm.formState.isSubmitting}
-            className="mt-2 w-full"
+            className="mt-1"
           >
-            Actualizar contraseña
-          </Button>
+            {passwordForm.formState.isSubmitting ? "Actualizando…" : "Actualizar contraseña"}
+          </AuthButton>
+        </form>
 
+        <div className="mt-8 flex justify-center">
           <button
             type="button"
             onClick={() => {
               setFormError(null);
               setStep("code");
             }}
-            className="text-center text-sm font-medium text-brand-gray hover:text-brand-red"
+            className={backLinkClass}
           >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
             Volver a ingresar el código
           </button>
-        </form>
+        </div>
       </AuthLayout>
     );
   }
@@ -135,45 +148,52 @@ export function ResetPasswordPage() {
       title="Restablecer contraseña"
       subtitle={
         prefillEmail
-          ? `Enviamos un código a ${prefillEmail}`
+          ? `Enviamos un código de 6 dígitos a ${prefillEmail}`
           : "Ingresa el código de 6 dígitos que recibiste por correo"
       }
     >
-      <form onSubmit={codeForm.handleSubmit(onSubmitCode)} className="flex flex-col gap-4">
-        {formError && <Alert variant="error">{formError}</Alert>}
+      <form onSubmit={codeForm.handleSubmit(onSubmitCode)} noValidate className="flex flex-col gap-5">
+        {formError && <AuthAlert>{formError}</AuthAlert>}
 
         {prefillEmail ? (
           <input type="hidden" {...codeForm.register("email")} />
         ) : (
-          <Input
-            label="Correo"
+          <AuthField
+            label="Correo corporativo"
             type="email"
+            inputMode="email"
             autoComplete="username"
+            icon={<Mail className="h-[18px] w-[18px]" />}
             error={codeForm.formState.errors.email?.message}
             {...codeForm.register("email")}
           />
         )}
-        <Input
-          label="Código de 6 dígitos"
+
+        <AuthField
+          label="Código de verificación"
           type="text"
           inputMode="numeric"
           maxLength={6}
           autoComplete="one-time-code"
+          autoFocus
+          icon={<KeyRound className="h-[18px] w-[18px]" />}
+          className="font-heading font-semibold tracking-[0.42em] placeholder:font-normal"
+          style={{ fontSize: "19px" }}
           error={codeForm.formState.errors.code?.message}
           {...codeForm.register("code")}
         />
 
-        <Button type="submit" isLoading={codeForm.formState.isSubmitting} className="mt-2 w-full">
-          Verificar código
-        </Button>
+        <AuthButton type="submit" isLoading={codeForm.formState.isSubmitting} className="mt-1">
+          {codeForm.formState.isSubmitting ? "Verificando…" : "Verificar código"}
+        </AuthButton>
+      </form>
 
-        <Link
-          to="/login"
-          className="text-center text-sm font-medium text-brand-gray hover:text-brand-red"
-        >
+      <div className="mt-8 flex justify-center">
+        <Link to="/login" className={backLinkClass}>
+          <ArrowLeft className="h-4 w-4" aria-hidden />
           Volver a iniciar sesión
         </Link>
-      </form>
+      </div>
     </AuthLayout>
   );
 }
