@@ -59,27 +59,29 @@ export function OtpCodeInput({
   return (
     <div>
       <div className="flex justify-center gap-2.5">
-        {digits.map((digit, index) => (
-          <input
-            key={index}
-            ref={(el) => {
-              inputsRef.current[index] = el;
-            }}
-            type="text"
-            inputMode="numeric"
-            maxLength={1}
-            autoFocus={autoFocus && index === 0}
-            value={digit}
-            onChange={(e) => handleChange(index, e.target.value)}
-            onKeyDown={(e) => handleKeyDown(index, e)}
-            onPaste={handlePaste}
-            className={`h-12 w-12 shrink-0 rounded-edge border bg-white text-center font-heading text-lg font-semibold text-ink caret-brand-red outline-none transition-[border-color,box-shadow] duration-200 ease-out ${
-              error
-                ? "border-brand-red shadow-[0_0_0_4px_rgba(228,0,43,0.09)]"
-                : "border-line hover:border-zinc-300 focus:border-brand-red focus:shadow-[0_0_0_4px_rgba(228,0,43,0.09)]"
-            }`}
-          />
-        ))}
+        {digits.map((digit, index) => {
+          const stateClass = error
+            ? "border-brand-red bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_rgba(228,0,43,0.08),0_6px_16px_-8px_rgba(228,0,43,0.35)]"
+            : `${digit ? "border-zinc-300" : "border-line"} hover:border-zinc-300 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_-1px_rgba(15,23,42,0.07)] focus:border-brand-red focus:bg-white focus:scale-[1.05] focus:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_rgba(228,0,43,0.08),0_6px_16px_-8px_rgba(228,0,43,0.35)]`;
+
+          return (
+            <input
+              key={index}
+              ref={(el) => {
+                inputsRef.current[index] = el;
+              }}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
+              autoFocus={autoFocus && index === 0}
+              value={digit}
+              onChange={(e) => handleChange(index, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(index, e)}
+              onPaste={handlePaste}
+              className={`h-12 w-12 shrink-0 rounded-edge border bg-gradient-to-b from-white to-zinc-50/70 text-center font-heading text-lg font-semibold tabular-nums text-ink caret-brand-red shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[border-color,box-shadow,background-color,transform] duration-200 ease-out ${stateClass}`}
+            />
+          );
+        })}
       </div>
       {error && <p className="mt-2 text-[13px] text-brand-red">{error}</p>}
     </div>

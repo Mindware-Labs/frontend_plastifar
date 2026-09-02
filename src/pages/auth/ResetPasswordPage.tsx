@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Lock, LockKeyhole, Mail } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -35,6 +35,8 @@ type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 type Step = "code" | "password" | "done";
 
+const RESEND_COOLDOWN_SECONDS = 120;
+
 const backLinkClass =
   "inline-flex items-center gap-1.5 rounded text-[13.5px] font-medium text-brand-gray transition-colors hover:text-brand-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red";
 
@@ -45,6 +47,9 @@ export function ResetPasswordPage() {
   const [formError, setFormError] = useState<string | null>(null);
   // Solo se llena tras una verificación exitosa del código: es lo que habilita el paso 2.
   const [verified, setVerified] = useState<{ email: string; code: string } | null>(null);
+  // Arranca en 2 minutos: ya se envió un código al llegar a esta pantalla desde ForgotPasswordPage.
+  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS);
+  const [isResending, setIsResending] = useState(false);
 
   const prefillEmail = (location.state as { email?: string } | null)?.email ?? "";
 
@@ -54,6 +59,31 @@ export function ResetPasswordPage() {
   });
 
   const passwordForm = useForm<PasswordFormValues>({ resolver: zodResolver(passwordSchema) });
+
+  useEffect(() => {
+    if (step !== "code" || resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [step, resendCooldown]);
+
+  async function handleResendCode() {
+    const email = codeForm.getValues("email");
+    if (!email) {
+      setFormError("Ingresa tu correo para reenviar el código");
+      return;
+    }
+
+    setFormError(null);
+    setIsResending(true);
+    try {
+      await authApi.forgotPassword({ email });
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "No se pudo reenviar el código");
+    } finally {
+      setIsResending(false);
+    }
+  }
 
   async function onSubmitCode(values: CodeFormValues) {
     setFormError(null);
@@ -191,6 +221,30 @@ export function ResetPasswordPage() {
               />
             )}
           />
+
+          <p className="mt-3 text-center text-[13px] text-zinc-500">
+            {resendCooldown > 0 ? (
+              <>
+                Reenviar código en{" "}
+                <span className="font-medium tabular-nums text-brand-gray">
+                  {String(Math.floor(resendCooldown / 60)).padStart(2, "0")}:
+                  {String(resendCooldown % 60).padStart(2, "0")}
+                </span>
+              </>
+            ) : (
+              <>
+                ¿No recibiste el código?{" "}
+                <button
+                  type="button"
+                  onClick={handleResendCode}
+                  disabled={isResending}
+                  className="rounded font-medium text-brand-red underline-offset-4 transition-colors hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isResending ? "Reenviando…" : "Reenviar código"}
+                </button>
+              </>
+            )}
+          </p>
         </div>
 
         <AuthButton type="submit" isLoading={codeForm.formState.isSubmitting} className="mt-1">

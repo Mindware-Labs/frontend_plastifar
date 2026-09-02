@@ -18,15 +18,16 @@ import {
  */
 
 const shellBase =
-  "group relative flex h-14 cursor-text items-center gap-[13px] rounded-edge border bg-white transition-[border-color,box-shadow] duration-200 ease-out";
+  "group relative flex h-12 cursor-text items-center gap-[11px] rounded-edge border bg-gradient-to-b from-white to-zinc-50/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow,background-color] duration-200 ease-out";
 
 const shellIdle =
-  "border-line hover:border-zinc-300 focus-within:border-brand-red focus-within:shadow-[0_0_0_4px_rgba(228,0,43,0.09)]";
+  "border-line hover:border-zinc-300 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_-1px_rgba(15,23,42,0.07)] focus-within:border-brand-red focus-within:bg-white focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_rgba(228,0,43,0.08),0_6px_16px_-8px_rgba(228,0,43,0.35)]";
 
-const shellError = "border-brand-red shadow-[0_0_0_4px_rgba(228,0,43,0.09)]";
+const shellError =
+  "border-brand-red bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_rgba(228,0,43,0.08),0_6px_16px_-8px_rgba(228,0,43,0.35)]";
 
 const inputBase =
-  "h-full w-full min-w-0 bg-transparent p-0 text-[15px] font-normal text-ink caret-brand-red outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-zinc-400";
+  "h-full w-full min-w-0 bg-transparent p-0 text-[15px] font-medium tracking-[-0.01em] text-ink caret-brand-red outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-zinc-400";
 
 interface FieldFrameProps {
   inputId: string;
@@ -59,8 +60,10 @@ function FieldFrame({
         className={`${shellBase} ${padded} ${error ? shellError : shellIdle}`}
       >
         <span
-          className={`shrink-0 transition-colors duration-200 ${
-            error ? "text-brand-red" : "text-zinc-400 group-focus-within:text-brand-red"
+          className={`shrink-0 transition-[color,transform] duration-200 ${
+            error
+              ? "text-brand-red"
+              : "text-zinc-400 group-focus-within:scale-[1.08] group-focus-within:text-brand-red"
           }`}
         >
           {icon}
@@ -110,7 +113,7 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(function A
   const inputId = id ?? props.name ?? fallbackId;
 
   return (
-    <FieldFrame inputId={inputId} error={error} action={action} icon={icon} padded="px-[18px]">
+    <FieldFrame inputId={inputId} error={error} action={action} icon={icon} padded="px-4">
       <input
         ref={ref}
         id={inputId}
@@ -155,14 +158,14 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
         hint={capsLock ? "Bloq Mayús está activado" : undefined}
         action={action}
         icon={icon}
-        padded="pl-[18px] pr-[11px]"
+        padded="pl-4 pr-2.5"
         trailing={
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
             tabIndex={-1}
             aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
-            className="flex h-[34px] w-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition-colors duration-150 hover:bg-zinc-100 hover:text-ink"
+            className="flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition-all duration-150 hover:bg-zinc-100 hover:text-ink active:scale-90"
           >
             {visible ? (
               <EyeOff className="h-[17px] w-[17px]" />
