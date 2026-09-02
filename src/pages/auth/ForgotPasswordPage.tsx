@@ -6,9 +6,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
 import { ApiError } from "../../api/client";
-import { AuthAlert } from "../../components/auth/AuthAlert";
 import { AuthButton } from "../../components/auth/AuthButton";
 import { AuthField } from "../../components/auth/AuthField";
+import { AuthToast } from "../../components/auth/AuthToast";
 import { AuthLayout } from "../../layouts/AuthLayout";
 
 const schema = z.object({
@@ -42,9 +42,9 @@ export function ForgotPasswordPage() {
       title="Recuperar contraseña"
       subtitle="Te enviaremos un código de 6 dígitos al correo asociado a tu cuenta"
     >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
-        {formError && <AuthAlert>{formError}</AuthAlert>}
+      <AuthToast message={formError} onDismiss={() => setFormError(null)} />
 
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
         <AuthField
           label="Correo corporativo"
           placeholder="nombre@plastifar.com"

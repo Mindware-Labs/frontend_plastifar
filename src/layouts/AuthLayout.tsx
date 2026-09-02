@@ -60,6 +60,19 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
         © {new Date().getFullYear()} Plastifar, S.A. · Autopista Duarte Km. 13½ · Santo Domingo,
         República Dominicana
       </p>
+
+      <p className="relative mt-2 flex items-center justify-center gap-1.5 text-[11px] tracking-[0.02em] text-zinc-400">
+        Desarrollado por
+        <img
+          src="/brand/centerquest-icon.png"
+          alt="Center Quest"
+          width={14}
+          height={14}
+          draggable={false}
+          className="select-none opacity-80"
+        />
+        <span className="font-medium text-zinc-500">Center Quest</span>
+      </p>
     </div>
   );
 }

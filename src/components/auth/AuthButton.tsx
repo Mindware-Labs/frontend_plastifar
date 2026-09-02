@@ -26,10 +26,10 @@ export function AuthButton({
       className={`flex h-14 w-full cursor-pointer items-center justify-center gap-2.5
         rounded-edge bg-brand-red font-heading text-[12.5px] font-semibold uppercase
         tracking-[0.16em] text-white
-        shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_14px_30px_-14px_rgba(228,0,43,0.6)]
+        shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_14px_30px_-14px_color-mix(in_srgb,var(--color-brand-red)_60%,transparent)]
         transition-[transform,box-shadow,filter,opacity] duration-200 ease-out
         hover:-translate-y-px hover:brightness-105
-        hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_36px_-14px_rgba(228,0,43,0.7)]
+        hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_36px_-14px_color-mix(in_srgb,var(--color-brand-red)_70%,transparent)]
         active:translate-y-px active:brightness-[0.97]
         focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red
         disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none

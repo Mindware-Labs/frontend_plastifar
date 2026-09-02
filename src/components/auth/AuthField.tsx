@@ -21,10 +21,10 @@ const shellBase =
   "group relative flex h-12 cursor-text items-center gap-[11px] rounded-edge border bg-gradient-to-b from-white to-zinc-50/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow,background-color] duration-200 ease-out";
 
 const shellIdle =
-  "border-line hover:border-zinc-300 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_-1px_rgba(15,23,42,0.07)] focus-within:border-brand-red focus-within:bg-white focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_rgba(228,0,43,0.08),0_6px_16px_-8px_rgba(228,0,43,0.35)]";
+  "border-line hover:border-zinc-300 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_-1px_rgba(15,23,42,0.07)] focus-within:border-brand-red focus-within:bg-white focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]";
 
 const shellError =
-  "border-brand-red bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_rgba(228,0,43,0.08),0_6px_16px_-8px_rgba(228,0,43,0.35)]";
+  "border-brand-red bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]";
 
 const inputBase =
   "h-full w-full min-w-0 bg-transparent p-0 text-[15px] font-medium tracking-[-0.01em] text-ink caret-brand-red outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-zinc-400";

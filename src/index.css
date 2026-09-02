@@ -84,16 +84,30 @@ input:-webkit-autofill:focus {
   to { opacity: 1; }
 }
 
+@keyframes plf-toast-in {
+  from { opacity: 0; transform: translateY(-14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes plf-toast-progress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
 .animate-plf-float { animation: plf-float 16s ease-in-out infinite; }
 .animate-plf-drift { animation: plf-drift 20s ease-in-out infinite; }
 .animate-plf-rise { animation: plf-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-fade { animation: plf-fade 1.1s ease-out both; }
+.animate-plf-toast-in { animation: plf-toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-plf-float,
   .animate-plf-drift,
   .animate-plf-rise,
-  .animate-plf-fade {
+  .animate-plf-fade,
+  .animate-plf-toast-in,
+  .animate-plf-toast-progress {
     animation: none !important;
   }
 }

@@ -9,6 +9,7 @@ import { ApiError } from "../../api/client";
 import { AuthAlert } from "../../components/auth/AuthAlert";
 import { AuthButton } from "../../components/auth/AuthButton";
 import { AuthField, AuthPasswordField } from "../../components/auth/AuthField";
+import { AuthToast } from "../../components/auth/AuthToast";
 import { OtpCodeInput } from "../../components/auth/OtpCodeInput";
 import { AuthLayout } from "../../layouts/AuthLayout";
 
@@ -34,6 +35,7 @@ const passwordSchema = z
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 type Step = "code" | "password" | "done";
+type ToastState = { message: string; variant: "error" | "success" };
 
 const RESEND_COOLDOWN_SECONDS = 120;
 
@@ -44,7 +46,7 @@ export function ResetPasswordPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [step, setStep] = useState<Step>("code");
-  const [formError, setFormError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   // Solo se llena tras una verificación exitosa del código: es lo que habilita el paso 2.
   const [verified, setVerified] = useState<{ email: string; code: string } | null>(null);
   // Arranca en 2 minutos: ya se envió un código al llegar a esta pantalla desde ForgotPasswordPage.
@@ -69,43 +71,53 @@ export function ResetPasswordPage() {
   async function handleResendCode() {
     const email = codeForm.getValues("email");
     if (!email) {
-      setFormError("Ingresa tu correo para reenviar el código");
+      setToast({ message: "Ingresa tu correo para reenviar el código", variant: "error" });
       return;
     }
 
-    setFormError(null);
+    setToast(null);
     setIsResending(true);
     try {
       await authApi.forgotPassword({ email });
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      setToast({ message: `Reenviamos el código a ${email}`, variant: "success" });
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "No se pudo reenviar el código");
+      setToast({
+        message: err instanceof ApiError ? err.message : "No se pudo reenviar el código",
+        variant: "error",
+      });
     } finally {
       setIsResending(false);
     }
   }
 
   async function onSubmitCode(values: CodeFormValues) {
-    setFormError(null);
+    setToast(null);
     try {
       await authApi.verifyResetCode(values);
       setVerified(values);
       setStep("password");
     } catch (err) {
       // Código incorrecto o expirado: no avanza, se queda en este paso con el error visible.
-      setFormError(err instanceof ApiError ? err.message : "Código inválido o expirado");
+      setToast({
+        message: err instanceof ApiError ? err.message : "Código inválido o expirado",
+        variant: "error",
+      });
     }
   }
 
   async function onSubmitPassword(values: PasswordFormValues) {
     if (!verified) return;
 
-    setFormError(null);
+    setToast(null);
     try {
       await authApi.resetPassword({ ...verified, newPassword: values.newPassword });
       setStep("done");
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "No se pudo actualizar la contraseña");
+      setToast({
+        message: err instanceof ApiError ? err.message : "No se pudo actualizar la contraseña",
+        variant: "error",
+      });
     }
   }
 
@@ -125,13 +137,17 @@ export function ResetPasswordPage() {
   if (step === "password") {
     return (
       <AuthLayout title="Nueva contraseña" subtitle={`Código verificado para ${verified?.email}`}>
+        <AuthToast
+          message={toast?.message ?? null}
+          variant={toast?.variant}
+          onDismiss={() => setToast(null)}
+        />
+
         <form
           onSubmit={passwordForm.handleSubmit(onSubmitPassword)}
           noValidate
           className="flex flex-col gap-5"
         >
-          {formError && <AuthAlert>{formError}</AuthAlert>}
-
           <AuthPasswordField
             label="Nueva contraseña"
             autoComplete="new-password"
@@ -161,7 +177,7 @@ export function ResetPasswordPage() {
           <button
             type="button"
             onClick={() => {
-              setFormError(null);
+              setToast(null);
               setStep("code");
             }}
             className={backLinkClass}
@@ -183,13 +199,17 @@ export function ResetPasswordPage() {
           : "Ingresa el código de 6 dígitos que recibiste por correo"
       }
     >
+      <AuthToast
+        message={toast?.message ?? null}
+        variant={toast?.variant}
+        onDismiss={() => setToast(null)}
+      />
+
       <form
         onSubmit={codeForm.handleSubmit(onSubmitCode)}
         noValidate
         className="-mt-3.5 flex flex-col gap-5"
       >
-        {formError && <AuthAlert>{formError}</AuthAlert>}
-
         {prefillEmail ? (
           <input type="hidden" {...codeForm.register("email")} />
         ) : (

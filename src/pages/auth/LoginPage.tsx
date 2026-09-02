@@ -5,9 +5,9 @@ import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
-import { AuthAlert } from "../../components/auth/AuthAlert";
 import { AuthButton } from "../../components/auth/AuthButton";
 import { AuthField, AuthPasswordField } from "../../components/auth/AuthField";
+import { AuthToast } from "../../components/auth/AuthToast";
 import { useAuth } from "../../context/AuthContext";
 import { AuthLayout } from "../../layouts/AuthLayout";
 
@@ -62,9 +62,9 @@ export function LoginPage() {
         </>
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3">
-        {formError && <AuthAlert>{formError}</AuthAlert>}
+      <AuthToast message={formError} onDismiss={() => setFormError(null)} />
 
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3">
         <AuthField
           label="Correo corporativo"
           placeholder="Correo corporativo"
