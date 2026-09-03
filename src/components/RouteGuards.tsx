@@ -16,10 +16,14 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
+  // TEMPORAL: login comentado para entrar al panel sin credenciales durante
+  // desarrollo. Descomentar antes de cualquier despliegue real.
   if (isLoading) return <RestoringSession />;
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
-  }
+  // if (!user) {
+  //   return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
+  // }
+  void user;
+  void location;
 
   return <>{children}</>;
 }

@@ -190,11 +190,11 @@ components:
 
 **Creative North Star: "The Working Table"**
 
-This is a tool for people who sit in it for a full shift, and the interface behaves like a well-ruled ledger rather than a dashboard. Everything structural is a hairline: a 1 px rule under the top bar, under the module bar, under the section tabs, under each table row. There are no cards, no panels-within-panels, no tinted containers to signal "this is a section". White is the working surface, `#f5f5f6` is the resting surface, and the difference between them is the only tonal move the system makes.
+This is a tool for people who sit in it for a full shift, and the interface behaves like a well-ruled ledger rather than a dashboard. Everything structural is a hairline: a 1 px rule under the top bar, to the right of the sidebar, under the section tabs, under each table row. There are no cards, no panels-within-panels, no tinted containers to signal "this is a section". White is the working surface, `#f5f5f6` is the resting surface, and the difference between them is the only tonal move the system makes.
 
 Colour is used as a signal and nothing else. Pantone 185 C red appears on the primary action, on the active navigation state, on focus, and on the granted cell of the permission matrix — nowhere as decoration. Green 348 C means healthy or valid. Amber means intermediate, pending, or changed-but-unsaved. Everything else is grey, and the grey scale is fine-grained enough (five neutrals for text and three for rules) that hierarchy comes from weight and value rather than from boxes.
 
-Density is deliberate and consistent. Table rows land at 32–40 px, form controls at 40 px, criteria-bar controls at 32 px, module tabs at 47 px, the top bar at 64 px. Two developers build separate modules against this system, and the end user must not be able to tell where one module ends and the next begins; the measurements above are what makes that true.
+Density is deliberate and consistent. Table rows land at 32–40 px, form controls at 40 px, criteria-bar controls at 32 px, sidebar module rows at 40 px, the top bar and the sidebar header at 64 px. Two developers build separate modules against this system, and the end user must not be able to tell where one module ends and the next begins; the measurements above are what makes that true.
 
 **Key Characteristics:**
 - Hairline structure, no cards — the table is the page.
@@ -261,7 +261,7 @@ A near-monochrome working surface with one institutional red used as a signal, a
 
 ## Layout
 
-The application frame is fixed and shared: a 64 px top bar (white, hairline bottom, logo left, account menu right), a 47 px module bar below it (white, hairline bottom, tabs with a 2 px red underline when active), then the page at `32px` horizontal padding, `16px` top and `48px` bottom.
+The application frame is fixed and shared: a sidebar on the left (white, hairline right edge) holding the logo and the four modules as a vertical list, and on the right a 64 px top bar (white, hairline bottom, holding only the account menu — the mobile menu trigger below `lg`) above the page at `32px` horizontal padding, `16px` top and `48px` bottom. The sidebar is 220 px expanded, collapses to 64 px icon-only on its own toggle, and below `lg` it leaves the flow entirely and reappears as an overlay panel — same scrim and dialog shadow as `Modal` — triggered by the top bar's menu button.
 
 Inside the page, every listing screen follows the same vertical order and nothing is inserted between the steps:
 
@@ -331,7 +331,7 @@ Borders are always 1 px and always from the three-step rule scale. Interactive c
 - **Checkbox:** the entire bordered row is the hit area; when checked, the row takes a red hairline at 35 % and a 3 %-alpha red wash.
 
 ### Navigation
-- **Module bar (47 px):** white, hairline bottom, 15 px Lucide icon plus 13.5px label. Active is `ink`, semibold, with a 2 px red bottom border; inactive is `muted` medium and darkens to `ink` on hover.
+- **Sidebar (220 px / 64 px collapsed):** white, hairline right edge. Header row at 64 px holds the logo (the isotipo alone when collapsed) and a collapse toggle. Each module row is 40 px, 17 px Lucide icon plus 13.5px label, a 2 px left border. Active is `ink`, semibold, red left border and a 4 %-alpha red wash; inactive is `muted` medium and darkens to `ink` with a `fill` wash on hover. Collapsed rows keep only the icon, centred, with the label as a native tooltip.
 - **Section tabs:** the same active language at 13px on the header's hairline, sharing that rule with the module's primary action.
 - **Back link:** a small `muted` chevron-plus-label above the title, present only on detail screens.
 

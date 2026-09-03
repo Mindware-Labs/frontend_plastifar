@@ -1,15 +1,19 @@
-import { ChevronDown, KeyRound, LogOut } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut, Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Logo } from "../Logo";
 import { useAuth } from "../../context/useAuth";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 
+interface TopBarProps {
+  /** Abre el panel de modulos superpuesto; solo existe por debajo de lg. */
+  onOpenMenu: () => void;
+}
+
 /**
- * Cabecera global (64 px) del panel interno, segun el lienzo
- * design/dashboard/Main.dc.html: logotipo, buscador global, y menu de la
- * persona conectada. Sin controles decorativos: todo lo que se ve, funciona.
+ * Cabecera global (64 px) del panel interno: en escritorio, solo el menu de
+ * la persona conectada — el logotipo y la navegacion de modulos viven en el
+ * Sidebar. Por debajo de lg aparece el disparador del panel superpuesto.
  */
-export function TopBar() {
+export function TopBar({ onOpenMenu }: TopBarProps) {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
@@ -37,8 +41,17 @@ export function TopBar() {
   const initials = local.slice(0, 2).toUpperCase() || "PF";
 
   return (
-    <header className="flex h-16 items-center gap-7 border-b border-line bg-white px-8">
-      <Logo height={24} className="shrink-0" />
+    <header className="flex h-16 items-center gap-4 border-b border-line bg-white px-4 sm:px-8">
+      <button
+        type="button"
+        onClick={onOpenMenu}
+        aria-label="Abrir menú de módulos"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-edge text-muted
+          outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3
+          focus-visible:ring-brand-red/25 lg:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
 
       <div className="flex-1" />
 
@@ -48,7 +61,8 @@ export function TopBar() {
           onClick={() => setMenuOpen((open) => !open)}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          className={`flex items-center gap-2.5 rounded-edge py-1 pl-1 pr-1.5 transition-colors
+          className={`flex items-center gap-2.5 rounded-edge py-1 pl-1 pr-1.5 outline-none
+            transition-colors focus-visible:ring-3 focus-visible:ring-brand-red/25
             ${menuOpen ? "bg-fill" : "hover:bg-fill"}`}
         >
           <span
@@ -84,7 +98,8 @@ export function TopBar() {
                 setChangingPassword(true);
               }}
               className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-2 text-left text-[13px]
-                text-brand-gray transition-colors hover:bg-fill hover:text-ink"
+                text-brand-gray outline-none transition-colors hover:bg-fill hover:text-ink
+                focus-visible:bg-fill focus-visible:text-ink"
             >
               <KeyRound className="h-4 w-4" />
               Cambiar contraseña
@@ -94,7 +109,8 @@ export function TopBar() {
               role="menuitem"
               onClick={() => logout()}
               className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-2 text-left text-[13px]
-                font-medium text-brand-red-dark transition-colors hover:bg-red-50"
+                font-medium text-brand-red-dark outline-none transition-colors hover:bg-red-50
+                focus-visible:bg-red-50"
             >
               <LogOut className="h-4 w-4" />
               Cerrar sesión
