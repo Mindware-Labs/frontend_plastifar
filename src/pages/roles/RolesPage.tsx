@@ -13,7 +13,7 @@ import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
-import { useAuth } from "../../context/useAuth";
+import { usePermissions } from "../../hooks/usePermissions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import type { RoleListResponse, RoleResponse } from "../../types/api";
@@ -29,8 +29,8 @@ const filters: { key: FilterKey; label: string; countKey: keyof RoleListResponse
 ];
 
 export function RolesPage() {
-  const { user } = useAuth();
-  const isAdmin = Boolean(user?.isAdmin);
+  const { can } = usePermissions();
+  const canWrite = can("roles.write");
 
   const [busyId, setBusyId] = useState<number | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(
@@ -56,7 +56,7 @@ export function RolesPage() {
 
   /** Los roles del sistema no se tocan: sostienen los permisos base. */
   function canManage(role: RoleResponse) {
-    return isAdmin && !role.isSystem;
+    return canWrite && !role.isSystem;
   }
 
   function askDelete(role: RoleResponse) {
@@ -94,7 +94,7 @@ export function RolesPage() {
             : "Cargando los roles del sistema…"
         }
         action={
-          isAdmin && (
+          canWrite && (
             <Button size="sm" onClick={() => setModal("nuevo")}>
               <Plus className="h-[15px] w-[15px]" />
               Nuevo rol
@@ -142,7 +142,7 @@ export function RolesPage() {
                 <Th>Nombre</Th>
                 <Th>Tipo</Th>
                 <Th>Estado</Th>
-                {isAdmin && <Th className="w-24 text-right">Acciones</Th>}
+                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
               </HeadRow>
             </thead>
             <tbody>
@@ -159,7 +159,7 @@ export function RolesPage() {
                   <Td>
                     <StatusDot active={role.isActive} />
                   </Td>
-                  {isAdmin && (
+                  {canWrite && (
                     <Td>
                       {canManage(role) && (
                         <div className="flex items-center justify-end gap-1">

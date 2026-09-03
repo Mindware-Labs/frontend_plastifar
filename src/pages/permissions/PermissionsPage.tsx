@@ -9,6 +9,7 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePermissions } from "../../hooks/usePermissions";
 import { flattenPermissions, permissionsMock } from "../../mocks/permissions";
 import type { PermissionKey, PermissionMatrixResponse } from "../../types/permissions";
 import { PermissionMatrix } from "./PermissionMatrix";
@@ -39,6 +40,11 @@ export function PermissionsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
+
+  // Sin roles.write la matriz sigue siendo util para consultar la politica: se
+  // muestra entera, pero las celdas no se tocan y no hay nada que guardar.
+  const { can } = usePermissions();
+  const canWrite = can("roles.write");
 
   useEffect(() => {
     permissionsMock
@@ -200,7 +206,7 @@ export function PermissionsPage() {
           )
         }
         action={
-          dirtyCells > 0 && (
+          canWrite && dirtyCells > 0 && (
             <div className="flex items-center gap-2">
               <Button size="sm" variant="ghost" onClick={discard} disabled={isSaving}>
                 Descartar
@@ -279,6 +285,15 @@ export function PermissionsPage() {
         </div>
       )}
 
+      {matrix !== null && !canWrite && (
+        <div className="mb-3">
+          <Alert variant="info">
+            Estás viendo la política en modo consulta. Para cambiar los permisos de un rol necesitas
+            el permiso <span className="font-mono text-[11px]">roles.write</span>.
+          </Alert>
+        </div>
+      )}
+
       {matrix === null ? (
         <div className="flex justify-center py-16">
           <Spinner />
@@ -294,6 +309,7 @@ export function PermissionsPage() {
           grants={grants}
           original={original}
           onToggle={toggle}
+          readOnly={!canWrite}
         />
       )}
 

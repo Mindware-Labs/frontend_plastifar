@@ -1,9 +1,12 @@
 import { createContext, useContext } from "react";
+import type { DepartmentAccessClaim } from "../lib/permissions";
 
 export interface AuthUser {
   staffId: number;
   email: string;
   isAdmin: boolean;
+  /** Accesos por departamento con sus permisos, leidos del token. */
+  departmentAccess: DepartmentAccessClaim[];
 }
 
 export interface AuthContextValue {

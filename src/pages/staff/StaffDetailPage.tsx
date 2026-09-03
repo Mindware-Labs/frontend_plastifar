@@ -11,6 +11,7 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { RowAction } from "../../components/ui/RowAction";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { usePermissions } from "../../hooks/usePermissions";
 import { permissionsMock, resolveEffectivePermissions } from "../../mocks/permissions";
 import type {
   DepartmentAccess,
@@ -36,6 +37,8 @@ function formatDate(value: string | null) {
 
 export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const { id } = useParams();
+  const { can } = usePermissions();
+  const canWrite = can("staff.write");
 
   const [staff, setStaff] = useState<StaffDetail | null>(null);
   const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
@@ -172,7 +175,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
           </span>
         }
         action={
-          section === "accesos" && (
+          section === "accesos" && canWrite && (
             <Button size="sm" onClick={() => setModal("nuevo")}>
               <Plus className="h-[15px] w-[15px]" />
               Otorgar acceso
@@ -180,6 +183,18 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
           )
         }
       />
+
+      {/* RF-P7: la instalación no puede quedarse sin ningún administrador
+          activo. Se avisa donde se toma la decisión, no solo con un 409 después. */}
+      {staff.isLastAdmin && (
+        <div className="mb-3">
+          <Alert variant="info">
+            Es el único administrador activo del sistema. Hasta que exista otro, no se le puede
+            quitar el perfil de administrador ni desactivar: quedarían todos fuera de la
+            administración del panel.
+          </Alert>
+        </div>
+      )}
 
       {section === "datos" ? (
         <DataTable>
@@ -253,6 +268,8 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                         <Star aria-hidden className="h-3.5 w-3.5 fill-brand-red text-brand-red" />
                         Principal
                       </span>
+                    ) : !canWrite ? (
+                      <span className="text-[12.5px] text-faint">—</span>
                     ) : (
                       <button
                         type="button"
@@ -268,6 +285,9 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                   <Td className="text-[12.5px] text-brand-gray">{formatDate(access.grantedAt)}</Td>
                   <Td>
                     <div className="flex items-center justify-end gap-1">
+                      {!canWrite && <span className="text-[12px] text-faint">—</span>}
+                      {canWrite && (
+                      <>
                       <RowAction
                         label={`Cambiar el rol en ${access.departmentName}`}
                         icon={Pencil}
@@ -284,6 +304,8 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                         disabled={access.isPrimary}
                         danger
                       />
+                      </>
+                      )}
                     </div>
                   </Td>
                 </Row>

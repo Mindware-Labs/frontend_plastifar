@@ -3,6 +3,7 @@ import { authApi } from "../api/auth";
 import { refreshSession } from "../api/client";
 import { tokenStore } from "../api/tokenStore";
 import { decodeAccessToken } from "../lib/jwt";
+import { parseDepartmentAccess } from "../lib/permissions";
 import { AuthContext, type AuthUser } from "./useAuth";
 
 function userFromToken(accessToken: string | null): AuthUser | null {
@@ -14,6 +15,7 @@ function userFromToken(accessToken: string | null): AuthUser | null {
     staffId: Number(claims.sub),
     email: claims.email,
     isAdmin: claims.is_admin === "true",
+    departmentAccess: parseDepartmentAccess(claims.dept_access),
   };
 }
 

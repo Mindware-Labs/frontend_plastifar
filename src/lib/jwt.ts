@@ -6,6 +6,12 @@ interface AccessTokenClaims {
   sub: string;
   email: string;
   is_admin: "true" | "false";
+  /**
+   * Accesos por departamento con los permisos de cada rol, serializados como
+   * texto JSON por TokenService. El token los trae para no consultar la base en
+   * cada comprobacion; se interpretan con parseDepartmentAccess.
+   */
+  dept_access?: string;
   exp: number;
 }
 

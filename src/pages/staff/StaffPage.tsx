@@ -18,6 +18,7 @@ import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
+import { usePermissions } from "../../hooks/usePermissions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
@@ -43,7 +44,10 @@ const columns: { key: SortKey; label: string }[] = [
 
 export function StaffPage() {
   const { user } = useAuth();
-  const isAdmin = Boolean(user?.isAdmin);
+  // El permiso, no el perfil: un administrador lo tiene por definicion, pero un
+  // rol con staff.write tambien, y hasta ahora la interfaz no lo contemplaba.
+  const { can } = usePermissions();
+  const canWrite = can("staff.write");
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -101,7 +105,7 @@ export function StaffPage() {
 
   /** Desactivar y eliminar nunca aplican sobre uno mismo; editar si. */
   function canManage(member: StaffResponse) {
-    return isAdmin && member.id !== user?.staffId;
+    return canWrite && member.id !== user?.staffId;
   }
 
   /** El error sube al dialogo, que lo muestra sin cerrarse. */
@@ -178,7 +182,7 @@ export function StaffPage() {
             : "Cargando el personal con acceso al sistema…"
         }
         action={
-          isAdmin && (
+          canWrite && (
             <Button size="sm" onClick={() => setModal("nuevo")}>
               <Plus className="h-[15px] w-[15px]" />
               Agregar personal
@@ -247,7 +251,7 @@ export function StaffPage() {
                     {label}
                   </Th>
                 ))}
-                {isAdmin && <Th className="w-36 text-right">Acciones</Th>}
+                {canWrite && <Th className="w-36 text-right">Acciones</Th>}
               </HeadRow>
             </thead>
 
@@ -276,7 +280,7 @@ export function StaffPage() {
                   <Td>
                     <StatusDot active={member.isActive} />
                   </Td>
-                  {isAdmin && (
+                  {canWrite && (
                     <Td>
                       <div className="flex items-center justify-end gap-1">
                         <RowAction
