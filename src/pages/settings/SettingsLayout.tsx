@@ -8,6 +8,7 @@ const sections = [
   { label: "Días no laborables", to: "/configuracion/feriados" },
   { label: "Líneas de producto", to: "/configuracion/lineas" },
   { label: "Plantillas", to: "/configuracion/plantillas" },
+  { label: "Buzones", to: "/configuracion/buzones" },
 ];
 
 interface SettingsLayoutProps {

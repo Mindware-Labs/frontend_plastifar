@@ -10,6 +10,7 @@
 import type {
   EmailTemplate,
   Holiday,
+  Mailbox,
   ProductLine,
   SlaPolicy,
   TicketTopic,
@@ -242,6 +243,39 @@ const templates: EmailTemplate[] = [
   },
 ];
 
+const mailboxes: Mailbox[] = [
+  {
+    id: 1,
+    address: "calidad@plastifar.com",
+    displayName: "Calidad · reclamaciones",
+    provider: "Office 365",
+    departmentId: 1,
+    secretRef: "mailbox/calidad",
+    isActive: true,
+    lastSyncedAt: "2026-09-03T12:40:00Z",
+  },
+  {
+    id: 2,
+    address: "almacen@plastifar.com",
+    displayName: "Almacén · faltantes",
+    provider: "Gmail",
+    departmentId: 2,
+    secretRef: "mailbox/almacen",
+    isActive: true,
+    lastSyncedAt: "2026-09-03T11:05:00Z",
+  },
+  {
+    id: 3,
+    address: "ventas@plastifar.com",
+    displayName: "Soporte · cotizaciones",
+    provider: "IMAP",
+    departmentId: 3,
+    secretRef: "mailbox/ventas",
+    isActive: false,
+    lastSyncedAt: null,
+  },
+];
+
 /** Latencia simulada: sin ella los estados de carga nunca se ven al desarrollar. */
 function delay<T>(value: T, ms = 240): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
@@ -258,4 +292,5 @@ export const settingsMock = {
   holidays: (): Promise<Holiday[]> => delay(clone(holidays)),
   productLines: (): Promise<ProductLine[]> => delay(clone(productLines)),
   templates: (): Promise<EmailTemplate[]> => delay(clone(templates)),
+  mailboxes: (): Promise<Mailbox[]> => delay(clone(mailboxes)),
 };

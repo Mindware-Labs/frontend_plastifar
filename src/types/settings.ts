@@ -91,3 +91,27 @@ export interface EmailTemplate {
   body: string;
   isActive: boolean;
 }
+
+export type MailboxProvider = "IMAP" | "Gmail" | "Office 365";
+
+export const MAILBOX_PROVIDERS: MailboxProvider[] = ["IMAP", "Gmail", "Office 365"];
+
+/**
+ * Buzon de entrada. Solo administracion (RF-K4): la lectura real del correo
+ * -que convertiria un mensaje entrante en ticket- es un subsistema aparte que
+ * el plan deja pendiente (seccion 9.7, decision de Plastifar todavia abierta).
+ */
+export interface Mailbox {
+  id: number;
+  address: string;
+  displayName: string;
+  provider: MailboxProvider;
+  /** Departamento donde caen los tickets que este buzon origine. */
+  departmentId: number;
+  /** Referencia al secreto en la configuracion protegida del servidor; nunca
+   *  la contraseña en si. Una contraseña de correo en una columna es una fuga
+   *  esperando su turno. */
+  secretRef: string;
+  isActive: boolean;
+  lastSyncedAt: string | null;
+}

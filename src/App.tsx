@@ -7,6 +7,7 @@ import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { RolesPage } from "./pages/roles/RolesPage";
 import { HolidaysSection } from "./pages/settings/HolidaysSection";
+import { MailboxesSection } from "./pages/settings/MailboxesSection";
 import { ProductLinesSection } from "./pages/settings/ProductLinesSection";
 import { SlaSection } from "./pages/settings/SlaSection";
 import { TemplatesSection } from "./pages/settings/TemplatesSection";
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="/configuracion/feriados" element={<HolidaysSection />} />
         <Route path="/configuracion/lineas" element={<ProductLinesSection />} />
         <Route path="/configuracion/plantillas" element={<TemplatesSection />} />
+        <Route path="/configuracion/buzones" element={<MailboxesSection />} />
         <Route path="/" element={<Navigate to="/staff" replace />} />
       </Route>
 
