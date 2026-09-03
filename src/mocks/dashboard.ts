@@ -6,15 +6,15 @@
  * fija, cifras estables.
  */
 import type {
+  ActivityStreamPoint,
   DashboardData,
-  HeatmapCell,
   KpiCardData,
   PriorityCompliance,
   SlaState,
   TicketPriority,
   TicketRow,
   TicketStatus,
-  WeekdayVolume,
+  WeeklyBarPoint,
 } from "../types/dashboard";
 import { HOUR_BLOCKS, WEEKDAYS_SHORT } from "../types/dashboard";
 
@@ -107,37 +107,49 @@ function buildKpis(seed: number): KpiCardData[] {
   ];
 }
 
-function buildWeeklyVolume(seed: number): WeekdayVolume[] {
+function buildWeeklyBars(seed: number): WeeklyBarPoint[] {
   const random = rng(seed);
-  return WEEKDAYS_SHORT.map((day, index) => ({
-    day,
-    count: Math.round((index < 5 ? 30 + Math.sin(index) * 12 : 8) + random() * 14),
-  }));
+  return WEEKDAYS_SHORT.map((label, index) => {
+    const primary = Math.round((index < 5 ? 30 + Math.sin(index) * 12 : 8) + random() * 14);
+    return { label, primary, secondary: Math.round(primary * (0.55 + random() * 0.3)) };
+  });
 }
 
-function buildHourlyActivity(seed: number): HeatmapCell[] {
+function buildActivityStream(seed: number): ActivityStreamPoint[] {
   const random = rng(seed);
-  const cells: HeatmapCell[] = [];
+  return HOUR_BLOCKS.map((block, index) => {
+    // Horario laboral (08–12, 12–16) concentra la carga; noche y madrugada
+    // casi no tienen tickets.
+    const businessHours = index === 2 || index === 3;
+    const base = businessHours ? 70 : index === 1 || index === 4 ? 30 : 5;
+    const w1 = Math.round(Math.max(0, base + (random() - 0.5) * 20));
+    return { t: block, w1, w2: Math.round(w1 * (0.5 + random() * 0.3)) };
+  });
+}
 
-  WEEKDAYS_SHORT.forEach((day, dayIndex) => {
-    const isWeekend = dayIndex >= 5;
+function buildActivityHeatmap(seed: number, weeks = 13): ActivityHeatmapDay[] {
+  const random = rng(seed);
+  const days = weeks * 7;
+  const today = new Date();
+  // Retrocede hasta el lunes de la semana mas antigua, para que cada columna
+  // sea una semana completa L→D como el resto del panel.
+  const mondayOffset = (today.getDay() + 6) % 7;
+  const start = new Date(today);
+  start.setDate(start.getDate() - mondayOffset - (weeks - 1) * 7);
 
-    HOUR_BLOCKS.forEach((block, blockIndex) => {
-      // Horario laboral (08–12, 12–16) concentra la carga; noche y madrugada
-      // casi no tienen tickets; fin de semana, mucho menos en general.
-      const businessHours = blockIndex === 2 || blockIndex === 3;
-      const base = businessHours ? 70 : blockIndex === 1 || blockIndex === 4 ? 30 : 5;
-      const weekendFactor = isWeekend ? 0.25 : 1;
-
-      cells.push({
-        day,
-        block,
-        count: Math.round(Math.max(0, base * weekendFactor + (random() - 0.5) * 20)),
-      });
-    });
+  const counts = Array.from({ length: days }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(date.getDate() + index);
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    const base = isWeekend ? random() * 3 : 6 + random() * 14;
+    return { date: date.toISOString().slice(0, 10), count: Math.round(base) };
   });
 
-  return cells;
+  const max = Math.max(1, ...counts.map((day) => day.count));
+  return counts.map((day) => ({
+    ...day,
+    level: (day.count === 0 ? 0 : Math.min(4, 1 + Math.floor((day.count / max) * 4))) as ActivityHeatmapDay["level"],
+  }));
 }
 
 function buildPriorityCompliance(seed: number): PriorityCompliance[] {
@@ -198,11 +210,18 @@ function buildTickets(seed: number): TicketRow[] {
 
 export const dashboardMock = {
   data(): Promise<DashboardData> {
+    const weeklyBars = buildWeeklyBars(SEED >> 1);
+    const activityStream = buildActivityStream(SEED >> 11);
+    const activityHeatmap = buildActivityHeatmap(SEED >> 13);
+
     return delay({
       kpis: buildKpis(SEED),
-      weeklyVolume: buildWeeklyVolume(SEED >> 1),
-      weeklyVolumeDelta: delta(SEED >> 3, 25, true, "vs. semana anterior"),
-      hourlyActivity: buildHourlyActivity(SEED >> 11),
+      weeklyBars,
+      weeklyTotal: weeklyBars.reduce((sum, point) => sum + point.primary, 0),
+      activityStream,
+      activityPeak: Math.max(...activityStream.map((point) => point.w1)),
+      activityHeatmap,
+      activityHeatmapTotal: activityHeatmap.reduce((sum, day) => sum + day.count, 0),
       slaCompliance: Math.round(85 + rng(SEED >> 9)() * 12),
       priorityCompliance: buildPriorityCompliance(SEED >> 10),
       tickets: buildTickets(SEED >> 7),

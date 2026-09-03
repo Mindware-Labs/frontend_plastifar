@@ -1,71 +1,8 @@
-import {
-  BarChart3,
-  Building2,
-  ChevronDown,
-  LayoutDashboard,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings,
-  Users,
-} from "lucide-react";
+import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { REPORT_FAMILIES } from "../../types/reports";
+import { SIDEBAR_NAV } from "../../lib/navigation";
 import { Logo } from "../Logo";
-
-interface ModuleLink {
-  label: string;
-  to: string;
-}
-
-interface ModuleEntry {
-  label: string;
-  icon: typeof Users;
-  to: string;
-  match: string[];
-  /** Rutas estaticas del modulo. Todas viven aqui, no como pestanas dentro
-   *  de la vista — lo unico que se queda en la vista es la navegacion que
-   *  depende de un id (la ficha de un registro concreto). */
-  children?: ModuleLink[];
-}
-
-const modules: ModuleEntry[] = [
-  { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", match: ["/dashboard"] },
-  {
-    label: "Personal",
-    icon: Users,
-    to: "/staff",
-    match: ["/staff", "/roles", "/permisos"],
-    children: [
-      { label: "Colaboradores", to: "/staff" },
-      { label: "Roles", to: "/roles" },
-      { label: "Permisos", to: "/permisos" },
-    ],
-  },
-  { label: "Clientes", icon: Building2, to: "/clientes", match: ["/clientes"] },
-  {
-    label: "Reportes",
-    icon: BarChart3,
-    to: REPORT_FAMILIES[0].to,
-    match: ["/reportes"],
-    children: REPORT_FAMILIES.map(({ label, to }) => ({ label, to })),
-  },
-  {
-    label: "Configuración",
-    icon: Settings,
-    to: "/configuracion/motivos",
-    match: ["/configuracion"],
-    children: [
-      { label: "Motivos", to: "/configuracion/motivos" },
-      { label: "SLA", to: "/configuracion/sla" },
-      { label: "Días no laborables", to: "/configuracion/feriados" },
-      { label: "Líneas de producto", to: "/configuracion/lineas" },
-      { label: "Plantillas", to: "/configuracion/plantillas" },
-      { label: "Buzones", to: "/configuracion/buzones" },
-      { label: "Territorios", to: "/configuracion/territorios" },
-    ],
-  },
-];
 
 interface SidebarProps {
   collapsed: boolean;
@@ -125,7 +62,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2.5">
-          {modules.map((module) => {
+          {SIDEBAR_NAV.map((module) => {
             const { label, icon: Icon, to, match, children } = module;
             const isActive = match.some((path) => pathname.startsWith(path));
             const isOpen =

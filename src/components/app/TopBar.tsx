@@ -1,19 +1,24 @@
 import { ChevronDown, KeyRound, LogOut, Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/useAuth";
+import type { Crumb } from "../../lib/breadcrumbs";
+import { Breadcrumb } from "./Breadcrumb";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 
 interface TopBarProps {
+  /** Rastro de la ruta actual, ya resuelto — el TopBar no sabe de rutas. */
+  crumbs: Crumb[];
   /** Abre el panel de modulos superpuesto; solo existe por debajo de lg. */
   onOpenMenu: () => void;
 }
 
 /**
- * Cabecera global (64 px) del panel interno: en escritorio, solo el menu de
- * la persona conectada — el logotipo y la navegacion de modulos viven en el
- * Sidebar. Por debajo de lg aparece el disparador del panel superpuesto.
+ * Cabecera global (64 px) del panel interno: el breadcrumb a la izquierda y
+ * el menu de la persona conectada a la derecha. El logotipo y la navegacion
+ * de modulos viven en el Sidebar; por debajo de lg aparece ademas el
+ * disparador del panel superpuesto.
  */
-export function TopBar({ onOpenMenu }: TopBarProps) {
+export function TopBar({ crumbs, onOpenMenu }: TopBarProps) {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
@@ -41,7 +46,7 @@ export function TopBar({ onOpenMenu }: TopBarProps) {
   const initials = local.slice(0, 2).toUpperCase() || "PF";
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b border-line bg-white px-4 sm:px-8">
+    <header className="flex h-16 items-center gap-3 border-b border-line bg-white px-4 sm:px-8">
       <button
         type="button"
         onClick={onOpenMenu}
@@ -53,7 +58,9 @@ export function TopBar({ onOpenMenu }: TopBarProps) {
         <Menu className="h-5 w-5" />
       </button>
 
-      <div className="flex-1" />
+      <Breadcrumb crumbs={crumbs} />
+
+      <div className="min-w-2 flex-1" />
 
       <div className="relative" ref={menuRef}>
         <button

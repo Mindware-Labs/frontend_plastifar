@@ -11,6 +11,7 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { RowAction } from "../../components/ui/RowAction";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { usePermissions } from "../../hooks/usePermissions";
 import { permissionsMock, resolveEffectivePermissions } from "../../mocks/permissions";
 import type {
@@ -57,6 +58,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   }, [id]);
 
   const fullName = staff ? `${staff.firstName} ${staff.lastName}` : "";
+  useDynamicBreadcrumb(staff ? fullName : null);
   const primary = staff?.accesses.find((access) => access.isPrimary) ?? null;
 
   const effective = useMemo(() => {
@@ -139,11 +141,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   if (error) {
     return (
       <div>
-        <ModuleHeader
-          title="Colaborador"
-          sections={sections}
-          backTo={{ to: "/staff", label: "Personal" }}
-        />
+        <ModuleHeader title="Colaborador" sections={sections} />
         <Alert variant="error">{error}</Alert>
       </div>
     );
@@ -162,7 +160,6 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
       <ModuleHeader
         title={fullName}
         sections={sections}
-        backTo={{ to: "/staff", label: "Personal" }}
         summary={
           <span className="inline-flex flex-wrap items-center gap-2">
             {staff.email}

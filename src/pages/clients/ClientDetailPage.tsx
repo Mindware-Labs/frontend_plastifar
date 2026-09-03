@@ -11,6 +11,7 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { RowAction } from "../../components/ui/RowAction";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { usePermissions } from "../../hooks/usePermissions";
 import { clientsMock } from "../../mocks/clients";
 import { upsertById } from "../../lib/catalog";
@@ -45,6 +46,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
   const salesReps = clientsMock.salesReps();
   const clientId = Number(id);
+  useDynamicBreadcrumb(client?.name ?? null);
 
   useEffect(() => {
     Promise.all([clientsMock.clients(), clientsMock.territories(), clientsMock.contacts(clientId)])
@@ -116,11 +118,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   if (error) {
     return (
       <div>
-        <ModuleHeader
-          title="Cliente"
-          sections={sections}
-          backTo={{ to: "/clientes", label: "Clientes" }}
-        />
+        <ModuleHeader title="Cliente" sections={sections} />
         <Alert variant="error">{error}</Alert>
       </div>
     );
@@ -139,7 +137,6 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       <ModuleHeader
         title={client.name}
         sections={sections}
-        backTo={{ to: "/clientes", label: "Clientes" }}
         summary={
           <span className="inline-flex flex-wrap items-center gap-2">
             {client.code}

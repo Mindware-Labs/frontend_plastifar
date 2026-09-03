@@ -1,5 +1,4 @@
-import { ChevronLeft } from "lucide-react";
-import { NavLink, Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import type { ReactNode } from "react";
 
 export interface ModuleSection {
@@ -20,32 +19,14 @@ interface ModuleHeaderProps {
    * para lo que el Sidebar no puede resolver: la navegacion dentro de un
    * registro concreto (la ficha de un colaborador o de un cliente), donde
    * la ruta lleva un id y no tiene sentido como entrada estatica del menu.
+   * Volver al listado lo resuelve el breadcrumb del TopBar, no esta cabecera.
    */
   sections?: ModuleSection[];
-  /** Ruta de vuelta al listado. Presente solo en fichas. */
-  backTo?: { to: string; label: string };
 }
 
-export function ModuleHeader({
-  title = "Personal",
-  summary,
-  action,
-  sections = [],
-  backTo,
-}: ModuleHeaderProps) {
+export function ModuleHeader({ title = "Personal", summary, action, sections = [] }: ModuleHeaderProps) {
   return (
     <div className="mb-3">
-      {backTo && (
-        <Link
-          to={backTo.to}
-          className="-ml-1 mb-1.5 inline-flex items-center gap-1 rounded-edge px-1 py-0.5 text-[12px] font-medium
-            text-muted transition-colors hover:text-ink"
-        >
-          <ChevronLeft aria-hidden className="h-3.5 w-3.5" />
-          {backTo.label}
-        </Link>
-      )}
-
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="font-heading text-[20px] font-bold tracking-[-0.02em] text-ink">{title}</h1>

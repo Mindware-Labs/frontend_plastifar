@@ -29,9 +29,18 @@ export interface KpiCardData {
 
 export const WEEKDAYS_SHORT = ["L", "M", "X", "J", "V", "S", "D"] as const;
 
-export interface WeekdayVolume {
-  day: (typeof WEEKDAYS_SHORT)[number];
-  count: number;
+/** Datos del MonoRoundedBarChart: creados/resueltos por dia de la semana. */
+export interface WeeklyBarPoint {
+  label: (typeof WEEKDAYS_SHORT)[number];
+  primary: number;
+  secondary: number;
+}
+
+/** Datos del MonoRoundedStreamChart: dos series por bloque horario. */
+export interface ActivityStreamPoint {
+  t: string;
+  w1: number;
+  w2: number;
 }
 
 export const TICKET_STATUSES = [
@@ -70,18 +79,12 @@ export interface PriorityCompliance {
 
 export const HOUR_BLOCKS = ["00–04", "04–08", "08–12", "12–16", "16–20", "20–24"] as const;
 
-/** Una celda: dia de semana x bloque horario, con el conteo de tickets. */
-export interface HeatmapCell {
-  day: (typeof WEEKDAYS_SHORT)[number];
-  block: (typeof HOUR_BLOCKS)[number];
-  count: number;
-}
-
 export interface DashboardData {
   kpis: KpiCardData[];
-  weeklyVolume: WeekdayVolume[];
-  weeklyVolumeDelta: Delta;
-  hourlyActivity: HeatmapCell[];
+  weeklyBars: WeeklyBarPoint[];
+  weeklyTotal: number;
+  activityStream: ActivityStreamPoint[];
+  activityPeak: number;
   slaCompliance: number;
   priorityCompliance: PriorityCompliance[];
   tickets: TicketRow[];
