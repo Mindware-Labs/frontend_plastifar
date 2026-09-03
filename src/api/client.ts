@@ -1,7 +1,8 @@
 import type { LoginResponse } from "../types/api";
 import { tokenStore } from "./tokenStore";
 
-const BASE_URL = import.meta.env.VITE_API_URL as string;
+// Sin la barra final: "…app/" + "/api/…" da "//api/…", que no coincide con ninguna ruta.
+const BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
 
 export class ApiError extends Error {
   status: number;
