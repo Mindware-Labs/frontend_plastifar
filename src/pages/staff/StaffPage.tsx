@@ -1,5 +1,6 @@
 import { LogOut, Pencil, Plus, Trash2, UserX } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -254,12 +255,16 @@ export function StaffPage() {
               {rows.map((member) => (
                 <Row key={member.id} busy={busyId === member.id}>
                   <Td>
-                    <span className="flex items-center gap-2.5">
+                    <Link
+                      to={`/staff/${member.id}`}
+                      className="flex items-center gap-2.5 rounded-edge underline-offset-4
+                        outline-none focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                    >
                       <Avatar name={fullName(member)} seed={member.id} />
-                      <span className="whitespace-nowrap text-[13px] font-medium text-ink">
+                      <span className="whitespace-nowrap text-[13px] font-medium text-ink hover:underline">
                         {fullName(member)}
                       </span>
-                    </span>
+                    </Link>
                   </Td>
                   <Td className="text-[12.5px] text-brand-gray">{member.email}</Td>
                   <Td className="text-[12.5px] text-brand-gray">

@@ -24,3 +24,12 @@ dist-ssr
 *.sw?
 
 .env
+
+# Directorios de herramientas de asistencia: son locales de cada maquina
+.atl/
+.codex/
+.impeccable/
+
+# Documentacion interna y material de referencia, fuera del control de versiones
+Plan-de-construccion-Plastifar.pdf
+image.png

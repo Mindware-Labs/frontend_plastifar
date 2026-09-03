@@ -6,7 +6,7 @@ import { NavLink, useLocation } from "react-router-dom";
  * (Bandeja, Reportes, Calidad, Clientes) entrara aqui sin mover nada mas.
  */
 const modules = [
-  { label: "Personal", icon: Users, to: "/staff", match: ["/staff", "/roles"] },
+  { label: "Personal", icon: Users, to: "/staff", match: ["/staff", "/roles", "/permisos"] },
 ];
 
 export function ModuleTabs() {

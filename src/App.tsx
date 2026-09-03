@@ -4,7 +4,9 @@ import { AppLayout } from "./layouts/AppLayout";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
+import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { RolesPage } from "./pages/roles/RolesPage";
+import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
 import { StaffPage } from "./pages/staff/StaffPage";
 
 export default function App() {
@@ -30,7 +32,10 @@ export default function App() {
         }
       >
         <Route path="/staff" element={<StaffPage />} />
+        <Route path="/staff/:id" element={<StaffDetailPage section="datos" />} />
+        <Route path="/staff/:id/accesos" element={<StaffDetailPage section="accesos" />} />
         <Route path="/roles" element={<RolesPage />} />
+        <Route path="/permisos" element={<PermissionsPage />} />
         <Route path="/" element={<Navigate to="/staff" replace />} />
       </Route>
 

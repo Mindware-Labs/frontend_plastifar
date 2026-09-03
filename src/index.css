@@ -23,12 +23,16 @@
   --color-line: #e7e7ea;
   --color-line-soft: #f0f0f2;
   --color-line-strong: #dcdce0;
-  --color-muted: #8a8a90;
-  --color-faint: #9a9aa0;
+  /* Los dos grises de texto secundario cumplen 4.5:1 sobre blanco: 5.9:1 el
+     apagado y 4.8:1 el tenue. Con los valores anteriores (3.4:1 y 2.8:1) las
+     cabeceras de columna, las claves de permiso y los estados vacios quedaban
+     por debajo del piso de contraste. */
+  --color-muted: #63636d;
+  --color-faint: #71717a;
   --color-fill: #f1f1f3;
   /* Ambar de apoyo: solo estados intermedios en pantalla (fuerza media,
-     prioridad alta). No es un color institucional. */
-  --color-warn: #c2760a;
+     prioridad alta). No es un color institucional. 5.4:1 sobre blanco. */
+  --color-warn: #9a5c04;
 
   /* Radio unico de los controles: casi recto, coherente con el trazo
      industrial del logotipo. Un solo lugar donde ajustarlo. */
