@@ -7,11 +7,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
 }
 
+/**
+ * El hover no puede ser un matiz: sobre el rojo 185 C pleno, aclarar u
+ * oscurecer un 5 % no se percibe. Primary baja al rojo oscuro del brandbook y
+ * levanta la sombra; al pulsar, la sombra se cierra y el boton baja un pixel.
+ */
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary:
-    "bg-brand-red text-white shadow-[0_10px_20px_-12px_rgba(228,0,43,0.55)] hover:brightness-105 active:translate-y-px",
+    "bg-brand-red text-white shadow-[0_10px_20px_-12px_rgba(228,0,43,0.55)] " +
+    "hover:bg-brand-red-dark hover:shadow-[0_14px_24px_-10px_rgba(228,0,43,0.7)] " +
+    "active:translate-y-px active:bg-brand-red-dark active:shadow-[0_6px_12px_-9px_rgba(228,0,43,0.6)] " +
+    "disabled:hover:bg-brand-red disabled:hover:shadow-[0_10px_20px_-12px_rgba(228,0,43,0.55)]",
   secondary:
-    "border border-line-strong bg-white text-brand-gray hover:bg-canvas hover:text-ink",
+    "border border-line-strong bg-white text-brand-gray hover:border-zinc-400 hover:bg-canvas hover:text-ink",
   danger: "border border-brand-red bg-white text-brand-red hover:bg-red-50",
   ghost: "text-brand-gray hover:bg-fill hover:text-ink",
 };
@@ -35,9 +43,9 @@ export function Button({
       disabled={disabled || isLoading}
       className={`inline-flex items-center justify-center gap-2 rounded-edge
         font-heading text-[11.5px] font-semibold uppercase tracking-[0.06em]
-        transition-[filter,background-color,color,transform] outline-none
+        transition-[background-color,border-color,color,box-shadow,transform] outline-none
         focus-visible:ring-3 focus-visible:ring-brand-red/25
-        disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:brightness-100
+        disabled:cursor-not-allowed disabled:opacity-60
         ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
       {...props}
     >

@@ -12,6 +12,7 @@ import { Separator } from "../../components/shadcn/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/shadcn/tooltip";
 import { formatBytes, formatDateTime, formatTicketCode } from "../../lib/format";
 import type { EmailDetailResponse } from "../../types/api";
+import { ticketBadgeClass } from "./badgeStyles";
 
 interface EmailDetailPaneProps {
   emailId: number;
@@ -20,6 +21,11 @@ interface EmailDetailPaneProps {
   /** El correo cambió de carpeta: ya no pertenece a la vista actual. */
   onMoved: () => void;
 }
+
+/** Acciones de la barra: gris de texto en reposo, tinta sobre relleno al pasar. */
+const toolButtonClass =
+  "text-brand-gray transition-colors hover:bg-fill hover:text-ink " +
+  "focus-visible:ring-brand-red/20 focus-visible:border-brand-red/30";
 
 function initials(name: string) {
   return name
@@ -115,6 +121,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
                   <Button
                     variant="ghost"
                     size="icon"
+                    className={toolButtonClass}
                     disabled={moving}
                     onClick={() => handleMove(() => emailsApi.archive(email.id))}
                   >
@@ -128,6 +135,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
                   <Button
                     variant="ghost"
                     size="icon"
+                    className={toolButtonClass}
                     disabled={moving}
                     onClick={() => handleMove(() => emailsApi.markAsJunk(email.id))}
                   >
@@ -141,6 +149,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
                   <Button
                     variant="ghost"
                     size="icon"
+                    className={toolButtonClass}
                     disabled={moving}
                     onClick={() => handleMove(() => emailsApi.trash(email.id))}
                   >
@@ -156,6 +165,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
                 <Button
                   variant="ghost"
                   size="icon"
+                  className={toolButtonClass}
                   disabled={moving}
                   onClick={() => handleMove(() => emailsApi.restore(email.id))}
                 >
@@ -169,7 +179,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
 
         <div className="ml-auto">
           {email.ticketId ? (
-            <Badge variant="secondary">{formatTicketCode(email.ticketId)}</Badge>
+            <Badge variant="secondary" className={ticketBadgeClass}>
+              {formatTicketCode(email.ticketId)}
+            </Badge>
           ) : (
             <PfButton size="sm" onClick={handleCreateTicket} isLoading={creating}>
               <TicketIcon className="h-[15px] w-[15px]" />
@@ -179,7 +191,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
         </div>
       </div>
 
-      <Separator />
+      <Separator className="bg-line" />
 
       {createError && (
         <div className="p-4 pb-0">
@@ -188,7 +200,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
       )}
 
       <div className="p-4 pb-0">
-        <h2 className="font-heading text-lg font-bold leading-tight">
+        <h2 className="font-heading text-[19px] font-bold leading-tight tracking-[-0.02em] text-ink">
           {email.subject || "(sin asunto)"}
         </h2>
       </div>
@@ -198,19 +210,19 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
           <AvatarFallback>{initials(displayName)}</AvatarFallback>
         </Avatar>
         <div className="grid min-w-0 gap-1">
-          <div className="font-semibold">{displayName}</div>
-          <div className="line-clamp-1 text-xs text-muted-foreground">{email.fromEmail}</div>
-          <div className="line-clamp-1 text-xs text-muted-foreground">
+          <div className="text-[13px] font-semibold text-ink">{displayName}</div>
+          <div className="line-clamp-1 text-[12px] text-subtle">{email.fromEmail}</div>
+          <div className="line-clamp-1 text-[12px] text-subtle">
             Para: {email.toEmails.join(", ") || "—"}
             {email.ccEmails.length > 0 && ` · CC: ${email.ccEmails.join(", ")}`}
           </div>
         </div>
-        <div className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+        <div className="ml-auto shrink-0 whitespace-nowrap text-[12px] font-medium text-faint">
           {formatDateTime(email.createdAt)}
         </div>
       </div>
 
-      <Separator />
+      <Separator className="bg-line" />
 
       <div className="min-h-0 flex-1">
         {email.bodyHtml ? (
@@ -222,30 +234,30 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
             className="h-full w-full border-0 bg-white"
           />
         ) : email.bodyText ? (
-          <pre className="h-full overflow-y-auto whitespace-pre-wrap p-4 text-sm leading-relaxed text-foreground">
+          <pre className="h-full overflow-y-auto whitespace-pre-wrap p-4 text-[13px] leading-relaxed text-ink">
             {email.bodyText}
           </pre>
         ) : (
-          <p className="p-4 text-sm text-muted-foreground">Este correo no tiene contenido.</p>
+          <p className="p-4 text-[13px] text-subtle">Este correo no tiene contenido.</p>
         )}
       </div>
 
       {email.attachments.length > 0 && (
         <>
-          <Separator />
+          <Separator className="bg-line" />
           <div className="shrink-0 p-4">
-            <p className="mb-2 text-xs font-semibold text-muted-foreground">
+            <p className="mb-2 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
               Adjuntos ({email.attachments.length})
             </p>
             <div className="flex flex-wrap gap-2">
               {email.attachments.map((attachment) => (
                 <span
                   key={attachment.id}
-                  className="inline-flex items-center gap-1.5 rounded-edge border bg-muted/40 px-2.5 py-1.5 text-xs"
+                  className="inline-flex items-center gap-1.5 rounded-edge border border-line bg-canvas px-2.5 py-1.5 text-[12px] text-brand-gray"
                 >
-                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                  <Paperclip className="h-3.5 w-3.5 text-faint" />
                   {attachment.fileName}
-                  <span className="text-muted-foreground">· {formatBytes(attachment.sizeBytes)}</span>
+                  <span className="text-subtle">· {formatBytes(attachment.sizeBytes)}</span>
                 </span>
               ))}
             </div>

@@ -1,11 +1,11 @@
-import { Inbox, Paperclip, Search } from "lucide-react";
+import { Inbox, Paperclip } from "lucide-react";
 import { useState } from "react";
 import { emailsApi, type EmailQuery } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
+import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
 import { Badge } from "../../components/shadcn/badge";
-import { Input } from "../../components/shadcn/input";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../components/shadcn/resizable";
 import { ScrollArea } from "../../components/shadcn/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "../../components/shadcn/tabs";
@@ -14,6 +14,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { formatEmailListDate, formatTicketCode } from "../../lib/format";
 import type { EmailListResponse, EmailSummaryResponse } from "../../types/api";
+import { ticketBadgeClass } from "./badgeStyles";
 import { EmailDetailPane } from "./EmailDetailPane";
 
 export type FolderKey = "inbox" | "archived" | "junk" | "trash";
@@ -25,6 +26,15 @@ const folderMeta: Record<FolderKey, { title: string; emptyText: string }> = {
   junk: { title: "Junk", emptyText: "No hay correos marcados como junk." },
   trash: { title: "Papelera", emptyText: "La papelera está vacía." },
 };
+
+/**
+ * Pestanas del filtro: shadcn las pinta con negro al 60 % de opacidad, que se
+ * lee lavado. Aqui van colores solidos de la paleta y el activo toma el rojo
+ * 185 C sobre blanco, igual que el modulo activo del sidebar.
+ */
+const tabTriggerClass =
+  "text-[12.5px] font-medium text-subtle transition-colors hover:text-ink " +
+  "data-active:bg-white data-active:font-semibold data-active:text-brand-red-dark";
 
 /** Sin control de paginacion: se pide la pagina mas grande que admite la API. */
 const PAGE_SIZE = 100;
@@ -85,35 +95,37 @@ export function BandejaPage({ folder }: BandejaPageProps) {
           </div>
         ) : (
           <div className={`min-h-0 flex-1 pb-6 transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <ResizablePanelGroup className="h-full rounded-edge border">
+            <ResizablePanelGroup className="h-full rounded-edge border border-line bg-white">
               <ResizablePanel defaultSize="34%" minSize="26%" maxSize="50%" className="flex flex-col">
-                <div className="flex shrink-0 items-center justify-between gap-2 p-4 pb-0">
-                  <h2 className="font-heading text-xl font-bold">{meta.title}</h2>
+                <div className="flex shrink-0 items-center justify-between gap-3 p-4 pb-3">
+                  <h2 className="font-heading text-[20px] font-bold tracking-[-0.02em] text-ink">
+                    {meta.title}
+                  </h2>
                   <Tabs value={ticketFilter} onValueChange={(value) => setTicketFilter(value as TicketFilter)}>
-                    <TabsList>
-                      <TabsTrigger value="todos">Todos</TabsTrigger>
-                      <TabsTrigger value="sin-ticket">Sin ticket</TabsTrigger>
+                    <TabsList className="border border-line bg-canvas">
+                      <TabsTrigger value="todos" className={tabTriggerClass}>
+                        Todos
+                      </TabsTrigger>
+                      <TabsTrigger value="sin-ticket" className={tabTriggerClass}>
+                        Sin ticket
+                      </TabsTrigger>
                     </TabsList>
                   </Tabs>
                 </div>
 
-                <div className="shrink-0 p-4">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Buscar por remitente o asunto…"
-                      className="pl-8"
-                    />
-                  </div>
+                <div className="shrink-0 px-4 pb-3">
+                  <SearchInput
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Buscar por remitente o asunto…"
+                  />
                 </div>
 
                 <ScrollArea className="flex-1">
                   {rows.length === 0 ? (
                     <div className="flex h-40 flex-col items-center justify-center gap-2 px-6 text-center">
-                      <Inbox className="h-6 w-6 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">
+                      <Inbox className="h-6 w-6 text-faint" />
+                      <p className="text-[13px] text-subtle">
                         {unfiltered ? meta.emptyText : "Ningún correo coincide con esta búsqueda."}
                       </p>
                     </div>
@@ -128,30 +140,52 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                             type="button"
                             onClick={() => setSelectedId(email.id)}
                             data-selected={isSelected}
-                            className="flex flex-col items-start gap-2 rounded-edge border p-3 text-left text-sm
-                              transition-colors hover:bg-accent data-[selected=true]:border-brand-red
-                              data-[selected=true]:bg-fill"
+                            className="group flex flex-col items-start gap-1.5 rounded-edge border
+                              border-line bg-white p-3 text-left outline-none
+                              transition-[background-color,border-color,box-shadow]
+                              hover:border-line-strong hover:bg-canvas
+                              focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12
+                              data-[selected=true]:border-brand-red/45 data-[selected=true]:bg-brand-red/[0.05]
+                              data-[selected=true]:hover:border-brand-red
+                              data-[selected=true]:hover:bg-brand-red/[0.085]
+                              data-[selected=true]:hover:shadow-[0_6px_16px_-10px_rgba(228,0,43,0.5)]"
                           >
                             <div className="flex w-full items-center gap-2">
                               <Avatar className="size-6">
-                                <AvatarFallback className="text-[10px]">{initials(name)}</AvatarFallback>
+                                <AvatarFallback
+                                  className="bg-fill text-[10px] font-semibold text-brand-gray
+                                    group-data-[selected=true]:bg-brand-red/12
+                                    group-data-[selected=true]:text-brand-red-dark"
+                                >
+                                  {initials(name)}
+                                </AvatarFallback>
                               </Avatar>
-                              <span className="font-semibold">{name}</span>
-                              <span className="ml-auto text-xs text-muted-foreground">
+                              <span className="truncate text-[13px] font-semibold text-ink
+                                transition-colors group-data-[selected=true]:text-brand-red-dark">
+                                {name}
+                              </span>
+                              <span className="ml-auto shrink-0 text-[11px] font-medium text-faint">
                                 {formatEmailListDate(email.createdAt)}
                               </span>
                             </div>
-                            <div className="line-clamp-1 w-full font-medium">
+                            <div className="line-clamp-1 w-full text-[12.5px] font-medium text-brand-gray">
                               {email.subject || "(sin asunto)"}
                             </div>
-                            <div className="line-clamp-2 w-full text-muted-foreground">{email.preview}</div>
+                            <div className="line-clamp-2 w-full text-[12px] leading-relaxed text-subtle">
+                              {email.preview}
+                            </div>
                             {(email.ticketId || email.attachmentCount > 0) && (
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 pt-0.5">
                                 {email.ticketId && (
-                                  <Badge variant="secondary">{formatTicketCode(email.ticketId)}</Badge>
+                                  <Badge variant="secondary" className={ticketBadgeClass}>
+                                    {formatTicketCode(email.ticketId)}
+                                  </Badge>
                                 )}
                                 {email.attachmentCount > 0 && (
-                                  <Badge variant="outline">
+                                  <Badge
+                                    variant="outline"
+                                    className="border-line bg-white text-[10px] font-semibold text-subtle"
+                                  >
                                     <Paperclip className="h-3 w-3" />
                                     {email.attachmentCount}
                                   </Badge>
@@ -166,7 +200,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                 </ScrollArea>
               </ResizablePanel>
 
-              <ResizableHandle withHandle />
+              <ResizableHandle withHandle className="bg-line" />
 
               <ResizablePanel minSize="35%" className="flex flex-col">
                 {selectedId ? (
@@ -178,8 +212,8 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                   />
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-                    <Inbox className="h-7 w-7 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Seleccioná un correo para verlo.</p>
+                    <Inbox className="h-7 w-7 text-faint" />
+                    <p className="text-[13px] text-subtle">Seleccioná un correo para verlo.</p>
                   </div>
                 )}
               </ResizablePanel>
