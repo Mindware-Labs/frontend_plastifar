@@ -177,7 +177,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
                     <ShieldAlert />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Marcar como junk</TooltipContent>
+                <TooltipContent>Marcar como no deseado</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>

@@ -23,7 +23,7 @@ type TicketFilter = "todos" | "sin-ticket";
 const folderMeta: Record<FolderKey, { title: string; emptyText: string }> = {
   inbox: { title: "Bandeja", emptyText: "Todavía no llegó ningún correo." },
   archived: { title: "Archivados", emptyText: "No hay correos archivados." },
-  junk: { title: "Junk", emptyText: "No hay correos marcados como junk." },
+  junk: { title: "No deseado", emptyText: "No hay correos marcados como no deseados." },
   trash: { title: "Papelera", emptyText: "La papelera está vacía." },
 };
 

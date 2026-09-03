@@ -28,7 +28,7 @@ const groups: NavGroup[] = [
     children: [
       { label: "Bandeja", to: "/bandeja", end: true },
       { label: "Archivados", to: "/bandeja/archivados" },
-      { label: "Junk", to: "/bandeja/junk" },
+      { label: "No deseado", to: "/bandeja/junk" },
       { label: "Papelera", to: "/bandeja/papelera" },
     ],
   },
