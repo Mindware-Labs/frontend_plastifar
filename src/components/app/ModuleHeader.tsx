@@ -62,15 +62,18 @@ export function ModuleHeader({
         )}
       </div>
 
-      <div className="mt-2 flex items-end justify-between gap-4 border-b border-line">
-        <div className="flex items-center gap-6">
+      {/* Las pestanas se desplazan dentro de su propia franja y la accion baja de
+          linea si no cabe: con cinco secciones, un flex rigido empujaba el boton
+          fuera del viewport y hacia desbordar la pagina entera en 390 px. */}
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-1 border-b border-line">
+        <div className="flex w-full min-w-0 items-center gap-6 overflow-x-auto pb-px sm:w-auto sm:flex-1">
           {sections.map(({ label, to }) => (
             <NavLink
               key={to}
               to={to}
               end
               className={({ isActive }) =>
-                `-mb-px border-b-2 pb-2 text-[13px] transition-colors ${
+                `-mb-px shrink-0 whitespace-nowrap border-b-2 pb-2 text-[13px] transition-colors ${
                   isActive
                     ? "border-brand-red font-semibold text-ink"
                     : "border-transparent font-medium text-muted hover:text-ink"
@@ -82,7 +85,7 @@ export function ModuleHeader({
           ))}
         </div>
 
-        {action && <div className="pb-1.5">{action}</div>}
+        {action && <div className="shrink-0 pb-1.5">{action}</div>}
       </div>
     </div>
   );
