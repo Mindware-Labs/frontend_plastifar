@@ -1,14 +1,15 @@
-import { Building2, Settings, Users } from "lucide-react";
+import { BarChart3, Building2, Settings, Users } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 /**
- * Barra de modulos (47 px). El resto del sistema (Bandeja, Reportes, Calidad)
- * entrara aqui sin mover nada mas.
+ * Barra de modulos (47 px). El resto del sistema (Bandeja, Calidad) entrara
+ * aqui sin mover nada mas.
  */
 const modules = [
   { label: "Personal", icon: Users, to: "/staff", match: ["/staff", "/roles", "/permisos"] },
   { label: "Clientes", icon: Building2, to: "/clientes", match: ["/clientes"] },
   { label: "Configuración", icon: Settings, to: "/configuracion", match: ["/configuracion"] },
+  { label: "Reportes", icon: BarChart3, to: "/reportes", match: ["/reportes"] },
 ];
 
 export function ModuleTabs() {

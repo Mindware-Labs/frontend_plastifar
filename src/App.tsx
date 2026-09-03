@@ -7,6 +7,9 @@ import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
 import { ClientsPage } from "./pages/clients/ClientsPage";
 import { PermissionsPage } from "./pages/permissions/PermissionsPage";
+import { LiveOperationSection } from "./pages/reports/LiveOperationSection";
+import { ReportCatalogSection } from "./pages/reports/ReportCatalogSection";
+import { SlaTimesSection } from "./pages/reports/SlaTimesSection";
 import { RolesPage } from "./pages/roles/RolesPage";
 import { HolidaysSection } from "./pages/settings/HolidaysSection";
 import { MailboxesSection } from "./pages/settings/MailboxesSection";
@@ -59,6 +62,33 @@ export default function App() {
         <Route path="/configuracion/plantillas" element={<TemplatesSection />} />
         <Route path="/configuracion/buzones" element={<MailboxesSection />} />
         <Route path="/configuracion/territorios" element={<TerritoriesSection />} />
+
+        <Route path="/reportes" element={<Navigate to="/reportes/operacion" replace />} />
+        <Route path="/reportes/operacion" element={<LiveOperationSection />} />
+        <Route path="/reportes/sla" element={<SlaTimesSection />} />
+        <Route
+          path="/reportes/productividad"
+          element={<ReportCatalogSection family="productividad" blockedBy="la Bandeja de tickets" />}
+        />
+        <Route
+          path="/reportes/calidad"
+          element={<ReportCatalogSection family="calidad" blockedBy="Calidad (HCA y créditos)" />}
+        />
+        <Route
+          path="/reportes/clientes"
+          element={<ReportCatalogSection family="clientes" blockedBy="la Bandeja de tickets" />}
+        />
+        <Route
+          path="/reportes/volumen"
+          element={<ReportCatalogSection family="volumen" blockedBy="la Bandeja de tickets" />}
+        />
+        <Route
+          path="/reportes/auditoria"
+          element={
+            <ReportCatalogSection family="auditoria" blockedBy="la Bandeja de tickets y la bitácora real" />
+          }
+        />
+
         <Route path="/" element={<Navigate to="/staff" replace />} />
       </Route>
 
