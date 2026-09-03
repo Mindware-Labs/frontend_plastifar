@@ -1,14 +1,13 @@
 import { Outlet } from "react-router-dom";
-import { ModuleTabs } from "../components/app/ModuleTabs";
-import { TopBar } from "../components/app/TopBar";
+import { Sidebar } from "../components/app/Sidebar";
 
 export function AppLayout() {
   return (
-    <div className="min-h-screen bg-white">
-      <TopBar />
-      <ModuleTabs />
-
-      <main className="px-8 pb-12 pt-4">
+    <div className="flex h-screen bg-white">
+      <Sidebar />
+      {/* flex-col + overflow-hidden: cada pagina decide su propia zona de scroll,
+          en vez de que el layout adivine un alto fijo. */}
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden px-8 pt-6">
         <Outlet />
       </main>
     </div>

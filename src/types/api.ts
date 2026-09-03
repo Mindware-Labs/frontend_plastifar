@@ -112,3 +112,60 @@ export interface DepartmentResponse {
 export interface ApiMessage {
   message: string;
 }
+
+export interface EmailAttachmentResponse {
+  id: number;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+}
+
+/** Fila de la bandeja (GET /api/emails): lo justo para decidir si vale la pena abrirlo. */
+export interface EmailSummaryResponse {
+  id: number;
+  fromEmail: string;
+  fromName: string | null;
+  subject: string;
+  createdAt: string;
+  ticketId: number | null;
+  attachmentCount: number;
+}
+
+export interface EmailDetailResponse {
+  id: number;
+  direction: "Inbound" | "Outbound";
+  fromEmail: string;
+  fromName: string | null;
+  toEmails: string[];
+  ccEmails: string[];
+  subject: string;
+  bodyHtml: string | null;
+  bodyText: string | null;
+  createdAt: string;
+  ticketId: number | null;
+  attachments: EmailAttachmentResponse[];
+}
+
+/** Respuesta paginada de la bandeja (GET /api/emails). */
+export interface EmailListResponse {
+  items: EmailSummaryResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: { all: number; unlinked: number; linked: number };
+}
+
+export interface TicketSummaryResponse {
+  id: number;
+  code: string;
+  subject: string;
+  status: string;
+  priority: string;
+  source: string;
+  requesterEmail: string;
+  requesterName: string | null;
+  departmentId: number | null;
+  createdAt: string;
+  updatedAt: string;
+}

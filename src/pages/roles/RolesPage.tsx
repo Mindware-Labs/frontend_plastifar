@@ -86,8 +86,9 @@ export function RolesPage() {
   }
 
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <ModuleHeader
+        title="Personal"
         summary={
           counts
             ? `${counts.all} roles definidos · ${counts.custom} personalizados · los permisos llegan en una fase posterior`
@@ -103,107 +104,109 @@ export function RolesPage() {
         }
       />
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar por nombre de rol…"
-          className="w-[240px]"
-        />
-
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-        {filters.map(({ key, label, countKey }) => (
-          <FilterChip
-            key={key}
-            label={label}
-            count={counts?.[countKey] ?? 0}
-            active={filter === key}
-            onClick={() => setFilter(key)}
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar por nombre de rol…"
+            className="w-[240px]"
           />
-        ))}
-      </div>
 
-      {error && (
-        <div className="mb-3">
-          <Alert variant="error">{error}</Alert>
-        </div>
-      )}
+          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-      {data === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
+          {filters.map(({ key, label, countKey }) => (
+            <FilterChip
+              key={key}
+              label={label}
+              count={counts?.[countKey] ?? 0}
+              active={filter === key}
+              onClick={() => setFilter(key)}
+            />
+          ))}
         </div>
-      ) : (
-        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Nombre</Th>
-                <Th>Tipo</Th>
-                <Th>Estado</Th>
-                {isAdmin && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
-            <tbody>
-              {rows.map((role) => (
-                <Row key={role.id} busy={busyId === role.id}>
-                  <Td className="text-[13px] font-medium text-ink">{role.name}</Td>
-                  <Td>
-                    {role.isSystem ? (
-                      <Badge>Sistema</Badge>
-                    ) : (
-                      <Badge tone="green">Personalizado</Badge>
-                    )}
-                  </Td>
-                  <Td>
-                    <StatusDot active={role.isActive} />
-                  </Td>
-                  {isAdmin && (
+
+        {error && (
+          <div className="mb-3">
+            <Alert variant="error">{error}</Alert>
+          </div>
+        )}
+
+        {data === null ? (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        ) : (
+          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Nombre</Th>
+                  <Th>Tipo</Th>
+                  <Th>Estado</Th>
+                  {isAdmin && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+              <tbody>
+                {rows.map((role) => (
+                  <Row key={role.id} busy={busyId === role.id}>
+                    <Td className="text-[13px] font-medium text-ink">{role.name}</Td>
                     <Td>
-                      {canManage(role) && (
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar el rol ${role.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(role)}
-                            disabled={busyId === role.id}
-                          />
-                          <RowAction
-                            label={`Eliminar el rol ${role.name}`}
-                            icon={Trash2}
-                            onClick={() => askDelete(role)}
-                            disabled={busyId === role.id}
-                            danger
-                          />
-                        </div>
+                      {role.isSystem ? (
+                        <Badge>Sistema</Badge>
+                      ) : (
+                        <Badge tone="green">Personalizado</Badge>
                       )}
                     </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
+                    <Td>
+                      <StatusDot active={role.isActive} />
+                    </Td>
+                    {isAdmin && (
+                      <Td>
+                        {canManage(role) && (
+                          <div className="flex items-center justify-end gap-1">
+                            <RowAction
+                              label={`Editar el rol ${role.name}`}
+                              icon={Pencil}
+                              onClick={() => setModal(role)}
+                              disabled={busyId === role.id}
+                            />
+                            <RowAction
+                              label={`Eliminar el rol ${role.name}`}
+                              icon={Trash2}
+                              onClick={() => askDelete(role)}
+                              disabled={busyId === role.id}
+                              danger
+                            />
+                          </div>
+                        )}
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
 
-          {rows.length === 0 && (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {unfiltered
-                ? "Todavía no hay roles creados."
-                : "Ningún rol coincide con este filtro o búsqueda."}
-            </p>
-          )}
+            {rows.length === 0 && (
+              <p className="py-14 text-center text-[13.5px] text-faint">
+                {unfiltered
+                  ? "Todavía no hay roles creados."
+                  : "Ningún rol coincide con este filtro o búsqueda."}
+              </p>
+            )}
 
-          <Pagination
-            page={data.page}
-            pageSize={data.pageSize}
-            total={data.total}
-            totalPages={data.totalPages}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            noun="roles"
-          />
-        </div>
-      )}
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="roles"
+            />
+          </div>
+        )}
+      </div>
 
       {confirmation && (
         <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />

@@ -1,6 +1,7 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { GuestRoute, ProtectedRoute } from "./components/RouteGuards";
 import { AppLayout } from "./layouts/AppLayout";
+import { BandejaPage } from "./pages/bandeja/BandejaPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
@@ -29,9 +30,10 @@ export default function App() {
           </ProtectedRoute>
         }
       >
+        <Route path="/bandeja" element={<BandejaPage />} />
         <Route path="/staff" element={<StaffPage />} />
         <Route path="/roles" element={<RolesPage />} />
-        <Route path="/" element={<Navigate to="/staff" replace />} />
+        <Route path="/" element={<Navigate to="/bandeja" replace />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

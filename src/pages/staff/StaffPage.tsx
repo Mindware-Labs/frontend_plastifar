@@ -169,8 +169,9 @@ export function StaffPage() {
   }
 
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <ModuleHeader
+        title="Personal"
         summary={
           counts
             ? `${counts.all} colaboradores · ${counts.active} activos · ${counts.admins} con permisos de administrador`
@@ -186,152 +187,154 @@ export function StaffPage() {
         }
       />
 
-      {/* Criterios: busqueda, departamento y pastillas de estado */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar por nombre o correo…"
-          className="w-[240px]"
-        />
-
-        <Select
-          size="sm"
-          className="w-[220px]"
-          aria-label="Filtrar por departamento"
-          value={String(departmentId)}
-          onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
-          options={[
-            { value: "todos", label: "Todos los departamentos" },
-            ...departments.map((department) => ({
-              value: String(department.id),
-              label: department.name,
-            })),
-          ]}
-        />
-
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-        {filters.map(({ key, label, countKey }) => (
-          <FilterChip
-            key={key}
-            label={label}
-            count={counts?.[countKey] ?? 0}
-            active={filter === key}
-            onClick={() => setFilter(key)}
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        {/* Criterios: busqueda, departamento y pastillas de estado */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar por nombre o correo…"
+            className="w-[240px]"
           />
-        ))}
-      </div>
 
-      {error && (
-        <div className="mb-3">
-          <Alert variant="error">{error}</Alert>
+          <Select
+            size="sm"
+            className="w-[220px]"
+            aria-label="Filtrar por departamento"
+            value={String(departmentId)}
+            onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+            options={[
+              { value: "todos", label: "Todos los departamentos" },
+              ...departments.map((department) => ({
+                value: String(department.id),
+                label: department.name,
+              })),
+            ]}
+          />
+
+          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+          {filters.map(({ key, label, countKey }) => (
+            <FilterChip
+              key={key}
+              label={label}
+              count={counts?.[countKey] ?? 0}
+              active={filter === key}
+              onClick={() => setFilter(key)}
+            />
+          ))}
         </div>
-      )}
 
-      {data === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      ) : (
-        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-          <DataTable>
-            <thead>
-              <HeadRow>
-                {columns.map(({ key, label }) => (
-                  <Th
-                    key={key}
-                    sort={{ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) }}
-                  >
-                    {label}
-                  </Th>
-                ))}
-                {isAdmin && <Th className="w-36 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+        {error && (
+          <div className="mb-3">
+            <Alert variant="error">{error}</Alert>
+          </div>
+        )}
 
-            <tbody>
-              {rows.map((member) => (
-                <Row key={member.id} busy={busyId === member.id}>
-                  <Td>
-                    <span className="flex items-center gap-2.5">
-                      <Avatar name={fullName(member)} seed={member.id} />
-                      <span className="whitespace-nowrap text-[13px] font-medium text-ink">
-                        {fullName(member)}
-                      </span>
-                    </span>
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">{member.email}</Td>
-                  <Td className="text-[12.5px] text-brand-gray">
-                    {departmentName(member.primaryDepartmentId)}
-                  </Td>
-                  <Td>
-                    {member.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
-                  </Td>
-                  <Td>
-                    <StatusDot active={member.isActive} />
-                  </Td>
-                  {isAdmin && (
+        {data === null ? (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        ) : (
+          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  {columns.map(({ key, label }) => (
+                    <Th
+                      key={key}
+                      sort={{ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) }}
+                    >
+                      {label}
+                    </Th>
+                  ))}
+                  {isAdmin && <Th className="w-36 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+
+              <tbody>
+                {rows.map((member) => (
+                  <Row key={member.id} busy={busyId === member.id}>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Editar a ${fullName(member)}`}
-                          icon={Pencil}
-                          onClick={() => setModal(member)}
-                          disabled={busyId === member.id}
-                        />
-                        {member.isActive && canManage(member) && (
-                          <>
-                            <RowAction
-                              label={`Cerrar las sesiones de ${fullName(member)}`}
-                              icon={LogOut}
-                              onClick={() => askRevokeSessions(member)}
-                              disabled={busyId === member.id}
-                            />
-                            <RowAction
-                              label={`Desactivar a ${fullName(member)}`}
-                              icon={UserX}
-                              onClick={() => askDeactivate(member)}
-                              disabled={busyId === member.id}
-                            />
-                          </>
-                        )}
-                        {canManage(member) && (
-                          <RowAction
-                            label={`Eliminar a ${fullName(member)}`}
-                            icon={Trash2}
-                            onClick={() => askDelete(member)}
-                            disabled={busyId === member.id}
-                            danger
-                          />
-                        )}
-                      </div>
+                      <span className="flex items-center gap-2.5">
+                        <Avatar name={fullName(member)} seed={member.id} />
+                        <span className="whitespace-nowrap text-[13px] font-medium text-ink">
+                          {fullName(member)}
+                        </span>
+                      </span>
                     </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
+                    <Td className="text-[12.5px] text-brand-gray">{member.email}</Td>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      {departmentName(member.primaryDepartmentId)}
+                    </Td>
+                    <Td>
+                      {member.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
+                    </Td>
+                    <Td>
+                      <StatusDot active={member.isActive} />
+                    </Td>
+                    {isAdmin && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Editar a ${fullName(member)}`}
+                            icon={Pencil}
+                            onClick={() => setModal(member)}
+                            disabled={busyId === member.id}
+                          />
+                          {member.isActive && canManage(member) && (
+                            <>
+                              <RowAction
+                                label={`Cerrar las sesiones de ${fullName(member)}`}
+                                icon={LogOut}
+                                onClick={() => askRevokeSessions(member)}
+                                disabled={busyId === member.id}
+                              />
+                              <RowAction
+                                label={`Desactivar a ${fullName(member)}`}
+                                icon={UserX}
+                                onClick={() => askDeactivate(member)}
+                                disabled={busyId === member.id}
+                              />
+                            </>
+                          )}
+                          {canManage(member) && (
+                            <RowAction
+                              label={`Eliminar a ${fullName(member)}`}
+                              icon={Trash2}
+                              onClick={() => askDelete(member)}
+                              disabled={busyId === member.id}
+                              danger
+                            />
+                          )}
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
 
-          {rows.length === 0 && (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {unfiltered
-                ? "Todavía no hay personal registrado."
-                : "Ningún colaborador coincide con este filtro o búsqueda."}
-            </p>
-          )}
+            {rows.length === 0 && (
+              <p className="py-14 text-center text-[13.5px] text-faint">
+                {unfiltered
+                  ? "Todavía no hay personal registrado."
+                  : "Ningún colaborador coincide con este filtro o búsqueda."}
+              </p>
+            )}
 
-          <Pagination
-            page={data.page}
-            pageSize={data.pageSize}
-            total={data.total}
-            totalPages={data.totalPages}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            noun="colaboradores"
-          />
-        </div>
-      )}
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="colaboradores"
+            />
+          </div>
+        )}
+      </div>
 
       {confirmation && (
         <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />
