@@ -1,5 +1,10 @@
 import { apiRequest, toQuery } from "./client";
-import type { EmailDetailResponse, EmailListResponse, TicketSummaryResponse } from "../types/api";
+import type {
+  AttachmentLinkResponse,
+  EmailDetailResponse,
+  EmailListResponse,
+  TicketSummaryResponse,
+} from "../types/api";
 
 export interface EmailQuery {
   page: number;
@@ -15,6 +20,9 @@ export const emailsApi = {
   list: (query: EmailQuery) => apiRequest<EmailListResponse>(`/api/emails${toQuery({ ...query })}`),
 
   get: (id: number) => apiRequest<EmailDetailResponse>(`/api/emails/${id}`),
+
+  attachmentLink: (emailId: number, attachmentId: number) =>
+    apiRequest<AttachmentLinkResponse>(`/api/emails/${emailId}/attachments/${attachmentId}`),
 
   createTicket: (id: number) =>
     apiRequest<TicketSummaryResponse>(`/api/emails/${id}/ticket`, { method: "POST" }),

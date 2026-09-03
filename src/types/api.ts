@@ -120,6 +120,15 @@ export interface EmailAttachmentResponse {
   sizeBytes: number;
 }
 
+/** Enlace firmado al documento; inline = el navegador lo muestra en vez de descargarlo. */
+export interface AttachmentLinkResponse {
+  url: string;
+  fileName: string;
+  contentType: string;
+  inline: boolean;
+  expiresAt: string;
+}
+
 /** Fila de la bandeja (GET /api/emails): lo justo para decidir si vale la pena abrirlo. */
 export interface EmailSummaryResponse {
   id: number;
