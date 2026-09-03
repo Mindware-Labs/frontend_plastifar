@@ -9,6 +9,7 @@ const sections = [
   { label: "Líneas de producto", to: "/configuracion/lineas" },
   { label: "Plantillas", to: "/configuracion/plantillas" },
   { label: "Buzones", to: "/configuracion/buzones" },
+  { label: "Territorios", to: "/configuracion/territorios" },
 ];
 
 interface SettingsLayoutProps {
