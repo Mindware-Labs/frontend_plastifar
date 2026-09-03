@@ -27,11 +27,7 @@ const folderMeta: Record<FolderKey, { title: string; emptyText: string }> = {
   trash: { title: "Papelera", emptyText: "La papelera está vacía." },
 };
 
-/**
- * Pestanas del filtro: shadcn las pinta con negro al 60 % de opacidad, que se
- * lee lavado. Aqui van colores solidos de la paleta y el activo toma el rojo
- * 185 C sobre blanco, igual que el modulo activo del sidebar.
- */
+/** Pestanas del filtro: shadcn las pinta con negro al 60 %, que se lee lavado. */
 const tabTriggerClass =
   "text-[12.5px] font-medium text-subtle transition-colors hover:text-ink " +
   "data-active:bg-white data-active:font-semibold data-active:text-brand-red-dark";

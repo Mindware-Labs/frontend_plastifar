@@ -7,11 +7,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
 }
 
-/**
- * El hover no puede ser un matiz: sobre el rojo 185 C pleno, aclarar u
- * oscurecer un 5 % no se percibe. Primary baja al rojo oscuro del brandbook y
- * levanta la sombra; al pulsar, la sombra se cierra y el boton baja un pixel.
- */
+/** Sobre el rojo 185 C pleno un matiz no se percibe: el hover cambia de color y de sombra. */
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary:
     "bg-brand-red text-white shadow-[0_10px_20px_-12px_rgba(228,0,43,0.55)] " +

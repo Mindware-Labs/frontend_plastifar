@@ -186,9 +186,7 @@ input:-webkit-autofill:focus {
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  /* La escala de radios de shadcn se aplana sobre --radius-edge: los modulos
-     que usan shadcn (bandeja) tienen el mismo canto casi recto que el resto
-     de la interfaz. Un solo valor, sin escalones intermedios. */
+  /* La escala de shadcn se aplana sobre --radius-edge: un solo canto en toda la app. */
   --radius-sm: var(--radius-edge);
   --radius-md: var(--radius-edge);
   --radius-lg: var(--radius-edge);

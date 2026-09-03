@@ -1,6 +1,6 @@
-import { ChevronDown, Inbox, KeyRound, LogOut, Users } from "lucide-react";
+import { ChevronDown, Inbox, KeyRound, LogOut, PanelLeft, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import { Logo } from "../Logo";
 import { ChangePasswordModal } from "./ChangePasswordModal";
@@ -20,8 +20,7 @@ interface NavGroup {
   children?: NavItem[];
 }
 
-/** Arbol de navegacion del panel. El resto del sistema (Reportes, Calidad,
- * Clientes) entra aqui sin tocar el layout. */
+/** Arbol de navegacion del panel: los modulos nuevos entran aqui sin tocar el layout. */
 const groups: NavGroup[] = [
   {
     label: "Correo",
@@ -43,21 +42,42 @@ const groups: NavGroup[] = [
   },
 ];
 
+/** Panel de hijos anclado al icono: se posiciona fijo para que el riel no lo recorte. */
+interface Flyout {
+  group: NavGroup;
+  top: number;
+  left: number;
+}
+
 const linkBase =
   "flex items-center gap-2.5 rounded-edge px-3 py-2 text-[13px] font-medium transition-colors";
 const linkInactive = "text-brand-gray hover:bg-fill hover:text-ink";
 const linkActive = "bg-brand-red/8 font-semibold text-brand-red-dark";
 
-/**
- * Barra lateral fija (240 px): logotipo, arbol de modulos y, al pie, la
- * persona conectada. Reemplaza la vieja pareja TopBar + ModuleTabs: toda la
- * navegacion vive en un solo lugar.
- */
+/** Icono suelto de la barra contraida. */
+const railBase = "flex h-9 w-9 shrink-0 items-center justify-center rounded-edge transition-colors";
+
+const collapsedKey = "plf.sidebar-collapsed";
+
+/** En navegacion privada leer localStorage lanza: la barra abre expandida. */
+function readCollapsed() {
+  try {
+    return localStorage.getItem(collapsedKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Barra lateral: logotipo, arbol de modulos y, al pie, la persona conectada. */
 export function Sidebar() {
   const { user, logout } = useAuth();
+  const { pathname } = useLocation();
+  const [collapsed, setCollapsed] = useState(readCollapsed);
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [flyout, setFlyout] = useState<Flyout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -77,18 +97,101 @@ export function Sidebar() {
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!flyout) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setFlyout(null);
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [flyout]);
+
+  useEffect(() => () => cancelClose(), []);
+
+  function cancelClose() {
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  }
+
+  function openFlyout(group: NavGroup, anchor: HTMLElement) {
+    if (!group.children) return;
+    cancelClose();
+    const rect = anchor.getBoundingClientRect();
+    setFlyout({ group, top: rect.top - 6, left: rect.right + 8 });
+  }
+
+  /** Retardo corto: da tiempo a cruzar el hueco entre el icono y el panel. */
+  function scheduleClose() {
+    cancelClose();
+    closeTimer.current = window.setTimeout(() => setFlyout(null), 140);
+  }
+
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    setMenuOpen(false);
+    setFlyout(null);
+    try {
+      localStorage.setItem(collapsedKey, next ? "1" : "0");
+    } catch {
+      // Sin almacenamiento la barra funciona igual, solo no recuerda el estado.
+    }
+  }
+
+  /** Contraida no se ven los hijos: el icono se enciende con cualquier ruta del grupo. */
+  function isGroupActive(group: NavGroup) {
+    const targets = group.children?.map((child) => child.to) ?? [group.to!];
+    return targets.some((to) => pathname === to || pathname.startsWith(`${to}/`));
+  }
+
   const local = user?.email.split("@")[0] ?? "";
   const initials = local.slice(0, 2).toUpperCase() || "PF";
 
   return (
-    <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-line bg-white">
-      <div className="flex h-16 shrink-0 items-center px-5">
-        <Logo height={22} />
+    <aside
+      className={`flex h-screen shrink-0 flex-col border-r border-line bg-white
+        transition-[width] duration-200 ease-out ${collapsed ? "w-[68px]" : "w-60"}`}
+    >
+      <div
+        className={`flex h-16 shrink-0 items-center ${
+          collapsed ? "justify-center px-2" : "justify-between px-5"
+        }`}
+      >
+        {!collapsed && <Logo height={22} />}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? "Expandir la barra lateral" : "Contraer la barra lateral"}
+          title={collapsed ? "Expandir" : "Contraer"}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-edge text-faint
+            transition-colors hover:bg-fill hover:text-ink"
+        >
+          <PanelLeft className={`h-4 w-4 transition-transform ${collapsed ? "rotate-180" : ""}`} />
+        </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-1">
+      <nav
+        className={`flex-1 overflow-y-auto overflow-x-hidden py-1 ${
+          collapsed ? "flex flex-col items-center gap-1 px-2" : "px-3"
+        }`}
+      >
         {groups.map((group) =>
-          group.children ? (
+          collapsed ? (
+            <Link
+              key={group.label}
+              to={group.to ?? group.children![0].to}
+              aria-label={group.label}
+              onMouseEnter={(event) => openFlyout(group, event.currentTarget)}
+              onMouseLeave={scheduleClose}
+              onFocus={(event) => openFlyout(group, event.currentTarget)}
+              onBlur={scheduleClose}
+              className={`${railBase} ${isGroupActive(group) ? linkActive : linkInactive}`}
+            >
+              <group.icon className="h-[18px] w-[18px]" />
+            </Link>
+          ) : group.children ? (
             <div key={group.label} className="mt-5 first:mt-0">
               <div
                 className="flex items-center gap-2.5 px-3 pb-1.5 font-heading text-[10px] font-semibold
@@ -167,7 +270,9 @@ export function Sidebar() {
             onClick={() => setMenuOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className={`flex w-full items-center gap-2.5 rounded-edge py-1.5 pl-1.5 pr-2 transition-colors
+            title={collapsed ? local : undefined}
+            className={`flex w-full items-center rounded-edge transition-colors
+              ${collapsed ? "justify-center py-1.5" : "gap-2.5 py-1.5 pl-1.5 pr-2"}
               ${menuOpen ? "bg-fill" : "hover:bg-fill"}`}
           >
             <span
@@ -176,18 +281,55 @@ export function Sidebar() {
             >
               {initials}
             </span>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block truncate text-[12.5px] font-semibold leading-tight text-ink">
-                {local}
-              </span>
-              <span className="block truncate text-[11px] leading-tight text-faint">
-                {user?.isAdmin ? "Administrador" : "Staff"}
-              </span>
-            </span>
-            <ChevronDown className={`h-4 w-4 shrink-0 text-faint transition-transform ${menuOpen ? "rotate-180" : ""}`} />
+            {!collapsed && (
+              <>
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-[12.5px] font-semibold leading-tight text-ink">
+                    {local}
+                  </span>
+                  <span className="block truncate text-[11px] leading-tight text-faint">
+                    {user?.isAdmin ? "Administrador" : "Staff"}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-faint transition-transform ${menuOpen ? "rotate-180" : ""}`}
+                />
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      {collapsed && flyout && (
+        <div
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          style={{ top: flyout.top, left: flyout.left }}
+          className="animate-plf-toast-in fixed z-30 w-[196px] rounded-edge border border-line
+            bg-white p-1.5 shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.22)]"
+        >
+          <p
+            className="flex items-center gap-2 px-2.5 pb-1.5 pt-1 font-heading text-[10px]
+              font-semibold uppercase tracking-[0.1em] text-faint"
+          >
+            <flyout.group.icon className="h-[13px] w-[13px]" />
+            {flyout.group.label}
+          </p>
+          <div className="flex flex-col gap-0.5">
+            {flyout.group.children?.map((child) => (
+              <NavLink
+                key={child.to}
+                to={child.to}
+                end={child.end}
+                onClick={() => setFlyout(null)}
+                className={({ isActive }) => `${linkBase} ${isActive ? linkActive : linkInactive}`}
+              >
+                {child.label}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      )}
 
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
     </aside>
