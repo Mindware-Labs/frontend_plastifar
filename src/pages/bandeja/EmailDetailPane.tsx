@@ -1,12 +1,15 @@
-import { Paperclip, Ticket as TicketIcon } from "lucide-react";
+import { Archive, ArchiveRestore, Paperclip, ShieldAlert, Ticket as TicketIcon, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
-import { Avatar } from "../../components/ui/Avatar";
-import { Badge } from "../../components/ui/Badge";
-import { Button } from "../../components/ui/Button";
+import { Button as PfButton } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Spinner";
+import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
+import { Badge } from "../../components/shadcn/badge";
+import { Button } from "../../components/shadcn/button";
+import { Separator } from "../../components/shadcn/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/shadcn/tooltip";
 import { formatBytes, formatDateTime, formatTicketCode } from "../../lib/format";
 import type { EmailDetailResponse } from "../../types/api";
 
@@ -14,6 +17,17 @@ interface EmailDetailPaneProps {
   emailId: number;
   /** Avisa al panel de la lista para que refresque (el correo puede salir del filtro actual). */
   onTicketCreated: () => void;
+  /** El correo cambió de carpeta: ya no pertenece a la vista actual. */
+  onMoved: () => void;
+}
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 /**
@@ -21,11 +35,12 @@ interface EmailDetailPaneProps {
  * dangerouslySetInnerHTML. Un iframe con sandbox vacio lo aisla por completo
  * (sin scripts, sin acceso al DOM de la app) y aun asi se ve con su formato.
  */
-export function EmailDetailPane({ emailId, onTicketCreated }: EmailDetailPaneProps) {
+export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDetailPaneProps) {
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [moving, setMoving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +74,17 @@ export function EmailDetailPane({ emailId, onTicketCreated }: EmailDetailPanePro
     }
   }
 
+  async function handleMove(action: () => Promise<void>) {
+    if (moving) return;
+    setMoving(true);
+    try {
+      await action();
+      onMoved();
+    } finally {
+      setMoving(false);
+    }
+  }
+
   if (error) {
     return (
       <div className="p-6">
@@ -76,46 +102,115 @@ export function EmailDetailPane({ emailId, onTicketCreated }: EmailDetailPanePro
   }
 
   const displayName = email.fromName ?? email.fromEmail;
+  const isInInbox = email.folder === "Inbox";
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 border-b border-line px-6 py-5">
-        <div className="flex items-start justify-between gap-4">
-          <h2 className="min-w-0 font-heading text-[16px] font-bold leading-snug text-ink">
-            {email.subject || "(sin asunto)"}
-          </h2>
-
-          {email.ticketId ? (
-            <Badge tone="green">{formatTicketCode(email.ticketId)}</Badge>
+      <div className="flex items-center p-2">
+        <div className="flex items-center gap-1">
+          {isInInbox ? (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={moving}
+                    onClick={() => handleMove(() => emailsApi.archive(email.id))}
+                  >
+                    <Archive />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Archivar</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={moving}
+                    onClick={() => handleMove(() => emailsApi.markAsJunk(email.id))}
+                  >
+                    <ShieldAlert />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Marcar como junk</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={moving}
+                    onClick={() => handleMove(() => emailsApi.trash(email.id))}
+                  >
+                    <Trash2 />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Mover a la papelera</TooltipContent>
+              </Tooltip>
+            </>
           ) : (
-            <Button size="sm" className="shrink-0" onClick={handleCreateTicket} isLoading={creating}>
-              <TicketIcon className="h-[15px] w-[15px]" />
-              Crear ticket
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={moving}
+                  onClick={() => handleMove(() => emailsApi.restore(email.id))}
+                >
+                  <ArchiveRestore />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Restaurar a la bandeja</TooltipContent>
+            </Tooltip>
           )}
         </div>
 
-        {createError && (
-          <div className="mt-3">
-            <Alert variant="error">{createError}</Alert>
-          </div>
-        )}
-
-        <div className="mt-4 flex items-start gap-3">
-          <Avatar name={displayName} seed={email.id} size={34} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold text-ink">{displayName}</p>
-            <p className="truncate text-[12px] text-muted">{email.fromEmail}</p>
-            <p className="mt-1 truncate text-[11.5px] text-faint">
-              Para: {email.toEmails.join(", ") || "—"}
-              {email.ccEmails.length > 0 && ` · CC: ${email.ccEmails.join(", ")}`}
-            </p>
-          </div>
-          <p className="shrink-0 whitespace-nowrap text-[11.5px] text-faint">
-            {formatDateTime(email.createdAt)}
-          </p>
+        <div className="ml-auto">
+          {email.ticketId ? (
+            <Badge variant="secondary">{formatTicketCode(email.ticketId)}</Badge>
+          ) : (
+            <PfButton size="sm" onClick={handleCreateTicket} isLoading={creating}>
+              <TicketIcon className="h-[15px] w-[15px]" />
+              Crear ticket
+            </PfButton>
+          )}
         </div>
       </div>
+
+      <Separator />
+
+      {createError && (
+        <div className="p-4 pb-0">
+          <Alert variant="error">{createError}</Alert>
+        </div>
+      )}
+
+      <div className="p-4 pb-0">
+        <h2 className="font-heading text-lg font-bold leading-tight">
+          {email.subject || "(sin asunto)"}
+        </h2>
+      </div>
+
+      <div className="flex items-start gap-4 p-4 text-sm">
+        <Avatar>
+          <AvatarFallback>{initials(displayName)}</AvatarFallback>
+        </Avatar>
+        <div className="grid min-w-0 gap-1">
+          <div className="font-semibold">{displayName}</div>
+          <div className="line-clamp-1 text-xs text-muted-foreground">{email.fromEmail}</div>
+          <div className="line-clamp-1 text-xs text-muted-foreground">
+            Para: {email.toEmails.join(", ") || "—"}
+            {email.ccEmails.length > 0 && ` · CC: ${email.ccEmails.join(", ")}`}
+          </div>
+        </div>
+        <div className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+          {formatDateTime(email.createdAt)}
+        </div>
+      </div>
+
+      <Separator />
 
       <div className="min-h-0 flex-1">
         {email.bodyHtml ? (
@@ -127,33 +222,35 @@ export function EmailDetailPane({ emailId, onTicketCreated }: EmailDetailPanePro
             className="h-full w-full border-0 bg-white"
           />
         ) : email.bodyText ? (
-          <pre className="h-full overflow-y-auto whitespace-pre-wrap px-6 py-5 text-[13px] leading-relaxed text-brand-gray">
+          <pre className="h-full overflow-y-auto whitespace-pre-wrap p-4 text-sm leading-relaxed text-foreground">
             {email.bodyText}
           </pre>
         ) : (
-          <p className="px-6 py-5 text-[13px] text-faint">Este correo no tiene contenido.</p>
+          <p className="p-4 text-sm text-muted-foreground">Este correo no tiene contenido.</p>
         )}
       </div>
 
       {email.attachments.length > 0 && (
-        <div className="shrink-0 border-t border-line bg-canvas px-6 py-3.5">
-          <p className="mb-2 font-heading text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">
-            Adjuntos ({email.attachments.length})
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {email.attachments.map((attachment) => (
-              <span
-                key={attachment.id}
-                className="inline-flex items-center gap-1.5 rounded-edge border border-line-strong
-                  bg-white px-2.5 py-1.5 text-[12px] text-brand-gray"
-              >
-                <Paperclip className="h-3.5 w-3.5 text-faint" />
-                {attachment.fileName}
-                <span className="text-faint">· {formatBytes(attachment.sizeBytes)}</span>
-              </span>
-            ))}
+        <>
+          <Separator />
+          <div className="shrink-0 p-4">
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">
+              Adjuntos ({email.attachments.length})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {email.attachments.map((attachment) => (
+                <span
+                  key={attachment.id}
+                  className="inline-flex items-center gap-1.5 rounded-edge border bg-muted/40 px-2.5 py-1.5 text-xs"
+                >
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                  {attachment.fileName}
+                  <span className="text-muted-foreground">· {formatBytes(attachment.sizeBytes)}</span>
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

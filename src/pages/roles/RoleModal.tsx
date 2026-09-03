@@ -114,7 +114,7 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
           />
         )}
 
-        <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
+        <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-subtle">
           Los permisos del rol se configuran en un paso posterior, cuando existan las entidades
           sobre las que aplican (tickets, departamentos, etc.).
         </p>

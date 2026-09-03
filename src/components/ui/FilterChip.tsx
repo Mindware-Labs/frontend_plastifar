@@ -22,7 +22,7 @@ export function FilterChip({ label, count, active, onClick }: FilterChipProps) {
       {label}
       <span
         className={`rounded-full px-1.5 py-px text-[11px] font-semibold ${
-          active ? "bg-white/22 text-white" : "bg-fill text-muted"
+          active ? "bg-white/22 text-white" : "bg-fill text-subtle"
         }`}
       >
         {count}

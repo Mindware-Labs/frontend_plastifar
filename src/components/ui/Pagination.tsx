@@ -36,11 +36,11 @@ export function Pagination({
   const to = Math.min(page * pageSize, total);
 
   const stepClass = `flex h-7 w-7 items-center justify-center rounded-edge border border-line-strong
-    text-muted transition-colors hover:bg-fill hover:text-ink
+    text-subtle transition-colors hover:bg-fill hover:text-ink
     disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 py-3 text-[12.5px] text-muted">
+    <div className="flex flex-wrap items-center justify-between gap-3 py-3 text-[12.5px] text-subtle">
       <p>
         Mostrando <span className="font-medium text-ink">{from}</span>–
         <span className="font-medium text-ink">{to}</span> de{" "}

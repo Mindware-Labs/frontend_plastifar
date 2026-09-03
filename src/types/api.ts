@@ -126,14 +126,18 @@ export interface EmailSummaryResponse {
   fromEmail: string;
   fromName: string | null;
   subject: string;
+  preview: string;
   createdAt: string;
   ticketId: number | null;
   attachmentCount: number;
 }
 
+export type EmailFolder = "Inbox" | "Archived" | "Junk" | "Trash";
+
 export interface EmailDetailResponse {
   id: number;
   direction: "Inbound" | "Outbound";
+  folder: EmailFolder;
   fromEmail: string;
   fromName: string | null;
   toEmails: string[];
@@ -154,6 +158,7 @@ export interface EmailListResponse {
   total: number;
   totalPages: number;
   counts: { all: number; unlinked: number; linked: number };
+  folderCounts: { inbox: number; archived: number; junk: number; trash: number };
 }
 
 export interface TicketSummaryResponse {

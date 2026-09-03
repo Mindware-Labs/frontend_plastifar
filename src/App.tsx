@@ -30,7 +30,10 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/bandeja" element={<BandejaPage />} />
+        <Route path="/bandeja" element={<BandejaPage folder="inbox" />} />
+        <Route path="/bandeja/archivados" element={<BandejaPage folder="archived" />} />
+        <Route path="/bandeja/junk" element={<BandejaPage folder="junk" />} />
+        <Route path="/bandeja/papelera" element={<BandejaPage folder="trash" />} />
         <Route path="/staff" element={<StaffPage />} />
         <Route path="/roles" element={<RolesPage />} />
         <Route path="/" element={<Navigate to="/bandeja" replace />} />

@@ -8,6 +8,8 @@ import { ChangePasswordModal } from "./ChangePasswordModal";
 interface NavItem {
   label: string;
   to: string;
+  /** Coincidencia exacta: sin esto, "/bandeja" quedaria activo tambien en "/bandeja/junk". */
+  end?: boolean;
 }
 
 interface NavGroup {
@@ -21,7 +23,16 @@ interface NavGroup {
 /** Arbol de navegacion del panel. El resto del sistema (Reportes, Calidad,
  * Clientes) entra aqui sin tocar el layout. */
 const groups: NavGroup[] = [
-  { label: "Bandeja", icon: Inbox, to: "/bandeja" },
+  {
+    label: "Correo",
+    icon: Inbox,
+    children: [
+      { label: "Bandeja", to: "/bandeja", end: true },
+      { label: "Archivados", to: "/bandeja/archivados" },
+      { label: "Junk", to: "/bandeja/junk" },
+      { label: "Papelera", to: "/bandeja/papelera" },
+    ],
+  },
   {
     label: "Personal",
     icon: Users,
@@ -91,6 +102,7 @@ export function Sidebar() {
                   <NavLink
                     key={child.to}
                     to={child.to}
+                    end={child.end}
                     className={({ isActive }) => `${linkBase} pl-9 ${isActive ? linkActive : linkInactive}`}
                   >
                     {child.label}

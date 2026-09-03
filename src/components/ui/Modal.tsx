@@ -108,7 +108,7 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
               {title}
             </h2>
             {description && (
-              <p id={descriptionId} className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
+              <p id={descriptionId} className="mt-1.5 text-[12.5px] leading-relaxed text-subtle">
                 {description}
               </p>
             )}

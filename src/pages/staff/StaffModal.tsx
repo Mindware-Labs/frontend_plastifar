@@ -214,7 +214,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           </Alert>
         ) : (
           !isEdit && (
-            <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
+            <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-subtle">
               Se genera una contraseña aleatoria y se envía un código de activación de 6 dígitos al
               correo indicado. La persona define su propia contraseña desde “Olvidé mi contraseña”.
             </p>

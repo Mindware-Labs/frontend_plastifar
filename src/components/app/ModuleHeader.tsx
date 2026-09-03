@@ -17,7 +17,7 @@ export function ModuleHeader({ title, summary, action }: ModuleHeaderProps) {
         {summary && (
           <>
             <span aria-hidden className="h-3.5 w-px self-center bg-line" />
-            <p className="text-[12.5px] text-muted">{summary}</p>
+            <p className="text-[12.5px] text-subtle">{summary}</p>
           </>
         )}
       </div>

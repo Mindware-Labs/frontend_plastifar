@@ -134,7 +134,7 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
             tabIndex={-1}
             aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
             className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center
-              rounded-edge text-muted transition-colors hover:bg-fill hover:text-ink"
+              rounded-edge text-subtle transition-colors hover:bg-fill hover:text-ink"
           >
             {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
