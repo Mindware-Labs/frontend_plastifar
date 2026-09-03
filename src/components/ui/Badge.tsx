@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 interface BadgeProps {
-  /** red = privilegio (administrador); green = propio del cliente; neutral = base. */
-  tone?: "neutral" | "red" | "green";
+  /** red = privilegio/critico; green = propio/sano; warn = pendiente; neutral = base. */
+  tone?: "neutral" | "red" | "green" | "warn";
   children: ReactNode;
 }
 
@@ -10,6 +10,7 @@ const tones: Record<NonNullable<BadgeProps["tone"]>, string> = {
   neutral: "bg-fill text-brand-gray",
   red: "bg-brand-red/8 text-brand-red-dark",
   green: "bg-brand-green/8 text-brand-green",
+  warn: "bg-warn/10 text-warn",
 };
 
 /** Pastilla de categoria en tablas: 22 px de alto, sin borde, fondo al 8 %. */

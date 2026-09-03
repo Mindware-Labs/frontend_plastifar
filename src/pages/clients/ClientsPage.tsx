@@ -6,6 +6,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
@@ -14,15 +15,26 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { Tooltip } from "../../components/ui/Tooltip";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
 import { clientsMock } from "../../mocks/clients";
-import type { Client, Territory } from "../../types/clients";
+import type { Client, Contact, Territory } from "../../types/clients";
 import { ClientModal } from "./ClientModal";
 import { ReassignSalesRepModal } from "./ReassignSalesRepModal";
 
 type ChipKey = "todos" | "activos" | "inactivos" | "sinVendedor";
+
+const COLUMNS: ColumnOption[] = [
+  { id: "cliente", label: "Cliente", locked: true },
+  { id: "codigo", label: "Código" },
+  { id: "tipo", label: "Tipo" },
+  { id: "territorio", label: "Territorio" },
+  { id: "vendedor", label: "Vendedor" },
+  { id: "contactos", label: "Contactos" },
+  { id: "estado", label: "Estado" },
+];
 
 const typeTone: Record<Client["type"], "red" | "green" | "neutral"> = {
   Distribuidor: "red",
@@ -48,9 +60,15 @@ export function ClientsPage() {
   const [modal, setModal] = useState<"nuevo" | Client | null>(null);
   const [reassigning, setReassigning] = useState<Client | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(COLUMNS.map((c) => c.id));
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
   const salesReps = clientsMock.salesReps();
+  const contactsByClient = useMemo(() => clientsMock.contactsByClient(), []);
+
+  function isVisible(id: string) {
+    return visibleColumns.includes(id);
+  }
 
   useEffect(() => {
     Promise.all([clientsMock.clients(), clientsMock.territories()])
@@ -159,7 +177,6 @@ export function ClientsPage() {
     <div>
       <ModuleHeader
         title="Clientes"
-        sections={[{ label: "Clientes", to: "/clientes" }]}
         summary={
           <span className="inline-flex flex-wrap items-center gap-2">
             {clients === null ? (
@@ -256,6 +273,15 @@ export function ClientsPage() {
           active={chip === "sinVendedor"}
           onClick={() => setChip("sinVendedor")}
         />
+
+        <div className="ml-auto">
+          <ColumnPicker
+            columns={COLUMNS}
+            visible={visibleColumns}
+            onChange={setVisibleColumns}
+            label="Columnas"
+          />
+        </div>
       </div>
 
       {error && (
@@ -279,17 +305,23 @@ export function ClientsPage() {
           <thead>
             <HeadRow>
               <Th>Cliente</Th>
-              <Th>Código</Th>
-              <Th>Tipo</Th>
-              <Th>Territorio</Th>
-              <Th>Vendedor</Th>
-              <Th>Estado</Th>
+              {isVisible("codigo") && <Th>Código</Th>}
+              {isVisible("tipo") && <Th>Tipo</Th>}
+              {isVisible("territorio") && <Th>Territorio</Th>}
+              {isVisible("vendedor") && <Th>Vendedor</Th>}
+              {isVisible("contactos") && <Th>Contactos</Th>}
+              {isVisible("estado") && <Th>Estado</Th>}
               {canWrite && <Th className="w-32 text-right">Acciones</Th>}
             </HeadRow>
           </thead>
 
           <tbody>
-            {rows.map((client) => (
+            {rows.map((client) => {
+              const contacts = contactsByClient[client.id] ?? [];
+              const shown = contacts.slice(0, 3);
+              const overflow = contacts.length - shown.length;
+
+              return (
               <Row key={client.id}>
                 <Td>
                   <Link
@@ -303,19 +335,58 @@ export function ClientsPage() {
                     </span>
                   </Link>
                 </Td>
-                <Td>
-                  <span className="font-mono text-[12px] text-brand-gray">{client.code}</span>
-                </Td>
-                <Td>
-                  <Badge tone={typeTone[client.type]}>{client.type}</Badge>
-                </Td>
-                <Td className="text-[12.5px] text-brand-gray">{territoryName(client.territoryId)}</Td>
-                <Td className="text-[12.5px] text-brand-gray">
-                  {repName(client.salesRepStaffId) ?? <span className="text-faint">Sin vendedor</span>}
-                </Td>
-                <Td>
-                  <StatusDot active={client.isActive} />
-                </Td>
+                {isVisible("codigo") && (
+                  <Td>
+                    <span className="font-mono text-[12px] text-brand-gray">{client.code}</span>
+                  </Td>
+                )}
+                {isVisible("tipo") && (
+                  <Td>
+                    <Badge tone={typeTone[client.type]}>{client.type}</Badge>
+                  </Td>
+                )}
+                {isVisible("territorio") && (
+                  <Td className="text-[12.5px] text-brand-gray">{territoryName(client.territoryId)}</Td>
+                )}
+                {isVisible("vendedor") && (
+                  <Td className="text-[12.5px] text-brand-gray">
+                    {repName(client.salesRepStaffId) ?? <span className="text-faint">Sin vendedor</span>}
+                  </Td>
+                )}
+                {isVisible("contactos") && (
+                  <Td>
+                    {contacts.length === 0 ? (
+                      <span className="text-[12.5px] text-faint">Ninguno</span>
+                    ) : (
+                      <div className="flex items-center -space-x-1.5">
+                        {shown.map((contact) => (
+                          <Tooltip
+                            key={contact.id}
+                            content={<ContactTooltipContent contact={contact} />}
+                          >
+                            <span className="ring-2 ring-white rounded-full">
+                              <Avatar
+                                name={`${contact.firstName} ${contact.lastName}`}
+                                seed={contact.id}
+                                size={24}
+                              />
+                            </span>
+                          </Tooltip>
+                        ))}
+                        {overflow > 0 && (
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-fill ring-2 ring-white text-[10px] font-semibold text-brand-gray">
+                            +{overflow}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </Td>
+                )}
+                {isVisible("estado") && (
+                  <Td>
+                    <StatusDot active={client.isActive} />
+                  </Td>
+                )}
                 {canWrite && (
                   <Td>
                     <div className="flex items-center justify-end gap-1">
@@ -344,7 +415,8 @@ export function ClientsPage() {
                   </Td>
                 )}
               </Row>
-            ))}
+              );
+            })}
           </tbody>
         </DataTable>
       )}
@@ -371,5 +443,19 @@ export function ClientsPage() {
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
     </div>
+  );
+}
+
+/** Lo que se ve al pasar el mouse sobre un avatar de contacto en el listado. */
+function ContactTooltipContent({ contact }: { contact: Contact }) {
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className="font-semibold">
+        {contact.firstName} {contact.lastName}
+        {contact.isPrimary && " · Principal"}
+      </span>
+      {contact.position && <span className="text-faint">{contact.position}</span>}
+      {contact.email && <span className="text-faint">{contact.email}</span>}
+    </span>
   );
 }

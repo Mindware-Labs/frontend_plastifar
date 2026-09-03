@@ -151,4 +151,13 @@ export const clientsMock = {
   clients: (): Promise<Client[]> => delay(clone(clients)),
   contacts: (clientId: number): Promise<Contact[]> =>
     delay(clone(contacts.filter((contact) => contact.clientId === clientId))),
+  /** Sincrono y agrupado: el listado pinta el avatar de contactos de todas las
+   *  filas a la vez, y pedirlo cliente por cliente seria un N+1. */
+  contactsByClient(): Record<number, Contact[]> {
+    const grouped: Record<number, Contact[]> = {};
+    for (const contact of clone(contacts)) {
+      (grouped[contact.clientId] ??= []).push(contact);
+    }
+    return grouped;
+  },
 };

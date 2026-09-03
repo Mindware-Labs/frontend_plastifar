@@ -27,6 +27,7 @@ dist-ssr
 
 # Directorios de herramientas de asistencia: son locales de cada maquina
 .atl/
+.claude/
 .codex/
 .impeccable/
 

@@ -2,16 +2,6 @@ import type { ReactNode } from "react";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 
-const sections = [
-  { label: "Motivos", to: "/configuracion/motivos" },
-  { label: "SLA", to: "/configuracion/sla" },
-  { label: "Días no laborables", to: "/configuracion/feriados" },
-  { label: "Líneas de producto", to: "/configuracion/lineas" },
-  { label: "Plantillas", to: "/configuracion/plantillas" },
-  { label: "Buzones", to: "/configuracion/buzones" },
-  { label: "Territorios", to: "/configuracion/territorios" },
-];
-
 interface SettingsLayoutProps {
   /** Resumen en linea con el titulo; cada seccion cuenta lo suyo. */
   summary: ReactNode;
@@ -20,16 +10,15 @@ interface SettingsLayoutProps {
 }
 
 /**
- * Cabecera compartida de Configuracion. Las cinco secciones son pestanas de una
- * sola pantalla: son catalogos distintos pero se administran del mismo modo, y
- * separarlos en modulos haria buscar en cinco sitios lo que se cambia junto.
+ * Cabecera compartida de Configuracion. Los siete catalogos se navegan desde
+ * el Sidebar (grupo "Configuración"); esta pantalla ya no repite esas rutas
+ * como pestanas propias.
  */
 export function SettingsLayout({ summary, action, children }: SettingsLayoutProps) {
   return (
     <div>
       <ModuleHeader
         title="Configuración"
-        sections={sections}
         action={action}
         summary={
           <span className="inline-flex flex-wrap items-center gap-2">

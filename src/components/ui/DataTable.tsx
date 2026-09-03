@@ -62,14 +62,17 @@ export function Th({ sort, className = "", children, ...props }: ThProps) {
 interface RowProps {
   /** Atenuada mientras una accion sobre ella esta en curso. */
   busy?: boolean;
+  /** Para lo puntual que el filete comun no resuelve, p.ej. `group` cuando la
+   *  fila revela sus acciones solo al pasar el mouse. */
+  className?: string;
   children: ReactNode;
 }
 
-export function Row({ busy = false, children }: RowProps) {
+export function Row({ busy = false, className = "", children }: RowProps) {
   return (
     <tr
       className={`border-b border-line-soft transition-colors last:border-0 hover:bg-canvas
-        [&>td:first-child]:pl-0 [&>td:last-child]:pr-0 ${busy ? "opacity-50" : ""}`}
+        [&>td:first-child]:pl-0 [&>td:last-child]:pr-0 ${busy ? "opacity-50" : ""} ${className}`}
     >
       {children}
     </tr>

@@ -6,6 +6,7 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
 import { ClientsPage } from "./pages/clients/ClientsPage";
+import { DashboardPage } from "./pages/dashboard/DashboardPage";
 import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { LiveOperationSection } from "./pages/reports/LiveOperationSection";
 import { ReportCatalogSection } from "./pages/reports/ReportCatalogSection";
@@ -43,6 +44,8 @@ export default function App() {
           </ProtectedRoute>
         }
       >
+        <Route path="/dashboard" element={<DashboardPage />} />
+
         <Route path="/staff" element={<StaffPage />} />
         <Route path="/staff/:id" element={<StaffDetailPage section="datos" />} />
         <Route path="/staff/:id/accesos" element={<StaffDetailPage section="accesos" />} />
@@ -89,7 +92,7 @@ export default function App() {
           }
         />
 
-        <Route path="/" element={<Navigate to="/staff" replace />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
