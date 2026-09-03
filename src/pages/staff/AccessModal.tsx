@@ -1,10 +1,24 @@
-import { useState } from "react";
-import { Alert } from "../../components/ui/Alert";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import { Button } from "../../components/ui/Button";
-import { CheckboxField } from "../../components/ui/Field";
+import { CheckboxField, SelectField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { Select } from "../../components/ui/Select";
 import type { DepartmentAccess, RoleSummary } from "../../types/permissions";
+
+/**
+ * Espejo de la validacion del servidor en POST /api/staff/{id}/department-access:
+ * departamento y rol obligatorios, y el departamento no puede repetirse en dos
+ * accesos de la misma persona (la clave primaria de StaffDepartmentAccess es
+ * StaffId + DepartmentId).
+ */
+const schema = z.object({
+  departmentId: z.string().min(1, "Elige el departamento al que le das acceso"),
+  roleId: z.string().min(1, "Elige con qué rol entra a ese departamento"),
+  isPrimary: z.boolean(),
+});
+
+type FormValues = z.infer<typeof schema>;
 
 interface AccessModalProps {
   staffName: string;
@@ -32,32 +46,40 @@ export function AccessModal({
 }: AccessModalProps) {
   const isEdit = access !== undefined;
 
-  const [departmentId, setDepartmentId] = useState(access ? String(access.departmentId) : "");
-  const [roleId, setRoleId] = useState(access ? String(access.roleId) : "");
-  const [isPrimary, setIsPrimary] = useState(access?.isPrimary ?? isFirst);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    control,
+    register,
+    handleSubmit,
+    formState: { errors, touchedFields, isSubmitting },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    mode: "onTouched",
+    defaultValues: {
+      departmentId: access ? String(access.departmentId) : "",
+      roleId: access ? String(access.roleId) : "",
+      isPrimary: access?.isPrimary ?? isFirst,
+    },
+  });
 
-  const available = departments.filter(
-    (department) => isEdit || !taken.includes(department.id),
-  );
+  function stateOf(field: keyof FormValues): FieldState {
+    if (errors[field]) return "error";
+    return touchedFields[field] ? "valid" : "idle";
+  }
+
+  const available = departments.filter((department) => isEdit || !taken.includes(department.id));
 
   // Un rol inactivo no puede asignarse a nadie nuevo, pero si ya estaba asignado
   // se muestra para no romper la ficha de quien lo tiene.
   const assignableRoles = roles.filter(
-    (role) => !role.grantsAll && (role.isActive || String(role.id) === roleId),
+    (role) => !role.grantsAll && (role.isActive || (access && role.id === access.roleId)),
   );
 
-  function submit() {
-    if (departmentId === "") {
-      setError("Elige el departamento al que le das acceso");
-      return;
-    }
-    if (roleId === "") {
-      setError("Elige con qué rol entra a ese departamento");
-      return;
-    }
-
-    onSave({ departmentId: Number(departmentId), roleId: Number(roleId), isPrimary });
+  function onSubmit(values: FormValues) {
+    onSave({
+      departmentId: Number(values.departmentId),
+      roleId: Number(values.roleId),
+      isPrimary: values.isPrimary,
+    });
     onClose();
   }
 
@@ -76,64 +98,72 @@ export function AccessModal({
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="button" onClick={submit}>
+          <Button type="submit" form="access-form" isLoading={isSubmitting}>
             {isEdit ? "Guardar cambios" : "Otorgar acceso"}
           </Button>
         </>
       }
     >
-      <div className="flex flex-col gap-4">
-        {error && <Alert variant="error">{error}</Alert>}
-
-        <label className="flex flex-col gap-1.5">
-          <span className="font-heading text-[11px] font-semibold uppercase tracking-[0.06em] text-brand-gray">
-            Departamento
-          </span>
-          <Select
-            value={departmentId}
-            onChange={setDepartmentId}
-            disabled={isEdit}
-            placeholder="Elige un departamento"
-            options={available.map((department) => ({
-              value: String(department.id),
-              label: department.name,
-            }))}
-          />
-          {!isEdit && available.length === 0 && (
-            <span className="text-[11.5px] text-faint">
-              Ya tiene acceso a todos los departamentos.
-            </span>
+      <form id="access-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        <Controller
+          name="departmentId"
+          control={control}
+          render={({ field }) => (
+            <SelectField
+              label="Departamento"
+              required
+              name={field.name}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              disabled={isEdit}
+              placeholder="Elige un departamento"
+              options={available.map((department) => ({
+                value: String(department.id),
+                label: department.name,
+              }))}
+              state={stateOf("departmentId")}
+              error={errors.departmentId?.message}
+              hint={
+                !isEdit && available.length === 0
+                  ? "Ya tiene acceso a todos los departamentos."
+                  : undefined
+              }
+            />
           )}
-        </label>
+        />
 
-        <label className="flex flex-col gap-1.5">
-          <span className="font-heading text-[11px] font-semibold uppercase tracking-[0.06em] text-brand-gray">
-            Rol en ese departamento
-          </span>
-          <Select
-            value={roleId}
-            onChange={setRoleId}
-            placeholder="Elige un rol"
-            options={assignableRoles.map((role) => ({
-              value: String(role.id),
-              label: role.isActive ? role.name : `${role.name} (inactivo)`,
-              disabled: !role.isActive,
-            }))}
-          />
-          <span className="text-[11.5px] leading-relaxed text-faint">
-            El rol solo aplica dentro de este departamento. La misma persona puede tener otro rol
-            distinto en otro.
-          </span>
-        </label>
+        <Controller
+          name="roleId"
+          control={control}
+          render={({ field }) => (
+            <SelectField
+              label="Rol en ese departamento"
+              required
+              name={field.name}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              placeholder="Elige un rol"
+              options={assignableRoles.map((role) => ({
+                value: String(role.id),
+                label: role.isActive ? role.name : `${role.name} (inactivo)`,
+                disabled: !role.isActive,
+              }))}
+              state={stateOf("roleId")}
+              error={errors.roleId?.message}
+              hint="Solo aplica dentro de este departamento: la misma persona puede tener otro rol en otro."
+            />
+          )}
+        />
 
         <CheckboxField
           label="Departamento principal"
           description="Es el que aparece en el listado de personal. Marcarlo aquí lo quita del acceso que lo sea hoy."
-          checked={isPrimary}
           disabled={isFirst}
-          onChange={(event) => setIsPrimary(event.target.checked)}
+          {...register("isPrimary")}
         />
-      </div>
+      </form>
     </Modal>
   );
 }
