@@ -7,10 +7,6 @@ export interface ModuleSection {
 }
 
 interface ModuleHeaderProps {
-  /** Titulo del modulo. Las fichas lo sustituyen por el nombre del registro. */
-  title?: string;
-  /** Resumen en linea con el titulo, no debajo: gana altura para la tabla. */
-  summary?: ReactNode;
   /** Accion principal del modulo. */
   action?: ReactNode;
   /**
@@ -24,52 +20,44 @@ interface ModuleHeaderProps {
   sections?: ModuleSection[];
 }
 
-export function ModuleHeader({ title = "Personal", summary, action, sections = [] }: ModuleHeaderProps) {
-  return (
-    <div className="mb-3">
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="font-heading text-[20px] font-bold tracking-[-0.02em] text-ink">{title}</h1>
-          {/* El filete y el resumen van en un solo bloque: sueltos como hermanos
-              del flex, al envolverse la linea el filete se quedaba colgando solo
-              al final del titulo. */}
-          {summary && (
-            <span className="flex items-center gap-3">
-              <span aria-hidden className="hidden h-3.5 w-px bg-line sm:block" />
-              <span className="text-[12.5px] text-muted">{summary}</span>
-            </span>
-          )}
+/**
+ * El titulo y el resumen del modulo ya no viven aqui: el breadcrumb del
+ * TopBar nombra la pagina actual, y repetirlo en el contenido era el mismo
+ * dato dos veces. Lo que queda es lo que el breadcrumb no resuelve: la accion
+ * principal y, en una ficha, las pestanas de seccion — mas el filete que
+ * separa la cabecera de la fila de criterios.
+ */
+export function ModuleHeader({ action, sections = [] }: ModuleHeaderProps) {
+  if (sections.length > 0) {
+    return (
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-1 border-b border-line">
+        <div className="flex w-full min-w-0 items-center gap-6 overflow-x-auto pb-px sm:w-auto sm:flex-1">
+          {sections.map(({ label, to }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end
+              className={({ isActive }) =>
+                `-mb-px shrink-0 whitespace-nowrap border-b-2 pb-2 text-[13px] transition-colors ${
+                  isActive
+                    ? "border-brand-red font-semibold text-ink"
+                    : "border-transparent font-medium text-muted hover:text-ink"
+                }`
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
         </div>
 
-        {sections.length === 0 && action && <div className="shrink-0">{action}</div>}
+        {action && <div className="shrink-0 pb-1.5">{action}</div>}
       </div>
+    );
+  }
 
-      {sections.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-1 border-b border-line">
-          <div className="flex w-full min-w-0 items-center gap-6 overflow-x-auto pb-px sm:w-auto sm:flex-1">
-            {sections.map(({ label, to }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end
-                className={({ isActive }) =>
-                  `-mb-px shrink-0 whitespace-nowrap border-b-2 pb-2 text-[13px] transition-colors ${
-                    isActive
-                      ? "border-brand-red font-semibold text-ink"
-                      : "border-transparent font-medium text-muted hover:text-ink"
-                  }`
-                }
-              >
-                {label}
-              </NavLink>
-            ))}
-          </div>
+  if (action) {
+    return <div className="mb-3 flex justify-end border-b border-line pb-3">{action}</div>;
+  }
 
-          {action && <div className="shrink-0 pb-1.5">{action}</div>}
-        </div>
-      )}
-
-      {sections.length === 0 && <div className="mt-3 border-b border-line" />}
-    </div>
-  );
+  return <div className="mb-3 border-b border-line" />;
 }

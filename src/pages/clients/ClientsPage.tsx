@@ -176,20 +176,6 @@ export function ClientsPage() {
   return (
     <div>
       <ModuleHeader
-        title="Clientes"
-        summary={
-          <span className="inline-flex flex-wrap items-center gap-2">
-            {clients === null ? (
-              "Cargando los clientes…"
-            ) : (
-              <>
-                {all.length} clientes · {activeCount} activos · {noRepCount} sin vendedor
-              </>
-            )}
-            <span aria-hidden className="h-3 w-px bg-line" />
-            <Badge>Datos de demostración</Badge>
-          </span>
-        }
         action={
           canWrite && (
             <Button size="sm" onClick={() => setModal("nuevo")}>

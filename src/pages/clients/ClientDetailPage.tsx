@@ -118,7 +118,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   if (error) {
     return (
       <div>
-        <ModuleHeader title="Cliente" sections={sections} />
+        <ModuleHeader sections={sections} />
         <Alert variant="error">{error}</Alert>
       </div>
     );
@@ -135,17 +135,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   return (
     <div>
       <ModuleHeader
-        title={client.name}
         sections={sections}
-        summary={
-          <span className="inline-flex flex-wrap items-center gap-2">
-            {client.code}
-            <span aria-hidden className="h-3 w-px bg-line" />
-            {territoryName(client.territoryId)}
-            <span aria-hidden className="h-3 w-px bg-line" />
-            <Badge>Datos de demostración</Badge>
-          </span>
-        }
         action={
           canWrite &&
           (section === "datos" ? (

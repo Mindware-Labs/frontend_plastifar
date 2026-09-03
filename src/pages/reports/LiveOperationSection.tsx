@@ -41,7 +41,7 @@ export function LiveOperationSection() {
   }
 
   return (
-    <ReportsLayout summary="Bandeja por estado, carga por agente y vencimientos, ahora mismo">
+    <ReportsLayout>
       <DateRangeBar range={range} onChange={setRange} onExport={data ? exportCsv : undefined} />
 
       {error && (

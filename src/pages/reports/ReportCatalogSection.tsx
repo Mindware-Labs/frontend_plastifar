@@ -23,7 +23,7 @@ export function ReportCatalogSection({ family, blockedBy }: ReportCatalogSection
   const reports = REPORT_CATALOG.filter((report) => report.family === family);
 
   return (
-    <ReportsLayout summary={`${reports.length} reportes · pendientes de ${blockedBy}`}>
+    <ReportsLayout>
       <DateRangeBar range={range} onChange={setRange} />
 
       <div className="mb-3 flex items-start gap-2.5 border border-dashed border-line-strong bg-canvas px-3.5 py-3">

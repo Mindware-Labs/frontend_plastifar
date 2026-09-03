@@ -116,15 +116,8 @@ export function HolidaysSection() {
     });
   }
 
-  const activeCount = all.filter((holiday) => holiday.isActive).length;
-
   return (
     <SettingsLayout
-      summary={
-        holidays === null
-          ? "Cargando el calendario…"
-          : `${all.length} días registrados · ${activeCount} activos`
-      }
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nuevo")}>

@@ -5,7 +5,6 @@ import { Spinner } from "../../components/ui/Spinner";
 import { dashboardMock } from "../../mocks/dashboard";
 import type { DashboardData, KpiKey } from "../../types/dashboard";
 import { DashboardCard } from "./DashboardCard";
-import { DashboardHeader } from "./DashboardHeader";
 import { KpiTile } from "./KpiTile";
 import { MonoRoundedBarChart } from "./mono-charts/MonoRoundedBarChart";
 import { MonoRoundedDonutChart } from "./mono-charts/MonoRoundedDonutChart";
@@ -61,8 +60,6 @@ export function DashboardPage() {
     // negativo cancela el padding de <main> para que el tinte llegue al borde.
     <div className="-mx-8 -mt-4 -mb-12 bg-fill px-8 pt-6 pb-12">
       <div className="flex flex-col gap-6">
-        <DashboardHeader />
-
         {error && <Alert variant="error">{error}</Alert>}
 
         {data === null ? (

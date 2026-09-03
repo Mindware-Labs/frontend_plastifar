@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
-import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker } from "../../components/ui/ColumnPicker";
 import { FilterChip } from "../../components/ui/FilterChip";
@@ -191,20 +190,6 @@ export function PermissionsPage() {
   return (
     <div>
       <ModuleHeader
-        summary={
-          matrix ? (
-            <span className="inline-flex flex-wrap items-center gap-2">
-              {`${catalog.length} permisos · ${matrix.roles.length} roles · ${
-                counts.sinAsignar === 0
-                  ? "todos asignados"
-                  : `${counts.sinAsignar} sin asignar a ningún rol`
-              }`}
-              <Badge>Datos de demostración</Badge>
-            </span>
-          ) : (
-            "Cargando el catálogo de permisos…"
-          )
-        }
         action={
           canWrite && dirtyCells > 0 && (
             <div className="flex items-center gap-2">

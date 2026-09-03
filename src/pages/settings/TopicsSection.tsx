@@ -169,13 +169,6 @@ export function TopicsSection() {
 
   return (
     <SettingsLayout
-      summary={
-        topics === null
-          ? "Cargando los motivos…"
-          : `${all.length} motivos · ${activeCount} activos · encolan en ${
-              new Set(all.map((topic) => topic.defaultDepartmentId)).size
-            } departamentos`
-      }
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nuevo")}>

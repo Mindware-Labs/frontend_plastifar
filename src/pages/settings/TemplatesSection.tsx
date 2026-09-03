@@ -88,11 +88,6 @@ export function TemplatesSection() {
 
   return (
     <SettingsLayout
-      summary={
-        templates === null
-          ? "Cargando las plantillas…"
-          : `${all.length} plantillas · ${activeCount} activas`
-      }
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nueva")}>

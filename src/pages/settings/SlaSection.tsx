@@ -125,13 +125,6 @@ export function SlaSection() {
 
   return (
     <SettingsLayout
-      summary={
-        policies === null
-          ? "Cargando las políticas…"
-          : `${all.length} políticas · ${all.filter((policy) => policy.isActive).length} activas · ${
-              4 - uncovered.length
-            } de 4 prioridades cubiertas`
-      }
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nueva")}>

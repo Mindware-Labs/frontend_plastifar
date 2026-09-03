@@ -176,11 +176,6 @@ export function StaffPage() {
   return (
     <div>
       <ModuleHeader
-        summary={
-          counts
-            ? `${counts.all} colaboradores · ${counts.active} activos · ${counts.admins} con permisos de administrador`
-            : "Cargando el personal con acceso al sistema…"
-        }
         action={
           canWrite && (
             <Button size="sm" onClick={() => setModal("nuevo")}>

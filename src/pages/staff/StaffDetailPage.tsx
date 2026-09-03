@@ -141,7 +141,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   if (error) {
     return (
       <div>
-        <ModuleHeader title="Colaborador" sections={sections} />
+        <ModuleHeader sections={sections} />
         <Alert variant="error">{error}</Alert>
       </div>
     );
@@ -158,19 +158,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   return (
     <div>
       <ModuleHeader
-        title={fullName}
         sections={sections}
-        summary={
-          <span className="inline-flex flex-wrap items-center gap-2">
-            {staff.email}
-            <span aria-hidden className="h-3 w-px bg-line" />
-            {primary ? primary.departmentName : "Sin departamento principal"}
-            {/* Con su propio filete: pegada al departamento, la pastilla se lee
-                como una propiedad de Calidad y no de los datos. */}
-            <span aria-hidden className="h-3 w-px bg-line" />
-            <Badge>Datos de demostración</Badge>
-          </span>
-        }
         action={
           section === "accesos" && canWrite && (
             <Button size="sm" onClick={() => setModal("nuevo")}>

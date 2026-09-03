@@ -88,11 +88,6 @@ export function RolesPage() {
   return (
     <div>
       <ModuleHeader
-        summary={
-          counts
-            ? `${counts.all} roles definidos · ${counts.custom} personalizados · los permisos llegan en una fase posterior`
-            : "Cargando los roles del sistema…"
-        }
         action={
           canWrite && (
             <Button size="sm" onClick={() => setModal("nuevo")}>

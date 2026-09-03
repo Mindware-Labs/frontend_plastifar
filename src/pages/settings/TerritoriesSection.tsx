@@ -86,11 +86,6 @@ export function TerritoriesSection() {
 
   return (
     <SettingsLayout
-      summary={
-        territories === null
-          ? "Cargando los territorios…"
-          : `${all.length} territorios · ${activeCount} activos`
-      }
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nuevo")}>

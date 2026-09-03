@@ -112,11 +112,6 @@ export function ProductLinesSection() {
 
   return (
     <SettingsLayout
-      summary={
-        lines === null
-          ? "Cargando las líneas…"
-          : `${all.length} líneas · ${activeCount} activas · ${inUseCount} en uso por algún motivo`
-      }
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nueva")}>

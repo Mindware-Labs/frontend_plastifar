@@ -127,31 +127,6 @@ function buildActivityStream(seed: number): ActivityStreamPoint[] {
   });
 }
 
-function buildActivityHeatmap(seed: number, weeks = 13): ActivityHeatmapDay[] {
-  const random = rng(seed);
-  const days = weeks * 7;
-  const today = new Date();
-  // Retrocede hasta el lunes de la semana mas antigua, para que cada columna
-  // sea una semana completa L→D como el resto del panel.
-  const mondayOffset = (today.getDay() + 6) % 7;
-  const start = new Date(today);
-  start.setDate(start.getDate() - mondayOffset - (weeks - 1) * 7);
-
-  const counts = Array.from({ length: days }, (_, index) => {
-    const date = new Date(start);
-    date.setDate(date.getDate() + index);
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-    const base = isWeekend ? random() * 3 : 6 + random() * 14;
-    return { date: date.toISOString().slice(0, 10), count: Math.round(base) };
-  });
-
-  const max = Math.max(1, ...counts.map((day) => day.count));
-  return counts.map((day) => ({
-    ...day,
-    level: (day.count === 0 ? 0 : Math.min(4, 1 + Math.floor((day.count / max) * 4))) as ActivityHeatmapDay["level"],
-  }));
-}
-
 function buildPriorityCompliance(seed: number): PriorityCompliance[] {
   const random = rng(seed);
   return [
@@ -212,7 +187,6 @@ export const dashboardMock = {
   data(): Promise<DashboardData> {
     const weeklyBars = buildWeeklyBars(SEED >> 1);
     const activityStream = buildActivityStream(SEED >> 11);
-    const activityHeatmap = buildActivityHeatmap(SEED >> 13);
 
     return delay({
       kpis: buildKpis(SEED),
@@ -220,8 +194,6 @@ export const dashboardMock = {
       weeklyTotal: weeklyBars.reduce((sum, point) => sum + point.primary, 0),
       activityStream,
       activityPeak: Math.max(...activityStream.map((point) => point.w1)),
-      activityHeatmap,
-      activityHeatmapTotal: activityHeatmap.reduce((sum, day) => sum + day.count, 0),
       slaCompliance: Math.round(85 + rng(SEED >> 9)() * 12),
       priorityCompliance: buildPriorityCompliance(SEED >> 10),
       tickets: buildTickets(SEED >> 7),

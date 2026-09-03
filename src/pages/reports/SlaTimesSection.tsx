@@ -44,7 +44,7 @@ export function SlaTimesSection() {
   }
 
   return (
-    <ReportsLayout summary="Cumplimiento y tiempos reales contra el compromiso de SLA">
+    <ReportsLayout>
       <DateRangeBar range={range} onChange={setRange} onExport={data ? exportCsv : undefined} />
 
       {error && (

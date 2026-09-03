@@ -130,11 +130,6 @@ export function MailboxesSection() {
 
   return (
     <SettingsLayout
-      summary={
-        mailboxes === null
-          ? "Cargando los buzones…"
-          : `${all.length} buzones · ${activeCount} activos`
-      }
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nuevo")}>
