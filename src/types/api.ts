@@ -162,6 +162,8 @@ export interface EmailDetailResponse {
   bodyText: string | null;
   createdAt: string;
   ticketId: number | null;
+  /** Todos los que ya estaban en la conversacion, para el "responder a todos". */
+  otherRecipients: string[];
   attachments: EmailAttachmentResponse[];
   thread: EmailThreadMessageResponse[];
 }
@@ -224,4 +226,9 @@ export interface EmailFolderCounts {
   junk: FolderCount;
   trash: FolderCount;
   sent: FolderCount;
+}
+
+/** La firma que se agrega al pie de los correos que envia esta persona. */
+export interface StaffSignatureResponse {
+  signature: string | null;
 }

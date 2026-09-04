@@ -1,4 +1,4 @@
-import { ChevronDown, Inbox, KeyRound, LogOut, PanelLeft, Users } from "lucide-react";
+import { ChevronDown, Inbox, KeyRound, LogOut, PanelLeft, PenLine, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
@@ -6,6 +6,7 @@ import { useEmailCounts } from "../../context/useEmailCounts";
 import type { EmailFolderCounts } from "../../types/api";
 import { Logo } from "../Logo";
 import { ChangePasswordModal } from "./ChangePasswordModal";
+import { SignatureModal } from "./SignatureModal";
 
 interface NavItem {
   label: string;
@@ -104,6 +105,7 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [editingSignature, setEditingSignature] = useState(false);
   const [flyout, setFlyout] = useState<Flyout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<number | null>(null);
@@ -281,6 +283,19 @@ export function Sidebar() {
                 role="menuitem"
                 onClick={() => {
                   setMenuOpen(false);
+                  setEditingSignature(true);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-2 text-left text-[13px]
+                  text-brand-gray transition-colors hover:bg-fill hover:text-ink"
+              >
+                <PenLine className="h-4 w-4" />
+                Tu firma
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
                   setChangingPassword(true);
                 }}
                 className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-2 text-left text-[13px]
@@ -369,6 +384,7 @@ export function Sidebar() {
       )}
 
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
+      {editingSignature && <SignatureModal onClose={() => setEditingSignature(false)} />}
     </aside>
   );
 }

@@ -29,6 +29,7 @@ import {
   formatTicketCode,
 } from "../../lib/format";
 import type { EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
+import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { fieldLabelClass } from "./toolbarStyles";
 import { ticketBadgeClass } from "./badgeStyles";
@@ -145,6 +146,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   }, [replyOpen]);
 
   useEffect(() => {
+    if (!replyOpen) return;
+    writeDraft(String(emailId), { body: replyBody, cc: replyCc });
+  }, [replyOpen, emailId, replyBody, replyCc]);
+
+  useEffect(() => {
     if (ccOpen) ccRef.current?.focus();
   }, [ccOpen]);
 
@@ -171,6 +177,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
         files,
       });
 
+      clearDraft(String(email.id));
       setEmail({ ...email, thread: [...(email.thread ?? []), reply] });
       setOpenReplyId(reply.id);
       setReplyBody("");
@@ -203,6 +210,20 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
 
     setReplyError(null);
     setFiles(merged);
+  }
+
+  function openComposer() {
+    const draft = readDraft(String(emailId));
+
+    if (draft) {
+      setReplyBody(draft.body);
+      if (draft.cc) {
+        setReplyCc(draft.cc);
+        setCcOpen(true);
+      }
+    }
+
+    setReplyOpen(true);
   }
 
   function closeComposer() {
@@ -239,6 +260,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
 
   const displayName = email.fromName ?? email.fromEmail;
   const isOutbound = email.direction === "Outbound";
+  // Quienes ya estaban en el hilo: el servidor ya descarto nuestra casilla y al remitente.
+  const replyAll = email.otherRecipients ?? [];
   const isInInbox = email.folder === "Inbox";
 
   // Un API sin este campo no debe tumbar el panel entero.
@@ -411,6 +434,22 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">
                 {email.fromEmail}
               </span>
+              {!ccOpen && replyAll.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCcOpen(true);
+                    setReplyCc(replyAll.join(", "));
+                  }}
+                  title="Copiar a todos los de la conversación"
+                  className="shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10.5px] font-bold
+                    uppercase tracking-[0.08em] text-faint outline-none transition-colors
+                    hover:bg-fill hover:text-brand-red
+                    focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                >
+                  Todos
+                </button>
+              )}
               {!ccOpen && (
                 <button
                   type="button"
@@ -736,7 +775,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
         <button
           type="button"
           hidden={isOutbound}
-          onClick={() => setReplyOpen(true)}
+          onClick={openComposer}
           className="flex w-full items-center gap-2 rounded-edge border border-line bg-canvas
             px-3 py-2 text-left text-[12px] text-subtle outline-none
             transition-[background-color,border-color,color]

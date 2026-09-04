@@ -3,6 +3,7 @@ import type {
   CreateStaffRequest,
   StaffListResponse,
   StaffResponse,
+  StaffSignatureResponse,
   UpdateStaffRequest,
 } from "../types/api";
 
@@ -19,6 +20,14 @@ export interface StaffQuery {
 }
 
 export const staffApi = {
+  getSignature: () => apiRequest<StaffSignatureResponse>("/api/staff/me/signature"),
+
+  updateSignature: (signature: string) =>
+    apiRequest<StaffSignatureResponse>("/api/staff/me/signature", {
+      method: "PUT",
+      body: JSON.stringify({ signature }),
+    }),
+
   list: (query: StaffQuery) => apiRequest<StaffListResponse>(`/api/staff${toQuery({ ...query })}`),
 
   create: (data: CreateStaffRequest) =>
