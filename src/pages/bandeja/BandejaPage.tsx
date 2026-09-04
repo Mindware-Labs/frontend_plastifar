@@ -126,7 +126,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                       </p>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-2 p-4 pt-0">
+                    <div className="flex flex-col gap-1 p-3 pt-0">
                       {rows.map((email) => {
                         const name = fullName(email);
                         const isSelected = selectedId === email.id;
@@ -136,8 +136,8 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                             type="button"
                             onClick={() => setSelectedId(email.id)}
                             data-selected={isSelected}
-                            className="group flex flex-col items-start gap-1.5 rounded-edge border
-                              border-line bg-white p-3 text-left outline-none
+                            className="group flex flex-col items-start gap-0.5 rounded-edge border
+                              border-line bg-white px-2.5 py-2 text-left outline-none
                               transition-[background-color,border-color,box-shadow]
                               hover:border-line-strong hover:bg-canvas
                               focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12
@@ -146,48 +146,53 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                               data-[selected=true]:hover:bg-brand-red/[0.085]
                               data-[selected=true]:hover:shadow-[0_6px_16px_-10px_rgba(228,0,43,0.5)]"
                           >
-                            <div className="flex w-full items-center gap-2">
-                              <Avatar className="size-6">
+                            <div className="flex w-full items-center gap-1.5">
+                              <Avatar className="size-5">
                                 <AvatarFallback
-                                  className="bg-fill text-[10px] font-semibold text-brand-gray
+                                  className="bg-fill text-[9px] font-semibold text-brand-gray
                                     group-data-[selected=true]:bg-brand-red/12
                                     group-data-[selected=true]:text-brand-red-dark"
                                 >
                                   {initials(name)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="truncate text-[13px] font-semibold text-ink
+                              <span className="truncate text-[12.5px] font-semibold text-ink
                                 transition-colors group-data-[selected=true]:text-brand-red-dark">
                                 {name}
                               </span>
-                              <span className="ml-auto shrink-0 text-[11px] font-medium text-faint">
+                              <span className="ml-auto shrink-0 text-[10.5px] font-medium text-faint">
                                 {formatEmailListDate(email.createdAt)}
                               </span>
                             </div>
-                            <div className="line-clamp-1 w-full text-[12.5px] font-medium text-brand-gray">
-                              {email.subject || "(sin asunto)"}
+
+                            {/* Distintivos al final del asunto: se ahorra una fila entera por tarjeta. */}
+                            <div className="flex w-full items-center gap-1.5">
+                              <span className="truncate text-[12px] font-medium text-brand-gray">
+                                {email.subject || "(sin asunto)"}
+                              </span>
+                              {(email.attachmentCount > 0 || email.ticketId) && (
+                                <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                                  {email.attachmentCount > 0 && (
+                                    <span className="flex items-center gap-0.5 text-[10.5px] font-medium text-faint">
+                                      <Paperclip className="h-3 w-3" />
+                                      {email.attachmentCount}
+                                    </span>
+                                  )}
+                                  {email.ticketId && (
+                                    <Badge
+                                      variant="secondary"
+                                      className={`${ticketBadgeClass} h-4 px-1.5`}
+                                    >
+                                      {formatTicketCode(email.ticketId)}
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <div className="line-clamp-2 w-full text-[12px] leading-relaxed text-subtle">
+
+                            <div className="line-clamp-1 w-full text-[11.5px] text-subtle">
                               {email.preview}
                             </div>
-                            {(email.ticketId || email.attachmentCount > 0) && (
-                              <div className="flex items-center gap-1.5 pt-0.5">
-                                {email.ticketId && (
-                                  <Badge variant="secondary" className={ticketBadgeClass}>
-                                    {formatTicketCode(email.ticketId)}
-                                  </Badge>
-                                )}
-                                {email.attachmentCount > 0 && (
-                                  <Badge
-                                    variant="outline"
-                                    className="border-line bg-white text-[10px] font-semibold text-subtle"
-                                  >
-                                    <Paperclip className="h-3 w-3" />
-                                    {email.attachmentCount}
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
                           </button>
                         );
                       })}
