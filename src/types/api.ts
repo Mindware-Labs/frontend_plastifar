@@ -171,6 +171,9 @@ export interface EmailReplyResponse {
   bodyText: string;
   authorName: string;
   createdAt: string;
+  /** Sent | Delayed | Delivered | Bounced | Complained. */
+  deliveryStatus: string | null;
+  deliveryDetail: string | null;
   attachments: EmailAttachmentResponse[];
 }
 

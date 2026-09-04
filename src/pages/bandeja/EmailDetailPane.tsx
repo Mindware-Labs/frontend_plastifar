@@ -53,6 +53,14 @@ const toolButtonClass =
   "size-7 text-brand-gray transition-colors hover:bg-fill hover:text-ink " +
   "focus-visible:ring-brand-red/20 focus-visible:border-brand-red/30";
 
+/** Lo que informa el proveedor del envio. "Sent" no se muestra: es el estado normal. */
+const deliveryLabels: Record<string, { label: string; className: string }> = {
+  Delivered: { label: "Entregado", className: "text-brand-green" },
+  Delayed: { label: "Demorado", className: "text-warn" },
+  Bounced: { label: "No entregado", className: "text-brand-red" },
+  Complained: { label: "Marcado como spam", className: "text-brand-red" },
+};
+
 /** Etiquetas del editor: mismo ancho para que los valores queden en una sola columna. */
 const fieldLabelClass =
   "w-8 shrink-0 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-faint";
@@ -548,6 +556,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
               </button>
             </div>
 
+            {(openReply.deliveryStatus === "Bounced" ||
+              openReply.deliveryStatus === "Complained") && (
+              <div className="shrink-0 border-b border-line px-4 py-2">
+                <Alert variant="error">
+                  {deliveryLabels[openReply.deliveryStatus].label}.{" "}
+                  {openReply.deliveryDetail ?? "El proveedor no dio más detalle."}
+                </Alert>
+              </div>
+            )}
+
             <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[13px] leading-relaxed text-ink">
               {openReply.bodyText}
             </div>
@@ -654,7 +672,19 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
                 <span className="truncate text-[11.5px] text-subtle">
                   {firstLine(reply.bodyText)}
                 </span>
-                <span className="ml-auto shrink-0 text-[10.5px] font-medium text-faint">
+                {reply.deliveryStatus && deliveryLabels[reply.deliveryStatus] && (
+                  <span
+                    className={`ml-auto shrink-0 text-[10.5px] font-semibold
+                      ${deliveryLabels[reply.deliveryStatus].className}`}
+                  >
+                    {deliveryLabels[reply.deliveryStatus].label}
+                  </span>
+                )}
+                <span
+                  className={`shrink-0 text-[10.5px] font-medium text-faint ${
+                    reply.deliveryStatus && deliveryLabels[reply.deliveryStatus] ? "" : "ml-auto"
+                  }`}
+                >
                   {formatEmailListDate(reply.createdAt)}
                 </span>
               </button>
