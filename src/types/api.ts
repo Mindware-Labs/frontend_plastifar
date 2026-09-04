@@ -157,6 +157,18 @@ export interface EmailDetailResponse {
   createdAt: string;
   ticketId: number | null;
   attachments: EmailAttachmentResponse[];
+  replies: EmailReplyResponse[];
+}
+
+/** Respuesta ya enviada por el staff sobre este correo. */
+export interface EmailReplyResponse {
+  id: number;
+  fromEmail: string;
+  toEmails: string[];
+  subject: string;
+  bodyText: string;
+  authorName: string;
+  createdAt: string;
 }
 
 /** Respuesta paginada de la bandeja (GET /api/emails). */

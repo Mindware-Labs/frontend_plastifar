@@ -285,7 +285,7 @@ export function AttachmentPreviewModal({
                 Este tipo de archivo no se puede previsualizar.
               </p>
               <p className="text-[12.5px] text-subtle">
-                Descargalo para abrirlo con la aplicación de tu equipo.
+                Descárgalo para abrirlo con la aplicación de tu equipo.
               </p>
             </div>
           )}

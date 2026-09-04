@@ -3,6 +3,7 @@ import type {
   AttachmentLinkResponse,
   EmailDetailResponse,
   EmailListResponse,
+  EmailReplyResponse,
   TicketSummaryResponse,
 } from "../types/api";
 
@@ -26,6 +27,12 @@ export const emailsApi = {
     apiRequest<AttachmentLinkResponse>(
       `/api/emails/${emailId}/attachments/${attachmentId}${toQuery({ download: download ? "true" : undefined })}`,
     ),
+
+  reply: (id: number, body: string) =>
+    apiRequest<EmailReplyResponse>(`/api/emails/${id}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    }),
 
   createTicket: (id: number) =>
     apiRequest<TicketSummaryResponse>(`/api/emails/${id}/ticket`, { method: "POST" }),

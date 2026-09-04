@@ -209,7 +209,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                     <Inbox className="h-7 w-7 text-faint" />
-                    <p className="text-[13px] text-subtle">Seleccioná un correo para verlo.</p>
+                    <p className="text-[13px] text-subtle">Selecciona un correo para verlo.</p>
                   </div>
                 )}
               </ResizablePanel>

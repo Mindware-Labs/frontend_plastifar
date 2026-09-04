@@ -1,12 +1,14 @@
 import {
   Archive,
   ArchiveRestore,
+  CornerUpLeft,
   Paperclip,
+  Send,
   ShieldAlert,
   Ticket as TicketIcon,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
@@ -56,6 +58,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
   const [createError, setCreateError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyBody, setReplyBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const replyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,6 +96,27 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
     }
   }
 
+  useEffect(() => {
+    if (replyOpen) replyRef.current?.focus();
+  }, [replyOpen]);
+
+  async function handleReply() {
+    if (!email || sending || replyBody.trim() === "") return;
+    setSending(true);
+    setReplyError(null);
+
+    try {
+      const reply = await emailsApi.reply(email.id, replyBody);
+      setEmail({ ...email, replies: [...(email.replies ?? []), reply] });
+      setReplyBody("");
+      setReplyOpen(false);
+    } catch (err) {
+      setReplyError(err instanceof ApiError ? err.message : "No se pudo enviar la respuesta");
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function handleMove(action: () => Promise<void>) {
     if (moving) return;
     setMoving(true);
@@ -118,6 +146,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
 
   const displayName = email.fromName ?? email.fromEmail;
   const isInInbox = email.folder === "Inbox";
+
+  // Un API sin este campo no debe tumbar el panel entero.
+  const replies = email.replies ?? [];
 
   return (
     <div className="flex h-full flex-col">
@@ -281,6 +312,95 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
           </div>
         </>
       )}
+
+      <Separator className="bg-line" />
+
+      <div className="shrink-0 p-4">
+        {replies.length > 0 && (
+          <div className="mb-3 max-h-32 space-y-2 overflow-y-auto pr-1">
+            {replies.map((reply) => (
+              <div key={reply.id} className="rounded-edge border border-line bg-canvas p-2.5">
+                <div className="flex items-center gap-1.5 text-[11.5px]">
+                  <CornerUpLeft className="h-3 w-3 shrink-0 text-faint" />
+                  <span className="font-semibold text-ink">{reply.authorName}</span>
+                  <span className="truncate text-faint">· {formatDateTime(reply.createdAt)}</span>
+                </div>
+                <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[12px] leading-relaxed text-subtle">
+                  {reply.bodyText}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {replyError && (
+          <div className="mb-2">
+            <Alert variant="error">{replyError}</Alert>
+          </div>
+        )}
+
+        {replyOpen ? (
+          <div className="rounded-edge border border-line p-3">
+            <p className="mb-2 text-[11.5px] text-subtle">
+              Para: <span className="font-medium text-ink">{email.fromEmail}</span>
+            </p>
+
+            <textarea
+              ref={replyRef}
+              value={replyBody}
+              onChange={(event) => setReplyBody(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) handleReply();
+              }}
+              rows={5}
+              placeholder="Escribe la respuesta…"
+              className="w-full resize-none rounded-edge border border-line bg-white p-2.5
+                text-[13px] leading-relaxed text-ink outline-none transition-colors
+                placeholder:text-faint focus:border-brand-red/40 focus:ring-3 focus:ring-brand-red/12"
+            />
+
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <p className="text-[11px] leading-snug text-faint">
+                Sale de la casilla de soporte, con tu nombre y tu firma.
+              </p>
+              <div className="flex shrink-0 gap-2">
+                <PfButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setReplyOpen(false);
+                    setReplyError(null);
+                  }}
+                >
+                  Cancelar
+                </PfButton>
+                <PfButton
+                  size="sm"
+                  onClick={handleReply}
+                  isLoading={sending}
+                  disabled={replyBody.trim() === ""}
+                >
+                  <Send className="h-[15px] w-[15px]" />
+                  Enviar
+                </PfButton>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setReplyOpen(true)}
+            className="flex w-full items-center gap-2 rounded-edge border border-line bg-canvas
+              px-3 py-2.5 text-left text-[12.5px] text-subtle outline-none
+              transition-[background-color,border-color,color]
+              hover:border-line-strong hover:bg-white hover:text-ink
+              focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12"
+          >
+            <CornerUpLeft className="h-3.5 w-3.5 text-faint" />
+            Responder a {email.fromName ?? email.fromEmail}
+          </button>
+        )}
+      </div>
 
       {previewIndex !== null && (
         <AttachmentPreviewModal
