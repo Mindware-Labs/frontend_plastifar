@@ -1,4 +1,12 @@
-import { CornerUpLeft, Inbox, MessagesSquare, Paperclip, PenLine } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CornerUpLeft,
+  Inbox,
+  MessagesSquare,
+  Paperclip,
+  PenLine,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { emailsApi, type EmailQuery } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
@@ -20,7 +28,7 @@ import { ticketBadgeClass } from "./badgeStyles";
 import { EmailDetailPane } from "./EmailDetailPane";
 import { NewEmailComposer } from "./NewEmailComposer";
 
-export type FolderKey = "inbox" | "archived" | "junk" | "trash";
+export type FolderKey = "inbox" | "archived" | "junk" | "trash" | "sent";
 type TicketFilter = "todos" | "sin-ticket" | "sin-responder";
 
 const folderMeta: Record<FolderKey, { title: string; emptyText: string }> = {
@@ -28,6 +36,7 @@ const folderMeta: Record<FolderKey, { title: string; emptyText: string }> = {
   archived: { title: "Archivados", emptyText: "No hay correos archivados." },
   junk: { title: "No deseado", emptyText: "No hay correos marcados como no deseados." },
   trash: { title: "Papelera", emptyText: "La papelera está vacía." },
+  sent: { title: "Enviados", emptyText: "Todavía no enviaste ningún correo." },
 };
 
 /** Pestanas del filtro: shadcn las pinta con negro al 60 %, que se lee lavado. */
@@ -35,8 +44,13 @@ const tabTriggerClass =
   "flex-1 text-[11.5px] font-medium text-subtle transition-colors hover:text-ink " +
   "data-active:bg-white data-active:font-semibold data-active:text-brand-red-dark";
 
-/** Sin control de paginacion: se pide la pagina mas grande que admite la API. */
-const PAGE_SIZE = 100;
+/** Cada pagina se pide al servidor: entra lo que se ve, no la bandeja entera. */
+const PAGE_SIZE = 15;
+
+const pagerButtonClass =
+  "flex h-6 w-6 shrink-0 items-center justify-center rounded-edge text-brand-gray outline-none " +
+  "transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20 " +
+  "disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent";
 
 interface BandejaPageProps {
   folder: FolderKey;
@@ -60,7 +74,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const debouncedSearch = useDebouncedValue(search).trim();
   const meta = folderMeta[folder];
 
-  const { data, isStale, error, refresh } = usePagedList<EmailQuery, EmailListResponse>(
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<EmailQuery, EmailListResponse>(
     {
       fetch: emailsApi.list,
       criteria: { pageSize: PAGE_SIZE, folder, filter: ticketFilter, search: debouncedSearch || undefined },
@@ -135,7 +149,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                   />
                 </div>
 
-                <div className="shrink-0 px-4 pb-3">
+                <div className={`shrink-0 px-4 pb-3 ${folder === "sent" ? "hidden" : ""}`}>
                   <Tabs
                     value={ticketFilter}
                     onValueChange={(value) => setTicketFilter(value as TicketFilter)}
@@ -263,6 +277,33 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                     </div>
                   )}
                 </ScrollArea>
+
+                {data !== null && data.totalPages > 1 && (
+                  <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line
+                    px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage(page - 1)}
+                      disabled={page <= 1}
+                      aria-label="Página anterior"
+                      className={pagerButtonClass}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="text-[11.5px] font-medium text-subtle">
+                      {page} de {data.totalPages} · {data.total} conversaciones
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage(page + 1)}
+                      disabled={page >= data.totalPages}
+                      aria-label="Página siguiente"
+                      className={pagerButtonClass}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </ResizablePanel>
 
               <ResizableHandle withHandle className="bg-line" />

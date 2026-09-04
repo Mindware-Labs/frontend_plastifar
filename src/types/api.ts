@@ -223,4 +223,5 @@ export interface EmailFolderCounts {
   archived: FolderCount;
   junk: FolderCount;
   trash: FolderCount;
+  sent: FolderCount;
 }

@@ -238,6 +238,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   }
 
   const displayName = email.fromName ?? email.fromEmail;
+  const isOutbound = email.direction === "Outbound";
   const isInInbox = email.folder === "Inbox";
 
   // Un API sin este campo no debe tumbar el panel entero.
@@ -685,7 +686,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
 
       <Separator className="bg-line" />
 
-      <div className="shrink-0 px-4 py-2.5">
+      <div className={`shrink-0 px-4 py-2.5 ${isOutbound && others.length === 0 ? "hidden" : ""}`}>
         {others.length > 0 && (
           <div className="mb-2 max-h-24 overflow-y-auto pr-0.5">
             {others.map((reply) => (
@@ -734,6 +735,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
 
         <button
           type="button"
+          hidden={isOutbound}
           onClick={() => setReplyOpen(true)}
           className="flex w-full items-center gap-2 rounded-edge border border-line bg-canvas
             px-3 py-2 text-left text-[12px] text-subtle outline-none

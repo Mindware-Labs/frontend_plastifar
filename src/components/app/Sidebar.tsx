@@ -31,6 +31,7 @@ const groups: NavGroup[] = [
     icon: Inbox,
     children: [
       { label: "Bandeja", to: "/bandeja", end: true, folder: "inbox" },
+      { label: "Enviados", to: "/bandeja/enviados", folder: "sent" },
       { label: "Archivados", to: "/bandeja/archivados", folder: "archived" },
       { label: "No deseado", to: "/bandeja/junk", folder: "junk" },
       { label: "Papelera", to: "/bandeja/papelera", folder: "trash" },
