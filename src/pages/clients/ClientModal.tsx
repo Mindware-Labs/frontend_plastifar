@@ -7,7 +7,11 @@ import { Modal } from "../../components/ui/Modal";
 import { NEW_ID } from "../../lib/catalog";
 import { CLIENT_TYPES, type Client } from "../../types/clients";
 
-
+/**
+ * Espejo de la validacion del servidor en POST/PUT /api/clients
+ * (ClientsController.ValidateAsync): codigo 2-20, nombre 2-160, correo valido
+ * si viene, RNC hasta 20 caracteres, territorio existente y vendedor activo.
+ */
 const schema = z.object({
   code: z.string().trim().min(2, "Al menos 2 caracteres").max(20, "Máximo 20 caracteres"),
   name: z.string().trim().min(2, "Al menos 2 caracteres").max(160, "Máximo 160 caracteres"),

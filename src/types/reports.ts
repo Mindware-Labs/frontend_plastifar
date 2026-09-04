@@ -82,34 +82,3 @@ export interface DateRange {
   from: string;
   to: string;
 }
-
-export interface StatusCount {
-  status: string;
-  count: number;
-  tone: "neutral" | "red" | "green" | "warn";
-}
-
-export interface AgentLoad {
-  agentName: string;
-  departmentName: string;
-  openTickets: number;
-}
-
-/** Datos de "Operación en vivo": los cinco reportes de esa familia. */
-export interface LiveOperationData {
-  byStatus: StatusCount[];
-  unassigned: number;
-  dueSoon: number;
-  overdue: number;
-  byAgent: AgentLoad[];
-}
-
-/** Datos de "SLA y tiempos": los cinco reportes de esa familia. */
-export interface SlaTimesData {
-  firstResponseCompliance: number;
-  resolutionCompliance: number;
-  avgFirstResponseMinutes: number;
-  avgResolutionMinutes: number;
-  avgPausedMinutes: number;
-  byPriority: { priority: string; compliance: number }[];
-}

@@ -11,10 +11,8 @@ import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
 import { HcaPage } from "./pages/quality/HcaPage";
-import { LiveOperationSection } from "./pages/reports/LiveOperationSection";
 import { QualityReportsSection } from "./pages/reports/QualityReportsSection";
 import { ReportCatalogSection } from "./pages/reports/ReportCatalogSection";
-import { SlaTimesSection } from "./pages/reports/SlaTimesSection";
 import { RolesPage } from "./pages/roles/RolesPage";
 import { HolidaysSection } from "./pages/settings/HolidaysSection";
 import { MailboxesSection } from "./pages/settings/MailboxesSection";
@@ -78,8 +76,14 @@ export default function App() {
         <Route path="/configuracion/territorios" element={<TerritoriesSection />} />
 
         <Route path="/reportes" element={<Navigate to="/reportes/operacion" replace />} />
-        <Route path="/reportes/operacion" element={<LiveOperationSection />} />
-        <Route path="/reportes/sla" element={<SlaTimesSection />} />
+        <Route
+          path="/reportes/operacion"
+          element={<ReportCatalogSection family="operacion" blockedBy="la Bandeja de tickets" />}
+        />
+        <Route
+          path="/reportes/sla"
+          element={<ReportCatalogSection family="sla" blockedBy="la Bandeja de tickets" />}
+        />
         <Route
           path="/reportes/productividad"
           element={<ReportCatalogSection family="productividad" blockedBy="la Bandeja de tickets" />}
