@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 
 interface ModalProps {
   title: string;
@@ -13,9 +14,6 @@ interface ModalProps {
   children: ReactNode;
 }
 
-const focusableSelector =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 /**
  * Dialogo modal del panel. Se monta en un portal sobre document.body para que
  * ningun ancestro con transform o overflow lo recorte ni lo desplace.
@@ -25,56 +23,7 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
   const titleId = useId();
   const descriptionId = useId();
 
-  // El efecto de montaje no debe depender de onClose: si el padre recrea esa
-  // funcion en cada render, el efecto se reiniciaria y devolveria el foco al
-  // primer campo en mitad del tecleo.
-  const closeRef = useRef(onClose);
-  useEffect(() => {
-    closeRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    // El foco entra al primer campo, no al aspa: se llega a escribir de inmediato.
-    const panel = panelRef.current;
-    const firstField = panel?.querySelector<HTMLElement>(
-      "input:not([type='hidden']), select, textarea",
-    );
-    (firstField ?? panel?.querySelector<HTMLElement>("button"))?.focus();
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closeRef.current();
-        return;
-      }
-      if (event.key !== "Tab" || !panel) return;
-
-      // Trampa de foco: el tabulador no debe escaparse al fondo de la pagina.
-      const items = Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector));
-      if (items.length === 0) return;
-
-      const first = items[0];
-      const last = items[items.length - 1];
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = originalOverflow;
-      previouslyFocused?.focus();
-    };
-  }, []);
+  useDialogBehavior(panelRef, onClose);
 
   return createPortal(
     <div

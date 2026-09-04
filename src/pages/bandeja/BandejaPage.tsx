@@ -117,7 +117,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                   />
                 </div>
 
-                <ScrollArea className="flex-1">
+                <ScrollArea className="min-h-0 flex-1">
                   {rows.length === 0 ? (
                     <div className="flex h-40 flex-col items-center justify-center gap-2 px-6 text-center">
                       <Inbox className="h-6 w-6 text-faint" />

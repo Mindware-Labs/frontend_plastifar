@@ -21,8 +21,11 @@ export const emailsApi = {
 
   get: (id: number) => apiRequest<EmailDetailResponse>(`/api/emails/${id}`),
 
-  attachmentLink: (emailId: number, attachmentId: number) =>
-    apiRequest<AttachmentLinkResponse>(`/api/emails/${emailId}/attachments/${attachmentId}`),
+  // download fuerza la descarga: sin el, los tipos que el navegador sabe mostrar se abren.
+  attachmentLink: (emailId: number, attachmentId: number, download = false) =>
+    apiRequest<AttachmentLinkResponse>(
+      `/api/emails/${emailId}/attachments/${attachmentId}${toQuery({ download: download ? "true" : undefined })}`,
+    ),
 
   createTicket: (id: number) =>
     apiRequest<TicketSummaryResponse>(`/api/emails/${id}/ticket`, { method: "POST" }),

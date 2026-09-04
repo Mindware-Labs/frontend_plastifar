@@ -1,7 +1,6 @@
 import {
   Archive,
   ArchiveRestore,
-  Loader2,
   Paperclip,
   ShieldAlert,
   Ticket as TicketIcon,
@@ -19,7 +18,8 @@ import { Button } from "../../components/shadcn/button";
 import { Separator } from "../../components/shadcn/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/shadcn/tooltip";
 import { formatBytes, formatDateTime, formatTicketCode } from "../../lib/format";
-import type { EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
+import type { EmailDetailResponse } from "../../types/api";
+import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { ticketBadgeClass } from "./badgeStyles";
 
 interface EmailDetailPaneProps {
@@ -34,12 +34,6 @@ interface EmailDetailPaneProps {
 const toolButtonClass =
   "text-brand-gray transition-colors hover:bg-fill hover:text-ink " +
   "focus-visible:ring-brand-red/20 focus-visible:border-brand-red/30";
-
-/** Lleva la pestana ya abierta al documento; replace evita dejar el blanco en el historial. */
-function sendTo(tab: Window | null, url: string) {
-  if (tab) tab.location.replace(url);
-  else window.location.href = url;
-}
 
 function initials(name: string) {
   return name
@@ -61,8 +55,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
-  const [openingId, setOpeningId] = useState<number | null>(null);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,25 +86,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
       setCreateError(err instanceof ApiError ? err.message : "No se pudo crear el ticket");
     } finally {
       setCreating(false);
-    }
-  }
-
-  async function openAttachment(attachment: EmailAttachmentResponse) {
-    if (openingId !== null) return;
-
-    // La pestana se abre antes del await: el navegador bloquea las que nacen despues.
-    const tab = window.open("", "_blank");
-    setOpeningId(attachment.id);
-    setAttachmentError(null);
-
-    try {
-      const link = await emailsApi.attachmentLink(emailId, attachment.id);
-      sendTo(tab, link.url);
-    } catch (err) {
-      tab?.close();
-      setAttachmentError(err instanceof ApiError ? err.message : "No se pudo abrir el documento");
-    } finally {
-      setOpeningId(null);
     }
   }
 
@@ -285,32 +259,20 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
               Adjuntos ({email.attachments.length})
             </p>
 
-            {attachmentError && (
-              <div className="mb-2">
-                <Alert variant="error">{attachmentError}</Alert>
-              </div>
-            )}
-
             <div className="flex flex-wrap gap-2">
-              {email.attachments.map((attachment) => (
+              {email.attachments.map((attachment, position) => (
                 <button
                   key={attachment.id}
                   type="button"
-                  onClick={() => openAttachment(attachment)}
-                  disabled={openingId !== null}
-                  title={`Abrir ${attachment.fileName}`}
+                  onClick={() => setPreviewIndex(position)}
+                  title={`Ver ${attachment.fileName}`}
                   className="group inline-flex items-center gap-1.5 rounded-edge border border-line
                     bg-canvas px-2.5 py-1.5 text-[12px] text-brand-gray outline-none
                     transition-[background-color,border-color,color]
                     hover:border-brand-red/35 hover:bg-white hover:text-ink
-                    focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12
-                    disabled:cursor-not-allowed disabled:opacity-60"
+                    focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12"
                 >
-                  {openingId === attachment.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-red" />
-                  ) : (
-                    <Paperclip className="h-3.5 w-3.5 text-faint transition-colors group-hover:text-brand-red" />
-                  )}
+                  <Paperclip className="h-3.5 w-3.5 text-faint transition-colors group-hover:text-brand-red" />
                   {attachment.fileName}
                   <span className="text-subtle">· {formatBytes(attachment.sizeBytes)}</span>
                 </button>
@@ -318,6 +280,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
             </div>
           </div>
         </>
+      )}
+
+      {previewIndex !== null && (
+        <AttachmentPreviewModal
+          emailId={email.id}
+          attachments={email.attachments}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(null)}
+        />
       )}
     </div>
   );

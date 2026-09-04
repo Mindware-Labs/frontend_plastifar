@@ -276,3 +276,9 @@ input:-webkit-autofill:focus {
     @apply font-sans;
   }
 }
+
+/* Scroll nativo fino y sin flechas, a tono con la barra de shadcn. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
