@@ -7,6 +7,7 @@ import {
   ShieldAlert,
   Ticket as TicketIcon,
   Trash2,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
@@ -19,7 +20,12 @@ import { Badge } from "../../components/shadcn/badge";
 import { Button } from "../../components/shadcn/button";
 import { Separator } from "../../components/shadcn/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/shadcn/tooltip";
-import { formatBytes, formatDateTime, formatTicketCode } from "../../lib/format";
+import {
+  formatBytes,
+  formatDateTime,
+  formatEmailListDate,
+  formatTicketCode,
+} from "../../lib/format";
 import type { EmailDetailResponse } from "../../types/api";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { ticketBadgeClass } from "./badgeStyles";
@@ -36,6 +42,11 @@ interface EmailDetailPaneProps {
 const toolButtonClass =
   "size-7 text-brand-gray transition-colors hover:bg-fill hover:text-ink " +
   "focus-visible:ring-brand-red/20 focus-visible:border-brand-red/30";
+
+/** Primer renglon con contenido: es el resumen que cabe en una linea de la lista. */
+function firstLine(text: string) {
+  return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
+}
 
 function initials(name: string) {
   return name
@@ -63,6 +74,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
   const [sending, setSending] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
   const replyRef = useRef<HTMLTextAreaElement>(null);
+  const [openReplyId, setOpenReplyId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +112,17 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
     if (replyOpen) replyRef.current?.focus();
   }, [replyOpen]);
 
+  useEffect(() => {
+    if (openReplyId === null) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpenReplyId(null);
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [openReplyId]);
+
   async function handleReply() {
     if (!email || sending || replyBody.trim() === "") return;
     setSending(true);
@@ -108,6 +131,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
     try {
       const reply = await emailsApi.reply(email.id, replyBody);
       setEmail({ ...email, replies: [...(email.replies ?? []), reply] });
+      setOpenReplyId(reply.id);
       setReplyBody("");
       setReplyOpen(false);
     } catch (err) {
@@ -149,6 +173,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
 
   // Un API sin este campo no debe tumbar el panel entero.
   const replies = email.replies ?? [];
+  const openReply = replies.find((reply) => reply.id === openReplyId) ?? null;
 
   return (
     <div className="flex h-full flex-col">
@@ -269,7 +294,45 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
 
       <Separator className="bg-line" />
 
-      <div className="min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1">
+        {openReply && (
+          <div className="absolute inset-0 z-10 flex flex-col bg-white">
+            <div className="flex shrink-0 items-start gap-2 border-b border-line px-4 py-2.5">
+              <CornerUpLeft className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-red" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-heading text-[13.5px] font-bold tracking-[-0.01em] text-ink">
+                  {openReply.subject}
+                </p>
+                <p className="mt-0.5 truncate text-[11px] text-subtle">
+                  <span className="font-semibold text-brand-gray">{openReply.authorName}</span>
+                  {" · "}
+                  {openReply.fromName ?? openReply.fromEmail}
+                  {" · Para: "}
+                  {openReply.toEmails.join(", ")}
+                </p>
+              </div>
+              <span className="shrink-0 whitespace-nowrap text-[11px] font-medium text-faint">
+                {formatDateTime(openReply.createdAt)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setOpenReplyId(null)}
+                aria-label="Volver al correo"
+                title="Volver al correo"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-edge text-brand-gray
+                  outline-none transition-colors hover:bg-fill hover:text-ink
+                  focus-visible:ring-3 focus-visible:ring-brand-red/20"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[13px] leading-relaxed text-ink">
+              {openReply.bodyText}
+            </div>
+          </div>
+        )}
+
         {email.bodyHtml ? (
           <iframe
             key={email.id}
@@ -322,18 +385,29 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
 
       <div className="shrink-0 px-4 py-2.5">
         {replies.length > 0 && (
-          <div className="mb-3 max-h-32 space-y-2 overflow-y-auto pr-1">
+          <div className="mb-2 max-h-24 overflow-y-auto pr-0.5">
             {replies.map((reply) => (
-              <div key={reply.id} className="rounded-edge border border-line bg-canvas p-2">
-                <div className="flex items-center gap-1.5 text-[11.5px]">
-                  <CornerUpLeft className="h-3 w-3 shrink-0 text-faint" />
-                  <span className="font-semibold text-ink">{reply.authorName}</span>
-                  <span className="truncate text-faint">· {formatDateTime(reply.createdAt)}</span>
-                </div>
-                <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[12px] leading-relaxed text-subtle">
-                  {reply.bodyText}
-                </p>
-              </div>
+              <button
+                key={reply.id}
+                type="button"
+                onClick={() => setOpenReplyId(reply.id === openReplyId ? null : reply.id)}
+                data-open={reply.id === openReplyId}
+                className="flex w-full items-center gap-1.5 rounded-edge px-1.5 py-1 text-left
+                  outline-none transition-colors hover:bg-fill
+                  focus-visible:ring-3 focus-visible:ring-brand-red/12
+                  data-[open=true]:bg-brand-red/[0.06]"
+              >
+                <CornerUpLeft className="h-3 w-3 shrink-0 text-faint" />
+                <span className="shrink-0 text-[11.5px] font-semibold text-ink">
+                  {reply.authorName}
+                </span>
+                <span className="truncate text-[11.5px] text-subtle">
+                  {firstLine(reply.bodyText)}
+                </span>
+                <span className="ml-auto shrink-0 text-[10.5px] font-medium text-faint">
+                  {formatEmailListDate(reply.createdAt)}
+                </span>
+              </button>
             ))}
           </div>
         )}

@@ -164,6 +164,7 @@ export interface EmailDetailResponse {
 export interface EmailReplyResponse {
   id: number;
   fromEmail: string;
+  fromName: string | null;
   toEmails: string[];
   subject: string;
   bodyText: string;

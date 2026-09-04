@@ -156,7 +156,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                                   {initials(name)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="truncate text-[12.5px] font-semibold text-ink
+                              <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-ink
                                 transition-colors group-data-[selected=true]:text-brand-red-dark">
                                 {name}
                               </span>
@@ -167,7 +167,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
                             {/* Distintivos al final del asunto: se ahorra una fila entera por tarjeta. */}
                             <div className="flex w-full items-center gap-1.5">
-                              <span className="truncate text-[12px] font-medium text-brand-gray">
+                              <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-brand-gray">
                                 {email.subject || "(sin asunto)"}
                               </span>
                               {(email.attachmentCount > 0 || email.ticketId) && (
