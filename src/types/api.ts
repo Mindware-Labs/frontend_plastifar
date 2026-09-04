@@ -141,6 +141,10 @@ export interface EmailSummaryResponse {
   attachmentCount: number;
   /** Cuantos correos tiene la conversacion, contando los nuestros. */
   messageCount: number;
+  /** Sin leer por quien consulta: la marca es de cada persona, no del equipo. */
+  unread: boolean;
+  /** El ultimo correo de la conversacion salio de aca. */
+  answered: boolean;
 }
 
 export type EmailFolder = "Inbox" | "Archived" | "Junk" | "Trash";
@@ -190,8 +194,8 @@ export interface EmailListResponse {
   pageSize: number;
   total: number;
   totalPages: number;
-  counts: { all: number; unlinked: number; linked: number };
-  folderCounts: { inbox: number; archived: number; junk: number; trash: number };
+  counts: { all: number; unlinked: number; linked: number; unanswered: number };
+  folderCounts: EmailFolderCounts;
 }
 
 export interface TicketSummaryResponse {
@@ -206,4 +210,17 @@ export interface TicketSummaryResponse {
   departmentId: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Total y sin leer de una carpeta, para los contadores del menu. */
+export interface FolderCount {
+  total: number;
+  unread: number;
+}
+
+export interface EmailFolderCounts {
+  inbox: FolderCount;
+  archived: FolderCount;
+  junk: FolderCount;
+  trash: FolderCount;
 }

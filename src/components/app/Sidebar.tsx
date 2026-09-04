@@ -2,6 +2,8 @@ import { ChevronDown, Inbox, KeyRound, LogOut, PanelLeft, Users } from "lucide-r
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
+import { useEmailCounts } from "../../context/useEmailCounts";
+import type { EmailFolderCounts } from "../../types/api";
 import { Logo } from "../Logo";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 
@@ -10,6 +12,8 @@ interface NavItem {
   to: string;
   /** Coincidencia exacta: sin esto, "/bandeja" quedaria activo tambien en "/bandeja/junk". */
   end?: boolean;
+  /** Carpeta de correo cuyo contador se pinta al final del renglon. */
+  folder?: keyof EmailFolderCounts;
 }
 
 interface NavGroup {
@@ -26,10 +30,10 @@ const groups: NavGroup[] = [
     label: "Correo",
     icon: Inbox,
     children: [
-      { label: "Bandeja", to: "/bandeja", end: true },
-      { label: "Archivados", to: "/bandeja/archivados" },
-      { label: "No deseado", to: "/bandeja/junk" },
-      { label: "Papelera", to: "/bandeja/papelera" },
+      { label: "Bandeja", to: "/bandeja", end: true, folder: "inbox" },
+      { label: "Archivados", to: "/bandeja/archivados", folder: "archived" },
+      { label: "No deseado", to: "/bandeja/junk", folder: "junk" },
+      { label: "Papelera", to: "/bandeja/papelera", folder: "trash" },
     ],
   },
   {
@@ -51,6 +55,29 @@ interface Flyout {
 
 const linkBase =
   "flex items-center gap-2.5 rounded-edge px-3 py-2 text-[13px] font-medium transition-colors";
+
+/** Sin leer manda en rojo; si todo esta leido, el total queda en gris de apoyo. */
+function FolderBadge({ count }: { count: { total: number; unread: number } }) {
+  if (count.unread > 0) {
+    return (
+      <span
+        className="ml-auto flex h-[18px] min-w-[18px] shrink-0 items-center justify-center
+          rounded-full bg-brand-red px-1.5 font-heading text-[10.5px] font-bold tabular-nums
+          text-white shadow-[0_2px_6px_-2px_rgba(228,0,43,0.6)]"
+      >
+        {count.unread > 99 ? "99+" : count.unread}
+      </span>
+    );
+  }
+
+  if (count.total === 0) return null;
+
+  return (
+    <span className="ml-auto shrink-0 text-[11px] font-medium tabular-nums text-faint">
+      {count.total}
+    </span>
+  );
+}
 const linkInactive = "text-brand-gray hover:bg-fill hover:text-ink";
 const linkActive = "bg-brand-red/8 font-semibold text-brand-red-dark";
 
@@ -71,6 +98,7 @@ function readCollapsed() {
 /** Barra lateral: logotipo, arbol de modulos y, al pie, la persona conectada. */
 export function Sidebar() {
   const { user, logout } = useAuth();
+  const { counts } = useEmailCounts();
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -148,6 +176,9 @@ export function Sidebar() {
 
   const local = user?.email.split("@")[0] ?? "";
   const initials = local.slice(0, 2).toUpperCase() || "PF";
+  const pendingMail = counts
+    ? counts.inbox.unread + counts.archived.unread + counts.junk.unread + counts.trash.unread
+    : 0;
 
   return (
     <aside
@@ -187,9 +218,13 @@ export function Sidebar() {
               onMouseLeave={scheduleClose}
               onFocus={(event) => openFlyout(group, event.currentTarget)}
               onBlur={scheduleClose}
-              className={`${railBase} ${isGroupActive(group) ? linkActive : linkInactive}`}
+              className={`${railBase} relative ${isGroupActive(group) ? linkActive : linkInactive}`}
             >
               <group.icon className="h-[18px] w-[18px]" />
+              {/* Contraida no hay sitio para cifras: un punto avisa que hay algo sin leer. */}
+              {group.label === "Correo" && pendingMail > 0 && (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-brand-red" />
+              )}
             </Link>
           ) : group.children ? (
             <div key={group.label} className="mt-5 first:mt-0">
@@ -209,6 +244,7 @@ export function Sidebar() {
                     className={({ isActive }) => `${linkBase} pl-9 ${isActive ? linkActive : linkInactive}`}
                   >
                     {child.label}
+                    {child.folder && counts && <FolderBadge count={counts[child.folder]} />}
                   </NavLink>
                 ))}
               </div>

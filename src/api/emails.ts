@@ -2,6 +2,7 @@ import { apiRequest, toQuery } from "./client";
 import type {
   AttachmentLinkResponse,
   EmailDetailResponse,
+  EmailFolderCounts,
   EmailListResponse,
   EmailThreadMessageResponse,
   TicketSummaryResponse,
@@ -19,6 +20,12 @@ export interface EmailQuery {
 
 export const emailsApi = {
   list: (query: EmailQuery) => apiRequest<EmailListResponse>(`/api/emails${toQuery({ ...query })}`),
+
+  counts: () => apiRequest<EmailFolderCounts>("/api/emails/counts"),
+
+  markRead: (id: number) => apiRequest<void>(`/api/emails/${id}/read`, { method: "POST" }),
+
+  markUnread: (id: number) => apiRequest<void>(`/api/emails/${id}/unread`, { method: "POST" }),
 
   get: (id: number) => apiRequest<EmailDetailResponse>(`/api/emails/${id}`),
 
