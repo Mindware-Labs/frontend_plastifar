@@ -23,10 +23,22 @@ export function LiveOperationSection() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     reportsMock
       .liveOperation(range)
-      .then(setData)
-      .catch(() => setError("No se pudo cargar el reporte"));
+      .then((loaded) => {
+        if (cancelled) return;
+        setData(loaded);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError("No se pudo cargar el reporte");
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [range]);
 
   const total = data?.byStatus.reduce((sum, entry) => sum + entry.count, 0) ?? 0;

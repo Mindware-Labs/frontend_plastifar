@@ -4,7 +4,7 @@ import { Alert } from "../../components/ui/Alert";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { Spinner } from "../../components/ui/Spinner";
 import { downloadCsv } from "../../lib/csv";
-import { formatAmount } from "../../lib/quality";
+import { formatAmount, isSheetOverdue } from "../../lib/quality";
 import { qualityMock } from "../../mocks/quality";
 import type { CorrectiveActionSheet, CreditRequest } from "../../types/quality";
 import { REPORT_CATALOG } from "../../types/reports";
@@ -94,9 +94,10 @@ function aggregate(
     // Estado actual, no reconstruido a la fecha de corte: sin historial de
     // transiciones no se puede saber que estaba abierto aquel dia.
     openAtEnd: sheets.filter((sheet) => sheet.status !== "Cerrada").length,
-    overdueOpen: sheets.filter(
-      (sheet) => sheet.status !== "Cerrada" && sheet.dueDate < to,
-    ).length,
+    // Igual que openAtEnd: estado actual a hoy, no reconstruido al corte del
+    // rango elegido — de lo contrario un rango pasado o futuro desalinea esta
+    // cifra con "abiertas ahora".
+    overdueOpen: sheets.filter((sheet) => isSheetOverdue(sheet)).length,
     avgClosureDays:
       closureDays.length === 0
         ? null

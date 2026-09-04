@@ -89,6 +89,17 @@ export function ClientsPage() {
   const activeCount = all.filter((client) => client.isActive).length;
   const noRepCount = all.filter((client) => client.salesRepStaffId === null).length;
 
+  // La seleccion es sobre el filtro actual (RF-C7): cambiar el filtro deja
+  // atras ids que ya no se ven, y "reasignar" nunca debe alcanzar a un
+  // cliente que el usuario ya no tiene en pantalla. Se ajusta durante el
+  // render, como useLocalPage, y no en un efecto aparte.
+  const filterCriteria = JSON.stringify([debouncedSearch, territoryId, salesRepId, type, chip]);
+  const [lastFilterCriteria, setLastFilterCriteria] = useState(filterCriteria);
+  if (filterCriteria !== lastFilterCriteria) {
+    setLastFilterCriteria(filterCriteria);
+    setSelectedIds([]);
+  }
+
   function territoryName(id: number) {
     return territories.find((territory) => territory.id === id)?.name ?? "—";
   }
@@ -123,7 +134,7 @@ export function ClientsPage() {
   // total, totalPages y counts (anexo 12.1).
   const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
     rows,
-    JSON.stringify([debouncedSearch, territoryId, salesRepId, type, chip]),
+    filterCriteria,
   );
 
   const selected = all.filter((client) => selectedIds.includes(client.id));

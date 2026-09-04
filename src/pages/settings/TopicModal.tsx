@@ -69,11 +69,13 @@ export function TopicModal({
 
   const priority = useWatch({ control, name: "defaultPriority" });
 
-  // Solo dos niveles: un motivo que ya es hijo no puede ser padre de otro, y
-  // nadie puede ser su propio padre.
-  const possibleParents = topics.filter(
-    (candidate) => candidate.parentId === null && candidate.id !== topic?.id,
-  );
+  // Solo dos niveles: un motivo que ya es hijo no puede ser padre de otro,
+  // nadie puede ser su propio padre, y un motivo que ya tiene hijos no puede
+  // pasar a tener padre (eso crearía una cadena de tres niveles).
+  const hasChildren = topic !== undefined && topics.some((candidate) => candidate.parentId === topic.id);
+  const possibleParents = hasChildren
+    ? []
+    : topics.filter((candidate) => candidate.parentId === null && candidate.id !== topic?.id);
 
   const defaultForPriority = policies.find(
     (policy) => policy.priority === priority && policy.isDefault,

@@ -36,6 +36,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const canWrite = can("clients.write");
 
   const [client, setClient] = useState<Client | null>(null);
+  const [allClients, setAllClients] = useState<Client[]>([]);
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       .then(([clients, loadedTerritories, loadedContacts]) => {
         const found = clients.find((candidate) => candidate.id === clientId) ?? null;
         setClient(found);
+        setAllClients(clients);
         setTerritories(loadedTerritories);
         setContacts(loadedContacts);
       })
@@ -286,7 +288,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       {editingClient && (
         <ClientModal
           client={client}
-          existing={[client]}
+          existing={allClients}
           territories={territories}
           salesReps={salesReps}
           onClose={() => setEditingClient(false)}

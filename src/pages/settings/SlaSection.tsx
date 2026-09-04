@@ -71,7 +71,17 @@ export function SlaSection() {
     useLocalPage(rows, JSON.stringify([debouncedSearch, priority]));
 
   function upsert(item: SlaPolicy) {
-    setPolicies((previous) => upsertById(previous ?? [], item));
+    setPolicies((previous) => {
+      const next = upsertById(previous ?? [], item);
+      // Una sola predeterminada por prioridad: marcar esta desmarca las demás
+      // de la misma prioridad, igual que ClearOtherDefaultsAsync en el backend.
+      if (!item.isDefault) return next;
+      return next.map((policy) =>
+        policy.id !== item.id && policy.priority === item.priority && policy.isDefault
+          ? { ...policy, isDefault: false }
+          : policy,
+      );
+    });
   }
 
   function makeDefault(policy: SlaPolicy) {
