@@ -5,6 +5,7 @@ import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
 import { Button as PfButton } from "../../components/ui/Button";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
+import { useNoticeInset, useReceipts } from "../../context/useReceipts";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes } from "../../lib/format";
 import { fieldLabelClass } from "./toolbarStyles";
@@ -26,6 +27,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const receipts = useReceipts();
   const toRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -35,6 +37,8 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   useEffect(() => {
     toRef.current?.focus();
   }, []);
+
+  useNoticeInset(44);
 
   useEffect(() => {
     if (ccOpen) ccRef.current?.focus();
@@ -75,6 +79,12 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         files,
         clientToken: tokenRef.current,
       });
+      receipts.done({
+        action: "componer",
+        title: "Correo enviado",
+        detail: "Lo encuentras en Enviados",
+      });
+
       onSent();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo enviar el correo");

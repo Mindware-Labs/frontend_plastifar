@@ -17,6 +17,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button as PfButton } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Spinner";
 import { useEmailCounts } from "../../context/useEmailCounts";
+import { useNoticeInset, useReceipts } from "../../context/useReceipts";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
 import { Badge } from "../../components/shadcn/badge";
 import { Button } from "../../components/shadcn/button";
@@ -55,6 +56,46 @@ interface EmailDetailPaneProps {
   /** Cierra el panel y deja la lista sin seleccion. */
   onClose: () => void;
 }
+
+/** Su unico trabajo es existir: mientras el editor este abierto, el recibo se corre hacia arriba. */
+function ComposerInset() {
+  useNoticeInset(44);
+  return null;
+}
+
+interface MoveKind {
+  action: string;
+  done: string;
+  failed: string;
+  run: (id: number) => Promise<void>;
+}
+
+const MOVES: Record<string, MoveKind> = {
+  archivar: {
+    action: "archivar",
+    done: "Archivado",
+    failed: "No se pudo archivar",
+    run: (id) => emailsApi.archive(id),
+  },
+  junk: {
+    action: "junk",
+    done: "Movido a No deseado",
+    failed: "No se pudo mover a No deseado",
+    run: (id) => emailsApi.markAsJunk(id),
+  },
+  papelera: {
+    action: "papelera",
+    done: "Movido a la papelera",
+    failed: "No se pudo mover a la papelera",
+    run: (id) => emailsApi.trash(id),
+  },
+  restaurar: {
+    action: "restaurar",
+    done: "Devuelto a la bandeja",
+    failed: "No se pudo restaurar",
+    run: (id) => emailsApi.restore(id),
+  },
+};
 
 /** Acciones de la barra: gris de texto en reposo, tinta sobre relleno al pasar. */
 const toolButtonClass =
@@ -112,6 +153,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   const replyText = blocksToText(replyBlocks);
   const [reloadKey, setReloadKey] = useState(0);
   const { onInboxChanged } = useEmailCounts();
+  const receipts = useReceipts();
 
   useEffect(() => {
     let cancelled = false;
@@ -181,6 +223,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
         clientToken: tokenRef.current,
       });
 
+      receipts.done({
+        action: "responder",
+        title: "Respuesta enviada",
+        detail: email.fromName ?? email.fromEmail,
+      });
+
       clearDraft(String(email.id));
       setEmail({ ...email, thread: [...(email.thread ?? []), reply] });
       setOpenReplyId(reply.id);
@@ -238,12 +286,39 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
     setReplyError(null);
   }
 
-  async function handleMove(action: () => Promise<void>) {
-    if (moving) return;
+  /**
+   * El servidor ya movio el correo cuando esto vuelve, asi que el recibo no promete
+   * deshacer: ofrece la accion inversa, que es otro viaje y puede fallar por su cuenta.
+   */
+  async function handleMove(move: MoveKind) {
+    if (!email || moving) return;
     setMoving(true);
+
     try {
-      await action();
+      await move.run(email.id);
       onMoved();
+
+      receipts.done({
+        action: move.action,
+        title: move.done,
+        detail: email.fromName ?? email.fromEmail,
+        undo: move.action === "restaurar"
+          ? undefined
+          : {
+              label: "Devolver a la bandeja",
+              run: async () => {
+                await emailsApi.restore(email.id);
+                onMoved();
+              },
+            },
+      });
+    } catch (err) {
+      // Antes esto se tragaba el error y el correo parecia movido sin haberse movido.
+      receipts.failed({
+        action: move.action,
+        title: move.failed,
+        detail: err instanceof ApiError ? err.message : undefined,
+      });
     } finally {
       setMoving(false);
     }
@@ -290,7 +365,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                     size="icon"
                     className={toolButtonClass}
                     disabled={moving}
-                    onClick={() => handleMove(() => emailsApi.archive(email.id))}
+                    onClick={() => handleMove(MOVES.archivar)}
                   >
                     <Archive />
                   </Button>
@@ -304,7 +379,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                     size="icon"
                     className={toolButtonClass}
                     disabled={moving}
-                    onClick={() => handleMove(() => emailsApi.markAsJunk(email.id))}
+                    onClick={() => handleMove(MOVES.junk)}
                   >
                     <ShieldAlert />
                   </Button>
@@ -318,7 +393,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                     size="icon"
                     className={toolButtonClass}
                     disabled={moving}
-                    onClick={() => handleMove(() => emailsApi.trash(email.id))}
+                    onClick={() => handleMove(MOVES.papelera)}
                   >
                     <Trash2 />
                   </Button>
@@ -334,7 +409,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                   size="icon"
                   className={toolButtonClass}
                   disabled={moving}
-                  onClick={() => handleMove(() => emailsApi.restore(email.id))}
+                  onClick={() => handleMove(MOVES.restaurar)}
                 >
                   <ArchiveRestore />
                 </Button>
@@ -544,6 +619,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               </div>
             )}
 
+            <ComposerInset />
             <div className="flex shrink-0 items-center gap-2 border-t border-line px-4 py-2">
               <button
                 type="button"

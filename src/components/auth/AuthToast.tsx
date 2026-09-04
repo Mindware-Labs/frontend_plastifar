@@ -79,7 +79,7 @@ export function AuthToast({
           key={message}
           aria-hidden
           style={{ animationDuration: `${duration}ms` }}
-          className={`animate-plf-toast-progress absolute inset-x-0 bottom-0 h-[3px] origin-left ${
+          className={`animate-plf-toast-progress absolute inset-x-0 bottom-0 hidden h-[3px] origin-left motion-safe:block ${
             isError ? "bg-brand-red/35" : "bg-brand-green/35"
           }`}
         />

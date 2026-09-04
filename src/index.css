@@ -122,6 +122,11 @@ input:-webkit-autofill:focus {
   to { opacity: 1; transform: none; }
 }
 
+/* El recibo se va mas rapido de lo que llega: el aviso pesa al aparecer, no al irse. */
+@keyframes plf-receipt-out {
+  to { opacity: 0; transform: translateY(6px); }
+}
+
 @keyframes plf-toast-progress {
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
@@ -136,6 +141,7 @@ input:-webkit-autofill:focus {
 .animate-plf-modal-in { animation: plf-modal-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
+.animate-plf-receipt-out { animation: plf-receipt-out 0.16s ease-in both; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-plf-float,
@@ -148,6 +154,28 @@ input:-webkit-autofill:focus {
   .animate-plf-shake,
   .animate-plf-toast-progress {
     animation: none !important;
+  }
+
+  /* La salida se acorta en vez de anularse: con animation:none nunca llega animationend
+     y la tarjeta se quedaria pegada en pantalla. */
+  .animate-plf-receipt-out {
+    animation-duration: 1ms !important;
+  }
+}
+
+/* Filete del recibo fallido: textura en vez de color, legible en escala de grises. */
+.plf-rule-broken {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-subtle) 0 2px,
+    transparent 2px 5px
+  );
+}
+
+/* Sin movimiento, un filete lleno y quieto diria que el tiempo no corre: manda la cifra. */
+@media (prefers-reduced-motion: reduce) {
+  .plf-clock {
+    display: none !important;
   }
 }
 

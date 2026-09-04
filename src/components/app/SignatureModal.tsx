@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { staffApi } from "../../api/staff";
+import { useReceipts } from "../../context/useReceipts";
 import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
@@ -13,6 +14,7 @@ export function SignatureModal({ onClose }: { onClose: () => void }) {
   const [signature, setSignature] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const receipts = useReceipts();
 
   useEffect(() => {
     let cancelled = false;
@@ -40,6 +42,7 @@ export function SignatureModal({ onClose }: { onClose: () => void }) {
 
     try {
       await staffApi.updateSignature(signature);
+      receipts.done({ action: "firma", title: "Firma guardada" });
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la firma");
