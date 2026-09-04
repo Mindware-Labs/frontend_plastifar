@@ -9,9 +9,11 @@ import { FilterChip } from "../../components/ui/FilterChip";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
+import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLocalPage } from "../../hooks/useLocalPage";
 import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
 import { settingsMock } from "../../mocks/settings";
@@ -115,6 +117,34 @@ export function TopicsSection() {
   }, [all, chip, departmentId, debouncedSearch]);
 
   const isFlat = debouncedSearch !== "" || departmentId !== "todos" || chip !== "todos";
+
+  /**
+   * RF-K2: los listados de catalogo paginan como cualquier otro. Aqui la
+   * unidad de pagina es el motivo de primer nivel con sus hijos, no la fila:
+   * cortar por filas dejaria un sub-motivo al principio de la pagina siguiente,
+   * separado del padre que le da sentido. Con la busqueda activa la lista ya
+   * esta aplanada y cada fila es su propio grupo.
+   */
+  const groups = useMemo(() => {
+    if (isFlat) return rows.map((topic) => [topic]);
+    return rows.reduce<TicketTopic[][]>((acc, topic) => {
+      if (topic.parentId === null) acc.push([topic]);
+      else if (acc.length > 0) acc[acc.length - 1].push(topic);
+      return acc;
+    }, []);
+  }, [rows, isFlat]);
+
+  const {
+    page,
+    pageSize,
+    total,
+    totalPages,
+    pageRows: pageGroups,
+    setPage,
+    changePageSize,
+  } = useLocalPage(groups, JSON.stringify([debouncedSearch, departmentId, chip]));
+
+  const pageRows = pageGroups.flat();
 
   function upsert(item: TicketTopic) {
     setTopics((previous) => upsertById(previous ?? [], item));
@@ -252,7 +282,7 @@ export function TopicsSection() {
           </thead>
 
           <tbody>
-            {rows.map((topic) => {
+            {pageRows.map((topic) => {
               const policy = policyFor(topic);
               const parent = parentName(topic);
               const isChild = topic.parentId !== null;
@@ -323,6 +353,18 @@ export function TopicsSection() {
             })}
           </tbody>
         </DataTable>
+      )}
+
+      {topics !== null && rows.length > 0 && (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          onPageSizeChange={changePageSize}
+          noun={isFlat ? "motivos" : "motivos de primer nivel"}
+        />
       )}
 
       <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">

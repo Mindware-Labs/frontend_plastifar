@@ -12,6 +12,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLocalPage } from "../../hooks/useLocalPage";
 import { usePermissions } from "../../hooks/usePermissions";
 import { upsertById } from "../../lib/catalog";
 import { describeDue, formatDay, isPlanItemSettled, isSheetOverdue } from "../../lib/quality";
@@ -50,8 +51,6 @@ export function HcaPage() {
   // del compromiso ordena, con desempate estable por id (anexo 12.1).
   const [sortDir, setSortDir] = useState<SortDir | null>(null);
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [modalOpen, setModalOpen] = useState(false);
 
   const staff = qualityMock.staff();
@@ -128,21 +127,13 @@ export function HcaPage() {
           return sortDir === "asc" ? ordered : -ordered;
         });
 
-  // Paginacion de prueba: el corte lo hace la vista solo mientras no existe
-  // /api/quality/sheets. El endpoint tiene que devolver la pagina ya cortada en
-  // SQL, con total, totalPages y counts (anexo 12.1); esta pantalla ya consume
-  // esa forma y no cambia cuando llegue.
-  const total = rows.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  function resetToFirstPage<T>(setter: (value: T) => void) {
-    return (value: T) => {
-      setter(value);
-      setPage(1);
-    };
-  }
+  // El corte lo hace la vista solo mientras no existe /api/quality/sheets: el
+  // endpoint tiene que devolver la pagina ya cortada en SQL, con total,
+  // totalPages y counts (anexo 12.1).
+  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
+    rows,
+    JSON.stringify([debouncedSearch, productLineId, responsibleId, clientId, from, to, chip, sortDir]),
+  );
 
   return (
     <div>
@@ -162,7 +153,7 @@ export function HcaPage() {
         <CriteriaField label="Buscar">
           <SearchInput
             value={search}
-            onChange={resetToFirstPage(setSearch)}
+            onChange={setSearch}
             placeholder="Número, cliente o descripción…"
             className="w-[230px]"
           />
@@ -172,7 +163,7 @@ export function HcaPage() {
           label="Línea"
           ariaLabel="Filtrar por línea de producto"
           value={productLineId}
-          onChange={resetToFirstPage(setProductLineId)}
+          onChange={setProductLineId}
           width="w-[160px]"
           options={[
             { value: "todas", label: "Todas las líneas" },
@@ -184,7 +175,7 @@ export function HcaPage() {
           label="Responsable"
           ariaLabel="Filtrar por responsable"
           value={responsibleId}
-          onChange={resetToFirstPage(setResponsibleId)}
+          onChange={setResponsibleId}
           width="w-[170px]"
           options={[
             { value: "todos", label: "Todos los responsables" },
@@ -196,7 +187,7 @@ export function HcaPage() {
           label="Cliente"
           ariaLabel="Filtrar por cliente"
           value={clientId}
-          onChange={resetToFirstPage(setClientId)}
+          onChange={setClientId}
           options={[
             { value: "todos", label: "Todos los clientes" },
             ...clients.map((client) => ({ value: String(client.id), label: client.name })),
@@ -214,7 +205,7 @@ export function HcaPage() {
               className="w-[140px]"
               value={from}
               max={to === "" ? undefined : to}
-              onChange={(event) => resetToFirstPage(setFrom)(event.target.value)}
+              onChange={(event) => setFrom(event.target.value)}
             />
           </CriteriaField>
 
@@ -225,7 +216,7 @@ export function HcaPage() {
               className="w-[140px]"
               value={to}
               min={from === "" ? undefined : from}
-              onChange={(event) => resetToFirstPage(setTo)(event.target.value)}
+              onChange={(event) => setTo(event.target.value)}
             />
           </CriteriaField>
         </div>
@@ -235,25 +226,25 @@ export function HcaPage() {
             label="Todas"
             count={counts.todas}
             active={chip === "todas"}
-            onClick={() => resetToFirstPage(setChip)("todas")}
+            onClick={() => setChip("todas")}
           />
           <FilterChip
             label="Abiertas"
             count={counts.abiertas}
             active={chip === "abiertas"}
-            onClick={() => resetToFirstPage(setChip)("abiertas")}
+            onClick={() => setChip("abiertas")}
           />
           <FilterChip
             label="Vencidas"
             count={counts.vencidas}
             active={chip === "vencidas"}
-            onClick={() => resetToFirstPage(setChip)("vencidas")}
+            onClick={() => setChip("vencidas")}
           />
           <FilterChip
             label="Cerradas"
             count={counts.cerradas}
             active={chip === "cerradas"}
-            onClick={() => resetToFirstPage(setChip)("cerradas")}
+            onClick={() => setChip("cerradas")}
           />
         </div>
       </div>
@@ -289,7 +280,6 @@ export function HcaPage() {
                     dir: sortDir,
                     onToggle: () => {
                       setSortDir((current) => (current === "asc" ? "desc" : "asc"));
-                      setPage(1);
                     },
                   }}
                 >
@@ -356,15 +346,12 @@ export function HcaPage() {
           </DataTable>
 
           <Pagination
-            page={currentPage}
+            page={page}
             pageSize={pageSize}
             total={total}
             totalPages={totalPages}
             onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
+            onPageSizeChange={changePageSize}
             noun="hojas"
           />
         </>

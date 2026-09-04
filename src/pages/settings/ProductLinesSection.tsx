@@ -8,9 +8,11 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLocalPage } from "../../hooks/useLocalPage";
 import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
 import { settingsMock } from "../../mocks/settings";
@@ -59,6 +61,12 @@ export function ProductLinesSection() {
 
     return byChip && bySearch;
   });
+
+  // RF-K2: los listados de catalogo paginan como cualquier otro. El corte
+  // lo hace la vista solo mientras no exista /api/settings/...; el endpoint
+  // devuelve la pagina ya cortada en SQL (anexo 12.1).
+  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } =
+    useLocalPage(rows, JSON.stringify([debouncedSearch, chip]));
 
   function upsert(item: ProductLine) {
     setLines((previous) => upsertById(previous ?? [], item));
@@ -178,7 +186,7 @@ export function ProductLinesSection() {
           </thead>
 
           <tbody>
-            {rows.map((line) => (
+            {pageRows.map((line) => (
               <Row key={line.id}>
                 <Td>
                   <span className="font-mono text-[12px] text-brand-gray">{line.code}</span>
@@ -214,6 +222,18 @@ export function ProductLinesSection() {
             ))}
           </tbody>
         </DataTable>
+      )}
+
+      {lines !== null && rows.length > 0 && (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          onPageSizeChange={changePageSize}
+          noun="líneas"
+        />
       )}
 
       <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">

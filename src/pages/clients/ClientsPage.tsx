@@ -10,6 +10,7 @@ import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicke
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
@@ -17,10 +18,12 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLocalPage } from "../../hooks/useLocalPage";
 import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
 import { clientsMock } from "../../mocks/clients";
 import type { Client, Contact, Territory } from "../../types/clients";
+import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
 import { ClientModal } from "./ClientModal";
 import { ReassignSalesRepModal } from "./ReassignSalesRepModal";
 
@@ -61,6 +64,9 @@ export function ClientsPage() {
   const [reassigning, setReassigning] = useState<Client | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(COLUMNS.map((c) => c.id));
+  /** RF-C7 en lote: seleccion sobre el filtro actual, no sobre la pagina. */
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkReassigning, setBulkReassigning] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
   const salesReps = clientsMock.salesReps();
@@ -111,6 +117,29 @@ export function ClientsPage() {
 
     return byChip && byTerritory && bySalesRep && byType && bySearch;
   });
+
+  // RF-C1 pide el listado paginado. El corte lo hace la vista solo mientras no
+  // exista /api/clients: el endpoint devuelve la pagina ya cortada en SQL, con
+  // total, totalPages y counts (anexo 12.1).
+  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
+    rows,
+    JSON.stringify([debouncedSearch, territoryId, salesRepId, type, chip]),
+  );
+
+  const selected = all.filter((client) => selectedIds.includes(client.id));
+  const allFilteredSelected = rows.length > 0 && rows.every((client) => selectedIds.includes(client.id));
+
+  function toggleSelection(id: number) {
+    setSelectedIds((previous) =>
+      previous.includes(id) ? previous.filter((entry) => entry !== id) : [...previous, id],
+    );
+  }
+
+  /** La cabecera marca lo que hay bajo el filtro, no solo lo que se ve: una
+   *  reasignacion de cartera alcanza a las cinco paginas, no a la primera. */
+  function toggleAllFiltered() {
+    setSelectedIds(allFilteredSelected ? [] : rows.map((client) => client.id));
+  }
 
   function upsert(item: Client) {
     setClients((previous) => upsertById(previous ?? [], item));
@@ -276,6 +305,26 @@ export function ClientsPage() {
         </div>
       )}
 
+      {canWrite && selected.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 border-y border-line bg-canvas px-3 py-2">
+          <span className="text-[12.5px] font-medium text-ink">
+            {selected.length} {selected.length === 1 ? "cliente seleccionado" : "clientes seleccionados"}
+          </span>
+          <Button size="sm" variant="secondary" onClick={() => setBulkReassigning(true)}>
+            <UserCog className="h-[15px] w-[15px]" />
+            Reasignar vendedor
+          </Button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds([])}
+            className="rounded-edge text-[12.5px] text-muted underline-offset-4 transition-colors
+              hover:text-ink hover:underline"
+          >
+            Limpiar selección
+          </button>
+        </div>
+      )}
+
       {clients === null ? (
         <div className="flex justify-center py-16">
           <Spinner />
@@ -290,6 +339,21 @@ export function ClientsPage() {
         <DataTable>
           <thead>
             <HeadRow>
+              {canWrite && (
+                <Th className="w-9">
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={toggleAllFiltered}
+                    aria-label={
+                      allFilteredSelected
+                        ? "Quitar la selección de todos los clientes filtrados"
+                        : "Seleccionar todos los clientes filtrados"
+                    }
+                    className="h-4 w-4 rounded-[2px] border-line-strong accent-brand-red"
+                  />
+                </Th>
+              )}
               <Th>Cliente</Th>
               {isVisible("codigo") && <Th>Código</Th>}
               {isVisible("tipo") && <Th>Tipo</Th>}
@@ -302,13 +366,24 @@ export function ClientsPage() {
           </thead>
 
           <tbody>
-            {rows.map((client) => {
+            {pageRows.map((client) => {
               const contacts = contactsByClient[client.id] ?? [];
               const shown = contacts.slice(0, 3);
               const overflow = contacts.length - shown.length;
 
               return (
               <Row key={client.id}>
+                {canWrite && (
+                  <Td>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(client.id)}
+                      onChange={() => toggleSelection(client.id)}
+                      aria-label={`Seleccionar ${client.name}`}
+                      className="h-4 w-4 rounded-[2px] border-line-strong accent-brand-red"
+                    />
+                  </Td>
+                )}
                 <Td>
                   <Link
                     to={`/clientes/${client.id}`}
@@ -407,6 +482,18 @@ export function ClientsPage() {
         </DataTable>
       )}
 
+      {clients !== null && rows.length > 0 && (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          onPageSizeChange={changePageSize}
+          noun="clientes"
+        />
+      )}
+
       {modal !== null && (
         <ClientModal
           client={modal === "nuevo" ? undefined : modal}
@@ -424,6 +511,22 @@ export function ClientsPage() {
           salesReps={salesReps}
           onClose={() => setReassigning(null)}
           onSave={(salesRepStaffId) => upsert({ ...reassigning, salesRepStaffId })}
+        />
+      )}
+
+      {bulkReassigning && (
+        <BulkReassignSalesRepModal
+          clients={selected}
+          salesReps={salesReps}
+          onClose={() => setBulkReassigning(false)}
+          onSave={(salesRepStaffId) => {
+            setClients((previous) =>
+              (previous ?? []).map((client) =>
+                selectedIds.includes(client.id) ? { ...client, salesRepStaffId } : client,
+              ),
+            );
+            setSelectedIds([]);
+          }}
         />
       )}
 

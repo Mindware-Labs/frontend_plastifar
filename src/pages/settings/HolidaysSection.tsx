@@ -7,9 +7,11 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLocalPage } from "../../hooks/useLocalPage";
 import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
 import { settingsMock } from "../../mocks/settings";
@@ -81,6 +83,12 @@ export function HolidaysSection() {
    * ademas trabajen ese dia de la semana: uno que cae domingo no mueve nada, y
    * esa es justo la consecuencia que la fila tiene que decir.
    */
+  // RF-K2: los listados de catalogo paginan como cualquier otro. El corte
+  // lo hace la vista solo mientras no exista /api/settings/...; el endpoint
+  // devuelve la pagina ya cortada en SQL (anexo 12.1).
+  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } =
+    useLocalPage(rows, JSON.stringify([debouncedSearch, year]));
+
   function movedPolicies(holiday: Holiday) {
     const weekday = WEEKDAYS.find((day) => day.jsDay === asLocalDate(holiday.date).getDay())?.key;
     if (!weekday || !holiday.isActive) return [];
@@ -182,7 +190,7 @@ export function HolidaysSection() {
           </thead>
 
           <tbody>
-            {rows.map((holiday) => (
+            {pageRows.map((holiday) => (
               <Row key={holiday.id}>
                 <Td className="text-[13px] font-medium tabular-nums text-ink">
                   {dateFormat.format(asLocalDate(holiday.date))}
@@ -235,6 +243,18 @@ export function HolidaysSection() {
             ))}
           </tbody>
         </DataTable>
+      )}
+
+      {holidays !== null && rows.length > 0 && (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          onPageSizeChange={changePageSize}
+          noun="días"
+        />
       )}
 
       <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">

@@ -14,6 +14,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLocalPage } from "../../hooks/useLocalPage";
 import { usePermissions } from "../../hooks/usePermissions";
 import { upsertById } from "../../lib/catalog";
 import { creditDecisionBlock, formatAmount, formatDay, formatInstant } from "../../lib/quality";
@@ -45,8 +46,6 @@ export function CreditRequestsPage() {
   const [minAmount, setMinAmount] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [creating, setCreating] = useState(false);
   const [deciding, setDeciding] = useState<{
     request: CreditRequest;
@@ -102,20 +101,12 @@ export function CreditRequestsPage() {
 
   const rows = base.filter((request) => chip === "todas" || request.status === chip);
 
-  // Paginacion de prueba: el corte lo hace la vista solo mientras no exista
-  // /api/quality/credit-requests. El endpoint devuelve la pagina ya cortada en
-  // SQL, con total, totalPages y counts (anexo 12.1).
-  const total = rows.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  function resetToFirstPage<T>(setter: (value: T) => void) {
-    return (value: T) => {
-      setter(value);
-      setPage(1);
-    };
-  }
+  // El corte lo hace la vista solo mientras no exista
+  // /api/quality/credit-requests (anexo 12.1).
+  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
+    rows,
+    JSON.stringify([debouncedSearch, clientId, minAmount, chip]),
+  );
 
   function upsert(request: CreditRequest) {
     setRequests((previous) => upsertById(previous ?? [], request));
@@ -139,7 +130,7 @@ export function CreditRequestsPage() {
         <CriteriaField label="Buscar">
           <SearchInput
             value={search}
-            onChange={resetToFirstPage(setSearch)}
+            onChange={setSearch}
             placeholder="Número, cliente, factura o motivo…"
             className="w-[260px]"
           />
@@ -149,7 +140,7 @@ export function CreditRequestsPage() {
           label="Cliente"
           ariaLabel="Filtrar por cliente"
           value={clientId}
-          onChange={resetToFirstPage(setClientId)}
+          onChange={setClientId}
           options={[
             { value: "todos", label: "Todos los clientes" },
             ...clients.map((client) => ({ value: String(client.id), label: client.name })),
@@ -167,7 +158,7 @@ export function CreditRequestsPage() {
             placeholder="0"
             className="w-[130px]"
             value={minAmount}
-            onChange={(event) => resetToFirstPage(setMinAmount)(event.target.value)}
+            onChange={(event) => setMinAmount(event.target.value)}
           />
         </CriteriaField>
 
@@ -176,31 +167,31 @@ export function CreditRequestsPage() {
             label="Todas"
             count={counts.todas}
             active={chip === "todas"}
-            onClick={() => resetToFirstPage(setChip)("todas")}
+            onClick={() => setChip("todas")}
           />
           <FilterChip
             label="Solicitadas"
             count={counts.Solicitada}
             active={chip === "Solicitada"}
-            onClick={() => resetToFirstPage(setChip)("Solicitada")}
+            onClick={() => setChip("Solicitada")}
           />
           <FilterChip
             label="Aprobadas"
             count={counts.Aprobada}
             active={chip === "Aprobada"}
-            onClick={() => resetToFirstPage(setChip)("Aprobada")}
+            onClick={() => setChip("Aprobada")}
           />
           <FilterChip
             label="Rechazadas"
             count={counts.Rechazada}
             active={chip === "Rechazada"}
-            onClick={() => resetToFirstPage(setChip)("Rechazada")}
+            onClick={() => setChip("Rechazada")}
           />
           <FilterChip
             label="Aplicadas"
             count={counts.Aplicada}
             active={chip === "Aplicada"}
-            onClick={() => resetToFirstPage(setChip)("Aplicada")}
+            onClick={() => setChip("Aplicada")}
           />
         </div>
       </div>
@@ -332,15 +323,12 @@ export function CreditRequestsPage() {
           </DataTable>
 
           <Pagination
-            page={currentPage}
+            page={page}
             pageSize={pageSize}
             total={total}
             totalPages={totalPages}
             onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
+            onPageSizeChange={changePageSize}
             noun="solicitudes"
           />
         </>

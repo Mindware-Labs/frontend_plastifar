@@ -235,9 +235,9 @@ const creditRequests: CreditRequest[] = [
     invoiceRef: "B0100004461",
     status: "Aprobada",
     requestedByStaffId: 2,
-    requestedAt: "2026-07-05T13:40:00Z",
+    requestedAt: "2026-08-18T13:40:00Z",
     decidedByStaffId: 3,
-    decidedAt: "2026-07-06T15:05:00Z",
+    decidedAt: "2026-08-20T15:05:00Z",
     decisionNote: "Procede: el error de etiquetado es nuestro y está documentado en la HCA-000140.",
   },
   {

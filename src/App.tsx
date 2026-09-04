@@ -12,6 +12,7 @@ import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
 import { HcaPage } from "./pages/quality/HcaPage";
 import { LiveOperationSection } from "./pages/reports/LiveOperationSection";
+import { QualityReportsSection } from "./pages/reports/QualityReportsSection";
 import { ReportCatalogSection } from "./pages/reports/ReportCatalogSection";
 import { SlaTimesSection } from "./pages/reports/SlaTimesSection";
 import { RolesPage } from "./pages/roles/RolesPage";
@@ -83,10 +84,7 @@ export default function App() {
           path="/reportes/productividad"
           element={<ReportCatalogSection family="productividad" blockedBy="la Bandeja de tickets" />}
         />
-        <Route
-          path="/reportes/calidad"
-          element={<ReportCatalogSection family="calidad" blockedBy="Calidad (HCA y créditos)" />}
-        />
+        <Route path="/reportes/calidad" element={<QualityReportsSection />} />
         <Route
           path="/reportes/clientes"
           element={<ReportCatalogSection family="clientes" blockedBy="la Bandeja de tickets" />}
