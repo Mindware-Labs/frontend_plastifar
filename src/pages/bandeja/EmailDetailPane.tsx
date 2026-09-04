@@ -30,6 +30,7 @@ import {
 } from "../../lib/format";
 import type { EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
+import { fieldLabelClass } from "./toolbarStyles";
 import { ticketBadgeClass } from "./badgeStyles";
 
 /** Que adjunto se esta mirando: puede ser del correo o de una respuesta nuestra. */
@@ -48,6 +49,8 @@ interface EmailDetailPaneProps {
   onTicketCreated: () => void;
   /** El correo cambió de carpeta: ya no pertenece a la vista actual. */
   onMoved: () => void;
+  /** Cierra el panel y deja la lista sin seleccion. */
+  onClose: () => void;
 }
 
 /** Acciones de la barra: gris de texto en reposo, tinta sobre relleno al pasar. */
@@ -62,10 +65,6 @@ const deliveryLabels: Record<string, { label: string; className: string }> = {
   Bounced: { label: "No entregado", className: "text-brand-red" },
   Complained: { label: "Marcado como spam", className: "text-brand-red" },
 };
-
-/** Etiquetas del editor: mismo ancho para que los valores queden en una sola columna. */
-const fieldLabelClass =
-  "w-8 shrink-0 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-faint";
 
 /** Primer renglon con contenido: es el resumen que cabe en una linea de la lista. */
 function firstLine(text: string) {
@@ -86,7 +85,7 @@ function initials(name: string) {
  * dangerouslySetInnerHTML. Un iframe con sandbox vacio lo aisla por completo
  * (sin scripts, sin acceso al DOM de la app) y aun asi se ve con su formato.
  */
-export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDetailPaneProps) {
+export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: EmailDetailPaneProps) {
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -314,7 +313,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
           )}
         </div>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
           {email.ticketId ? (
             <Badge variant="secondary" className={ticketBadgeClass}>
               {formatTicketCode(email.ticketId)}
@@ -325,6 +324,17 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
               Crear ticket
             </PfButton>
           )}
+
+          <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-line" />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolButtonClass} onClick={onClose}>
+                <X />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Cerrar el correo</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

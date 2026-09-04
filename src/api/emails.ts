@@ -44,6 +44,26 @@ export const emailsApi = {
     return apiRequest<EmailThreadMessageResponse>(`/api/emails/${id}/reply`, { method: "POST", body: form });
   },
 
+  compose: (input: {
+    to: string;
+    cc?: string;
+    subject: string;
+    body: string;
+    files?: File[];
+  }) => {
+    const form = new FormData();
+    form.append("to", input.to);
+    if (input.cc) form.append("cc", input.cc);
+    form.append("subject", input.subject);
+    form.append("body", input.body);
+    for (const file of input.files ?? []) form.append("attachments", file);
+
+    return apiRequest<EmailThreadMessageResponse>("/api/emails/compose", {
+      method: "POST",
+      body: form,
+    });
+  },
+
   createTicket: (id: number) =>
     apiRequest<TicketSummaryResponse>(`/api/emails/${id}/ticket`, { method: "POST" }),
 

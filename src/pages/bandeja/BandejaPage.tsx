@@ -1,7 +1,8 @@
-import { CornerUpLeft, Inbox, MessagesSquare, Paperclip } from "lucide-react";
+import { CornerUpLeft, Inbox, MessagesSquare, Paperclip, PenLine } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { emailsApi, type EmailQuery } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
+import { Button as PfButton } from "../../components/ui/Button";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
@@ -17,6 +18,7 @@ import { formatEmailListDate, formatTicketCode } from "../../lib/format";
 import type { EmailListResponse, EmailSummaryResponse } from "../../types/api";
 import { ticketBadgeClass } from "./badgeStyles";
 import { EmailDetailPane } from "./EmailDetailPane";
+import { NewEmailComposer } from "./NewEmailComposer";
 
 export type FolderKey = "inbox" | "archived" | "junk" | "trash";
 type TicketFilter = "todos" | "sin-ticket" | "sin-responder";
@@ -53,6 +55,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const [search, setSearch] = useState("");
   const [ticketFilter, setTicketFilter] = useState<TicketFilter>("todos");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [composing, setComposing] = useState(false);
   const { refresh: refreshCounts, onInboxChanged } = useEmailCounts();
   const debouncedSearch = useDebouncedValue(search).trim();
   const meta = folderMeta[folder];
@@ -265,17 +268,31 @@ export function BandejaPage({ folder }: BandejaPageProps) {
               <ResizableHandle withHandle className="bg-line" />
 
               <ResizablePanel minSize="35%" className="flex flex-col">
-                {selectedId ? (
+                {composing ? (
+                  <NewEmailComposer
+                    onSent={() => {
+                      setComposing(false);
+                      refresh();
+                      refreshCounts();
+                    }}
+                    onCancel={() => setComposing(false)}
+                  />
+                ) : selectedId ? (
                   <EmailDetailPane
                     key={selectedId}
                     emailId={selectedId}
                     onTicketCreated={refresh}
                     onMoved={handleMoved}
+                    onClose={() => setSelectedId(null)}
                   />
                 ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                  <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
                     <Inbox className="h-7 w-7 text-faint" />
                     <p className="text-[13px] text-subtle">Selecciona un correo para verlo.</p>
+                    <PfButton size="sm" className="h-8 px-4" onClick={() => setComposing(true)}>
+                      <PenLine className="h-[15px] w-[15px]" />
+                      Escribir un correo
+                    </PfButton>
                   </div>
                 )}
               </ResizablePanel>
