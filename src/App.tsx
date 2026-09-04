@@ -11,6 +11,8 @@ import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
 import { HcaPage } from "./pages/quality/HcaPage";
+import { AuditReportsSection } from "./pages/reports/AuditReportsSection";
+import { ClientsReportsSection } from "./pages/reports/ClientsReportsSection";
 import { QualityReportsSection } from "./pages/reports/QualityReportsSection";
 import { ReportCatalogSection } from "./pages/reports/ReportCatalogSection";
 import { RolesPage } from "./pages/roles/RolesPage";
@@ -89,20 +91,12 @@ export default function App() {
           element={<ReportCatalogSection family="productividad" blockedBy="la Bandeja de tickets" />}
         />
         <Route path="/reportes/calidad" element={<QualityReportsSection />} />
-        <Route
-          path="/reportes/clientes"
-          element={<ReportCatalogSection family="clientes" blockedBy="la Bandeja de tickets" />}
-        />
+        <Route path="/reportes/clientes" element={<ClientsReportsSection />} />
         <Route
           path="/reportes/volumen"
           element={<ReportCatalogSection family="volumen" blockedBy="la Bandeja de tickets" />}
         />
-        <Route
-          path="/reportes/auditoria"
-          element={
-            <ReportCatalogSection family="auditoria" blockedBy="la Bandeja de tickets y la bitácora real" />
-          }
-        />
+        <Route path="/reportes/auditoria" element={<AuditReportsSection />} />
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Route>

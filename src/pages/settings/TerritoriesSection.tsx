@@ -1,5 +1,6 @@
 import { Pencil, Plus, Power } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { territoriesApi } from "../../api/territories";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -13,9 +14,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLocalPage } from "../../hooks/useLocalPage";
-import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
-import { clientsMock } from "../../mocks/clients";
 import type { Territory } from "../../types/clients";
 import { SettingsLayout } from "./SettingsLayout";
 import { TerritoryModal } from "./TerritoryModal";
@@ -37,11 +36,12 @@ export function TerritoriesSection() {
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
+  function reload() {
+    return territoriesApi.list({ page: 1, pageSize: 100 }).then((res) => setTerritories(res.items));
+  }
+
   useEffect(() => {
-    clientsMock
-      .territories()
-      .then(setTerritories)
-      .catch(() => setError("No se pudieron cargar los territorios"));
+    reload().catch(() => setError("No se pudieron cargar los territorios"));
   }, []);
 
   const all = useMemo(() => territories ?? [], [territories]);
@@ -67,10 +67,6 @@ export function TerritoriesSection() {
   const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } =
     useLocalPage(rows, JSON.stringify([debouncedSearch, chip]));
 
-  function upsert(item: Territory) {
-    setTerritories((previous) => upsertById(previous ?? [], item));
-  }
-
   function askToggle(territory: Territory) {
     setConfirmation({
       tone: "warn",
@@ -88,7 +84,14 @@ export function TerritoriesSection() {
         </>
       ),
       confirmLabel: territory.isActive ? "Desactivar" : "Reactivar",
-      onConfirm: () => upsert({ ...territory, isActive: !territory.isActive }),
+      onConfirm: async () => {
+        await territoriesApi.update(territory.id, {
+          code: territory.code,
+          name: territory.name,
+          isActive: !territory.isActive,
+        });
+        await reload();
+      },
     });
   }
 
@@ -222,9 +225,8 @@ export function TerritoriesSection() {
       {modal !== null && (
         <TerritoryModal
           territory={modal === "nuevo" ? undefined : modal}
-          existing={all}
           onClose={() => setModal(null)}
-          onSave={upsert}
+          onSaved={() => reload()}
         />
       )}
 

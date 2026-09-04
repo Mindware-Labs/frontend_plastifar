@@ -1,6 +1,5 @@
-// Contrato anticipado del modulo de Permisos efectivos. Todavia no existe en el
-// backend: cuando GET /api/permissions y GET /api/staff/{id}/department-access
-// esten escritos, esto pasa a types/api.ts como espejo de los DTOs reales.
+// Espejo de api/Dtos/PermissionDtos.cs en el backend. GET /api/permissions/matrix
+// y GET /api/staff/{id}/department-access devuelven exactamente estas formas.
 
 /** Clave estable del catalogo, con la convencion modulo.accion. */
 export type PermissionKey = string;
@@ -69,6 +68,8 @@ export interface StaffDetail {
    * quedarse sin ninguno, asi que degradarlo o desactivarlo se bloquea.
    */
   isLastAdmin: boolean;
+  /** Lo que esta persona puede hacer hoy, resuelto por el servidor (RF-P4). */
+  effectivePermissions: EffectivePermission[];
 }
 
 /** Un permiso y los departamentos donde esa persona lo ejerce. */

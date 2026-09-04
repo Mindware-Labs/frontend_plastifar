@@ -1,5 +1,6 @@
 import { Pencil, Plus, Power } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -13,9 +14,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLocalPage } from "../../hooks/useLocalPage";
-import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
-import { settingsMock } from "../../mocks/settings";
 import { usedVariables } from "../../lib/templates";
 import type { EmailTemplate } from "../../types/settings";
 import { SettingsLayout } from "./SettingsLayout";
@@ -38,11 +37,12 @@ export function TemplatesSection() {
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
+  function reload() {
+    return settingsApi.templates.list({ page: 1, pageSize: 100 }).then((res) => setTemplates(res.items));
+  }
+
   useEffect(() => {
-    settingsMock
-      .templates()
-      .then(setTemplates)
-      .catch(() => setError("No se pudieron cargar las plantillas"));
+    reload().catch(() => setError("No se pudieron cargar las plantillas"));
   }, []);
 
   const all = useMemo(() => templates ?? [], [templates]);
@@ -69,10 +69,6 @@ export function TemplatesSection() {
   const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } =
     useLocalPage(rows, JSON.stringify([debouncedSearch, chip]));
 
-  function upsert(item: EmailTemplate) {
-    setTemplates((previous) => upsertById(previous ?? [], item));
-  }
-
   function askToggle(template: EmailTemplate) {
     setConfirmation({
       tone: "warn",
@@ -90,7 +86,16 @@ export function TemplatesSection() {
         </>
       ),
       confirmLabel: template.isActive ? "Desactivar" : "Reactivar",
-      onConfirm: () => upsert({ ...template, isActive: !template.isActive }),
+      onConfirm: async () => {
+        await settingsApi.templates.update(template.id, {
+          key: template.key,
+          name: template.name,
+          subject: template.subject,
+          body: template.body,
+          isActive: !template.isActive,
+        });
+        await reload();
+      },
     });
   }
 
@@ -242,9 +247,8 @@ export function TemplatesSection() {
       {modal !== null && (
         <TemplateModal
           template={modal === "nueva" ? undefined : modal}
-          existing={all}
           onClose={() => setModal(null)}
-          onSave={upsert}
+          onSaved={() => reload()}
         />
       )}
 

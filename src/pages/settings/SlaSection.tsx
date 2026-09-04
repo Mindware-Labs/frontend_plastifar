@@ -1,5 +1,7 @@
 import { Pencil, Plus, Power, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../api/client";
+import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -13,10 +15,8 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLocalPage } from "../../hooks/useLocalPage";
-import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
 import { humanizeMinutes, workdayMinutes } from "../../lib/sla";
-import { settingsMock } from "../../mocks/settings";
 import { PRIORITIES, type Holiday, type Priority, type SlaPolicy } from "../../types/settings";
 import { SettingsLayout } from "./SettingsLayout";
 import { SlaModal } from "./SlaModal";
@@ -28,6 +28,7 @@ export function SlaSection() {
   const [policies, setPolicies] = useState<SlaPolicy[] | null>(null);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState<Priority | "todas">("todas");
@@ -37,13 +38,15 @@ export function SlaSection() {
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
+  function reload() {
+    return settingsApi.slaPolicies.list({ page: 1, pageSize: 100 }).then((res) => setPolicies(res.items));
+  }
+
   useEffect(() => {
-    Promise.all([settingsMock.policies(), settingsMock.holidays()])
-      .then(([loadedPolicies, loadedHolidays]) => {
-        setPolicies(loadedPolicies);
-        setHolidays(loadedHolidays);
-      })
-      .catch(() => setError("No se pudieron cargar las políticas de SLA"));
+    Promise.all([reload(), settingsApi.holidays.list({ page: 1, pageSize: 100 }).then((res) => setHolidays(res.items))]).catch(
+      () => setError("No se pudieron cargar las políticas de SLA"),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const all = useMemo(() => policies ?? [], [policies]);
@@ -64,62 +67,29 @@ export function SlaSection() {
     return byPriority && bySearch;
   });
 
-  // RF-K2: los listados de catalogo paginan como cualquier otro. El corte
-  // lo hace la vista solo mientras no exista /api/settings/...; el endpoint
-  // devuelve la pagina ya cortada en SQL (anexo 12.1).
   const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } =
     useLocalPage(rows, JSON.stringify([debouncedSearch, priority]));
 
-  function upsert(item: SlaPolicy) {
-    setPolicies((previous) => {
-      const next = upsertById(previous ?? [], item);
-      // Una sola predeterminada por prioridad: marcar esta desmarca las demás
-      // de la misma prioridad, igual que ClearOtherDefaultsAsync en el backend.
-      if (!item.isDefault) return next;
-      return next.map((policy) =>
-        policy.id !== item.id && policy.priority === item.priority && policy.isDefault
-          ? { ...policy, isDefault: false }
-          : policy,
-      );
-    });
-  }
-
-  function makeDefault(policy: SlaPolicy) {
-    upsert({ ...policy, isDefault: true });
+  async function makeDefault(policy: SlaPolicy) {
+    setBusyId(policy.id);
+    setError(null);
+    try {
+      await settingsApi.slaPolicies.update(policy.id, { ...policy, isDefault: true });
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo marcar como predeterminada");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   /**
    * RF-K5: cada prioridad necesita una política predeterminada. Desactivar la
    * última de su prioridad dejaría sin compromiso de tiempo a todo ticket que
-   * nazca con ella.
+   * nazca con ella — el servidor lo rechaza con 409 y ese mensaje es el que se
+   * muestra, sin duplicar la regla aquí.
    */
   function askToggle(policy: SlaPolicy) {
-    const isLastForPriority =
-      policy.isActive &&
-      !all.some(
-        (candidate) =>
-          candidate.id !== policy.id && candidate.priority === policy.priority && candidate.isActive,
-      );
-
-    if (isLastForPriority) {
-      setConfirmation({
-        tone: "warn",
-        icon: Power,
-        title: "No se puede desactivar",
-        description: (
-          <>
-            <strong className="font-semibold text-ink">{policy.name}</strong> es la única política
-            activa de prioridad {policy.priority.toLowerCase()}. Sin ella, los tickets que nazcan con
-            esa prioridad no tendrían compromiso de tiempo. Crea otra antes de desactivar esta.
-          </>
-        ),
-        confirmLabel: "Entendido",
-        cancelLabel: "Cerrar",
-        onConfirm: () => {},
-      });
-      return;
-    }
-
     setConfirmation({
       tone: "warn",
       icon: Power,
@@ -136,8 +106,14 @@ export function SlaSection() {
         </>
       ),
       confirmLabel: policy.isActive ? "Desactivar" : "Reactivar",
-      onConfirm: () =>
-        upsert({ ...policy, isActive: !policy.isActive, isDefault: policy.isActive ? false : policy.isDefault }),
+      onConfirm: async () => {
+        await settingsApi.slaPolicies.update(policy.id, {
+          ...policy,
+          isActive: !policy.isActive,
+          isDefault: policy.isActive ? false : policy.isDefault,
+        });
+        await reload();
+      },
     });
   }
 
@@ -220,7 +196,7 @@ export function SlaSection() {
 
           <tbody>
             {pageRows.map((policy) => (
-              <Row key={policy.id}>
+              <Row key={policy.id} busy={busyId === policy.id}>
                 <Td className="text-[13px] font-medium text-ink">{policy.name}</Td>
                 <Td>
                   <Badge tone={policy.priority === "Emergencia" ? "red" : "neutral"}>
@@ -255,6 +231,7 @@ export function SlaSection() {
                     <button
                       type="button"
                       onClick={() => makeDefault(policy)}
+                      disabled={busyId === policy.id}
                       className="rounded-edge text-[12.5px] text-muted underline-offset-4 transition-colors
                         hover:text-ink hover:underline"
                     >
@@ -274,11 +251,13 @@ export function SlaSection() {
                         label={`Editar ${policy.name}`}
                         icon={Pencil}
                         onClick={() => setModal(policy)}
+                        disabled={busyId === policy.id}
                       />
                       <RowAction
                         label={policy.isActive ? `Desactivar ${policy.name}` : `Reactivar ${policy.name}`}
                         icon={Power}
                         onClick={() => askToggle(policy)}
+                        disabled={busyId === policy.id}
                       />
                     </div>
                   </Td>
@@ -312,7 +291,7 @@ export function SlaSection() {
           policy={modal === "nueva" ? undefined : modal}
           holidays={holidays}
           onClose={() => setModal(null)}
-          onSave={upsert}
+          onSaved={() => reload()}
         />
       )}
 

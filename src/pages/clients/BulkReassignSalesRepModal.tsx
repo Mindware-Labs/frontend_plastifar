@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { ApiError } from "../../api/client";
+import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { SelectField } from "../../components/ui/Field";
@@ -9,7 +12,7 @@ interface BulkReassignSalesRepModalProps {
   clients: Client[];
   salesReps: { id: number; name: string }[];
   onClose: () => void;
-  onSave: (salesRepStaffId: number | null) => void;
+  onSaved: () => void;
 }
 
 /**
@@ -20,12 +23,8 @@ interface BulkReassignSalesRepModalProps {
  * El dialogo nombra a quien va a tocar antes de tocarlo: una accion sobre una
  * seleccion que no se ve es una accion a ciegas.
  */
-export function BulkReassignSalesRepModal({
-  clients,
-  salesReps,
-  onClose,
-  onSave,
-}: BulkReassignSalesRepModalProps) {
+export function BulkReassignSalesRepModal({ clients, salesReps, onClose, onSaved }: BulkReassignSalesRepModalProps) {
+  const [formError, setFormError] = useState<string | null>(null);
   const { control, handleSubmit, formState } = useForm<{ salesRepStaffId: string }>({
     defaultValues: { salesRepStaffId: "" },
   });
@@ -33,9 +32,18 @@ export function BulkReassignSalesRepModal({
   const shown = clients.slice(0, 6);
   const overflow = clients.length - shown.length;
 
-  function onSubmit(values: { salesRepStaffId: string }) {
-    onSave(values.salesRepStaffId === "" ? null : Number(values.salesRepStaffId));
-    onClose();
+  async function onSubmit(values: { salesRepStaffId: string }) {
+    setFormError(null);
+    try {
+      await clientsApi.bulkReassignSalesRep({
+        clientIds: clients.map((client) => client.id),
+        salesRepStaffId: values.salesRepStaffId === "" ? null : Number(values.salesRepStaffId),
+      });
+      onSaved();
+      onClose();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "No se pudo reasignar el vendedor");
+    }
   }
 
   return (
@@ -60,6 +68,8 @@ export function BulkReassignSalesRepModal({
         noValidate
         className="flex flex-col gap-4"
       >
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <ul className="flex flex-col gap-1 rounded-edge bg-canvas px-3 py-2.5 text-[12.5px] text-brand-gray">
           {shown.map((client) => (
             <li key={client.id} className="truncate">

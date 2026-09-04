@@ -1,10 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { settingsApi } from "../../api/settings";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import { PRIORITIES, type SlaPolicy, type TicketTopic } from "../../types/settings";
 
 /**
@@ -30,23 +33,19 @@ interface TopicModalProps {
   policies: SlaPolicy[];
   departments: { id: number; name: string }[];
   onClose: () => void;
-  onSave: (topic: TicketTopic) => void;
+  onSaved: (topic: TicketTopic) => void;
 }
 
-export function TopicModal({
-  topic,
-  topics,
-  policies,
-  departments,
-  onClose,
-  onSave,
-}: TopicModalProps) {
+export function TopicModal({ topic, topics, policies, departments, onClose, onSaved }: TopicModalProps) {
   const isEdit = topic !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     control,
     register,
     handleSubmit,
+    setError,
+    setFocus,
     formState: { errors, touchedFields, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -81,9 +80,9 @@ export function TopicModal({
     (policy) => policy.priority === priority && policy.isDefault,
   );
 
-  function onSubmit(values: FormValues) {
-    onSave({
-      id: topic?.id ?? NEW_ID,
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
+    const request = {
       name: values.name.trim(),
       parentId: values.parentId === "" ? null : Number(values.parentId),
       defaultDepartmentId: Number(values.defaultDepartmentId),
@@ -91,9 +90,22 @@ export function TopicModal({
       slaPolicyId: values.slaPolicyId === "" ? null : Number(values.slaPolicyId),
       requiresProductLine: values.requiresProductLine,
       isActive: values.isActive,
-      ticketCount: topic?.ticketCount ?? 0,
-    });
-    onClose();
+    };
+
+    try {
+      const saved = isEdit
+        ? await settingsApi.topics.update(topic.id, request)
+        : await settingsApi.topics.create(request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError("name", { message: err.message });
+        setFocus("name");
+        return;
+      }
+      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar el motivo");
+    }
   }
 
   return (
@@ -113,6 +125,8 @@ export function TopicModal({
       }
     >
       <form id="topic-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <TextField
           label="Nombre"
           placeholder="Ej. Producto defectuoso"

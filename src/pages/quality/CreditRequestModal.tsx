@@ -1,6 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { qualityApi } from "../../api/quality";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
@@ -10,9 +13,8 @@ import {
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import type { Client } from "../../types/clients";
-import { CURRENCIES, type CreditRequest, type Currency } from "../../types/quality";
+import { CURRENCIES, type CreditRequest } from "../../types/quality";
 
 // Espejo de la validacion del servidor de POST /api/quality/credit-requests.
 const schema = z.object({
@@ -35,30 +37,15 @@ type FormValues = z.infer<typeof schema>;
 
 interface CreditRequestModalProps {
   clients: Client[];
-  existing: CreditRequest[];
-  /** Quien solicita: el mismo que luego no podrá aprobarla. */
-  requestedByStaffId: number | null;
   onClose: () => void;
-  onSave: (request: CreditRequest) => void;
-}
-
-function nextNumber(existing: CreditRequest[]): string {
-  const highest = existing.reduce((top, request) => {
-    const parsed = Number(request.number.replace(/\D/g, ""));
-    return Number.isNaN(parsed) ? top : Math.max(top, parsed);
-  }, 0);
-  return `SC-${String(highest + 1).padStart(6, "0")}`;
+  onSaved: (request: CreditRequest) => void;
 }
 
 /** RF-Q7: alta de solicitud con monto, motivo y referencia de factura. Nace de
  *  un ticket cuando exista la Bandeja; hasta entonces, alta manual. */
-export function CreditRequestModal({
-  clients,
-  existing,
-  requestedByStaffId,
-  onClose,
-  onSave,
-}: CreditRequestModalProps) {
+export function CreditRequestModal({ clients, onClose, onSaved }: CreditRequestModalProps) {
+  const [formError, setFormError] = useState<string | null>(null);
+
   const {
     control,
     register,
@@ -81,27 +68,24 @@ export function CreditRequestModal({
     return touchedFields[field] ? "valid" : "idle";
   }
 
-  function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
     const invoiceRef = values.invoiceRef.trim();
 
-    onSave({
-      id: NEW_ID,
-      number: nextNumber(existing),
-      ticketId: null,
-      ticketNumber: null,
-      clientId: Number(values.clientId),
-      amount: Number(values.amount),
-      currency: values.currency as Currency,
-      reason: values.reason.trim(),
-      invoiceRef: invoiceRef === "" ? null : invoiceRef,
-      status: "Solicitada",
-      requestedByStaffId: requestedByStaffId ?? 0,
-      requestedAt: new Date().toISOString(),
-      decidedByStaffId: null,
-      decidedAt: null,
-      decisionNote: null,
-    });
-    onClose();
+    try {
+      const saved = await qualityApi.creditRequests.create({
+        clientId: Number(values.clientId),
+        amount: Number(values.amount),
+        currency: values.currency,
+        reason: values.reason.trim(),
+        invoiceRef: invoiceRef === "" ? null : invoiceRef,
+        ticketId: null,
+      });
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "No se pudo crear la solicitud");
+    }
   }
 
   return (
@@ -121,6 +105,8 @@ export function CreditRequestModal({
       }
     >
       <form id="credit-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <Controller
           name="clientId"
           control={control}

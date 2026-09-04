@@ -1,6 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { qualityApi } from "../../api/quality";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { TextAreaField } from "../../components/ui/Field";
@@ -13,10 +16,8 @@ interface CreditDecisionModalProps {
   decision: "aprobar" | "rechazar";
   requesterName: string;
   clientName: string;
-  /** Quien decide: queda sellado, y nunca puede ser el solicitante. */
-  decidedByStaffId: number | null;
   onClose: () => void;
-  onSave: (request: CreditRequest) => void;
+  onSaved: (request: CreditRequest) => void;
 }
 
 /** RF-Q8: aprobacion y rechazo con nota. El motivo del rechazo es obligatorio;
@@ -27,11 +28,11 @@ export function CreditDecisionModal({
   decision,
   requesterName,
   clientName,
-  decidedByStaffId,
   onClose,
-  onSave,
+  onSaved,
 }: CreditDecisionModalProps) {
   const isReject = decision === "rechazar";
+  const [formError, setFormError] = useState<string | null>(null);
 
   const schema = z.object({
     decisionNote: isReject
@@ -53,16 +54,21 @@ export function CreditDecisionModal({
     defaultValues: { decisionNote: "" },
   });
 
-  function onSubmit(values: z.infer<typeof schema>) {
+  async function onSubmit(values: z.infer<typeof schema>) {
+    setFormError(null);
     const note = values.decisionNote.trim();
-    onSave({
-      ...request,
-      status: isReject ? "Rechazada" : "Aprobada",
-      decidedByStaffId,
-      decidedAt: new Date().toISOString(),
-      decisionNote: note === "" ? null : note,
-    });
-    onClose();
+    const decisionNote = note === "" ? null : note;
+
+    try {
+      const saved = isReject
+        ? await qualityApi.creditRequests.reject(request.id, decisionNote)
+        : await qualityApi.creditRequests.approve(request.id, decisionNote);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      const fallback = isReject ? "No se pudo rechazar la solicitud" : "No se pudo aprobar la solicitud";
+      setFormError(err instanceof ApiError ? err.message : fallback);
+    }
   }
 
   return (
@@ -96,6 +102,8 @@ export function CreditDecisionModal({
         noValidate
         className="flex flex-col gap-4"
       >
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <dl className="flex flex-col gap-2 rounded-edge bg-canvas px-3 py-2.5 text-[13px] text-brand-gray">
           <Line label="Cliente" value={clientName} />
           <Line label="Monto" value={formatAmount(request.amount, request.currency)} />

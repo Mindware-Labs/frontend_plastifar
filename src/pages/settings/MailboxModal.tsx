@@ -1,10 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { settingsApi } from "../../api/settings";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import { MAILBOX_PROVIDERS, type Mailbox } from "../../types/settings";
 
 /**
@@ -31,14 +34,14 @@ type FormValues = z.infer<typeof schema>;
 
 interface MailboxModalProps {
   mailbox?: Mailbox;
-  existing: Mailbox[];
   departments: { id: number; name: string }[];
   onClose: () => void;
-  onSave: (mailbox: Mailbox) => void;
+  onSaved: (mailbox: Mailbox) => void;
 }
 
-export function MailboxModal({ mailbox, existing, departments, onClose, onSave }: MailboxModalProps) {
+export function MailboxModal({ mailbox, departments, onClose, onSaved }: MailboxModalProps) {
   const isEdit = mailbox !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     control,
@@ -65,30 +68,31 @@ export function MailboxModal({ mailbox, existing, departments, onClose, onSave }
     return touchedFields[field] ? "valid" : "idle";
   }
 
-  function onSubmit(values: FormValues) {
-    const clash = existing.find(
-      (candidate) =>
-        candidate.address.toLowerCase() === values.address.trim().toLowerCase() &&
-        candidate.id !== mailbox?.id,
-    );
-
-    if (clash) {
-      setError("address", { message: `Ese correo ya lo usa el buzón ${clash.displayName}` });
-      setFocus("address");
-      return;
-    }
-
-    onSave({
-      id: mailbox?.id ?? NEW_ID,
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
+    const request = {
       address: values.address.trim().toLowerCase(),
       displayName: values.displayName.trim(),
       provider: values.provider as Mailbox["provider"],
       departmentId: Number(values.departmentId),
       secretRef: values.secretRef.trim(),
       isActive: values.isActive,
-      lastSyncedAt: mailbox?.lastSyncedAt ?? null,
-    });
-    onClose();
+    };
+
+    try {
+      const saved = isEdit
+        ? await settingsApi.mailboxes.update(mailbox.id, request)
+        : await settingsApi.mailboxes.create(request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError("address", { message: err.message });
+        setFocus("address");
+        return;
+      }
+      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar el buzón");
+    }
   }
 
   return (
@@ -113,6 +117,8 @@ export function MailboxModal({ mailbox, existing, departments, onClose, onSave }
         noValidate
         className="flex flex-col gap-4"
       >
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <div className="grid grid-cols-2 gap-3">
           <TextField
             label="Correo"

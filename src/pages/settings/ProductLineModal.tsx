@@ -1,10 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { settingsApi } from "../../api/settings";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import type { ProductLine } from "../../types/settings";
 
 /**
@@ -26,13 +29,13 @@ type FormValues = z.infer<typeof schema>;
 
 interface ProductLineModalProps {
   line?: ProductLine;
-  existing: ProductLine[];
   onClose: () => void;
-  onSave: (line: ProductLine) => void;
+  onSaved: (line: ProductLine) => void;
 }
 
-export function ProductLineModal({ line, existing, onClose, onSave }: ProductLineModalProps) {
+export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalProps) {
   const isEdit = line !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -55,27 +58,29 @@ export function ProductLineModal({ line, existing, onClose, onSave }: ProductLin
     return touchedFields[field] ? "valid" : "idle";
   }
 
-  function onSubmit(values: FormValues) {
-    const code = values.code.trim().toUpperCase();
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
+    const request = { code: values.code.trim().toUpperCase(), name: values.name.trim(), isActive: values.isActive };
 
-    const clash = existing.find(
-      (candidate) => candidate.code.toUpperCase() === code && candidate.id !== line?.id,
-    );
-
-    if (clash) {
-      setError("code", { message: `Ese código ya lo usa la línea ${clash.name}` });
-      setFocus("code");
-      return;
+    try {
+      const saved = isEdit
+        ? await settingsApi.productLines.update(line.id, request)
+        : await settingsApi.productLines.create(request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        if (err.message.toLowerCase().includes("código")) {
+          setError("code", { message: err.message });
+          setFocus("code");
+        } else {
+          setError("name", { message: err.message });
+          setFocus("name");
+        }
+        return;
+      }
+      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar la línea");
     }
-
-    onSave({
-      id: line?.id ?? NEW_ID,
-      code,
-      name: values.name.trim(),
-      isActive: values.isActive,
-      usedByTopics: line?.usedByTopics ?? 0,
-    });
-    onClose();
   }
 
   return (
@@ -95,6 +100,8 @@ export function ProductLineModal({ line, existing, onClose, onSave }: ProductLin
       }
     >
       <form id="line-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <TextField
           label="Código"
           placeholder="Ej. BIO"

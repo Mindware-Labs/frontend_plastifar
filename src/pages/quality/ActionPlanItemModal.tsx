@@ -1,6 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { qualityApi } from "../../api/quality";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
   SelectField,
@@ -9,7 +13,6 @@ import {
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import type { ActionPlanItem, QualityStaff } from "../../types/quality";
 
 // Espejo de la validacion del servidor de POST/PUT /api/quality/sheets/{id}/plan.
@@ -32,7 +35,7 @@ interface ActionPlanItemModalProps {
   item?: ActionPlanItem;
   staff: QualityStaff[];
   onClose: () => void;
-  onSave: (item: ActionPlanItem) => void;
+  onSaved: (item: ActionPlanItem) => void;
 }
 
 /** RF-Q4: agregar y editar acciones del plan. Marcar cumplida y anular son
@@ -43,9 +46,10 @@ export function ActionPlanItemModal({
   item,
   staff,
   onClose,
-  onSave,
+  onSaved,
 }: ActionPlanItemModalProps) {
   const isEdit = item !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     control,
@@ -67,18 +71,24 @@ export function ActionPlanItemModal({
     return touchedFields[field] ? "valid" : "idle";
   }
 
-  function onSubmit(values: FormValues) {
-    onSave({
-      id: item?.id ?? NEW_ID,
-      sheetId,
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
+    const request = {
       description: values.description.trim(),
       responsibleStaffId: Number(values.responsibleStaffId),
       dueDate: values.dueDate,
-      completedAt: item?.completedAt ?? null,
-      status: item?.status ?? "Pendiente",
-      cancelReason: item?.cancelReason ?? null,
-    });
-    onClose();
+    };
+
+    try {
+      const saved = isEdit
+        ? await qualityApi.planItems.update(item.id, request)
+        : await qualityApi.planItems.create(sheetId, request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      const fallback = isEdit ? "No se pudo guardar la acción" : "No se pudo agregar la acción";
+      setFormError(err instanceof ApiError ? err.message : fallback);
+    }
   }
 
   return (
@@ -103,6 +113,8 @@ export function ActionPlanItemModal({
         noValidate
         className="flex flex-col gap-4"
       >
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <TextAreaField
           label="Acción"
           required

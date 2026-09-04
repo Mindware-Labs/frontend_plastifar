@@ -1,10 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { clientsApi } from "../../api/clients";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import type { Contact } from "../../types/clients";
 
 /**
@@ -27,13 +30,14 @@ type FormValues = z.infer<typeof schema>;
 interface ContactModalProps {
   clientId: number;
   contact?: Contact;
-  existing: Contact[];
+  isFirst: boolean;
   onClose: () => void;
-  onSave: (contact: Contact) => void;
+  onSaved: (contact: Contact) => void;
 }
 
-export function ContactModal({ clientId, contact, existing, onClose, onSave }: ContactModalProps) {
+export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: ContactModalProps) {
   const isEdit = contact !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -50,7 +54,7 @@ export function ContactModal({ clientId, contact, existing, onClose, onSave }: C
       email: contact?.email ?? "",
       phone: contact?.phone ?? "",
       position: contact?.position ?? "",
-      isPrimary: contact?.isPrimary ?? existing.length === 0,
+      isPrimary: contact?.isPrimary ?? isFirst,
       isActive: contact?.isActive ?? true,
     },
   });
@@ -60,25 +64,11 @@ export function ContactModal({ clientId, contact, existing, onClose, onSave }: C
     return touchedFields[field] ? "valid" : "idle";
   }
 
-  function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
     const email = values.email.trim();
-    if (email !== "") {
-      const clash = existing.find(
-        (candidate) =>
-          candidate.email?.toLowerCase() === email.toLowerCase() && candidate.id !== contact?.id,
-      );
-      if (clash) {
-        setError("email", {
-          message: `Ese correo ya lo usa ${clash.firstName} ${clash.lastName} en este cliente`,
-        });
-        setFocus("email");
-        return;
-      }
-    }
 
-    onSave({
-      id: contact?.id ?? NEW_ID,
-      clientId,
+    const request = {
       firstName: values.firstName.trim(),
       lastName: values.lastName.trim(),
       email: email === "" ? null : email,
@@ -86,8 +76,24 @@ export function ContactModal({ clientId, contact, existing, onClose, onSave }: C
       position: values.position.trim() === "" ? null : values.position.trim(),
       isPrimary: values.isPrimary,
       isActive: values.isActive,
-    });
-    onClose();
+    };
+
+    try {
+      const saved = isEdit
+        ? await clientsApi.contacts.update(contact.id, request)
+        : await clientsApi.contacts.create(clientId, request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError("email", { message: err.message });
+        setFocus("email");
+        return;
+      }
+
+      const fallback = isEdit ? "No se pudo guardar el contacto" : "No se pudo agregar el contacto";
+      setFormError(err instanceof ApiError ? err.message : fallback);
+    }
   }
 
   return (
@@ -112,6 +118,8 @@ export function ContactModal({ clientId, contact, existing, onClose, onSave }: C
         noValidate
         className="flex flex-col gap-4"
       >
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <div className="grid grid-cols-2 gap-3">
           <TextField
             label="Nombre"

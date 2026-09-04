@@ -1,6 +1,10 @@
 import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { clientsApi } from "../../api/clients";
+import { productLinesApi } from "../../api/productLines";
+import { qualityApi, type SheetListResponse, type SheetQuery } from "../../api/quality";
+import { staffApi } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -12,21 +16,25 @@ import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { useLocalPage } from "../../hooks/useLocalPage";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import { upsertById } from "../../lib/catalog";
-import { describeDue, formatDay, isPlanItemSettled, isSheetOverdue } from "../../lib/quality";
-import { clientsMock } from "../../mocks/clients";
-import { qualityMock } from "../../mocks/quality";
-import { settingsMock } from "../../mocks/settings";
+import { describeDue, formatDay, isSheetOverdue } from "../../lib/quality";
 import type { Client } from "../../types/clients";
 import type { ProductLine } from "../../types/settings";
-import type { CorrectiveActionSheet } from "../../types/quality";
+import type { QualityStaff } from "../../types/quality";
 import { HcaModal } from "./HcaModal";
 import { HcaStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
 
 type ChipKey = "todas" | "abiertas" | "vencidas" | "cerradas";
+type SortKey = "numero" | "compromiso" | "cliente";
+
+const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "open" | "overdue" | "closed" }[] = [
+  { key: "todas", label: "Todas", countKey: "all" },
+  { key: "abiertas", label: "Abiertas", status: "abiertas", countKey: "open" },
+  { key: "vencidas", label: "Vencidas", status: "vencidas", countKey: "overdue" },
+  { key: "cerradas", label: "Cerradas", status: "cerradas", countKey: "closed" },
+];
 
 /** RF-Q1: listado paginado de HCA con pastillas por estado y filtros por linea
  *  de producto, responsable, cliente y rango de fechas. */
@@ -34,10 +42,9 @@ export function HcaPage() {
   const { can } = usePermissions();
   const canWrite = can("quality.write");
 
-  const [sheets, setSheets] = useState<CorrectiveActionSheet[] | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [productLines, setProductLines] = useState<ProductLine[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [staff, setStaff] = useState<QualityStaff[]>([]);
 
   const [search, setSearch] = useState("");
   const [productLineId, setProductLineId] = useState("todas");
@@ -46,28 +53,29 @@ export function HcaPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
-
-  // La primera pregunta del supervisor es cual vence antes; por eso la columna
-  // del compromiso ordena, con desempate estable por id (anexo 12.1).
-  const [sortDir, setSortDir] = useState<SortDir | null>(null);
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "compromiso", dir: "asc" });
+  const [pageSize, setPageSize] = useState(10);
 
   const [modalOpen, setModalOpen] = useState(false);
 
-  const staff = qualityMock.staff();
-  const itemsBySheet = useMemo(() => qualityMock.planItemsBySheet(), []);
-  const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search).trim();
 
   useEffect(() => {
-    Promise.all([qualityMock.sheets(), clientsMock.clients(), settingsMock.productLines()])
-      .then(([loadedSheets, loadedClients, loadedLines]) => {
-        setSheets(loadedSheets);
-        setClients(loadedClients);
-        setProductLines(loadedLines);
-      })
-      .catch(() => setError("No se pudieron cargar las hojas de corrección"));
-  }, []);
+    clientsApi
+      .list({ page: 1, pageSize: 100 })
+      .then((data) => setClients(data.items))
+      .catch(() => setClients([]));
 
-  const all = useMemo(() => sheets ?? [], [sheets]);
+    productLinesApi
+      .list()
+      .then((data) => setProductLines(data.items))
+      .catch(() => setProductLines([]));
+
+    staffApi
+      .list({ page: 1, pageSize: 100, status: "activos" })
+      .then((data) => setStaff(data.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))))
+      .catch(() => setStaff([]));
+  }, []);
 
   function clientName(id: number) {
     return clients.find((client) => client.id === id)?.name ?? "—";
@@ -82,58 +90,41 @@ export function HcaPage() {
     return staff.find((person) => person.id === id)?.name ?? "—";
   }
 
-  // Los contadores corresponden al filtro base —busqueda, selectores y rango—
-  // sin aplicar la pastilla activa, para que los numeros no cambien segun la
-  // pastilla seleccionada (anexo 12.1).
-  const base = all.filter((sheet) => {
-    const byLine = productLineId === "todas" || sheet.productLineId === Number(productLineId);
-    const byResponsible =
-      responsibleId === "todos" || sheet.responsibleStaffId === Number(responsibleId);
-    const byClient = clientId === "todos" || sheet.clientId === Number(clientId);
-
-    const detectedDay = sheet.detectedAt.slice(0, 10);
-    const byFrom = from === "" || detectedDay >= from;
-    const byTo = to === "" || detectedDay <= to;
-
-    const bySearch =
-      debouncedSearch === "" ||
-      sheet.number.toLowerCase().includes(debouncedSearch) ||
-      sheet.description.toLowerCase().includes(debouncedSearch) ||
-      clientName(sheet.clientId).toLowerCase().includes(debouncedSearch);
-
-    return byLine && byResponsible && byClient && byFrom && byTo && bySearch;
-  });
-
-  const counts = {
-    todas: base.length,
-    abiertas: base.filter((sheet) => sheet.status !== "Cerrada").length,
-    vencidas: base.filter((sheet) => isSheetOverdue(sheet)).length,
-    cerradas: base.filter((sheet) => sheet.status === "Cerrada").length,
+  const criteria: Omit<SheetQuery, "page"> = {
+    pageSize,
+    search: debouncedSearch || undefined,
+    productLineId: productLineId === "todas" ? undefined : Number(productLineId),
+    responsibleId: responsibleId === "todos" ? undefined : Number(responsibleId),
+    clientId: clientId === "todos" ? undefined : Number(clientId),
+    from: from || undefined,
+    to: to || undefined,
+    status: CHIPS.find((c) => c.key === chip)?.status,
+    sort: sort.key === "numero" ? undefined : sort.key,
+    dir: sort.dir,
   };
 
-  const filtered = base.filter((sheet) => {
-    if (chip === "abiertas") return sheet.status !== "Cerrada";
-    if (chip === "vencidas") return isSheetOverdue(sheet);
-    if (chip === "cerradas") return sheet.status === "Cerrada";
-    return true;
+  const { data, isStale, error, setPage, refresh } = usePagedList<SheetQuery, SheetListResponse>({
+    fetch: qualityApi.sheets.list,
+    criteria,
+    fallbackError: "No se pudieron cargar las hojas de corrección",
   });
 
-  const rows =
-    sortDir === null
-      ? filtered
-      : [...filtered].sort((a, b) => {
-          const byDate = a.dueDate.localeCompare(b.dueDate);
-          const ordered = byDate !== 0 ? byDate : a.id - b.id;
-          return sortDir === "asc" ? ordered : -ordered;
-        });
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const unfiltered =
+    chip === "todas" &&
+    productLineId === "todas" &&
+    responsibleId === "todos" &&
+    clientId === "todos" &&
+    from === "" &&
+    to === "" &&
+    !debouncedSearch;
 
-  // El corte lo hace la vista solo mientras no existe /api/quality/sheets: el
-  // endpoint tiene que devolver la pagina ya cortada en SQL, con total,
-  // totalPages y counts (anexo 12.1).
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
-    rows,
-    JSON.stringify([debouncedSearch, productLineId, responsibleId, clientId, from, to, chip, sortDir]),
-  );
+  function toggleSort(key: SortKey) {
+    setSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
+    );
+  }
 
   return (
     <div>
@@ -149,7 +140,6 @@ export function HcaPage() {
       />
 
       <div className="mb-3 flex flex-wrap items-end gap-2">
-        {/* Sin htmlFor: SearchInput ya trae su propio aria-label. */}
         <CriteriaField label="Buscar">
           <SearchInput
             value={search}
@@ -195,8 +185,6 @@ export function HcaPage() {
           width="w-[200px]"
         />
 
-        {/* El par de fechas viaja junto: partirlo entre dos lineas deja un
-            «Hasta» huerfano que no se entiende solo. */}
         <div className="flex items-end gap-2">
           <CriteriaField label="Detectada desde" htmlFor="hca-desde">
             <ControlInput
@@ -222,30 +210,15 @@ export function HcaPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <FilterChip
-            label="Todas"
-            count={counts.todas}
-            active={chip === "todas"}
-            onClick={() => setChip("todas")}
-          />
-          <FilterChip
-            label="Abiertas"
-            count={counts.abiertas}
-            active={chip === "abiertas"}
-            onClick={() => setChip("abiertas")}
-          />
-          <FilterChip
-            label="Vencidas"
-            count={counts.vencidas}
-            active={chip === "vencidas"}
-            onClick={() => setChip("vencidas")}
-          />
-          <FilterChip
-            label="Cerradas"
-            count={counts.cerradas}
-            active={chip === "cerradas"}
-            onClick={() => setChip("cerradas")}
-          />
+          {CHIPS.map(({ key, label, countKey }) => (
+            <FilterChip
+              key={key}
+              label={label}
+              count={counts?.[countKey] ?? 0}
+              active={chip === key}
+              onClick={() => setChip(key)}
+            />
+          ))}
         </div>
       </div>
 
@@ -255,33 +228,31 @@ export function HcaPage() {
         </div>
       )}
 
-      {sheets === null ? (
+      {data === null ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : pageRows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          {all.length === 0
+          {unfiltered
             ? "Todavía no hay hojas de corrección registradas."
             : "Ninguna hoja coincide con este filtro o búsqueda."}
         </p>
       ) : (
-        <>
+        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
           <DataTable>
             <thead>
               <HeadRow>
-                <Th>Número</Th>
-                <Th>Cliente</Th>
+                <Th sort={{ dir: sort.key === "numero" ? sort.dir : null, onToggle: () => toggleSort("numero") }}>
+                  Número
+                </Th>
+                <Th sort={{ dir: sort.key === "cliente" ? sort.dir : null, onToggle: () => toggleSort("cliente") }}>
+                  Cliente
+                </Th>
                 <Th>Línea</Th>
                 <Th>Responsable</Th>
-                <Th>Plan</Th>
                 <Th
-                  sort={{
-                    dir: sortDir,
-                    onToggle: () => {
-                      setSortDir((current) => (current === "asc" ? "desc" : "asc"));
-                    },
-                  }}
+                  sort={{ dir: sort.key === "compromiso" ? sort.dir : null, onToggle: () => toggleSort("compromiso") }}
                 >
                   Compromiso
                 </Th>
@@ -291,9 +262,7 @@ export function HcaPage() {
             </thead>
 
             <tbody>
-              {pageRows.map((sheet) => {
-                const items = itemsBySheet[sheet.id] ?? [];
-                const settled = items.filter(isPlanItemSettled).length;
+              {rows.map((sheet) => {
                 const overdue = isSheetOverdue(sheet);
 
                 return (
@@ -312,17 +281,8 @@ export function HcaPage() {
                     <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
                       {staffName(sheet.responsibleStaffId)}
                     </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
-                      {items.length === 0 ? (
-                        <span className="text-faint">Sin acciones</span>
-                      ) : (
-                        `${settled}/${items.length} resueltas`
-                      )}
-                    </Td>
                     <Td className="whitespace-nowrap">
-                      <span className="block text-[12.5px] text-brand-gray">
-                        {formatDay(sheet.dueDate)}
-                      </span>
+                      <span className="block text-[12.5px] text-brand-gray">{formatDay(sheet.dueDate)}</span>
                       {sheet.status !== "Cerrada" && (
                         <span
                           className={`block text-[11.5px] ${
@@ -346,31 +306,27 @@ export function HcaPage() {
           </DataTable>
 
           <Pagination
-            page={page}
-            pageSize={pageSize}
-            total={total}
-            totalPages={totalPages}
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+            totalPages={data.totalPages}
             onPageChange={setPage}
-            onPageSizeChange={changePageSize}
+            onPageSizeChange={setPageSize}
             noun="hojas"
           />
-        </>
+        </div>
       )}
-
-      <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
-        Datos de prueba: el módulo de Calidad todavía no tiene backend. Las hojas, los planes de
-        acción y los clientes que se ven aquí son de ejemplo, y los vínculos con tickets quedan
-        apagados hasta que exista la Bandeja.
-      </p>
 
       {modalOpen && (
         <HcaModal
           clients={clients}
           productLines={productLines}
           staff={staff}
-          existing={all}
           onClose={() => setModalOpen(false)}
-          onSave={(sheet) => setSheets((previous) => upsertById(previous ?? [], sheet))}
+          onSaved={() => {
+            setModalOpen(false);
+            refresh();
+          }}
         />
       )}
     </div>

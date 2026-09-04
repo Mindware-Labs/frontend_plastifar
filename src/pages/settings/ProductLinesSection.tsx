@@ -1,5 +1,6 @@
 import { Pencil, Plus, Power } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -13,9 +14,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLocalPage } from "../../hooks/useLocalPage";
-import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
-import { settingsMock } from "../../mocks/settings";
 import type { ProductLine } from "../../types/settings";
 import { ProductLineModal } from "./ProductLineModal";
 import { SettingsLayout } from "./SettingsLayout";
@@ -37,11 +36,12 @@ export function ProductLinesSection() {
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
+  function reload() {
+    return settingsApi.productLines.list({ page: 1, pageSize: 100 }).then((res) => setLines(res.items));
+  }
+
   useEffect(() => {
-    settingsMock
-      .productLines()
-      .then(setLines)
-      .catch(() => setError("No se pudieron cargar las líneas de producto"));
+    reload().catch(() => setError("No se pudieron cargar las líneas de producto"));
   }, []);
 
   const all = useMemo(() => lines ?? [], [lines]);
@@ -67,10 +67,6 @@ export function ProductLinesSection() {
   // devuelve la pagina ya cortada en SQL (anexo 12.1).
   const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } =
     useLocalPage(rows, JSON.stringify([debouncedSearch, chip]));
-
-  function upsert(item: ProductLine) {
-    setLines((previous) => upsertById(previous ?? [], item));
-  }
 
   /**
    * RF-K5: no se desactiva la ultima linea en uso. Los motivos marcados con
@@ -114,7 +110,14 @@ export function ProductLinesSection() {
         </>
       ),
       confirmLabel: line.isActive ? "Desactivar" : "Reactivar",
-      onConfirm: () => upsert({ ...line, isActive: !line.isActive }),
+      onConfirm: async () => {
+        await settingsApi.productLines.update(line.id, {
+          code: line.code,
+          name: line.name,
+          isActive: !line.isActive,
+        });
+        await reload();
+      },
     });
   }
 
@@ -244,9 +247,8 @@ export function ProductLinesSection() {
       {modal !== null && (
         <ProductLineModal
           line={modal === "nueva" ? undefined : modal}
-          existing={all}
           onClose={() => setModal(null)}
-          onSave={upsert}
+          onSaved={() => reload()}
         />
       )}
 

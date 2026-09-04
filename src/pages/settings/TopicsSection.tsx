@@ -1,5 +1,7 @@
 import { CornerDownRight, Pencil, Plus, Power } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { departmentsApi } from "../../api/departments";
+import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -14,9 +16,9 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLocalPage } from "../../hooks/useLocalPage";
-import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
-import { settingsMock } from "../../mocks/settings";
+import { upsertById } from "../../lib/catalog";
+import type { DepartmentResponse } from "../../types/api";
 import type { SlaPolicy, TicketTopic } from "../../types/settings";
 import { SettingsLayout } from "./SettingsLayout";
 import { TopicModal } from "./TopicModal";
@@ -36,6 +38,7 @@ export function TopicsSection() {
 
   const [topics, setTopics] = useState<TicketTopic[] | null>(null);
   const [policies, setPolicies] = useState<SlaPolicy[]>([]);
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -46,15 +49,20 @@ export function TopicsSection() {
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
-  const departments = settingsMock.departments();
+
+  function reload() {
+    return settingsApi.topics
+      .list({ page: 1, pageSize: 100 })
+      .then((res) => setTopics(res.items));
+  }
 
   useEffect(() => {
-    Promise.all([settingsMock.topics(), settingsMock.policies()])
-      .then(([loadedTopics, loadedPolicies]) => {
-        setTopics(loadedTopics);
-        setPolicies(loadedPolicies);
-      })
-      .catch(() => setError("No se pudieron cargar los motivos"));
+    Promise.all([
+      reload(),
+      settingsApi.slaPolicies.list({ page: 1, pageSize: 100 }).then((res) => setPolicies(res.items)),
+      departmentsApi.list().then(setDepartments),
+    ]).catch(() => setError("No se pudieron cargar los motivos"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const all = useMemo(() => topics ?? [], [topics]);
@@ -155,27 +163,6 @@ export function TopicsSection() {
    * abrir un ticket, asi que el sistema se quedaria sin puerta de entrada.
    */
   function askToggle(topic: TicketTopic) {
-    const isLastActive = topic.isActive && activeCount === 1;
-
-    if (isLastActive) {
-      setConfirmation({
-        tone: "warn",
-        icon: Power,
-        title: "No se puede desactivar",
-        description: (
-          <>
-            <strong className="font-semibold text-ink">{topic.name}</strong> es el único motivo
-            activo. Sin al menos uno no se puede abrir ningún ticket: crea o reactiva otro motivo
-            antes de desactivar este.
-          </>
-        ),
-        confirmLabel: "Entendido",
-        cancelLabel: "Cerrar",
-        onConfirm: () => {},
-      });
-      return;
-    }
-
     setConfirmation({
       tone: "warn",
       icon: Power,
@@ -193,7 +180,18 @@ export function TopicsSection() {
         </>
       ),
       confirmLabel: topic.isActive ? "Desactivar" : "Reactivar",
-      onConfirm: () => upsert({ ...topic, isActive: !topic.isActive }),
+      onConfirm: async () => {
+        const saved = await settingsApi.topics.update(topic.id, {
+          name: topic.name,
+          parentId: topic.parentId,
+          defaultDepartmentId: topic.defaultDepartmentId,
+          defaultPriority: topic.defaultPriority,
+          slaPolicyId: topic.slaPolicyId,
+          requiresProductLine: topic.requiresProductLine,
+          isActive: !topic.isActive,
+        });
+        upsert(saved);
+      },
     });
   }
 
@@ -380,7 +378,7 @@ export function TopicsSection() {
           policies={policies}
           departments={departments}
           onClose={() => setModal(null)}
-          onSave={upsert}
+          onSaved={upsert}
         />
       )}
 

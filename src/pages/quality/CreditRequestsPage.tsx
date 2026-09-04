@@ -1,5 +1,8 @@
 import { Check, Plus, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { clientsApi } from "../../api/clients";
+import { qualityApi, type CreditListResponse, type CreditQuery } from "../../api/quality";
+import { staffApi } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -14,14 +17,11 @@ import { Spinner } from "../../components/ui/Spinner";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { useLocalPage } from "../../hooks/useLocalPage";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import { upsertById } from "../../lib/catalog";
-import { creditDecisionBlock, formatAmount, formatDay, formatInstant } from "../../lib/quality";
-import { clientsMock } from "../../mocks/clients";
-import { qualityMock } from "../../mocks/quality";
+import { formatAmount, formatDay, formatInstant } from "../../lib/quality";
 import type { Client } from "../../types/clients";
-import type { CreditRequest, CreditStatus } from "../../types/quality";
+import type { CreditRequest, CreditStatus, QualityStaff } from "../../types/quality";
 import { CreditDecisionModal } from "./CreditDecisionModal";
 import { CreditRequestModal } from "./CreditRequestModal";
 import { CreditStatusBadge } from "./StatusBadges";
@@ -29,22 +29,29 @@ import { TicketLink } from "./TicketLink";
 
 type ChipKey = "todas" | CreditStatus;
 
+const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "requested" | "approved" | "rejected" | "applied" }[] = [
+  { key: "todas", label: "Todas", countKey: "all" },
+  { key: "Solicitada", label: "Solicitadas", status: "Solicitada", countKey: "requested" },
+  { key: "Aprobada", label: "Aprobadas", status: "Aprobada", countKey: "approved" },
+  { key: "Rechazada", label: "Rechazadas", status: "Rechazada", countKey: "rejected" },
+  { key: "Aplicada", label: "Aplicadas", status: "Aplicada", countKey: "applied" },
+];
+
 /** RF-Q6, RF-Q7 y RF-Q8: solicitudes de credito. */
 export function CreditRequestsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const canWrite = can("quality.write");
-  const canApprove = can("quality.approve");
   const viewerStaffId = user?.staffId ?? null;
 
-  const [requests, setRequests] = useState<CreditRequest[] | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [staff, setStaff] = useState<QualityStaff[]>([]);
 
   const [search, setSearch] = useState("");
   const [clientId, setClientId] = useState("todos");
   const [minAmount, setMinAmount] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
+  const [pageSize, setPageSize] = useState(10);
 
   const [creating, setCreating] = useState(false);
   const [deciding, setDeciding] = useState<{
@@ -52,19 +59,19 @@ export function CreditRequestsPage() {
     decision: "aprobar" | "rechazar";
   } | null>(null);
 
-  const staff = qualityMock.staff();
-  const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search).trim();
 
   useEffect(() => {
-    Promise.all([qualityMock.creditRequests(viewerStaffId), clientsMock.clients()])
-      .then(([loadedRequests, loadedClients]) => {
-        setRequests(loadedRequests);
-        setClients(loadedClients);
-      })
-      .catch(() => setError("No se pudieron cargar las solicitudes de crédito"));
-  }, [viewerStaffId]);
+    clientsApi
+      .list({ page: 1, pageSize: 100 })
+      .then((data) => setClients(data.items))
+      .catch(() => setClients([]));
 
-  const all = useMemo(() => requests ?? [], [requests]);
+    staffApi
+      .list({ page: 1, pageSize: 100, status: "activos" })
+      .then((data) => setStaff(data.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))))
+      .catch(() => setStaff([]));
+  }, []);
 
   function clientName(id: number) {
     return clients.find((client) => client.id === id)?.name ?? "—";
@@ -76,41 +83,25 @@ export function CreditRequestsPage() {
     return staff.find((person) => person.id === id)?.name ?? "—";
   }
 
-  const minimum = minAmount === "" ? null : Number(minAmount);
+  const minimum = minAmount === "" ? undefined : Number(minAmount);
 
-  const base = all.filter((request) => {
-    const byClient = clientId === "todos" || request.clientId === Number(clientId);
-    const byAmount = minimum === null || Number.isNaN(minimum) || request.amount >= minimum;
-    const bySearch =
-      debouncedSearch === "" ||
-      request.number.toLowerCase().includes(debouncedSearch) ||
-      request.reason.toLowerCase().includes(debouncedSearch) ||
-      (request.invoiceRef?.toLowerCase().includes(debouncedSearch) ?? false) ||
-      clientName(request.clientId).toLowerCase().includes(debouncedSearch);
-
-    return byClient && byAmount && bySearch;
-  });
-
-  const counts = {
-    todas: base.length,
-    Solicitada: base.filter((request) => request.status === "Solicitada").length,
-    Aprobada: base.filter((request) => request.status === "Aprobada").length,
-    Rechazada: base.filter((request) => request.status === "Rechazada").length,
-    Aplicada: base.filter((request) => request.status === "Aplicada").length,
+  const criteria: Omit<CreditQuery, "page"> = {
+    pageSize,
+    search: debouncedSearch || undefined,
+    clientId: clientId === "todos" ? undefined : Number(clientId),
+    minAmount: minimum === undefined || Number.isNaN(minimum) ? undefined : minimum,
+    status: CHIPS.find((c) => c.key === chip)?.status,
   };
 
-  const rows = base.filter((request) => chip === "todas" || request.status === chip);
+  const { data, isStale, error, setPage, refresh } = usePagedList<CreditQuery, CreditListResponse>({
+    fetch: qualityApi.creditRequests.list,
+    criteria,
+    fallbackError: "No se pudieron cargar las solicitudes de crédito",
+  });
 
-  // El corte lo hace la vista solo mientras no exista
-  // /api/quality/credit-requests (anexo 12.1).
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
-    rows,
-    JSON.stringify([debouncedSearch, clientId, minAmount, chip]),
-  );
-
-  function upsert(request: CreditRequest) {
-    setRequests((previous) => upsertById(previous ?? [], request));
-  }
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const unfiltered = chip === "todas" && clientId === "todos" && minAmount === "" && !debouncedSearch;
 
   return (
     <div>
@@ -126,7 +117,6 @@ export function CreditRequestsPage() {
       />
 
       <div className="mb-3 flex flex-wrap items-end gap-2">
-        {/* Sin htmlFor: SearchInput ya trae su propio aria-label. */}
         <CriteriaField label="Buscar">
           <SearchInput
             value={search}
@@ -163,36 +153,15 @@ export function CreditRequestsPage() {
         </CriteriaField>
 
         <div className="flex flex-wrap items-center gap-2">
-          <FilterChip
-            label="Todas"
-            count={counts.todas}
-            active={chip === "todas"}
-            onClick={() => setChip("todas")}
-          />
-          <FilterChip
-            label="Solicitadas"
-            count={counts.Solicitada}
-            active={chip === "Solicitada"}
-            onClick={() => setChip("Solicitada")}
-          />
-          <FilterChip
-            label="Aprobadas"
-            count={counts.Aprobada}
-            active={chip === "Aprobada"}
-            onClick={() => setChip("Aprobada")}
-          />
-          <FilterChip
-            label="Rechazadas"
-            count={counts.Rechazada}
-            active={chip === "Rechazada"}
-            onClick={() => setChip("Rechazada")}
-          />
-          <FilterChip
-            label="Aplicadas"
-            count={counts.Aplicada}
-            active={chip === "Aplicada"}
-            onClick={() => setChip("Aplicada")}
-          />
+          {CHIPS.map(({ key, label, countKey }) => (
+            <FilterChip
+              key={key}
+              label={label}
+              count={counts?.[countKey] ?? 0}
+              active={chip === key}
+              onClick={() => setChip(key)}
+            />
+          ))}
         </div>
       </div>
 
@@ -202,24 +171,21 @@ export function CreditRequestsPage() {
         </div>
       )}
 
-      {requests === null ? (
+      {data === null ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : pageRows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          {all.length === 0
+          {unfiltered
             ? "Todavía no hay solicitudes de crédito."
             : "Ninguna solicitud coincide con este filtro o búsqueda."}
         </p>
       ) : (
-        <>
+        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
           <DataTable>
             <thead>
               <HeadRow>
-                {/* El monto viaja junto al número: en pantalla estrecha la
-                    tabla se desplaza, y el dato por el que existe esta
-                    pantalla no puede ser el que se queda fuera. */}
                 <Th>Número</Th>
                 <Th className="text-right">Monto</Th>
                 <Th>Cliente</Th>
@@ -232,8 +198,8 @@ export function CreditRequestsPage() {
             </thead>
 
             <tbody>
-              {pageRows.map((request) => {
-                const block = creditDecisionBlock(request, viewerStaffId, canApprove);
+              {rows.map((request) => {
+                const block = request.decisionBlockedReason;
                 const own = request.requestedByStaffId === viewerStaffId;
 
                 return (
@@ -247,8 +213,6 @@ export function CreditRequestsPage() {
                       {formatAmount(request.amount, request.currency)}
                     </Td>
                     <Td className="text-[12.5px] text-brand-gray">
-                      {/* En pantalla estrecha el nombre cede con puntos
-                          suspensivos en vez de empujar la tabla. */}
                       <span
                         title={clientName(request.clientId)}
                         className="block max-w-[130px] truncate sm:max-w-none sm:overflow-visible"
@@ -260,8 +224,6 @@ export function CreditRequestsPage() {
                       {staffName(request.requestedByStaffId)}
                     </Td>
                     <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
-                      {/* Solo el dia: la hora exacta vive en el detalle, y aqui
-                          le quitaba el ancho al nombre del cliente. */}
                       {formatDay(request.requestedAt.slice(0, 10))}
                     </Td>
                     <Td>
@@ -296,16 +258,7 @@ export function CreditRequestsPage() {
                               />
                             </>
                           ) : (
-                            // La regla de separacion entre quien pide y quien
-                            // aprueba se dice, no se esconde: un boton ausente
-                            // se lee como un fallo de la pantalla.
-                            <Tooltip
-                              content={
-                                own
-                                  ? "No puedes aprobar tu propia solicitud"
-                                  : "No tienes permiso para decidir"
-                              }
-                            >
+                            <Tooltip content={block}>
                               <span className="text-[11.5px] text-faint">
                                 {own ? "Tuya" : "Sin permiso"}
                               </span>
@@ -323,30 +276,25 @@ export function CreditRequestsPage() {
           </DataTable>
 
           <Pagination
-            page={page}
-            pageSize={pageSize}
-            total={total}
-            totalPages={totalPages}
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+            totalPages={data.totalPages}
             onPageChange={setPage}
-            onPageSizeChange={changePageSize}
+            onPageSizeChange={setPageSize}
             noun="solicitudes"
           />
-        </>
+        </div>
       )}
-
-      <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
-        Datos de prueba: el módulo de Calidad todavía no tiene backend. Los montos, los clientes y
-        las decisiones que se ven aquí son de ejemplo; ninguna nota de crédito real se emite desde
-        esta pantalla.
-      </p>
 
       {creating && (
         <CreditRequestModal
           clients={clients}
-          existing={all}
-          requestedByStaffId={viewerStaffId}
           onClose={() => setCreating(false)}
-          onSave={upsert}
+          onSaved={() => {
+            setCreating(false);
+            refresh();
+          }}
         />
       )}
 
@@ -356,9 +304,11 @@ export function CreditRequestsPage() {
           decision={deciding.decision}
           requesterName={staffName(deciding.request.requestedByStaffId)}
           clientName={clientName(deciding.request.clientId)}
-          decidedByStaffId={viewerStaffId}
           onClose={() => setDeciding(null)}
-          onSave={upsert}
+          onSaved={() => {
+            setDeciding(null);
+            refresh();
+          }}
         />
       )}
     </div>

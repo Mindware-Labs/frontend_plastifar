@@ -1,6 +1,10 @@
 import { Pencil, Plus, Power, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { ApiError } from "../../api/client";
+import { clientsApi } from "../../api/clients";
+import { staffApi } from "../../api/staff";
+import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
@@ -13,8 +17,6 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { usePermissions } from "../../hooks/usePermissions";
-import { clientsMock } from "../../mocks/clients";
-import { upsertById } from "../../lib/catalog";
 import type { Client, Contact, Territory } from "../../types/clients";
 import { ClientModal } from "./ClientModal";
 import { ContactModal } from "./ContactModal";
@@ -36,30 +38,37 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const canWrite = can("clients.write");
 
   const [client, setClient] = useState<Client | null>(null);
-  const [allClients, setAllClients] = useState<Client[]>([]);
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [territories, setTerritories] = useState<Territory[]>([]);
+  const [salesReps, setSalesReps] = useState<{ id: number; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [busyContactId, setBusyContactId] = useState<number | null>(null);
 
   const [editingClient, setEditingClient] = useState(false);
   const [contactModal, setContactModal] = useState<"nuevo" | Contact | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
-  const salesReps = clientsMock.salesReps();
   const clientId = Number(id);
   useDynamicBreadcrumb(client?.name ?? null);
 
+  function reload() {
+    return clientsApi.get(clientId).then(({ client: loaded, contacts: loadedContacts }) => {
+      setClient(loaded);
+      setContacts(loadedContacts);
+    });
+  }
+
   useEffect(() => {
-    Promise.all([clientsMock.clients(), clientsMock.territories(), clientsMock.contacts(clientId)])
-      .then(([clients, loadedTerritories, loadedContacts]) => {
-        const found = clients.find((candidate) => candidate.id === clientId) ?? null;
-        setClient(found);
-        setAllClients(clients);
-        setTerritories(loadedTerritories);
-        setContacts(loadedContacts);
-      })
-      .catch(() => setError("No se pudo cargar la ficha del cliente"));
-  }, [clientId]);
+    if (!id) return;
+    Promise.all([
+      reload(),
+      territoriesApi.list().then((res) => setTerritories(res.items)),
+      staffApi
+        .list({ page: 1, pageSize: 100, status: "activos", sort: "nombre", dir: "asc" })
+        .then((res) => setSalesReps(res.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })))),
+    ]).catch(() => setError("No se pudo cargar la ficha del cliente"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   function territoryName(territoryId: number) {
     return territories.find((territory) => territory.id === territoryId)?.name ?? "—";
@@ -70,20 +79,17 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     return salesReps.find((rep) => rep.id === staffId)?.name ?? null;
   }
 
-  function upsertContact(item: Contact) {
-    // Principal exclusivo: marcar uno nuevo como principal desmarca al anterior
-    // dentro de la misma operación (sección 7.3).
-    setContacts((previous) => {
-      const base = previous ?? [];
-      const next = item.isPrimary ? base.map((c) => ({ ...c, isPrimary: false })) : base;
-      return upsertById(next, item);
-    });
-  }
-
-  function makePrimary(contact: Contact) {
-    setContacts((previous) =>
-      (previous ?? []).map((c) => ({ ...c, isPrimary: c.id === contact.id })),
-    );
+  async function makePrimary(contact: Contact) {
+    setBusyContactId(contact.id);
+    setError(null);
+    try {
+      await clientsApi.contacts.makePrimary(contact.id);
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo marcar como principal");
+    } finally {
+      setBusyContactId(null);
+    }
   }
 
   function askDeactivateContact(contact: Contact) {
@@ -107,7 +113,18 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
         </>
       ),
       confirmLabel: contact.isActive ? "Desactivar" : "Reactivar",
-      onConfirm: () => upsertContact({ ...contact, isActive: !contact.isActive }),
+      onConfirm: async () => {
+        await clientsApi.contacts.update(contact.id, {
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          email: contact.email,
+          phone: contact.phone,
+          position: contact.position,
+          isPrimary: contact.isPrimary,
+          isActive: !contact.isActive,
+        });
+        await reload();
+      },
     });
   }
 
@@ -220,7 +237,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
             <tbody>
               {contacts.map((contact) => (
-                <Row key={contact.id}>
+                <Row key={contact.id} busy={busyContactId === contact.id}>
                   <Td className="text-[13px] font-medium text-ink">
                     {contact.firstName} {contact.lastName}
                   </Td>
@@ -237,6 +254,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                       <button
                         type="button"
                         onClick={() => makePrimary(contact)}
+                        disabled={busyContactId === contact.id}
                         className="rounded-edge text-[12.5px] text-muted underline-offset-4 transition-colors
                           hover:text-ink hover:underline"
                       >
@@ -256,6 +274,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                           label={`Editar a ${contact.firstName} ${contact.lastName}`}
                           icon={Pencil}
                           onClick={() => setContactModal(contact)}
+                          disabled={busyContactId === contact.id}
                         />
                         <RowAction
                           label={
@@ -267,7 +286,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                           }
                           icon={Power}
                           onClick={() => askDeactivateContact(contact)}
-                          disabled={contact.isPrimary && contact.isActive}
+                          disabled={(contact.isPrimary && contact.isActive) || busyContactId === contact.id}
                         />
                       </div>
                     </Td>
@@ -288,11 +307,10 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       {editingClient && (
         <ClientModal
           client={client}
-          existing={allClients}
           territories={territories}
           salesReps={salesReps}
           onClose={() => setEditingClient(false)}
-          onSave={setClient}
+          onSaved={setClient}
         />
       )}
 
@@ -300,9 +318,9 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
         <ContactModal
           clientId={client.id}
           contact={contactModal === "nuevo" ? undefined : contactModal}
-          existing={contacts}
+          isFirst={contacts.length === 0}
           onClose={() => setContactModal(null)}
-          onSave={upsertContact}
+          onSaved={() => reload()}
         />
       )}
 

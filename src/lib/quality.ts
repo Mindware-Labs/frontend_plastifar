@@ -1,15 +1,7 @@
-// Reglas de negocio del modulo de Calidad, sin React dentro.
-//
-// Espejo de la seccion 10.3 del plan de construccion. Se escriben aqui, y no
-// dentro de las pantallas, porque son exactamente las mismas que el servidor
-// tendra que validar: cuando exista /api/quality/..., este archivo es la lista
-// de lo que hay que replicar en C#, uno por uno.
-import type {
-  ActionPlanItem,
-  CorrectiveActionSheet,
-  CreditRequest,
-  HcaStatus,
-} from "../types/quality";
+// Formato y fechas del modulo de Calidad, sin React dentro. Las reglas de
+// negocio (condiciones de cierre, separacion entre quien pide y quien aprueba
+// un credito) las resuelve el servidor; este archivo ya no las duplica.
+import type { ActionPlanItem, CorrectiveActionSheet, HcaStatus } from "../types/quality";
 
 const dateFormat = new Intl.DateTimeFormat("es-DO", {
   day: "2-digit",
@@ -79,55 +71,6 @@ export function isPlanItemSettled(item: ActionPlanItem): boolean {
   return item.status === "Cumplida" || item.status === "Anulada";
 }
 
-export interface ClosureCondition {
-  id: "rootCause" | "planItems" | "effectiveness";
-  label: string;
-  /** Que falta, en el idioma de la operacion. Vacio cuando ya se cumple. */
-  missing: string;
-  met: boolean;
-}
-
-/**
- * Las tres condiciones que el plan exige para cerrar una HCA (10.3, reglas 2 y
- * 3). Se devuelven siempre las tres, cumplidas o no: la pantalla de cierre las
- * muestra como lista viva, para que nadie descubra lo que falta despues de
- * haber escrito la verificacion de eficacia.
- */
-export function closureConditions(
-  sheet: CorrectiveActionSheet,
-  items: ActionPlanItem[],
-): ClosureCondition[] {
-  const pending = items.filter((item) => !isPlanItemSettled(item));
-
-  return [
-    {
-      id: "rootCause",
-      label: "Causa raíz escrita",
-      met: (sheet.rootCause ?? "").trim().length > 0,
-      missing: "Falta la causa raíz: sin ella la hoja no explica por qué ocurrió.",
-    },
-    {
-      id: "planItems",
-      label: "Acciones del plan resueltas",
-      met: pending.length === 0,
-      missing:
-        pending.length === 1
-          ? "Queda 1 acción sin resolver: o se cumple, o se anula con justificación."
-          : `Quedan ${pending.length} acciones sin resolver: o se cumplen, o se anulan con justificación.`,
-    },
-    {
-      id: "effectiveness",
-      label: "Verificación de eficacia registrada",
-      met: sheet.effectivenessCheckAt !== null && (sheet.effectivenessNotes ?? "").trim() !== "",
-      missing: "Falta la verificación de eficacia: sin ella no consta que la acción funcionara.",
-    },
-  ];
-}
-
-export function canCloseSheet(sheet: CorrectiveActionSheet, items: ActionPlanItem[]): boolean {
-  return closureConditions(sheet, items).every((condition) => condition.met);
-}
-
 /**
  * Siguiente estado al que puede avanzar la hoja, y que se lo impide.
  * `Cerrada` no sale de aqui: el cierre tiene su propio dialogo y sus tres
@@ -159,26 +102,4 @@ const currencyFormats: Record<string, Intl.NumberFormat> = {
 export function formatAmount(amount: number, currency: string): string {
   const format = currencyFormats[currency] ?? currencyFormats.DOP;
   return format.format(amount);
-}
-
-/**
- * Separacion entre quien pide y quien aprueba (10.3, regla 5). Es el control
- * que da sentido al proceso: tener el permiso no basta, hay que no ser el
- * solicitante. Devuelve el motivo del rechazo, o null cuando si puede.
- */
-export function creditDecisionBlock(
-  request: CreditRequest,
-  viewerStaffId: number | null,
-  hasApprovePermission: boolean,
-): string | null {
-  if (request.status !== "Solicitada") {
-    return `Esta solicitud ya está ${request.status.toLowerCase()}; no admite otra decisión.`;
-  }
-  if (!hasApprovePermission) {
-    return "No tienes el permiso para aprobar o rechazar solicitudes de crédito.";
-  }
-  if (viewerStaffId !== null && request.requestedByStaffId === viewerStaffId) {
-    return "No puedes aprobar una solicitud que tú mismo hiciste: quien pide y quien aprueba deben ser personas distintas.";
-  }
-  return null;
 }

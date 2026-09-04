@@ -1,6 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { qualityApi } from "../../api/quality";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { TextAreaField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
@@ -19,7 +23,7 @@ type FormValues = z.infer<typeof schema>;
 interface CancelPlanItemModalProps {
   item: ActionPlanItem;
   onClose: () => void;
-  onSave: (item: ActionPlanItem) => void;
+  onSaved: (item: ActionPlanItem) => void;
 }
 
 /**
@@ -27,7 +31,9 @@ interface CancelPlanItemModalProps {
  * justificacion — y la justificacion queda escrita en la hoja, porque es lo que
  * explica a un auditor por que el plan se cerro sin ella.
  */
-export function CancelPlanItemModal({ item, onClose, onSave }: CancelPlanItemModalProps) {
+export function CancelPlanItemModal({ item, onClose, onSaved }: CancelPlanItemModalProps) {
+  const [formError, setFormError] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -38,14 +44,15 @@ export function CancelPlanItemModal({ item, onClose, onSave }: CancelPlanItemMod
     defaultValues: { cancelReason: item.cancelReason ?? "" },
   });
 
-  function onSubmit(values: FormValues) {
-    onSave({
-      ...item,
-      status: "Anulada",
-      completedAt: null,
-      cancelReason: values.cancelReason.trim(),
-    });
-    onClose();
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
+    try {
+      const saved = await qualityApi.planItems.cancel(item.id, values.cancelReason.trim());
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "No se pudo anular la acción");
+    }
   }
 
   return (
@@ -70,6 +77,8 @@ export function CancelPlanItemModal({ item, onClose, onSave }: CancelPlanItemMod
         noValidate
         className="flex flex-col gap-4"
       >
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <p className="rounded-edge bg-canvas px-3 py-2.5 text-[13px] leading-relaxed text-brand-gray">
           {item.description}
         </p>

@@ -1,5 +1,6 @@
 import { CalendarOff, Pencil, Plus, Power } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -12,9 +13,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLocalPage } from "../../hooks/useLocalPage";
-import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
-import { settingsMock } from "../../mocks/settings";
 import { WEEKDAYS, type Holiday, type SlaPolicy } from "../../types/settings";
 import { HolidayModal } from "./HolidayModal";
 import { SettingsLayout } from "./SettingsLayout";
@@ -49,13 +48,16 @@ export function HolidaysSection() {
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
+  function reload() {
+    return settingsApi.holidays.list({ page: 1, pageSize: 100 }).then((res) => setHolidays(res.items));
+  }
+
   useEffect(() => {
-    Promise.all([settingsMock.holidays(), settingsMock.policies()])
-      .then(([loadedHolidays, loadedPolicies]) => {
-        setHolidays(loadedHolidays);
-        setPolicies(loadedPolicies);
-      })
-      .catch(() => setError("No se pudieron cargar los días no laborables"));
+    Promise.all([
+      reload(),
+      settingsApi.slaPolicies.list({ page: 1, pageSize: 100 }).then((res) => setPolicies(res.items)),
+    ]).catch(() => setError("No se pudieron cargar los días no laborables"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const all = useMemo(() => holidays ?? [], [holidays]);
@@ -98,10 +100,6 @@ export function HolidaysSection() {
     );
   }
 
-  function upsert(item: Holiday) {
-    setHolidays((previous) => upsertById(previous ?? [], item));
-  }
-
   function askToggle(holiday: Holiday) {
     setConfirmation({
       tone: "warn",
@@ -120,7 +118,14 @@ export function HolidaysSection() {
         </>
       ),
       confirmLabel: holiday.isActive ? "Desactivar" : "Reactivar",
-      onConfirm: () => upsert({ ...holiday, isActive: !holiday.isActive }),
+      onConfirm: async () => {
+        await settingsApi.holidays.update(holiday.id, {
+          date: holiday.date,
+          name: holiday.name,
+          isActive: !holiday.isActive,
+        });
+        await reload();
+      },
     });
   }
 
@@ -265,9 +270,8 @@ export function HolidaysSection() {
       {modal !== null && (
         <HolidayModal
           holiday={modal === "nuevo" ? undefined : modal}
-          existing={all}
           onClose={() => setModal(null)}
-          onSave={upsert}
+          onSaved={() => reload()}
         />
       )}
 

@@ -2,11 +2,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import { renderPreview, unknownVariables } from "../../lib/templates";
 import { TEMPLATE_VARIABLES, type EmailTemplate } from "../../types/settings";
 
@@ -31,14 +32,14 @@ type FormValues = z.infer<typeof schema>;
 
 interface TemplateModalProps {
   template?: EmailTemplate;
-  existing: EmailTemplate[];
   onClose: () => void;
-  onSave: (template: EmailTemplate) => void;
+  onSaved: (template: EmailTemplate) => void;
 }
 
-export function TemplateModal({ template, existing, onClose, onSave }: TemplateModalProps) {
+export function TemplateModal({ template, onClose, onSaved }: TemplateModalProps) {
   const isEdit = template !== undefined;
   const [showPreview, setShowPreview] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     control,
@@ -68,18 +69,11 @@ export function TemplateModal({ template, existing, onClose, onSave }: TemplateM
   const body = useWatch({ control, name: "body" });
   const unknown = unknownVariables(`${subject} ${body}`);
 
-  function onSubmit(values: FormValues) {
-    const clash = existing.find(
-      (candidate) => candidate.key === values.key.trim() && candidate.id !== template?.id,
-    );
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
 
-    if (clash) {
-      setError("key", { message: `Esa clave ya la usa la plantilla ${clash.name}` });
-      setFocus("key");
-      return;
-    }
-
-    // La variable desconocida se rechaza aqui, no al enviar el correo.
+    // La variable desconocida se rechaza aqui, no al enviar el correo — el
+    // servidor valida lo mismo, esto solo evita el viaje de ida y vuelta.
     const invalid = unknownVariables(`${values.subject} ${values.body}`);
     if (invalid.length > 0) {
       const field = unknownVariables(values.subject).length > 0 ? "subject" : "body";
@@ -90,15 +84,28 @@ export function TemplateModal({ template, existing, onClose, onSave }: TemplateM
       return;
     }
 
-    onSave({
-      id: template?.id ?? NEW_ID,
+    const request = {
       key: values.key.trim(),
       name: values.name.trim(),
       subject: values.subject.trim(),
       body: values.body.trim(),
       isActive: values.isActive,
-    });
-    onClose();
+    };
+
+    try {
+      const saved = isEdit
+        ? await settingsApi.templates.update(template.id, request)
+        : await settingsApi.templates.create(request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError("key", { message: err.message });
+        setFocus("key");
+        return;
+      }
+      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar la plantilla");
+    }
   }
 
   return (
@@ -126,6 +133,8 @@ export function TemplateModal({ template, existing, onClose, onSave }: TemplateM
         noValidate
         className="flex flex-col gap-4"
       >
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <div className="grid grid-cols-2 gap-3">
           <TextField
             label="Nombre"

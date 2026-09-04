@@ -1,11 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { settingsApi } from "../../api/settings";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import { addWorkingMinutes, humanizeMinutes, workdayMinutes } from "../../lib/sla";
 import {
   PRIORITIES,
@@ -61,7 +63,7 @@ interface SlaModalProps {
   policy?: SlaPolicy;
   holidays: Holiday[];
   onClose: () => void;
-  onSave: (policy: SlaPolicy) => void;
+  onSaved: (policy: SlaPolicy) => void;
 }
 
 const timeFormat = new Intl.DateTimeFormat("es-DO", {
@@ -72,8 +74,9 @@ const timeFormat = new Intl.DateTimeFormat("es-DO", {
   minute: "2-digit",
 });
 
-export function SlaModal({ policy, holidays, onClose, onSave }: SlaModalProps) {
+export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) {
   const isEdit = policy !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     control,
@@ -146,9 +149,9 @@ export function SlaModal({ policy, holidays, onClose, onSave }: SlaModalProps) {
     };
   }, [businessHoursOnly, workdayStart, workdayEnd, workDays, firstResponseMinutes, resolutionMinutes, holidays]);
 
-  function onSubmit(form: FormValues) {
-    onSave({
-      id: policy?.id ?? NEW_ID,
+  async function onSubmit(form: FormValues) {
+    setFormError(null);
+    const request = {
       name: form.name.trim(),
       priority: form.priority as SlaPolicy["priority"],
       firstResponseMinutes: Number(form.firstResponseMinutes),
@@ -159,8 +162,17 @@ export function SlaModal({ policy, holidays, onClose, onSave }: SlaModalProps) {
       workDays: form.workDays as Weekday[],
       isDefault: form.isDefault,
       isActive: form.isActive,
-    });
-    onClose();
+    };
+
+    try {
+      const saved = isEdit
+        ? await settingsApi.slaPolicies.update(policy.id, request)
+        : await settingsApi.slaPolicies.create(request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar la política");
+    }
   }
 
   return (
@@ -180,6 +192,8 @@ export function SlaModal({ policy, holidays, onClose, onSave }: SlaModalProps) {
       }
     >
       <form id="sla-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <TextField
           label="Nombre"
           placeholder="Ej. Alta · jornada laboral"

@@ -1,12 +1,12 @@
 import { Lock } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { ApiError } from "../../api/client";
+import { reportsApi, type QualityReport } from "../../api/reports";
 import { Alert } from "../../components/ui/Alert";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { Spinner } from "../../components/ui/Spinner";
 import { downloadCsv } from "../../lib/csv";
-import { formatAmount, isSheetOverdue } from "../../lib/quality";
-import { qualityMock } from "../../mocks/quality";
-import type { CorrectiveActionSheet, CreditRequest } from "../../types/quality";
+import { formatAmount } from "../../lib/quality";
 import { REPORT_CATALOG } from "../../types/reports";
 import { DateRangeBar } from "./DateRangeBar";
 import { ReportsLayout } from "./ReportsLayout";
@@ -17,29 +17,12 @@ import { useDateRange } from "./useDateRange";
  * Familia "Calidad y reclamaciones" (seccion 11.2). Tres de sus cinco reportes
  * ya se pueden calcular, porque el modulo de Calidad registra sus propios
  * datos; los otros dos cuentan reclamaciones, que son tickets, y siguen
- * bloqueados por la Bandeja.
- *
- * La agregacion se hace aqui solo mientras no exista el API: el plan es
- * explicito en que ningun reporte trae filas al servidor para sumarlas en
- * memoria (seccion 11.3), asi que estos tres calculos son la especificacion de
- * las tres consultas SQL que hay que escribir, no su implementacion final.
+ * bloqueados por la Bandeja. La agregacion ocurre en SQL, en
+ * GET /api/reports/quality (seccion 11.3): esta pantalla solo pinta lo que
+ * el servidor ya sumo.
  */
 
 const BLOCKED = ["reclamaciones-por-motivo", "reclamaciones-por-linea"];
-
-interface QualityReportData {
-  openedInRange: number;
-  closedInRange: number;
-  openAtEnd: number;
-  overdueOpen: number;
-  avgClosureDays: number | null;
-  byMonth: { month: string; opened: number; closed: number }[];
-  credits: { count: number; byCurrency: { currency: string; total: number; count: number }[] };
-}
-
-function monthKey(iso: string) {
-  return iso.slice(0, 7);
-}
 
 const monthFormat = new Intl.DateTimeFormat("es-DO", { month: "long", year: "numeric" });
 
@@ -47,92 +30,17 @@ function monthLabel(key: string) {
   return monthFormat.format(new Date(`${key}-01T00:00:00`));
 }
 
-function aggregate(
-  sheets: CorrectiveActionSheet[],
-  credits: CreditRequest[],
-  from: string,
-  to: string,
-): QualityReportData {
-  const inRange = (iso: string | null) => iso !== null && iso.slice(0, 10) >= from && iso.slice(0, 10) <= to;
-
-  const opened = sheets.filter((sheet) => inRange(sheet.detectedAt));
-  const closed = sheets.filter((sheet) => inRange(sheet.closedAt));
-
-  // Tiempo de cierre: desde detectada hasta cerrada, en dias completos.
-  const closureDays = closed.map((sheet) =>
-    Math.max(
-      0,
-      Math.round(
-        (Date.parse(sheet.closedAt!) - Date.parse(sheet.detectedAt)) / 86_400_000,
-      ),
-    ),
-  );
-
-  const months = [
-    ...new Set([
-      ...opened.map((sheet) => monthKey(sheet.detectedAt)),
-      ...closed.map((sheet) => monthKey(sheet.closedAt!)),
-    ]),
-  ].sort();
-
-  const emitted = credits.filter(
-    (credit) => (credit.status === "Aprobada" || credit.status === "Aplicada") && inRange(credit.decidedAt),
-  );
-
-  const byCurrency = [...new Set(emitted.map((credit) => credit.currency))].sort().map((currency) => {
-    const ofCurrency = emitted.filter((credit) => credit.currency === currency);
-    return {
-      currency,
-      count: ofCurrency.length,
-      total: ofCurrency.reduce((sum, credit) => sum + credit.amount, 0),
-    };
-  });
-
-  return {
-    openedInRange: opened.length,
-    closedInRange: closed.length,
-    // Estado actual, no reconstruido a la fecha de corte: sin historial de
-    // transiciones no se puede saber que estaba abierto aquel dia.
-    openAtEnd: sheets.filter((sheet) => sheet.status !== "Cerrada").length,
-    // Igual que openAtEnd: estado actual a hoy, no reconstruido al corte del
-    // rango elegido — de lo contrario un rango pasado o futuro desalinea esta
-    // cifra con "abiertas ahora".
-    overdueOpen: sheets.filter((sheet) => isSheetOverdue(sheet)).length,
-    avgClosureDays:
-      closureDays.length === 0
-        ? null
-        : Math.round(closureDays.reduce((sum, days) => sum + days, 0) / closureDays.length),
-    byMonth: months.map((month) => ({
-      month,
-      opened: opened.filter((sheet) => monthKey(sheet.detectedAt) === month).length,
-      closed: closed.filter((sheet) => monthKey(sheet.closedAt!) === month).length,
-    })),
-    credits: { count: emitted.length, byCurrency },
-  };
-}
-
 export function QualityReportsSection() {
   const { range, setRange } = useDateRange();
-  const [sheets, setSheets] = useState<CorrectiveActionSheet[] | null>(null);
-  const [credits, setCredits] = useState<CreditRequest[] | null>(null);
+  const [data, setData] = useState<QualityReport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([qualityMock.sheets(), qualityMock.creditRequests(null)])
-      .then(([loadedSheets, loadedCredits]) => {
-        setSheets(loadedSheets);
-        setCredits(loadedCredits);
-      })
-      .catch(() => setError("No se pudo cargar el reporte"));
-  }, []);
-
-  const data = useMemo(
-    () =>
-      sheets === null || credits === null
-        ? null
-        : aggregate(sheets, credits, range.from, range.to),
-    [sheets, credits, range.from, range.to],
-  );
+    reportsApi
+      .quality(range.from, range.to)
+      .then(setData)
+      .catch((err) => setError(err instanceof ApiError ? err.message : "No se pudo cargar el reporte"));
+  }, [range.from, range.to]);
 
   const blockedReports = REPORT_CATALOG.filter((report) => BLOCKED.includes(report.id));
 
@@ -166,13 +74,13 @@ export function QualityReportsSection() {
             <StatTile label="HCA cerradas en el período" value={String(data.closedInRange)} tone="green" />
             <StatTile
               label="Abiertas hoy"
-              value={String(data.openAtEnd)}
-              hint={data.overdueOpen > 0 ? `${data.overdueOpen} ya vencidas` : "Ninguna vencida"}
-              tone={data.overdueOpen > 0 ? "red" : "neutral"}
+              value={String(data.openNow)}
+              hint={data.overdueNow > 0 ? `${data.overdueNow} ya vencidas` : "Ninguna vencida"}
+              tone={data.overdueNow > 0 ? "red" : "neutral"}
             />
             <StatTile
               label="Tiempo medio de cierre"
-              value={data.avgClosureDays === null ? "—" : `${data.avgClosureDays} días`}
+              value={data.averageClosureDays === 0 ? "—" : `${data.averageClosureDays} días`}
               hint="Desde detectada hasta cerrada"
             />
           </div>
@@ -275,12 +183,6 @@ export function QualityReportsSection() {
               ))}
             </div>
           </section>
-
-          <p className="max-w-[76ch] text-[12px] leading-relaxed text-faint">
-            Datos de prueba: estas cifras se calculan sobre las hojas y solicitudes de ejemplo del
-            módulo de Calidad. Cuando exista el API, la agregación se hace en SQL — el plan no acepta
-            traer filas al servidor para sumarlas en memoria.
-          </p>
         </div>
       )}
     </ReportsLayout>

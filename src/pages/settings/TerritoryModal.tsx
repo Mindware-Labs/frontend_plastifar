@@ -1,15 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { territoriesApi } from "../../api/territories";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import type { Territory } from "../../types/clients";
 
 /**
- * Espejo de la validacion del servidor en POST/PUT /api/settings/territories:
- * codigo unico en mayusculas y nombre unico, ambos obligatorios.
+ * Espejo de la validacion del servidor en POST/PUT /api/territories: codigo
+ * unico en mayusculas y nombre unico, ambos obligatorios.
  */
 const schema = z.object({
   code: z
@@ -26,13 +29,13 @@ type FormValues = z.infer<typeof schema>;
 
 interface TerritoryModalProps {
   territory?: Territory;
-  existing: Territory[];
   onClose: () => void;
-  onSave: (territory: Territory) => void;
+  onSaved: (territory: Territory) => void;
 }
 
-export function TerritoryModal({ territory, existing, onClose, onSave }: TerritoryModalProps) {
+export function TerritoryModal({ territory, onClose, onSaved }: TerritoryModalProps) {
   const isEdit = territory !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -55,27 +58,29 @@ export function TerritoryModal({ territory, existing, onClose, onSave }: Territo
     return touchedFields[field] ? "valid" : "idle";
   }
 
-  function onSubmit(values: FormValues) {
-    const code = values.code.trim().toUpperCase();
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
+    const request = { code: values.code.trim().toUpperCase(), name: values.name.trim(), isActive: values.isActive };
 
-    const clash = existing.find(
-      (candidate) => candidate.code.toUpperCase() === code && candidate.id !== territory?.id,
-    );
-
-    if (clash) {
-      setError("code", { message: `Ese código ya lo usa ${clash.name}` });
-      setFocus("code");
-      return;
+    try {
+      const saved = isEdit
+        ? await territoriesApi.update(territory.id, request)
+        : await territoriesApi.create(request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        if (err.message.toLowerCase().includes("código")) {
+          setError("code", { message: err.message });
+          setFocus("code");
+        } else {
+          setError("name", { message: err.message });
+          setFocus("name");
+        }
+        return;
+      }
+      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar el territorio");
     }
-
-    onSave({
-      id: territory?.id ?? NEW_ID,
-      code,
-      name: values.name.trim(),
-      isActive: values.isActive,
-      clientCount: territory?.clientCount ?? 0,
-    });
-    onClose();
   }
 
   return (
@@ -100,6 +105,8 @@ export function TerritoryModal({ territory, existing, onClose, onSave }: Territo
         noValidate
         className="flex flex-col gap-4"
       >
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <TextField
           label="Código"
           placeholder="Ej. SDQ"

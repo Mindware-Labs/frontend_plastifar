@@ -1,10 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { settingsApi } from "../../api/settings";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import type { Holiday } from "../../types/settings";
 
 /**
@@ -21,14 +24,13 @@ type FormValues = z.infer<typeof schema>;
 
 interface HolidayModalProps {
   holiday?: Holiday;
-  /** Para rechazar una fecha repetida antes de que la rechace el servidor. */
-  existing: Holiday[];
   onClose: () => void;
-  onSave: (holiday: Holiday) => void;
+  onSaved: (holiday: Holiday) => void;
 }
 
-export function HolidayModal({ holiday, existing, onClose, onSave }: HolidayModalProps) {
+export function HolidayModal({ holiday, onClose, onSaved }: HolidayModalProps) {
   const isEdit = holiday !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -51,24 +53,24 @@ export function HolidayModal({ holiday, existing, onClose, onSave }: HolidayModa
     return touchedFields[field] ? "valid" : "idle";
   }
 
-  function onSubmit(values: FormValues) {
-    const clash = existing.find(
-      (candidate) => candidate.date === values.date && candidate.id !== holiday?.id,
-    );
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
+    const request = { date: values.date, name: values.name.trim(), isActive: values.isActive };
 
-    if (clash) {
-      setError("date", { message: `Ya existe un día registrado en esa fecha: ${clash.name}` });
-      setFocus("date");
-      return;
+    try {
+      const saved = isEdit
+        ? await settingsApi.holidays.update(holiday.id, request)
+        : await settingsApi.holidays.create(request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError("date", { message: err.message });
+        setFocus("date");
+        return;
+      }
+      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar el día");
     }
-
-    onSave({
-      id: holiday?.id ?? NEW_ID,
-      date: values.date,
-      name: values.name.trim(),
-      isActive: values.isActive,
-    });
-    onClose();
   }
 
   return (
@@ -88,6 +90,8 @@ export function HolidayModal({ holiday, existing, onClose, onSave }: HolidayModa
       }
     >
       <form id="holiday-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <TextField
           label="Fecha"
           type="date"

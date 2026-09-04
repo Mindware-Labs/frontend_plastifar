@@ -96,6 +96,8 @@ export interface CreditRequest {
   decidedByStaffId: number | null;
   decidedAt: string | null;
   decisionNote: string | null;
+  /** Por qué quien mira no puede decidir esta solicitud; null cuando sí puede. */
+  decisionBlockedReason: string | null;
 }
 
 /** Personal referenciado por las hojas y las solicitudes. */

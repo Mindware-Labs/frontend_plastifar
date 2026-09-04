@@ -9,6 +9,11 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
+import { ApiError } from "../../api/client";
+import { clientsApi } from "../../api/clients";
+import { productLinesApi } from "../../api/productLines";
+import { qualityApi, type ClosureCondition } from "../../api/quality";
+import { staffApi } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -17,13 +22,9 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { RowAction } from "../../components/ui/RowAction";
 import { Spinner } from "../../components/ui/Spinner";
 import { Tooltip } from "../../components/ui/Tooltip";
-import { useAuth } from "../../context/useAuth";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { usePermissions } from "../../hooks/usePermissions";
-import { upsertById } from "../../lib/catalog";
 import {
-  canCloseSheet,
-  closureConditions,
   describeDue,
   formatDay,
   formatInstant,
@@ -31,13 +32,9 @@ import {
   isPlanItemSettled,
   isSheetOverdue,
   nextStatus,
-  today,
 } from "../../lib/quality";
-import { clientsMock } from "../../mocks/clients";
-import { qualityMock } from "../../mocks/quality";
-import { settingsMock } from "../../mocks/settings";
 import type { Client } from "../../types/clients";
-import type { ActionPlanItem, CorrectiveActionSheet } from "../../types/quality";
+import type { ActionPlanItem, CorrectiveActionSheet, QualityStaff } from "../../types/quality";
 import type { ProductLine } from "../../types/settings";
 import { ActionPlanItemModal } from "./ActionPlanItemModal";
 import { CancelPlanItemModal } from "./CancelPlanItemModal";
@@ -54,7 +51,6 @@ interface HcaDetailPageProps {
 /** RF-Q3, RF-Q4 y RF-Q5: la ficha de una HCA, por secciones. */
 export function HcaDetailPage({ section }: HcaDetailPageProps) {
   const { id } = useParams();
-  const { user } = useAuth();
   const { can } = usePermissions();
   const canWrite = can("quality.write");
 
@@ -62,9 +58,14 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
 
   const [sheet, setSheet] = useState<CorrectiveActionSheet | null>(null);
   const [items, setItems] = useState<ActionPlanItem[] | null>(null);
+  const [conditions, setConditions] = useState<ClosureCondition[]>([]);
+  const [closable, setClosable] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [productLines, setProductLines] = useState<ProductLine[]>([]);
+  const [staff, setStaff] = useState<QualityStaff[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** Error de una accion sobre la pagina ya cargada: no reemplaza la ficha. */
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [editing, setEditing] = useState(false);
   const [itemModal, setItemModal] = useState<"nueva" | ActionPlanItem | null>(null);
@@ -73,23 +74,27 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   const [closing, setClosing] = useState(false);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
-  const staff = qualityMock.staff();
   useDynamicBreadcrumb(sheet?.number ?? null);
+
+  function reload() {
+    return qualityApi.sheets.get(sheetId).then((data) => {
+      setSheet(data.sheet);
+      setItems(data.planItems);
+      setConditions(data.closureConditions);
+      setClosable(data.canClose);
+    });
+  }
 
   useEffect(() => {
     Promise.all([
-      qualityMock.sheets(),
-      qualityMock.planItems(sheetId),
-      clientsMock.clients(),
-      settingsMock.productLines(),
-    ])
-      .then(([sheets, loadedItems, loadedClients, loadedLines]) => {
-        setSheet(sheets.find((candidate) => candidate.id === sheetId) ?? null);
-        setItems(loadedItems);
-        setClients(loadedClients);
-        setProductLines(loadedLines);
-      })
-      .catch(() => setError("No se pudo cargar la hoja de corrección"));
+      reload(),
+      clientsApi.list({ page: 1, pageSize: 100 }).then((data) => setClients(data.items)),
+      productLinesApi.list().then((data) => setProductLines(data.items)),
+      staffApi
+        .list({ page: 1, pageSize: 100, status: "activos" })
+        .then((data) => setStaff(data.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })))),
+    ]).catch(() => setError("No se pudo cargar la hoja de corrección"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetId]);
 
   function staffName(staffId: number | null) {
@@ -122,12 +127,17 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
 
   const isClosed = sheet.status === "Cerrada";
   const overdue = isSheetOverdue(sheet);
-  const conditions = closureConditions(sheet, items);
-  const closable = canCloseSheet(sheet, items);
   const advance = nextStatus(sheet);
 
-  function upsertItem(item: ActionPlanItem) {
-    setItems((previous) => upsertById(previous ?? [], item));
+  async function askAdvance() {
+    if (advance.status === null) return;
+    setActionError(null);
+    try {
+      await qualityApi.sheets.advance(sheetId, advance.status);
+      await reload();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo avanzar el estado");
+    }
   }
 
   function askComplete(item: ActionPlanItem) {
@@ -142,8 +152,10 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
         </>
       ),
       confirmLabel: "Marcar cumplida",
-      onConfirm: () =>
-        upsertItem({ ...item, status: "Cumplida", completedAt: today(), cancelReason: null }),
+      onConfirm: async () => {
+        await qualityApi.planItems.complete(item.id);
+        await reload();
+      },
     });
   }
 
@@ -196,6 +208,12 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   return (
     <div>
       <ModuleHeader sections={sections} action={primaryAction} />
+
+      {actionError && (
+        <div className="mb-3">
+          <Alert variant="error">{actionError}</Alert>
+        </div>
+      )}
 
       {section === "datos" && (
         <>
@@ -265,13 +283,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                 variant="secondary"
                 size="sm"
                 disabled={advance.blockedBy !== null}
-                onClick={() =>
-                  setSheet((previous) =>
-                    previous === null || advance.status === null
-                      ? previous
-                      : { ...previous, status: advance.status },
-                  )
-                }
+                onClick={askAdvance}
               >
                 Pasar a {advance.status}
                 <ArrowRight className="h-[15px] w-[15px]" />
@@ -481,9 +493,11 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           clients={clients}
           productLines={productLines}
           staff={staff}
-          existing={[sheet]}
           onClose={() => setEditing(false)}
-          onSave={setSheet}
+          onSaved={() => {
+            setEditing(false);
+            reload();
+          }}
         />
       )}
 
@@ -494,7 +508,10 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           item={itemModal === "nueva" ? undefined : itemModal}
           staff={staff}
           onClose={() => setItemModal(null)}
-          onSave={upsertItem}
+          onSaved={() => {
+            setItemModal(null);
+            reload();
+          }}
         />
       )}
 
@@ -502,21 +519,33 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
         <CancelPlanItemModal
           item={cancelling}
           onClose={() => setCancelling(null)}
-          onSave={upsertItem}
+          onSaved={() => {
+            setCancelling(null);
+            reload();
+          }}
         />
       )}
 
       {verifying && (
-        <EffectivenessModal sheet={sheet} onClose={() => setVerifying(false)} onSave={setSheet} />
+        <EffectivenessModal
+          sheet={sheet}
+          onClose={() => setVerifying(false)}
+          onSaved={() => {
+            setVerifying(false);
+            reload();
+          }}
+        />
       )}
 
       {closing && (
         <CloseSheetModal
           sheet={sheet}
-          items={items}
-          closedByStaffId={user?.staffId ?? null}
+          conditions={conditions}
           onClose={() => setClosing(false)}
-          onSave={setSheet}
+          onSaved={() => {
+            setClosing(false);
+            reload();
+          }}
         />
       )}
 

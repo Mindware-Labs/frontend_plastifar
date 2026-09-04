@@ -1,6 +1,9 @@
-import { Ban, Pencil, Plus, Power, Trash2, UserCog } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Pencil, Plus, Power, Trash2, UserCog, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { clientsApi, type ClientQuery } from "../../api/clients";
+import { staffApi } from "../../api/staff";
+import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
@@ -16,13 +19,10 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
-import { Tooltip } from "../../components/ui/Tooltip";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { useLocalPage } from "../../hooks/useLocalPage";
-import { upsertById } from "../../lib/catalog";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import { clientsMock } from "../../mocks/clients";
-import type { Client, Contact, Territory } from "../../types/clients";
+import type { Client, ClientListResponse, Territory } from "../../types/clients";
 import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
 import { ClientModal } from "./ClientModal";
 import { ReassignSalesRepModal } from "./ReassignSalesRepModal";
@@ -46,19 +46,27 @@ const typeTone: Record<Client["type"], "red" | "green" | "neutral"> = {
   Institucional: "green",
 };
 
+const chipToStatus: Record<ChipKey, string | undefined> = {
+  todos: undefined,
+  activos: "activos",
+  inactivos: "inactivos",
+  sinVendedor: "sinvendedor",
+};
+
 export function ClientsPage() {
   const { can } = usePermissions();
   const canWrite = can("clients.write");
 
-  const [clients, setClients] = useState<Client[] | null>(null);
   const [territories, setTerritories] = useState<Territory[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [salesReps, setSalesReps] = useState<{ id: number; name: string }[]>([]);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [territoryId, setTerritoryId] = useState("todos");
   const [salesRepId, setSalesRepId] = useState("todos");
   const [type, setType] = useState("todos");
   const [chip, setChip] = useState<ChipKey>("todos");
+  const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nuevo" | Client | null>(null);
   const [reassigning, setReassigning] = useState<Client | null>(null);
@@ -68,35 +76,49 @@ export function ClientsPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkReassigning, setBulkReassigning] = useState(false);
 
-  const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
-  const salesReps = clientsMock.salesReps();
-  const contactsByClient = useMemo(() => clientsMock.contactsByClient(), []);
+  const debouncedSearch = useDebouncedValue(search).trim();
 
   function isVisible(id: string) {
     return visibleColumns.includes(id);
   }
 
   useEffect(() => {
-    Promise.all([clientsMock.clients(), clientsMock.territories()])
-      .then(([loadedClients, loadedTerritories]) => {
-        setClients(loadedClients);
-        setTerritories(loadedTerritories);
-      })
-      .catch(() => setError("No se pudieron cargar los clientes"));
+    territoriesApi
+      .list()
+      .then((res) => setTerritories(res.items))
+      .catch(() => setTerritories([]));
+
+    staffApi
+      .list({ page: 1, pageSize: 100, status: "activos", sort: "nombre", dir: "asc" })
+      .then((res) => setSalesReps(res.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))))
+      .catch(() => setSalesReps([]));
   }, []);
 
-  const all = useMemo(() => clients ?? [], [clients]);
-  const activeCount = all.filter((client) => client.isActive).length;
-  const noRepCount = all.filter((client) => client.salesRepStaffId === null).length;
+  const { data, isStale, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
+    fetch: clientsApi.list,
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      territoryId: territoryId === "todos" ? undefined : Number(territoryId),
+      salesRepId: salesRepId === "todos" ? undefined : Number(salesRepId),
+      type: type === "todos" ? undefined : type,
+      status: chipToStatus[chip],
+    },
+    fallbackError: "No se pudieron cargar los clientes",
+  });
 
-  // La seleccion es sobre el filtro actual (RF-C7): cambiar el filtro deja
-  // atras ids que ya no se ven, y "reasignar" nunca debe alcanzar a un
-  // cliente que el usuario ya no tiene en pantalla. Se ajusta durante el
-  // render, como useLocalPage, y no en un efecto aparte.
-  const filterCriteria = JSON.stringify([debouncedSearch, territoryId, salesRepId, type, chip]);
-  const [lastFilterCriteria, setLastFilterCriteria] = useState(filterCriteria);
-  if (filterCriteria !== lastFilterCriteria) {
-    setLastFilterCriteria(filterCriteria);
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const unfiltered =
+    chip === "todos" && territoryId === "todos" && salesRepId === "todos" && type === "todos" && !debouncedSearch;
+
+  // La seleccion es sobre el filtro actual (RF-C7): al cambiar de pagina o de
+  // filtro se descarta, para que "reasignar" nunca alcance a un cliente que la
+  // persona ya no tiene en pantalla.
+  const criteriaKey = JSON.stringify([debouncedSearch, territoryId, salesRepId, type, chip, data?.page]);
+  const [lastCriteriaKey, setLastCriteriaKey] = useState(criteriaKey);
+  if (criteriaKey !== lastCriteriaKey) {
+    setLastCriteriaKey(criteriaKey);
     setSelectedIds([]);
   }
 
@@ -109,36 +131,8 @@ export function ClientsPage() {
     return salesReps.find((rep) => rep.id === id)?.name ?? null;
   }
 
-  const rows = all.filter((client) => {
-    const byChip =
-      chip === "todos" ||
-      (chip === "activos" && client.isActive) ||
-      (chip === "inactivos" && !client.isActive) ||
-      (chip === "sinVendedor" && client.salesRepStaffId === null);
-
-    const byTerritory = territoryId === "todos" || client.territoryId === Number(territoryId);
-    const bySalesRep = salesRepId === "todos" || client.salesRepStaffId === Number(salesRepId);
-    const byType = type === "todos" || client.type === type;
-
-    const bySearch =
-      debouncedSearch === "" ||
-      client.name.toLowerCase().includes(debouncedSearch) ||
-      client.code.toLowerCase().includes(debouncedSearch) ||
-      (client.taxId?.toLowerCase().includes(debouncedSearch) ?? false);
-
-    return byChip && byTerritory && bySalesRep && byType && bySearch;
-  });
-
-  // RF-C1 pide el listado paginado. El corte lo hace la vista solo mientras no
-  // exista /api/clients: el endpoint devuelve la pagina ya cortada en SQL, con
-  // total, totalPages y counts (anexo 12.1).
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
-    rows,
-    filterCriteria,
-  );
-
-  const selected = all.filter((client) => selectedIds.includes(client.id));
-  const allFilteredSelected = rows.length > 0 && rows.every((client) => selectedIds.includes(client.id));
+  const selected = rows.filter((client) => selectedIds.includes(client.id));
+  const allPageSelected = rows.length > 0 && rows.every((client) => selectedIds.includes(client.id));
 
   function toggleSelection(id: number) {
     setSelectedIds((previous) =>
@@ -146,14 +140,23 @@ export function ClientsPage() {
     );
   }
 
-  /** La cabecera marca lo que hay bajo el filtro, no solo lo que se ve: una
-   *  reasignacion de cartera alcanza a las cinco paginas, no a la primera. */
-  function toggleAllFiltered() {
-    setSelectedIds(allFilteredSelected ? [] : rows.map((client) => client.id));
+  function toggleAllOnPage() {
+    setSelectedIds((previous) => {
+      if (allPageSelected) return previous.filter((id) => !rows.some((client) => client.id === id));
+      const ids = new Set(previous);
+      for (const client of rows) ids.add(client.id);
+      return [...ids];
+    });
   }
 
-  function upsert(item: Client) {
-    setClients((previous) => upsertById(previous ?? [], item));
+  async function runOnRow(id: number, action: () => Promise<void>) {
+    setBusyId(id);
+    try {
+      await action();
+      refresh();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   function askToggle(client: Client) {
@@ -164,7 +167,7 @@ export function ClientsPage() {
       description: client.isActive ? (
         <>
           <strong className="font-semibold text-ink">{client.name}</strong> deja de poder recibir
-          tickets nuevos. Su historial y sus {client.ticketCount} tickets existentes se conservan.
+          tickets nuevos. Su historial se conserva.
         </>
       ) : (
         <>
@@ -173,30 +176,15 @@ export function ClientsPage() {
         </>
       ),
       confirmLabel: client.isActive ? "Desactivar" : "Reactivar",
-      onConfirm: () => upsert({ ...client, isActive: !client.isActive }),
+      onConfirm: () =>
+        runOnRow(client.id, () =>
+          client.isActive ? clientsApi.deactivate(client.id) : clientsApi.activate(client.id),
+        ),
     });
   }
 
-  /** RF-C4: un cliente con tickets no se elimina, se desactiva. */
+  /** RF-C4: el servidor rechaza con 409 si tiene contactos (o tickets, cuando exista esa tabla). */
   function askDelete(client: Client) {
-    if (client.ticketCount > 0) {
-      setConfirmation({
-        tone: "warn",
-        icon: Ban,
-        title: "No se puede eliminar",
-        description: (
-          <>
-            <strong className="font-semibold text-ink">{client.name}</strong> tiene{" "}
-            {client.ticketCount} tickets registrados; no se puede eliminar, solo desactivar.
-          </>
-        ),
-        confirmLabel: "Entendido",
-        cancelLabel: "Cerrar",
-        onConfirm: () => {},
-      });
-      return;
-    }
-
     setConfirmation({
       tone: "danger",
       icon: Trash2,
@@ -209,7 +197,7 @@ export function ClientsPage() {
         </>
       ),
       confirmLabel: "Eliminar",
-      onConfirm: () => setClients((previous) => (previous ?? []).filter((c) => c.id !== client.id)),
+      onConfirm: () => runOnRow(client.id, () => clientsApi.remove(client.id)),
     });
   }
 
@@ -275,38 +263,28 @@ export function ClientsPage() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <FilterChip
-          label="Todos"
-          count={all.length}
-          active={chip === "todos"}
-          onClick={() => setChip("todos")}
-        />
+        <FilterChip label="Todos" count={counts?.all ?? 0} active={chip === "todos"} onClick={() => setChip("todos")} />
         <FilterChip
           label="Activos"
-          count={activeCount}
+          count={counts?.active ?? 0}
           active={chip === "activos"}
           onClick={() => setChip("activos")}
         />
         <FilterChip
           label="Inactivos"
-          count={all.length - activeCount}
+          count={counts?.inactive ?? 0}
           active={chip === "inactivos"}
           onClick={() => setChip("inactivos")}
         />
         <FilterChip
           label="Sin vendedor"
-          count={noRepCount}
+          count={counts?.withoutSalesRep ?? 0}
           active={chip === "sinVendedor"}
           onClick={() => setChip("sinVendedor")}
         />
 
         <div className="ml-auto">
-          <ColumnPicker
-            columns={COLUMNS}
-            visible={visibleColumns}
-            onChange={setVisibleColumns}
-            label="Columnas"
-          />
+          <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
         </div>
       </div>
 
@@ -336,183 +314,165 @@ export function ClientsPage() {
         </div>
       )}
 
-      {clients === null ? (
+      {data === null ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : rows.length === 0 ? (
-        <p className="py-14 text-center text-[13.5px] text-faint">
-          {all.length === 0
-            ? "Todavía no hay clientes registrados."
-            : "Ningún cliente coincide con este filtro o búsqueda."}
-        </p>
       ) : (
-        <DataTable>
-          <thead>
-            <HeadRow>
-              {canWrite && (
-                <Th className="w-9">
-                  <input
-                    type="checkbox"
-                    checked={allFilteredSelected}
-                    onChange={toggleAllFiltered}
-                    aria-label={
-                      allFilteredSelected
-                        ? "Quitar la selección de todos los clientes filtrados"
-                        : "Seleccionar todos los clientes filtrados"
-                    }
-                    className="h-4 w-4 rounded-[2px] border-line-strong accent-brand-red"
-                  />
-                </Th>
-              )}
-              <Th>Cliente</Th>
-              {isVisible("codigo") && <Th>Código</Th>}
-              {isVisible("tipo") && <Th>Tipo</Th>}
-              {isVisible("territorio") && <Th>Territorio</Th>}
-              {isVisible("vendedor") && <Th>Vendedor</Th>}
-              {isVisible("contactos") && <Th>Contactos</Th>}
-              {isVisible("estado") && <Th>Estado</Th>}
-              {canWrite && <Th className="w-32 text-right">Acciones</Th>}
-            </HeadRow>
-          </thead>
+        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          {rows.length === 0 ? (
+            <p className="py-14 text-center text-[13.5px] text-faint">
+              {unfiltered
+                ? "Todavía no hay clientes registrados."
+                : "Ningún cliente coincide con este filtro o búsqueda."}
+            </p>
+          ) : (
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  {canWrite && (
+                    <Th className="w-9">
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        onChange={toggleAllOnPage}
+                        aria-label={
+                          allPageSelected
+                            ? "Quitar la selección de esta página"
+                            : "Seleccionar todos los clientes de esta página"
+                        }
+                        className="h-4 w-4 rounded-[2px] border-line-strong accent-brand-red"
+                      />
+                    </Th>
+                  )}
+                  <Th>Cliente</Th>
+                  {isVisible("codigo") && <Th>Código</Th>}
+                  {isVisible("tipo") && <Th>Tipo</Th>}
+                  {isVisible("territorio") && <Th>Territorio</Th>}
+                  {isVisible("vendedor") && <Th>Vendedor</Th>}
+                  {isVisible("contactos") && <Th>Contactos</Th>}
+                  {isVisible("estado") && <Th>Estado</Th>}
+                  {canWrite && <Th className="w-32 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
 
-          <tbody>
-            {pageRows.map((client) => {
-              const contacts = contactsByClient[client.id] ?? [];
-              const shown = contacts.slice(0, 3);
-              const overflow = contacts.length - shown.length;
-
-              return (
-              <Row key={client.id}>
-                {canWrite && (
-                  <Td>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(client.id)}
-                      onChange={() => toggleSelection(client.id)}
-                      aria-label={`Seleccionar ${client.name}`}
-                      className="h-4 w-4 rounded-[2px] border-line-strong accent-brand-red"
-                    />
-                  </Td>
-                )}
-                <Td>
-                  <Link
-                    to={`/clientes/${client.id}`}
-                    className="flex items-center gap-2.5 rounded-edge underline-offset-4 outline-none
-                      focus-visible:ring-3 focus-visible:ring-brand-red/20"
-                  >
-                    <Avatar name={client.name} seed={client.id} />
-                    <span className="whitespace-nowrap text-[13px] font-medium text-ink hover:underline">
-                      {client.name}
-                    </span>
-                  </Link>
-                </Td>
-                {isVisible("codigo") && (
-                  <Td>
-                    <span className="font-mono text-[12px] text-brand-gray">{client.code}</span>
-                  </Td>
-                )}
-                {isVisible("tipo") && (
-                  <Td>
-                    <Badge tone={typeTone[client.type]}>{client.type}</Badge>
-                  </Td>
-                )}
-                {isVisible("territorio") && (
-                  <Td className="text-[12.5px] text-brand-gray">{territoryName(client.territoryId)}</Td>
-                )}
-                {isVisible("vendedor") && (
-                  <Td className="text-[12.5px] text-brand-gray">
-                    {repName(client.salesRepStaffId) ?? <span className="text-faint">Sin vendedor</span>}
-                  </Td>
-                )}
-                {isVisible("contactos") && (
-                  <Td>
-                    {contacts.length === 0 ? (
-                      <span className="text-[12.5px] text-faint">Ninguno</span>
-                    ) : (
-                      <div className="flex items-center -space-x-1.5">
-                        {shown.map((contact) => (
-                          <Tooltip
-                            key={contact.id}
-                            content={<ContactTooltipContent contact={contact} />}
-                          >
-                            <span className="ring-2 ring-white rounded-full">
-                              <Avatar
-                                name={`${contact.firstName} ${contact.lastName}`}
-                                seed={contact.id}
-                                size={24}
-                              />
-                            </span>
-                          </Tooltip>
-                        ))}
-                        {overflow > 0 && (
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-fill ring-2 ring-white text-[10px] font-semibold text-brand-gray">
-                            +{overflow}
+              <tbody>
+                {rows.map((client) => (
+                  <Row key={client.id} busy={busyId === client.id}>
+                    {canWrite && (
+                      <Td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(client.id)}
+                          onChange={() => toggleSelection(client.id)}
+                          aria-label={`Seleccionar ${client.name}`}
+                          className="h-4 w-4 rounded-[2px] border-line-strong accent-brand-red"
+                        />
+                      </Td>
+                    )}
+                    <Td>
+                      <Link
+                        to={`/clientes/${client.id}`}
+                        className="flex items-center gap-2.5 rounded-edge underline-offset-4 outline-none
+                          focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                      >
+                        <Avatar name={client.name} seed={client.id} />
+                        <span className="whitespace-nowrap text-[13px] font-medium text-ink hover:underline">
+                          {client.name}
+                        </span>
+                      </Link>
+                    </Td>
+                    {isVisible("codigo") && (
+                      <Td>
+                        <span className="font-mono text-[12px] text-brand-gray">{client.code}</span>
+                      </Td>
+                    )}
+                    {isVisible("tipo") && (
+                      <Td>
+                        <Badge tone={typeTone[client.type]}>{client.type}</Badge>
+                      </Td>
+                    )}
+                    {isVisible("territorio") && (
+                      <Td className="text-[12.5px] text-brand-gray">{territoryName(client.territoryId)}</Td>
+                    )}
+                    {isVisible("vendedor") && (
+                      <Td className="text-[12.5px] text-brand-gray">
+                        {repName(client.salesRepStaffId) ?? <span className="text-faint">Sin vendedor</span>}
+                      </Td>
+                    )}
+                    {isVisible("contactos") && (
+                      <Td>
+                        {client.contactCount === 0 ? (
+                          <span className="text-[12.5px] text-faint">Ninguno</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[12.5px] text-brand-gray">
+                            <Users aria-hidden className="h-3.5 w-3.5 text-faint" />
+                            {client.contactCount}
                           </span>
                         )}
-                      </div>
+                      </Td>
                     )}
-                  </Td>
-                )}
-                {isVisible("estado") && (
-                  <Td>
-                    <StatusDot active={client.isActive} />
-                  </Td>
-                )}
-                {canWrite && (
-                  <Td>
-                    <div className="flex items-center justify-end gap-1">
-                      <RowAction
-                        label={`Reasignar vendedor de ${client.name}`}
-                        icon={UserCog}
-                        onClick={() => setReassigning(client)}
-                      />
-                      <RowAction
-                        label={`Editar ${client.name}`}
-                        icon={Pencil}
-                        onClick={() => setModal(client)}
-                      />
-                      <RowAction
-                        label={client.isActive ? `Desactivar ${client.name}` : `Reactivar ${client.name}`}
-                        icon={Power}
-                        onClick={() => askToggle(client)}
-                      />
-                      <RowAction
-                        label={`Eliminar ${client.name}`}
-                        icon={Trash2}
-                        onClick={() => askDelete(client)}
-                        danger
-                      />
-                    </div>
-                  </Td>
-                )}
-              </Row>
-              );
-            })}
-          </tbody>
-        </DataTable>
-      )}
+                    {isVisible("estado") && (
+                      <Td>
+                        <StatusDot active={client.isActive} />
+                      </Td>
+                    )}
+                    {canWrite && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Reasignar vendedor de ${client.name}`}
+                            icon={UserCog}
+                            onClick={() => setReassigning(client)}
+                            disabled={busyId === client.id}
+                          />
+                          <RowAction
+                            label={`Editar ${client.name}`}
+                            icon={Pencil}
+                            onClick={() => setModal(client)}
+                            disabled={busyId === client.id}
+                          />
+                          <RowAction
+                            label={client.isActive ? `Desactivar ${client.name}` : `Reactivar ${client.name}`}
+                            icon={Power}
+                            onClick={() => askToggle(client)}
+                            disabled={busyId === client.id}
+                          />
+                          <RowAction
+                            label={`Eliminar ${client.name}`}
+                            icon={Trash2}
+                            onClick={() => askDelete(client)}
+                            disabled={busyId === client.id}
+                            danger
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+          )}
 
-      {clients !== null && rows.length > 0 && (
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          totalPages={totalPages}
-          onPageChange={setPage}
-          onPageSizeChange={changePageSize}
-          noun="clientes"
-        />
+          <Pagination
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+            totalPages={data.totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="clientes"
+          />
+        </div>
       )}
 
       {modal !== null && (
         <ClientModal
           client={modal === "nuevo" ? undefined : modal}
-          existing={all}
           territories={territories}
           salesReps={salesReps}
           onClose={() => setModal(null)}
-          onSave={upsert}
+          onSaved={refresh}
         />
       )}
 
@@ -521,7 +481,7 @@ export function ClientsPage() {
           client={reassigning}
           salesReps={salesReps}
           onClose={() => setReassigning(null)}
-          onSave={(salesRepStaffId) => upsert({ ...reassigning, salesRepStaffId })}
+          onSaved={refresh}
         />
       )}
 
@@ -530,32 +490,14 @@ export function ClientsPage() {
           clients={selected}
           salesReps={salesReps}
           onClose={() => setBulkReassigning(false)}
-          onSave={(salesRepStaffId) => {
-            setClients((previous) =>
-              (previous ?? []).map((client) =>
-                selectedIds.includes(client.id) ? { ...client, salesRepStaffId } : client,
-              ),
-            );
+          onSaved={() => {
             setSelectedIds([]);
+            refresh();
           }}
         />
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
     </div>
-  );
-}
-
-/** Lo que se ve al pasar el mouse sobre un avatar de contacto en el listado. */
-function ContactTooltipContent({ contact }: { contact: Contact }) {
-  return (
-    <span className="flex flex-col gap-0.5">
-      <span className="font-semibold">
-        {contact.firstName} {contact.lastName}
-        {contact.isPrimary && " · Principal"}
-      </span>
-      {contact.position && <span className="text-faint">{contact.position}</span>}
-      {contact.email && <span className="text-faint">{contact.email}</span>}
-    </span>
   );
 }

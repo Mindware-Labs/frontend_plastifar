@@ -1,6 +1,4 @@
-// Contrato anticipado del modulo de Clientes. Todavia no existe en el backend:
-// cuando los endpoints /api/clients/... esten escritos, esto pasa a types/api.ts
-// como espejo de los DTOs reales.
+// Espejo de api/Dtos/ClientDtos.cs en el backend.
 
 export type ClientType = "Distribuidor" | "Mayorista" | "Detallista" | "Institucional";
 
@@ -39,6 +37,7 @@ export interface Client {
   isActive: boolean;
   /** Tickets que ya lo referencian: un cliente con historial no se elimina, se desactiva. */
   ticketCount: number;
+  contactCount: number;
 }
 
 /** Persona de contacto dentro de un cliente. */
@@ -52,5 +51,65 @@ export interface Contact {
   phone: string | null;
   position: string | null;
   isPrimary: boolean;
+  isActive: boolean;
+}
+
+export interface ClientCounts {
+  all: number;
+  active: number;
+  inactive: number;
+  withoutSalesRep: number;
+}
+
+export interface ClientListResponse {
+  items: Client[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: ClientCounts;
+}
+
+export interface ClientDetailResponse {
+  client: Client;
+  contacts: Contact[];
+}
+
+export interface SaveClientRequest {
+  code: string;
+  name: string;
+  taxId: string | null;
+  type: ClientType;
+  territoryId: number;
+  salesRepStaffId: number | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  isActive: boolean;
+}
+
+export interface SaveContactRequest {
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  position: string | null;
+  isPrimary: boolean;
+  isActive: boolean;
+}
+
+export interface BulkReassignSalesRepRequest {
+  clientIds: number[];
+  salesRepStaffId: number | null;
+}
+
+export interface BulkReassignSalesRepResponse {
+  updated: number;
+}
+
+export interface SaveTerritoryRequest {
+  name: string;
+  code: string;
   isActive: boolean;
 }

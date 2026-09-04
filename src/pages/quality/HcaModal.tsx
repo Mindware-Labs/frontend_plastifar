@@ -1,6 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { qualityApi } from "../../api/quality";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
   SelectField,
@@ -9,7 +13,6 @@ import {
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import { today } from "../../lib/quality";
 import type { Client } from "../../types/clients";
 import type { CorrectiveActionSheet, QualityStaff } from "../../types/quality";
@@ -45,20 +48,8 @@ interface HcaModalProps {
   clients: Client[];
   productLines: ProductLine[];
   staff: QualityStaff[];
-  /** Solo para numerar la hoja nueva mientras no exista la secuencia del servidor. */
-  existing: CorrectiveActionSheet[];
   onClose: () => void;
-  onSave: (sheet: CorrectiveActionSheet) => void;
-}
-
-/** El numero visible lo asigna el servidor con su propia secuencia; esto solo
- *  evita que dos hojas de prueba se llamen igual. */
-function nextNumber(existing: CorrectiveActionSheet[]): string {
-  const highest = existing.reduce((top, sheet) => {
-    const parsed = Number(sheet.number.replace(/\D/g, ""));
-    return Number.isNaN(parsed) ? top : Math.max(top, parsed);
-  }, 0);
-  return `HCA-${String(highest + 1).padStart(6, "0")}`;
+  onSaved: (sheet: CorrectiveActionSheet) => void;
 }
 
 export function HcaModal({
@@ -66,11 +57,11 @@ export function HcaModal({
   clients,
   productLines,
   staff,
-  existing,
   onClose,
-  onSave,
+  onSaved,
 }: HcaModalProps) {
   const isEdit = sheet !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     control,
@@ -97,32 +88,34 @@ export function HcaModal({
     return touchedFields[field] ? "valid" : "idle";
   }
 
-  function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
+
     const rootCause = values.rootCause.trim();
     const immediateAction = values.immediateAction.trim();
 
-    onSave({
-      id: sheet?.id ?? NEW_ID,
-      number: sheet?.number ?? nextNumber(existing),
-      ticketId: sheet?.ticketId ?? null,
-      ticketNumber: sheet?.ticketNumber ?? null,
+    const request = {
       clientId: Number(values.clientId),
       productLineId: Number(values.productLineId),
-      detectedAt: `${values.detectedAt}T00:00:00Z`,
+      detectedAt: values.detectedAt,
       description: values.description.trim(),
       immediateAction: immediateAction === "" ? null : immediateAction,
       rootCause: rootCause === "" ? null : rootCause,
       responsibleStaffId: Number(values.responsibleStaffId),
       dueDate: values.dueDate,
-      status: sheet?.status ?? "Abierta",
-      effectivenessCheckAt: sheet?.effectivenessCheckAt ?? null,
-      effectivenessNotes: sheet?.effectivenessNotes ?? null,
-      closedAt: sheet?.closedAt ?? null,
-      closedByStaffId: sheet?.closedByStaffId ?? null,
-      closingNote: sheet?.closingNote ?? null,
-      createdAt: sheet?.createdAt ?? new Date().toISOString(),
-    });
-    onClose();
+      ticketId: sheet?.ticketId ?? null,
+    };
+
+    try {
+      const saved = isEdit
+        ? await qualityApi.sheets.update(sheet.id, request)
+        : await qualityApi.sheets.create(request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      const fallback = isEdit ? "No se pudo guardar la hoja" : "No se pudo crear la hoja";
+      setFormError(err instanceof ApiError ? err.message : fallback);
+    }
   }
 
   return (
@@ -146,6 +139,8 @@ export function HcaModal({
       }
     >
       <form id="hca-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <div className="grid grid-cols-2 gap-3">
           <Controller
             name="clientId"

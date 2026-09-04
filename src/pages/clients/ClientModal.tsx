@@ -1,10 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { clientsApi } from "../../api/clients";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { NEW_ID } from "../../lib/catalog";
 import { CLIENT_TYPES, type Client } from "../../types/clients";
 
 /**
@@ -30,22 +33,15 @@ type FormValues = z.infer<typeof schema>;
 
 interface ClientModalProps {
   client?: Client;
-  existing: Client[];
   territories: { id: number; name: string; isActive: boolean }[];
   salesReps: { id: number; name: string }[];
   onClose: () => void;
-  onSave: (client: Client) => void;
+  onSaved: (client: Client) => void;
 }
 
-export function ClientModal({
-  client,
-  existing,
-  territories,
-  salesReps,
-  onClose,
-  onSave,
-}: ClientModalProps) {
+export function ClientModal({ client, territories, salesReps, onClose, onSaved }: ClientModalProps) {
   const isEdit = client !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     control,
@@ -77,32 +73,12 @@ export function ClientModal({
     return touchedFields[field] ? "valid" : "idle";
   }
 
-  function onSubmit(values: FormValues) {
-    const code = values.code.trim();
-    const codeClash = existing.find(
-      (candidate) => candidate.code.toLowerCase() === code.toLowerCase() && candidate.id !== client?.id,
-    );
-    if (codeClash) {
-      setError("code", { message: `Ese código ya lo usa ${codeClash.name}` });
-      setFocus("code");
-      return;
-    }
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
 
     const taxId = values.taxId.trim();
-    if (taxId !== "") {
-      const taxIdClash = existing.find(
-        (candidate) => candidate.taxId === taxId && candidate.id !== client?.id,
-      );
-      if (taxIdClash) {
-        setError("taxId", { message: `Ese RNC ya lo usa ${taxIdClash.name}` });
-        setFocus("taxId");
-        return;
-      }
-    }
-
-    onSave({
-      id: client?.id ?? NEW_ID,
-      code,
+    const request = {
+      code: values.code.trim(),
       name: values.name.trim(),
       taxId: taxId === "" ? null : taxId,
       type: values.type as Client["type"],
@@ -113,9 +89,29 @@ export function ClientModal({
       address: values.address.trim() === "" ? null : values.address.trim(),
       notes: values.notes.trim() === "" ? null : values.notes.trim(),
       isActive: values.isActive,
-      ticketCount: client?.ticketCount ?? 0,
-    });
-    onClose();
+    };
+
+    try {
+      const saved = isEdit ? await clientsApi.update(client.id, request) : await clientsApi.create(request);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      // 409 de codigo o RNC duplicado: se marca en su campo, no en un aviso
+      // general que obliga a adivinar cual es (seccion 4.2).
+      if (err instanceof ApiError && err.status === 409) {
+        if (err.message.toLowerCase().includes("rnc")) {
+          setError("taxId", { message: err.message });
+          setFocus("taxId");
+        } else {
+          setError("code", { message: err.message });
+          setFocus("code");
+        }
+        return;
+      }
+
+      const fallback = isEdit ? "No se pudo guardar el cliente" : "No se pudo crear el cliente";
+      setFormError(err instanceof ApiError ? err.message : fallback);
+    }
   }
 
   return (
@@ -135,6 +131,8 @@ export function ClientModal({
       }
     >
       <form id="client-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <div className="grid grid-cols-2 gap-3">
           <TextField
             label="Código"

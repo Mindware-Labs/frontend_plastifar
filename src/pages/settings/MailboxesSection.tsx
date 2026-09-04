@@ -1,5 +1,7 @@
 import { CheckCircle2, Pencil, Plug, Plus, Power, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { departmentsApi } from "../../api/departments";
+import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -13,9 +15,8 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLocalPage } from "../../hooks/useLocalPage";
-import { upsertById } from "../../lib/catalog";
 import { usePermissions } from "../../hooks/usePermissions";
-import { settingsMock } from "../../mocks/settings";
+import type { DepartmentResponse } from "../../types/api";
 import type { Mailbox } from "../../types/settings";
 import { MailboxModal } from "./MailboxModal";
 import { SettingsLayout } from "./SettingsLayout";
@@ -30,32 +31,12 @@ const syncFormat = new Intl.DateTimeFormat("es-DO", {
   minute: "2-digit",
 });
 
-/**
- * Simula la prueba de conexion sin credenciales de por medio: comprueba que
- * el buzon tenga a donde apuntar y este activo, no que el correo real
- * responda. Esa parte llega con la ingesta por correo (seccion 9.7).
- */
-function testConnection(mailbox: Mailbox): Promise<TestResult> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (!mailbox.isActive) {
-        resolve({ ok: false, message: "El buzón está desactivado: actívalo antes de probarlo." });
-        return;
-      }
-      if (mailbox.secretRef.trim() === "") {
-        resolve({ ok: false, message: "Falta la referencia del secreto en la configuración del servidor." });
-        return;
-      }
-      resolve({ ok: true, message: `Conexión resuelta con ${mailbox.provider} para ${mailbox.address}.` });
-    }, 500);
-  });
-}
-
 export function MailboxesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
   const [mailboxes, setMailboxes] = useState<Mailbox[] | null>(null);
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -67,13 +48,16 @@ export function MailboxesSection() {
   const [testResult, setTestResult] = useState<{ id: number; result: TestResult } | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
-  const departments = settingsMock.departments();
+
+  function reload() {
+    return settingsApi.mailboxes.list({ page: 1, pageSize: 100 }).then((res) => setMailboxes(res.items));
+  }
 
   useEffect(() => {
-    settingsMock
-      .mailboxes()
-      .then(setMailboxes)
-      .catch(() => setError("No se pudieron cargar los buzones"));
+    Promise.all([reload(), departmentsApi.list().then(setDepartments)]).catch(() =>
+      setError("No se pudieron cargar los buzones"),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const all = useMemo(() => mailboxes ?? [], [mailboxes]);
@@ -97,15 +81,8 @@ export function MailboxesSection() {
     return byChip && bySearch;
   });
 
-  // RF-K2: los listados de catalogo paginan como cualquier otro. El corte
-  // lo hace la vista solo mientras no exista /api/settings/...; el endpoint
-  // devuelve la pagina ya cortada en SQL (anexo 12.1).
   const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } =
     useLocalPage(rows, JSON.stringify([debouncedSearch, chip]));
-
-  function upsert(item: Mailbox) {
-    setMailboxes((previous) => upsertById(previous ?? [], item));
-  }
 
   function askToggle(mailbox: Mailbox) {
     setConfirmation({
@@ -124,16 +101,31 @@ export function MailboxesSection() {
         </>
       ),
       confirmLabel: mailbox.isActive ? "Desactivar" : "Reactivar",
-      onConfirm: () => upsert({ ...mailbox, isActive: !mailbox.isActive }),
+      onConfirm: async () => {
+        await settingsApi.mailboxes.update(mailbox.id, {
+          address: mailbox.address,
+          displayName: mailbox.displayName,
+          provider: mailbox.provider,
+          departmentId: mailbox.departmentId,
+          secretRef: mailbox.secretRef,
+          isActive: !mailbox.isActive,
+        });
+        await reload();
+      },
     });
   }
 
   async function handleTest(mailbox: Mailbox) {
     setTestingId(mailbox.id);
     setTestResult(null);
-    const result = await testConnection(mailbox);
-    setTestingId(null);
-    setTestResult({ id: mailbox.id, result });
+    try {
+      const result = await settingsApi.mailboxes.test(mailbox.id);
+      setTestResult({ id: mailbox.id, result });
+    } catch {
+      setTestResult({ id: mailbox.id, result: { ok: false, message: "No se pudo probar la conexión." } });
+    } finally {
+      setTestingId(null);
+    }
   }
 
   return (
@@ -252,6 +244,7 @@ export function MailboxesSection() {
                               : Plug
                         }
                         onClick={() => handleTest(mailbox)}
+                        disabled={testingId === mailbox.id}
                       />
                       <RowAction
                         label={`Editar ${mailbox.displayName}`}
@@ -298,10 +291,9 @@ export function MailboxesSection() {
       {modal !== null && (
         <MailboxModal
           mailbox={modal === "nuevo" ? undefined : modal}
-          existing={all}
           departments={departments}
           onClose={() => setModal(null)}
-          onSave={upsert}
+          onSaved={() => reload()}
         />
       )}
 

@@ -1,6 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
@@ -31,7 +34,7 @@ interface AccessModalProps {
   /** Verdadero cuando todavia no hay ningun acceso: el primero es el principal. */
   isFirst: boolean;
   onClose: () => void;
-  onSave: (value: { departmentId: number; roleId: number; isPrimary: boolean }) => void;
+  onSave: (value: { departmentId: number; roleId: number; isPrimary: boolean }) => Promise<void>;
 }
 
 export function AccessModal({
@@ -45,6 +48,7 @@ export function AccessModal({
   onSave,
 }: AccessModalProps) {
   const isEdit = access !== undefined;
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     control,
@@ -74,13 +78,19 @@ export function AccessModal({
     (role) => !role.grantsAll && (role.isActive || (access && role.id === access.roleId)),
   );
 
-  function onSubmit(values: FormValues) {
-    onSave({
-      departmentId: Number(values.departmentId),
-      roleId: Number(values.roleId),
-      isPrimary: values.isPrimary,
-    });
-    onClose();
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
+    try {
+      await onSave({
+        departmentId: Number(values.departmentId),
+        roleId: Number(values.roleId),
+        isPrimary: values.isPrimary,
+      });
+      onClose();
+    } catch (err) {
+      const fallback = isEdit ? "No se pudo guardar el acceso" : "No se pudo otorgar el acceso";
+      setFormError(err instanceof ApiError ? err.message : fallback);
+    }
   }
 
   return (
@@ -105,6 +115,8 @@ export function AccessModal({
       }
     >
       <form id="access-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <Controller
           name="departmentId"
           control={control}

@@ -1,12 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check } from "lucide-react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
+import { qualityApi, type ClosureCondition } from "../../api/quality";
+import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { TextAreaField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { closureConditions } from "../../lib/quality";
-import type { ActionPlanItem, CorrectiveActionSheet } from "../../types/quality";
+import type { CorrectiveActionSheet } from "../../types/quality";
 
 const schema = z.object({
   closingNote: z.string().trim().max(1000, "Máximo 1000 caracteres"),
@@ -16,23 +19,17 @@ type FormValues = z.infer<typeof schema>;
 
 interface CloseSheetModalProps {
   sheet: CorrectiveActionSheet;
-  items: ActionPlanItem[];
-  /** Quien cierra: queda sellado en la hoja. */
-  closedByStaffId: number | null;
+  /** Ya resueltas por el servidor (GET .../sheets/{id}), no se recalculan aquí. */
+  conditions: ClosureCondition[];
   onClose: () => void;
-  onSave: (sheet: CorrectiveActionSheet) => void;
+  onSaved: (sheet: CorrectiveActionSheet) => void;
 }
 
 /** RF-Q5: el cierre. Solo se llega aquí con las tres condiciones cumplidas; el
- *  diálogo las repite para que el sello no sea un acto a ciegas. */
-export function CloseSheetModal({
-  sheet,
-  items,
-  closedByStaffId,
-  onClose,
-  onSave,
-}: CloseSheetModalProps) {
-  const conditions = closureConditions(sheet, items);
+ *  diálogo las repite para que el sello no sea un acto a ciegas. El servidor
+ *  vuelve a comprobarlas: la del navegador es comodidad, esa es la barrera. */
+export function CloseSheetModal({ sheet, conditions, onClose, onSaved }: CloseSheetModalProps) {
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -44,16 +41,16 @@ export function CloseSheetModal({
     defaultValues: { closingNote: sheet.closingNote ?? "" },
   });
 
-  function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues) {
+    setFormError(null);
     const closingNote = values.closingNote.trim();
-    onSave({
-      ...sheet,
-      status: "Cerrada",
-      closedAt: new Date().toISOString(),
-      closedByStaffId,
-      closingNote: closingNote === "" ? null : closingNote,
-    });
-    onClose();
+    try {
+      const saved = await qualityApi.sheets.close(sheet.id, closingNote === "" ? null : closingNote);
+      onSaved(saved);
+      onClose();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "No se pudo cerrar la hoja");
+    }
   }
 
   return (
@@ -78,6 +75,8 @@ export function CloseSheetModal({
         noValidate
         className="flex flex-col gap-4"
       >
+        {formError && <Alert variant="error">{formError}</Alert>}
+
         <ul className="flex flex-col gap-1.5">
           {conditions.map((condition) => (
             <li

@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { permissionsApi } from "../../api/permissions";
+import { ApiError } from "../../api/client";
+import { rolesApi } from "../../api/roles";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -9,7 +12,7 @@ import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePermissions } from "../../hooks/usePermissions";
-import { flattenPermissions, permissionsMock } from "../../mocks/permissions";
+import { flattenPermissions } from "../../lib/permissionCatalog";
 import type { PermissionKey, PermissionMatrixResponse } from "../../types/permissions";
 import { PermissionMatrix } from "./PermissionMatrix";
 
@@ -46,7 +49,7 @@ export function PermissionsPage() {
   const canWrite = can("roles.write");
 
   useEffect(() => {
-    permissionsMock
+    permissionsApi
       .matrix()
       .then((data) => {
         setMatrix(data);
@@ -137,16 +140,38 @@ export function PermissionsPage() {
     });
   }
 
+  /**
+   * No existe un endpoint de matriz completa: cada rol se guarda con su propio
+   * PUT /api/roles/{id} (seccion 12.3 — se sigue el criterio del modulo de
+   * Personal, que ya expone ese endpoint). Solo se manda lo que cambio.
+   */
   async function save() {
     setIsSaving(true);
     setError(null);
     try {
-      const stored = await permissionsMock.saveGrants(grants);
-      setOriginal(stored);
-      setGrants(stored);
+      const changedRoles = editableRoles.filter((role) => {
+        const before = new Set(original[role.id] ?? []);
+        const after = new Set(grants[role.id] ?? []);
+        return before.size !== after.size || [...before].some((key) => !after.has(key));
+      });
+
+      await Promise.all(
+        changedRoles.map((role) =>
+          rolesApi.update(role.id, {
+            name: role.name,
+            isActive: role.isActive,
+            permissions: grants[role.id] ?? [],
+          }),
+        ),
+      );
+
+      const fresh = await permissionsApi.matrix();
+      setMatrix(fresh);
+      setGrants(fresh.grants);
+      setOriginal(fresh.grants);
       setSavedAt(Date.now());
-    } catch {
-      setError("No se pudieron guardar los permisos");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudieron guardar los permisos");
     } finally {
       setIsSaving(false);
     }
@@ -263,10 +288,7 @@ export function PermissionsPage() {
 
       {savedAt !== null && (
         <div className="mb-3">
-          <Alert variant="success">
-            Cambios guardados en los datos de demostración. Todavía no hay servidor detrás: al
-            recargar la página vuelve el estado inicial.
-          </Alert>
+          <Alert variant="success">Cambios guardados.</Alert>
         </div>
       )}
 

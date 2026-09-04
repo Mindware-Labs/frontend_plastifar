@@ -1,6 +1,10 @@
 import { KeyRound, Pencil, Plus, Star, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { ApiError } from "../../api/client";
+import { departmentsApi } from "../../api/departments";
+import { permissionsApi } from "../../api/permissions";
+import { staffApi } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
@@ -13,12 +17,12 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { usePermissions } from "../../hooks/usePermissions";
-import { permissionsMock, resolveEffectivePermissions } from "../../mocks/permissions";
 import type {
   DepartmentAccess,
   PermissionMatrixResponse,
   StaffDetail,
 } from "../../types/permissions";
+import type { DepartmentResponse } from "../../types/api";
 import { AccessModal } from "./AccessModal";
 
 interface StaffDetailPageProps {
@@ -43,70 +47,61 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
 
   const [staff, setStaff] = useState<StaffDetail | null>(null);
   const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [modal, setModal] = useState<"nuevo" | DepartmentAccess | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
+  const staffId = Number(id);
+
+  function reload() {
+    return staffApi.getDepartmentAccess(staffId).then(setStaff);
+  }
+
   useEffect(() => {
-    Promise.all([permissionsMock.staffDetail(), permissionsMock.matrix()])
-      .then(([detail, data]) => {
+    if (!id) return;
+    Promise.all([staffApi.getDepartmentAccess(staffId), permissionsApi.matrix(), departmentsApi.list()])
+      .then(([detail, data, depts]) => {
         setStaff(detail);
         setMatrix(data);
+        setDepartments(depts);
       })
       .catch(() => setError("No se pudo cargar la ficha del colaborador"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fullName = staff ? `${staff.firstName} ${staff.lastName}` : "";
   useDynamicBreadcrumb(staff ? fullName : null);
   const primary = staff?.accesses.find((access) => access.isPrimary) ?? null;
+  const effective = staff?.effectivePermissions ?? [];
 
-  const effective = useMemo(() => {
-    if (!staff || !matrix) return [];
-    return resolveEffectivePermissions(matrix.groups, matrix.grants, staff);
-  }, [staff, matrix]);
-
-  function updateAccesses(next: DepartmentAccess[]) {
-    setStaff((previous) => (previous ? { ...previous, accesses: next } : previous));
+  /** RF-P2/RF-P3: el POST solo sirve para un departamento nuevo; editar uno ya
+   * concedido — rol o principal — pasa por el PUT (ver seccion 6.5). */
+  async function saveAccess(value: { departmentId: number; roleId: number; isPrimary: boolean }) {
+    const isEdit = staff?.accesses.some((access) => access.departmentId === value.departmentId) ?? false;
+    if (isEdit) {
+      await staffApi.updateDepartmentAccess(staffId, value.departmentId, {
+        roleId: value.roleId,
+        isPrimary: value.isPrimary,
+      });
+    } else {
+      await staffApi.grantDepartmentAccess(staffId, value);
+    }
+    await reload();
   }
 
-  function saveAccess(value: { departmentId: number; roleId: number; isPrimary: boolean }) {
-    if (!staff || !matrix) return;
-
-    const department = permissionsMock
-      .departments()
-      .find((entry) => entry.id === value.departmentId);
-    const role = matrix.roles.find((entry) => entry.id === value.roleId);
-    if (!department || !role) return;
-
-    const existing = staff.accesses.find((access) => access.departmentId === value.departmentId);
-
-    const entry: DepartmentAccess = {
-      departmentId: department.id,
-      departmentName: department.name,
-      roleId: role.id,
-      roleName: role.name,
-      isPrimary: value.isPrimary,
-      grantedAt: existing?.grantedAt ?? new Date().toISOString(),
-      grantedByName: existing?.grantedByName ?? "Tú",
-    };
-
-    const rest = staff.accesses.filter((access) => access.departmentId !== value.departmentId);
-    // Principal exclusivo: marcar uno desmarca al anterior en la misma operación.
-    const normalized = value.isPrimary
-      ? rest.map((access) => ({ ...access, isPrimary: false }))
-      : rest;
-
-    updateAccesses([...normalized, entry].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)));
-  }
-
-  function makePrimary(access: DepartmentAccess) {
-    if (!staff) return;
-    updateAccesses(
-      staff.accesses
-        .map((entry) => ({ ...entry, isPrimary: entry.departmentId === access.departmentId }))
-        .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
-    );
+  async function makePrimary(access: DepartmentAccess) {
+    setError(null);
+    try {
+      await staffApi.updateDepartmentAccess(staffId, access.departmentId, {
+        roleId: access.roleId,
+        isPrimary: true,
+      });
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo cambiar el departamento principal");
+    }
   }
 
   function askRevoke(access: DepartmentAccess) {
@@ -126,10 +121,10 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
         </>
       ),
       confirmLabel: "Revocar acceso",
-      onConfirm: () =>
-        updateAccesses(
-          staff.accesses.filter((entry) => entry.departmentId !== access.departmentId),
-        ),
+      onConfirm: async () => {
+        await staffApi.revokeDepartmentAccess(staffId, access.departmentId);
+        await reload();
+      },
     });
   }
 
@@ -357,7 +352,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
         <AccessModal
           staffName={fullName}
           access={modal === "nuevo" ? undefined : modal}
-          departments={permissionsMock.departments()}
+          departments={departments}
           roles={matrix.roles}
           taken={staff.accesses.map((access) => access.departmentId)}
           isFirst={staff.accesses.length === 0}
