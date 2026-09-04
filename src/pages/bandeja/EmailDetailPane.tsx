@@ -26,9 +26,19 @@ import {
   formatEmailListDate,
   formatTicketCode,
 } from "../../lib/format";
-import type { EmailDetailResponse } from "../../types/api";
+import type { EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { ticketBadgeClass } from "./badgeStyles";
+
+/** Que adjunto se esta mirando: puede ser del correo o de una respuesta nuestra. */
+interface PreviewTarget {
+  emailId: number;
+  attachments: EmailAttachmentResponse[];
+  index: number;
+}
+
+const MAX_FILES = 5;
+const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
 
 interface EmailDetailPaneProps {
   emailId: number;
@@ -68,12 +78,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyBody, setReplyBody] = useState("");
+  const [replyCc, setReplyCc] = useState("");
+  const [ccOpen, setCcOpen] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
   const replyRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -129,16 +143,49 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
     setReplyError(null);
 
     try {
-      const reply = await emailsApi.reply(email.id, replyBody);
+      const reply = await emailsApi.reply(email.id, {
+        body: replyBody,
+        cc: replyCc.trim() || undefined,
+        files,
+      });
+
       setEmail({ ...email, replies: [...(email.replies ?? []), reply] });
       setOpenReplyId(reply.id);
       setReplyBody("");
+      setReplyCc("");
+      setCcOpen(false);
+      setFiles([]);
       setReplyOpen(false);
     } catch (err) {
       setReplyError(err instanceof ApiError ? err.message : "No se pudo enviar la respuesta");
     } finally {
       setSending(false);
     }
+  }
+
+  function addFiles(incoming: File[]) {
+    if (incoming.length === 0) return;
+
+    const merged = [...files, ...incoming];
+    const total = merged.reduce((sum, file) => sum + file.size, 0);
+
+    if (merged.length > MAX_FILES) {
+      setReplyError(`No se pueden adjuntar más de ${MAX_FILES} archivos.`);
+      return;
+    }
+
+    if (total > MAX_TOTAL_BYTES) {
+      setReplyError("Los adjuntos superan los 10 MB en total.");
+      return;
+    }
+
+    setReplyError(null);
+    setFiles(merged);
+  }
+
+  function closeComposer() {
+    setReplyOpen(false);
+    setReplyError(null);
   }
 
   async function handleMove(action: () => Promise<void>) {
@@ -295,6 +342,147 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
       <Separator className="bg-line" />
 
       <div className="relative min-h-0 flex-1">
+        {replyOpen && (
+          <div
+            className="absolute inset-0 z-20 flex flex-col bg-white"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              addFiles(Array.from(event.dataTransfer.files));
+            }}
+          >
+            <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2">
+              <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-brand-red" />
+              <span className="shrink-0 text-[12.5px] font-semibold text-ink">Responder</span>
+              <span className="truncate text-[11.5px] text-subtle">
+                {email.subject ? `Re: ${email.subject}` : "(sin asunto)"}
+              </span>
+              <button
+                type="button"
+                onClick={closeComposer}
+                aria-label="Cerrar el editor"
+                title="Cerrar el editor"
+                className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-edge
+                  text-brand-gray outline-none transition-colors hover:bg-fill hover:text-ink
+                  focus-visible:ring-3 focus-visible:ring-brand-red/20"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-1.5 text-[11.5px]">
+              <span className="shrink-0 text-subtle">Para:</span>
+              <span className="truncate font-medium text-ink">{email.fromEmail}</span>
+              {ccOpen ? (
+                <input
+                  value={replyCc}
+                  onChange={(event) => setReplyCc(event.target.value)}
+                  placeholder="Copia a: correo@dominio.com, otro@dominio.com"
+                  className="ml-2 min-w-0 flex-1 rounded-edge border border-line bg-white px-2 py-1
+                    text-[11.5px] text-ink outline-none transition-colors placeholder:text-faint
+                    focus:border-brand-red/40 focus:ring-3 focus:ring-brand-red/12"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCcOpen(true)}
+                  className="ml-auto shrink-0 font-medium text-brand-red outline-none
+                    transition-colors hover:text-brand-red-dark
+                    focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                >
+                  Agregar copia
+                </button>
+              )}
+            </div>
+
+            <textarea
+              ref={replyRef}
+              value={replyBody}
+              onChange={(event) => setReplyBody(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) handleReply();
+              }}
+              placeholder="Escribe la respuesta…"
+              className="min-h-0 flex-1 resize-none px-4 py-3 text-[13px] leading-relaxed text-ink
+                outline-none placeholder:text-faint"
+            />
+
+            {files.length > 0 && (
+              <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-line px-4 py-2">
+                {files.map((file, position) => (
+                  <span
+                    key={`${file.name}-${position}`}
+                    className="inline-flex items-center gap-1.5 rounded-edge border border-line
+                      bg-canvas px-2 py-1 text-[11.5px] text-brand-gray"
+                  >
+                    <Paperclip className="h-3 w-3 text-faint" />
+                    <span className="max-w-[160px] truncate">{file.name}</span>
+                    <span className="text-faint">{formatBytes(file.size)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFiles(files.filter((_, at) => at !== position))}
+                      aria-label={`Quitar ${file.name}`}
+                      className="text-faint transition-colors hover:text-brand-red"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {replyError && (
+              <div className="shrink-0 px-4 pb-2 pt-2">
+                <Alert variant="error">{replyError}</Alert>
+              </div>
+            )}
+
+            <div className="flex shrink-0 items-center gap-2 border-t border-line px-4 py-2">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-edge border border-line bg-canvas
+                  px-2 py-1 text-[11.5px] font-medium text-brand-gray outline-none
+                  transition-[background-color,border-color,color]
+                  hover:border-line-strong hover:bg-white hover:text-ink
+                  focus-visible:ring-3 focus-visible:ring-brand-red/20"
+              >
+                <Paperclip className="h-3.5 w-3.5" />
+                Adjuntar
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  addFiles(Array.from(event.target.files ?? []));
+                  event.target.value = "";
+                }}
+              />
+              <span className="truncate text-[11px] text-faint">
+                Hasta {MAX_FILES} archivos, 10 MB · también puedes soltarlos aquí
+              </span>
+
+              <div className="ml-auto flex shrink-0 gap-2">
+                <PfButton variant="ghost" size="sm" className="h-7 px-3" onClick={closeComposer}>
+                  Cancelar
+                </PfButton>
+                <PfButton
+                  size="sm"
+                  className="h-7 px-3"
+                  onClick={handleReply}
+                  isLoading={sending}
+                  disabled={replyBody.trim() === ""}
+                >
+                  <Send className="h-[15px] w-[15px]" />
+                  Enviar
+                </PfButton>
+              </div>
+            </div>
+          </div>
+        )}
+
         {openReply && (
           <div className="absolute inset-0 z-10 flex flex-col bg-white">
             <div className="flex shrink-0 items-start gap-2 border-b border-line px-4 py-2.5">
@@ -330,6 +518,33 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
             <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[13px] leading-relaxed text-ink">
               {openReply.bodyText}
             </div>
+
+            {openReply.attachments.length > 0 && (
+              <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-line px-4 py-2">
+                {openReply.attachments.map((attachment, position) => (
+                  <button
+                    key={attachment.id}
+                    type="button"
+                    onClick={() =>
+                      setPreview({
+                        emailId: openReply.id,
+                        attachments: openReply.attachments,
+                        index: position,
+                      })
+                    }
+                    className="group inline-flex items-center gap-1.5 rounded-edge border border-line
+                      bg-canvas px-2 py-1 text-[11.5px] text-brand-gray outline-none
+                      transition-[background-color,border-color,color]
+                      hover:border-brand-red/35 hover:bg-white hover:text-ink
+                      focus-visible:ring-3 focus-visible:ring-brand-red/12"
+                  >
+                    <Paperclip className="h-3 w-3 text-faint transition-colors group-hover:text-brand-red" />
+                    {attachment.fileName}
+                    <span className="text-subtle">· {formatBytes(attachment.sizeBytes)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -363,7 +578,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
                 <button
                   key={attachment.id}
                   type="button"
-                  onClick={() => setPreviewIndex(position)}
+                  onClick={() =>
+                    setPreview({ emailId: email.id, attachments: email.attachments, index: position })
+                  }
                   title={`Ver ${attachment.fileName}`}
                   className="group inline-flex items-center gap-1.5 rounded-edge border border-line
                     bg-canvas px-2 py-1 text-[11.5px] text-brand-gray outline-none
@@ -412,82 +629,27 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
           </div>
         )}
 
-        {replyError && (
-          <div className="mb-2">
-            <Alert variant="error">{replyError}</Alert>
-          </div>
-        )}
-
-        {replyOpen ? (
-          <div className="rounded-edge border border-line p-3">
-            <p className="mb-2 text-[11.5px] text-subtle">
-              Para: <span className="font-medium text-ink">{email.fromEmail}</span>
-            </p>
-
-            <textarea
-              ref={replyRef}
-              value={replyBody}
-              onChange={(event) => setReplyBody(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) handleReply();
-              }}
-              rows={5}
-              placeholder="Escribe la respuesta…"
-              className="w-full resize-none rounded-edge border border-line bg-white p-2.5
-                text-[13px] leading-relaxed text-ink outline-none transition-colors
-                placeholder:text-faint focus:border-brand-red/40 focus:ring-3 focus:ring-brand-red/12"
-            />
-
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <p className="text-[11px] leading-snug text-faint">
-                Sale de la casilla de soporte, con tu nombre y tu firma.
-              </p>
-              <div className="flex shrink-0 gap-2">
-                <PfButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setReplyOpen(false);
-                    setReplyError(null);
-                  }}
-                >
-                  Cancelar
-                </PfButton>
-                <PfButton
-                  size="sm"
-                  onClick={handleReply}
-                  isLoading={sending}
-                  disabled={replyBody.trim() === ""}
-                >
-                  <Send className="h-[15px] w-[15px]" />
-                  Enviar
-                </PfButton>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setReplyOpen(true)}
-            className="flex w-full items-center gap-2 rounded-edge border border-line bg-canvas
-              px-3 py-2 text-left text-[12px] text-subtle outline-none
-              transition-[background-color,border-color,color]
-              hover:border-line-strong hover:bg-white hover:text-ink
-              focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12"
-          >
-            <CornerUpLeft className="h-3.5 w-3.5 text-faint" />
-            Responder a {email.fromName ?? email.fromEmail}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setReplyOpen(true)}
+          className="flex w-full items-center gap-2 rounded-edge border border-line bg-canvas
+            px-3 py-2 text-left text-[12px] text-subtle outline-none
+            transition-[background-color,border-color,color]
+            hover:border-line-strong hover:bg-white hover:text-ink
+            focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12"
+        >
+          <CornerUpLeft className="h-3.5 w-3.5 text-faint" />
+          Responder a {email.fromName ?? email.fromEmail}
+        </button>
       </div>
 
-      {previewIndex !== null && (
+      {preview && (
         <AttachmentPreviewModal
-          emailId={email.id}
-          attachments={email.attachments}
-          index={previewIndex}
-          onIndexChange={setPreviewIndex}
-          onClose={() => setPreviewIndex(null)}
+          emailId={preview.emailId}
+          attachments={preview.attachments}
+          index={preview.index}
+          onIndexChange={(index) => setPreview({ ...preview, index })}
+          onClose={() => setPreview(null)}
         />
       )}
     </div>

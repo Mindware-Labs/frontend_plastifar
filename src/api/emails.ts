@@ -28,11 +28,14 @@ export const emailsApi = {
       `/api/emails/${emailId}/attachments/${attachmentId}${toQuery({ download: download ? "true" : undefined })}`,
     ),
 
-  reply: (id: number, body: string) =>
-    apiRequest<EmailReplyResponse>(`/api/emails/${id}/reply`, {
-      method: "POST",
-      body: JSON.stringify({ body }),
-    }),
+  reply: (id: number, input: { body: string; cc?: string; files?: File[] }) => {
+    const form = new FormData();
+    form.append("body", input.body);
+    if (input.cc) form.append("cc", input.cc);
+    for (const file of input.files ?? []) form.append("attachments", file);
+
+    return apiRequest<EmailReplyResponse>(`/api/emails/${id}/reply`, { method: "POST", body: form });
+  },
 
   createTicket: (id: number) =>
     apiRequest<TicketSummaryResponse>(`/api/emails/${id}/ticket`, { method: "POST" }),

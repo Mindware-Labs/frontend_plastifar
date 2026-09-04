@@ -166,10 +166,12 @@ export interface EmailReplyResponse {
   fromEmail: string;
   fromName: string | null;
   toEmails: string[];
+  ccEmails: string[];
   subject: string;
   bodyText: string;
   authorName: string;
   createdAt: string;
+  attachments: EmailAttachmentResponse[];
 }
 
 /** Respuesta paginada de la bandeja (GET /api/emails). */
