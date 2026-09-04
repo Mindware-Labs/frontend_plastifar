@@ -3,7 +3,7 @@ import type {
   AttachmentLinkResponse,
   EmailDetailResponse,
   EmailListResponse,
-  EmailReplyResponse,
+  EmailThreadMessageResponse,
   TicketSummaryResponse,
 } from "../types/api";
 
@@ -34,7 +34,7 @@ export const emailsApi = {
     if (input.cc) form.append("cc", input.cc);
     for (const file of input.files ?? []) form.append("attachments", file);
 
-    return apiRequest<EmailReplyResponse>(`/api/emails/${id}/reply`, { method: "POST", body: form });
+    return apiRequest<EmailThreadMessageResponse>(`/api/emails/${id}/reply`, { method: "POST", body: form });
   },
 
   createTicket: (id: number) =>

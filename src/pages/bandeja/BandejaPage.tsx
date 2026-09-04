@@ -1,4 +1,4 @@
-import { Inbox, Paperclip } from "lucide-react";
+import { Inbox, MessagesSquare, Paperclip } from "lucide-react";
 import { useState } from "react";
 import { emailsApi, type EmailQuery } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
@@ -170,8 +170,17 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                               <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-brand-gray">
                                 {email.subject || "(sin asunto)"}
                               </span>
-                              {(email.attachmentCount > 0 || email.ticketId) && (
+                              {(email.messageCount > 1 || email.attachmentCount > 0 || email.ticketId) && (
                                 <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                                  {email.messageCount > 1 && (
+                                    <span
+                                      title={`${email.messageCount} correos en la conversación`}
+                                      className="flex items-center gap-0.5 text-[10.5px] font-medium text-faint"
+                                    >
+                                      <MessagesSquare className="h-3 w-3" />
+                                      {email.messageCount}
+                                    </span>
+                                  )}
                                   {email.attachmentCount > 0 && (
                                     <span className="flex items-center gap-0.5 text-[10.5px] font-medium text-faint">
                                       <Paperclip className="h-3 w-3" />

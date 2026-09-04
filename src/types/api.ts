@@ -139,6 +139,8 @@ export interface EmailSummaryResponse {
   createdAt: string;
   ticketId: number | null;
   attachmentCount: number;
+  /** Cuantos correos tiene la conversacion, contando los nuestros. */
+  messageCount: number;
 }
 
 export type EmailFolder = "Inbox" | "Archived" | "Junk" | "Trash";
@@ -157,18 +159,22 @@ export interface EmailDetailResponse {
   createdAt: string;
   ticketId: number | null;
   attachments: EmailAttachmentResponse[];
-  replies: EmailReplyResponse[];
+  thread: EmailThreadMessageResponse[];
 }
 
-/** Respuesta ya enviada por el staff sobre este correo. */
-export interface EmailReplyResponse {
+/** Un correo de la conversacion, venga del cliente o de nosotros. */
+export interface EmailThreadMessageResponse {
   id: number;
+  /** Inbound | Outbound. */
+  direction: string;
   fromEmail: string;
   fromName: string | null;
   toEmails: string[];
   ccEmails: string[];
   subject: string;
+  bodyHtml: string | null;
   bodyText: string;
+  /** Quien la escribio, si salio de aca. Vacio en lo que manda el cliente. */
   authorName: string;
   createdAt: string;
   /** Sent | Delayed | Delivered | Bounced | Complained. */

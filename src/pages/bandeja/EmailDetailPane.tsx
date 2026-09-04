@@ -1,6 +1,7 @@
 import {
   Archive,
   ArchiveRestore,
+  CornerDownRight,
   CornerUpLeft,
   Paperclip,
   Send,
@@ -166,7 +167,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
         files,
       });
 
-      setEmail({ ...email, replies: [...(email.replies ?? []), reply] });
+      setEmail({ ...email, thread: [...(email.thread ?? []), reply] });
       setOpenReplyId(reply.id);
       setReplyBody("");
       setReplyCc("");
@@ -236,8 +237,10 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
   const isInInbox = email.folder === "Inbox";
 
   // Un API sin este campo no debe tumbar el panel entero.
-  const replies = email.replies ?? [];
-  const openReply = replies.find((reply) => reply.id === openReplyId) ?? null;
+  const thread = email.thread ?? [];
+  // El correo abierto ya se ve completo arriba: en la tira va el resto de la conversacion.
+  const others = thread.filter((message) => message.id !== email.id);
+  const openReply = thread.find((message) => message.id === openReplyId) ?? null;
 
   return (
     <div className="flex h-full flex-col">
@@ -527,13 +530,19 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
         {openReply && (
           <div className="absolute inset-0 z-10 flex flex-col bg-white">
             <div className="flex shrink-0 items-start gap-2 border-b border-line px-4 py-2.5">
-              <CornerUpLeft className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-red" />
+              {openReply.direction === "Outbound" ? (
+                <CornerUpLeft className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-red" />
+              ) : (
+                <CornerDownRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-faint" />
+              )}
               <div className="min-w-0 flex-1">
                 <p className="truncate font-heading text-[13.5px] font-bold tracking-[-0.01em] text-ink">
                   {openReply.subject}
                 </p>
                 <p className="mt-0.5 truncate text-[11px] text-subtle">
-                  <span className="font-semibold text-brand-gray">{openReply.authorName}</span>
+                  <span className="font-semibold text-brand-gray">
+                    {openReply.direction === "Outbound" ? openReply.authorName : "Del cliente"}
+                  </span>
                   {" · "}
                   {openReply.fromName ?? openReply.fromEmail}
                   {" · Para: "}
@@ -566,9 +575,19 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
               </div>
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[13px] leading-relaxed text-ink">
-              {openReply.bodyText}
-            </div>
+            {openReply.bodyHtml && openReply.direction === "Inbound" ? (
+              <iframe
+                key={openReply.id}
+                sandbox=""
+                srcDoc={openReply.bodyHtml}
+                title={`Correo de ${openReply.fromEmail}`}
+                className="min-h-0 w-full flex-1 border-0 bg-white"
+              />
+            ) : (
+              <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[13px] leading-relaxed text-ink">
+                {openReply.bodyText}
+              </div>
+            )}
 
             {openReply.attachments.length > 0 && (
               <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-line px-4 py-2">
@@ -652,9 +671,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
       <Separator className="bg-line" />
 
       <div className="shrink-0 px-4 py-2.5">
-        {replies.length > 0 && (
+        {others.length > 0 && (
           <div className="mb-2 max-h-24 overflow-y-auto pr-0.5">
-            {replies.map((reply) => (
+            {others.map((reply) => (
               <button
                 key={reply.id}
                 type="button"
@@ -665,9 +684,15 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
                   focus-visible:ring-3 focus-visible:ring-brand-red/12
                   data-[open=true]:bg-brand-red/[0.06]"
               >
-                <CornerUpLeft className="h-3 w-3 shrink-0 text-faint" />
+                {reply.direction === "Outbound" ? (
+                  <CornerUpLeft className="h-3 w-3 shrink-0 text-brand-red" />
+                ) : (
+                  <CornerDownRight className="h-3 w-3 shrink-0 text-faint" />
+                )}
                 <span className="shrink-0 text-[11.5px] font-semibold text-ink">
-                  {reply.authorName}
+                  {reply.direction === "Outbound"
+                    ? reply.authorName
+                    : reply.fromName ?? reply.fromEmail}
                 </span>
                 <span className="truncate text-[11.5px] text-subtle">
                   {firstLine(reply.bodyText)}
