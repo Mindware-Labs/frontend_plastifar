@@ -34,7 +34,7 @@ interface EmailDetailPaneProps {
 
 /** Acciones de la barra: gris de texto en reposo, tinta sobre relleno al pasar. */
 const toolButtonClass =
-  "text-brand-gray transition-colors hover:bg-fill hover:text-ink " +
+  "size-7 text-brand-gray transition-colors hover:bg-fill hover:text-ink " +
   "focus-visible:ring-brand-red/20 focus-visible:border-brand-red/30";
 
 function initials(name: string) {
@@ -152,7 +152,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center p-2">
+      <div className="flex items-center px-2 py-1.5">
         <div className="flex items-center gap-1">
           {isInInbox ? (
             <>
@@ -223,7 +223,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
               {formatTicketCode(email.ticketId)}
             </Badge>
           ) : (
-            <PfButton size="sm" onClick={handleCreateTicket} isLoading={creating}>
+            <PfButton size="sm" className="h-7 px-3" onClick={handleCreateTicket} isLoading={creating}>
               <TicketIcon className="h-[15px] w-[15px]" />
               Crear ticket
             </PfButton>
@@ -234,31 +234,36 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
       <Separator className="bg-line" />
 
       {createError && (
-        <div className="p-4 pb-0">
+        <div className="px-4 pt-3">
           <Alert variant="error">{createError}</Alert>
         </div>
       )}
 
-      <div className="p-4 pb-0">
-        <h2 className="font-heading text-[19px] font-bold leading-tight tracking-[-0.02em] text-ink">
+      <div className="px-4 pb-3 pt-2.5">
+        <h2 className="font-heading text-[17px] font-bold leading-tight tracking-[-0.02em] text-ink">
           {email.subject || "(sin asunto)"}
         </h2>
-      </div>
 
-      <div className="flex items-start gap-4 p-4 text-sm">
-        <Avatar>
-          <AvatarFallback>{initials(displayName)}</AvatarFallback>
-        </Avatar>
-        <div className="grid min-w-0 gap-1">
-          <div className="text-[13px] font-semibold text-ink">{displayName}</div>
-          <div className="line-clamp-1 text-[12px] text-subtle">{email.fromEmail}</div>
-          <div className="line-clamp-1 text-[12px] text-subtle">
-            Para: {email.toEmails.join(", ") || "—"}
-            {email.ccEmails.length > 0 && ` · CC: ${email.ccEmails.join(", ")}`}
+        <div className="mt-2 flex items-center gap-2">
+          <Avatar className="size-7 shrink-0">
+            <AvatarFallback className="text-[10px]">{initials(displayName)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="truncate text-[12.5px] font-semibold text-ink">
+              {displayName}
+              {/* El nombre puede ser el propio correo: repetirlo no aporta. */}
+              {displayName !== email.fromEmail && (
+                <span className="ml-1.5 font-normal text-subtle">{email.fromEmail}</span>
+              )}
+            </p>
+            <p className="truncate text-[11px] text-faint">
+              Para: {email.toEmails.join(", ") || "—"}
+              {email.ccEmails.length > 0 && ` · CC: ${email.ccEmails.join(", ")}`}
+            </p>
           </div>
-        </div>
-        <div className="ml-auto shrink-0 whitespace-nowrap text-[12px] font-medium text-faint">
-          {formatDateTime(email.createdAt)}
+          <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] font-medium text-faint">
+            {formatDateTime(email.createdAt)}
+          </span>
         </div>
       </div>
 
@@ -285,8 +290,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
       {email.attachments.length > 0 && (
         <>
           <Separator className="bg-line" />
-          <div className="shrink-0 p-4">
-            <p className="mb-2 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+          <div className="shrink-0 px-4 py-2.5">
+            <p className="mb-1.5 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
               Adjuntos ({email.attachments.length})
             </p>
 
@@ -298,7 +303,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
                   onClick={() => setPreviewIndex(position)}
                   title={`Ver ${attachment.fileName}`}
                   className="group inline-flex items-center gap-1.5 rounded-edge border border-line
-                    bg-canvas px-2.5 py-1.5 text-[12px] text-brand-gray outline-none
+                    bg-canvas px-2 py-1 text-[11.5px] text-brand-gray outline-none
                     transition-[background-color,border-color,color]
                     hover:border-brand-red/35 hover:bg-white hover:text-ink
                     focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12"
@@ -315,11 +320,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
 
       <Separator className="bg-line" />
 
-      <div className="shrink-0 p-4">
+      <div className="shrink-0 px-4 py-2.5">
         {replies.length > 0 && (
           <div className="mb-3 max-h-32 space-y-2 overflow-y-auto pr-1">
             {replies.map((reply) => (
-              <div key={reply.id} className="rounded-edge border border-line bg-canvas p-2.5">
+              <div key={reply.id} className="rounded-edge border border-line bg-canvas p-2">
                 <div className="flex items-center gap-1.5 text-[11.5px]">
                   <CornerUpLeft className="h-3 w-3 shrink-0 text-faint" />
                   <span className="font-semibold text-ink">{reply.authorName}</span>
@@ -391,7 +396,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
             type="button"
             onClick={() => setReplyOpen(true)}
             className="flex w-full items-center gap-2 rounded-edge border border-line bg-canvas
-              px-3 py-2.5 text-left text-[12.5px] text-subtle outline-none
+              px-3 py-2 text-left text-[12px] text-subtle outline-none
               transition-[background-color,border-color,color]
               hover:border-line-strong hover:bg-white hover:text-ink
               focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12"

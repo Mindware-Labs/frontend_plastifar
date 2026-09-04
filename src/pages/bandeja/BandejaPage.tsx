@@ -92,7 +92,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
         ) : (
           <div className={`min-h-0 flex-1 pb-6 transition-opacity ${isStale ? "opacity-60" : ""}`}>
             <ResizablePanelGroup className="h-full rounded-edge border border-line bg-white">
-              <ResizablePanel defaultSize="34%" minSize="26%" maxSize="50%" className="flex flex-col">
+              <ResizablePanel defaultSize="26%" minSize="20%" maxSize="45%" className="flex flex-col">
                 <div className="flex shrink-0 items-center justify-between gap-3 p-4 pb-3">
                   <h2 className="font-heading text-[20px] font-bold tracking-[-0.02em] text-ink">
                     {meta.title}
