@@ -118,6 +118,8 @@ export interface EmailAttachmentResponse {
   fileName: string;
   contentType: string;
   sizeBytes: number;
+  /** false = el archivo se purgó por antigüedad; la ficha queda para el historial. */
+  available: boolean;
 }
 
 /** Enlace firmado al documento; inline = el navegador lo muestra en vez de descargarlo. */

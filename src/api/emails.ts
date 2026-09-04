@@ -35,9 +35,13 @@ export const emailsApi = {
       `/api/emails/${emailId}/attachments/${attachmentId}${toQuery({ download: download ? "true" : undefined })}`,
     ),
 
-  reply: (id: number, input: { body: string; bodyHtml?: string; cc?: string; files?: File[] }) => {
+  reply: (
+    id: number,
+    input: { body: string; bodyHtml?: string; cc?: string; files?: File[]; clientToken?: string },
+  ) => {
     const form = new FormData();
     form.append("body", input.body);
+    if (input.clientToken) form.append("clientToken", input.clientToken);
     if (input.bodyHtml) form.append("bodyHtml", input.bodyHtml);
     if (input.cc) form.append("cc", input.cc);
     for (const file of input.files ?? []) form.append("attachments", file);
@@ -52,9 +56,11 @@ export const emailsApi = {
     body: string;
     bodyHtml?: string;
     files?: File[];
+    clientToken?: string;
   }) => {
     const form = new FormData();
     form.append("to", input.to);
+    if (input.clientToken) form.append("clientToken", input.clientToken);
     if (input.cc) form.append("cc", input.cc);
     form.append("subject", input.subject);
     form.append("body", input.body);

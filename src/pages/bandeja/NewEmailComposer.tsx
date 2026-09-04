@@ -29,6 +29,8 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const toRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // La marca del envio nace con el editor: un reintento la repite y no duplica el correo.
+  const tokenRef = useRef(crypto.randomUUID());
 
   useEffect(() => {
     toRef.current?.focus();
@@ -71,6 +73,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         body,
         bodyHtml: blocksToEmailHtml(blocks),
         files,
+        clientToken: tokenRef.current,
       });
       onSent();
     } catch (err) {

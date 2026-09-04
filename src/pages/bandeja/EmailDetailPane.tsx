@@ -98,6 +98,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyBlocks, setReplyBlocks] = useState<unknown>(null);
   const [draftBlocks, setDraftBlocks] = useState<unknown>(null);
+  const tokenRef = useRef<string>("");
   const [replyCc, setReplyCc] = useState("");
   const [ccOpen, setCcOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
@@ -177,6 +178,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
         bodyHtml: blocksToEmailHtml(replyBlocks),
         cc: replyCc.trim() || undefined,
         files,
+        clientToken: tokenRef.current,
       });
 
       clearDraft(String(email.id));
@@ -216,6 +218,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   }
 
   function openComposer() {
+    tokenRef.current = crypto.randomUUID();
     const draft = readDraft(String(emailId));
 
     if (draft) {
@@ -708,15 +711,22 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                 <button
                   key={attachment.id}
                   type="button"
+                  disabled={!attachment.available}
                   onClick={() =>
                     setPreview({ emailId: email.id, attachments: email.attachments, index: position })
                   }
-                  title={`Ver ${attachment.fileName}`}
+                  title={
+                    attachment.available
+                      ? `Ver ${attachment.fileName}`
+                      : "El archivo se eliminó por antigüedad"
+                  }
                   className="group inline-flex items-center gap-1.5 rounded-edge border border-line
                     bg-canvas px-2 py-1 text-[11.5px] text-brand-gray outline-none
                     transition-[background-color,border-color,color]
                     hover:border-brand-red/35 hover:bg-white hover:text-ink
-                    focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12"
+                    focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12
+                    disabled:cursor-not-allowed disabled:line-through disabled:opacity-50
+                    disabled:hover:border-line disabled:hover:bg-canvas disabled:hover:text-brand-gray"
                 >
                   <Paperclip className="h-3.5 w-3.5 text-faint transition-colors group-hover:text-brand-red" />
                   {attachment.fileName}

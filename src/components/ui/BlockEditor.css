@@ -79,14 +79,37 @@
   color: var(--color-faint);
 }
 
-/* El icono del comando: gris en reposo, rojo de marca en el que esta elegido. */
+/* El icono del comando vive en una pastilla roja tenue; al elegirlo, sube de tono. */
 .bn-mt-suggestion-menu-item-section {
-  color: var(--color-subtle);
+  border-radius: var(--radius-edge);
+  background: rgb(228 0 43 / 0.07);
+  color: var(--color-brand-red);
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out;
 }
 
 .mantine-Menu-item[data-hovered] .bn-mt-suggestion-menu-item-section,
 .mantine-Menu-item:hover .bn-mt-suggestion-menu-item-section {
-  color: var(--color-brand-red);
+  background: rgb(228 0 43 / 0.14);
+  color: var(--color-brand-red-dark);
+}
+
+/* El atajo de teclado: gris en reposo, y en el elegido acompana al icono. */
+.bn-suggestion-menu .mantine-Badge-root {
+  border: 1px solid var(--color-line);
+  background: var(--color-canvas);
+  color: var(--color-subtle);
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.mantine-Menu-item[data-hovered] .mantine-Badge-root,
+.mantine-Menu-item:hover .mantine-Badge-root {
+  border-color: rgb(228 0 43 / 0.25);
+  background: rgb(228 0 43 / 0.06);
+  color: var(--color-brand-red-dark);
 }
 
 /* Barra flotante de formato: mismo papel y mismo filete que el resto de la interfaz. */
