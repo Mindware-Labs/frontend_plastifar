@@ -2,6 +2,8 @@
 const PREFIX = "plf.draft.";
 
 export interface Draft {
+  /** Documento del editor, tal cual lo entrega BlockNote. */
+  blocks?: unknown;
   body: string;
   cc?: string;
   subject?: string;

@@ -1,0 +1,18 @@
+/* El editor trae relleno de pagina completa; dentro del panel sobra la mitad. */
+.plf-editor .bn-editor {
+  padding: 12px 16px 24px;
+}
+
+.plf-editor .bn-block-content[data-content-type="paragraph"] p {
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+/* El menu de barra y el flotante se alinean con el resto de la interfaz. */
+.plf-editor .bn-side-menu {
+  opacity: 0.5;
+}
+
+.plf-editor .bn-side-menu:hover {
+  opacity: 1;
+}

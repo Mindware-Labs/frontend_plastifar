@@ -4,6 +4,8 @@ import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
 import { Button as PfButton } from "../../components/ui/Button";
+import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
+import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes } from "../../lib/format";
 import { fieldLabelClass } from "./toolbarStyles";
 
@@ -20,7 +22,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const [cc, setCc] = useState("");
   const [ccOpen, setCcOpen] = useState(false);
   const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [blocks, setBlocks] = useState<unknown>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,12 +59,19 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   }
 
   async function handleSend() {
-    if (sending || to.trim() === "" || subject.trim() === "" || body.trim() === "") return;
+    if (sending || !ready) return;
     setSending(true);
     setError(null);
 
     try {
-      await emailsApi.compose({ to, cc: cc.trim() || undefined, subject, body, files });
+      await emailsApi.compose({
+        to,
+        cc: cc.trim() || undefined,
+        subject,
+        body,
+        bodyHtml: blocksToEmailHtml(blocks),
+        files,
+      });
       onSent();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo enviar el correo");
@@ -71,6 +80,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
     }
   }
 
+  const body = blocksToText(blocks);
   const ready = to.trim() !== "" && subject.trim() !== "" && body.trim() !== "";
 
   return (
@@ -162,16 +172,14 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         />
       </div>
 
-      <textarea
-        value={body}
-        onChange={(event) => setBody(event.target.value)}
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
         onKeyDown={(event) => {
           if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) handleSend();
         }}
-        placeholder="Escribe el mensaje…"
-        className="min-h-0 flex-1 resize-none px-4 py-3 text-[13px] leading-relaxed text-ink
-          outline-none placeholder:text-faint"
-      />
+      >
+        <LazyBlockEditor onChange={setBlocks} placeholder="Escribe el mensaje…" />
+      </div>
 
       {files.length > 0 && (
         <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-line px-4 py-2">

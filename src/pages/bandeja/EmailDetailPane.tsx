@@ -29,6 +29,8 @@ import {
   formatTicketCode,
 } from "../../lib/format";
 import type { EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
+import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
+import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { fieldLabelClass } from "./toolbarStyles";
@@ -94,16 +96,19 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   const [moving, setMoving] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
-  const [replyBody, setReplyBody] = useState("");
+  const [replyBlocks, setReplyBlocks] = useState<unknown>(null);
+  const [draftBlocks, setDraftBlocks] = useState<unknown>(null);
   const [replyCc, setReplyCc] = useState("");
   const [ccOpen, setCcOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
-  const replyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
+
+  // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
+  const replyText = blocksToText(replyBlocks);
   const [reloadKey, setReloadKey] = useState(0);
   const { onInboxChanged } = useEmailCounts();
 
@@ -142,13 +147,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   }
 
   useEffect(() => {
-    if (replyOpen) replyRef.current?.focus();
-  }, [replyOpen]);
-
-  useEffect(() => {
     if (!replyOpen) return;
-    writeDraft(String(emailId), { body: replyBody, cc: replyCc });
-  }, [replyOpen, emailId, replyBody, replyCc]);
+    writeDraft(String(emailId), { blocks: replyBlocks, body: replyText, cc: replyCc });
+  }, [replyOpen, emailId, replyBlocks, replyText, replyCc]);
 
   useEffect(() => {
     if (ccOpen) ccRef.current?.focus();
@@ -166,13 +167,14 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   }, [openReplyId]);
 
   async function handleReply() {
-    if (!email || sending || replyBody.trim() === "") return;
+    if (!email || sending || replyText.trim() === "") return;
     setSending(true);
     setReplyError(null);
 
     try {
       const reply = await emailsApi.reply(email.id, {
-        body: replyBody,
+        body: replyText,
+        bodyHtml: blocksToEmailHtml(replyBlocks),
         cc: replyCc.trim() || undefined,
         files,
       });
@@ -180,7 +182,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
       clearDraft(String(email.id));
       setEmail({ ...email, thread: [...(email.thread ?? []), reply] });
       setOpenReplyId(reply.id);
-      setReplyBody("");
+      setReplyBlocks(null);
+      setDraftBlocks(null);
       setReplyCc("");
       setCcOpen(false);
       setFiles([]);
@@ -216,7 +219,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
     const draft = readDraft(String(emailId));
 
     if (draft) {
-      setReplyBody(draft.body);
+      setDraftBlocks(draft.blocks ?? null);
+      setReplyBlocks(draft.blocks ?? null);
       if (draft.cc) {
         setReplyCc(draft.cc);
         setCcOpen(true);
@@ -494,17 +498,18 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               </div>
             )}
 
-            <textarea
-              ref={replyRef}
-              value={replyBody}
-              onChange={(event) => setReplyBody(event.target.value)}
+            <div
+              className="min-h-0 flex-1 overflow-y-auto"
               onKeyDown={(event) => {
                 if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) handleReply();
               }}
-              placeholder="Escribe la respuesta…"
-              className="min-h-0 flex-1 resize-none px-4 py-3 text-[13px] leading-relaxed text-ink
-                outline-none placeholder:text-faint"
-            />
+            >
+              <LazyBlockEditor
+                initialContent={draftBlocks}
+                onChange={setReplyBlocks}
+                placeholder="Escribe la respuesta…"
+              />
+            </div>
 
             {files.length > 0 && (
               <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-line px-4 py-2">
@@ -572,7 +577,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                   className="h-7 px-3"
                   onClick={handleReply}
                   isLoading={sending}
-                  disabled={replyBody.trim() === ""}
+                  disabled={replyText.trim() === ""}
                 >
                   <Send className="h-[15px] w-[15px]" />
                   Enviar

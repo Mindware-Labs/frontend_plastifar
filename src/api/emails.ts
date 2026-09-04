@@ -35,9 +35,10 @@ export const emailsApi = {
       `/api/emails/${emailId}/attachments/${attachmentId}${toQuery({ download: download ? "true" : undefined })}`,
     ),
 
-  reply: (id: number, input: { body: string; cc?: string; files?: File[] }) => {
+  reply: (id: number, input: { body: string; bodyHtml?: string; cc?: string; files?: File[] }) => {
     const form = new FormData();
     form.append("body", input.body);
+    if (input.bodyHtml) form.append("bodyHtml", input.bodyHtml);
     if (input.cc) form.append("cc", input.cc);
     for (const file of input.files ?? []) form.append("attachments", file);
 
@@ -49,6 +50,7 @@ export const emailsApi = {
     cc?: string;
     subject: string;
     body: string;
+    bodyHtml?: string;
     files?: File[];
   }) => {
     const form = new FormData();
@@ -56,6 +58,7 @@ export const emailsApi = {
     if (input.cc) form.append("cc", input.cc);
     form.append("subject", input.subject);
     form.append("body", input.body);
+    if (input.bodyHtml) form.append("bodyHtml", input.bodyHtml);
     for (const file of input.files ?? []) form.append("attachments", file);
 
     return apiRequest<EmailThreadMessageResponse>("/api/emails/compose", {
