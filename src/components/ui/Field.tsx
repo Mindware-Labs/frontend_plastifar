@@ -1,5 +1,12 @@
 import { AlertCircle, Check, Eye, EyeOff } from "lucide-react";
-import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import {
+  forwardRef,
+  useId,
+  useState,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type TextareaHTMLAttributes,
+} from "react";
 import { controlBase, controlSizes, stateClasses, type FieldState } from "./fieldStyles";
 import { Select, type SelectOption } from "./Select";
 
@@ -196,6 +203,44 @@ export function SelectField({
     </FieldShell>
   );
 }
+
+interface TextAreaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: string;
+  error?: string;
+  hint?: ReactNode;
+}
+
+/**
+ * Texto largo con la misma gramatica que TextField: etiqueta versalita, filete
+ * gris, foco rojo y el error debajo, en su campo. No lleva estado "correcto":
+ * una palomita verde junto a un parrafo de causa raiz no dice nada util.
+ */
+export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
+  function TextAreaField({ label, error, hint, id, className = "", required, rows = 3, ...props }, ref) {
+    const generated = useId();
+    const fieldId = id ?? props.name ?? generated;
+
+    return (
+      <FieldShell id={fieldId} label={label} error={error} hint={hint} required={required}>
+        <textarea
+          ref={ref}
+          id={fieldId}
+          rows={rows}
+          aria-invalid={error !== undefined}
+          aria-describedby={describedBy(fieldId, error, hint)}
+          className={`w-full rounded-edge border bg-white px-3 py-2.5 text-[13px] leading-relaxed
+            text-ink outline-none transition-colors placeholder:text-zinc-400
+            ${
+              error
+                ? "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/10"
+                : "border-line-strong hover:border-zinc-400 focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
+            } ${className}`}
+          {...props}
+        />
+      </FieldShell>
+    );
+  },
+);
 
 interface CheckboxFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label: string;

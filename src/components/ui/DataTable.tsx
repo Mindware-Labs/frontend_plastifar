@@ -41,7 +41,11 @@ export function Th({ sort, className = "", children, ...props }: ThProps) {
         <button
           type="button"
           onClick={sort.onToggle}
-          className="inline-flex items-center gap-1.5 transition-colors hover:text-ink"
+          // Repite versalita y color: un <button> reinicia `text-transform` y el
+          // color por las reglas de control de formulario, asi que sin esto la
+          // cabecera ordenable salia en caja mixta y mas oscura que sus vecinas.
+          className="inline-flex items-center gap-1.5 uppercase tracking-[0.08em] text-inherit
+            transition-colors hover:text-ink"
         >
           {children}
           {sort.dir === null ? (

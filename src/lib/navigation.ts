@@ -6,6 +6,7 @@
 import {
   BarChart3,
   Building2,
+  ClipboardCheck,
   LayoutDashboard,
   Settings,
   Users,
@@ -43,6 +44,16 @@ export const SIDEBAR_NAV: ModuleEntry[] = [
     ],
   },
   { label: "Clientes", icon: Building2, to: "/clientes", match: ["/clientes"] },
+  {
+    label: "Calidad",
+    icon: ClipboardCheck,
+    to: "/calidad/hca",
+    match: ["/calidad"],
+    children: [
+      { label: "HCA", to: "/calidad/hca" },
+      { label: "Solicitudes de crédito", to: "/calidad/creditos" },
+    ],
+  },
   {
     label: "Reportes",
     icon: BarChart3,

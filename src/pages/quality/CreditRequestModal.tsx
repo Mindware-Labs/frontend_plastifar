@@ -1,0 +1,199 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
+import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
+import {
+  SelectField,
+  TextAreaField,
+  TextField,
+  type FieldState,
+} from "../../components/ui/Field";
+import { Modal } from "../../components/ui/Modal";
+import { NEW_ID } from "../../lib/catalog";
+import type { Client } from "../../types/clients";
+import { CURRENCIES, type CreditRequest, type Currency } from "../../types/quality";
+
+// Espejo de la validacion del servidor de POST /api/quality/credit-requests.
+const schema = z.object({
+  clientId: z.string().min(1, "Elige el cliente"),
+  amount: z
+    .string()
+    .min(1, "Indica el monto")
+    .refine((value) => Number(value) > 0, "El monto tiene que ser mayor que cero")
+    .refine((value) => Number(value) <= 10_000_000, "Monto fuera de rango"),
+  currency: z.string().min(1, "Elige la moneda"),
+  invoiceRef: z.string().trim().max(40, "Máximo 40 caracteres"),
+  reason: z
+    .string()
+    .trim()
+    .min(20, "Explica por qué procede el crédito: al menos 20 caracteres")
+    .max(1000, "Máximo 1000 caracteres"),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+interface CreditRequestModalProps {
+  clients: Client[];
+  existing: CreditRequest[];
+  /** Quien solicita: el mismo que luego no podrá aprobarla. */
+  requestedByStaffId: number | null;
+  onClose: () => void;
+  onSave: (request: CreditRequest) => void;
+}
+
+function nextNumber(existing: CreditRequest[]): string {
+  const highest = existing.reduce((top, request) => {
+    const parsed = Number(request.number.replace(/\D/g, ""));
+    return Number.isNaN(parsed) ? top : Math.max(top, parsed);
+  }, 0);
+  return `SC-${String(highest + 1).padStart(6, "0")}`;
+}
+
+/** RF-Q7: alta de solicitud con monto, motivo y referencia de factura. Nace de
+ *  un ticket cuando exista la Bandeja; hasta entonces, alta manual. */
+export function CreditRequestModal({
+  clients,
+  existing,
+  requestedByStaffId,
+  onClose,
+  onSave,
+}: CreditRequestModalProps) {
+  const {
+    control,
+    register,
+    handleSubmit,
+    formState: { errors, touchedFields, isSubmitting },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    mode: "onTouched",
+    defaultValues: {
+      clientId: "",
+      amount: "",
+      currency: "DOP",
+      invoiceRef: "",
+      reason: "",
+    },
+  });
+
+  function stateOf(field: keyof FormValues): FieldState {
+    if (errors[field]) return "error";
+    return touchedFields[field] ? "valid" : "idle";
+  }
+
+  function onSubmit(values: FormValues) {
+    const invoiceRef = values.invoiceRef.trim();
+
+    onSave({
+      id: NEW_ID,
+      number: nextNumber(existing),
+      ticketId: null,
+      ticketNumber: null,
+      clientId: Number(values.clientId),
+      amount: Number(values.amount),
+      currency: values.currency as Currency,
+      reason: values.reason.trim(),
+      invoiceRef: invoiceRef === "" ? null : invoiceRef,
+      status: "Solicitada",
+      requestedByStaffId: requestedByStaffId ?? 0,
+      requestedAt: new Date().toISOString(),
+      decidedByStaffId: null,
+      decidedAt: null,
+      decisionNote: null,
+    });
+    onClose();
+  }
+
+  return (
+    <Modal
+      title="Nueva solicitud de crédito"
+      description="Autoriza una nota de crédito al cliente cuando la reclamación procede."
+      onClose={onClose}
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" form="credit-form" isLoading={isSubmitting}>
+            Crear solicitud
+          </Button>
+        </>
+      }
+    >
+      <form id="credit-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        <Controller
+          name="clientId"
+          control={control}
+          render={({ field }) => (
+            <SelectField
+              label="Cliente"
+              required
+              name={field.name}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              placeholder="Elige uno"
+              options={clients.map((client) => ({ value: String(client.id), label: client.name }))}
+              state={stateOf("clientId")}
+              error={errors.clientId?.message}
+            />
+          )}
+        />
+
+        <div className="grid grid-cols-[1fr_140px] gap-3">
+          <TextField
+            label="Monto"
+            type="number"
+            step="0.01"
+            min="0"
+            required
+            placeholder="0.00"
+            state={stateOf("amount")}
+            error={errors.amount?.message}
+            {...register("amount")}
+          />
+
+          <Controller
+            name="currency"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                label="Moneda"
+                required
+                name={field.name}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                options={CURRENCIES.map((currency) => ({ value: currency, label: currency }))}
+                state={stateOf("currency")}
+                error={errors.currency?.message}
+              />
+            )}
+          />
+        </div>
+
+        <TextField
+          label="Referencia de factura"
+          placeholder="Opcional. Ej. B0100004471"
+          state={stateOf("invoiceRef")}
+          error={errors.invoiceRef?.message}
+          {...register("invoiceRef")}
+        />
+
+        <TextAreaField
+          label="Motivo"
+          required
+          rows={4}
+          placeholder="Qué se le acredita al cliente y por qué procede"
+          error={errors.reason?.message}
+          {...register("reason")}
+        />
+
+        <Alert variant="info">
+          No podrás aprobar esta solicitud tú mismo: quien pide y quien aprueba deben ser personas
+          distintas.
+        </Alert>
+      </form>
+    </Modal>
+  );
+}

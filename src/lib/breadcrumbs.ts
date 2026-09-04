@@ -73,6 +73,32 @@ const detailPatterns: BreadcrumbPattern[] = [
     ],
   },
   {
+    path: "/calidad/hca/:id",
+    build: (number) => [
+      { label: "Calidad", to: "/calidad/hca" },
+      { label: "HCA", to: "/calidad/hca" },
+      { label: number ?? "Hoja de corrección" },
+    ],
+  },
+  {
+    path: "/calidad/hca/:id/plan",
+    build: (number, { id }) => [
+      { label: "Calidad", to: "/calidad/hca" },
+      { label: "HCA", to: "/calidad/hca" },
+      { label: number ?? "Hoja de corrección", to: `/calidad/hca/${id}` },
+      { label: "Plan de acción" },
+    ],
+  },
+  {
+    path: "/calidad/hca/:id/cierre",
+    build: (number, { id }) => [
+      { label: "Calidad", to: "/calidad/hca" },
+      { label: "HCA", to: "/calidad/hca" },
+      { label: number ?? "Hoja de corrección", to: `/calidad/hca/${id}` },
+      { label: "Cierre" },
+    ],
+  },
+  {
     path: "/clientes/:id/historial",
     build: (name, { id }) => [
       { label: "Clientes", to: "/clientes" },

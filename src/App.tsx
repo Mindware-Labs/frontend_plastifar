@@ -8,6 +8,9 @@ import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
 import { ClientsPage } from "./pages/clients/ClientsPage";
 import { DashboardPage } from "./pages/dashboard/DashboardPage";
 import { PermissionsPage } from "./pages/permissions/PermissionsPage";
+import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
+import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
+import { HcaPage } from "./pages/quality/HcaPage";
 import { LiveOperationSection } from "./pages/reports/LiveOperationSection";
 import { ReportCatalogSection } from "./pages/reports/ReportCatalogSection";
 import { SlaTimesSection } from "./pages/reports/SlaTimesSection";
@@ -56,6 +59,13 @@ export default function App() {
         <Route path="/clientes/:id" element={<ClientDetailPage section="datos" />} />
         <Route path="/clientes/:id/contactos" element={<ClientDetailPage section="contactos" />} />
         <Route path="/clientes/:id/historial" element={<ClientDetailPage section="historial" />} />
+
+        <Route path="/calidad" element={<Navigate to="/calidad/hca" replace />} />
+        <Route path="/calidad/hca" element={<HcaPage />} />
+        <Route path="/calidad/hca/:id" element={<HcaDetailPage section="datos" />} />
+        <Route path="/calidad/hca/:id/plan" element={<HcaDetailPage section="plan" />} />
+        <Route path="/calidad/hca/:id/cierre" element={<HcaDetailPage section="cierre" />} />
+        <Route path="/calidad/creditos" element={<CreditRequestsPage />} />
 
         <Route path="/configuracion" element={<Navigate to="/configuracion/motivos" replace />} />
         <Route path="/configuracion/motivos" element={<TopicsSection />} />
