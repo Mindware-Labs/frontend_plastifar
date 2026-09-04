@@ -53,6 +53,10 @@ const toolButtonClass =
   "size-7 text-brand-gray transition-colors hover:bg-fill hover:text-ink " +
   "focus-visible:ring-brand-red/20 focus-visible:border-brand-red/30";
 
+/** Etiquetas del editor: mismo ancho para que los valores queden en una sola columna. */
+const fieldLabelClass =
+  "w-8 shrink-0 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-faint";
+
 /** Primer renglon con contenido: es el resumen que cabe en una linea de la lista. */
 function firstLine(text: string) {
   return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
@@ -88,6 +92,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
   const [replyError, setReplyError] = useState<string | null>(null);
   const replyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const ccRef = useRef<HTMLInputElement>(null);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -125,6 +130,10 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
   useEffect(() => {
     if (replyOpen) replyRef.current?.focus();
   }, [replyOpen]);
+
+  useEffect(() => {
+    if (ccOpen) ccRef.current?.focus();
+  }, [ccOpen]);
 
   useEffect(() => {
     if (openReplyId === null) return;
@@ -370,30 +379,54 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
               </button>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-1.5 text-[11.5px]">
-              <span className="shrink-0 text-subtle">Para:</span>
-              <span className="truncate font-medium text-ink">{email.fromEmail}</span>
-              {ccOpen ? (
-                <input
-                  value={replyCc}
-                  onChange={(event) => setReplyCc(event.target.value)}
-                  placeholder="Copia a: correo@dominio.com, otro@dominio.com"
-                  className="ml-2 min-w-0 flex-1 rounded-edge border border-line bg-white px-2 py-1
-                    text-[11.5px] text-ink outline-none transition-colors placeholder:text-faint
-                    focus:border-brand-red/40 focus:ring-3 focus:ring-brand-red/12"
-                />
-              ) : (
+            <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5">
+              <span className={fieldLabelClass}>Para</span>
+              <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">
+                {email.fromEmail}
+              </span>
+              {!ccOpen && (
                 <button
                   type="button"
                   onClick={() => setCcOpen(true)}
-                  className="ml-auto shrink-0 font-medium text-brand-red outline-none
-                    transition-colors hover:text-brand-red-dark
+                  title="Agregar copia"
+                  className="shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10.5px] font-bold
+                    uppercase tracking-[0.08em] text-faint outline-none transition-colors
+                    hover:bg-fill hover:text-brand-red
                     focus-visible:ring-3 focus-visible:ring-brand-red/20"
                 >
-                  Agregar copia
+                  CC
                 </button>
               )}
             </div>
+
+            {ccOpen && (
+              <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
+                transition-colors focus-within:bg-canvas">
+                <span className={fieldLabelClass}>CC</span>
+                <input
+                  ref={ccRef}
+                  value={replyCc}
+                  onChange={(event) => setReplyCc(event.target.value)}
+                  placeholder="correo@dominio.com, otro@dominio.com"
+                  className="min-w-0 flex-1 bg-transparent text-[12px] text-ink outline-none
+                    placeholder:text-faint"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCcOpen(false);
+                    setReplyCc("");
+                  }}
+                  aria-label="Quitar la copia"
+                  title="Quitar la copia"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-edge text-faint
+                    outline-none transition-colors hover:bg-fill hover:text-ink
+                    focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
 
             <textarea
               ref={replyRef}
