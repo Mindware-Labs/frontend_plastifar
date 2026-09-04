@@ -16,6 +16,7 @@ import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
 import { Button as PfButton } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Spinner";
+import { useEmailCounts } from "../../context/useEmailCounts";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
 import { Badge } from "../../components/shadcn/badge";
 import { Button } from "../../components/shadcn/button";
@@ -103,6 +104,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
   const fileRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const { onInboxChanged } = useEmailCounts();
 
   useEffect(() => {
     let cancelled = false;
@@ -119,7 +122,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved }: EmailDeta
     return () => {
       cancelled = true;
     };
-  }, [emailId]);
+  }, [emailId, reloadKey]);
+
+  useEffect(() => onInboxChanged(() => setReloadKey((current) => current + 1)), [onInboxChanged]);
 
   async function handleCreateTicket() {
     if (!email) return;

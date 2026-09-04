@@ -1,5 +1,5 @@
 import { CornerUpLeft, Inbox, MessagesSquare, Paperclip } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { emailsApi, type EmailQuery } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -53,7 +53,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const [search, setSearch] = useState("");
   const [ticketFilter, setTicketFilter] = useState<TicketFilter>("todos");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const { refresh: refreshCounts } = useEmailCounts();
+  const { refresh: refreshCounts, onInboxChanged } = useEmailCounts();
   const debouncedSearch = useDebouncedValue(search).trim();
   const meta = folderMeta[folder];
 
@@ -64,6 +64,14 @@ export function BandejaPage({ folder }: BandejaPageProps) {
       fallbackError: "No se pudo cargar la bandeja",
     },
   );
+
+  // El aviso llega en cualquier momento: se guarda la recarga vigente para no resuscribirse.
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+
+  useEffect(() => onInboxChanged(() => refreshRef.current()), [onInboxChanged]);
 
   const rows = data?.items ?? [];
   const unfiltered = !debouncedSearch;
