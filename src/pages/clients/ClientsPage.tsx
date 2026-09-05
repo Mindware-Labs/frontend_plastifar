@@ -39,12 +39,9 @@ const COLUMNS: ColumnOption[] = [
   { id: "estado", label: "Estado" },
 ];
 
-const typeTone: Record<Client["type"], "red" | "green" | "neutral"> = {
-  Distribuidor: "red",
-  Mayorista: "neutral",
-  Detallista: "neutral",
-  Institucional: "green",
-};
+// El tipo de cliente no es ni accion principal, ni estado activo, ni salud: es
+// una clasificacion. Por la regla del rojo unico y del verde reservado a lo
+// sano, las cuatro variantes van en el mismo tono neutro.
 
 const chipToStatus: Record<ChipKey, string | undefined> = {
   todos: undefined,
@@ -53,12 +50,24 @@ const chipToStatus: Record<ChipKey, string | undefined> = {
   sinVendedor: "sinvendedor",
 };
 
+// Declarativas como en Personal y Roles: una sola fuente para etiqueta y
+// contador es lo que evita que los numeros se desalineen al agregar una pastilla.
+const chips: { key: ChipKey; label: string; countKey: keyof ClientListResponse["counts"] }[] = [
+  { key: "todos", label: "Todos", countKey: "all" },
+  { key: "activos", label: "Activos", countKey: "active" },
+  { key: "inactivos", label: "Inactivos", countKey: "inactive" },
+  { key: "sinVendedor", label: "Sin vendedor", countKey: "withoutSalesRep" },
+];
+
 export function ClientsPage() {
   const { can } = usePermissions();
   const canWrite = can("clients.write");
 
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [salesReps, setSalesReps] = useState<{ id: number; name: string }[]>([]);
+  // Misma politica que la ficha: los catalogos de apoyo degradan la pantalla,
+  // no la tumban, pero su fallo se dice y se puede reintentar.
+  const [referenceError, setReferenceError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
@@ -72,7 +81,12 @@ export function ClientsPage() {
   const [reassigning, setReassigning] = useState<Client | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(COLUMNS.map((c) => c.id));
-  /** RF-C7 en lote: seleccion sobre el filtro actual, no sobre la pagina. */
+  /**
+   * RF-C7 en lote: la seleccion es sobre la pagina visible, no sobre todo el
+   * filtro. `POST /api/clients/bulk/sales-rep` solo acepta una lista explicita
+   * de ids, asi que "todos los filtrados" exigiria traer los ids de todas las
+   * paginas — justo la consulta sin tope que la seccion 4.1 prohibe.
+   */
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkReassigning, setBulkReassigning] = useState(false);
 
@@ -82,16 +96,23 @@ export function ClientsPage() {
     return visibleColumns.includes(id);
   }
 
-  useEffect(() => {
-    territoriesApi
-      .list()
-      .then((res) => setTerritories(res.items))
-      .catch(() => setTerritories([]));
+  function loadReferenceData() {
+    setReferenceError(null);
+    return Promise.all([
+      territoriesApi.list().then((res) => setTerritories(res.items)),
+      staffApi
+        .list({ page: 1, pageSize: 100, status: "activos", sort: "nombre", dir: "asc" })
+        .then((res) => setSalesReps(res.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })))),
+    ]).catch(() =>
+      setReferenceError(
+        "No se pudieron cargar los territorios ni los vendedores: la tabla los muestra como «—» y sus dos filtros quedan vacíos.",
+      ),
+    );
+  }
 
-    staffApi
-      .list({ page: 1, pageSize: 100, status: "activos", sort: "nombre", dir: "asc" })
-      .then((res) => setSalesReps(res.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))))
-      .catch(() => setSalesReps([]));
+  useEffect(() => {
+    void loadReferenceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const { data, isStale, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
@@ -112,13 +133,15 @@ export function ClientsPage() {
   const unfiltered =
     chip === "todos" && territoryId === "todos" && salesRepId === "todos" && type === "todos" && !debouncedSearch;
 
-  // La seleccion es sobre el filtro actual (RF-C7): al cambiar de pagina o de
-  // filtro se descarta, para que "reasignar" nunca alcance a un cliente que la
-  // persona ya no tiene en pantalla.
-  const criteriaKey = JSON.stringify([debouncedSearch, territoryId, salesRepId, type, chip, data?.page]);
-  const [lastCriteriaKey, setLastCriteriaKey] = useState(criteriaKey);
-  if (criteriaKey !== lastCriteriaKey) {
-    setLastCriteriaKey(criteriaKey);
+  // Se descarta la seleccion en cuanto cambian las filas visibles — otra
+  // pagina, otro filtro, o un refresco que movio la lista. Anclarlo a las filas
+  // y no a los criterios es lo que garantiza que `selected` nunca contenga un
+  // id que la persona ya no tiene delante, que es como una reasignacion en lote
+  // podria alcanzar a un cliente que nadie eligio.
+  const visibleIdsKey = rows.map((client) => client.id).join(",");
+  const [lastVisibleIdsKey, setLastVisibleIdsKey] = useState(visibleIdsKey);
+  if (visibleIdsKey !== lastVisibleIdsKey) {
+    setLastVisibleIdsKey(visibleIdsKey);
     setSelectedIds([]);
   }
 
@@ -219,12 +242,12 @@ export function ClientsPage() {
           value={search}
           onChange={setSearch}
           placeholder="Buscar por nombre, código o RNC…"
-          className="w-[260px]"
+          className="w-[240px]"
         />
 
         <Select
           size="sm"
-          className="w-[180px]"
+          className="w-[200px]"
           aria-label="Filtrar por territorio"
           value={territoryId}
           onChange={setTerritoryId}
@@ -236,7 +259,7 @@ export function ClientsPage() {
 
         <Select
           size="sm"
-          className="w-[180px]"
+          className="w-[200px]"
           aria-label="Filtrar por vendedor"
           value={salesRepId}
           onChange={setSalesRepId}
@@ -248,7 +271,7 @@ export function ClientsPage() {
 
         <Select
           size="sm"
-          className="w-[170px]"
+          className="w-[200px]"
           aria-label="Filtrar por tipo"
           value={type}
           onChange={setType}
@@ -263,61 +286,72 @@ export function ClientsPage() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <FilterChip label="Todos" count={counts?.all ?? 0} active={chip === "todos"} onClick={() => setChip("todos")} />
-        <FilterChip
-          label="Activos"
-          count={counts?.active ?? 0}
-          active={chip === "activos"}
-          onClick={() => setChip("activos")}
-        />
-        <FilterChip
-          label="Inactivos"
-          count={counts?.inactive ?? 0}
-          active={chip === "inactivos"}
-          onClick={() => setChip("inactivos")}
-        />
-        <FilterChip
-          label="Sin vendedor"
-          count={counts?.withoutSalesRep ?? 0}
-          active={chip === "sinVendedor"}
-          onClick={() => setChip("sinVendedor")}
-        />
+        {/* Antes de la primera respuesta las pastillas van en esqueleto, no en
+            cero: un cero es una afirmacion, y todavia no se sabe nada. */}
+        {counts === undefined
+          ? chips.map(({ key }) => (
+              <span key={key} aria-hidden className="h-8 w-[104px] animate-pulse rounded-full bg-fill" />
+            ))
+          : chips.map(({ key, label, countKey }) => (
+              <FilterChip
+                key={key}
+                label={label}
+                count={counts[countKey]}
+                active={chip === key}
+                onClick={() => setChip(key)}
+              />
+            ))}
 
         <div className="ml-auto">
           <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
         </div>
       </div>
 
+      {/* El reintento va en linea con su aviso, no debajo: apilados en columna
+          eran dos bloques de dos alturas cada uno empujando la tabla. */}
+      {referenceError !== null && (
+        <div className="mb-3 flex items-start gap-3">
+          <Alert variant="error">{referenceError}</Alert>
+          <Button size="sm" variant="secondary" onClick={() => void loadReferenceData()}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
       {error && (
-        <div className="mb-3">
+        <div className="mb-3 flex items-start gap-3">
           <Alert variant="error">{error}</Alert>
+          <Button size="sm" variant="secondary" onClick={refresh}>
+            Reintentar
+          </Button>
         </div>
       )}
 
       {canWrite && selected.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-3 border-y border-line bg-canvas px-3 py-2">
-          <span className="text-[12.5px] font-medium text-ink">
+        // Hairline, sin tinte ni recuadro: la barra de seleccion es estructura,
+        // y en este sistema la estructura es un filete de 1 px.
+        <div className="mb-3 flex flex-wrap items-center gap-3 border-y border-line py-2">
+          <span className="text-[12.5px] font-medium tabular-nums text-ink">
             {selected.length} {selected.length === 1 ? "cliente seleccionado" : "clientes seleccionados"}
           </span>
           <Button size="sm" variant="secondary" onClick={() => setBulkReassigning(true)}>
             <UserCog className="h-[15px] w-[15px]" />
             Reasignar vendedor
           </Button>
-          <button
-            type="button"
-            onClick={() => setSelectedIds([])}
-            className="rounded-edge text-[12.5px] text-muted underline-offset-4 transition-colors
-              hover:text-ink hover:underline"
-          >
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
             Limpiar selección
-          </button>
+          </Button>
         </div>
       )}
 
+      {/* Un error de carga no deja el spinner girando debajo: la primera version
+          mostraba el aviso y seguia fingiendo que la tabla estaba en camino. */}
       {data === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
+        error === null && (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        )
       ) : (
         <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
           {rows.length === 0 ? (
@@ -341,7 +375,7 @@ export function ClientsPage() {
                             ? "Quitar la selección de esta página"
                             : "Seleccionar todos los clientes de esta página"
                         }
-                        className="h-4 w-4 rounded-[2px] border-line-strong accent-brand-red"
+                        className="h-4 w-4 rounded-edge border-line-strong accent-brand-red"
                       />
                     </Th>
                   )}
@@ -352,7 +386,7 @@ export function ClientsPage() {
                   {isVisible("vendedor") && <Th>Vendedor</Th>}
                   {isVisible("contactos") && <Th>Contactos</Th>}
                   {isVisible("estado") && <Th>Estado</Th>}
-                  {canWrite && <Th className="w-32 text-right">Acciones</Th>}
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
                 </HeadRow>
               </thead>
 
@@ -366,7 +400,7 @@ export function ClientsPage() {
                           checked={selectedIds.includes(client.id)}
                           onChange={() => toggleSelection(client.id)}
                           aria-label={`Seleccionar ${client.name}`}
-                          className="h-4 w-4 rounded-[2px] border-line-strong accent-brand-red"
+                          className="h-4 w-4 rounded-edge border-line-strong accent-brand-red"
                         />
                       </Td>
                     )}
@@ -384,12 +418,14 @@ export function ClientsPage() {
                     </Td>
                     {isVisible("codigo") && (
                       <Td>
-                        <span className="font-mono text-[12px] text-brand-gray">{client.code}</span>
+                        {/* El codigo comercial lo lee la operacion, no una maquina: va en
+                            Poppins como el resto de la fila, no en mono. */}
+                        <span className="text-[12.5px] tabular-nums text-brand-gray">{client.code}</span>
                       </Td>
                     )}
                     {isVisible("tipo") && (
                       <Td>
-                        <Badge tone={typeTone[client.type]}>{client.type}</Badge>
+                        <Badge tone="neutral">{client.type}</Badge>
                       </Td>
                     )}
                     {isVisible("territorio") && (
@@ -397,7 +433,8 @@ export function ClientsPage() {
                     )}
                     {isVisible("vendedor") && (
                       <Td className="text-[12.5px] text-brand-gray">
-                        {repName(client.salesRepStaffId) ?? <span className="text-faint">Sin vendedor</span>}
+                        {/* Ambar: "sin asignar" es un estado intermedio, no un dato ausente. */}
+                        {repName(client.salesRepStaffId) ?? <span className="text-warn">Sin vendedor</span>}
                       </Td>
                     )}
                     {isVisible("contactos") && (
@@ -405,7 +442,7 @@ export function ClientsPage() {
                         {client.contactCount === 0 ? (
                           <span className="text-[12.5px] text-faint">Ninguno</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-[12.5px] text-brand-gray">
+                          <span className="inline-flex items-center gap-1.5 text-[12.5px] tabular-nums text-brand-gray">
                             <Users aria-hidden className="h-3.5 w-3.5 text-faint" />
                             {client.contactCount}
                           </span>

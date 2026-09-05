@@ -23,7 +23,12 @@ export interface AuditLogRow {
   id: number;
   actor: string;
   entity: string;
-  entityId: number;
+  /**
+   * Texto, no numero: AuditLog.EntityId es una columna de texto y
+   * AuditExtensions la escribe con entityId.ToString(). Hay identificadores
+   * compuestos ("12:3" para un acceso departamental) que no son un numero.
+   */
+  entityId: string;
   action: string;
   createdAt: string;
 }

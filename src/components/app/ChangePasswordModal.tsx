@@ -6,7 +6,7 @@ import { z } from "zod";
 import { authApi } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import { tokenStore } from "../../api/tokenStore";
-import { evaluatePassword, passwordSchema } from "../../lib/password";
+import { PASSWORD_MAX_LENGTH, evaluatePassword, passwordSchema } from "../../lib/password";
 import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
 import { PasswordField, type FieldState } from "../ui/Field";
@@ -113,7 +113,6 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   if (step === "listo") {
     return (
       <Modal
-        eyebrow="Mi cuenta"
         title="Contraseña actualizada"
         onClose={onClose}
         footer={
@@ -133,8 +132,10 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   if (step === "actual") {
     return (
       <Modal
-        eyebrow="Mi cuenta · Paso 1 de 2"
-        title="Confirma tu contraseña"
+        // El contador de pasos baja al titulo: el eyebrow desaparece del panel
+        // entero, pero "1 de 2" es informacion real, no un adorno sobre el
+        // encabezado, y sin el nadie sabe cuanto le queda por delante.
+        title="Paso 1 de 2 · Confirma tu contraseña"
         description="Antes de cambiarla, escribe la contraseña con la que entras hoy."
         onClose={onClose}
         footer={
@@ -181,8 +182,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      eyebrow="Mi cuenta · Paso 2 de 2"
-      title="Crea una contraseña"
+      title="Paso 2 de 2 · Crea una contraseña"
       description="Debe cumplir todos los requisitos. Al guardar se cierran tus otras sesiones."
       onClose={onClose}
       footer={
@@ -222,6 +222,9 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
           label="Nueva contraseña"
           autoComplete="new-password"
           required
+          // El limite se valida en el esquema; ponerlo tambien en el control
+          // evita que alguien escriba de mas y se entere solo al enviar.
+          maxLength={PASSWORD_MAX_LENGTH}
           state={strength.isValid ? "valid" : "idle"}
           error={newForm.formState.errors.newPassword?.message}
           {...newForm.register("newPassword")}
@@ -231,6 +234,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
           label="Repetir nueva contraseña"
           autoComplete="new-password"
           required
+          maxLength={PASSWORD_MAX_LENGTH}
           state={confirmState}
           error={newForm.formState.errors.confirmPassword?.message}
           {...newForm.register("confirmPassword")}

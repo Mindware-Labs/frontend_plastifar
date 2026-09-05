@@ -10,7 +10,6 @@ export interface ConfirmDialogProps {
   /** danger = destructivo e irreversible; warn = reversible pero con consecuencia. */
   tone?: ConfirmTone;
   icon?: ComponentType<{ className?: string }>;
-  eyebrow?: string;
   title: string;
   description: ReactNode;
   confirmLabel: string;
@@ -29,7 +28,6 @@ const toneClasses: Record<ConfirmTone, string> = {
 export function ConfirmDialog({
   tone = "danger",
   icon: Icon = AlertTriangle,
-  eyebrow,
   title,
   description,
   confirmLabel,
@@ -59,7 +57,28 @@ export function ConfirmDialog({
   }
 
   return (
-    <Modal eyebrow={eyebrow} title={title} onClose={requestClose}>
+    <Modal
+      title={title}
+      onClose={requestClose}
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={requestClose} disabled={isRunning}>
+            {cancelLabel}
+          </Button>
+          {/* Lo destructivo va delineado en rojo sobre blanco; el rojo pleno se
+              reserva para la accion afirmativa. El ambar (reversible con
+              consecuencia) si es la primaria del dialogo. */}
+          <Button
+            type="button"
+            variant={tone === "danger" ? "danger" : "primary"}
+            onClick={handleConfirm}
+            isLoading={isRunning}
+          >
+            {confirmLabel}
+          </Button>
+        </>
+      }
+    >
       <div className="flex gap-4">
         <span
           aria-hidden
@@ -72,15 +91,6 @@ export function ConfirmDialog({
           <div className="text-[13.5px] leading-relaxed text-brand-gray">{description}</div>
           {error && <Alert variant="error">{error}</Alert>}
         </div>
-      </div>
-
-      <div className="mt-6 flex justify-end gap-2 border-t border-line pt-4">
-        <Button type="button" variant="secondary" onClick={requestClose} disabled={isRunning}>
-          {cancelLabel}
-        </Button>
-        <Button type="button" onClick={handleConfirm} isLoading={isRunning}>
-          {confirmLabel}
-        </Button>
       </div>
     </Modal>
   );

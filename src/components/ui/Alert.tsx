@@ -21,7 +21,9 @@ const variants = {
   },
   info: {
     icon: Info,
-    role: "note",
+    // "note" no es un rol ARIA valido: el navegador lo descarta y el aviso
+    // desaparece del arbol de accesibilidad.
+    role: "status",
     className: "border-line-strong bg-canvas text-brand-gray",
     accent: "bg-brand-gray",
   },

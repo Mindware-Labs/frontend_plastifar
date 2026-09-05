@@ -1,8 +1,17 @@
 import { forwardRef, type InputHTMLAttributes } from "react";
+import {
+  controlBaseUnsized,
+  controlSizes,
+  stateClasses,
+  type ControlSize,
+  type FieldState,
+} from "./fieldStyles";
 
 interface ControlInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   /** sm = 32 px, para la fila de criterios; md = 40 px, para un formulario. */
-  size?: "sm" | "md";
+  size?: ControlSize;
+  /** Mismo estado explicito que los campos de Field.tsx: reposo, error, correcto. */
+  state?: FieldState;
 }
 
 /**
@@ -14,18 +23,23 @@ interface ControlInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
  * Existe porque la fila de criterios de Calidad y la barra de rango de Reportes
  * pedian el mismo control y estaban a punto de ser dos copias de la misma
  * cadena de clases.
+ *
+ * Se apoya en fieldStyles, no en una copia a mano: la version anterior repetia
+ * la gramatica y en el camino perdia los estados de error, correcto y
+ * deshabilitado, justo los que necesitan un monto o una fecha fuera de rango.
  */
 export const ControlInput = forwardRef<HTMLInputElement, ControlInputProps>(function ControlInput(
-  { size = "sm", className = "", ...props },
+  { size = "sm", state = "idle", className = "", ...props },
   ref,
 ) {
   return (
     <input
       ref={ref}
-      className={`rounded-edge border border-line-strong bg-white text-ink outline-none
-        transition-colors placeholder:text-zinc-400 hover:border-zinc-400 focus:border-brand-red
-        focus:ring-3 focus:ring-brand-red/10
-        ${size === "sm" ? "h-8 px-2.5 text-[12.5px]" : "h-10 px-3 text-[13px]"} ${className}`}
+      aria-invalid={state === "error" || undefined}
+      // El ancho lo decide quien lo coloca: la fila de criterios usa medidas
+      // fijas por columna, de ahi la base sin w-full.
+      className={`${controlBaseUnsized} ${stateClasses[state]} ${controlSizes[size]}
+        ${size === "sm" ? "px-2.5" : "px-3"} placeholder:text-faint ${className}`}
       {...props}
     />
   );

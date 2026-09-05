@@ -23,15 +23,70 @@ export function TopBar({ crumbs, onOpenMenu }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // Indice activo del recorrido con flechas: role="menu" promete teclado, y sin
+  // esto los dos elementos eran solo botones sueltos dentro de un rol que miente.
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const ITEM_COUNT = 2;
+
+  function openMenu() {
+    setActiveIndex(0);
+    setMenuOpen(true);
+  }
+
+  function closeMenu(returnFocus = true) {
+    setMenuOpen(false);
+    if (returnFocus) triggerRef.current?.focus();
+  }
+
+  // El foco entra al menu al abrirlo y sigue a la opcion activa; mismo patron
+  // que ColumnPicker, la unica implementacion correcta que ya tenia el panel.
+  useEffect(() => {
+    if (!menuOpen) return;
+    itemRefs.current[activeIndex]?.focus();
+  }, [menuOpen, activeIndex]);
+
+  function handleMenuKeyDown(event: React.KeyboardEvent, index: number) {
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        setActiveIndex((index + 1) % ITEM_COUNT);
+        return;
+      case "ArrowUp":
+        event.preventDefault();
+        setActiveIndex((index - 1 + ITEM_COUNT) % ITEM_COUNT);
+        return;
+      case "Home":
+        event.preventDefault();
+        setActiveIndex(0);
+        return;
+      case "End":
+        event.preventDefault();
+        setActiveIndex(ITEM_COUNT - 1);
+        return;
+      case "Escape":
+      case "Tab":
+        event.preventDefault();
+        closeMenu();
+        return;
+      default:
+    }
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
 
     function handlePointerDown(event: PointerEvent) {
+      // Cerrar por click fuera no devuelve el foco: la persona ya esta mirando
+      // otro sitio y devolverselo al disparador seria un salto sin motivo.
       if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
     }
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setMenuOpen(false);
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      triggerRef.current?.focus();
     }
 
     document.addEventListener("pointerdown", handlePointerDown);
@@ -64,8 +119,14 @@ export function TopBar({ crumbs, onOpenMenu }: TopBarProps) {
 
       <div className="relative" ref={menuRef}>
         <button
+          ref={triggerRef}
           type="button"
-          onClick={() => setMenuOpen((open) => !open)}
+          onClick={() => (menuOpen ? closeMenu(false) : openMenu())}
+          onKeyDown={(event) => {
+            if (menuOpen || !["ArrowDown", "Enter", " "].includes(event.key)) return;
+            event.preventDefault();
+            openMenu();
+          }}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           className={`flex items-center gap-2.5 rounded-edge py-1 pl-1 pr-1.5 outline-none
@@ -90,6 +151,7 @@ export function TopBar({ crumbs, onOpenMenu }: TopBarProps) {
         {menuOpen && (
           <div
             role="menu"
+            aria-label="Mi cuenta"
             className="animate-plf-toast-in absolute right-0 top-[46px] z-20 w-56 rounded-edge border border-line
               bg-white p-1.5 shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.22)]"
           >
@@ -98,9 +160,16 @@ export function TopBar({ crumbs, onOpenMenu }: TopBarProps) {
               <p className="mt-0.5 truncate text-[11.5px] text-faint">{user?.email}</p>
             </div>
             <button
+              ref={(node) => {
+                itemRefs.current[0] = node;
+              }}
               type="button"
               role="menuitem"
+              tabIndex={activeIndex === 0 ? 0 : -1}
+              onKeyDown={(event) => handleMenuKeyDown(event, 0)}
               onClick={() => {
+                // El dialogo se lleva el foco al montarse y lo devuelve al
+                // desmontarse: cerrar aqui sin reclamarlo evita pelearselo.
                 setMenuOpen(false);
                 setChangingPassword(true);
               }}
@@ -112,8 +181,13 @@ export function TopBar({ crumbs, onOpenMenu }: TopBarProps) {
               Cambiar contraseña
             </button>
             <button
+              ref={(node) => {
+                itemRefs.current[1] = node;
+              }}
               type="button"
               role="menuitem"
+              tabIndex={activeIndex === 1 ? 0 : -1}
+              onKeyDown={(event) => handleMenuKeyDown(event, 1)}
               onClick={() => logout()}
               className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-2 text-left text-[13px]
                 font-medium text-brand-red-dark outline-none transition-colors hover:bg-red-50

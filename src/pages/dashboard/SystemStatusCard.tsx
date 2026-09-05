@@ -1,10 +1,12 @@
 import { RefreshCcw, Sparkles } from "lucide-react";
-import { useState } from "react";
 import { DashboardCard } from "./DashboardCard";
+import { INSET_RADIUS } from "./radii";
 
 interface SystemStatusCardProps {
   onRefresh: () => void;
   isRefreshing: boolean;
+  /** Momento de la ultima carga con exito; null mientras no haya ninguna. */
+  lastSync: Date | null;
 }
 
 /**
@@ -14,13 +16,14 @@ interface SystemStatusCardProps {
  * los avatares y el estado activo del Sidebar. "Actualizar" es real: vuelve
  * a pedir los datos de demostracion, no es un boton decorativo.
  */
-export function SystemStatusCard({ onRefresh, isRefreshing }: SystemStatusCardProps) {
-  const [lastSync] = useState(() => new Date());
-
+export function SystemStatusCard({ onRefresh, isRefreshing, lastSync }: SystemStatusCardProps) {
+  // La marca de tiempo la fija quien trae los datos, no el montaje de esta
+  // tarjeta: si se calculara aqui una sola vez, "Actualizar" dejaria en
+  // pantalla la hora de la carga inicial y estaria mintiendo.
   return (
     <DashboardCard padding="sm" className="flex flex-col overflow-hidden !p-0">
       <div className="flex flex-1 flex-col gap-3 p-4">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-red/10 text-brand-red">
+        <span className={`flex h-9 w-9 items-center justify-center ${INSET_RADIUS} bg-brand-red/8 text-brand-red`}>
           <Sparkles className="h-4 w-4" />
         </span>
 
@@ -41,7 +44,9 @@ export function SystemStatusCard({ onRefresh, isRefreshing }: SystemStatusCardPr
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/50">Estado</p>
           <p className="truncate text-[12.5px] font-medium text-white">
-            Última actualización: {lastSync.toLocaleTimeString("es-DO", { hour: "2-digit", minute: "2-digit" })}
+            {lastSync
+              ? `Última actualización: ${lastSync.toLocaleTimeString("es-DO", { hour: "2-digit", minute: "2-digit" })}`
+              : "Sin datos cargados todavía"}
           </p>
         </div>
 
@@ -49,9 +54,9 @@ export function SystemStatusCard({ onRefresh, isRefreshing }: SystemStatusCardPr
           type="button"
           onClick={onRefresh}
           disabled={isRefreshing}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11.5px] font-semibold
+          className={`flex shrink-0 items-center gap-1.5 ${INSET_RADIUS} bg-white px-3 py-1.5 text-[11.5px] font-semibold
             text-ink outline-none transition-colors hover:bg-white/90 focus-visible:ring-3
-            focus-visible:ring-white/40 disabled:cursor-wait disabled:opacity-70"
+            focus-visible:ring-white/40 disabled:cursor-wait disabled:opacity-70`}
         >
           <RefreshCcw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
           Actualizar

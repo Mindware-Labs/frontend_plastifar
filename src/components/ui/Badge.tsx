@@ -10,7 +10,7 @@ const tones: Record<NonNullable<BadgeProps["tone"]>, string> = {
   neutral: "bg-fill text-brand-gray",
   red: "bg-brand-red/8 text-brand-red-dark",
   green: "bg-brand-green/8 text-brand-green",
-  warn: "bg-warn/10 text-warn",
+  warn: "bg-warn/8 text-warn",
 };
 
 /** Pastilla de categoria en tablas: 22 px de alto, sin borde, fondo al 8 %. */

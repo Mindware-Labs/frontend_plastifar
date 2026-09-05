@@ -1,35 +1,36 @@
-// Puerto literal, sin cambios, de useIsMobile.ts —
+// Puerto de useIsMobile.ts —
 // https://github.com/Subhan-code/Amicro--Micro-transitions- (MIT).
-import { useState, useEffect } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 /**
- * Custom hook to detect mobile viewport (< 768px by default).
- * Used to disable heavy animations and optimize rendering on mobile devices.
+ * Detecta el ancho de pantalla movil para apagar las animaciones pesadas.
+ *
+ * Es una suscripcion a algo externo al arbol, que es justo lo que
+ * `useSyncExternalStore` existe para leer. La version anterior mantenia el
+ * valor en `useState` con un inicializador y ademas lo reescribia dentro de un
+ * `useEffect`, lo que producia dos problemas: un render extra en cada montaje,
+ * y dos fuentes de verdad que no coincidian exactamente en `breakpoint` px
+ * -el inicializador combinaba `innerWidth < breakpoint` con la media query, y
+ * las dos discrepan en el limite-. Aqui la media query es la unica fuente.
  */
 export function useIsMobile(breakpoint = 768): boolean {
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth < breakpoint || window.matchMedia(`(max-width: ${breakpoint}px)`).matches;
-  });
+  const query = useMemo(
+    () => (typeof window === "undefined" ? null : window.matchMedia(`(max-width: ${breakpoint}px)`)),
+    [breakpoint],
+  );
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (query === null) return () => {};
+      query.addEventListener("change", onChange);
+      return () => query.removeEventListener("change", onChange);
+    },
+    [query],
+  );
 
-    const mql = window.matchMedia(`(max-width: ${breakpoint}px)`);
-    const onChange = (e: MediaQueryListEvent) => {
-      setIsMobile(e.matches);
-    };
-
-    setIsMobile(mql.matches);
-
-    if (mql.addEventListener) {
-      mql.addEventListener("change", onChange);
-      return () => mql.removeEventListener("change", onChange);
-    } else {
-      mql.addListener(onChange);
-      return () => mql.removeListener(onChange);
-    }
-  }, [breakpoint]);
-
-  return isMobile;
+  return useSyncExternalStore(
+    subscribe,
+    () => query?.matches ?? false,
+    () => false,
+  );
 }

@@ -23,11 +23,15 @@ interface SelectProps {
   placeholder?: string;
   size?: ControlSize;
   state?: FieldState;
+  /** Las opciones aun estan en camino: se dice eso, no "Sin opciones". */
+  loading?: boolean;
   disabled?: boolean;
   id?: string;
   className?: string;
   "aria-label"?: string;
   "aria-describedby"?: string;
+  /** Explicito cuando quien lo usa conoce la validez por otra via que `state`. */
+  "aria-invalid"?: boolean;
 }
 
 const PANEL_MAX_HEIGHT = 264;
@@ -48,11 +52,13 @@ export function Select({
   placeholder = "Selecciona una opción",
   size = "md",
   state = "idle",
+  loading = false,
   disabled,
   id,
   className = "",
   "aria-label": ariaLabel,
   "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
 }: SelectProps) {
   const generated = useId();
   const listId = `${id ?? generated}-listbox`;
@@ -177,6 +183,9 @@ export function Select({
         return;
       case "Escape":
         event.preventDefault();
+        // Sin detener la propagacion el mismo Escape llega al listener de
+        // documento de Modal: cerraba la lista y descartaba el formulario entero.
+        event.stopPropagation();
         closeList();
         triggerRef.current?.focus();
         return;
@@ -217,13 +226,14 @@ export function Select({
         aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
-        aria-invalid={resolved === "error"}
+        aria-invalid={ariaInvalid ?? resolved === "error"}
         disabled={disabled}
         onClick={() => (open ? closeList() : openList())}
         onKeyDown={handleKeyDown}
         className={`${controlBase} ${stateClasses[resolved]} ${controlSizes[size]}
           flex items-center justify-between gap-2 pl-3 pr-2.5 font-medium
-          ${selected ? "text-ink" : "text-zinc-400"}`}
+          focus-visible:ring-3 focus-visible:ring-brand-red/25
+          ${selected ? "text-ink" : "text-faint"}`}
       >
         <span className="truncate">{selected?.label ?? placeholder}</span>
         <ChevronDown
@@ -249,7 +259,7 @@ export function Select({
               maxHeight: PANEL_MAX_HEIGHT,
             }}
             className="animate-plf-toast-in z-[60] overflow-y-auto rounded-edge border border-line bg-white p-1
-              shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
+              shadow-panel"
           >
             {options.map((option, index) => {
               const isSelected = option.value === value;
@@ -267,7 +277,7 @@ export function Select({
                   className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge px-2.5 py-2
                     text-[13px] transition-colors ${
                       option.disabled
-                        ? "cursor-not-allowed text-zinc-300"
+                        ? "cursor-not-allowed text-muted"
                         : isActive
                           ? "bg-fill text-ink"
                           : "text-brand-gray"
@@ -279,8 +289,12 @@ export function Select({
               );
             })}
 
+            {/* Mientras la peticion esta en vuelo no hay "ninguna": todavia no
+                se sabe. Afirmar lo contrario es mentir sobre el dato. */}
             {options.length === 0 && (
-              <li className="px-2.5 py-3 text-center text-[12.5px] text-faint">Sin opciones</li>
+              <li className="px-2.5 py-3 text-center text-[12.5px] text-faint">
+                {loading ? "Cargando…" : "Sin opciones"}
+              </li>
             )}
           </ul>,
           document.body,

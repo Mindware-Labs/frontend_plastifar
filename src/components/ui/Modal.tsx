@@ -4,8 +4,6 @@ import { createPortal } from "react-dom";
 
 interface ModalProps {
   title: string;
-  /** Linea corta sobre el titulo: situa la accion dentro del modulo. */
-  eyebrow?: string;
   description?: ReactNode;
   onClose: () => void;
   /** Acciones del pie, separadas del cuerpo por un filete. */
@@ -20,7 +18,7 @@ const focusableSelector =
  * Dialogo modal del panel. Se monta en un portal sobre document.body para que
  * ningun ancestro con transform o overflow lo recorte ni lo desplace.
  */
-export function Modal({ title, eyebrow, description, onClose, footer, children }: ModalProps) {
+export function Modal({ title, description, onClose, footer, children }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -39,9 +37,13 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
     document.body.style.overflow = "hidden";
 
     // El foco entra al primer campo, no al aspa: se llega a escribir de inmediato.
+    // El Select del panel es un <button role="combobox">, no un <select>, asi que
+    // sin [role="combobox"] un dialogo que empieza por un desplegable enfocaba el
+    // aspa. Se excluye lo deshabilitado: focus() sobre un campo apagado no hace
+    // nada y el dialogo se quedaba sin foco inicial.
     const panel = panelRef.current;
     const firstField = panel?.querySelector<HTMLElement>(
-      "input:not([type='hidden']), select, textarea",
+      "input:not([type='hidden']):not([disabled]), textarea:not([disabled]), [role='combobox']:not([disabled])",
     );
     (firstField ?? panel?.querySelector<HTMLElement>("button"))?.focus();
 
@@ -53,6 +55,11 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
       if (event.key !== "Tab" || !panel) return;
 
       // Trampa de foco: el tabulador no debe escaparse al fondo de la pagina.
+      // Hueco conocido: solo recorre los descendientes del panel, y Select dibuja
+      // su listbox en un portal colgado de document.body. Con la lista abierta sus
+      // opciones quedan fuera de la trampa. No es urgente porque el listbox se
+      // maneja con flechas y cierra con Tab, pero si algun dia un portal necesita
+      // recorrido propio, hay que registrarlo aqui en vez de ampliar el selector.
       const items = Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector));
       if (items.length === 0) return;
 
@@ -91,24 +98,18 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         className="animate-plf-modal-in flex max-h-full w-full max-w-lg flex-col overflow-hidden
-          rounded-edge border border-line bg-white
-          shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]"
+          rounded-edge border border-line bg-white shadow-dialog"
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 pb-4 pt-5">
-          <div>
-            {eyebrow && (
-              <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
-                {eyebrow}
-              </p>
-            )}
+          <div className="flex flex-col gap-1">
             <h2
               id={titleId}
-              className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink"
+              className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink"
             >
               {title}
             </h2>
             {description && (
-              <p id={descriptionId} className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
+              <p id={descriptionId} className="text-[12.5px] leading-relaxed text-muted">
                 {description}
               </p>
             )}

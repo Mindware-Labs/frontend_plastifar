@@ -9,12 +9,20 @@ export interface TerritoryQuery {
   status?: string;
 }
 
+export interface TerritoryCounts {
+  all: number;
+  active: number;
+  inactive: number;
+}
+
 export interface TerritoryListResponse {
   items: Territory[];
   page: number;
   pageSize: number;
   total: number;
   totalPages: number;
+  /** Contadores del filtro base, como todo listado (seccion 12.1 del plan). */
+  counts: TerritoryCounts;
 }
 
 export const territoriesApi = {

@@ -49,7 +49,11 @@ export function BulkReassignSalesRepModal({ clients, salesReps, onClose, onSaved
   return (
     <Modal
       title="Reasignar vendedor en lote"
-      description={`Cambia quién atiende comercialmente a ${clients.length} clientes seleccionados.`}
+      description={
+        clients.length === 1
+          ? "Cambia quién atiende comercialmente al cliente seleccionado."
+          : `Cambia quién atiende comercialmente a los ${clients.length} clientes seleccionados.`
+      }
       onClose={onClose}
       footer={
         <>
@@ -57,7 +61,7 @@ export function BulkReassignSalesRepModal({ clients, salesReps, onClose, onSaved
             Cancelar
           </Button>
           <Button type="submit" form="bulk-reassign-form" isLoading={formState.isSubmitting}>
-            Reasignar {clients.length}
+            {clients.length === 1 ? "Reasignar cliente" : `Reasignar ${clients.length} clientes`}
           </Button>
         </>
       }
@@ -93,7 +97,7 @@ export function BulkReassignSalesRepModal({ clients, salesReps, onClose, onSaved
               value={field.value}
               onChange={field.onChange}
               onBlur={field.onBlur}
-              placeholder="Elige uno"
+              placeholder="Sin vendedor asignado"
               options={[
                 { value: "", label: "Sin vendedor asignado" },
                 ...salesReps.map((rep) => ({ value: String(rep.id), label: rep.name })),

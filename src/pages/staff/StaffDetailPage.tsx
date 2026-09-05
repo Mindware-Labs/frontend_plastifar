@@ -49,6 +49,10 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Igual que en la ficha de cliente: mientras una accion sobre un acceso esta
+  // en vuelo su fila se atenua y sus controles no aceptan un segundo click, que
+  // es lo que provocaba dos PUT y dos recargas resolviendo en desorden.
+  const [busyDepartmentId, setBusyDepartmentId] = useState<number | null>(null);
 
   const [modal, setModal] = useState<"nuevo" | DepartmentAccess | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
@@ -59,15 +63,37 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
     return staffApi.getDepartmentAccess(staffId).then(setStaff);
   }
 
-  useEffect(() => {
-    if (!id) return;
-    Promise.all([staffApi.getDepartmentAccess(staffId), permissionsApi.matrix(), departmentsApi.list()])
+  /** Refresco tras una mutacion: el fallo se dice, no se pierde en la consola. */
+  function reloadOrReport() {
+    return reload().catch((err) => {
+      setError(
+        err instanceof ApiError ? err.message : "No se pudo actualizar la ficha del colaborador",
+      );
+    });
+  }
+
+  function load() {
+    setError(null);
+    return Promise.all([
+      staffApi.getDepartmentAccess(staffId),
+      permissionsApi.matrix(),
+      departmentsApi.list(),
+    ])
       .then(([detail, data, depts]) => {
         setStaff(detail);
         setMatrix(data);
         setDepartments(depts);
       })
-      .catch(() => setError("No se pudo cargar la ficha del colaborador"));
+      .catch((err) => {
+        setError(
+          err instanceof ApiError ? err.message : "No se pudo cargar la ficha del colaborador",
+        );
+      });
+  }
+
+  useEffect(() => {
+    if (!id) return;
+    void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -88,10 +114,13 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
     } else {
       await staffApi.grantDepartmentAccess(staffId, value);
     }
-    await reload();
+    // El refresco no viaja al diálogo: la escritura ya salió bien y decir "no se
+    // pudo otorgar el acceso" por un GET fallido sería mentir sobre lo ocurrido.
+    await reloadOrReport();
   }
 
   async function makePrimary(access: DepartmentAccess) {
+    setBusyDepartmentId(access.departmentId);
     setError(null);
     try {
       await staffApi.updateDepartmentAccess(staffId, access.departmentId, {
@@ -101,6 +130,8 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
       await reload();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cambiar el departamento principal");
+    } finally {
+      setBusyDepartmentId(null);
     }
   }
 
@@ -110,7 +141,6 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
     setConfirmation({
       tone: "warn",
       icon: KeyRound,
-      eyebrow: "Personal · Accesos",
       title: "Revocar acceso",
       description: (
         <>
@@ -122,8 +152,13 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
       ),
       confirmLabel: "Revocar acceso",
       onConfirm: async () => {
-        await staffApi.revokeDepartmentAccess(staffId, access.departmentId);
-        await reload();
+        setBusyDepartmentId(access.departmentId);
+        try {
+          await staffApi.revokeDepartmentAccess(staffId, access.departmentId);
+          await reload();
+        } finally {
+          setBusyDepartmentId(null);
+        }
       },
     });
   }
@@ -133,11 +168,18 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
     { label: "Accesos", to: `/staff/${id}/accesos` },
   ];
 
-  if (error) {
+  // Solo es fatal si no hay ficha que mostrar; con la ficha cargada el fallo de
+  // una mutacion se dice sobre la propia pagina.
+  if (error !== null && (staff === null || matrix === null)) {
     return (
       <div>
         <ModuleHeader sections={sections} />
-        <Alert variant="error">{error}</Alert>
+        <div className="flex flex-col items-start gap-2">
+          <Alert variant="error">{error}</Alert>
+          <Button size="sm" variant="secondary" onClick={() => void load()}>
+            Reintentar
+          </Button>
+        </div>
       </div>
     );
   }
@@ -163,6 +205,15 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
           )
         }
       />
+
+      {error !== null && (
+        <div className="mb-3 flex flex-col items-start gap-2">
+          <Alert variant="error">{error}</Alert>
+          <Button size="sm" variant="secondary" onClick={() => void load()}>
+            Reintentar
+          </Button>
+        </div>
+      )}
 
       {/* RF-P7: la instalación no puede quedarse sin ningún administrador
           activo. Se avisa donde se toma la decisión, no solo con un 409 después. */}
@@ -215,12 +266,14 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
               <p className="text-[13.5px] text-faint">
                 Todavía no tiene acceso a ningún departamento: entra al sistema pero no ve nada.
               </p>
-              <div className="mt-3 flex justify-center">
-                <Button size="sm" onClick={() => setModal("nuevo")}>
-                  <Plus className="h-[15px] w-[15px]" />
-                  Otorgar el primero
-                </Button>
-              </div>
+              {canWrite && (
+                <div className="mt-3 flex justify-center">
+                  <Button size="sm" onClick={() => setModal("nuevo")}>
+                    <Plus className="h-[15px] w-[15px]" />
+                    Otorgar el primero
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
           <DataTable>
@@ -237,54 +290,58 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
 
             <tbody>
               {staff.accesses.map((access) => (
-                <Row key={access.departmentId}>
+                <Row key={access.departmentId} busy={busyDepartmentId === access.departmentId}>
                   <Td className="text-[13px] font-medium text-ink">{access.departmentName}</Td>
                   <Td>
                     <Badge>{access.roleName}</Badge>
                   </Td>
                   <Td>
                     {access.isPrimary ? (
+                      // Gris, no rojo: marcar el registro designado no es ni la accion
+                      // primaria ni el estado activo, los dos unicos usos del 185 C.
                       <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
-                        <Star aria-hidden className="h-3.5 w-3.5 fill-brand-red text-brand-red" />
+                        <Star aria-hidden className="h-3.5 w-3.5 fill-brand-gray text-brand-gray" />
                         Principal
                       </span>
                     ) : !canWrite ? (
                       <span className="text-[12.5px] text-faint">—</span>
                     ) : (
-                      <button
-                        type="button"
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="-mx-3.5"
                         onClick={() => makePrimary(access)}
-                        className="rounded-edge text-[12.5px] text-muted underline-offset-4 transition-colors
-                          hover:text-ink hover:underline"
+                        disabled={busyDepartmentId === access.departmentId}
                       >
                         Hacer principal
-                      </button>
+                      </Button>
                     )}
                   </Td>
                   <Td className="text-[12.5px] text-brand-gray">{access.grantedByName ?? "—"}</Td>
                   <Td className="text-[12.5px] text-brand-gray">{formatDate(access.grantedAt)}</Td>
                   <Td>
                     <div className="flex items-center justify-end gap-1">
-                      {!canWrite && <span className="text-[12px] text-faint">—</span>}
+                      {!canWrite && <span className="text-[12.5px] text-faint">—</span>}
                       {canWrite && (
-                      <>
-                      <RowAction
-                        label={`Cambiar el rol en ${access.departmentName}`}
-                        icon={Pencil}
-                        onClick={() => setModal(access)}
-                      />
-                      <RowAction
-                        label={
-                          access.isPrimary
-                            ? "El acceso principal no se revoca: marca otro como principal primero"
-                            : `Revocar el acceso a ${access.departmentName}`
-                        }
-                        icon={Trash2}
-                        onClick={() => askRevoke(access)}
-                        disabled={access.isPrimary}
-                        danger
-                      />
-                      </>
+                        <>
+                          <RowAction
+                            label={`Cambiar el rol en ${access.departmentName}`}
+                            icon={Pencil}
+                            onClick={() => setModal(access)}
+                            disabled={busyDepartmentId === access.departmentId}
+                          />
+                          <RowAction
+                            label={
+                              access.isPrimary
+                                ? "El acceso principal no se revoca: marca otro como principal primero"
+                                : `Revocar el acceso a ${access.departmentName}`
+                            }
+                            icon={Trash2}
+                            onClick={() => askRevoke(access)}
+                            disabled={access.isPrimary || busyDepartmentId === access.departmentId}
+                            danger
+                          />
+                        </>
                       )}
                     </div>
                   </Td>
@@ -294,7 +351,9 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
           </DataTable>
           )}
 
-          <h2 className="mb-1 mt-9 font-heading text-[14px] font-bold tracking-[-0.01em] text-ink">
+          {/* Cabecera de grupo, no un titulo de pagina: la rampa solo tiene
+              versalita de 10 px para nombrar un bloque dentro de una vista. */}
+          <h2 className="mb-1 mt-9 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
             Permiso efectivo
           </h2>
           <p className="mb-3 max-w-[76ch] text-[12.5px] leading-relaxed text-muted">
@@ -304,8 +363,13 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
           </p>
 
           {effective.length === 0 ? (
+            // Una lista derivada se queda vacia por dos motivos distintos, y la
+            // accion que corresponde a cada uno tambien lo es: otorgar un acceso,
+            // o revisar los permisos de los roles ya otorgados.
             <p className="py-12 text-center text-[13.5px] text-faint">
-              Sin accesos no hay permisos: hoy esta persona no puede hacer nada dentro del panel.
+              {staff.accesses.length === 0
+                ? "Sin accesos no hay permisos: hoy esta persona no puede hacer nada dentro del panel."
+                : "Tiene accesos, pero ninguno de sus roles concede todavía un permiso: revisa esos roles en la matriz."}
             </p>
           ) : (
           <DataTable>
@@ -366,13 +430,20 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   );
 }
 
-/** Fila de la ficha: etiqueta a la izquierda, valor a la derecha, sin tarjeta. */
+/**
+ * Fila de la ficha: etiqueta a la izquierda, valor a la derecha, sin tarjeta.
+ * La etiqueta es la cabecera de su fila, no una celda mas: sin `th scope="row"`
+ * un lector de pantalla recita los valores sin decir de que son.
+ */
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <Row>
-      <Td className="w-[220px] py-3 align-middle font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+      <th
+        scope="row"
+        className="w-[220px] py-3 pl-0 pr-3.5 text-left align-middle font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint"
+      >
         {label}
-      </Td>
+      </th>
       <Td className="py-3 text-[13px] text-brand-gray">{children}</Td>
     </Row>
   );

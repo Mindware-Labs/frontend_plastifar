@@ -398,7 +398,11 @@ Nine named keyframes, all short and all functional: page-entry rise (0.75s), fad
 - **Don't** shadow anything that scrolls with the page, and never use a hard offset shadow: the two shadows in this system are diffuse and belong to floating panels only.
 - **Don't** lighten `muted`, `faint` or `warn`; they sit at the 4.5:1 floor deliberately.
 - **Don't** use `alert()`, `confirm()` or `prompt()` — `ConfirmDialog` exists.
-- **Don't** add a kicker, eyebrow, or micro-caps line above a heading anywhere in the panel. See the carried exception below.
+- **Don't** add a kicker, eyebrow, or micro-caps line above a heading anywhere in the panel. There is no exception; the one the build used to carry is gone (see below).
 
-### Carried exception: the modal eyebrow
-`Modal` exposes an `eyebrow` prop and every dialog in the panel currently passes one (`StaffModal`, `RoleModal`, `ConfirmDialog`, and the Permisos dialogs). This is a violation the build carries, not a rule of this system: it is a kicker above a heading, and new surfaces must not treat it as house style. It survives only because removing it from one module would leave that module's dialogs visibly different from every other module's, and uniformity across modules is a product requirement. The correct fix is panel-wide: when the eyebrow goes, it goes from `Modal.tsx` and every call site at once. Until then, do not add `eyebrow` to any dialog in a new module, and do not introduce a kicker anywhere outside `Modal`.
+### Resolved: the modal eyebrow is gone
+`Modal` used to expose an `eyebrow` prop, and this document carried it as a disclosed violation on the grounds that removing it from one module would leave that module's dialogs visibly different from the rest. That reasoning also named the fix — panel-wide, `Modal.tsx` and every call site in one move — and that is what happened: the prop is deleted from `Modal` and `ConfirmDialog`, and all fifteen call sites with it.
+
+Two things went with it. The head's `mt-*` chain became `flex flex-col gap-1`, because with no eyebrow the `mt-1` on the `<h2>` was a stray 4 px offset. And `tracking-[0.14em]` — a fourth tracking value on no ramp, which had been hiding inside the eyebrow's own styles — no longer exists anywhere in the panel.
+
+One call site carried real information rather than decoration: `ChangePasswordModal`'s "Paso 1 de 2" / "Paso 2 de 2". That moved into the dialog title, which is where a step counter belongs.

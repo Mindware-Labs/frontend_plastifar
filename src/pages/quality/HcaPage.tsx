@@ -3,7 +3,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { clientsApi } from "../../api/clients";
 import { productLinesApi } from "../../api/productLines";
-import { qualityApi, type SheetListResponse, type SheetQuery } from "../../api/quality";
+import {
+  qualityApi,
+  type SheetCounts,
+  type SheetListResponse,
+  type SheetQuery,
+} from "../../api/quality";
 import { staffApi } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
@@ -27,7 +32,8 @@ import { HcaStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
 
 type ChipKey = "todas" | "abiertas" | "vencidas" | "cerradas";
-type SortKey = "numero" | "compromiso" | "cliente";
+/** Solo lo que el servidor sabe ordenar (SheetQuery.sort). */
+type SortKey = "compromiso" | "cliente";
 
 const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "open" | "overdue" | "closed" }[] = [
   { key: "todas", label: "Todas", countKey: "all" },
@@ -35,6 +41,23 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
   { key: "vencidas", label: "Vencidas", status: "vencidas", countKey: "overdue" },
   { key: "cerradas", label: "Cerradas", status: "cerradas", countKey: "closed" },
 ];
+
+/**
+ * Lo que el listado debe, antes de lo que contiene. La ficha ya abria diciendo
+ * que bloqueaba el cierre; el listado abria con una tabla muda. Solo se dice lo
+ * que el servidor cuenta: vencidas y abiertas, nada inventado.
+ */
+function listDebt(counts: SheetCounts): string {
+  if (counts.overdue === 0) {
+    return counts.open === 1
+      ? "Queda 1 HCA abierta y ninguna vencida."
+      : `Quedan ${counts.open} HCA abiertas y ninguna vencida.`;
+  }
+
+  const head =
+    counts.overdue === 1 ? "1 HCA pasó su fecha comprometida" : `${counts.overdue} HCA pasaron su fecha comprometida`;
+  return `${head}, sobre ${counts.open} ${counts.open === 1 ? "abierta" : "abiertas"}. Ninguna se cierra hasta resolver su plan y verificar la eficacia.`;
+}
 
 /** RF-Q1: listado paginado de HCA con pastillas por estado y filtros por linea
  *  de producto, responsable, cliente y rango de fechas. */
@@ -99,14 +122,14 @@ export function HcaPage() {
     from: from || undefined,
     to: to || undefined,
     status: CHIPS.find((c) => c.key === chip)?.status,
-    sort: sort.key === "numero" ? undefined : sort.key,
+    sort: sort.key,
     dir: sort.dir,
   };
 
   const { data, isStale, error, setPage, refresh } = usePagedList<SheetQuery, SheetListResponse>({
     fetch: qualityApi.sheets.list,
     criteria,
-    fallbackError: "No se pudieron cargar las hojas de corrección",
+    fallbackError: "No se pudieron cargar las HCA. Vuelve a intentarlo.",
   });
 
   const rows = data?.items ?? [];
@@ -209,43 +232,67 @@ export function HcaPage() {
           </CriteriaField>
         </div>
 
+        {/* Antes de la primera respuesta no hay contadores: un «0» al lado de
+            «Vencidas» es un dato, y seria falso. Se reserva el sitio y nada mas. */}
         <div className="flex flex-wrap items-center gap-2">
-          {CHIPS.map(({ key, label, countKey }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              count={counts?.[countKey] ?? 0}
-              active={chip === key}
-              onClick={() => setChip(key)}
-            />
-          ))}
+          {counts
+            ? CHIPS.map(({ key, label, countKey }) => (
+                <FilterChip
+                  key={key}
+                  label={label}
+                  count={counts[countKey]}
+                  active={chip === key}
+                  onClick={() => setChip(key)}
+                />
+              ))
+            : CHIPS.map(({ key }) => (
+                <span
+                  key={key}
+                  aria-hidden
+                  className="h-8 w-[104px] animate-pulse rounded-full bg-fill"
+                />
+              ))}
         </div>
       </div>
 
       {error && (
-        <div className="mb-3">
-          <Alert variant="error">{error}</Alert>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="min-w-[240px] flex-1">
+            <Alert variant="error">{error}</Alert>
+          </div>
+          <Button size="sm" variant="secondary" onClick={refresh}>
+            Reintentar
+          </Button>
         </div>
       )}
 
+      {counts && (counts.overdue > 0 || counts.open > 0) && (
+        <p className="mb-3 text-[12.5px] text-brand-gray">{listDebt(counts)}</p>
+      )}
+
       {data === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
+        // Con un error de carga no hay nada que esperar: el aviso ya trae el
+        // reintento, y una rueda eterna debajo del aviso mentia.
+        error === null && (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        )
       ) : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
           {unfiltered
-            ? "Todavía no hay hojas de corrección registradas."
-            : "Ninguna hoja coincide con este filtro o búsqueda."}
+            ? "Todavía no hay HCA registradas."
+            : "Ninguna HCA coincide con este filtro o búsqueda."}
         </p>
       ) : (
         <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
           <DataTable>
             <thead>
               <HeadRow>
-                <Th sort={{ dir: sort.key === "numero" ? sort.dir : null, onToggle: () => toggleSort("numero") }}>
-                  Número
-                </Th>
+                {/* Sin flecha: el servidor no ordena por número (SheetQuery.sort
+                    solo admite compromiso y cliente), y un control que gira el
+                    cursor sin cambiar el orden es peor que no tenerlo. */}
+                <Th>Número</Th>
                 <Th sort={{ dir: sort.key === "cliente" ? sort.dir : null, onToggle: () => toggleSort("cliente") }}>
                   Cliente
                 </Th>
@@ -254,7 +301,7 @@ export function HcaPage() {
                 <Th
                   sort={{ dir: sort.key === "compromiso" ? sort.dir : null, onToggle: () => toggleSort("compromiso") }}
                 >
-                  Compromiso
+                  Vence
                 </Th>
                 <Th>Estado</Th>
                 <Th>Ticket</Th>
@@ -282,7 +329,9 @@ export function HcaPage() {
                       {staffName(sheet.responsibleStaffId)}
                     </Td>
                     <Td className="whitespace-nowrap">
-                      <span className="block text-[12.5px] text-brand-gray">{formatDay(sheet.dueDate)}</span>
+                      <span className="block text-[12.5px] tabular-nums text-brand-gray">
+                        {formatDay(sheet.dueDate)}
+                      </span>
                       {sheet.status !== "Cerrada" && (
                         <span
                           className={`block text-[11.5px] ${
@@ -312,7 +361,7 @@ export function HcaPage() {
             totalPages={data.totalPages}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
-            noun="hojas"
+            noun="HCA"
           />
         </div>
       )}

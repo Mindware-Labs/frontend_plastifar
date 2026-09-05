@@ -18,7 +18,7 @@ import type { Contact } from "../../types/clients";
 const schema = z.object({
   firstName: z.string().trim().min(1, "Obligatorio").max(80, "Máximo 80 caracteres"),
   lastName: z.string().trim().min(1, "Obligatorio").max(80, "Máximo 80 caracteres"),
-  email: z.string().trim().max(120, "Máximo 120 caracteres").email("Correo inválido").or(z.literal("")),
+  email: z.string().trim().max(120, "Máximo 120 caracteres").email("Formato de correo inválido, revisa el @ y el dominio").or(z.literal("")),
   phone: z.string().trim().max(30, "Máximo 30 caracteres"),
   position: z.string().trim().max(80, "Máximo 80 caracteres"),
   isPrimary: z.boolean(),

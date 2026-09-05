@@ -28,7 +28,11 @@ export interface RoleSummary {
   name: string;
   isSystem: boolean;
   isActive: boolean;
-  /** Rol de administrador: concede todo el catalogo y no se edita. */
+  /**
+   * El rol concede el catalogo completo de verdad (lo calcula el servidor a
+   * partir de su lista de permisos). No confundir con `isSystem`: eso dice que
+   * el rol no se edita, no que lo conceda todo.
+   */
   grantsAll: boolean;
   /** Cuanta gente lo tiene asignado hoy; se muestra bajo la cabecera. */
   assignedStaff: number;

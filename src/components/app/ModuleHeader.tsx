@@ -31,7 +31,13 @@ export function ModuleHeader({ action, sections = [] }: ModuleHeaderProps) {
   if (sections.length > 0) {
     return (
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-1 border-b border-line">
-        <div className="flex w-full min-w-0 items-center gap-6 overflow-x-auto pb-px sm:w-auto sm:flex-1">
+        {/* Enlaces, no la pauta ARIA de pestanas: cada seccion es una ruta
+            propia y NavLink ya marca la activa con aria-current="page". El
+            patron tabs prometeria recorrido con flechas que aqui no aplica. */}
+        <nav
+          aria-label="Secciones"
+          className="flex w-full min-w-0 items-center gap-6 overflow-x-auto pb-px sm:w-auto sm:flex-1"
+        >
           {sections.map(({ label, to }) => (
             <NavLink
               key={to}
@@ -48,7 +54,7 @@ export function ModuleHeader({ action, sections = [] }: ModuleHeaderProps) {
               {label}
             </NavLink>
           ))}
-        </div>
+        </nav>
 
         {action && <div className="shrink-0 pb-1.5">{action}</div>}
       </div>

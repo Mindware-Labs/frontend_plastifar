@@ -20,7 +20,10 @@ export function StatTile({ label, value, tone = "neutral", hint }: StatTileProps
       <span className="font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
         {label}
       </span>
-      <span className={`font-heading text-[20px] font-bold leading-none tracking-[-0.02em] ${toneClasses[tone]}`}>
+      {/* tabular-nums: la cifra cambia con cada recarga y no debe bailar de ancho. */}
+      <span
+        className={`font-heading text-[20px] font-bold leading-none tracking-[-0.02em] tabular-nums ${toneClasses[tone]}`}
+      >
         {value}
       </span>
       {hint && <span className="text-[11.5px] text-muted">{hint}</span>}

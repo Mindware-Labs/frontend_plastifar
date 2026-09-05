@@ -11,26 +11,37 @@ import {
 /**
  * Campo de formulario del area de autenticacion.
  *
- * Sin etiqueta visible: el nombre del campo viaja en el placeholder y en el
- * aria-label, y el icono de la izquierda lo identifica de un vistazo. Es lo que
- * permite que la columna quede en 408px sin apretarse. El icono se tine del
- * 185 C al enfocar —la unica senal de color del formulario en reposo—.
+ * Etiqueta visible encima del control, en la misma gramatica que `ui/Field`:
+ * Montserrat versalita de 10.5px en `faint`. Antes el nombre del campo viajaba
+ * solo en el placeholder, asi que desaparecia en cuanto la persona escribia —y
+ * con el, la unica pista de que llevaba ese hueco (WCAG 3.3.2). El icono de la
+ * izquierda sigue identificandolo de un vistazo y se tine del 185 C al enfocar.
  */
 
 const shellBase =
-  "group relative flex h-12 cursor-text items-center gap-[11px] rounded-edge border bg-gradient-to-b from-white to-zinc-50/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow,background-color] duration-200 ease-out";
+  "group relative flex h-12 cursor-text items-center gap-[11px] rounded-edge border bg-gradient-to-b from-white to-canvas/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(27,27,29,0.04)] transition-[border-color,box-shadow,background-color] duration-200 ease-out";
 
 const shellIdle =
-  "border-line hover:border-zinc-300 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_-1px_rgba(15,23,42,0.07)] focus-within:border-brand-red focus-within:bg-white focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]";
+  "border-line hover:border-hairline-hover hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_-1px_rgba(27,27,29,0.07)] focus-within:border-brand-red focus-within:bg-white focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]";
 
 const shellError =
   "border-brand-red bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]";
 
 const inputBase =
-  "h-full w-full min-w-0 bg-transparent p-0 text-[15px] font-medium tracking-[-0.01em] text-ink caret-brand-red outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-zinc-400";
+  // 13.5px es el tamano de control del panel. Antes era 15px, un paso que no
+  // existe en la rampa: el area de acceso es mas espaciosa por sus alturas y su
+  // aire, no por tener su propia tipografia.
+  "h-full w-full min-w-0 bg-transparent p-0 text-[13.5px] font-medium tracking-[-0.01em] text-ink caret-brand-red outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-faint";
+
+/** Ids de los textos que describen al campo, en el mismo orden en que se leen. */
+function describedBy(inputId: string, error?: string, hint?: string) {
+  const ids = [error && `${inputId}-error`, hint && `${inputId}-hint`].filter(Boolean);
+  return ids.length > 0 ? ids.join(" ") : undefined;
+}
 
 interface FieldFrameProps {
   inputId: string;
+  label: string;
   error?: string;
   /** Aviso neutro bajo el campo (p. ej. Bloq Mayus). No es un error. */
   hint?: string;
@@ -44,6 +55,7 @@ interface FieldFrameProps {
 
 function FieldFrame({
   inputId,
+  label,
   error,
   hint,
   action,
@@ -53,17 +65,29 @@ function FieldFrame({
   trailing,
 }: FieldFrameProps) {
   return (
-    <div>
-      {/* El <label> envuelve al input: pulsar en cualquier punto de la pieza lo enfoca */}
+    <div className="flex flex-col gap-1.5">
       <label
         htmlFor={inputId}
+        className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint"
+      >
+        {label}
+      </label>
+
+      {/* La pieza ya no es un <label>: con la etiqueta visible encima, un
+          segundo <label> para el mismo input duplicaria el nombre accesible.
+          El click en el marco enfoca el campo a mano, salvo si cae sobre un
+          control propio (el ojo de mostrar contrasena). */}
+      <div
+        onMouseDown={(event) => {
+          if ((event.target as HTMLElement).closest("button, input")) return;
+          event.preventDefault();
+          document.getElementById(inputId)?.focus();
+        }}
         className={`${shellBase} ${padded} ${error ? shellError : shellIdle}`}
       >
         <span
-          className={`shrink-0 transition-[color,transform] duration-200 ${
-            error
-              ? "text-brand-red"
-              : "text-zinc-400 group-focus-within:scale-[1.08] group-focus-within:text-brand-red"
+          className={`shrink-0 transition-colors duration-200 ${
+            error ? "text-brand-red" : "text-muted group-focus-within:text-brand-red"
           }`}
         >
           {icon}
@@ -71,12 +95,12 @@ function FieldFrame({
 
         {children}
         {trailing}
-      </label>
+      </div>
 
       {error && (
         <p
           id={`${inputId}-error`}
-          className="animate-plf-rise mt-2.5 flex items-center gap-1.5 text-[12.5px] font-medium text-brand-red"
+          className="animate-plf-rise mt-1 flex items-center gap-1.5 text-[12.5px] font-medium text-brand-red"
         >
           <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
           {error}
@@ -84,9 +108,11 @@ function FieldFrame({
       )}
 
       {(hint || action) && (
-        <div className="mt-2.5 flex min-h-[18px] items-center justify-between gap-4">
+        <div className="mt-1 flex min-h-[18px] items-center justify-between gap-4">
           {hint ? (
-            <span className="animate-plf-rise text-[12.5px] text-zinc-500">{hint}</span>
+            <span id={`${inputId}-hint`} className="animate-plf-rise text-[12.5px] text-muted">
+              {hint}
+            </span>
           ) : (
             <span />
           )}
@@ -98,7 +124,7 @@ function FieldFrame({
 }
 
 interface AuthFieldProps extends InputHTMLAttributes<HTMLInputElement> {
-  /** Nombre del campo: se usa como placeholder y como etiqueta accesible. */
+  /** Nombre del campo: etiqueta visible y nombre accesible del control. */
   label: string;
   icon: ReactNode;
   error?: string;
@@ -106,22 +132,20 @@ interface AuthFieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(function AuthField(
-  { label, icon, error, action, id, className = "", placeholder, ...props },
+  { label, icon, error, action, id, className = "", ...props },
   ref,
 ) {
   const fallbackId = useId();
   const inputId = id ?? props.name ?? fallbackId;
 
   return (
-    <FieldFrame inputId={inputId} error={error} action={action} icon={icon} padded="px-4">
+    <FieldFrame inputId={inputId} label={label} error={error} action={action} icon={icon} padded="px-4">
       <input
         ref={ref}
         id={inputId}
-        aria-label={label}
-        placeholder={placeholder ?? label}
         className={`${inputBase} ${className}`}
         aria-invalid={!!error}
-        aria-describedby={error ? `${inputId}-error` : undefined}
+        aria-describedby={describedBy(inputId, error)}
         {...props}
       />
     </FieldFrame>
@@ -136,10 +160,7 @@ interface AuthPasswordFieldProps extends Omit<InputHTMLAttributes<HTMLInputEleme
 }
 
 export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldProps>(
-  function AuthPasswordField(
-    { label, icon, error, action, id, className = "", placeholder, ...props },
-    ref,
-  ) {
+  function AuthPasswordField({ label, icon, error, action, id, className = "", ...props }, ref) {
     const [visible, setVisible] = useState(false);
     const [capsLock, setCapsLock] = useState(false);
     const fallbackId = useId();
@@ -151,11 +172,14 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
       setCapsLock(event.getModifierState?.("CapsLock") ?? false);
     }
 
+    const hint = capsLock ? "Bloq Mayús está activado" : undefined;
+
     return (
       <FieldFrame
         inputId={inputId}
+        label={label}
         error={error}
-        hint={capsLock ? "Bloq Mayús está activado" : undefined}
+        hint={hint}
         action={action}
         icon={icon}
         padded="pl-4 pr-2.5"
@@ -165,7 +189,7 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             onClick={() => setVisible((v) => !v)}
             tabIndex={-1}
             aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
-            className="flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition-all duration-150 hover:bg-zinc-100 hover:text-ink active:scale-90"
+            className="flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
           >
             {visible ? (
               <EyeOff className="h-[17px] w-[17px]" />
@@ -179,11 +203,11 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
           ref={ref}
           id={inputId}
           type={visible ? "text" : "password"}
-          aria-label={label}
-          placeholder={placeholder ?? label}
           className={`${inputBase} ${visible ? "" : "tracking-[0.18em]"} ${className}`}
           aria-invalid={!!error}
-          aria-describedby={error ? `${inputId}-error` : undefined}
+          // El aviso de Bloq Mayus entra aqui tambien: sin referenciarlo, el
+          // grupo de personas que mas lo necesita nunca se entera de que existe.
+          aria-describedby={describedBy(inputId, error, hint)}
           {...props}
           onKeyDown={(event) => {
             trackCapsLock(event);

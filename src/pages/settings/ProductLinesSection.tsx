@@ -1,7 +1,6 @@
 import { Pencil, Plus, Power } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { settingsApi } from "../../api/settings";
-import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -16,35 +15,42 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLocalPage } from "../../hooks/useLocalPage";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { ProductLine } from "../../types/settings";
+import { ChipGroup, LoadErrorAlert, NoticeDialog } from "./catalogSection";
+import { freshCopy, staleClass, useSectionLoad } from "./catalogState";
 import { ProductLineModal } from "./ProductLineModal";
 import { SettingsLayout } from "./SettingsLayout";
 
 type ChipKey = "todas" | "activas" | "inactivas";
 
+const listLines = () => settingsApi.productLines.list({ page: 1, pageSize: 100 });
+
 export function ProductLinesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [lines, setLines] = useState<ProductLine[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [lines, setLines] = useState<ProductLine[]>([]);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
 
   const [modal, setModal] = useState<"nueva" | ProductLine | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
+  const [notice, setNotice] = useState<{ title: string; body: ReactNode } | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
-  function reload() {
-    return settingsApi.productLines.list({ page: 1, pageSize: 100 }).then((res) => setLines(res.items));
-  }
-
-  useEffect(() => {
-    reload().catch(() => setError("No se pudieron cargar las líneas de producto"));
+  const load = useCallback(async () => {
+    const { items } = await listLines();
+    setLines(items);
   }, []);
 
-  const all = useMemo(() => lines ?? [], [lines]);
+  const { status, isRefetching, error, reload, retry } = useSectionLoad(
+    load,
+    "No se pudieron cargar las líneas de producto",
+  );
+
+  const all = lines;
   const activeCount = all.filter((line) => line.isActive).length;
   const inUseCount = all.filter((line) => line.isActive && line.usedByTopics > 0).length;
 
@@ -65,8 +71,10 @@ export function ProductLinesSection() {
   // RF-K2: los listados de catalogo paginan como cualquier otro. El corte
   // lo hace la vista solo mientras no exista /api/settings/...; el endpoint
   // devuelve la pagina ya cortada en SQL (anexo 12.1).
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } =
-    useLocalPage(rows, JSON.stringify([debouncedSearch, chip]));
+  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
+    rows,
+    JSON.stringify([debouncedSearch, chip]),
+  );
 
   /**
    * RF-K5: no se desactiva la ultima linea en uso. Los motivos marcados con
@@ -76,20 +84,15 @@ export function ProductLinesSection() {
     const isLastInUse = line.isActive && line.usedByTopics > 0 && inUseCount === 1;
 
     if (isLastInUse) {
-      setConfirmation({
-        tone: "warn",
-        icon: Power,
+      setNotice({
         title: "No se puede desactivar",
-        description: (
+        body: (
           <>
             <strong className="font-semibold text-ink">{line.name}</strong> es la única línea activa
             que usan los motivos que la exigen. Sin ella, esos motivos no podrían abrirse: activa
             otra línea antes de desactivar esta.
           </>
         ),
-        confirmLabel: "Entendido",
-        cancelLabel: "Cerrar",
-        onConfirm: () => {},
       });
       return;
     }
@@ -111,12 +114,18 @@ export function ProductLinesSection() {
       ),
       confirmLabel: line.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        await settingsApi.productLines.update(line.id, {
-          code: line.code,
-          name: line.name,
-          isActive: !line.isActive,
-        });
-        await reload();
+        setBusyId(line.id);
+        try {
+          const current = await freshCopy(listLines, line);
+          await settingsApi.productLines.update(current.id, {
+            code: current.code,
+            name: current.name,
+            isActive: !current.isActive,
+          });
+          await reload();
+        } finally {
+          setBusyId(null);
+        }
       },
     });
   }
@@ -125,7 +134,7 @@ export function ProductLinesSection() {
     <SettingsLayout
       action={
         canWrite && (
-          <Button size="sm" onClick={() => setModal("nueva")}>
+          <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
             <Plus className="h-[15px] w-[15px]" />
             Nueva línea
           </Button>
@@ -142,92 +151,98 @@ export function ProductLinesSection() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <FilterChip
-          label="Todas"
-          count={all.length}
-          active={chip === "todas"}
-          onClick={() => setChip("todas")}
-        />
-        <FilterChip
-          label="Activas"
-          count={activeCount}
-          active={chip === "activas"}
-          onClick={() => setChip("activas")}
-        />
-        <FilterChip
-          label="Inactivas"
-          count={all.length - activeCount}
-          active={chip === "inactivas"}
-          onClick={() => setChip("inactivas")}
-        />
+        <ChipGroup label="Filtrar por estado" ready={status === "ready"}>
+          <FilterChip
+            label="Todas"
+            count={all.length}
+            active={chip === "todas"}
+            onClick={() => setChip("todas")}
+          />
+          <FilterChip
+            label="Activas"
+            count={activeCount}
+            active={chip === "activas"}
+            onClick={() => setChip("activas")}
+          />
+          <FilterChip
+            label="Inactivas"
+            count={all.length - activeCount}
+            active={chip === "inactivas"}
+            onClick={() => setChip("inactivas")}
+          />
+        </ChipGroup>
       </div>
 
-      {error && (
-        <div className="mb-3">
-          <Alert variant="error">{error}</Alert>
-        </div>
-      )}
+      {error && <LoadErrorAlert message={error} onRetry={retry} />}
 
-      {lines === null ? (
+      {status === "loading" ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : rows.length === 0 ? (
+      ) : status === "error" ? null : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          Ninguna línea coincide con este filtro o búsqueda.
+          {all.length === 0
+            ? "Todavía no hay ninguna línea de producto configurada."
+            : "Ninguna línea coincide con este filtro o búsqueda."}
         </p>
       ) : (
-        <DataTable>
-          <thead>
-            <HeadRow>
-              <Th>Código</Th>
-              <Th>Línea</Th>
-              <Th>Motivos que la exigen</Th>
-              <Th>Estado</Th>
-              {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-            </HeadRow>
-          </thead>
+        <div className={staleClass(isRefetching)}>
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Código</Th>
+                <Th>Línea</Th>
+                <Th>Motivos que la exigen</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-          <tbody>
-            {pageRows.map((line) => (
-              <Row key={line.id}>
-                <Td>
-                  <span className="font-mono text-[12px] text-brand-gray">{line.code}</span>
-                </Td>
-                <Td className="text-[13px] font-medium text-ink">{line.name}</Td>
-                <Td>
-                  {line.usedByTopics > 0 ? (
-                    <Badge>{line.usedByTopics}</Badge>
-                  ) : (
-                    <span className="text-[12.5px] text-faint">Ninguno</span>
-                  )}
-                </Td>
-                <Td>
-                  <StatusDot active={line.isActive} />
-                </Td>
-                {canWrite && (
+            <tbody>
+              {pageRows.map((line) => (
+                <Row key={line.id} busy={busyId === line.id}>
                   <Td>
-                    <div className="flex items-center justify-end gap-1">
-                      <RowAction
-                        label={`Editar ${line.name}`}
-                        icon={Pencil}
-                        onClick={() => setModal(line)}
-                      />
-                      <RowAction
-                        label={line.isActive ? `Desactivar ${line.name}` : `Reactivar ${line.name}`}
-                        icon={Power}
-                        onClick={() => askToggle(line)}
-                      />
-                    </div>
+                    <span className="font-mono text-[12px] text-brand-gray">{line.code}</span>
                   </Td>
-                )}
-              </Row>
-            ))}
-          </tbody>
-        </DataTable>
+                  <Td className="text-[12.5px] font-medium text-ink">{line.name}</Td>
+                  <Td>
+                    {line.usedByTopics > 0 ? (
+                      <Badge>
+                        <span className="tabular-nums">{line.usedByTopics}</span>
+                      </Badge>
+                    ) : (
+                      <span className="text-[12.5px] text-faint">Ninguno</span>
+                    )}
+                  </Td>
+                  <Td>
+                    <StatusDot active={line.isActive} />
+                  </Td>
+                  {canWrite && (
+                    <Td>
+                      <div className="flex items-center justify-end gap-1">
+                        <RowAction
+                          label={`Editar ${line.name}`}
+                          icon={Pencil}
+                          onClick={() => setModal(line)}
+                          disabled={busyId === line.id}
+                        />
+                        <RowAction
+                          label={line.isActive ? `Desactivar ${line.name}` : `Reactivar ${line.name}`}
+                          icon={Power}
+                          onClick={() => askToggle(line)}
+                          disabled={busyId === line.id}
+                        />
+                      </div>
+                    </Td>
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </div>
       )}
 
-      {lines !== null && rows.length > 0 && (
+      {status === "ready" && rows.length > 0 && (
         <Pagination
           page={page}
           pageSize={pageSize}
@@ -248,11 +263,19 @@ export function ProductLinesSection() {
         <ProductLineModal
           line={modal === "nueva" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={() => reload()}
+          onSaved={() => {
+            void reload();
+          }}
         />
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+
+      {notice && (
+        <NoticeDialog title={notice.title} icon={Power} onClose={() => setNotice(null)}>
+          {notice.body}
+        </NoticeDialog>
+      )}
     </SettingsLayout>
   );
 }

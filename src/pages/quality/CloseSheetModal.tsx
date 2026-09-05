@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check } from "lucide-react";
+import { AlertTriangle, Check } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -30,6 +30,7 @@ interface CloseSheetModalProps {
  *  vuelve a comprobarlas: la del navegador es comodidad, esa es la barrera. */
 export function CloseSheetModal({ sheet, conditions, onClose, onSaved }: CloseSheetModalProps) {
   const [formError, setFormError] = useState<string | null>(null);
+  const allMet = conditions.every((condition) => condition.met);
 
   const {
     register,
@@ -63,7 +64,12 @@ export function CloseSheetModal({ sheet, conditions, onClose, onSaved }: CloseSh
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" form="close-sheet-form" isLoading={isSubmitting}>
+          <Button
+            type="submit"
+            form="close-sheet-form"
+            disabled={!allMet}
+            isLoading={isSubmitting}
+          >
             Cerrar HCA
           </Button>
         </>
@@ -77,23 +83,46 @@ export function CloseSheetModal({ sheet, conditions, onClose, onSaved }: CloseSh
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
+        {/* Las condiciones se leen del servidor, no se dan por cumplidas: entre
+            que se cargó la ficha y se abrió este diálogo el estado pudo cambiar,
+            y pintar de verde algo que falta justo al sellar el registro es el
+            peor momento posible para mentir. Mismo contrato que la ficha. */}
         <ul className="flex flex-col gap-1.5">
           {conditions.map((condition) => (
             <li
               key={condition.id}
-              className="flex items-center gap-2 text-[13px] leading-relaxed text-brand-gray"
+              className={`flex items-start gap-2 text-[13px] leading-relaxed ${
+                condition.met ? "text-brand-gray" : "text-warn"
+              }`}
             >
-              <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-green" />
-              {condition.label}
+              {condition.met ? (
+                <Check aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-green" />
+              ) : (
+                <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn" />
+              )}
+              <span className="flex flex-col gap-0.5">
+                <span>
+                  {condition.label}
+                  <span className="sr-only">{condition.met ? ": cumplida" : ": falta"}</span>
+                </span>
+                {!condition.met && <span className="text-[12.5px]">{condition.missing}</span>}
+              </span>
             </li>
           ))}
         </ul>
 
+        {!allMet && (
+          <Alert variant="error">
+            Falta al menos una condición. El servidor rechazará el cierre: resuélvela y vuelve a
+            intentarlo.
+          </Alert>
+        )}
+
         <TextAreaField
           label="Nota de cierre"
           rows={3}
-          placeholder="Opcional. Obligada en la práctica si la hoja se abrió por error: explica por qué se cierra."
-          hint="Una HCA nunca se elimina; si se abrió por error, se cierra con nota explicativa."
+          placeholder="Se cerró tras verificar la eficacia con el cliente el 12 de marzo"
+          hint="Opcional, salvo que la hoja se abriera por error: una HCA nunca se elimina, se cierra explicando por qué."
           error={errors.closingNote?.message}
           {...register("closingNote")}
         />

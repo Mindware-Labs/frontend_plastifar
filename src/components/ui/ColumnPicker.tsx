@@ -122,6 +122,9 @@ export function ColumnPicker({ columns, visible, onChange, label = "Columnas" }:
       case "Escape":
       case "Tab":
         event.preventDefault();
+        // Sin esto el Escape sigue subiendo hasta el listener de documento de un
+        // Modal y cierra el dialogo entero, no solo este panel.
+        event.stopPropagation();
         closePanel();
         return;
       default:
@@ -166,7 +169,7 @@ export function ColumnPicker({ columns, visible, onChange, label = "Columnas" }:
             id={id}
             style={{ position: "fixed", right: anchor.right, top: anchor.top, maxHeight: PANEL_MAX_HEIGHT }}
             className="animate-plf-toast-in z-[60] w-[248px] overflow-y-auto rounded-edge border border-line bg-white p-1
-              shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
+              shadow-panel"
           >
             <p className="px-2.5 pb-1.5 pt-2 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
               Columnas visibles
@@ -192,7 +195,7 @@ export function ColumnPicker({ columns, visible, onChange, label = "Columnas" }:
                     className="flex w-full items-center justify-between gap-2 rounded-edge px-2.5 py-2 text-left
                       text-[13px] text-brand-gray outline-none transition-colors
                       hover:bg-fill hover:text-ink focus-visible:bg-fill focus-visible:text-ink
-                      disabled:cursor-not-allowed disabled:text-zinc-400 disabled:hover:bg-transparent"
+                      disabled:cursor-not-allowed disabled:text-faint disabled:hover:bg-transparent"
                   >
                     <span className="truncate">{column.label}</span>
                     {isVisible && <Check aria-hidden className="h-4 w-4 shrink-0 text-brand-red" />}

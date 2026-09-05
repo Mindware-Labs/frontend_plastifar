@@ -3,20 +3,24 @@ interface FilterChipProps {
   count: number;
   active: boolean;
   onClick: () => void;
+  disabled?: boolean;
 }
 
 /** Pastilla de filtro con contador. Activa = rojo 185 C pleno. */
-export function FilterChip({ label, count, active, onClick }: FilterChipProps) {
+export function FilterChip({ label, count, active, onClick, disabled }: FilterChipProps) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-pressed={active}
       className={`inline-flex h-8 items-center gap-[7px] rounded-full border px-3.5 text-[12.5px] font-medium
-        transition-colors ${
+        outline-none transition-colors focus-visible:ring-3 focus-visible:ring-brand-red/25
+        disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-line
+        disabled:hover:text-muted ${
           active
             ? "border-brand-red bg-brand-red text-white"
-            : "border-line bg-white text-zinc-500 hover:border-line-strong hover:text-ink"
+            : "border-line bg-white text-muted hover:border-line-strong hover:text-ink"
         }`}
     >
       {label}

@@ -6,7 +6,13 @@ import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
+import {
+  CheckboxField,
+  SelectField,
+  TextAreaField,
+  TextField,
+  type FieldState,
+} from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { CLIENT_TYPES, type Client } from "../../types/clients";
 
@@ -23,7 +29,7 @@ const schema = z.object({
   territoryId: z.string().min(1, "Elige el territorio"),
   salesRepStaffId: z.string(),
   phone: z.string().trim().max(30, "Máximo 30 caracteres"),
-  email: z.string().trim().max(120, "Máximo 120 caracteres").email("Correo inválido").or(z.literal("")),
+  email: z.string().trim().max(120, "Máximo 120 caracteres").email("Formato de correo inválido, revisa el @ y el dominio").or(z.literal("")),
   address: z.string().trim().max(200, "Máximo 200 caracteres"),
   notes: z.string().trim().max(1000, "Máximo 1000 caracteres"),
   isActive: z.boolean(),
@@ -207,7 +213,7 @@ export function ClientModal({ client, territories, salesReps, onClose, onSaved }
           control={control}
           render={({ field }) => (
             <SelectField
-              label="Vendedor asignado"
+              label="Vendedor"
               name={field.name}
               value={field.value}
               onChange={field.onChange}
@@ -249,19 +255,15 @@ export function ClientModal({ client, territories, salesReps, onClose, onSaved }
           {...register("address")}
         />
 
-        <label className="flex flex-col gap-1.5">
-          <span className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">
-            Notas internas
-          </span>
-          <textarea
-            rows={3}
-            placeholder="Observaciones que no ve el cliente"
-            className="w-full rounded-edge border border-line-strong bg-white px-3 py-2.5 text-[13px]
-              leading-relaxed text-ink outline-none transition-colors hover:border-zinc-400
-              focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
-            {...register("notes")}
-          />
-        </label>
+        {/* Por el componente compartido, no a mano: es el que trae id,
+            aria-describedby, aria-invalid y —sobre todo— el hueco donde se
+            imprime el tope de 1000 caracteres que declara el esquema. */}
+        <TextAreaField
+          label="Notas internas"
+          placeholder="Observaciones que no ve el cliente"
+          error={errors.notes?.message}
+          {...register("notes")}
+        />
 
         {isEdit && (
           <CheckboxField

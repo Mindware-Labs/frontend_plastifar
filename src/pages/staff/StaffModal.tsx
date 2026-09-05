@@ -100,15 +100,14 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
         return;
       }
 
-      const fallback = isEdit ? "No se pudo guardar el usuario" : "No se pudo crear el usuario";
+      const fallback = isEdit ? "No se pudo guardar el colaborador" : "No se pudo crear el colaborador";
       setFormError(err instanceof ApiError ? err.message : fallback);
     }
   }
 
   return (
     <Modal
-      eyebrow="Personal"
-      title={isEdit ? "Editar colaborador" : "Agregar personal"}
+      title={isEdit ? "Editar colaborador" : "Nuevo colaborador"}
       description={
         isEdit
           ? "Los cambios se aplican de inmediato. La contraseña no se toca."

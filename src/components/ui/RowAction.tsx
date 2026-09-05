@@ -9,8 +9,11 @@ interface RowActionProps {
 }
 
 /**
- * Accion de fila visible: icono con etiqueta accesible y tooltip nativo.
+ * Accion de fila visible: icono con etiqueta accesible.
  * El rojo 185 C se reserva para lo destructivo; el resto vive en gris.
+ *
+ * Sin `title`: repetia palabra por palabra el `aria-label` y el lector de
+ * pantalla anunciaba la accion dos veces.
  */
 export function RowAction({ label, icon: Icon, onClick, disabled, danger }: RowActionProps) {
   return (
@@ -18,11 +21,11 @@ export function RowAction({ label, icon: Icon, onClick, disabled, danger }: RowA
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={label}
       aria-label={label}
       className={`flex h-7 w-7 items-center justify-center rounded-edge text-muted transition-colors
+        outline-none focus-visible:ring-3 focus-visible:ring-brand-red/25
         disabled:cursor-not-allowed disabled:opacity-40 ${
-          danger ? "hover:bg-red-50 hover:text-brand-red" : "hover:bg-fill hover:text-ink"
+          danger ? "hover:bg-brand-red/[0.04] hover:text-brand-red" : "hover:bg-fill hover:text-ink"
         }`}
     >
       <Icon className="h-4 w-4" />

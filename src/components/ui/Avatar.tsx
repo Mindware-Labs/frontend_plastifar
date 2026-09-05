@@ -1,6 +1,13 @@
 // Paleta institucional para los avatares: negro de interfaz, gris 11 C,
 // verde 348 C y verde bio 369 C. El rojo se reserva para acciones.
-const palette = ["#1b1b1d", "#515151", "#007c39", "#63a70c"];
+// Se leen las propiedades del tema en vez de repetir los hex: cuatro literales
+// duplicados envejecen mal en cuanto el brandbook mueve un tono.
+const palette = [
+  "var(--color-ink)",
+  "var(--color-brand-gray)",
+  "var(--color-brand-green)",
+  "var(--color-brand-bio)",
+];
 
 interface AvatarProps {
   name: string;

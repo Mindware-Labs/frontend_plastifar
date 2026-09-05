@@ -1,5 +1,5 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
-import { GuestRoute, ProtectedRoute } from "./components/RouteGuards";
+import { GuestRoute, PermissionRoute, ProtectedRoute } from "./components/RouteGuards";
 import { AppLayout } from "./layouts/AppLayout";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { LoginPage } from "./pages/auth/LoginPage";
@@ -50,24 +50,38 @@ export default function App() {
       >
         <Route path="/dashboard" element={<DashboardPage />} />
 
-        <Route path="/staff" element={<StaffPage />} />
-        <Route path="/staff/:id" element={<StaffDetailPage section="datos" />} />
-        <Route path="/staff/:id/accesos" element={<StaffDetailPage section="accesos" />} />
-        <Route path="/roles" element={<RolesPage />} />
-        <Route path="/permisos" element={<PermissionsPage />} />
+        {/* RF-P6: cada familia de rutas declara el permiso de lectura que exige,
+            el mismo que el endpoint que va a consultar. */}
+        <Route element={<PermissionRoute permission="staff.read"><Outlet /></PermissionRoute>}>
+          <Route path="/staff" element={<StaffPage />} />
+          <Route path="/staff/:id" element={<StaffDetailPage section="datos" />} />
+          <Route path="/staff/:id/accesos" element={<StaffDetailPage section="accesos" />} />
+        </Route>
 
-        <Route path="/clientes" element={<ClientsPage />} />
-        <Route path="/clientes/:id" element={<ClientDetailPage section="datos" />} />
-        <Route path="/clientes/:id/contactos" element={<ClientDetailPage section="contactos" />} />
-        <Route path="/clientes/:id/historial" element={<ClientDetailPage section="historial" />} />
+        <Route element={<PermissionRoute permission="roles.read"><Outlet /></PermissionRoute>}>
+          <Route path="/roles" element={<RolesPage />} />
+          <Route path="/permisos" element={<PermissionsPage />} />
+        </Route>
 
-        <Route path="/calidad" element={<Navigate to="/calidad/hca" replace />} />
-        <Route path="/calidad/hca" element={<HcaPage />} />
-        <Route path="/calidad/hca/:id" element={<HcaDetailPage section="datos" />} />
-        <Route path="/calidad/hca/:id/plan" element={<HcaDetailPage section="plan" />} />
-        <Route path="/calidad/hca/:id/cierre" element={<HcaDetailPage section="cierre" />} />
-        <Route path="/calidad/creditos" element={<CreditRequestsPage />} />
+        <Route element={<PermissionRoute permission="clients.read"><Outlet /></PermissionRoute>}>
+          <Route path="/clientes" element={<ClientsPage />} />
+          <Route path="/clientes/:id" element={<ClientDetailPage section="datos" />} />
+          <Route path="/clientes/:id/contactos" element={<ClientDetailPage section="contactos" />} />
+          <Route path="/clientes/:id/historial" element={<ClientDetailPage section="historial" />} />
+        </Route>
 
+        <Route element={<PermissionRoute permission="quality.read"><Outlet /></PermissionRoute>}>
+          <Route path="/calidad" element={<Navigate to="/calidad/hca" replace />} />
+          <Route path="/calidad/hca" element={<HcaPage />} />
+          <Route path="/calidad/hca/:id" element={<HcaDetailPage section="datos" />} />
+          <Route path="/calidad/hca/:id/plan" element={<HcaDetailPage section="plan" />} />
+          <Route path="/calidad/hca/:id/cierre" element={<HcaDetailPage section="cierre" />} />
+          <Route path="/calidad/creditos" element={<CreditRequestsPage />} />
+        </Route>
+
+        {/* Configuracion no lleva guard de lectura a proposito: la seccion 8.4 del
+            plan abre la lectura de catalogos a todo el personal autenticado y solo
+            exige settings.write para escribir, que es lo que cada seccion ya gatea. */}
         <Route path="/configuracion" element={<Navigate to="/configuracion/motivos" replace />} />
         <Route path="/configuracion/motivos" element={<TopicsSection />} />
         <Route path="/configuracion/sla" element={<SlaSection />} />
@@ -77,26 +91,30 @@ export default function App() {
         <Route path="/configuracion/buzones" element={<MailboxesSection />} />
         <Route path="/configuracion/territorios" element={<TerritoriesSection />} />
 
-        <Route path="/reportes" element={<Navigate to="/reportes/operacion" replace />} />
-        <Route
-          path="/reportes/operacion"
-          element={<ReportCatalogSection family="operacion" blockedBy="la Bandeja de tickets" />}
-        />
-        <Route
-          path="/reportes/sla"
-          element={<ReportCatalogSection family="sla" blockedBy="la Bandeja de tickets" />}
-        />
-        <Route
-          path="/reportes/productividad"
-          element={<ReportCatalogSection family="productividad" blockedBy="la Bandeja de tickets" />}
-        />
-        <Route path="/reportes/calidad" element={<QualityReportsSection />} />
-        <Route path="/reportes/clientes" element={<ClientsReportsSection />} />
-        <Route
-          path="/reportes/volumen"
-          element={<ReportCatalogSection family="volumen" blockedBy="la Bandeja de tickets" />}
-        />
-        <Route path="/reportes/auditoria" element={<AuditReportsSection />} />
+        {/* El servidor ya exige reports.read en los tres endpoints; sin este
+            guard la pantalla se pintaba entera y se llenaba de 403. */}
+        <Route element={<PermissionRoute permission="reports.read"><Outlet /></PermissionRoute>}>
+          <Route path="/reportes" element={<Navigate to="/reportes/operacion" replace />} />
+          <Route
+            path="/reportes/operacion"
+            element={<ReportCatalogSection family="operacion" blockedBy="la Bandeja de tickets" />}
+          />
+          <Route
+            path="/reportes/sla"
+            element={<ReportCatalogSection family="sla" blockedBy="la Bandeja de tickets" />}
+          />
+          <Route
+            path="/reportes/productividad"
+            element={<ReportCatalogSection family="productividad" blockedBy="la Bandeja de tickets" />}
+          />
+          <Route path="/reportes/calidad" element={<QualityReportsSection />} />
+          <Route path="/reportes/clientes" element={<ClientsReportsSection />} />
+          <Route
+            path="/reportes/volumen"
+            element={<ReportCatalogSection family="volumen" blockedBy="la Bandeja de tickets" />}
+          />
+          <Route path="/reportes/auditoria" element={<AuditReportsSection />} />
+        </Route>
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Route>

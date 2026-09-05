@@ -1,17 +1,17 @@
-import { Lock } from "lucide-react";
-import { useEffect, useState } from "react";
-import { ApiError } from "../../api/client";
+import { useCallback } from "react";
 import { reportsApi, type QualityReport } from "../../api/reports";
-import { Alert } from "../../components/ui/Alert";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { Spinner } from "../../components/ui/Spinner";
-import { downloadCsv } from "../../lib/csv";
+import { downloadCsvSections } from "../../lib/csv";
 import { formatAmount } from "../../lib/quality";
 import { REPORT_CATALOG } from "../../types/reports";
+import { BlockedReports } from "./BlockedReports";
 import { DateRangeBar } from "./DateRangeBar";
+import { ReportState } from "./ReportState";
 import { ReportsLayout } from "./ReportsLayout";
+import { SectionHeading } from "./SectionHeading";
 import { StatTile } from "./StatTile";
 import { useDateRange } from "./useDateRange";
+import { useReportData } from "./useReportData";
 
 /**
  * Familia "Calidad y reclamaciones" (seccion 11.2). Tres de sus cinco reportes
@@ -32,43 +32,68 @@ function monthLabel(key: string) {
 
 export function QualityReportsSection() {
   const { range, setRange } = useDateRange();
-  const [data, setData] = useState<QualityReport | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    reportsApi
-      .quality(range.from, range.to)
-      .then(setData)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "No se pudo cargar el reporte"));
-  }, [range.from, range.to]);
+  const fetch = useCallback(() => reportsApi.quality(range.from, range.to), [range.from, range.to]);
+  const { data, isStale, error, retry } = useReportData<QualityReport>({
+    fetch,
+    key: `${range.from}|${range.to}`,
+    fallbackError: "No se pudo cargar el reporte",
+  });
 
   const blockedReports = REPORT_CATALOG.filter((report) => BLOCKED.includes(report.id));
 
+  /**
+   * Se exporta la pantalla entera, no una de sus tablas: cada bloque va bajo su
+   * propio encabezado en la misma hoja, que es lo que significa "el resultado
+   * tal como se ve". El nombre lleva el rango, como en las demas familias.
+   */
   function exportCsv() {
     if (!data) return;
-    downloadCsv(
-      `hca-por-periodo_${range.from}_${range.to}.csv`,
-      ["Mes", "Abiertas", "Cerradas"],
-      data.byMonth.map((entry) => [monthLabel(entry.month), entry.opened, entry.closed]),
-    );
+    downloadCsvSections(`calidad_${range.from}_${range.to}.csv`, [
+      {
+        title: "Resumen del período",
+        headers: ["Indicador", "Valor"],
+        rows: [
+          ["HCA abiertas en el período", data.openedInRange],
+          ["HCA cerradas en el período", data.closedInRange],
+          ["Abiertas hoy", data.openNow],
+          ["Vencidas hoy", data.overdueNow],
+          [
+            "Tiempo medio de cierre (días)",
+            data.averageClosureDays === 0 ? "—" : data.averageClosureDays,
+          ],
+        ],
+      },
+      {
+        title: "HCA abiertas y cerradas por período",
+        headers: ["Mes", "Abiertas", "Cerradas", "Diferencia"],
+        rows: data.byMonth.map((entry) => [
+          monthLabel(entry.month),
+          entry.opened,
+          entry.closed,
+          entry.opened - entry.closed,
+        ]),
+      },
+      {
+        title: "Notas de crédito emitidas y monto acumulado",
+        headers: ["Moneda", "Notas", "Acumulado"],
+        rows: data.credits.byCurrency.map((entry) => [
+          entry.currency,
+          entry.count,
+          formatAmount(entry.total, entry.currency),
+        ]),
+      },
+    ]);
   }
 
   return (
     <ReportsLayout>
       <DateRangeBar range={range} onChange={setRange} onExport={data ? exportCsv : undefined} />
 
-      {error && (
-        <div className="mb-3">
-          <Alert variant="error">{error}</Alert>
-        </div>
-      )}
+      <ReportState error={error} hasData={data !== null} onRetry={retry} />
 
-      {data === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      ) : (
-        <div className="flex flex-col gap-8">
+      {data !== null && (
+        <div className={`flex flex-col gap-8 transition-opacity ${isStale ? "opacity-60" : ""}`}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatTile label="HCA abiertas en el período" value={String(data.openedInRange)} />
             <StatTile label="HCA cerradas en el período" value={String(data.closedInRange)} tone="green" />
@@ -86,9 +111,7 @@ export function QualityReportsSection() {
           </div>
 
           <section>
-            <h2 className="mb-2 font-heading text-[14px] font-bold tracking-[-0.01em] text-ink">
-              HCA abiertas y cerradas por período
-            </h2>
+            <SectionHeading>HCA abiertas y cerradas por período</SectionHeading>
             {data.byMonth.length === 0 ? (
               <p className="py-8 text-center text-[13.5px] text-faint">
                 Ninguna hoja de corrección cae en este rango de fechas.
@@ -137,9 +160,7 @@ export function QualityReportsSection() {
           </section>
 
           <section>
-            <h2 className="mb-2 font-heading text-[14px] font-bold tracking-[-0.01em] text-ink">
-              Notas de crédito emitidas y monto acumulado
-            </h2>
+            <SectionHeading>Notas de crédito emitidas y monto acumulado</SectionHeading>
             {data.credits.count === 0 ? (
               <p className="py-8 text-center text-[13.5px] text-faint">
                 No se aprobó ninguna nota de crédito en este rango de fechas.
@@ -163,25 +184,17 @@ export function QualityReportsSection() {
           </section>
 
           <section>
-            <h2 className="mb-2 font-heading text-[14px] font-bold tracking-[-0.01em] text-ink">
-              Todavía bloqueados
-            </h2>
-            <div className="mb-3 flex items-start gap-2.5 border border-dashed border-line-strong bg-canvas px-3.5 py-3">
-              <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-faint" />
-              <p className="text-[12.5px] leading-relaxed text-muted">
-                Los otros dos reportes de esta familia cuentan reclamaciones, y una reclamación es un
-                ticket: llegan con la{" "}
-                <strong className="font-medium text-ink">Bandeja de tickets</strong>.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {blockedReports.map((report) => (
-                <div key={report.id} className="flex flex-col gap-1.5 border border-line-soft px-4 py-3.5">
-                  <span className="text-[13px] font-medium leading-tight text-ink">{report.name}</span>
-                  <span className="text-[12px] leading-relaxed text-faint">{report.description}</span>
-                </div>
-              ))}
-            </div>
+            <SectionHeading>Todavía bloqueados</SectionHeading>
+            <BlockedReports
+              note={
+                <>
+                  Los otros dos reportes de esta familia cuentan reclamaciones, y una reclamación es
+                  un ticket: llegan con la{" "}
+                  <strong className="font-medium text-ink">Bandeja de tickets</strong>.
+                </>
+              }
+              reports={blockedReports}
+            />
           </section>
         </div>
       )}

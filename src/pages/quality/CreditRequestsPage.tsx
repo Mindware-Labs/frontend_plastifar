@@ -1,11 +1,17 @@
-import { Check, Plus, X } from "lucide-react";
+import { BadgeCheck, Check, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { clientsApi } from "../../api/clients";
-import { qualityApi, type CreditListResponse, type CreditQuery } from "../../api/quality";
+import {
+  qualityApi,
+  type CreditCounts,
+  type CreditListResponse,
+  type CreditQuery,
+} from "../../api/quality";
 import { staffApi } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaSelect } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -37,6 +43,33 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
   { key: "Aplicada", label: "Aplicadas", status: "Aplicada", countKey: "applied" },
 ];
 
+/**
+ * Lo que el listado debe antes de lo que contiene: una solicitud sin decidir es
+ * dinero parado, y esa es la unica cifra que mueve a quien abre esta pantalla.
+ */
+function listDebt(counts: CreditCounts): string {
+  if (counts.requested === 0) {
+    return "Ninguna solicitud espera decisión.";
+  }
+  const head =
+    counts.requested === 1
+      ? "1 solicitud espera decisión"
+      : `${counts.requested} solicitudes esperan decisión`;
+  return `${head}. Nadie puede aprobar la suya propia: esas las decide otra persona.`;
+}
+
+/** Por que esta fila no ofrece ninguna accion. */
+function inactionReason(status: CreditStatus, canWrite: boolean): string {
+  if (status === "Aprobada") {
+    return canWrite
+      ? "Aprobada: solo queda marcarla como aplicada."
+      : "Aprobada. Marcarla como aplicada requiere el permiso quality.write.";
+  }
+  if (status === "Aplicada") return "Ya aplicada: la nota de crédito está registrada.";
+  if (status === "Rechazada") return "Rechazada: para cambiar el monto se crea otra solicitud.";
+  return "Sin acciones disponibles para esta solicitud.";
+}
+
 /** RF-Q6, RF-Q7 y RF-Q8: solicitudes de credito. */
 export function CreditRequestsPage() {
   const { user } = useAuth();
@@ -58,8 +91,12 @@ export function CreditRequestsPage() {
     request: CreditRequest;
     decision: "aprobar" | "rechazar";
   } | null>(null);
+  const [applying, setApplying] = useState<CreditRequest | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
+  // El monto tambien se escribe tecla a tecla: sin retardo, «12500» disparaba
+  // cinco consultas y devolvia la lista a la primera pagina cinco veces.
+  const debouncedMinAmount = useDebouncedValue(minAmount);
 
   useEffect(() => {
     clientsApi
@@ -83,7 +120,7 @@ export function CreditRequestsPage() {
     return staff.find((person) => person.id === id)?.name ?? "—";
   }
 
-  const minimum = minAmount === "" ? undefined : Number(minAmount);
+  const minimum = debouncedMinAmount === "" ? undefined : Number(debouncedMinAmount);
 
   const criteria: Omit<CreditQuery, "page"> = {
     pageSize,
@@ -96,12 +133,13 @@ export function CreditRequestsPage() {
   const { data, isStale, error, setPage, refresh } = usePagedList<CreditQuery, CreditListResponse>({
     fetch: qualityApi.creditRequests.list,
     criteria,
-    fallbackError: "No se pudieron cargar las solicitudes de crédito",
+    fallbackError: "No se pudieron cargar las solicitudes de crédito. Vuelve a intentarlo.",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  const unfiltered = chip === "todas" && clientId === "todos" && minAmount === "" && !debouncedSearch;
+  const unfiltered =
+    chip === "todas" && clientId === "todos" && debouncedMinAmount === "" && !debouncedSearch;
 
   return (
     <div>
@@ -152,29 +190,48 @@ export function CreditRequestsPage() {
           />
         </CriteriaField>
 
+        {/* Antes de la primera respuesta no hay contadores: un «0» junto a
+            «Solicitadas» es un dato, y seria falso. Se reserva el sitio. */}
         <div className="flex flex-wrap items-center gap-2">
-          {CHIPS.map(({ key, label, countKey }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              count={counts?.[countKey] ?? 0}
-              active={chip === key}
-              onClick={() => setChip(key)}
-            />
-          ))}
+          {counts
+            ? CHIPS.map(({ key, label, countKey }) => (
+                <FilterChip
+                  key={key}
+                  label={label}
+                  count={counts[countKey]}
+                  active={chip === key}
+                  onClick={() => setChip(key)}
+                />
+              ))
+            : CHIPS.map(({ key }) => (
+                <span
+                  key={key}
+                  aria-hidden
+                  className="h-8 w-[110px] animate-pulse rounded-full bg-fill"
+                />
+              ))}
         </div>
       </div>
 
       {error && (
-        <div className="mb-3">
-          <Alert variant="error">{error}</Alert>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="min-w-[240px] flex-1">
+            <Alert variant="error">{error}</Alert>
+          </div>
+          <Button size="sm" variant="secondary" onClick={refresh}>
+            Reintentar
+          </Button>
         </div>
       )}
 
+      {counts && <p className="mb-3 text-[12.5px] text-brand-gray">{listDebt(counts)}</p>}
+
       {data === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
+        error === null && (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        )
       ) : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
           {unfiltered
@@ -223,7 +280,7 @@ export function CreditRequestsPage() {
                     <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
                       {staffName(request.requestedByStaffId)}
                     </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
+                    <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
                       {formatDay(request.requestedAt.slice(0, 10))}
                     </Td>
                     <Td>
@@ -264,8 +321,18 @@ export function CreditRequestsPage() {
                               </span>
                             </Tooltip>
                           )
+                        ) : request.status === "Aprobada" && canWrite ? (
+                          <RowAction
+                            label={`Marcar ${request.number} como aplicada`}
+                            icon={BadgeCheck}
+                            onClick={() => setApplying(request)}
+                          />
                         ) : (
-                          <span className="text-[11.5px] text-faint">—</span>
+                          // Una raya sola no dice nada. La rama hermana explica
+                          // su propio bloqueo con un Tooltip; esta tambien.
+                          <Tooltip content={inactionReason(request.status, canWrite)}>
+                            <span className="text-[11.5px] text-faint">—</span>
+                          </Tooltip>
                         )}
                       </div>
                     </Td>
@@ -309,6 +376,31 @@ export function CreditRequestsPage() {
             setDeciding(null);
             refresh();
           }}
+        />
+      )}
+
+      {applying && (
+        <ConfirmDialog
+          // El propio texto dice que no se deshace: eso es «danger», no «warn».
+          tone="danger"
+          icon={BadgeCheck}
+          title={`Aplicar ${applying.number}`}
+          description={
+            <>
+              Se marcará la nota de crédito por{" "}
+              <strong className="font-medium text-ink">
+                {formatAmount(applying.amount, applying.currency)}
+              </strong>{" "}
+              de {clientName(applying.clientId)} como aplicada. Hazlo solo cuando ya
+              esté registrada en el sistema contable. Esta acción no se puede deshacer.
+            </>
+          }
+          confirmLabel="Marcar como aplicada"
+          onConfirm={async () => {
+            await qualityApi.creditRequests.apply(applying.id);
+            refresh();
+          }}
+          onClose={() => setApplying(null)}
         />
       )}
     </div>

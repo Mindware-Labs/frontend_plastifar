@@ -84,7 +84,7 @@ export function HolidayModal({ holiday, onClose, onSaved }: HolidayModalProps) {
             Cancelar
           </Button>
           <Button type="submit" form="holiday-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Agregar día"}
+            {isEdit ? "Guardar cambios" : "Crear día"}
           </Button>
         </>
       }
@@ -101,8 +101,10 @@ export function HolidayModal({ holiday, onClose, onSaved }: HolidayModalProps) {
           {...register("date")}
         />
 
+        {/* «Motivo» a secas se confunde con el catálogo de motivos de ticket,
+            que es el primero de este mismo módulo. */}
         <TextField
-          label="Motivo"
+          label="Motivo del cierre"
           placeholder="Ej. Día de la Restauración"
           required
           state={stateOf("name")}

@@ -8,12 +8,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  primary:
-    "bg-brand-red text-white shadow-[0_10px_20px_-12px_rgba(228,0,43,0.55)] hover:brightness-105 active:translate-y-px",
+  primary: "bg-brand-red text-white shadow-bloom hover:brightness-105 active:translate-y-px",
   secondary:
-    "border border-line-strong bg-white text-brand-gray hover:bg-canvas hover:text-ink",
-  danger: "border border-brand-red bg-white text-brand-red hover:bg-red-50",
-  ghost: "text-brand-gray hover:bg-fill hover:text-ink",
+    "border border-line-strong bg-white text-brand-gray hover:bg-canvas hover:text-ink active:translate-y-px",
+  // El lavado rojo es el 185 C al 4 %, no el `red-50` calido de Tailwind.
+  danger:
+    "border border-brand-red bg-white text-brand-red hover:bg-brand-red/[0.04] active:translate-y-px",
+  ghost: "text-brand-gray hover:bg-fill hover:text-ink active:translate-y-px",
 };
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
@@ -33,6 +34,7 @@ export function Button({
   return (
     <button
       disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
       className={`inline-flex items-center justify-center gap-2 rounded-edge
         font-heading text-[11.5px] font-semibold uppercase tracking-[0.06em]
         transition-[filter,background-color,color,transform] outline-none

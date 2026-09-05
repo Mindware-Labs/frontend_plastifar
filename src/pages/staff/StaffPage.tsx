@@ -123,7 +123,6 @@ export function StaffPage() {
     setConfirmation({
       tone: "warn",
       icon: UserX,
-      eyebrow: "Personal",
       title: "Desactivar colaborador",
       description: (
         <>
@@ -141,7 +140,6 @@ export function StaffPage() {
     setConfirmation({
       tone: "warn",
       icon: LogOut,
-      eyebrow: "Personal",
       title: "Cerrar sesiones",
       description: (
         <>
@@ -159,7 +157,6 @@ export function StaffPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Personal",
       title: "Eliminar colaborador",
       description: (
         <>
@@ -180,7 +177,7 @@ export function StaffPage() {
           canWrite && (
             <Button size="sm" onClick={() => setModal("nuevo")}>
               <Plus className="h-[15px] w-[15px]" />
-              Agregar personal
+              Nuevo colaborador
             </Button>
           )
         }
@@ -212,29 +209,49 @@ export function StaffPage() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        {filters.map(({ key, label, countKey }) => (
-          <FilterChip
-            key={key}
-            label={label}
-            count={counts?.[countKey] ?? 0}
-            active={filter === key}
-            onClick={() => setFilter(key)}
-          />
-        ))}
+        {/* Esqueleto antes de la primera respuesta: un cero es una afirmacion. */}
+        {counts === undefined
+          ? filters.map(({ key }) => (
+              <span key={key} aria-hidden className="h-8 w-[104px] animate-pulse rounded-full bg-fill" />
+            ))
+          : filters.map(({ key, label, countKey }) => (
+              <FilterChip
+                key={key}
+                label={label}
+                count={counts[countKey]}
+                active={filter === key}
+                onClick={() => setFilter(key)}
+              />
+            ))}
       </div>
 
       {error && (
-        <div className="mb-3">
+        <div className="mb-3 flex items-start gap-3">
           <Alert variant="error">{error}</Alert>
+          <Button size="sm" variant="secondary" onClick={refresh}>
+            Reintentar
+          </Button>
         </div>
       )}
 
+      {/* Con error no queda spinner girando debajo del aviso. */}
       {data === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
+        error === null && (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        )
       ) : (
         <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          {/* Sin filas se retira la tabla entera: dejar la cabecera puesta deja
+              el mensaje colgando bajo un filete de columnas que no existen. */}
+          {rows.length === 0 ? (
+            <p className="py-14 text-center text-[13.5px] text-faint">
+              {unfiltered
+                ? "Todavía no hay personal registrado."
+                : "Ningún colaborador coincide con este filtro o búsqueda."}
+            </p>
+          ) : (
           <DataTable>
             <thead>
               <HeadRow>
@@ -246,7 +263,7 @@ export function StaffPage() {
                     {label}
                   </Th>
                 ))}
-                {canWrite && <Th className="w-36 text-right">Acciones</Th>}
+                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
               </HeadRow>
             </thead>
 
@@ -316,13 +333,6 @@ export function StaffPage() {
               ))}
             </tbody>
           </DataTable>
-
-          {rows.length === 0 && (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {unfiltered
-                ? "Todavía no hay personal registrado."
-                : "Ningún colaborador coincide con este filtro o búsqueda."}
-            </p>
           )}
 
           <Pagination

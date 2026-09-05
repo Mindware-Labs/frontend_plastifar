@@ -63,7 +63,6 @@ export function RolesPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Personal · Roles",
       title: "Eliminar rol",
       description: (
         <>
@@ -102,35 +101,55 @@ export function RolesPage() {
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Buscar por nombre de rol…"
+          placeholder="Buscar por nombre…"
           className="w-[240px]"
         />
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        {filters.map(({ key, label, countKey }) => (
-          <FilterChip
-            key={key}
-            label={label}
-            count={counts?.[countKey] ?? 0}
-            active={filter === key}
-            onClick={() => setFilter(key)}
-          />
-        ))}
+        {/* Esqueleto antes de la primera respuesta: un cero es una afirmacion. */}
+        {counts === undefined
+          ? filters.map(({ key }) => (
+              <span key={key} aria-hidden className="h-8 w-[104px] animate-pulse rounded-full bg-fill" />
+            ))
+          : filters.map(({ key, label, countKey }) => (
+              <FilterChip
+                key={key}
+                label={label}
+                count={counts[countKey]}
+                active={filter === key}
+                onClick={() => setFilter(key)}
+              />
+            ))}
       </div>
 
       {error && (
-        <div className="mb-3">
+        <div className="mb-3 flex items-start gap-3">
           <Alert variant="error">{error}</Alert>
+          <Button size="sm" variant="secondary" onClick={refresh}>
+            Reintentar
+          </Button>
         </div>
       )}
 
+      {/* Con error no queda spinner girando debajo del aviso. */}
       {data === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
+        error === null && (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        )
       ) : (
         <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          {/* Sin filas se retira la tabla entera: dejar la cabecera puesta deja
+              el mensaje colgando bajo un filete de columnas que no existen. */}
+          {rows.length === 0 ? (
+            <p className="py-14 text-center text-[13.5px] text-faint">
+              {unfiltered
+                ? "Todavía no hay roles registrados."
+                : "Ningún rol coincide con este filtro o búsqueda."}
+            </p>
+          ) : (
           <DataTable>
             <thead>
               <HeadRow>
@@ -156,36 +175,38 @@ export function RolesPage() {
                   </Td>
                   {canWrite && (
                     <Td>
-                      {canManage(role) && (
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar el rol ${role.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(role)}
-                            disabled={busyId === role.id}
-                          />
-                          <RowAction
-                            label={`Eliminar el rol ${role.name}`}
-                            icon={Trash2}
-                            onClick={() => askDelete(role)}
-                            disabled={busyId === role.id}
-                            danger
-                          />
-                        </div>
-                      )}
+                      {/* Un rol del sistema conserva sus dos acciones, apagadas y
+                          con el motivo en la etiqueta: una celda vacia obliga a
+                          adivinar si falta el permiso o si el rol no se toca. */}
+                      <div className="flex items-center justify-end gap-1">
+                        <RowAction
+                          label={
+                            role.isSystem
+                              ? "Los roles del sistema no se editan: sostienen los permisos base"
+                              : `Editar el rol ${role.name}`
+                          }
+                          icon={Pencil}
+                          onClick={() => setModal(role)}
+                          disabled={!canManage(role) || busyId === role.id}
+                        />
+                        <RowAction
+                          label={
+                            role.isSystem
+                              ? "Los roles del sistema no se eliminan: sostienen los permisos base"
+                              : `Eliminar el rol ${role.name}`
+                          }
+                          icon={Trash2}
+                          onClick={() => askDelete(role)}
+                          disabled={!canManage(role) || busyId === role.id}
+                          danger
+                        />
+                      </div>
                     </Td>
                   )}
                 </Row>
               ))}
             </tbody>
           </DataTable>
-
-          {rows.length === 0 && (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {unfiltered
-                ? "Todavía no hay roles creados."
-                : "Ningún rol coincide con este filtro o búsqueda."}
-            </p>
           )}
 
           <Pagination

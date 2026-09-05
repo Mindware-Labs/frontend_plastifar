@@ -1,5 +1,5 @@
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { SIDEBAR_NAV } from "../../lib/navigation";
 import { Logo } from "../Logo";
@@ -12,6 +12,10 @@ interface SidebarProps {
   onCloseMobile: () => void;
 }
 
+/** Mismo recorrido que la trampa de foco de Modal, para no divergir del kit. */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /**
  * Navegacion completa del panel: los modulos y, para los que tienen catalogo
  * o familia de secciones, sus rutas hijas tambien — todo en un solo arbol,
@@ -23,24 +27,65 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
   // abierto si su modulo esta activo — derivado en el render, no en un
   // efecto, para no encadenar otro renderizado por cada cambio de ruta.
   const [expandedOverride, setExpandedOverride] = useState<Record<string, boolean>>({});
+  const mobilePanelRef = useRef<HTMLElement>(null);
 
-  // Mismo contrato de teclado que Modal: Escape cierra el panel superpuesto.
+  // onCloseMobile suele ser una flecha nueva en cada render: se lee por ref para
+  // que el efecto no se reinicie y vuelva a mover el foco al primer enlace.
+  const closeRef = useRef(onCloseMobile);
+  useEffect(() => {
+    closeRef.current = onCloseMobile;
+  });
+
+  // El panel movil se anuncia como dialogo (mismo scrim y misma sombra que
+  // Modal), asi que debe comportarse como uno: el foco entra, no se escapa con
+  // el tabulador, la pagina de debajo no hace scroll y al cerrar el foco vuelve
+  // al boton de menu. Sin esto, en ancho de telefono el teclado se quedaba
+  // atrapado en una barra superior que el scrim ya habia tapado.
   useEffect(() => {
     if (!mobileOpen) return;
 
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const panel = mobilePanelRef.current;
+    panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
+
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onCloseMobile();
+      if (event.key === "Escape") {
+        closeRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !panel) return;
+
+      const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (items.length === 0) return;
+
+      const first = items[0];
+      const last = items[items.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [mobileOpen, onCloseMobile]);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+      previouslyFocused?.focus();
+    };
+  }, [mobileOpen]);
 
   /** El panel movil siempre va expandido: colapsar solo tiene sentido cuando
    *  el sidebar compite por ancho con el contenido, y en movil es superpuesto.
    *  En modo icono no se listan las rutas hijas: no hay espacio para el
    *  texto, así que ese estado es solo un atajo al primer nivel. */
-  function renderContent(isCollapsed: boolean) {
+  function renderContent(isCollapsed: boolean, withCollapseToggle = true) {
     return (
       <>
         <div
@@ -49,6 +94,9 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           }`}
         >
           {!isCollapsed && <Logo variant="color" height={24} />}
+          {/* En el panel movil no se dibuja: esta oculto por CSS y un boton
+              invisible dentro de la trampa de foco es una parada muerta. */}
+          {withCollapseToggle && (
           <button
             type="button"
             onClick={onToggleCollapse}
@@ -59,6 +107,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           >
             {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
+          )}
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2.5">
@@ -152,8 +201,14 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
             onClick={onCloseMobile}
             className="animate-plf-scrim-in absolute inset-0 bg-ink/45 backdrop-blur-[2px]"
           />
-          <aside className="animate-plf-modal-in absolute inset-y-0 left-0 flex w-[240px] flex-col bg-white shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]">
-            {renderContent(false)}
+          <aside
+            ref={mobilePanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Módulos"
+            className="animate-plf-modal-in absolute inset-y-0 left-0 flex w-[240px] flex-col bg-white shadow-dialog"
+          >
+            {renderContent(false, false)}
           </aside>
         </div>
       )}

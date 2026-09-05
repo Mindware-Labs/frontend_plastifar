@@ -37,6 +37,25 @@
   /* Radio unico de los controles: casi recto, coherente con el trazo
      industrial del logotipo. Un solo lugar donde ajustarlo. */
   --radius-edge: 2px;
+  /* Lo conceptualmente redondo: avatares, punto de estado, contadores y chips. */
+  --radius-pill: 9999px;
+
+  /* Excepcion declarada del Dashboard, y solo de el: es la unica superficie de
+     tarjetas del panel. Dos radios, no cinco — la tarjeta y lo que va dentro.
+     Ningun otro modulo los usa; si aparecen fuera de src/pages/dashboard es una
+     fuga, no una decision. */
+  --radius-card: 16px;
+  --radius-inset: 8px;
+
+  /* Filete de un control al pasar el mouse. Estaba escrito a mano como
+     `zinc-400` en cada campo: nombrarlo evita que el literal siga creciendo. */
+  --color-hairline-hover: #a1a1aa;
+
+  /* Las tres unicas elevaciones del sistema. Nada que haga scroll con la pagina
+     lleva sombra; estas son para lo que flota encima y se va. */
+  --shadow-bloom: 0 10px 20px -12px rgba(228, 0, 43, 0.55);
+  --shadow-panel: 0 4px 8px rgba(27, 27, 29, 0.04), 0 24px 48px -20px rgba(27, 27, 29, 0.28);
+  --shadow-dialog: 0 4px 10px rgba(27, 27, 29, 0.06), 0 32px 64px -28px rgba(27, 27, 29, 0.45);
 
   --font-heading: "Montserrat", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Poppins", ui-sans-serif, system-ui, sans-serif;
@@ -44,6 +63,49 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+/* Relleno de la pagina, en un solo sitio. AppLayout lo aplica y el Dashboard lo
+   cancela con margenes negativos para que su tinte llegue a los bordes: mientras
+   fueron dos numeros escritos a mano en dos archivos, cambiar el del marco
+   rompia el tinte del Dashboard en silencio. */
+:root {
+  --plf-page-x: 2rem;
+  --plf-page-t: 1rem;
+  --plf-page-b: 3rem;
+}
+
+/* Los controles que pinta el navegador (casillas, radios, barras de progreso)
+   tomaban el azul del sistema: aqui el acento es el rojo 185 C como en todo
+   lo demas. */
+:root {
+  accent-color: var(--color-brand-red);
+}
+
+/* El panel tiene cinco contenedores con scroll permanente. Sin esto el
+   navegador dibuja su propia barra gris de sistema encima de una interfaz de
+   filetes de 1 px, y se ve como una pieza de otro programa. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-line-strong);
+  border-radius: var(--radius-pill);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-faint);
 }
 
 body {
@@ -56,6 +118,19 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
+}
+
+/* El cursor de texto es parte del foco: rojo en todo campo, no solo en los dos
+   del area de acceso donde estaba puesto a mano. */
+input,
+textarea {
+  caret-color: var(--color-brand-red);
+}
+
+/* Separacion del subrayado: estaba aplicada instancia por instancia en dos
+   archivos, aqui vale para todo enlace. */
+a {
+  text-underline-offset: 4px;
 }
 
 ::selection {
@@ -75,16 +150,6 @@ input:-webkit-autofill:focus {
 }
 
 /* --- Movimiento --- */
-
-@keyframes plf-float {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(0, -22px, 0) scale(1.035); }
-}
-
-@keyframes plf-drift {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(18px, 14px, 0); }
-}
 
 @keyframes plf-rise {
   from { opacity: 0; transform: translateY(16px); }
@@ -124,8 +189,6 @@ input:-webkit-autofill:focus {
   to { transform: scaleX(0); }
 }
 
-.animate-plf-float { animation: plf-float 16s ease-in-out infinite; }
-.animate-plf-drift { animation: plf-drift 20s ease-in-out infinite; }
 .animate-plf-rise { animation: plf-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-fade { animation: plf-fade 1.1s ease-out both; }
 .animate-plf-toast-in { animation: plf-toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -134,16 +197,35 @@ input:-webkit-autofill:focus {
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
 
+/* Regla general: alcanza tambien a lo que no nombramos aqui — el `animate-spin`
+   de Tailwind en los botones que cargan, y cualquier transicion o transform de
+   utilidad. Sin esto solo se apagaban los nueve fotogramas propios. */
 @media (prefers-reduced-motion: reduce) {
-  .animate-plf-float,
-  .animate-plf-drift,
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
   .animate-plf-rise,
   .animate-plf-fade,
   .animate-plf-toast-in,
   .animate-plf-scrim-in,
   .animate-plf-modal-in,
-  .animate-plf-shake,
+  .animate-plf-shake {
+    animation: none !important;
+  }
+
+  /* La barra de progreso del toast no se congela: congelada se queda en
+     scaleX(1), o sea en "100 % de tiempo restante", y el aviso desaparece
+     igual unos segundos despues. Un indicador que miente es peor que ninguno. */
   .animate-plf-toast-progress {
     animation: none !important;
+    display: none;
   }
 }

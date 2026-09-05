@@ -4,6 +4,7 @@ import { Bar, BarChart, ResponsiveContainer } from "recharts";
 import { Tooltip } from "../../components/ui/Tooltip";
 import type { Delta } from "../../types/dashboard";
 import { DashboardCard } from "./DashboardCard";
+import { INSET_RADIUS } from "./radii";
 
 interface KpiTileProps {
   icon: ComponentType<{ className?: string }>;
@@ -18,11 +19,13 @@ interface KpiTileProps {
   sparkline?: number[];
 }
 
+// 8% es el tinte que DESIGN.md fija para toda insignia del panel; al 10% estas
+// cuatro se salian del mismo valor que usan Badge y la matriz de permisos.
 const toneIconBadge: Record<NonNullable<KpiTileProps["tone"]>, string> = {
-  neutral: "bg-brand-gray/10 text-brand-gray",
-  red: "bg-brand-red/10 text-brand-red",
-  green: "bg-brand-green/10 text-brand-green",
-  warn: "bg-warn/10 text-warn",
+  neutral: "bg-brand-gray/8 text-brand-gray",
+  red: "bg-brand-red/8 text-brand-red",
+  green: "bg-brand-green/8 text-brand-green",
+  warn: "bg-warn/8 text-warn",
 };
 
 const toneBar: Record<NonNullable<KpiTileProps["tone"]>, string> = {
@@ -63,19 +66,24 @@ export function KpiTile({
     >
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted">
-          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${toneIconBadge[tone]}`}>
+          <span className={`flex h-5 w-5 shrink-0 items-center justify-center ${INSET_RADIUS} ${toneIconBadge[tone]}`}>
             <Icon className="h-3 w-3" />
           </span>
           <span className="truncate">{label}</span>
         </span>
 
+        {/* `aria-disabled` y no `disabled`: un boton deshabilitado de verdad
+            sale del orden de tabulacion, y entonces la unica explicacion de por
+            que no hace nada — el tooltip — quedaba fuera del alcance del
+            teclado. Sigue sin accion; el onClick la corta explicitamente. */}
         <Tooltip content="Más opciones (próximamente)">
           <button
             type="button"
-            disabled
-            aria-label="Más opciones"
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-faint
-              disabled:cursor-not-allowed"
+            aria-disabled
+            aria-label="Más opciones (próximamente)"
+            onClick={(event) => event.preventDefault()}
+            className={`flex h-6 w-6 shrink-0 cursor-not-allowed items-center justify-center ${INSET_RADIUS}
+              text-faint outline-none focus-visible:ring-3 focus-visible:ring-brand-red/25`}
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
@@ -91,7 +99,7 @@ export function KpiTile({
             <span className="flex items-center gap-1.5">
               <span
                 className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10.5px] font-bold ${
-                  isGood ? "bg-brand-green/10 text-brand-green" : "bg-brand-red/10 text-brand-red"
+                  isGood ? "bg-brand-green/8 text-brand-green" : "bg-brand-red/8 text-brand-red"
                 }`}
               >
                 {isPositive ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />}

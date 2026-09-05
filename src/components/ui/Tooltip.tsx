@@ -28,12 +28,24 @@ const EDGE = 8;
  * de la primera fila se cortaba contra el borde superior de la tabla. Este es
  * ese uso.
  */
+/** Lo que ya puede recibir foco por si mismo; envolverlo anadiria una parada extra. */
+const focusableSelector =
+  'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export function Tooltip({ content, children }: TooltipProps) {
   const [position, setPosition] = useState<Position | null>(null);
   const [left, setLeft] = useState(0);
+  // El envoltorio solo se vuelve enfocable cuando su contenido no lo es. Con un
+  // tabIndex fijo, cada fila de la tabla anadia una parada que no anuncia nada,
+  // y sobre un boton obligaba a pulsar Tab dos veces para llegar a la accion.
+  const [needsTabStop, setNeedsTabStop] = useState(false);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const bubbleRef = useRef<HTMLSpanElement>(null);
   const id = useId();
+
+  useLayoutEffect(() => {
+    setNeedsTabStop(!triggerRef.current?.querySelector(focusableSelector));
+  }, [children]);
 
   function show() {
     const rect = triggerRef.current?.getBoundingClientRect();
@@ -68,12 +80,19 @@ export function Tooltip({ content, children }: TooltipProps) {
         onMouseLeave={() => setPosition(null)}
         onFocus={show}
         onBlur={() => setPosition(null)}
+        // WCAG 1.4.13: el contenido que aparece al pasar el mouse o al enfocar
+        // se debe poder descartar sin mover el puntero ni el foco.
+        onKeyDown={(event) => {
+          if (event.key !== "Escape" || !position) return;
+          event.stopPropagation();
+          setPosition(null);
+        }}
       >
         <span
           ref={triggerRef}
-          tabIndex={0}
+          tabIndex={needsTabStop ? 0 : undefined}
           aria-describedby={position ? id : undefined}
-          className="outline-none rounded-full focus-visible:ring-3 focus-visible:ring-brand-red/25"
+          className="outline-none rounded-edge focus-visible:ring-3 focus-visible:ring-brand-red/25"
         >
           {children}
         </span>
@@ -96,7 +115,7 @@ export function Tooltip({ content, children }: TooltipProps) {
             }}
             className="animate-plf-fade pointer-events-none fixed z-50 w-max max-w-[280px] whitespace-normal
               rounded-edge border border-line bg-white px-2.5 py-1.5 text-[11.5px] leading-relaxed
-              text-ink shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
+              text-ink shadow-panel"
           >
             {content}
           </span>,

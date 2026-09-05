@@ -65,6 +65,30 @@ export interface SavePlanItemRequest {
   dueDate: string;
 }
 
+export interface PlanItemQuery {
+  page?: number;
+  pageSize?: number;
+  /** todas | pendientes | cumplidas | anuladas */
+  status?: string;
+}
+
+export interface PlanItemCounts {
+  all: number;
+  pending: number;
+  done: number;
+  cancelled: number;
+}
+
+/** ActionPlanController.List pagina en servidor desde la seccion 4.1 del plan. */
+export interface ActionPlanListResponse {
+  items: ActionPlanItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: PlanItemCounts;
+}
+
 export interface CreditQuery {
   page: number;
   pageSize: number;
@@ -141,6 +165,15 @@ export const qualityApi = {
   },
 
   planItems: {
+    /**
+     * La ficha de la HCA sigue trayendo su plan completo en el detalle; esto es
+     * para pintar el plan por si solo sin volver a pedir la hoja entera.
+     */
+    list: (sheetId: number, query: PlanItemQuery = {}) =>
+      apiRequest<ActionPlanListResponse>(
+        `/api/quality/sheets/${sheetId}/plan${toQuery({ pageSize: 100, ...query })}`,
+      ),
+
     create: (sheetId: number, data: SavePlanItemRequest) =>
       apiRequest<ActionPlanItem>(`/api/quality/sheets/${sheetId}/plan`, {
         method: "POST",

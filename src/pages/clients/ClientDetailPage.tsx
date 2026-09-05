@@ -25,13 +25,6 @@ interface ClientDetailPageProps {
   section: "datos" | "contactos" | "historial";
 }
 
-const typeTone: Record<Client["type"], "red" | "green" | "neutral"> = {
-  Distribuidor: "red",
-  Mayorista: "neutral",
-  Detallista: "neutral",
-  Institucional: "green",
-};
-
 export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const { id } = useParams();
   const { can } = usePermissions();
@@ -42,6 +35,9 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [salesReps, setSalesReps] = useState<{ id: number; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Los catalogos de apoyo solo alimentan nombres para mostrar: que fallen no
+  // justifica borrar una ficha que si cargo, pero tampoco callarse.
+  const [referenceError, setReferenceError] = useState<string | null>(null);
   const [busyContactId, setBusyContactId] = useState<number | null>(null);
 
   const [editingClient, setEditingClient] = useState(false);
@@ -58,15 +54,38 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     });
   }
 
-  useEffect(() => {
-    if (!id) return;
-    Promise.all([
-      reload(),
+  /** Refresco tras una mutacion: el fallo se dice, no se pierde en la consola. */
+  function reloadOrReport() {
+    return reload().catch((err) => {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la ficha del cliente");
+    });
+  }
+
+  function loadRecord() {
+    setError(null);
+    return reload().catch((err) => {
+      setError(err instanceof ApiError ? err.message : "No se pudo cargar la ficha del cliente");
+    });
+  }
+
+  function loadReferenceData() {
+    setReferenceError(null);
+    return Promise.all([
       territoriesApi.list().then((res) => setTerritories(res.items)),
       staffApi
         .list({ page: 1, pageSize: 100, status: "activos", sort: "nombre", dir: "asc" })
         .then((res) => setSalesReps(res.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })))),
-    ]).catch(() => setError("No se pudo cargar la ficha del cliente"));
+    ]).catch(() =>
+      setReferenceError(
+        "No se pudieron cargar los territorios ni los vendedores: abajo aparecen sin nombre, y el diálogo de edición se abrirá con esas listas vacías.",
+      ),
+    );
+  }
+
+  useEffect(() => {
+    if (!id) return;
+    void loadRecord();
+    void loadReferenceData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -114,16 +133,21 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       ),
       confirmLabel: contact.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        await clientsApi.contacts.update(contact.id, {
-          firstName: contact.firstName,
-          lastName: contact.lastName,
-          email: contact.email,
-          phone: contact.phone,
-          position: contact.position,
-          isPrimary: contact.isPrimary,
-          isActive: !contact.isActive,
-        });
-        await reload();
+        setBusyContactId(contact.id);
+        try {
+          await clientsApi.contacts.update(contact.id, {
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            email: contact.email,
+            phone: contact.phone,
+            position: contact.position,
+            isPrimary: contact.isPrimary,
+            isActive: !contact.isActive,
+          });
+          await reload();
+        } finally {
+          setBusyContactId(null);
+        }
       },
     });
   }
@@ -134,11 +158,18 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     { label: "Historial de tickets", to: `/clientes/${id}/historial` },
   ];
 
-  if (error) {
+  // Solo es fatal si no hay ficha que mostrar; con la ficha cargada el fallo de
+  // una mutacion se dice sobre la propia pagina.
+  if (error !== null && client === null) {
     return (
       <div>
         <ModuleHeader sections={sections} />
-        <Alert variant="error">{error}</Alert>
+        <div className="flex flex-col items-start gap-2">
+          <Alert variant="error">{error}</Alert>
+          <Button size="sm" variant="secondary" onClick={() => void loadRecord()}>
+            Reintentar
+          </Button>
+        </div>
       </div>
     );
   }
@@ -171,6 +202,24 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
         }
       />
 
+      {error !== null && (
+        <div className="mb-3 flex flex-col items-start gap-2">
+          <Alert variant="error">{error}</Alert>
+          <Button size="sm" variant="secondary" onClick={() => void loadRecord()}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
+      {referenceError !== null && (
+        <div className="mb-3 flex flex-col items-start gap-2">
+          <Alert variant="error">{referenceError}</Alert>
+          <Button size="sm" variant="secondary" onClick={() => void loadReferenceData()}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
       {section === "datos" && (
         <DataTable>
           <tbody>
@@ -181,22 +230,24 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
               </span>
             </DetailRow>
             <DetailRow label="Código">
-              <span className="font-mono text-[12.5px]">{client.code}</span>
+              {/* El codigo comercial lo lee la operacion, no una maquina: la mono
+                  esta reservada a identificadores de maquina como las claves de permiso. */}
+              <span className="tabular-nums">{client.code}</span>
             </DetailRow>
             <DetailRow label="RNC">{client.taxId ?? "—"}</DetailRow>
             <DetailRow label="Tipo">
-              <Badge tone={typeTone[client.type]}>{client.type}</Badge>
+              <Badge tone="neutral">{client.type}</Badge>
             </DetailRow>
             <DetailRow label="Territorio">{territoryName(client.territoryId)}</DetailRow>
             <DetailRow label="Vendedor">
-              {repName(client.salesRepStaffId) ?? (
-                <span className="text-faint">Sin vendedor asignado</span>
-              )}
+              {/* Ambar: "sin asignar" es un estado intermedio, no un dato ausente.
+                  Mismas palabras que el listado. */}
+              {repName(client.salesRepStaffId) ?? <span className="text-warn">Sin vendedor</span>}
             </DetailRow>
             <DetailRow label="Teléfono">{client.phone ?? "—"}</DetailRow>
             <DetailRow label="Correo">{client.email ?? "—"}</DetailRow>
             <DetailRow label="Dirección">{client.address ?? "—"}</DetailRow>
-            <DetailRow label="Notas">
+            <DetailRow label="Notas internas">
               {client.notes ?? <span className="text-faint">Sin notas internas</span>}
             </DetailRow>
             <DetailRow label="Estado">
@@ -246,20 +297,22 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   <Td className="text-[12.5px] text-brand-gray">{contact.position ?? "—"}</Td>
                   <Td>
                     {contact.isPrimary ? (
+                      // Gris, no rojo: marcar el registro designado no es ni la accion
+                      // primaria ni el estado activo, los dos unicos usos del 185 C.
                       <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
-                        <Star aria-hidden className="h-3.5 w-3.5 fill-brand-red text-brand-red" />
+                        <Star aria-hidden className="h-3.5 w-3.5 fill-brand-gray text-brand-gray" />
                         Principal
                       </span>
                     ) : canWrite && contact.isActive ? (
-                      <button
-                        type="button"
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="-mx-3.5"
                         onClick={() => makePrimary(contact)}
                         disabled={busyContactId === contact.id}
-                        className="rounded-edge text-[12.5px] text-muted underline-offset-4 transition-colors
-                          hover:text-ink hover:underline"
                       >
                         Hacer principal
-                      </button>
+                      </Button>
                     ) : (
                       <span className="text-[12.5px] text-faint">—</span>
                     )}
@@ -320,7 +373,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
           contact={contactModal === "nuevo" ? undefined : contactModal}
           isFirst={contacts.length === 0}
           onClose={() => setContactModal(null)}
-          onSaved={() => reload()}
+          onSaved={() => void reloadOrReport()}
         />
       )}
 
@@ -329,13 +382,20 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   );
 }
 
-/** Fila de la ficha: etiqueta a la izquierda, valor a la derecha, sin tarjeta. */
+/**
+ * Fila de la ficha: etiqueta a la izquierda, valor a la derecha, sin tarjeta.
+ * La etiqueta es la cabecera de su fila, no una celda mas: sin `th scope="row"`
+ * un lector de pantalla recita once valores sin decir de que son.
+ */
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <Row>
-      <Td className="w-[220px] py-3 align-middle font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+      <th
+        scope="row"
+        className="w-[220px] py-3 pl-0 pr-3.5 text-left align-middle font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint"
+      >
         {label}
-      </Td>
+      </th>
       <Td className="py-3 text-[13px] text-brand-gray">{children}</Td>
     </Row>
   );

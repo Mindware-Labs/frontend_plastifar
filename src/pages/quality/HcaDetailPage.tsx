@@ -66,6 +66,10 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   const [error, setError] = useState<string | null>(null);
   /** Error de una accion sobre la pagina ya cargada: no reemplaza la ficha. */
   const [actionError, setActionError] = useState<string | null>(null);
+  /** Relectura sobre una ficha ya pintada: se atenua, no se reemplaza. */
+  const [isRefetching, setIsRefetching] = useState(false);
+  /** Cada reintento vuelve a lanzar la carga. */
+  const [attempt, setAttempt] = useState(0);
 
   const [editing, setEditing] = useState(false);
   const [itemModal, setItemModal] = useState<"nueva" | ActionPlanItem | null>(null);
@@ -76,26 +80,80 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
 
   useDynamicBreadcrumb(sheet?.number ?? null);
 
-  function reload() {
-    return qualityApi.sheets.get(sheetId).then((data) => {
+  /**
+   * Relectura tras una accion sobre la ficha ya cargada. No se vacia nada: la
+   * tabla se atenua y se repinta. Nunca rechaza —el fallo se cuenta arriba—,
+   * porque quien la llama es el `onSaved` de un dialogo que ya se cerro.
+   */
+  async function reload() {
+    setIsRefetching(true);
+    try {
+      const data = await qualityApi.sheets.get(sheetId);
       setSheet(data.sheet);
       setItems(data.planItems);
       setConditions(data.closureConditions);
       setClosable(data.canClose);
-    });
+      setActionError(null);
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError
+          ? `${err.message} Vuelve a intentarlo.`
+          : "Se guardó el cambio, pero no se pudo releer la HCA. Vuelve a intentarlo.",
+      );
+    } finally {
+      setIsRefetching(false);
+    }
+  }
+
+  /**
+   * Carga de la ficha. Se vacia primero y se descarta la respuesta si el id
+   * cambio: sin esto, ir de HCA-001 a HCA-002 seguia pintando la 001 bajo la
+   * miga de la 002, y dos navegaciones rapidas podian resolverse al reves y
+   * dejar clavada la hoja equivocada.
+   */
+  // El vaciado ocurre en render, no en el efecto: en el efecto corre despues de
+  // pintar, y en ese hueco se alcanzaba a ver un fotograma de la hoja anterior
+  // bajo la miga de la nueva.
+  const [lastSheetId, setLastSheetId] = useState(sheetId);
+  if (sheetId !== lastSheetId) {
+    setLastSheetId(sheetId);
+    setSheet(null);
+    setItems(null);
+    setConditions([]);
+    setClosable(false);
+    setError(null);
+    setActionError(null);
   }
 
   useEffect(() => {
+    let cancelled = false;
+
     Promise.all([
-      reload(),
-      clientsApi.list({ page: 1, pageSize: 100 }).then((data) => setClients(data.items)),
-      productLinesApi.list().then((data) => setProductLines(data.items)),
-      staffApi
-        .list({ page: 1, pageSize: 100, status: "activos" })
-        .then((data) => setStaff(data.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })))),
-    ]).catch(() => setError("No se pudo cargar la hoja de corrección"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheetId]);
+      qualityApi.sheets.get(sheetId),
+      clientsApi.list({ page: 1, pageSize: 100 }),
+      productLinesApi.list(),
+      staffApi.list({ page: 1, pageSize: 100, status: "activos" }),
+    ])
+      .then(([detail, clientsPage, linesPage, staffPage]) => {
+        if (cancelled) return;
+        setSheet(detail.sheet);
+        setItems(detail.planItems);
+        setConditions(detail.closureConditions);
+        setClosable(detail.canClose);
+        setClients(clientsPage.items);
+        setProductLines(linesPage.items);
+        setStaff(
+          staffPage.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setError("No se pudo cargar la HCA. Vuelve a intentarlo.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sheetId, attempt]);
 
   function staffName(staffId: number | null) {
     if (staffId === null) return "—";
@@ -109,10 +167,19 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   ];
 
   if (error) {
+    // La ficha conserva sus pestanas: perder el armazon del registro deja a la
+    // persona sin saber donde esta, y el aviso trae la salida.
     return (
       <div>
         <ModuleHeader sections={sections} />
-        <Alert variant="error">{error}</Alert>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-[240px] flex-1">
+            <Alert variant="error">{error}</Alert>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setAttempt((value) => value + 1)}>
+            Reintentar
+          </Button>
+        </div>
       </div>
     );
   }
@@ -183,10 +250,18 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     // El boton de cierre existe siempre en la seccion de cierre, apagado
     // mientras falte una condicion: esconderlo dejaria a la persona sin saber
     // que el cierre es lo que esta preparando.
+    // El motivo se nombra, no se señala: «están abajo» es falso en una pantalla
+    // corta y no significa nada con lector de pantalla.
+    const missing = conditions.find((condition) => !condition.met);
+
     return (
       <Tooltip
         content={
-          closable ? "Todo listo para cerrar" : "Faltan condiciones para cerrar; están abajo"
+          closable
+            ? "Todo listo para cerrar"
+            : missing
+              ? `Falta: ${missing.missing}`
+              : "Faltan condiciones de cierre por cumplir"
         }
       >
         <Button
@@ -215,6 +290,9 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
         </div>
       )}
 
+      {/* Mientras se relee, el contenido se atenua; la rueda es solo de la
+          primera carga. */}
+      <div className={`transition-opacity ${isRefetching ? "opacity-60" : ""}`}>
       {section === "datos" && (
         <>
           <DataTable>
@@ -333,7 +411,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
             <tbody>
               {items.map((item) => {
                 const itemOverdue = isPlanItemOverdue(item);
-                const settled = item.status === "Cumplida" || item.status === "Anulada";
+                const settled = isPlanItemSettled(item);
 
                 return (
                   <Row key={item.id}>
@@ -348,10 +426,10 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                     <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
                       {staffName(item.responsibleStaffId)}
                     </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
+                    <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
                       {formatDay(item.dueDate)}
                     </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
+                    <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
                       {item.completedAt ? formatDay(item.completedAt) : <span className="text-faint">—</span>}
                     </Td>
                     <Td>
@@ -392,7 +470,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
       {section === "cierre" && (
         <div className="flex flex-col gap-6">
           <section>
-            <h2 className="mb-3 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+            <h2 className="mb-3 font-heading text-[17px] font-bold leading-tight tracking-[-0.01em] text-ink">
               Condiciones de cierre
             </h2>
 
@@ -415,16 +493,20 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                     )}
                   </span>
 
+                  {/* Estado y motivo van en un solo nodo detras de su etiqueta:
+                      antes el lector de pantalla leia las tres etiquetas y luego
+                      tres explicaciones sueltas, sin saber cual era de cual. */}
                   <span className="flex flex-col gap-0.5">
-                    <span className="text-[13px] font-medium text-ink">
-                      {condition.label}
-                      <span className="sr-only">{condition.met ? ": cumplida" : ": falta"}</span>
+                    <span className="text-[13px] font-medium text-ink">{condition.label}</span>
+                    <span
+                      className={
+                        condition.met
+                          ? "sr-only"
+                          : "max-w-[76ch] text-[12.5px] leading-relaxed text-warn"
+                      }
+                    >
+                      {condition.met ? "Cumplida." : `Falta: ${condition.missing}`}
                     </span>
-                    {!condition.met && (
-                      <span className="max-w-[76ch] text-[12.5px] leading-relaxed text-warn">
-                        {condition.missing}
-                      </span>
-                    )}
                   </span>
                 </li>
               ))}
@@ -432,7 +514,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           </section>
 
           <section>
-            <h2 className="mb-3 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+            <h2 className="mb-3 font-heading text-[17px] font-bold leading-tight tracking-[-0.01em] text-ink">
               Verificación de eficacia
             </h2>
 
@@ -471,7 +553,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
 
           {isClosed && (
             <section>
-              <h2 className="mb-3 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+              <h2 className="mb-3 font-heading text-[17px] font-bold leading-tight tracking-[-0.01em] text-ink">
                 Cierre
               </h2>
               <p className="text-[13px] leading-relaxed text-brand-gray">
@@ -487,6 +569,8 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
         </div>
       )}
 
+      </div>
+
       {editing && (
         <HcaModal
           sheet={sheet}
@@ -496,7 +580,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           onClose={() => setEditing(false)}
           onSaved={() => {
             setEditing(false);
-            reload();
+            void reload();
           }}
         />
       )}
@@ -510,7 +594,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           onClose={() => setItemModal(null)}
           onSaved={() => {
             setItemModal(null);
-            reload();
+            void reload();
           }}
         />
       )}
@@ -521,7 +605,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           onClose={() => setCancelling(null)}
           onSaved={() => {
             setCancelling(null);
-            reload();
+            void reload();
           }}
         />
       )}
@@ -532,7 +616,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           onClose={() => setVerifying(false)}
           onSaved={() => {
             setVerifying(false);
-            reload();
+            void reload();
           }}
         />
       )}
@@ -544,7 +628,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           onClose={() => setClosing(false)}
           onSaved={() => {
             setClosing(false);
-            reload();
+            void reload();
           }}
         />
       )}

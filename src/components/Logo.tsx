@@ -33,12 +33,14 @@ export function Logo({ variant = "color", height = 34, className = "" }: LogoPro
 /**
  * Version para fondos rojos, verdes o fotograficos: el brand book exige que la
  * marca viaje dentro de una reserva blanca de esquinas redondeadas.
+ *
+ * La reserva toma el radio unico del sistema y no lleva sombra: es contenido de
+ * pagina, no una pieza que flote encima (Regla de Pagina Plana). El contraste
+ * contra el fondo saturado lo da el blanco de la reserva, no una elevacion.
  */
 export function LogoReserve({ height = 30, className = "" }: { height?: number; className?: string }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-2xl bg-white px-5 py-3.5 shadow-[0_18px_40px_-22px_rgba(0,0,0,0.55)] ${className}`}
-    >
+    <span className={`inline-flex items-center rounded-edge bg-white px-5 py-3.5 ${className}`}>
       <Logo height={height} />
     </span>
   );

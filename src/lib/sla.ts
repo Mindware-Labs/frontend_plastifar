@@ -83,7 +83,10 @@ export function addWorkingMinutes(
     const isHoliday = closedDates.has(isoDate(cursor));
 
     if (!isWorkday || isHoliday) {
-      if (isHoliday && isWorkday) skippedHolidays += 1;
+      // Existiendo un feriado, el feriado es la razon: contarlo como «dia no
+      // laborable» porque encima cae en sabado atribuye el salto a la jornada
+      // cuando quien lo causa es un registro del calendario.
+      if (isHoliday) skippedHolidays += 1;
       else skippedNonWorkdays += 1;
       cursor = nextDayAtOpening(cursor, opens);
       continue;

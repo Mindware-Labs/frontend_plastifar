@@ -113,14 +113,14 @@ export function HcaModal({
       onSaved(saved);
       onClose();
     } catch (err) {
-      const fallback = isEdit ? "No se pudo guardar la hoja" : "No se pudo crear la hoja";
+      const fallback = isEdit ? "No se pudo guardar la HCA" : "No se pudo crear la HCA";
       setFormError(err instanceof ApiError ? err.message : fallback);
     }
   }
 
   return (
     <Modal
-      title={isEdit ? `Editar ${sheet.number}` : "Nueva hoja de corrección"}
+      title={isEdit ? `Editar ${sheet.number}` : "Nueva HCA"}
       description={
         isEdit
           ? "Una HCA no se elimina: si se abrió por error, se cierra con nota explicativa."

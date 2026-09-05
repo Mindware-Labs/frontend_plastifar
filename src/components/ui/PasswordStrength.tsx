@@ -20,9 +20,9 @@ export function PasswordStrength({ value, className = "" }: { value: string; cla
   const styles = tierClasses[tier.level];
 
   return (
-    <section aria-live="polite" className={`flex flex-col gap-3 ${className}`}>
+    <section className={`flex flex-col gap-3 ${className}`}>
       <div className="flex items-center gap-3">
-        <div className="h-1 flex-1 overflow-hidden rounded-full bg-line">
+        <div aria-hidden className="h-1 flex-1 overflow-hidden rounded-full bg-line">
           <div
             className={`h-full origin-left rounded-full transition-[transform,background-color]
               duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${empty ? "bg-line" : styles.fill}`}
@@ -30,15 +30,20 @@ export function PasswordStrength({ value, className = "" }: { value: string; cla
           />
         </div>
 
+        {/* Solo la pastilla anuncia. Con el aria-live en toda la seccion, cada
+            tecla que cambiaba una regla releia las cuatro reglas enteras. */}
         <span
-          className={`inline-flex h-[20px] min-w-[52px] items-center justify-center rounded-full px-2
-            font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-white
-            transition-colors ${empty ? "bg-zinc-300" : styles.badge}`}
+          aria-live="polite"
+          className={`inline-flex h-[20px] min-w-[80px] items-center justify-center rounded-full px-2
+            font-heading text-[10px] font-semibold uppercase tracking-[0.08em]
+            transition-colors ${empty ? "bg-line-strong text-muted" : `${styles.badge} text-white`}`}
         >
           {empty ? "—" : tier.label}
         </span>
       </div>
 
+      {/* Estatica a proposito: el estado de cada regla viaja en su propio texto,
+          asi quien usa lector la consulta cuando quiere en vez de recibirla. */}
       <ul className="grid gap-1.5 sm:grid-cols-2">
         {rules.map((rule) => (
           <li key={rule.id} className="flex items-center gap-2">
@@ -58,6 +63,7 @@ export function PasswordStrength({ value, className = "" }: { value: string; cla
               }`}
             >
               {rule.label}
+              <span className="sr-only">{rule.met ? ": cumplido" : ": falta"}</span>
             </span>
           </li>
         ))}

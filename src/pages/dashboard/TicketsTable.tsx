@@ -34,6 +34,7 @@ import {
   type TicketStatus,
 } from "../../types/dashboard";
 import { DashboardCard } from "./DashboardCard";
+import { INSET_RADIUS } from "./radii";
 
 const priorityStyle: Record<TicketPriority, { icon: ComponentType<{ className?: string }>; tone: "red" | "warn" | "neutral" }> = {
   "Crítica": { icon: Flame, tone: "red" },
@@ -141,13 +142,21 @@ export function TicketsTable({ tickets }: TicketsTableProps) {
           <h2 className="font-heading text-[13px] font-bold tracking-[-0.01em] text-ink">
             Bandeja de tickets
           </h2>
-          <p className="mt-0.5 text-[12px] text-muted">
+          <p className="mt-0.5 text-[12px] tabular-nums text-muted">
             {rows.length} de {tickets.length} tickets · datos de demostración
           </p>
         </div>
 
+        {/* `aria-disabled` en vez de `disabled`: el boton sigue sin hacer nada,
+            pero conserva su parada de tabulacion, que es lo unico que permite
+            leer con teclado la razon por la que no hace nada. */}
         <Tooltip content="Se habilita cuando la Bandeja de tickets exista de verdad">
-          <Button size="sm" disabled>
+          <Button
+            size="sm"
+            aria-disabled
+            onClick={(event) => event.preventDefault()}
+            className="cursor-not-allowed opacity-60 hover:brightness-100"
+          >
             <Plus className="h-[15px] w-[15px]" />
             Nuevo ticket
           </Button>
@@ -271,7 +280,7 @@ export function TicketsTable({ tickets }: TicketsTableProps) {
                     <Row key={ticket.id} className="group">
                       <Td>
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-mono text-[10.5px] text-faint">#{ticket.number}</span>
+                          <span className="font-mono text-[10.5px] tabular-nums text-faint">#{ticket.number}</span>
                           <span className="max-w-[260px] truncate text-[13px] font-medium text-ink">
                             {ticket.subject}
                           </span>
@@ -343,13 +352,16 @@ export function TicketsTable({ tickets }: TicketsTableProps) {
                       )}
 
                       {isVisible("actualizado") && (
-                        <Td className="whitespace-nowrap text-[12px] text-faint">
+                        <Td className="whitespace-nowrap text-[12px] tabular-nums text-faint">
                           {timeAgo(ticket.updatedMinutesAgo)}
                         </Td>
                       )}
 
                       <Td>
-                        <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                        {/* Invisible tiene que significar tambien no-clicable:
+                            a `opacity-0` el boton sigue recibiendo el clic de
+                            quien no sabe que esta ahi. */}
+                        <div className="flex items-center justify-end gap-0.5 pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
                           <RowAction label={`Ver ${ticket.subject}`} icon={Eye} onClick={() => {}} disabled />
                           <RowAction label={`Más acciones para ${ticket.subject}`} icon={MoreHorizontal} onClick={() => {}} disabled />
                         </div>
@@ -369,10 +381,10 @@ export function TicketsTable({ tickets }: TicketsTableProps) {
               const slaInfo = slaStyle[ticket.sla];
 
               return (
-                <div key={ticket.id} className="rounded-xl border border-line-soft p-3.5">
+                <div key={ticket.id} className={`${INSET_RADIUS} border border-line-soft p-3.5`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <span className="font-mono text-[10.5px] text-faint">#{ticket.number}</span>
+                      <span className="font-mono text-[10.5px] tabular-nums text-faint">#{ticket.number}</span>
                       <p className="truncate text-[13px] font-medium text-ink">{ticket.subject}</p>
                     </div>
                     <RowAction label="Más acciones" icon={MoreHorizontal} onClick={() => {}} disabled />
@@ -402,7 +414,7 @@ export function TicketsTable({ tickets }: TicketsTableProps) {
 
                   <div className="mt-3 flex items-center justify-between border-t border-line-soft pt-2.5 text-[11.5px] text-faint">
                     <span>{ticket.assigneeName ?? "Sin asignar"}</span>
-                    <span>{timeAgo(ticket.updatedMinutesAgo)}</span>
+                    <span className="tabular-nums">{timeAgo(ticket.updatedMinutesAgo)}</span>
                   </div>
                 </div>
               );

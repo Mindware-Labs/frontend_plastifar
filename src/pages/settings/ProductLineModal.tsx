@@ -70,12 +70,19 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
       onClose();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        if (err.message.toLowerCase().includes("código")) {
+        // El API no dice que campo choca. Se busca el valor enviado dentro del
+        // mensaje —lo unico que no cambia si alguien reescribe la frase— y, si
+        // no aparece ninguno, el conflicto se muestra arriba: preferible a
+        // marcar un campo al azar.
+        const message = err.message.toLowerCase();
+        if (message.includes(request.code.toLowerCase())) {
           setError("code", { message: err.message });
           setFocus("code");
-        } else {
+        } else if (message.includes(request.name.toLowerCase())) {
           setError("name", { message: err.message });
           setFocus("name");
+        } else {
+          setFormError(err.message);
         }
         return;
       }
@@ -130,7 +137,7 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
             />
 
             {line.usedByTopics > 0 && (
-              <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
+              <p className="rounded-edge border border-line px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
                 {line.usedByTopics} {line.usedByTopics === 1 ? "motivo la exige" : "motivos la exigen"}.
                 Desactivarla no rompe el historial, pero deja de poder elegirse en tickets nuevos.
               </p>

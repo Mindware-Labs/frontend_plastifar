@@ -65,7 +65,14 @@ export function CancelPlanItemModal({ item, onClose, onSaved }: CancelPlanItemMo
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" form="cancel-item-form" isLoading={isSubmitting}>
+          {/* Lo destructivo va delineado en rojo sobre blanco: el rojo pleno es
+              la primaria afirmativa, y anular no lo es. */}
+          <Button
+            type="submit"
+            form="cancel-item-form"
+            variant="danger"
+            isLoading={isSubmitting}
+          >
             Anular acción
           </Button>
         </>
@@ -79,9 +86,14 @@ export function CancelPlanItemModal({ item, onClose, onSaved }: CancelPlanItemMo
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <p className="rounded-edge bg-canvas px-3 py-2.5 text-[13px] leading-relaxed text-brand-gray">
-          {item.description}
-        </p>
+        {/* Sin caja teñida: el panel señala una sección con un filete, no con un
+            bloque de color. */}
+        <div className="flex flex-col gap-1 border-y border-line-soft py-2.5">
+          <span className="font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+            Acción
+          </span>
+          <p className="text-[13px] leading-relaxed text-brand-gray">{item.description}</p>
+        </div>
 
         <TextAreaField
           label="Justificación"

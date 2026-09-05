@@ -79,7 +79,6 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
 
   return (
     <Modal
-      eyebrow="Personal · Roles"
       title={isEdit ? "Editar rol" : "Nuevo rol"}
       description="Los roles agrupan permisos y se asignan al personal por departamento."
       onClose={onClose}

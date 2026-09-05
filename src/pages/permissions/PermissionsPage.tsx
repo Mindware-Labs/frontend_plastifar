@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { permissionsApi } from "../../api/permissions";
 import { ApiError } from "../../api/client";
 import { rolesApi } from "../../api/roles";
@@ -6,9 +6,10 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker } from "../../components/ui/ColumnPicker";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { CriteriaField, CriteriaSelect } from "../../components/ui/CriteriaField";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -38,8 +39,13 @@ export function PermissionsPage() {
   const [chip, setChip] = useState<ChipKey>("todos");
 
   const [isSaving, setIsSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
+  /** Relectura de la matriz sobre una pagina ya pintada: se atenua, no se vacia. */
+  const [isRefetching, setIsRefetching] = useState(true);
+  // Contador, no marca de tiempo: el instante nunca se lee, solo hace falta
+  // saber que hubo un guardado y reiniciar el temporizador si hay otro encima.
+  const [saveAck, setSaveAck] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
@@ -48,7 +54,15 @@ export function PermissionsPage() {
   const { can } = usePermissions();
   const canWrite = can("roles.write");
 
-  useEffect(() => {
+  /**
+   * Carga inicial y reintento comparten camino. Si falla no queda nada pintado,
+   * asi que el aviso tiene que traer la salida: sin reintento la unica forma de
+   * recuperarse era recargar la pagina entera.
+   */
+  // No fija estado de forma sincrona: al montar eso era un render extra antes
+  // de la primera pintura. `isRefetching` arranca en true y lo apaga el
+  // `finally`; quien reintenta lo vuelve a encender desde su propio manejador.
+  const load = useCallback(() => {
     permissionsApi
       .matrix()
       .then((data) => {
@@ -57,19 +71,26 @@ export function PermissionsPage() {
         setOriginal(data.grants);
         setVisibleRoles(data.roles.map((role) => String(role.id)));
       })
-      .catch(() => setError("No se pudo cargar el catálogo de permisos"));
+      .catch(() => setError("No se pudo cargar el catálogo de permisos. Vuelve a intentarlo."))
+      .finally(() => setIsRefetching(false));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // El aviso de guardado se retira solo: no es un estado, es un acuse.
   useEffect(() => {
-    if (savedAt === null) return;
-    const timer = window.setTimeout(() => setSavedAt(null), 4000);
+    if (saveAck === 0) return;
+    const timer = window.setTimeout(() => setSaveAck(0), 4000);
     return () => window.clearTimeout(timer);
-  }, [savedAt]);
+  }, [saveAck]);
 
   const catalog = useMemo(() => (matrix ? flattenPermissions(matrix.groups) : []), [matrix]);
   const editableRoles = useMemo(
-    () => (matrix?.roles ?? []).filter((role) => !role.grantsAll),
+    // Editable = no es del sistema. `grantsAll` solo dice que su lista cubre el
+    // catalogo entero, que es un hecho distinto y no impide editarla.
+    () => (matrix?.roles ?? []).filter((role) => !role.isSystem),
     [matrix],
   );
 
@@ -144,6 +165,11 @@ export function PermissionsPage() {
    * No existe un endpoint de matriz completa: cada rol se guarda con su propio
    * PUT /api/roles/{id} (seccion 12.3 — se sigue el criterio del modulo de
    * Personal, que ya expone ese endpoint). Solo se manda lo que cambio.
+   *
+   * Cada rol se resuelve por separado: si el tercero guarda y el cuarto falla,
+   * el tercero deja de estar sucio igualmente. Con un `Promise.all` un fallo
+   * parcial dejaba el anillo ambar sobre celdas ya guardadas y el siguiente
+   * intento las volvia a mandar.
    */
   async function save() {
     setIsSaving(true);
@@ -155,7 +181,7 @@ export function PermissionsPage() {
         return before.size !== after.size || [...before].some((key) => !after.has(key));
       });
 
-      await Promise.all(
+      const results = await Promise.allSettled(
         changedRoles.map((role) =>
           rolesApi.update(role.id, {
             name: role.name,
@@ -165,15 +191,66 @@ export function PermissionsPage() {
         ),
       );
 
+      const failed = changedRoles.filter((_, index) => results[index].status === "rejected");
+
+      if (failed.length === changedRoles.length && failed.length > 0) {
+        const reason = results[0];
+        setError(
+          reason.status === "rejected" && reason.reason instanceof ApiError
+            ? `${reason.reason.message} Vuelve a intentarlo.`
+            : "No se pudieron guardar los permisos. Vuelve a intentarlo.",
+        );
+        return;
+      }
+
+      // Lo guardado deja de estar sucio aunque otro rol haya fallado.
+      await refreshAfterSave();
+
+      if (failed.length > 0) {
+        setError(
+          `Se guardaron ${changedRoles.length - failed.length} de ${changedRoles.length} roles. ` +
+            `Quedó sin guardar: ${failed.map((role) => role.name).join(", ")}. Vuelve a intentarlo.`,
+        );
+        return;
+      }
+
+      // Con el filtro «Con cambios» puesto, guardar vacia el listado: ya no hay
+      // ningun permiso cambiado que mostrar. Se vuelve a «Todos» para que el
+      // acuse de guardado no llegue junto a una pagina en blanco.
+      if (chip === "conCambios") setChip("todos");
+      setSaveAck((previous) => previous + 1);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? `${err.message} Vuelve a intentarlo.`
+          : "No se pudieron guardar los permisos. Vuelve a intentarlo.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  /**
+   * Relee la matriz y reconcilia lo que depende de la lista de roles: un rol
+   * creado o borrado en el servidor dejaba la columna fuera de la vista o un id
+   * fantasma en el selector de columnas.
+   */
+  async function refreshAfterSave() {
+    setIsRefetching(true);
+    try {
       const fresh = await permissionsApi.matrix();
+      const freshIds = fresh.roles.map((role) => String(role.id));
       setMatrix(fresh);
       setGrants(fresh.grants);
       setOriginal(fresh.grants);
-      setSavedAt(Date.now());
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudieron guardar los permisos");
+      setVisibleRoles((previous) => {
+        const kept = freshIds.filter((id) => previous.includes(id));
+        const added = freshIds.filter((id) => !previous.includes(id));
+        // Un rol nuevo entra visible; uno que ya no existe se cae.
+        return kept.length + added.length === 0 ? freshIds : [...kept, ...added];
+      });
     } finally {
-      setIsSaving(false);
+      setIsRefetching(false);
     }
   }
 
@@ -211,82 +288,118 @@ export function PermissionsPage() {
   );
 
   const isEmpty = matrix !== null && groups.length === 0;
+  /** Catalogo vacio y filtro vacio no son el mismo vacio y no se dicen igual. */
+  const catalogIsEmpty = catalog.length === 0;
+  const unfiltered = chip === "todos" && module === "todos" && debouncedSearch === "";
 
   return (
     <div>
       <ModuleHeader
         action={
-          canWrite && dirtyCells > 0 && (
+          // La accion primaria se pinta siempre que se pueda escribir, apagada
+          // mientras no haya nada que guardar: desmontarla dejaba la cabecera
+          // vacia y sin decir que guardar es el proposito de la pagina.
+          canWrite && (
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="ghost" onClick={discard} disabled={isSaving}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setConfirmingDiscard(true)}
+                disabled={isSaving || dirtyCells === 0}
+              >
                 Descartar
               </Button>
-              <Button size="sm" onClick={save} isLoading={isSaving}>
-                Guardar {dirtyCells} {dirtyCells === 1 ? "cambio" : "cambios"}
+              <Button size="sm" onClick={save} isLoading={isSaving} disabled={dirtyCells === 0}>
+                {dirtyCells === 0
+                  ? "Guardar cambios"
+                  : `Guardar ${dirtyCells} ${dirtyCells === 1 ? "cambio" : "cambios"}`}
               </Button>
             </div>
           )
         }
       />
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar permiso…"
-          className="w-[240px]"
-        />
+      <div className="mb-3 flex flex-wrap items-end gap-2">
+        <CriteriaField label="Buscar">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar permiso…"
+            className="w-[240px]"
+          />
+        </CriteriaField>
 
-        <Select
-          size="sm"
-          className="w-[200px]"
-          aria-label="Filtrar por módulo"
+        <CriteriaSelect
+          label="Módulo"
+          ariaLabel="Filtrar por módulo"
           value={module}
           onChange={setModule}
+          width="w-[200px]"
           options={[
             { value: "todos", label: "Todos los módulos" },
             ...(matrix?.groups ?? []).map((group) => ({ value: group.module, label: group.module })),
           ]}
         />
 
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+        <span aria-hidden className="mx-1 mb-1.5 h-5 w-px bg-line" />
 
-        <FilterChip
-          label="Todos"
-          count={counts.todos}
-          active={chip === "todos"}
-          onClick={() => setChip("todos")}
-        />
-        <FilterChip
-          label="Sin asignar"
-          count={counts.sinAsignar}
-          active={chip === "sinAsignar"}
-          onClick={() => setChip("sinAsignar")}
-        />
-        <FilterChip
-          label="Con cambios"
-          count={counts.conCambios}
-          active={chip === "conCambios"}
-          onClick={() => setChip("conCambios")}
-        />
+        <div className="flex flex-wrap items-center gap-2 pb-0.5">
+          <FilterChip
+            label="Todos"
+            count={counts.todos}
+            active={chip === "todos"}
+            onClick={() => setChip("todos")}
+          />
+          <FilterChip
+            label="Sin asignar"
+            count={counts.sinAsignar}
+            active={chip === "sinAsignar"}
+            onClick={() => setChip("sinAsignar")}
+          />
+          <FilterChip
+            label="Con cambios"
+            count={counts.conCambios}
+            active={chip === "conCambios"}
+            onClick={() => setChip("conCambios")}
+          />
+        </div>
 
-        <div className="ml-auto">
+        <div className="ml-auto pb-0.5">
           <ColumnPicker
             columns={(matrix?.roles ?? []).map((role) => ({ id: String(role.id), label: role.name }))}
             visible={visibleRoles}
-            onChange={setVisibleRoles}
-            label="Roles"
+            // Una columna de permisos sin ningun rol enfrente no cruza nada: se
+            // conserva siempre al menos un rol a la vista.
+            onChange={(next) => {
+              if (next.length === 0) return;
+              setVisibleRoles(next);
+            }}
+            label="Mostrar roles"
           />
         </div>
       </div>
 
       {error && (
-        <div className="mb-3">
-          <Alert variant="error">{error}</Alert>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="min-w-[240px] flex-1">
+            <Alert variant="error">{error}</Alert>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={isRefetching}
+            onClick={() => {
+              setError(null);
+              setIsRefetching(true);
+              load();
+            }}
+          >
+            Reintentar
+          </Button>
         </div>
       )}
 
-      {savedAt !== null && (
+      {saveAck > 0 && (
         <div className="mb-3">
           <Alert variant="success">Cambios guardados.</Alert>
         </div>
@@ -302,22 +415,30 @@ export function PermissionsPage() {
       )}
 
       {matrix === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
+        // Con un error de carga no queda nada que esperar: el aviso de arriba ya
+        // trae el reintento, y una rueda eterna bajo el aviso mentia.
+        error === null && (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        )
       ) : isEmpty ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          Ningún permiso coincide con este filtro o búsqueda.
+          {catalogIsEmpty || unfiltered
+            ? "Todavía no hay permisos en el catálogo."
+            : "Ningún permiso coincide con este filtro o búsqueda."}
         </p>
       ) : (
-        <PermissionMatrix
-          groups={groups}
-          roles={roles}
-          grants={grants}
-          original={original}
-          onToggle={toggle}
-          readOnly={!canWrite}
-        />
+        <div className={`transition-opacity ${isRefetching ? "opacity-60" : ""}`}>
+          <PermissionMatrix
+            groups={groups}
+            roles={roles}
+            grants={grants}
+            original={original}
+            onToggle={toggle}
+            readOnly={!canWrite}
+          />
+        </div>
       )}
 
       <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
@@ -327,6 +448,23 @@ export function PermissionsPage() {
         supervisión: amplía la lectura a todos los departamentos sin conceder escritura. Dentro de la
         matriz se navega con las flechas del teclado.
       </p>
+
+      {confirmingDiscard && (
+        <ConfirmDialog
+          tone="warn"
+          title="Descartar los cambios sin guardar"
+          description={
+            <>
+              Se perderán {dirtyCells} {dirtyCells === 1 ? "cambio" : "cambios"} de la matriz y las
+              celdas vuelven a como llegaron del servidor.
+            </>
+          }
+          confirmLabel="Descartar cambios"
+          cancelLabel="Seguir editando"
+          onConfirm={discard}
+          onClose={() => setConfirmingDiscard(false)}
+        />
+      )}
     </div>
   );
 }

@@ -76,8 +76,10 @@ export function TopicModal({ topic, topics, policies, departments, onClose, onSa
     ? []
     : topics.filter((candidate) => candidate.parentId === null && candidate.id !== topic?.id);
 
+  // Misma regla que la tabla: una predeterminada desactivada no se aplica a
+  // nada, y prometerla aqui hace que la fila guardada diga lo contrario.
   const defaultForPriority = policies.find(
-    (policy) => policy.priority === priority && policy.isDefault,
+    (policy) => policy.priority === priority && policy.isDefault && policy.isActive,
   );
 
   async function onSubmit(values: FormValues) {
@@ -147,7 +149,8 @@ export function TopicModal({ topic, topics, policies, departments, onClose, onSa
               value={field.value}
               onChange={field.onChange}
               onBlur={field.onBlur}
-              placeholder="Ninguno · es de primer nivel"
+              // Sin placeholder: el valor vacio ya es una opcion con nombre, y
+              // repetir el mismo texto como marcador lo deja sin funcion.
               options={[
                 { value: "", label: "Ninguno · es de primer nivel" },
                 ...possibleParents.map((parent) => ({
@@ -214,7 +217,6 @@ export function TopicModal({ topic, topics, policies, departments, onClose, onSa
               value={field.value}
               onChange={field.onChange}
               onBlur={field.onBlur}
-              placeholder="La predeterminada de la prioridad"
               options={[
                 {
                   value: "",

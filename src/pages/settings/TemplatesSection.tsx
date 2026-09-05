@@ -1,7 +1,6 @@
 import { Pencil, Plus, Power } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { settingsApi } from "../../api/settings";
-import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -17,17 +16,21 @@ import { useLocalPage } from "../../hooks/useLocalPage";
 import { usePermissions } from "../../hooks/usePermissions";
 import { usedVariables } from "../../lib/templates";
 import type { EmailTemplate } from "../../types/settings";
+import { ChipGroup, LoadErrorAlert } from "./catalogSection";
+import { freshCopy, staleClass, useSectionLoad } from "./catalogState";
 import { SettingsLayout } from "./SettingsLayout";
 import { TemplateModal } from "./TemplateModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
 
+const listTemplates = () => settingsApi.templates.list({ page: 1, pageSize: 100 });
+
 export function TemplatesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [templates, setTemplates] = useState<EmailTemplate[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
@@ -37,15 +40,17 @@ export function TemplatesSection() {
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
-  function reload() {
-    return settingsApi.templates.list({ page: 1, pageSize: 100 }).then((res) => setTemplates(res.items));
-  }
-
-  useEffect(() => {
-    reload().catch(() => setError("No se pudieron cargar las plantillas"));
+  const load = useCallback(async () => {
+    const { items } = await listTemplates();
+    setTemplates(items);
   }, []);
 
-  const all = useMemo(() => templates ?? [], [templates]);
+  const { status, isRefetching, error, reload, retry } = useSectionLoad(
+    load,
+    "No se pudieron cargar las plantillas",
+  );
+
+  const all = templates;
   const activeCount = all.filter((template) => template.isActive).length;
 
   const rows = all.filter((template) => {
@@ -66,8 +71,10 @@ export function TemplatesSection() {
   // RF-K2: los listados de catalogo paginan como cualquier otro. El corte
   // lo hace la vista solo mientras no exista /api/settings/...; el endpoint
   // devuelve la pagina ya cortada en SQL (anexo 12.1).
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } =
-    useLocalPage(rows, JSON.stringify([debouncedSearch, chip]));
+  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
+    rows,
+    JSON.stringify([debouncedSearch, chip]),
+  );
 
   function askToggle(template: EmailTemplate) {
     setConfirmation({
@@ -87,14 +94,20 @@ export function TemplatesSection() {
       ),
       confirmLabel: template.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        await settingsApi.templates.update(template.id, {
-          key: template.key,
-          name: template.name,
-          subject: template.subject,
-          body: template.body,
-          isActive: !template.isActive,
-        });
-        await reload();
+        setBusyId(template.id);
+        try {
+          const current = await freshCopy(listTemplates, template);
+          await settingsApi.templates.update(current.id, {
+            key: current.key,
+            name: current.name,
+            subject: current.subject,
+            body: current.body,
+            isActive: !current.isActive,
+          });
+          await reload();
+        } finally {
+          setBusyId(null);
+        }
       },
     });
   }
@@ -103,7 +116,7 @@ export function TemplatesSection() {
     <SettingsLayout
       action={
         canWrite && (
-          <Button size="sm" onClick={() => setModal("nueva")}>
+          <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
             <Plus className="h-[15px] w-[15px]" />
             Nueva plantilla
           </Button>
@@ -115,118 +128,122 @@ export function TemplatesSection() {
           value={search}
           onChange={setSearch}
           placeholder="Buscar por nombre, clave o asunto…"
-          className="w-[280px]"
+          className="w-[240px]"
         />
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <FilterChip
-          label="Todas"
-          count={all.length}
-          active={chip === "todas"}
-          onClick={() => setChip("todas")}
-        />
-        <FilterChip
-          label="Activas"
-          count={activeCount}
-          active={chip === "activas"}
-          onClick={() => setChip("activas")}
-        />
-        <FilterChip
-          label="Inactivas"
-          count={all.length - activeCount}
-          active={chip === "inactivas"}
-          onClick={() => setChip("inactivas")}
-        />
+        <ChipGroup label="Filtrar por estado" ready={status === "ready"}>
+          <FilterChip
+            label="Todas"
+            count={all.length}
+            active={chip === "todas"}
+            onClick={() => setChip("todas")}
+          />
+          <FilterChip
+            label="Activas"
+            count={activeCount}
+            active={chip === "activas"}
+            onClick={() => setChip("activas")}
+          />
+          <FilterChip
+            label="Inactivas"
+            count={all.length - activeCount}
+            active={chip === "inactivas"}
+            onClick={() => setChip("inactivas")}
+          />
+        </ChipGroup>
       </div>
 
-      {error && (
-        <div className="mb-3">
-          <Alert variant="error">{error}</Alert>
-        </div>
-      )}
+      {error && <LoadErrorAlert message={error} onRetry={retry} />}
 
-      {templates === null ? (
+      {status === "loading" ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : rows.length === 0 ? (
+      ) : status === "error" ? null : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          Ninguna plantilla coincide con este filtro o búsqueda.
+          {all.length === 0
+            ? "Todavía no hay ninguna plantilla configurada."
+            : "Ninguna plantilla coincide con este filtro o búsqueda."}
         </p>
       ) : (
-        <DataTable>
-          <thead>
-            <HeadRow>
-              <Th>Plantilla</Th>
-              <Th>Asunto</Th>
-              <Th>Variables</Th>
-              <Th>Estado</Th>
-              {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-            </HeadRow>
-          </thead>
+        <div className={staleClass(isRefetching)}>
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Plantilla</Th>
+                <Th>Asunto</Th>
+                <Th>Variables</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-          <tbody>
-            {pageRows.map((template) => {
-              const variables = usedVariables(`${template.subject} ${template.body}`);
+            <tbody>
+              {pageRows.map((template) => {
+                const variables = usedVariables(`${template.subject} ${template.body}`);
 
-              return (
-                <Row key={template.id}>
-                  <Td>
-                    <span className="flex flex-col gap-0.5">
-                      <span className="text-[13px] font-medium leading-tight text-ink">
-                        {template.name}
-                      </span>
-                      <span className="font-mono text-[10.5px] leading-tight text-faint">
-                        {template.key}
-                      </span>
-                    </span>
-                  </Td>
-                  <Td className="max-w-[320px] text-[12.5px] text-brand-gray">
-                    <span className="block truncate">{template.subject}</span>
-                  </Td>
-                  <Td>
-                    {variables.length > 0 ? (
-                      <span className="flex flex-wrap gap-1">
-                        {variables.map((variable) => (
-                          <Badge key={variable}>{variable}</Badge>
-                        ))}
-                      </span>
-                    ) : (
-                      <span className="text-[12.5px] text-faint">Ninguna</span>
-                    )}
-                  </Td>
-                  <Td>
-                    <StatusDot active={template.isActive} />
-                  </Td>
-                  {canWrite && (
+                return (
+                  <Row key={template.id} busy={busyId === template.id}>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Editar ${template.name}`}
-                          icon={Pencil}
-                          onClick={() => setModal(template)}
-                        />
-                        <RowAction
-                          label={
-                            template.isActive
-                              ? `Desactivar ${template.name}`
-                              : `Reactivar ${template.name}`
-                          }
-                          icon={Power}
-                          onClick={() => askToggle(template)}
-                        />
-                      </div>
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-[12.5px] font-medium leading-tight text-ink">
+                          {template.name}
+                        </span>
+                        <span className="font-mono text-[10.5px] leading-tight text-faint">
+                          {template.key}
+                        </span>
+                      </span>
                     </Td>
-                  )}
-                </Row>
-              );
-            })}
-          </tbody>
-        </DataTable>
+                    <Td className="max-w-[320px] text-[12.5px] text-brand-gray">
+                      <span className="block truncate">{template.subject}</span>
+                    </Td>
+                    <Td>
+                      {variables.length > 0 ? (
+                        <span className="flex flex-wrap gap-1">
+                          {variables.map((variable) => (
+                            <Badge key={variable}>{variable}</Badge>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="text-[12.5px] text-faint">Ninguna</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <StatusDot active={template.isActive} />
+                    </Td>
+                    {canWrite && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Editar ${template.name}`}
+                            icon={Pencil}
+                            onClick={() => setModal(template)}
+                            disabled={busyId === template.id}
+                          />
+                          <RowAction
+                            label={
+                              template.isActive
+                                ? `Desactivar ${template.name}`
+                                : `Reactivar ${template.name}`
+                            }
+                            icon={Power}
+                            onClick={() => askToggle(template)}
+                            disabled={busyId === template.id}
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                );
+              })}
+            </tbody>
+          </DataTable>
+        </div>
       )}
 
-      {templates !== null && rows.length > 0 && (
+      {status === "ready" && rows.length > 0 && (
         <Pagination
           page={page}
           pageSize={pageSize}
@@ -248,7 +265,9 @@ export function TemplatesSection() {
         <TemplateModal
           template={modal === "nueva" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={() => reload()}
+          onSaved={() => {
+            void reload();
+          }}
         />
       )}
 

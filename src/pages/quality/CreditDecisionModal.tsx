@@ -104,7 +104,8 @@ export function CreditDecisionModal({
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <dl className="flex flex-col gap-2 rounded-edge bg-canvas px-3 py-2.5 text-[13px] text-brand-gray">
+        {/* Sin caja teñida: una sección se marca con un filete, no con un fondo. */}
+        <dl className="flex flex-col gap-2 border-y border-line-soft py-2.5 text-[13px] text-brand-gray">
           <Line label="Cliente" value={clientName} />
           <Line label="Monto" value={formatAmount(request.amount, request.currency)} />
           <Line label="Solicitada por" value={requesterName} />

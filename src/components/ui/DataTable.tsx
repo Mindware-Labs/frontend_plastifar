@@ -44,8 +44,9 @@ export function Th({ sort, className = "", children, ...props }: ThProps) {
           // Repite versalita y color: un <button> reinicia `text-transform` y el
           // color por las reglas de control de formulario, asi que sin esto la
           // cabecera ordenable salia en caja mixta y mas oscura que sus vecinas.
-          className="inline-flex items-center gap-1.5 uppercase tracking-[0.08em] text-inherit
-            transition-colors hover:text-ink"
+          className="inline-flex items-center gap-1.5 rounded-edge uppercase tracking-[0.08em]
+            text-inherit outline-none transition-colors hover:text-ink
+            focus-visible:ring-3 focus-visible:ring-brand-red/25"
         >
           {children}
           {sort.dir === null ? (
@@ -76,7 +77,7 @@ export function Row({ busy = false, className = "", children }: RowProps) {
   return (
     <tr
       className={`border-b border-line-soft transition-colors last:border-0 hover:bg-canvas
-        [&>td:first-child]:pl-0 [&>td:last-child]:pr-0 ${busy ? "opacity-50" : ""} ${className}`}
+        [&>td:first-child]:pl-0 [&>td:last-child]:pr-0 ${busy ? "opacity-60" : ""} ${className}`}
     >
       {children}
     </tr>

@@ -16,6 +16,11 @@ interface AuthLayoutProps {
  * y al 10 % de opacidad, es lo que estructura el espacio. La marca aparece una
  * sola vez y en su version reducida —el isotipo, autorizado por el manual para
  * uso digital pequeno— porque aqui no compite con nada.
+ *
+ * Las capas decorativas son estaticas a proposito. Hubo dos derivas ambientales
+ * documentadas que nunca se aplicaron a ningun elemento; en vez de reintroducir
+ * movimiento perpetuo detras de un formulario de acceso, se deja el fondo quieto
+ * y se retiran los fotogramas muertos. Lo documentado y lo enviado coinciden.
  */
 export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProps) {
   return (
@@ -39,7 +44,7 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
           </h1>
 
           {subtitle && (
-            <p className="mx-auto mt-2.5 max-w-[36ch] text-[14px] leading-relaxed text-zinc-500">
+            <p className="mx-auto mt-2.5 max-w-[36ch] text-[14px] leading-relaxed text-muted">
               {subtitle}
             </p>
           )}
@@ -56,12 +61,12 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
         )}
       </main>
 
-      <p className="relative mt-14 text-center text-[11.5px] leading-relaxed tracking-[0.04em] text-zinc-400">
+      <p className="relative mt-14 text-center text-[11.5px] leading-relaxed tracking-[0.04em] text-faint">
         © {new Date().getFullYear()} Plastifar, S.A. · Autopista Duarte Km. 13½ · Santo Domingo,
         República Dominicana
       </p>
 
-      <p className="relative mt-2 flex items-center justify-center gap-1.5 text-[11px] tracking-[0.02em] text-zinc-400">
+      <p className="relative mt-2 flex items-center justify-center gap-1.5 text-[11px] tracking-[0.02em] text-faint">
         Desarrollado por
         <img
           src="/brand/centerquest-icon.png"
@@ -71,7 +76,7 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
           draggable={false}
           className="select-none opacity-80"
         />
-        <span className="font-medium text-zinc-500">Center Quest</span>
+        <span className="font-medium text-muted">Center Quest</span>
       </p>
     </div>
   );

@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
+import { CARD_RADIUS } from "./radii";
 
 interface DashboardCardProps {
-  /** sm = tiles compactos (KPI); default = paneles con titulo y contenido. */
-  padding?: "default" | "sm";
+  /** sm = tiles compactos (KPI); chart = charts, holgados solo desde sm. */
+  padding?: "default" | "sm" | "chart";
   className?: string;
   children: ReactNode;
 }
@@ -10,7 +11,11 @@ interface DashboardCardProps {
 const paddingClass: Record<NonNullable<DashboardCardProps["padding"]>, string> = {
   default: "p-5",
   sm: "p-4",
+  chart: "p-4 sm:p-5",
 };
+
+/** Definicion UNICA de la tarjeta: los charts la envuelven en vez de recopiarla. */
+const CARD_SHELL = `${CARD_RADIUS} border border-line-soft bg-white shadow-[0_1px_2px_rgba(27,27,29,0.04),0_8px_24px_-12px_rgba(27,27,29,0.10)]`;
 
 /**
  * EXCEPCION DE DISENO, deliberada y acotada a este modulo: el resto del panel
@@ -22,7 +27,7 @@ const paddingClass: Record<NonNullable<DashboardCardProps["padding"]>, string> =
 export function DashboardCard({ padding = "default", className = "", children }: DashboardCardProps) {
   return (
     <div
-      className={`rounded-2xl border border-line-soft bg-white shadow-[0_1px_2px_rgba(27,27,29,0.04),0_8px_24px_-12px_rgba(27,27,29,0.10)] ${paddingClass[padding]} ${className}`}
+      className={`${CARD_SHELL} ${paddingClass[padding]} ${className}`}
     >
       {children}
     </div>

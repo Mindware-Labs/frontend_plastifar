@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
@@ -8,7 +8,12 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { addWorkingMinutes, humanizeMinutes, workdayMinutes } from "../../lib/sla";
+import {
+  addWorkingMinutes,
+  humanizeMinutes,
+  workdayMinutes,
+  type DeadlineResult,
+} from "../../lib/sla";
 import {
   PRIORITIES,
   WEEKDAYS,
@@ -74,6 +79,20 @@ const timeFormat = new Intl.DateTimeFormat("es-DO", {
   minute: "2-digit",
 });
 
+/** «Salta 2 días no laborables y 1 feriado», o cadena vacía si no salta nada. */
+function skippedPhrase(leg: DeadlineResult): string {
+  return [
+    leg.skippedNonWorkdays > 0 &&
+      `${leg.skippedNonWorkdays} ${
+        leg.skippedNonWorkdays === 1 ? "día no laborable" : "días no laborables"
+      }`,
+    leg.skippedHolidays > 0 &&
+      `${leg.skippedHolidays} ${leg.skippedHolidays === 1 ? "feriado" : "feriados"}`,
+  ]
+    .filter(Boolean)
+    .join(" y ");
+}
+
 export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) {
   const isEdit = policy !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
@@ -121,13 +140,21 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
     workdayEnd: workdayEnd,
   });
 
+  // El «ahora» del simulador es un dato vivo, no una constante de montaje: un
+  // dialogo abierto veinte minutos calculaba desde el instante en que se abrio
+  // y seguia diciendo «si entra un ticket ahora».
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   /**
    * El simulador: los minutos son una abstraccion que nadie puede comprobar de
    * cabeza. Se responde la pregunta que el administrador tiene de verdad —«si
    * entra un ticket ahora, cuando vence»— y se recalcula al cambiar la regla.
    */
   const simulation = useMemo(() => {
-    const now = new Date();
     const shape = {
       businessHoursOnly: businessHoursOnly,
       workdayStart: workdayStart,
@@ -147,7 +174,7 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
       firstResponse: addWorkingMinutes(now, first, shape, holidays),
       resolution: addWorkingMinutes(now, resolution, shape, holidays),
     };
-  }, [businessHoursOnly, workdayStart, workdayEnd, workDays, firstResponseMinutes, resolutionMinutes, holidays]);
+  }, [now, businessHoursOnly, workdayStart, workdayEnd, workDays, firstResponseMinutes, resolutionMinutes, holidays]);
 
   async function onSubmit(form: FormValues) {
     setFormError(null);
@@ -275,11 +302,11 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
               name="workDays"
               control={control}
               render={({ field }) => (
-                <fieldset
-                  className="flex flex-col gap-1.5"
-                  aria-invalid={errors.workDays !== undefined}
-                  aria-describedby={errors.workDays ? "workdays-error" : undefined}
-                >
+                // El error del grupo no puede colgar del <fieldset>: ni
+                // aria-invalid ni aria-describedby estan soportados ahi y no se
+                // anuncian a nadie. Se atan a cada casilla, que es lo que recibe
+                // el foco.
+                <fieldset className="flex flex-col gap-1.5">
                   <legend className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">
                     Días laborables
                   </legend>
@@ -303,6 +330,8 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
                             className="sr-only"
                             checked={checked}
                             aria-label={day.label}
+                            aria-invalid={errors.workDays !== undefined}
+                            aria-describedby={errors.workDays ? "workdays-error" : undefined}
                             onChange={(event) =>
                               field.onChange(
                                 event.target.checked
@@ -331,7 +360,7 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
         {simulation && (
           <div
             aria-live="polite"
-            className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3"
+            className="rounded-edge border border-line px-3.5 py-3"
           >
             <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
               Si entra un ticket ahora · {timeFormat.format(simulation.now)}
@@ -357,27 +386,20 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
                   </dd>
                 </div>
 
-                {(simulation.resolution.skippedHolidays > 0 ||
-                  simulation.resolution.skippedNonWorkdays > 0) && (
-                  <p className="mt-0.5 text-[11.5px] leading-relaxed text-faint">
-                    En el camino salta{" "}
-                    {[
-                      simulation.resolution.skippedNonWorkdays > 0 &&
-                        `${simulation.resolution.skippedNonWorkdays} ${
-                          simulation.resolution.skippedNonWorkdays === 1
-                            ? "día no laborable"
-                            : "días no laborables"
-                        }`,
-                      simulation.resolution.skippedHolidays > 0 &&
-                        `${simulation.resolution.skippedHolidays} ${
-                          simulation.resolution.skippedHolidays === 1 ? "feriado" : "feriados"
-                        }`,
-                    ]
-                      .filter(Boolean)
-                      .join(" y ")}
-                    .
-                  </p>
-                )}
+                {/* Los dos plazos saltan cosas distintas: decir solo lo que
+                    salta la resolucion deja el otro tramo sin explicar. */}
+                {(() => {
+                  const first = skippedPhrase(simulation.firstResponse);
+                  const resolution = skippedPhrase(simulation.resolution);
+                  if (first === "" && resolution === "") return null;
+
+                  return (
+                    <p className="mt-0.5 text-[11.5px] leading-relaxed text-faint">
+                      {first !== "" && <>Hasta la primera respuesta salta {first}. </>}
+                      {resolution !== "" && <>Hasta la resolución salta {resolution}.</>}
+                    </p>
+                  );
+                })()}
               </dl>
             )}
           </div>

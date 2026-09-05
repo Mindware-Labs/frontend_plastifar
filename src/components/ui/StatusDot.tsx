@@ -4,7 +4,7 @@ export function StatusDot({ active }: { active: boolean }) {
     <span className="inline-flex items-center gap-[7px] whitespace-nowrap text-[12.5px] text-brand-gray">
       <span
         aria-hidden
-        className={`h-[7px] w-[7px] shrink-0 rounded-full ${active ? "bg-brand-green" : "bg-zinc-300"}`}
+        className={`h-[7px] w-[7px] shrink-0 rounded-full ${active ? "bg-brand-green" : "bg-line-strong"}`}
       />
       {active ? "Activo" : "Inactivo"}
     </span>

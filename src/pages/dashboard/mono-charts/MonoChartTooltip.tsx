@@ -23,7 +23,7 @@ export function MonoChartTooltip({ active, payload, label, indicator = "dot", fo
         </div>
       )}
       <div className="flex flex-col gap-1">
-        {payload.map((item, idx) => {
+        {payload.map((item) => {
           const color = item.color || item.fill || "var(--color-brand-red)";
           const valueDisplay = formatter
             ? formatter(item.value, item.name)
@@ -32,7 +32,9 @@ export function MonoChartTooltip({ active, payload, label, indicator = "dot", fo
               : item.value;
 
           return (
-            <div key={idx} className="flex items-center justify-between gap-3">
+            // La clave sale del dato, no del indice: el donut reordena sus
+            // segmentos por magnitud en cada refresco.
+            <div key={item.dataKey ?? item.name} className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-1.5">
                 {indicator === "dot" ? (
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />

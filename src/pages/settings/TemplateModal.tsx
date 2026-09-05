@@ -6,7 +6,12 @@ import { ApiError } from "../../api/client";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
+import {
+  CheckboxField,
+  TextAreaField,
+  TextField,
+  type FieldState,
+} from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { renderPreview, unknownVariables } from "../../lib/templates";
 import { TEMPLATE_VARIABLES, type EmailTemplate } from "../../types/settings";
@@ -165,42 +170,30 @@ export function TemplateModal({ template, onClose, onSaved }: TemplateModalProps
           {...register("subject")}
         />
 
-        <label className="flex flex-col gap-1.5">
-          <span className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">
-            Cuerpo <span className="ml-1 text-brand-red">*</span>
-          </span>
-          <textarea
-            rows={9}
-            aria-invalid={errors.body !== undefined}
-            aria-describedby={errors.body ? "template-body-error" : undefined}
-            className={`w-full rounded-edge border bg-white px-3 py-2.5 text-[13px] leading-relaxed text-ink
-              outline-none transition-colors ${
-                errors.body
-                  ? "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/12"
-                  : "border-line-strong hover:border-zinc-400 focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
-              }`}
-            {...register("body")}
-          />
-          {errors.body?.message && (
-            <span id="template-body-error" className="text-[11.5px] font-medium text-brand-red-dark">
-              {errors.body.message}
-            </span>
-          )}
-        </label>
+        <TextAreaField
+          label="Cuerpo"
+          rows={9}
+          required
+          error={errors.body?.message}
+          {...register("body")}
+        />
 
         <div className="flex flex-col gap-1.5">
           <span className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">
             Variables permitidas
           </span>
+          {/* Que significa cada variable se lee, no se descubre pasando el
+              mouse: un `title` no existe para el teclado ni para el tactil. */}
           <div className="flex flex-wrap gap-1.5">
             {TEMPLATE_VARIABLES.map((variable) => (
               <span
                 key={variable.key}
-                title={variable.label}
-                className="inline-flex items-center rounded-edge border border-line bg-canvas px-2 py-1
-                  font-mono text-[11px] text-brand-gray"
+                className="inline-flex flex-col gap-0.5 rounded-edge border border-line px-2 py-1"
               >
-                {`{{${variable.key}}}`}
+                <span className="font-mono text-[11px] leading-tight text-brand-gray">
+                  {`{{${variable.key}}}`}
+                </span>
+                <span className="text-[10.5px] leading-tight text-faint">{variable.label}</span>
               </span>
             ))}
           </div>
@@ -209,13 +202,14 @@ export function TemplateModal({ template, onClose, onSaved }: TemplateModalProps
         {unknown.length > 0 && (
           <Alert variant="error">
             {unknown.length === 1 ? "Variable desconocida" : "Variables desconocidas"}:{" "}
-            {unknown.map((name) => `{{${name}}}`).join(", ")}. Solo se admiten las cuatro de arriba.
+            {unknown.map((name) => `{{${name}}}`).join(", ")}. Solo se admiten las{" "}
+            {TEMPLATE_VARIABLES.length} variables de arriba.
           </Alert>
         )}
 
         {/* RF-K3: vista previa con datos de ejemplo antes de guardar. */}
         {showPreview && (
-          <div className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3">
+          <div className="rounded-edge border border-line px-3.5 py-3">
             <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
               Así lo recibe el cliente
             </p>

@@ -1,8 +1,7 @@
 import { CornerDownRight, Pencil, Plus, Power } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { departmentsApi } from "../../api/departments";
 import { settingsApi } from "../../api/settings";
-import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -17,9 +16,10 @@ import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLocalPage } from "../../hooks/useLocalPage";
 import { usePermissions } from "../../hooks/usePermissions";
-import { upsertById } from "../../lib/catalog";
 import type { DepartmentResponse } from "../../types/api";
 import type { SlaPolicy, TicketTopic } from "../../types/settings";
+import { ChipGroup, LoadErrorAlert, NoticeDialog } from "./catalogSection";
+import { freshCopy, staleClass, useSectionLoad } from "./catalogState";
 import { SettingsLayout } from "./SettingsLayout";
 import { TopicModal } from "./TopicModal";
 
@@ -32,14 +32,16 @@ const priorityTone: Record<string, "red" | "green" | "neutral"> = {
   Baja: "neutral",
 };
 
+const listTopics = () => settingsApi.topics.list({ page: 1, pageSize: 100 });
+
 export function TopicsSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [topics, setTopics] = useState<TicketTopic[] | null>(null);
+  const [topics, setTopics] = useState<TicketTopic[]>([]);
   const [policies, setPolicies] = useState<SlaPolicy[]>([]);
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [departmentId, setDepartmentId] = useState("todos");
@@ -47,25 +49,27 @@ export function TopicsSection() {
 
   const [modal, setModal] = useState<"nuevo" | TicketTopic | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
+  const [notice, setNotice] = useState<{ title: string; body: ReactNode } | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
-  function reload() {
-    return settingsApi.topics
-      .list({ page: 1, pageSize: 100 })
-      .then((res) => setTopics(res.items));
-  }
-
-  useEffect(() => {
-    Promise.all([
-      reload(),
-      settingsApi.slaPolicies.list({ page: 1, pageSize: 100 }).then((res) => setPolicies(res.items)),
-      departmentsApi.list().then(setDepartments),
-    ]).catch(() => setError("No se pudieron cargar los motivos"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const load = useCallback(async () => {
+    const [topicPage, policyPage, departmentList] = await Promise.all([
+      listTopics(),
+      settingsApi.slaPolicies.list({ page: 1, pageSize: 100 }),
+      departmentsApi.list(),
+    ]);
+    setTopics(topicPage.items);
+    setPolicies(policyPage.items);
+    setDepartments(departmentList);
   }, []);
 
-  const all = useMemo(() => topics ?? [], [topics]);
+  const { status, isRefetching, error, reload, retry } = useSectionLoad(
+    load,
+    "No se pudieron cargar los motivos",
+  );
+
+  const all = topics;
   const activeCount = all.filter((topic) => topic.isActive).length;
 
   function departmentName(id: number) {
@@ -76,7 +80,8 @@ export function TopicsSection() {
    * Resolucion de la seccion 8.3: primero la politica del motivo; si no tiene, la
    * predeterminada de su prioridad. La celda nombra la que de verdad va a
    * aplicarse, porque decir «la de alta» esconde justo la consecuencia que esta
-   * pantalla existe para mostrar.
+   * pantalla existe para mostrar. La predeterminada tiene que estar activa: una
+   * politica apagada no calcula nada, y el dialogo aplica la misma regla.
    */
   function policyFor(topic: TicketTopic) {
     if (topic.slaPolicyId !== null) {
@@ -96,11 +101,14 @@ export function TopicsSection() {
   }
 
   /**
-   * Orden de lectura: cada motivo de primer nivel seguido de sus hijos. Buscar
-   * aplana la lista, porque una jerarquia con la mitad de las ramas ocultas
-   * miente sobre lo que hay.
+   * Solo la busqueda libre aplana el arbol: un termino puede encontrar al hijo
+   * sin encontrar al padre, y una jerarquia con la mitad de las ramas ocultas
+   * miente. El departamento y el estado siguen leyendose en dos niveles, porque
+   * filtran por una propiedad que padre e hijo declaran cada uno por su cuenta.
    */
-  const rows = useMemo(() => {
+  const isFlat = debouncedSearch !== "";
+
+  const { list: rows, nested } = useMemo(() => {
     const matches = (topic: TicketTopic) => {
       const byChip =
         chip === "todos" ||
@@ -117,52 +125,68 @@ export function TopicsSection() {
     };
 
     const filtered = all.filter(matches);
-    if (debouncedSearch !== "" || departmentId !== "todos" || chip !== "todos") return filtered;
+    if (isFlat) return { list: filtered, nested: new Set<number>() };
 
-    return all
-      .filter((topic) => topic.parentId === null)
-      .flatMap((parent) => [parent, ...all.filter((child) => child.parentId === parent.id)]);
-  }, [all, chip, departmentId, debouncedSearch]);
+    const kept = new Set(filtered.map((topic) => topic.id));
+    const list: TicketTopic[] = [];
+    const indented = new Set<number>();
+    const placed = new Set<number>();
 
-  const isFlat = debouncedSearch !== "" || departmentId !== "todos" || chip !== "todos";
+    for (const parent of all.filter((topic) => topic.parentId === null)) {
+      const children = all.filter((child) => child.parentId === parent.id && kept.has(child.id));
+      if (!kept.has(parent.id) && children.length === 0) continue;
+
+      if (kept.has(parent.id)) {
+        list.push(parent);
+        placed.add(parent.id);
+      }
+
+      for (const child of children) {
+        list.push(child);
+        placed.add(child.id);
+        // Sangrado solo cuando el padre esta encima: sangrar bajo un padre que
+        // el filtro dejo fuera dibujaria una rama que no esta en pantalla.
+        if (kept.has(parent.id)) indented.add(child.id);
+      }
+    }
+
+    // Un sub-motivo cuyo padre no esta en el catalogo existe y cuenta: se
+    // muestra suelto en vez de desaparecer sin dejar rastro.
+    for (const topic of filtered) if (!placed.has(topic.id)) list.push(topic);
+
+    return { list, nested: indented };
+  }, [all, chip, departmentId, debouncedSearch, isFlat]);
 
   /**
-   * RF-K2: los listados de catalogo paginan como cualquier otro. Aqui la
-   * unidad de pagina es el motivo de primer nivel con sus hijos, no la fila:
-   * cortar por filas dejaria un sub-motivo al principio de la pagina siguiente,
-   * separado del padre que le da sentido. Con la busqueda activa la lista ya
-   * esta aplanada y cada fila es su propio grupo.
+   * RF-K2: los listados de catalogo paginan como cualquier otro, y la unidad de
+   * pagina es la fila que se ve. Cortar por grupos padre-hijo hacia que el pie
+   * contara doce y la tabla enseñara veinte; cuando el corte separa a un hijo de
+   * su padre, la fila lo dice con «en <padre>» en vez de fingir la sangria.
    */
-  const groups = useMemo(() => {
-    if (isFlat) return rows.map((topic) => [topic]);
-    return rows.reduce<TicketTopic[][]>((acc, topic) => {
-      if (topic.parentId === null) acc.push([topic]);
-      else if (acc.length > 0) acc[acc.length - 1].push(topic);
-      return acc;
-    }, []);
-  }, [rows, isFlat]);
-
-  const {
-    page,
-    pageSize,
-    total,
-    totalPages,
-    pageRows: pageGroups,
-    setPage,
-    changePageSize,
-  } = useLocalPage(groups, JSON.stringify([debouncedSearch, departmentId, chip]));
-
-  const pageRows = pageGroups.flat();
-
-  function upsert(item: TicketTopic) {
-    setTopics((previous) => upsertById(previous ?? [], item));
-  }
+  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
+    rows,
+    JSON.stringify([debouncedSearch, departmentId, chip]),
+  );
 
   /**
    * RF-K5: no se desactiva el ultimo motivo activo. Sin motivos no hay forma de
    * abrir un ticket, asi que el sistema se quedaria sin puerta de entrada.
    */
   function askToggle(topic: TicketTopic) {
+    if (topic.isActive && activeCount === 1) {
+      setNotice({
+        title: "No se puede desactivar",
+        body: (
+          <>
+            <strong className="font-semibold text-ink">{topic.name}</strong> es el único motivo
+            activo. Sin ninguno no habría forma de abrir un ticket: activa otro antes de desactivar
+            este.
+          </>
+        ),
+      });
+      return;
+    }
+
     setConfirmation({
       tone: "warn",
       icon: Power,
@@ -170,8 +194,9 @@ export function TopicsSection() {
       description: topic.isActive ? (
         <>
           <strong className="font-semibold text-ink">{topic.name}</strong> dejará de ofrecerse al
-          abrir un ticket. Los {topic.ticketCount.toLocaleString("es-DO")} tickets que ya lo usan
-          conservan su motivo y su historial.
+          abrir un ticket. {topic.ticketCount.toLocaleString("es-DO")}{" "}
+          {topic.ticketCount === 1 ? "ticket que ya lo usa conserva" : "tickets que ya lo usan conservan"}{" "}
+          su motivo y su historial.
         </>
       ) : (
         <>
@@ -181,16 +206,22 @@ export function TopicsSection() {
       ),
       confirmLabel: topic.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        const saved = await settingsApi.topics.update(topic.id, {
-          name: topic.name,
-          parentId: topic.parentId,
-          defaultDepartmentId: topic.defaultDepartmentId,
-          defaultPriority: topic.defaultPriority,
-          slaPolicyId: topic.slaPolicyId,
-          requiresProductLine: topic.requiresProductLine,
-          isActive: !topic.isActive,
-        });
-        upsert(saved);
+        setBusyId(topic.id);
+        try {
+          const current = await freshCopy(listTopics, topic);
+          await settingsApi.topics.update(current.id, {
+            name: current.name,
+            parentId: current.parentId,
+            defaultDepartmentId: current.defaultDepartmentId,
+            defaultPriority: current.defaultPriority,
+            slaPolicyId: current.slaPolicyId,
+            requiresProductLine: current.requiresProductLine,
+            isActive: !current.isActive,
+          });
+          await reload();
+        } finally {
+          setBusyId(null);
+        }
       },
     });
   }
@@ -199,7 +230,7 @@ export function TopicsSection() {
     <SettingsLayout
       action={
         canWrite && (
-          <Button size="sm" onClick={() => setModal("nuevo")}>
+          <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
             <Plus className="h-[15px] w-[15px]" />
             Nuevo motivo
           </Button>
@@ -231,129 +262,143 @@ export function TopicsSection() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <FilterChip
-          label="Todos"
-          count={all.length}
-          active={chip === "todos"}
-          onClick={() => setChip("todos")}
-        />
-        <FilterChip
-          label="Activos"
-          count={activeCount}
-          active={chip === "activos"}
-          onClick={() => setChip("activos")}
-        />
-        <FilterChip
-          label="Inactivos"
-          count={all.length - activeCount}
-          active={chip === "inactivos"}
-          onClick={() => setChip("inactivos")}
-        />
+        <ChipGroup label="Filtrar por estado" ready={status === "ready"}>
+          <FilterChip
+            label="Todos"
+            count={all.length}
+            active={chip === "todos"}
+            onClick={() => setChip("todos")}
+          />
+          <FilterChip
+            label="Activos"
+            count={activeCount}
+            active={chip === "activos"}
+            onClick={() => setChip("activos")}
+          />
+          <FilterChip
+            label="Inactivos"
+            count={all.length - activeCount}
+            active={chip === "inactivos"}
+            onClick={() => setChip("inactivos")}
+          />
+        </ChipGroup>
       </div>
 
-      {error && (
-        <div className="mb-3">
-          <Alert variant="error">{error}</Alert>
-        </div>
-      )}
+      {error && <LoadErrorAlert message={error} onRetry={retry} />}
 
-      {topics === null ? (
+      {status === "loading" ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : rows.length === 0 ? (
+      ) : status === "error" ? null : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          Ningún motivo coincide con este filtro o búsqueda.
+          {all.length === 0
+            ? "Todavía no hay ningún motivo configurado."
+            : "Ningún motivo coincide con este filtro o búsqueda."}
         </p>
       ) : (
-        <DataTable>
-          <thead>
-            <HeadRow>
-              <Th>Motivo</Th>
-              <Th>Departamento</Th>
-              <Th>Prioridad</Th>
-              <Th>Política de SLA</Th>
-              <Th>Línea de producto</Th>
-              <Th>Estado</Th>
-              {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-            </HeadRow>
-          </thead>
+        <div className={staleClass(isRefetching)}>
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Motivo</Th>
+                <Th>Departamento</Th>
+                <Th>Prioridad</Th>
+                <Th>Política de SLA</Th>
+                <Th>Línea de producto</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-          <tbody>
-            {pageRows.map((topic) => {
-              const policy = policyFor(topic);
-              const parent = parentName(topic);
-              const isChild = topic.parentId !== null;
+            <tbody>
+              {pageRows.map((topic, index) => {
+                const policy = policyFor(topic);
+                const parent = parentName(topic);
+                const isChild = topic.parentId !== null;
+                // La sangria solo vale si el padre esta en pantalla, encima.
+                const isNested = nested.has(topic.id) && index > 0;
 
-              return (
-                <Row key={topic.id}>
-                  <Td>
-                    <span className={`flex items-center gap-2 ${isChild && !isFlat ? "pl-5" : ""}`}>
-                      {isChild && !isFlat && (
-                        <CornerDownRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-faint" />
-                      )}
-                      <span className="flex flex-col gap-0.5">
-                        <span className="text-[13px] font-medium leading-tight text-ink">
-                          {topic.name}
-                        </span>
-                        {isChild && isFlat && parent && (
-                          <span className="text-[11px] leading-tight text-faint">en {parent}</span>
-                        )}
-                      </span>
-                    </span>
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">
-                    {departmentName(topic.defaultDepartmentId)}
-                  </Td>
-                  <Td>
-                    <Badge tone={priorityTone[topic.defaultPriority]}>{topic.defaultPriority}</Badge>
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">
-                    {policy ? (
-                      <span className="flex flex-col gap-0.5">
-                        <span className="leading-tight">{policy.policy.name}</span>
-                        {policy.inherited && (
-                          <span className="text-[11px] leading-tight text-faint">
-                            heredada de {topic.defaultPriority}
-                          </span>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="text-warn">
-                        Sin política para {topic.defaultPriority}
-                      </span>
-                    )}
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">
-                    {topic.requiresProductLine ? "Obligatoria" : <span className="text-faint">—</span>}
-                  </Td>
-                  <Td>
-                    <StatusDot active={topic.isActive} />
-                  </Td>
-                  {canWrite && (
+                return (
+                  <Row key={topic.id} busy={busyId === topic.id}>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Editar ${topic.name}`}
-                          icon={Pencil}
-                          onClick={() => setModal(topic)}
-                        />
-                        <RowAction
-                          label={topic.isActive ? `Desactivar ${topic.name}` : `Reactivar ${topic.name}`}
-                          icon={Power}
-                          onClick={() => askToggle(topic)}
-                        />
-                      </div>
+                      <span className={`flex items-center gap-2 ${isNested ? "pl-5" : ""}`}>
+                        {isNested && (
+                          <CornerDownRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-faint" />
+                        )}
+                        <span className="flex flex-col gap-0.5">
+                          <span className="text-[12.5px] font-medium leading-tight text-ink">
+                            {topic.name}
+                          </span>
+                          {isChild && !isNested && parent && (
+                            <span className="text-[11px] leading-tight text-faint">en {parent}</span>
+                          )}
+                        </span>
+                      </span>
                     </Td>
-                  )}
-                </Row>
-              );
-            })}
-          </tbody>
-        </DataTable>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      {departmentName(topic.defaultDepartmentId)}
+                    </Td>
+                    <Td>
+                      <Badge tone={priorityTone[topic.defaultPriority]}>
+                        {topic.defaultPriority}
+                      </Badge>
+                    </Td>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      {policy ? (
+                        <span className="flex flex-col gap-0.5">
+                          <span className="leading-tight">{policy.policy.name}</span>
+                          {policy.inherited && (
+                            <span className="text-[11px] leading-tight text-faint">
+                              heredada de {topic.defaultPriority.toLowerCase()}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-warn">
+                          Sin política para {topic.defaultPriority.toLowerCase()}
+                        </span>
+                      )}
+                    </Td>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      {topic.requiresProductLine ? (
+                        "Obligatoria"
+                      ) : (
+                        <span className="text-faint">—</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <StatusDot active={topic.isActive} />
+                    </Td>
+                    {canWrite && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Editar ${topic.name}`}
+                            icon={Pencil}
+                            onClick={() => setModal(topic)}
+                            disabled={busyId === topic.id}
+                          />
+                          <RowAction
+                            label={
+                              topic.isActive ? `Desactivar ${topic.name}` : `Reactivar ${topic.name}`
+                            }
+                            icon={Power}
+                            onClick={() => askToggle(topic)}
+                            disabled={busyId === topic.id}
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                );
+              })}
+            </tbody>
+          </DataTable>
+        </div>
       )}
 
-      {topics !== null && rows.length > 0 && (
+      {status === "ready" && rows.length > 0 && (
         <Pagination
           page={page}
           pageSize={pageSize}
@@ -361,7 +406,7 @@ export function TopicsSection() {
           totalPages={totalPages}
           onPageChange={setPage}
           onPageSizeChange={changePageSize}
-          noun={isFlat ? "motivos" : "motivos de primer nivel"}
+          noun="motivos"
         />
       )}
 
@@ -378,11 +423,19 @@ export function TopicsSection() {
           policies={policies}
           departments={departments}
           onClose={() => setModal(null)}
-          onSaved={upsert}
+          onSaved={() => {
+            void reload();
+          }}
         />
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+
+      {notice && (
+        <NoticeDialog title={notice.title} icon={Power} onClose={() => setNotice(null)}>
+          {notice.body}
+        </NoticeDialog>
+      )}
     </SettingsLayout>
   );
 }

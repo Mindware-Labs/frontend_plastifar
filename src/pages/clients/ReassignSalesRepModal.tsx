@@ -22,23 +22,26 @@ export function ReassignSalesRepModal({ client, salesReps, onClose, onSaved }: R
     defaultValues: { salesRepStaffId: client.salesRepStaffId ? String(client.salesRepStaffId) : "" },
   });
 
-  // No existe un endpoint de un solo campo: se manda el cliente entero con el
-  // vendedor cambiado, igual que hace la edicion completa.
+  // No existe un endpoint de un solo campo: hay que mandar el cliente entero.
+  // Por eso se relee antes de escribir — la fila del listado puede llevar
+  // minutos en pantalla, y mandarla tal cual revertiria en silencio cualquier
+  // campo que otra persona haya cambiado mientras tanto.
   async function onSubmit(values: { salesRepStaffId: string }) {
     setFormError(null);
     try {
+      const { client: fresh } = await clientsApi.get(client.id);
       await clientsApi.update(client.id, {
-        code: client.code,
-        name: client.name,
-        taxId: client.taxId,
-        type: client.type,
-        territoryId: client.territoryId,
+        code: fresh.code,
+        name: fresh.name,
+        taxId: fresh.taxId,
+        type: fresh.type,
+        territoryId: fresh.territoryId,
         salesRepStaffId: values.salesRepStaffId === "" ? null : Number(values.salesRepStaffId),
-        phone: client.phone,
-        email: client.email,
-        address: client.address,
-        notes: client.notes,
-        isActive: client.isActive,
+        phone: fresh.phone,
+        email: fresh.email,
+        address: fresh.address,
+        notes: fresh.notes,
+        isActive: fresh.isActive,
       });
       onSaved();
       onClose();
@@ -58,7 +61,7 @@ export function ReassignSalesRepModal({ client, salesReps, onClose, onSaved }: R
             Cancelar
           </Button>
           <Button type="submit" form="reassign-form" isLoading={formState.isSubmitting}>
-            Guardar
+            Guardar cambios
           </Button>
         </>
       }

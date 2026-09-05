@@ -18,7 +18,14 @@ export function Breadcrumb({ crumbs }: BreadcrumbProps) {
   const ancestors = crumbs.slice(0, -1);
 
   return (
-    <nav aria-label="Ubicación actual" className="flex min-w-0 items-center">
+    <>
+      {/* Encabezado de primer nivel del panel. Es invisible a proposito: el
+          dispositivo visible que nombra la pagina es el rastro de abajo (ver
+          DESIGN.md, App Shell), pero sin un <h1> cada pantalla del panel
+          entregaba un esquema de documento vacio a un lector de pantalla. */}
+      <h1 className="sr-only">{current.label}</h1>
+
+      <nav aria-label="Ubicación actual" className="flex min-w-0 items-center">
       {/* Movil: solo la pagina actual — el resto del rastro compite por muy
           poco ancho y el Sidebar ya resuelve "a donde puedo ir". */}
       <span className="truncate text-[13px] font-semibold text-ink sm:hidden">{current.label}</span>
@@ -46,7 +53,8 @@ export function Breadcrumb({ crumbs }: BreadcrumbProps) {
         <li className="min-w-0 truncate text-[13px] font-semibold text-ink" aria-current="page">
           {current.label}
         </li>
-      </ol>
-    </nav>
+        </ol>
+      </nav>
+    </>
   );
 }

@@ -3,9 +3,14 @@
 // comportamiento (curva natural, doble area con gradiente) sin cambios;
 // recoloreado a la paleta de marca (antes monocromo negro/blanco) — rojo para
 // creados, verde para resueltos, mismo semaforo que el resto del Dashboard.
+import { CheckCircle2, Plus } from "lucide-react";
 import { useId } from "react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
+import { DashboardCard } from "../DashboardCard";
+import { MonoChartLegend, MonoChartTable, type LegendItem } from "./MonoChartA11y";
 import { MonoChartTooltip } from "./MonoChartTooltip";
+import { INSET_RADIUS } from "../radii";
+import { AXIS_TICK } from "./chartTheme";
 
 interface StreamPoint {
   t: string;
@@ -19,31 +24,42 @@ interface MonoRoundedStreamChartProps {
   compact?: boolean;
 }
 
+// Rojo/verde no puede ser la unica diferencia entre las dos curvas: "Resueltos"
+// va con trazo discontinuo para que se separe tambien sin percepcion de color.
+const LEGEND: LegendItem[] = [
+  { label: "Creados", color: "var(--color-brand-red)", shape: "line", icon: Plus },
+  { label: "Resueltos", color: "var(--color-brand-green)", shape: "dashed", icon: CheckCircle2 },
+];
+
 export function MonoRoundedStreamChart({ data, peak, compact = false }: MonoRoundedStreamChartProps) {
   const idPrefix = useId().replace(/:/g, "");
 
   return (
-    <div
-      className={`relative w-full rounded-2xl border border-line-soft bg-white shadow-[0_1px_2px_rgba(27,27,29,0.04),0_8px_24px_-12px_rgba(27,27,29,0.10)]
-        transition-shadow duration-300 flex flex-col justify-between overflow-hidden p-4 sm:p-5 ${
-          compact ? "h-[220px] sm:h-[268px]" : "min-h-[290px]"
-        }`}
+    <DashboardCard
+      padding="chart"
+      className={`relative w-full transition-shadow duration-300 flex flex-col justify-between overflow-hidden ${
+        compact ? "h-[220px] sm:h-[268px]" : "min-h-[290px]"
+      }`}
     >
       <div className="flex items-center justify-between mb-1">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold tracking-wider uppercase text-faint">Actividad por hora</span>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-brand-red/10 text-brand-red border border-brand-red/20">
+            <h2 className="text-xs font-semibold tracking-wider uppercase text-faint">Actividad por hora</h2>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-brand-red/8 text-brand-red border border-brand-red/20">
               Flujo
             </span>
           </div>
-          <div className="text-xl font-bold tracking-tight tabular-nums mt-0.5 font-sans text-ink">
+          <p className="text-xl font-bold tracking-tight tabular-nums mt-0.5 font-heading text-ink">
             {peak} <span className="text-xs font-normal text-muted">pico de tickets</span>
-          </div>
+          </p>
         </div>
       </div>
 
-      <div className="relative w-full flex-1 rounded-[14px] overflow-hidden p-2 bg-canvas">
+      <div
+        role="img"
+        aria-label={`Tickets creados y resueltos por hora. Pico de ${peak} tickets.`}
+        className={`relative w-full flex-1 ${INSET_RADIUS} overflow-hidden p-2 bg-canvas`}
+      >
         <svg className="absolute w-0 h-0 pointer-events-none">
           <defs>
             <linearGradient id={`${idPrefix}stream-g1`} x1="0" y1="0" x2="0" y2="1">
@@ -58,14 +74,22 @@ export function MonoRoundedStreamChart({ data, peak, compact = false }: MonoRoun
         </svg>
         <ResponsiveContainer width="100%" height={compact ? 130 : 160}>
           <AreaChart data={data} margin={{ top: 12, right: 12, left: -22, bottom: 0 }}>
-            <XAxis dataKey="t" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#A1A1AA" }} />
-            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#A1A1AA" }} />
+            <XAxis dataKey="t" tickLine={false} axisLine={false} tick={AXIS_TICK} />
+            <YAxis tickLine={false} axisLine={false} tick={AXIS_TICK} />
             <Tooltip content={<MonoChartTooltip indicator="dot" />} />
             <Area type="natural" dataKey="w1" name="Creados" stroke="var(--color-brand-red)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill={`url(#${idPrefix}stream-g1)`} animationDuration={800} />
-            <Area type="natural" dataKey="w2" name="Resueltos" stroke="var(--color-brand-green)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" fill={`url(#${idPrefix}stream-g2)`} animationDuration={900} />
+            <Area type="natural" dataKey="w2" name="Resueltos" stroke="var(--color-brand-green)" strokeWidth={1.5} strokeDasharray="5 3" strokeLinecap="round" strokeLinejoin="round" fill={`url(#${idPrefix}stream-g2)`} animationDuration={900} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
-    </div>
+
+      <MonoChartLegend items={LEGEND} />
+
+      <MonoChartTable
+        caption="Tickets creados y resueltos por hora"
+        columns={["Hora", "Creados", "Resueltos"]}
+        rows={data.map((point) => [point.t, point.w1, point.w2])}
+      />
+    </DashboardCard>
   );
 }

@@ -75,7 +75,7 @@ export function AccessModal({
   // Un rol inactivo no puede asignarse a nadie nuevo, pero si ya estaba asignado
   // se muestra para no romper la ficha de quien lo tiene.
   const assignableRoles = roles.filter(
-    (role) => !role.grantsAll && (role.isActive || (access && role.id === access.roleId)),
+    (role) => !role.isSystem && (role.isActive || (access && role.id === access.roleId)),
   );
 
   async function onSubmit(values: FormValues) {
@@ -95,7 +95,6 @@ export function AccessModal({
 
   return (
     <Modal
-      eyebrow="Personal · Accesos"
       title={isEdit ? "Cambiar el rol del acceso" : "Otorgar acceso a un departamento"}
       description={
         isEdit
