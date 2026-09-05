@@ -116,6 +116,9 @@ export function formatInitials(
   if (primerNombre) {
     return primerNombre.slice(0, 2).toUpperCase();
   }
+  if (primerApellido) {
+    return primerApellido.slice(0, 2).toUpperCase();
+  }
   if (fallbackEmail) {
     return (fallbackEmail.split("@")[0] ?? "").slice(0, 2).toUpperCase() || "PF";
   }
