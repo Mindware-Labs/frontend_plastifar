@@ -11,6 +11,7 @@ import {
 import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 
 interface ToggleRowProps {
   icon: ComponentType<{ className?: string }>;
@@ -76,6 +77,7 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
   const prefs = useNotifyPrefs();
   const [permission, setPermission] = useState<DesktopState>(desktopState);
   const [asking, setAsking] = useState(false);
+  const { isExiting, requestClose } = useModalAnimation(onClose);
 
   async function toggleDesktop(enabled: boolean) {
     if (!enabled) {
@@ -106,8 +108,10 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
       title="Avisos de correo nuevo"
       description="Se aplican en este navegador. Cada persona decide los suyos."
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       footer={
-        <Button size="sm" onClick={onClose}>
+        <Button size="sm" onClick={requestClose}>
           Listo
         </Button>
       }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { staffApi } from "../../api/staff";
 import { useReceipts } from "../../context/useReceipts";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
@@ -15,6 +16,7 @@ export function SignatureModal({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const receipts = useReceipts();
+  const { isExiting, requestClose } = useModalAnimation(onClose);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +45,7 @@ export function SignatureModal({ onClose }: { onClose: () => void }) {
     try {
       await staffApi.updateSignature(signature);
       receipts.done({ action: "firma", title: "Firma guardada" });
-      onClose();
+      requestClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la firma");
     } finally {
@@ -57,9 +59,11 @@ export function SignatureModal({ onClose }: { onClose: () => void }) {
       title="Tu firma"
       description="Se agrega al final de los correos que envías, debajo de tu nombre."
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       footer={
         <>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={requestClose}>
             Cancelar
           </Button>
           <Button size="sm" onClick={handleSave} isLoading={saving} disabled={signature === null}>

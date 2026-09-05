@@ -104,9 +104,35 @@ input:-webkit-autofill:focus {
   to { opacity: 1; }
 }
 
+@keyframes plf-scrim-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @keyframes plf-modal-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.985); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+    filter: blur(1.5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes plf-modal-out {
+  from {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+    filter: blur(1.5px);
+  }
 }
 
 @keyframes plf-shake {
@@ -244,7 +270,9 @@ input:-webkit-autofill:focus {
 .animate-plf-popover-in { animation: plf-popover-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-popover-out { animation: plf-popover-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-scrim-in { animation: plf-scrim-in 0.18s ease-out both; }
+.animate-plf-scrim-out { animation: plf-scrim-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-modal-in { animation: plf-modal-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-modal-out { animation: plf-modal-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
 .animate-plf-receipt-out { animation: plf-receipt-out 0.16s ease-in both; }
@@ -273,7 +301,9 @@ input:-webkit-autofill:focus {
   .animate-plf-selection-out,
   .animate-plf-tabs-out,
   .animate-plf-popover-out,
-  .animate-plf-receipt-out {
+  .animate-plf-receipt-out,
+  .animate-plf-scrim-out,
+  .animate-plf-modal-out {
     animation-duration: 1ms !important;
   }
 }

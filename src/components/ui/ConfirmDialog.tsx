@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import { useState, type ComponentType, type ReactNode } from "react";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
@@ -25,7 +26,6 @@ const toneClasses: Record<ConfirmTone, string> = {
   warn: "bg-warn/10 text-warn",
 };
 
-
 export function ConfirmDialog({
   tone = "danger",
   icon: Icon = AlertTriangle,
@@ -39,13 +39,14 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isExiting, requestClose } = useModalAnimation(onClose);
 
   async function handleConfirm() {
     setError(null);
     setIsRunning(true);
     try {
       await onConfirm();
-      onClose();
+      requestClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo completar la acción");
     } finally {
@@ -53,13 +54,18 @@ export function ConfirmDialog({
     }
   }
 
-  
-  function requestClose() {
-    if (!isRunning) onClose();
+  function handleCancel() {
+    if (!isRunning) requestClose();
   }
 
   return (
-    <Modal eyebrow={eyebrow} title={title} onClose={requestClose}>
+    <Modal
+      eyebrow={eyebrow}
+      title={title}
+      onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={handleCancel}
+    >
       <div className="flex gap-4">
         <span
           aria-hidden
@@ -75,7 +81,7 @@ export function ConfirmDialog({
       </div>
 
       <div className="mt-6 flex justify-end gap-2 border-t border-line pt-4">
-        <Button type="button" variant="secondary" onClick={requestClose} disabled={isRunning}>
+        <Button type="button" variant="secondary" onClick={handleCancel} disabled={isRunning}>
           {cancelLabel}
         </Button>
         <Button type="button" onClick={handleConfirm} isLoading={isRunning}>
