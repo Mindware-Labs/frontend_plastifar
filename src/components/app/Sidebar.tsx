@@ -179,8 +179,16 @@ export function Sidebar() {
     return targets.some((to) => pathname === to || pathname.startsWith(`${to}/`));
   }
 
-  const local = user?.email.split("@")[0] ?? "";
-  const initials = local.slice(0, 2).toUpperCase() || "PF";
+  const primerNombre = user?.firstName?.trim().split(/\s+/)[0];
+  const primerApellido = user?.lastName?.trim().split(/\s+/)[0];
+  const displayName =
+    primerNombre && primerApellido
+      ? `${primerNombre} ${primerApellido}`
+      : user?.firstName || (user?.email.split("@")[0] ?? "");
+  const initials =
+    primerNombre && primerApellido
+      ? `${primerNombre[0]}${primerApellido[0]}`.toUpperCase()
+      : (user?.email.split("@")[0] ?? "").slice(0, 2).toUpperCase() || "PF";
   const pendingMail = counts
     ? counts.inbox.unread + counts.archived.unread + counts.junk.unread + counts.trash.unread
     : 0;
@@ -277,7 +285,7 @@ export function Sidebar() {
                 shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.22)]"
             >
               <div className="mb-1 border-b border-line-soft px-2.5 pb-2.5 pt-2">
-                <p className="truncate font-heading text-[12.5px] font-semibold text-ink">{local}</p>
+                <p className="truncate font-heading text-[12.5px] font-semibold text-ink">{displayName}</p>
                 <p className="mt-0.5 truncate text-[11.5px] text-faint">{user?.email}</p>
               </div>
               <button
@@ -337,7 +345,7 @@ export function Sidebar() {
             onClick={() => setMenuOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            title={collapsed ? local : undefined}
+            title={collapsed ? displayName : undefined}
             className={`flex w-full items-center rounded-edge transition-colors
               ${collapsed ? "justify-center py-1.5" : "gap-2.5 py-1.5 pl-1.5 pr-2"}
               ${menuOpen ? "bg-fill" : "hover:bg-fill"}`}
@@ -352,7 +360,7 @@ export function Sidebar() {
               <>
                 <span className="min-w-0 flex-1 text-left">
                   <span className="block truncate text-[12.5px] font-semibold leading-tight text-ink">
-                    {local}
+                    {displayName}
                   </span>
                   <span className="block truncate text-[11px] leading-tight text-faint">
                     {user?.isAdmin ? "Administrador" : "Staff"}

@@ -28,6 +28,8 @@ export const staffApi = {
       body: JSON.stringify({ signature }),
     }),
 
+  getById: (id: number) => apiRequest<StaffResponse>(`/api/staff/${id}`),
+
   list: (query: StaffQuery) => apiRequest<StaffListResponse>(`/api/staff${toQuery({ ...query })}`),
 
   create: (data: CreateStaffRequest) =>

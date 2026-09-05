@@ -7,6 +7,10 @@ interface AccessTokenClaims {
   email: string;
   is_admin: "true" | "false";
   exp: number;
+  given_name?: string;
+  family_name?: string;
+  first_name?: string;
+  last_name?: string;
 }
 
 export function decodeAccessToken(token: string): AccessTokenClaims | null {

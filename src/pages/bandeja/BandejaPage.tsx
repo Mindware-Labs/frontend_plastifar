@@ -1,11 +1,10 @@
-import { Bell, BellOff, ChevronLeft, ChevronRight, Inbox, PenLine, Trash2 } from "lucide-react";
+import { Bell, BellOff, ChevronLeft, ChevronRight, Inbox, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi, type EmailQuery } from "../../api/emails";
 import { NotificationsModal } from "../../components/app/NotificationsModal";
 import { Alert } from "../../components/ui/Alert";
-import { Button as PfButton } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
@@ -25,6 +24,7 @@ import { NewEmailComposer } from "./NewEmailComposer";
 import { FilterButton, FilterChips } from "./SearchFilters";
 import { EMPTY_FILTERS, countActive, toQueryParams, type AdvancedFilters } from "./filterCriteria";
 import { SelectionBar } from "./SelectionBar";
+import { InboxTriageEmptyState } from "./InboxTriageEmptyState";
 
 export type FolderKey = "inbox" | "archived" | "junk" | "trash" | "sent";
 type TicketFilter = "todos" | "sin-ticket" | "sin-responder";
@@ -595,14 +595,14 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                     onClose={() => setSelectedId(null)}
                   />
                 ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                    <Inbox className="h-7 w-7 text-faint" />
-                    <p className="text-[13px] text-subtle">Selecciona un correo para verlo.</p>
-                    <PfButton size="sm" className="h-8 px-4" onClick={() => setComposing(true)}>
-                      <PenLine className="h-[15px] w-[15px]" />
-                      Escribir un correo
-                    </PfButton>
-                  </div>
+                  <InboxTriageEmptyState
+                    folder={folder}
+                    counts={data.counts}
+                    folderCounts={data.folderCounts}
+                    onCompose={() => setComposing(true)}
+                    onSelectTicketFilter={(f) => setTicketFilter(f)}
+                    activeTicketFilter={ticketFilter}
+                  />
                 )}
               </ResizablePanel>
             </ResizablePanelGroup>
