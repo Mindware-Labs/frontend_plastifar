@@ -48,28 +48,24 @@ export function ConversationRow({
       data-unread={email.unread}
       data-checked={checked}
       data-selecting={selecting}
-      className="group relative rounded-edge border border-line bg-white
-        transition-[background-color,border-color,box-shadow] duration-200 ease-out
-        data-[unread=false]:bg-canvas/60
-        data-[unread=false]:hover:border-line-strong data-[unread=false]:hover:bg-canvas
-        data-[unread=true]:data-[selected=false]:border-brand-red/40
-        data-[unread=true]:data-[selected=false]:bg-brand-red/[0.03]
-        data-[unread=true]:data-[selected=false]:shadow-[0_0_0_1px_rgba(228,0,43,0.22),0_2px_6px_-1px_rgba(228,0,43,0.28),0_10px_26px_-6px_rgba(228,0,43,0.45)]
-        data-[unread=true]:data-[selected=false]:hover:border-brand-red/60
-        data-[unread=true]:data-[selected=false]:hover:bg-brand-red/[0.06]
-        data-[unread=true]:data-[selected=false]:hover:shadow-[0_0_0_1px_rgba(228,0,43,0.35),0_3px_8px_-1px_rgba(228,0,43,0.38),0_14px_32px_-6px_rgba(228,0,43,0.6)]
-        data-[selected=true]:border-brand-red/45 data-[selected=true]:bg-brand-red/[0.05]
-        data-[selected=true]:hover:border-brand-red data-[selected=true]:hover:bg-brand-red/[0.085]
-        data-[selected=true]:hover:shadow-[0_6px_16px_-10px_rgba(228,0,43,0.5)]
-        data-[checked=true]:border-brand-red/45 data-[checked=true]:bg-brand-red/[0.06]
-        data-[checked=true]:shadow-[0_0_0_1px_rgba(228,0,43,0.18),0_2px_8px_-2px_rgba(228,0,43,0.2)]
-        has-[button[role=checkbox]:focus-visible]:border-brand-red/40"
+      className="group relative rounded-edge border transition-all duration-150 ease-out
+        data-[unread=false]:border-line data-[unread=false]:bg-canvas/50
+        data-[unread=false]:hover:border-line-strong data-[unread=false]:hover:bg-white data-[unread=false]:hover:shadow-xs
+        data-[unread=true]:data-[selected=false]:border-line data-[unread=true]:data-[selected=false]:bg-white
+        data-[unread=true]:data-[selected=false]:shadow-2xs
+        data-[unread=true]:data-[selected=false]:hover:border-line-strong data-[unread=true]:data-[selected=false]:hover:bg-white data-[unread=true]:data-[selected=false]:hover:shadow-xs data-[unread=true]:data-[selected=false]:hover:-translate-y-0.5
+        data-[selected=true]:border-line-strong data-[selected=true]:bg-white
+        data-[selected=true]:shadow-xs
+        data-[selected=true]:ring-1 data-[selected=true]:ring-line-strong/60
+        data-[selected=true]:hover:border-line-strong
+        data-[checked=true]:border-line-strong data-[checked=true]:bg-fill/60
+        has-[button[role=checkbox]:focus-visible]:border-line-strong"
     >
       <button
         type="button"
         onClick={onOpen}
         className="flex w-full flex-col items-start gap-0.5 rounded-edge px-2.5 py-2 text-left outline-none
-          focus-visible:ring-3 focus-visible:ring-brand-red/12"
+          focus-visible:ring-3 focus-visible:ring-line-strong/30"
       >
         <div className="flex w-full items-center gap-1.5">
           {/* El avatar cede su sitio a la casilla; el hueco se conserva para que nada salte. */}
@@ -82,18 +78,27 @@ export function ConversationRow({
               }`}
             >
               <AvatarFallback
-                className="bg-fill text-[9px] font-semibold text-brand-gray
-                  group-data-[selected=true]:bg-brand-red/12
-                  group-data-[selected=true]:text-brand-red-dark"
+                className="bg-fill text-[9px] font-semibold text-brand-gray transition-colors
+                  group-data-[selected=true]:bg-canvas
+                  group-data-[selected=true]:text-ink"
               >
                 {initials(name)}
               </AvatarFallback>
             </Avatar>
           </span>
+
+          {/* Indicador sutil de no leído: punto rojo luminoso */}
+          {email.unread && (
+            <span
+              aria-hidden
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red shadow-[0_0_6px_rgba(228,0,43,0.5)]"
+            />
+          )}
+
           <span
             className="min-w-0 flex-1 truncate text-[12.5px] text-ink transition-colors
               group-data-[unread=true]:font-bold group-data-[unread=false]:font-medium
-              group-data-[selected=true]:text-brand-red-dark"
+              group-data-[selected=true]:font-bold"
           >
             {name}
           </span>
