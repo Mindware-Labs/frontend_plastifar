@@ -234,3 +234,27 @@ export interface EmailFolderCounts {
 export interface StaffSignatureResponse {
   signature: string | null;
 }
+
+/** Aviso en vivo de un correo recibido: lo justo para sonar y avisar en el escritorio. */
+export interface InboxArrival {
+  emailId: number;
+  fromEmail: string;
+  fromName: string | null;
+  subject: string;
+  folder: EmailFolder;
+  hasAttachments: boolean;
+}
+
+/** Cada id representa a su conversacion entera, como en las acciones sueltas. */
+export type EmailBulkAction = "archive" | "junk" | "trash" | "restore" | "read" | "unread" | "delete";
+
+export interface EmailBulkResponse {
+  /** En delete pueden ser menos que las pedidas: las que tienen ticket se conservan. */
+  affected: number;
+}
+
+export interface EmptyTrashResponse {
+  deleted: number;
+  /** Conversaciones con ticket que se conservan como historial del caso. */
+  kept: number;
+}

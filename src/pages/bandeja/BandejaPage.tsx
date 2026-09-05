@@ -1,32 +1,30 @@
-import {
-  ChevronLeft,
-  ChevronRight,
-  CornerUpLeft,
-  Inbox,
-  MessagesSquare,
-  Paperclip,
-  PenLine,
-} from "lucide-react";
+import { Bell, BellOff, ChevronLeft, ChevronRight, Inbox, PenLine, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { ApiError } from "../../api/client";
 import { emailsApi, type EmailQuery } from "../../api/emails";
+import { NotificationsModal } from "../../components/app/NotificationsModal";
 import { Alert } from "../../components/ui/Alert";
 import { Button as PfButton } from "../../components/ui/Button";
+import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
-import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
-import { Badge } from "../../components/shadcn/badge";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../components/shadcn/resizable";
 import { ScrollArea } from "../../components/shadcn/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "../../components/shadcn/tabs";
-import { TooltipProvider } from "../../components/shadcn/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/shadcn/tooltip";
 import { useEmailCounts } from "../../context/useEmailCounts";
+import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useNotifyPrefs } from "../../hooks/useNotifyPrefs";
 import { usePagedList } from "../../hooks/usePagedList";
-import { formatEmailListDate, formatTicketCode } from "../../lib/format";
-import type { EmailListResponse, EmailSummaryResponse } from "../../types/api";
-import { ticketBadgeClass } from "./badgeStyles";
+import type { EmailBulkAction, EmailListResponse, EmailSummaryResponse } from "../../types/api";
+import { ConversationRow } from "./ConversationRow";
 import { EmailDetailPane } from "./EmailDetailPane";
 import { NewEmailComposer } from "./NewEmailComposer";
+import { FilterButton, FilterChips } from "./SearchFilters";
+import { EMPTY_FILTERS, countActive, toQueryParams, type AdvancedFilters } from "./filterCriteria";
+import { SelectionBar } from "./SelectionBar";
 
 export type FolderKey = "inbox" | "archived" | "junk" | "trash" | "sent";
 type TicketFilter = "todos" | "sin-ticket" | "sin-responder";
@@ -52,32 +50,107 @@ const pagerButtonClass =
   "transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20 " +
   "disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent";
 
+const headerButtonClass =
+  "flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-brand-gray outline-none " +
+  "transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20";
+
+function conversations(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? `conversación ${singular}` : `conversaciones ${plural}`}`;
+}
+
+interface BulkMeta {
+  /** Clave de fusion de los recibos: dos archivados seguidos se cuentan juntos. */
+  receipt: string;
+  done: (count: number) => string;
+  failed: string;
+  undo?: { action: EmailBulkAction; label: string };
+  /** La conversacion abierta deja de pertenecer a la carpeta: se cierra el panel. */
+  closesOpen: boolean;
+}
+
+const BULK: Record<EmailBulkAction, BulkMeta> = {
+  archive: {
+    receipt: "archivar",
+    done: (n) => conversations(n, "archivada", "archivadas"),
+    failed: "No se pudo archivar",
+    undo: { action: "restore", label: "Devolver a la bandeja" },
+    closesOpen: true,
+  },
+  junk: {
+    receipt: "junk",
+    done: (n) => conversations(n, "movida a No deseado", "movidas a No deseado"),
+    failed: "No se pudo mover a No deseado",
+    undo: { action: "restore", label: "Devolver a la bandeja" },
+    closesOpen: true,
+  },
+  trash: {
+    receipt: "papelera",
+    done: (n) => conversations(n, "movida a la papelera", "movidas a la papelera"),
+    failed: "No se pudo mover a la papelera",
+    undo: { action: "restore", label: "Devolver a la bandeja" },
+    closesOpen: true,
+  },
+  restore: {
+    receipt: "restaurar",
+    done: (n) => conversations(n, "devuelta a la bandeja", "devueltas a la bandeja"),
+    failed: "No se pudo restaurar",
+    closesOpen: true,
+  },
+  read: {
+    receipt: "leer",
+    done: (n) => conversations(n, "marcada como leída", "marcadas como leídas"),
+    failed: "No se pudo marcar como leído",
+    undo: { action: "unread", label: "Marcar no leídas" },
+    closesOpen: false,
+  },
+  unread: {
+    receipt: "no-leer",
+    done: (n) => conversations(n, "marcada como no leída", "marcadas como no leídas"),
+    failed: "No se pudo marcar como no leído",
+    undo: { action: "read", label: "Marcar leídas" },
+    closesOpen: false,
+  },
+  delete: {
+    receipt: "eliminar",
+    done: (n) => conversations(n, "eliminada definitivamente", "eliminadas definitivamente"),
+    failed: "No se pudo eliminar",
+    closesOpen: true,
+  },
+};
+
 interface BandejaPageProps {
   folder: FolderKey;
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
 export function BandejaPage({ folder }: BandejaPageProps) {
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<AdvancedFilters>(EMPTY_FILTERS);
   const [ticketFilter, setTicketFilter] = useState<TicketFilter>("todos");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
-  const { refresh: refreshCounts, onInboxChanged } = useEmailCounts();
+  const [checked, setChecked] = useState<Set<number>>(() => new Set());
+  const [busy, setBusy] = useState(false);
+  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
+  const [editingAlerts, setEditingAlerts] = useState(false);
+  const lastToggled = useRef<number | null>(null);
+  const [params, setParams] = useSearchParams();
+  const { counts, refresh: refreshCounts, onInboxChanged } = useEmailCounts();
+  const receipts = useReceipts();
+  const prefs = useNotifyPrefs();
   const debouncedSearch = useDebouncedValue(search).trim();
   const meta = folderMeta[folder];
+  const selectable = folder !== "sent";
 
   const { data, isStale, error, page, setPage, refresh } = usePagedList<EmailQuery, EmailListResponse>(
     {
       fetch: emailsApi.list,
-      criteria: { pageSize: PAGE_SIZE, folder, filter: ticketFilter, search: debouncedSearch || undefined },
+      criteria: {
+        pageSize: PAGE_SIZE,
+        folder,
+        filter: ticketFilter,
+        search: debouncedSearch || undefined,
+        ...toQueryParams(filters),
+      },
       fallbackError: "No se pudo cargar la bandeja",
     },
   );
@@ -90,18 +163,47 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
   useEffect(() => onInboxChanged(() => refreshRef.current()), [onInboxChanged]);
 
-  const rows = data?.items ?? [];
-  const unfiltered = !debouncedSearch;
+  // Un aviso del sistema trae el correo en la URL: se abre y la marca se borra para no reabrirlo al recargar.
+  const requestedId = Number(params.get("correo")) || null;
+  if (requestedId !== null && requestedId !== selectedId) setSelectedId(requestedId);
 
-  function fullName(email: EmailSummaryResponse) {
-    return email.fromName ?? email.fromEmail;
+  useEffect(() => {
+    if (requestedId !== null) setParams({}, { replace: true });
+  }, [requestedId, setParams]);
+
+  const rows = data?.items ?? [];
+  const unfiltered = !debouncedSearch && countActive(filters) === 0;
+
+  // Lo marcado que ya no esta en pantalla (cambio de pagina, de carpeta o de filtro) deja de contar.
+  const visibleKey = rows.map((email) => email.id).join(",");
+  const [prunedFor, setPrunedFor] = useState(visibleKey);
+  if (prunedFor !== visibleKey) {
+    setPrunedFor(visibleKey);
+    const visible = new Set(rows.map((email) => email.id));
+    const kept = new Set([...checked].filter((id) => visible.has(id)));
+    if (kept.size !== checked.size) setChecked(kept);
+  }
+
+  useEffect(() => {
+    if (checked.size === 0) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !confirmation) setChecked(new Set());
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [checked.size, confirmation]);
+
+  function refreshAll() {
+    refresh();
+    refreshCounts();
   }
 
   // Un correo movido a otra carpeta ya no pertenece a esta vista: se cierra el panel de lectura.
   function handleMoved() {
     setSelectedId(null);
-    refresh();
-    refreshCounts();
+    refreshAll();
   }
 
   // Abrir una conversacion la marca leida solo para quien la abre.
@@ -111,12 +213,143 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
     emailsApi
       .markRead(email.id)
-      .then(() => {
-        refresh();
-        refreshCounts();
-      })
+      .then(refreshAll)
       .catch(() => undefined);
   }
+
+  /** Shift extiende la marca desde la ultima fila tocada, como en cualquier lista de archivos. */
+  function toggleChecked(email: EmailSummaryResponse, shiftKey: boolean) {
+    const index = rows.findIndex((row) => row.id === email.id);
+    const anchor = lastToggled.current === null ? -1 : rows.findIndex((row) => row.id === lastToggled.current);
+    lastToggled.current = email.id;
+
+    setChecked((current) => {
+      const next = new Set(current);
+
+      if (shiftKey && anchor >= 0 && index >= 0) {
+        const [start, end] = anchor < index ? [anchor, index] : [index, anchor];
+        const adding = !current.has(email.id);
+        for (let at = start; at <= end; at += 1) {
+          if (adding) next.add(rows[at].id);
+          else next.delete(rows[at].id);
+        }
+        return next;
+      }
+
+      if (next.has(email.id)) next.delete(email.id);
+      else next.add(email.id);
+      return next;
+    });
+  }
+
+  const pageChecked = rows.filter((row) => checked.has(row.id)).length;
+  const pageState: boolean | "mixed" =
+    pageChecked === 0 ? false : pageChecked === rows.length ? true : "mixed";
+
+  function togglePage() {
+    setChecked(pageState === true ? new Set() : new Set(rows.map((row) => row.id)));
+  }
+
+  async function runBulk(action: EmailBulkAction, ids: number[]) {
+    const info = BULK[action];
+    setBusy(true);
+
+    try {
+      const { affected } = await emailsApi.bulk(ids, action);
+      const kept = ids.length - affected;
+
+      receipts.done({
+        action: info.receipt,
+        title: info.done(affected),
+        detail: action === "delete" && kept > 0 ? `${kept} con ticket se conservan como historial` : undefined,
+        undo: info.undo
+          ? {
+              label: info.undo.label,
+              run: async () => {
+                await emailsApi.bulk(ids, info.undo!.action);
+                refreshAll();
+              },
+            }
+          : undefined,
+      });
+
+      if (info.closesOpen && selectedId !== null && ids.includes(selectedId)) setSelectedId(null);
+      setChecked(new Set());
+      refreshAll();
+    } catch (err) {
+      receipts.failed({
+        action: info.receipt,
+        title: info.failed,
+        detail: err instanceof ApiError ? err.message : undefined,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleBulk(action: EmailBulkAction) {
+    const ids = [...checked];
+    if (ids.length === 0 || busy) return;
+
+    if (action !== "delete") {
+      void runBulk(action, ids);
+      return;
+    }
+
+    setConfirmation({
+      eyebrow: "Papelera",
+      title: "Eliminar definitivamente",
+      description: (
+        <>
+          {ids.length === 1
+            ? "Se borrará la conversación seleccionada"
+            : `Se borrarán las ${ids.length} conversaciones seleccionadas`}{" "}
+          con sus adjuntos. Las que pertenecen a un ticket se conservan como historial del caso. Esto no se
+          puede deshacer.
+        </>
+      ),
+      confirmLabel: "Eliminar",
+      icon: Trash2,
+      onConfirm: () => runBulk("delete", ids),
+    });
+  }
+
+  function confirmEmptyTrash() {
+    const total = counts?.trash.total ?? data?.total ?? 0;
+
+    setConfirmation({
+      eyebrow: "Papelera",
+      title: "Vaciar la papelera",
+      description: (
+        <>
+          {total === 1
+            ? "Se eliminará definitivamente la única conversación que hay"
+            : `Se eliminarán definitivamente las ${total} conversaciones que hay`}{" "}
+          en la papelera, con sus adjuntos. Las que pertenecen a un ticket se conservan como historial del
+          caso. Esto no se puede deshacer.
+        </>
+      ),
+      confirmLabel: "Vaciar papelera",
+      icon: Trash2,
+      onConfirm: async () => {
+        const result = await emailsApi.emptyTrash();
+        receipts.done({
+          action: "vaciar",
+          title: "Papelera vaciada",
+          detail:
+            result.kept > 0
+              ? `${result.deleted} eliminadas · ${result.kept} con ticket se conservan`
+              : `${conversations(result.deleted, "eliminada", "eliminadas")}`,
+        });
+        setSelectedId(null);
+        setChecked(new Set());
+        refreshAll();
+      },
+    });
+  }
+
+  const alertsOn = prefs.sound || prefs.desktop;
+  const trashTotal = counts?.trash.total ?? data?.total ?? 0;
 
   return (
     <TooltipProvider>
@@ -135,37 +368,92 @@ export function BandejaPage({ folder }: BandejaPageProps) {
           <div className={`min-h-0 flex-1 pb-6 transition-opacity ${isStale ? "opacity-60" : ""}`}>
             <ResizablePanelGroup className="h-full rounded-edge border border-line bg-white">
               <ResizablePanel defaultSize="26%" minSize="20%" maxSize="45%" className="flex flex-col">
-                <div className="shrink-0 px-4 pb-2.5 pt-4">
-                  <h2 className="font-heading text-[19px] font-bold tracking-[-0.02em] text-ink">
+                <div className="flex shrink-0 items-center gap-1 px-4 pb-2.5 pt-4">
+                  <h2 className="min-w-0 flex-1 truncate font-heading text-[19px] font-bold tracking-[-0.02em] text-ink">
                     {meta.title}
                   </h2>
+
+                  {folder === "trash" && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={confirmEmptyTrash}
+                          disabled={trashTotal === 0 || busy}
+                          aria-label="Vaciar la papelera"
+                          className={`${headerButtonClass} hover:text-brand-red-dark disabled:cursor-not-allowed
+                            disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-brand-gray`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Vaciar la papelera</TooltipContent>
+                    </Tooltip>
+                  )}
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setEditingAlerts(true)}
+                        aria-label="Avisos de correo nuevo"
+                        className={headerButtonClass}
+                      >
+                        {alertsOn ? (
+                          <Bell className="h-4 w-4 text-brand-red-dark" />
+                        ) : (
+                          <BellOff className="h-4 w-4" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {alertsOn ? "Avisos activados" : "Avisos desactivados"}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
 
-                <div className="shrink-0 px-4 pb-2.5">
-                  <SearchInput
-                    value={search}
-                    onChange={setSearch}
-                    placeholder="Buscar por remitente o asunto…"
-                  />
+                <div className="flex shrink-0 flex-col gap-2 px-4 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <SearchInput
+                      value={search}
+                      onChange={setSearch}
+                      placeholder="Buscar por remitente o asunto…"
+                      className="min-w-0 flex-1"
+                    />
+                    <FilterButton value={filters} onChange={setFilters} />
+                  </div>
+                  <FilterChips value={filters} onChange={setFilters} />
                 </div>
 
                 <div className={`shrink-0 px-4 pb-3 ${folder === "sent" ? "hidden" : ""}`}>
-                  <Tabs
-                    value={ticketFilter}
-                    onValueChange={(value) => setTicketFilter(value as TicketFilter)}
-                  >
-                    <TabsList className="w-full border border-line bg-canvas">
-                      <TabsTrigger value="todos" className={tabTriggerClass}>
-                        Todos
-                      </TabsTrigger>
-                      <TabsTrigger value="sin-ticket" className={tabTriggerClass}>
-                        Sin ticket
-                      </TabsTrigger>
-                      <TabsTrigger value="sin-responder" className={tabTriggerClass}>
-                        Sin responder
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
+                  {selectable && checked.size > 0 ? (
+                    <SelectionBar
+                      folder={folder}
+                      count={checked.size}
+                      pageState={pageState}
+                      busy={busy}
+                      onTogglePage={togglePage}
+                      onClear={() => setChecked(new Set())}
+                      onAction={handleBulk}
+                    />
+                  ) : (
+                    <Tabs
+                      value={ticketFilter}
+                      onValueChange={(value) => setTicketFilter(value as TicketFilter)}
+                    >
+                      <TabsList className="w-full border border-line bg-canvas">
+                        <TabsTrigger value="todos" className={tabTriggerClass}>
+                          Todos
+                        </TabsTrigger>
+                        <TabsTrigger value="sin-ticket" className={tabTriggerClass}>
+                          Sin ticket
+                        </TabsTrigger>
+                        <TabsTrigger value="sin-responder" className={tabTriggerClass}>
+                          Sin responder
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  )}
                 </div>
 
                 <ScrollArea className="min-h-0 flex-1">
@@ -178,109 +466,24 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1 p-3 pt-0">
-                      {rows.map((email) => {
-                        const name = fullName(email);
-                        const isSelected = selectedId === email.id;
-                        return (
-                          <button
-                            key={email.id}
-                            type="button"
-                            onClick={() => handleOpen(email)}
-                            data-selected={isSelected}
-                            data-unread={email.unread}
-                            className="group flex flex-col items-start gap-0.5 rounded-edge border
-                              border-line bg-white px-2.5 py-2 text-left outline-none
-                              transition-[background-color,border-color,box-shadow]
-                              data-[unread=false]:hover:border-line-strong data-[unread=false]:hover:bg-canvas
-                              focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12
-                              data-[selected=true]:border-brand-red/45 data-[selected=true]:bg-brand-red/[0.05]
-                              data-[selected=true]:hover:border-brand-red
-                              data-[selected=true]:hover:bg-brand-red/[0.085]
-                              data-[selected=true]:hover:shadow-[0_6px_16px_-10px_rgba(228,0,43,0.5)]
-                              data-[unread=false]:bg-canvas/60
-                              data-[unread=true]:data-[selected=false]:border-brand-red/40
-                              data-[unread=true]:data-[selected=false]:bg-brand-red/[0.03]
-                              data-[unread=true]:data-[selected=false]:shadow-[0_0_0_1px_rgba(228,0,43,0.22),0_2px_6px_-1px_rgba(228,0,43,0.28),0_10px_26px_-6px_rgba(228,0,43,0.45)]
-                              data-[unread=true]:data-[selected=false]:hover:border-brand-red/60
-                              data-[unread=true]:data-[selected=false]:hover:bg-brand-red/[0.06]
-                              data-[unread=true]:data-[selected=false]:hover:shadow-[0_0_0_1px_rgba(228,0,43,0.35),0_3px_8px_-1px_rgba(228,0,43,0.38),0_14px_32px_-6px_rgba(228,0,43,0.6)]"
-                          >
-                            <div className="flex w-full items-center gap-1.5">
-                              <Avatar className="size-5">
-                                <AvatarFallback
-                                  className="bg-fill text-[9px] font-semibold text-brand-gray
-                                    group-data-[selected=true]:bg-brand-red/12
-                                    group-data-[selected=true]:text-brand-red-dark"
-                                >
-                                  {initials(name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink
-                                transition-colors group-data-[unread=true]:font-bold
-                                group-data-[unread=false]:font-medium
-                                group-data-[selected=true]:text-brand-red-dark">
-                                {name}
-                              </span>
-                              <span className="ml-auto shrink-0 text-[10.5px] font-medium text-faint">
-                                {formatEmailListDate(email.createdAt)}
-                              </span>
-                            </div>
-
-                            {/* Distintivos al final del asunto: se ahorra una fila entera por tarjeta. */}
-                            <div className="flex w-full items-center gap-1.5">
-                              {email.answered && (
-                                <CornerUpLeft
-                                  className="h-3 w-3 shrink-0 text-brand-green"
-                                  aria-label="Respondido"
-                                />
-                              )}
-                              <span className="min-w-0 flex-1 truncate text-[12px] text-brand-gray
-                                group-data-[unread=true]:font-semibold
-                                group-data-[unread=false]:font-medium">
-                                {email.subject || "(sin asunto)"}
-                              </span>
-                              {(email.messageCount > 1 || email.attachmentCount > 0 || email.ticketId) && (
-                                <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                                  {email.messageCount > 1 && (
-                                    <span
-                                      title={`${email.messageCount} correos en la conversación`}
-                                      className="flex items-center gap-0.5 text-[10.5px] font-medium text-faint"
-                                    >
-                                      <MessagesSquare className="h-3 w-3" />
-                                      {email.messageCount}
-                                    </span>
-                                  )}
-                                  {email.attachmentCount > 0 && (
-                                    <span className="flex items-center gap-0.5 text-[10.5px] font-medium text-faint">
-                                      <Paperclip className="h-3 w-3" />
-                                      {email.attachmentCount}
-                                    </span>
-                                  )}
-                                  {email.ticketId && (
-                                    <Badge
-                                      variant="secondary"
-                                      className={`${ticketBadgeClass} h-4 px-1.5`}
-                                    >
-                                      {formatTicketCode(email.ticketId)}
-                                    </Badge>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="line-clamp-1 w-full text-[11.5px] text-subtle">
-                              {email.preview}
-                            </div>
-                          </button>
-                        );
-                      })}
+                      {rows.map((email) => (
+                        <ConversationRow
+                          key={email.id}
+                          email={email}
+                          selected={selectedId === email.id}
+                          checked={checked.has(email.id)}
+                          selecting={checked.size > 0}
+                          selectable={selectable}
+                          onOpen={() => handleOpen(email)}
+                          onToggle={(shiftKey) => toggleChecked(email, shiftKey)}
+                        />
+                      ))}
                     </div>
                   )}
                 </ScrollArea>
 
-                {data !== null && data.totalPages > 1 && (
-                  <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line
-                    px-3 py-2">
+                {data.totalPages > 1 && (
+                  <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line px-3 py-2">
                     <button
                       type="button"
                       onClick={() => setPage(page - 1)}
@@ -313,8 +516,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                   <NewEmailComposer
                     onSent={() => {
                       setComposing(false);
-                      refresh();
-                      refreshCounts();
+                      refreshAll();
                     }}
                     onCancel={() => setComposing(false)}
                   />
@@ -341,6 +543,9 @@ export function BandejaPage({ folder }: BandejaPageProps) {
           </div>
         )}
       </div>
+
+      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {editingAlerts && <NotificationsModal onClose={() => setEditingAlerts(false)} />}
     </TooltipProvider>
   );
 }

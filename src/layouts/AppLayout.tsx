@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import { InboxAlerts } from "../components/app/InboxAlerts";
 import { Sidebar } from "../components/app/Sidebar";
 import { ReceiptStack } from "../components/app/ReceiptStack";
 import { EmailCountsProvider } from "../context/EmailCountsContext";
@@ -8,6 +9,7 @@ export function AppLayout() {
   return (
     <EmailCountsProvider>
       <ReceiptProvider>
+        <InboxAlerts />
         <div className="flex h-screen bg-white">
           <Sidebar />
         {/* flex-col + overflow-hidden: cada pagina decide su propia zona de scroll,

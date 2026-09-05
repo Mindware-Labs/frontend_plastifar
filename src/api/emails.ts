@@ -1,27 +1,47 @@
 import { apiRequest, toQuery } from "./client";
 import type {
   AttachmentLinkResponse,
+  EmailBulkAction,
+  EmailBulkResponse,
   EmailDetailResponse,
   EmailFolderCounts,
   EmailListResponse,
   EmailThreadMessageResponse,
+  EmptyTrashResponse,
   TicketSummaryResponse,
 } from "../types/api";
 
 export interface EmailQuery {
   page: number;
   pageSize: number;
-  /** inbox | archived | junk | trash */
+  /** inbox | archived | junk | trash | sent */
   folder?: string;
-  /** todos | sin-ticket | con-ticket */
+  /** todos | sin-ticket | con-ticket | sin-responder */
   filter?: string;
   search?: string;
+  /** Direccion exacta, como remitente o destinatario de cualquier correo del hilo. */
+  from?: string;
+  /** ISO con zona; until es exclusivo (la medianoche siguiente al ultimo dia). */
+  since?: string;
+  until?: string;
+  hasAttachments?: string;
 }
 
 export const emailsApi = {
   list: (query: EmailQuery) => apiRequest<EmailListResponse>(`/api/emails${toQuery({ ...query })}`),
 
   counts: () => apiRequest<EmailFolderCounts>("/api/emails/counts"),
+
+  bulk: (ids: number[], action: EmailBulkAction) =>
+    apiRequest<EmailBulkResponse>("/api/emails/bulk", {
+      method: "POST",
+      body: JSON.stringify({ ids, action }),
+    }),
+
+  // Solo desde la papelera; un 409 significa que la conversacion tiene ticket y se conserva.
+  remove: (id: number) => apiRequest<void>(`/api/emails/${id}`, { method: "DELETE" }),
+
+  emptyTrash: () => apiRequest<EmptyTrashResponse>("/api/emails/trash/empty", { method: "POST" }),
 
   markRead: (id: number) => apiRequest<void>(`/api/emails/${id}/read`, { method: "POST" }),
 

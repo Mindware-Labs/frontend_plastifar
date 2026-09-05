@@ -15,6 +15,7 @@ import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
 import { Button as PfButton } from "../../components/ui/Button";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Spinner } from "../../components/ui/Spinner";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useNoticeInset, useReceipts } from "../../context/useReceipts";
@@ -135,6 +136,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyBlocks, setReplyBlocks] = useState<unknown>(null);
@@ -402,20 +404,38 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               </Tooltip>
             </>
           ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={toolButtonClass}
-                  disabled={moving}
-                  onClick={() => handleMove(MOVES.restaurar)}
-                >
-                  <ArchiveRestore />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Restaurar a la bandeja</TooltipContent>
-            </Tooltip>
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={toolButtonClass}
+                    disabled={moving}
+                    onClick={() => handleMove(MOVES.restaurar)}
+                  >
+                    <ArchiveRestore />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Restaurar a la bandeja</TooltipContent>
+              </Tooltip>
+              {email.folder === "Trash" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`${toolButtonClass} hover:text-brand-red-dark`}
+                      disabled={moving}
+                      onClick={() => setConfirmingDelete(true)}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Eliminar definitivamente</TooltipContent>
+                </Tooltip>
+              )}
+            </>
           )}
         </div>
 
@@ -877,6 +897,27 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
           Responder a {email.fromName ?? email.fromEmail}
         </button>
       </div>
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          eyebrow="Papelera"
+          icon={Trash2}
+          title="Eliminar definitivamente"
+          description={
+            <>
+              Se borrará la conversación con {displayName} y sus adjuntos. Si pertenece a un ticket no se
+              elimina: es el historial del caso. Esto no se puede deshacer.
+            </>
+          }
+          confirmLabel="Eliminar"
+          onConfirm={async () => {
+            await emailsApi.remove(email.id);
+            receipts.done({ action: "eliminar", title: "Eliminado definitivamente", detail: displayName });
+            onMoved();
+          }}
+          onClose={() => setConfirmingDelete(false)}
+        />
+      )}
 
       {preview && (
         <AttachmentPreviewModal
