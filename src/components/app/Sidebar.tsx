@@ -419,24 +419,6 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* 4. Micro-indicador de estado del sistema (visible cuando está expandida) */}
-      {!collapsed && (
-        <div className="px-4 py-2 border-t border-line-soft">
-          <div className="flex items-center justify-between text-[10.5px]">
-            <span className="flex items-center gap-1.5 text-subtle">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-green/40 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-green" />
-              </span>
-              <span className="font-medium">Plastifar Cloud</span>
-            </span>
-            <span className="font-heading text-[9.5px] font-bold uppercase tracking-wider text-brand-green">
-              En línea
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* 5. Pie de Tarjeta de Usuario y Menú Desplegable */}
       <div className="shrink-0 border-t border-line p-2.5" ref={menuRef}>
         <div className="relative">

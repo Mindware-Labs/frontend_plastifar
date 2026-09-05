@@ -206,6 +206,32 @@ input:-webkit-autofill:focus {
   to { transform: scaleX(0); }
 }
 
+/* Spinner cinético Plastifar: rotación continua con arco elástico y pulso suave del núcleo */
+@keyframes plf-spinner-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes plf-spinner-dash {
+  0% {
+    stroke-dasharray: 1 120;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 85 120;
+    stroke-dashoffset: -28;
+  }
+  100% {
+    stroke-dasharray: 1 120;
+    stroke-dashoffset: -116;
+  }
+}
+
+@keyframes plf-spinner-pulse {
+  0%, 100% { transform: scale(0.96); opacity: 0.9; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+
 .animate-plf-float { animation: plf-float 16s ease-in-out infinite; }
 .animate-plf-drift { animation: plf-drift 20s ease-in-out infinite; }
 .animate-plf-rise { animation: plf-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -222,6 +248,9 @@ input:-webkit-autofill:focus {
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
 .animate-plf-receipt-out { animation: plf-receipt-out 0.16s ease-in both; }
+.animate-plf-spinner-rotate { animation: plf-spinner-rotate 1.4s linear infinite; }
+.animate-plf-spinner-dash { animation: plf-spinner-dash 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.animate-plf-spinner-pulse { animation: plf-spinner-pulse 2s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-plf-float,

@@ -6,7 +6,7 @@ import { Spinner } from "./ui/Spinner";
 function RestoringSession() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-canvas">
-      <Spinner />
+      <Spinner size="lg" label="Restableciendo sesión..." />
     </div>
   );
 }
