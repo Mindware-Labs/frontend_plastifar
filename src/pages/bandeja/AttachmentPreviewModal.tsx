@@ -43,7 +43,8 @@ interface AttachmentPreviewModalProps {
 
 /** El servidor ya decidio que se abre dentro del navegador: aca solo se elige el visor. */
 function previewKind(link: AttachmentLinkResponse, fallback: boolean) {
-  if (link.contentType.startsWith("image/")) return "image";
+  // Solo las imagenes que el servidor sirve en linea: un SVG, por ejemplo, se descarga.
+  if (link.inline && link.contentType.startsWith("image/")) return "image";
   if (link.contentType === "application/pdf" && !fallback) return "pdf";
   return link.inline ? "frame" : "none";
 }
