@@ -4,6 +4,7 @@ import {
   Check,
   CircleSlash,
   Pencil,
+  Play,
   Plus,
   ShieldCheck,
 } from "lucide-react";
@@ -155,10 +156,10 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     };
   }, [sheetId, attempt]);
 
-  function staffName(staffId: number | null) {
-    if (staffId === null) return "—";
-    return staff.find((person) => person.id === staffId)?.name ?? "—";
-  }
+  // Ya no queda ningun nombre por resolver en el navegador: la HCA, sus
+  // acciones y el sello de cierre llegan con el suyo desde el servidor. La
+  // lista de personal sobrevive solo para alimentar los `<select>` de los
+  // dialogos, que necesitan las opciones y no un nombre suelto.
 
   const sections = [
     { label: "Datos", to: `/calidad/hca/${id}` },
@@ -204,6 +205,21 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
       await reload();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "No se pudo avanzar el estado");
+    }
+  }
+
+  /**
+   * Poner en curso no destruye nada ni sella ninguna fecha: se hace directo,
+   * sin dialogo de confirmacion. Lo que si necesita confirmacion es cumplir,
+   * porque sella el dia, y anular, porque exige justificacion.
+   */
+  async function startItem(item: ActionPlanItem) {
+    setActionError(null);
+    try {
+      await qualityApi.planItems.start(item.id);
+      await reload();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo poner la acción en curso");
     }
   }
 
@@ -312,18 +328,14 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                   )}
                 </span>
               </DetailRow>
-              <DetailRow label="Cliente">
-                {clients.find((client) => client.id === sheet.clientId)?.name ?? "—"}
-              </DetailRow>
-              <DetailRow label="Línea de producto">
-                {productLines.find((line) => line.id === sheet.productLineId)?.name ?? "—"}
-              </DetailRow>
+              <DetailRow label="Cliente">{sheet.clientName}</DetailRow>
+              <DetailRow label="Línea de producto">{sheet.productLineName}</DetailRow>
               <DetailRow label="Ticket de origen">
                 <TicketLink number={sheet.ticketNumber} />
               </DetailRow>
               <DetailRow label="Detectada el">{formatDay(sheet.detectedAt.slice(0, 10))}</DetailRow>
               <DetailRow label="Cierre comprometido">{formatDay(sheet.dueDate)}</DetailRow>
-              <DetailRow label="Responsable">{staffName(sheet.responsibleStaffId)}</DetailRow>
+              <DetailRow label="Responsable">{sheet.responsibleName}</DetailRow>
               <DetailRow label="Qué ocurrió">
                 <p className="max-w-[76ch] whitespace-pre-line">{sheet.description}</p>
               </DetailRow>
@@ -346,7 +358,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
               {isClosed && (
                 <>
                   <DetailRow label="Cerrada el">{formatInstant(sheet.closedAt)}</DetailRow>
-                  <DetailRow label="Cerrada por">{staffName(sheet.closedByStaffId)}</DetailRow>
+                  <DetailRow label="Cerrada por">{sheet.closedByName ?? "—"}</DetailRow>
                   <DetailRow label="Nota de cierre">
                     {sheet.closingNote ?? <span className="text-faint">Sin nota</span>}
                   </DetailRow>
@@ -384,7 +396,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
         (items.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-[13.5px] text-faint">
-              Esta hoja todavía no tiene plan de acción.
+              Esta HCA todavía no tiene plan de acción.
             </p>
             {canWrite && !isClosed && (
               <div className="mt-3 flex justify-center">
@@ -404,7 +416,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                 <Th>Comprometida</Th>
                 <Th>Cumplida</Th>
                 <Th>Estado</Th>
-                {canWrite && !isClosed && <Th className="w-28 text-right">Acciones</Th>}
+                {canWrite && !isClosed && <Th className="w-36 text-right">Acciones</Th>}
               </HeadRow>
             </thead>
 
@@ -424,7 +436,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                       )}
                     </Td>
                     <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
-                      {staffName(item.responsibleStaffId)}
+                      {item.responsibleName}
                     </Td>
                     <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
                       {formatDay(item.dueDate)}
@@ -439,10 +451,16 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                       <Td>
                         <div className="flex items-center justify-end gap-1">
                           <RowAction
-                            label={`Editar la acción de ${staffName(item.responsibleStaffId)}`}
+                            label={`Editar la acción de ${item.responsibleName}`}
                             icon={Pencil}
                             onClick={() => setItemModal(item)}
                             disabled={settled}
+                          />
+                          <RowAction
+                            label="Poner en curso"
+                            icon={Play}
+                            onClick={() => void startItem(item)}
+                            disabled={settled || item.status === "En curso"}
                           />
                           <RowAction
                             label="Marcar como cumplida"
@@ -538,7 +556,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
             ) : (
               <div className="flex flex-col items-start gap-3">
                 <p className="max-w-[76ch] text-[13px] leading-relaxed text-brand-gray">
-                  Todavía no consta que la acción funcionara. Sin esta comprobación la hoja no se
+                  Todavía no consta que la acción funcionara. Sin esta comprobación la HCA no se
                   puede cerrar.
                 </p>
                 {canWrite && !isClosed && (
@@ -557,7 +575,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                 Cierre
               </h2>
               <p className="text-[13px] leading-relaxed text-brand-gray">
-                Cerrada el {formatInstant(sheet.closedAt)} por {staffName(sheet.closedByStaffId)}.
+                Cerrada el {formatInstant(sheet.closedAt)} por {sheet.closedByName ?? "—"}.
               </p>
               {sheet.closingNote && (
                 <p className="mt-1.5 max-w-[76ch] text-[13px] leading-relaxed text-brand-gray">
@@ -665,5 +683,5 @@ function planDebt(items: ActionPlanItem[]): string {
   const head =
     pending.length === 1 ? "Queda 1 acción sin resolver" : `Quedan ${pending.length} acciones sin resolver`;
   const tail = overdue === 0 ? "" : overdue === 1 ? " · 1 vencida" : ` · ${overdue} vencidas`;
-  return `${head}${tail}. La hoja no se cierra hasta que se cumplan o se anulen con justificación.`;
+  return `${head}${tail}. La HCA no se cierra hasta que se cumplan o se anulen con justificación.`;
 }

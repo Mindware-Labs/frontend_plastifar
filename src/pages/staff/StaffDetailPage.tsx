@@ -44,11 +44,20 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const { id } = useParams();
   const { can } = usePermissions();
   const canWrite = can("staff.write");
+  /**
+   * Otorgar o cambiar un acceso necesita la lista de roles, y esa lista sale de
+   * GET /api/permissions/matrix, que exige roles.read. La ruta solo exige
+   * staff.read: quien no tenga los tres permisos ve la ficha completa —accesos y
+   * permiso efectivo, que es RF-P4— sin el boton que no podria usar.
+   */
+  const canManageAccess = canWrite && can("roles.read");
 
   const [staff, setStaff] = useState<StaffDetail | null>(null);
   const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** Fallo de los catalogos de apoyo: degrada el alta, no tumba la ficha. */
+  const [referenceError, setReferenceError] = useState<string | null>(null);
   // Igual que en la ficha de cliente: mientras una accion sobre un acceso esta
   // en vuelo su fila se atenua y sus controles no aceptan un segundo click, que
   // es lo que provocaba dos PUT y dos recargas resolviendo en desorden.
@@ -74,16 +83,9 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
 
   function load() {
     setError(null);
-    return Promise.all([
-      staffApi.getDepartmentAccess(staffId),
-      permissionsApi.matrix(),
-      departmentsApi.list(),
-    ])
-      .then(([detail, data, depts]) => {
-        setStaff(detail);
-        setMatrix(data);
-        setDepartments(depts);
-      })
+    return staffApi
+      .getDepartmentAccess(staffId)
+      .then(setStaff)
       .catch((err) => {
         setError(
           err instanceof ApiError ? err.message : "No se pudo cargar la ficha del colaborador",
@@ -91,11 +93,37 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
       });
   }
 
+  /**
+   * Los catalogos que solo alimentan el dialogo de accesos viajan aparte: en un
+   * unico Promise.all, un 403 de la matriz —que exige roles.read, un permiso que
+   * esta ruta no pide— rechazaba la promesa entera y dejaba la ficha en su
+   * estado de error, sin datos, sin accesos y sin permiso efectivo.
+   */
+  function loadReferenceData() {
+    setReferenceError(null);
+    return Promise.all([permissionsApi.matrix(), departmentsApi.list()])
+      .then(([data, depts]) => {
+        setMatrix(data);
+        setDepartments(depts);
+      })
+      .catch(() =>
+        setReferenceError(
+          "No se pudieron cargar los roles ni los departamentos: por ahora no se puede otorgar ni cambiar un acceso.",
+        ),
+      );
+  }
+
   useEffect(() => {
     if (!id) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (!canManageAccess) return;
+    void loadReferenceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManageAccess]);
 
   const fullName = staff ? `${staff.firstName} ${staff.lastName}` : "";
   useDynamicBreadcrumb(staff ? fullName : null);
@@ -170,7 +198,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
 
   // Solo es fatal si no hay ficha que mostrar; con la ficha cargada el fallo de
   // una mutacion se dice sobre la propia pagina.
-  if (error !== null && (staff === null || matrix === null)) {
+  if (error !== null && staff === null) {
     return (
       <div>
         <ModuleHeader sections={sections} />
@@ -184,7 +212,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
     );
   }
 
-  if (staff === null || matrix === null) {
+  if (staff === null) {
     return (
       <div className="flex justify-center py-16">
         <Spinner />
@@ -197,7 +225,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
       <ModuleHeader
         sections={sections}
         action={
-          section === "accesos" && canWrite && (
+          section === "accesos" && canManageAccess && matrix !== null && (
             <Button size="sm" onClick={() => setModal("nuevo")}>
               <Plus className="h-[15px] w-[15px]" />
               Otorgar acceso
@@ -210,6 +238,15 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
         <div className="mb-3 flex flex-col items-start gap-2">
           <Alert variant="error">{error}</Alert>
           <Button size="sm" variant="secondary" onClick={() => void load()}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
+      {section === "accesos" && referenceError !== null && (
+        <div className="mb-3 flex flex-col items-start gap-2">
+          <Alert variant="error">{referenceError}</Alert>
+          <Button size="sm" variant="secondary" onClick={() => void loadReferenceData()}>
             Reintentar
           </Button>
         </div>
@@ -266,7 +303,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
               <p className="text-[13.5px] text-faint">
                 Todavía no tiene acceso a ningún departamento: entra al sistema pero no ve nada.
               </p>
-              {canWrite && (
+              {canManageAccess && matrix !== null && (
                 <div className="mt-3 flex justify-center">
                   <Button size="sm" onClick={() => setModal("nuevo")}>
                     <Plus className="h-[15px] w-[15px]" />
@@ -322,14 +359,17 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                   <Td>
                     <div className="flex items-center justify-end gap-1">
                       {!canWrite && <span className="text-[12.5px] text-faint">—</span>}
+                      {/* Cambiar el rol necesita la lista de roles; revocar no. */}
+                      {canManageAccess && matrix !== null && (
+                        <RowAction
+                          label={`Cambiar el rol en ${access.departmentName}`}
+                          icon={Pencil}
+                          onClick={() => setModal(access)}
+                          disabled={busyDepartmentId === access.departmentId}
+                        />
+                      )}
                       {canWrite && (
                         <>
-                          <RowAction
-                            label={`Cambiar el rol en ${access.departmentName}`}
-                            icon={Pencil}
-                            onClick={() => setModal(access)}
-                            disabled={busyDepartmentId === access.departmentId}
-                          />
                           <RowAction
                             label={
                               access.isPrimary
@@ -412,7 +452,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
         </>
       )}
 
-      {modal !== null && (
+      {modal !== null && matrix !== null && (
         <AccessModal
           staffName={fullName}
           access={modal === "nuevo" ? undefined : modal}

@@ -1,5 +1,5 @@
 import { Pencil, Plus, Power } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -12,69 +12,51 @@ import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { useLocalPage } from "../../hooks/useLocalPage";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { usedVariables } from "../../lib/templates";
 import type { EmailTemplate } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass, useSectionLoad } from "./catalogState";
+import { freshCopy, staleClass } from "./catalogState";
 import { SettingsLayout } from "./SettingsLayout";
 import { TemplateModal } from "./TemplateModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
 
-const listTemplates = () => settingsApi.templates.list({ page: 1, pageSize: 100 });
-
 export function TemplatesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
+  const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nueva" | EmailTemplate | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
-  const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search).trim();
 
-  const load = useCallback(async () => {
-    const { items } = await listTemplates();
-    setTemplates(items);
-  }, []);
-
-  const { status, isRefetching, error, reload, retry } = useSectionLoad(
-    load,
-    "No se pudieron cargar las plantillas",
-  );
-
-  const all = templates;
-  const activeCount = all.filter((template) => template.isActive).length;
-
-  const rows = all.filter((template) => {
-    const byChip =
-      chip === "todas" ||
-      (chip === "activas" && template.isActive) ||
-      (chip === "inactivas" && !template.isActive);
-
-    const bySearch =
-      debouncedSearch === "" ||
-      template.name.toLowerCase().includes(debouncedSearch) ||
-      template.key.toLowerCase().includes(debouncedSearch) ||
-      template.subject.toLowerCase().includes(debouncedSearch);
-
-    return byChip && bySearch;
+  // Seccion 4.1: la pagina, el filtro, la busqueda y los contadores los resuelve
+  // SQL. La vista solo dibuja lo que llega.
+  const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    fetch: settingsApi.templates.list,
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      status: chip === "todas" ? undefined : chip,
+    },
+    fallbackError: "No se pudieron cargar las plantillas",
   });
 
-  // RF-K2: los listados de catalogo paginan como cualquier otro. El corte
-  // lo hace la vista solo mientras no exista /api/settings/...; el endpoint
-  // devuelve la pagina ya cortada en SQL (anexo 12.1).
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
-    rows,
-    JSON.stringify([debouncedSearch, chip]),
-  );
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const isFirstLoad = data === null && error === null;
+  // Sin criterio activo, una pagina vacia significa catalogo vacio; con
+  // criterio, que nada coincide. Los contadores no distinguen ese caso: se
+  // calculan sobre el filtro base, no sobre la tabla entera.
+  const isFiltering = debouncedSearch !== "" || chip !== "todas";
 
   function askToggle(template: EmailTemplate) {
     setConfirmation({
@@ -96,7 +78,7 @@ export function TemplatesSection() {
       onConfirm: async () => {
         setBusyId(template.id);
         try {
-          const current = await freshCopy(listTemplates, template);
+          const current = await freshCopy(settingsApi.templates.get, template);
           await settingsApi.templates.update(current.id, {
             key: current.key,
             name: current.name,
@@ -104,7 +86,7 @@ export function TemplatesSection() {
             body: current.body,
             isActive: !current.isActive,
           });
-          await reload();
+          refresh();
         } finally {
           setBusyId(null);
         }
@@ -133,42 +115,42 @@ export function TemplatesSection() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <ChipGroup label="Filtrar por estado" ready={status === "ready"}>
+        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
           <FilterChip
             label="Todas"
-            count={all.length}
+            count={counts?.all ?? 0}
             active={chip === "todas"}
             onClick={() => setChip("todas")}
           />
           <FilterChip
             label="Activas"
-            count={activeCount}
+            count={counts?.active ?? 0}
             active={chip === "activas"}
             onClick={() => setChip("activas")}
           />
           <FilterChip
             label="Inactivas"
-            count={all.length - activeCount}
+            count={counts?.inactive ?? 0}
             active={chip === "inactivas"}
             onClick={() => setChip("inactivas")}
           />
         </ChipGroup>
       </div>
 
-      {error && <LoadErrorAlert message={error} onRetry={retry} />}
+      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
-      {status === "loading" ? (
+      {isFirstLoad ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : status === "error" ? null : rows.length === 0 ? (
+      ) : data === null ? null : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          {all.length === 0
-            ? "Todavía no hay ninguna plantilla configurada."
-            : "Ninguna plantilla coincide con este filtro o búsqueda."}
+          {isFiltering
+            ? "Ninguna plantilla coincide con este filtro o búsqueda."
+            : "Todavía no hay ninguna plantilla configurada."}
         </p>
       ) : (
-        <div className={staleClass(isRefetching)}>
+        <div className={staleClass(isStale)}>
           <DataTable>
             <thead>
               <HeadRow>
@@ -181,7 +163,7 @@ export function TemplatesSection() {
             </thead>
 
             <tbody>
-              {pageRows.map((template) => {
+              {rows.map((template) => {
                 const variables = usedVariables(`${template.subject} ${template.body}`);
 
                 return (
@@ -243,14 +225,14 @@ export function TemplatesSection() {
         </div>
       )}
 
-      {status === "ready" && rows.length > 0 && (
+      {data !== null && data.total > 0 && (
         <Pagination
           page={page}
           pageSize={pageSize}
-          total={total}
-          totalPages={totalPages}
+          total={data.total}
+          totalPages={data.totalPages}
           onPageChange={setPage}
-          onPageSizeChange={changePageSize}
+          onPageSizeChange={setPageSize}
           noun="plantillas"
         />
       )}
@@ -265,9 +247,7 @@ export function TemplatesSection() {
         <TemplateModal
           template={modal === "nueva" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={() => {
-            void reload();
-          }}
+          onSaved={refresh}
         />
       )}
 

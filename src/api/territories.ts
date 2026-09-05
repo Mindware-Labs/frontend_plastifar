@@ -26,9 +26,15 @@ export interface TerritoryListResponse {
 }
 
 export const territoriesApi = {
-  /** TerritoriesController.List no manda page/pageSize aparte: 100 es su propio tope por defecto. */
+  /**
+   * El pageSize de 100 es solo el valor por omision para quien pide el catalogo
+   * como lista de opciones; el listado de Configuracion manda su propia pagina.
+   */
   list: (query: TerritoryQuery = {}) =>
     apiRequest<TerritoryListResponse>(`/api/territories${toQuery({ pageSize: 100, ...query })}`),
+
+  /** Relectura previa a una escritura: el listado ya no tiene el registro en memoria. */
+  get: (id: number) => apiRequest<Territory>(`/api/territories/${id}`),
 
   create: (data: SaveTerritoryRequest) =>
     apiRequest<Territory>("/api/territories", { method: "POST", body: JSON.stringify(data) }),

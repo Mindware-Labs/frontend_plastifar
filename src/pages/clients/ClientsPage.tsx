@@ -11,7 +11,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
-import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -28,6 +28,14 @@ import { ClientModal } from "./ClientModal";
 import { ReassignSalesRepModal } from "./ReassignSalesRepModal";
 
 type ChipKey = "todos" | "activos" | "inactivos" | "sinVendedor";
+
+/**
+ * Exactamente las cuatro claves que ClientsController sabe ordenar —`nombre`
+ * por defecto, mas `codigo`, `territorio` y `estado`—. No se ofrece cabecera
+ * clicable para tipo, vendedor ni contactos: el servidor ignoraria el parametro
+ * y la tabla se quedaria igual despues de pulsarla, que es peor que no poder.
+ */
+type SortKey = "nombre" | "codigo" | "territorio" | "estado";
 
 const COLUMNS: ColumnOption[] = [
   { id: "cliente", label: "Cliente", locked: true },
@@ -75,6 +83,7 @@ export function ClientsPage() {
   const [salesRepId, setSalesRepId] = useState("todos");
   const [type, setType] = useState("todos");
   const [chip, setChip] = useState<ChipKey>("todos");
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "nombre", dir: "asc" });
   const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nuevo" | Client | null>(null);
@@ -124,6 +133,8 @@ export function ClientsPage() {
       salesRepId: salesRepId === "todos" ? undefined : Number(salesRepId),
       type: type === "todos" ? undefined : type,
       status: chipToStatus[chip],
+      sort: sort.key,
+      dir: sort.dir,
     },
     fallbackError: "No se pudieron cargar los clientes",
   });
@@ -143,6 +154,26 @@ export function ClientsPage() {
   if (visibleIdsKey !== lastVisibleIdsKey) {
     setLastVisibleIdsKey(visibleIdsKey);
     setSelectedIds([]);
+  }
+
+  /**
+   * Ascendente significa lo que la persona espera de cada columna: de la A a la
+   * Z en nombre, codigo y territorio, y «activos primero» en estado. Esa ultima
+   * es la razon de que el servidor invierta la direccion en su rama `estado`:
+   * ordenar IsActive de menor a mayor pondria a los inactivos arriba, y nadie
+   * abre el listado para ver primero lo que ya no opera.
+   */
+  function toggleSort(key: SortKey) {
+    setSort((previous) =>
+      previous.key === key
+        ? { key, dir: previous.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" },
+    );
+  }
+
+  /** Cabecera ordenable; las columnas que el servidor no ordena no la reciben. */
+  function sortProps(key: SortKey) {
+    return { dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) };
   }
 
   function territoryName(id: number) {
@@ -241,7 +272,9 @@ export function ClientsPage() {
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Buscar por nombre, código o RNC…"
+          // La seccion 7.3 regla 7 mete tambien el nombre y el correo del
+          // contacto en la misma caja; sin decirlo, nadie encuentra esa mitad.
+          placeholder="Buscar por nombre, código, RNC o contacto…"
           className="w-[240px]"
         />
 
@@ -379,13 +412,13 @@ export function ClientsPage() {
                       />
                     </Th>
                   )}
-                  <Th>Cliente</Th>
-                  {isVisible("codigo") && <Th>Código</Th>}
+                  <Th sort={sortProps("nombre")}>Cliente</Th>
+                  {isVisible("codigo") && <Th sort={sortProps("codigo")}>Código</Th>}
                   {isVisible("tipo") && <Th>Tipo</Th>}
-                  {isVisible("territorio") && <Th>Territorio</Th>}
+                  {isVisible("territorio") && <Th sort={sortProps("territorio")}>Territorio</Th>}
                   {isVisible("vendedor") && <Th>Vendedor</Th>}
                   {isVisible("contactos") && <Th>Contactos</Th>}
-                  {isVisible("estado") && <Th>Estado</Th>}
+                  {isVisible("estado") && <Th sort={sortProps("estado")}>Estado</Th>}
                   {canWrite && <Th className="w-24 text-right">Acciones</Th>}
                 </HeadRow>
               </thead>

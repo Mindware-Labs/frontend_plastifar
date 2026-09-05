@@ -1,7 +1,8 @@
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { SIDEBAR_NAV } from "../../lib/navigation";
+import { usePermissions } from "../../hooks/usePermissions";
+import { SIDEBAR_NAV, type ModuleEntry, type ModuleLink } from "../../lib/navigation";
 import { Logo } from "../Logo";
 
 interface SidebarProps {
@@ -23,6 +24,33 @@ const FOCUSABLE_SELECTOR =
  */
 export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }: SidebarProps) {
   const { pathname } = useLocation();
+  const { can } = usePermissions();
+
+  /**
+   * RF-P6: el menu solo ofrece lo que la persona puede abrir. Un grupo se pinta
+   * mientras le quede al menos una ruta hija visible, y si su propia ruta cae
+   * fuera de sus permisos —Personal apunta a /staff, que exige staff.read—
+   * la fila del modulo lleva a la primera hija que si puede abrir, en vez de
+   * desaparecer un modulo al que todavia tiene entrada por Roles o Permisos.
+   */
+  const visibleNav = useMemo(() => {
+    return SIDEBAR_NAV.reduce<ModuleEntry[]>((acc, module) => {
+      const allowed = (entry: { permission?: string }) =>
+        entry.permission === undefined || can(entry.permission);
+
+      if (module.children === undefined) {
+        if (allowed(module)) acc.push(module);
+        return acc;
+      }
+
+      const children: ModuleLink[] = module.children.filter(allowed);
+      if (children.length === 0) return acc;
+
+      acc.push({ ...module, children, to: allowed(module) ? module.to : children[0].to });
+      return acc;
+    }, []);
+  }, [can]);
+
   // Solo guarda los toggles explicitos de la persona; sin uno, un grupo esta
   // abierto si su modulo esta activo — derivado en el render, no en un
   // efecto, para no encadenar otro renderizado por cada cambio de ruta.
@@ -111,7 +139,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2.5">
-          {SIDEBAR_NAV.map((module) => {
+          {visibleNav.map((module) => {
             const { label, icon: Icon, to, match, children } = module;
             const isActive = match.some((path) => pathname.startsWith(path));
             const isOpen =

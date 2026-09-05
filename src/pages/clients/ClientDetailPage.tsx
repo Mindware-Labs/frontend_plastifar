@@ -2,7 +2,12 @@ import { Pencil, Plus, Power, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
-import { clientsApi } from "../../api/clients";
+import {
+  clientsApi,
+  type ContactCounts,
+  type ContactListResponse,
+  type ContactQuery,
+} from "../../api/clients";
 import { staffApi } from "../../api/staff";
 import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -12,10 +17,15 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { FilterChip } from "../../components/ui/FilterChip";
+import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
+import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { Client, Contact, Territory } from "../../types/clients";
 import { ClientModal } from "./ClientModal";
@@ -25,13 +35,29 @@ interface ClientDetailPageProps {
   section: "datos" | "contactos" | "historial";
 }
 
+/** Las tres que sabe filtrar `ContactsController.List`; el resto no existe. */
+type ContactChipKey = "todos" | "activos" | "inactivos";
+
+const contactChipToStatus: Record<ContactChipKey, string | undefined> = {
+  todos: undefined,
+  activos: "activos",
+  inactivos: "inactivos",
+};
+
+// Declarativas como en el listado de clientes: una sola fuente para etiqueta y
+// contador es lo que evita que los numeros se desalineen al tocar una pastilla.
+const contactChips: { key: ContactChipKey; label: string; countKey: keyof ContactCounts }[] = [
+  { key: "todos", label: "Todos", countKey: "all" },
+  { key: "activos", label: "Activos", countKey: "active" },
+  { key: "inactivos", label: "Inactivos", countKey: "inactive" },
+];
+
 export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const { id } = useParams();
   const { can } = usePermissions();
   const canWrite = can("clients.write");
 
   const [client, setClient] = useState<Client | null>(null);
-  const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [salesReps, setSalesReps] = useState<{ id: number; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -44,18 +70,55 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const [contactModal, setContactModal] = useState<"nuevo" | Contact | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
+  const [contactSearch, setContactSearch] = useState("");
+  const [contactChip, setContactChip] = useState<ContactChipKey>("todos");
+  const [contactPageSize, setContactPageSize] = useState(10);
+
   const clientId = Number(id);
   useDynamicBreadcrumb(client?.name ?? null);
 
+  const debouncedContactSearch = useDebouncedValue(contactSearch).trim();
+
+  /**
+   * La pestana de Contactos pagina en servidor (seccion 4.1) y no reutiliza el
+   * arreglo `contacts` de la ficha: ese viene acotado a la primera pagina, sin
+   * total ni contadores, asi que como origen de la tabla mentiria.
+   */
+  const {
+    data: contactPage,
+    isStale: contactsStale,
+    error: contactsError,
+    setPage: setContactPage,
+    refresh: refreshContacts,
+  } = usePagedList<ContactQuery, ContactListResponse>({
+    fetch: (query) => clientsApi.contacts.list(clientId, query),
+    criteria: {
+      pageSize: contactPageSize,
+      search: debouncedContactSearch || undefined,
+      status: contactChipToStatus[contactChip],
+    },
+    fallbackError: "No se pudieron cargar los contactos",
+  });
+
+  const contactRows = contactPage?.items ?? [];
+  const contactCounts = contactPage?.counts;
+  const contactsUnfiltered = contactChip === "todos" && !debouncedContactSearch;
+  /** El total del servidor; `contactRows.length` es el largo de una pagina. */
+  const totalContacts = contactCounts?.all ?? client?.contactCount ?? 0;
+
   function reload() {
-    return clientsApi.get(clientId).then(({ client: loaded, contacts: loadedContacts }) => {
-      setClient(loaded);
-      setContacts(loadedContacts);
-    });
+    return clientsApi.get(clientId).then(({ client: loaded }) => setClient(loaded));
   }
 
-  /** Refresco tras una mutacion: el fallo se dice, no se pierde en la consola. */
-  function reloadOrReport() {
+  /**
+   * Refresco tras una mutacion de contacto: se relee la pagina —marcar un nuevo
+   * principal degrada a otra fila que puede estar en otra pagina, y crear o
+   * desactivar mueve los contadores—, y ademas la ficha, porque `contactCount`
+   * vive en el registro del cliente. Parchear el arreglo en memoria dejaria la
+   * estrella duplicada hasta el proximo viaje al servidor.
+   */
+  function refreshAfterContactChange() {
+    refreshContacts();
     return reload().catch((err) => {
       setError(err instanceof ApiError ? err.message : "No se pudo actualizar la ficha del cliente");
     });
@@ -103,7 +166,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     setError(null);
     try {
       await clientsApi.contacts.makePrimary(contact.id);
-      await reload();
+      await refreshAfterContactChange();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo marcar como principal");
     } finally {
@@ -144,7 +207,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
             isPrimary: contact.isPrimary,
             isActive: !contact.isActive,
           });
-          await reload();
+          await refreshAfterContactChange();
         } finally {
           setBusyContactId(null);
         }
@@ -174,7 +237,9 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     );
   }
 
-  if (client === null || contacts === null) {
+  // Solo espera al registro: la pestana de Contactos tiene su propio spinner y
+  // su propia caida, y no debe retener la ficha entera.
+  if (client === null) {
     return (
       <div className="flex justify-center py-16">
         <Spinner />
@@ -257,98 +322,165 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
         </DataTable>
       )}
 
-      {section === "contactos" &&
-        (contacts.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-[13.5px] text-faint">
-              Todavía no tiene contactos registrados.
-            </p>
-            {canWrite && (
-              <div className="mt-3 flex justify-center">
-                <Button size="sm" onClick={() => setContactModal("nuevo")}>
-                  <Plus className="h-[15px] w-[15px]" />
-                  Agregar el primero
-                </Button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Nombre</Th>
-                <Th>Correo</Th>
-                <Th>Teléfono</Th>
-                <Th>Cargo</Th>
-                <Th>Principal</Th>
-                <Th>Estado</Th>
-                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+      {section === "contactos" && (
+        <>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={contactSearch}
+              onChange={setContactSearch}
+              // Las tres columnas que busca el servidor; nombrarlas evita
+              // intentar por cargo o telefono y creer que no hay resultados.
+              placeholder="Buscar por nombre, apellido o correo…"
+              className="w-[240px]"
+            />
 
-            <tbody>
-              {contacts.map((contact) => (
-                <Row key={contact.id} busy={busyContactId === contact.id}>
-                  <Td className="text-[13px] font-medium text-ink">
-                    {contact.firstName} {contact.lastName}
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">{contact.email ?? "—"}</Td>
-                  <Td className="text-[12.5px] text-brand-gray">{contact.phone ?? "—"}</Td>
-                  <Td className="text-[12.5px] text-brand-gray">{contact.position ?? "—"}</Td>
-                  <Td>
-                    {contact.isPrimary ? (
-                      // Gris, no rojo: marcar el registro designado no es ni la accion
-                      // primaria ni el estado activo, los dos unicos usos del 185 C.
-                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
-                        <Star aria-hidden className="h-3.5 w-3.5 fill-brand-gray text-brand-gray" />
-                        Principal
-                      </span>
-                    ) : canWrite && contact.isActive ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="-mx-3.5"
-                        onClick={() => makePrimary(contact)}
-                        disabled={busyContactId === contact.id}
-                      >
-                        Hacer principal
-                      </Button>
-                    ) : (
-                      <span className="text-[12.5px] text-faint">—</span>
-                    )}
-                  </Td>
-                  <Td>
-                    <StatusDot active={contact.isActive} />
-                  </Td>
-                  {canWrite && (
-                    <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Editar a ${contact.firstName} ${contact.lastName}`}
-                          icon={Pencil}
-                          onClick={() => setContactModal(contact)}
-                          disabled={busyContactId === contact.id}
-                        />
-                        <RowAction
-                          label={
-                            contact.isPrimary && contact.isActive
-                              ? "El contacto principal no se desactiva: marca otro como principal primero"
-                              : contact.isActive
-                                ? `Desactivar a ${contact.firstName}`
-                                : `Reactivar a ${contact.firstName}`
-                          }
-                          icon={Power}
-                          onClick={() => askDeactivateContact(contact)}
-                          disabled={(contact.isPrimary && contact.isActive) || busyContactId === contact.id}
-                        />
+            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+            {/* Antes de la primera respuesta las pastillas van en esqueleto, no
+                en cero: un cero es una afirmacion, y todavia no se sabe nada. */}
+            {contactCounts === undefined
+              ? contactChips.map(({ key }) => (
+                  <span key={key} aria-hidden className="h-8 w-[104px] animate-pulse rounded-full bg-fill" />
+                ))
+              : contactChips.map(({ key, label, countKey }) => (
+                  <FilterChip
+                    key={key}
+                    label={label}
+                    count={contactCounts[countKey]}
+                    active={contactChip === key}
+                    onClick={() => setContactChip(key)}
+                  />
+                ))}
+          </div>
+
+          {/* El reintento va en linea con su aviso, y el spinner de abajo no
+              sigue girando debajo de un error: o carga, o explica por que no. */}
+          {contactsError !== null && (
+            <div className="mb-3 flex items-start gap-3">
+              <Alert variant="error">{contactsError}</Alert>
+              <Button size="sm" variant="secondary" onClick={refreshContacts}>
+                Reintentar
+              </Button>
+            </div>
+          )}
+
+          {contactPage === null ? (
+            contactsError === null && (
+              <div className="flex justify-center py-16">
+                <Spinner />
+              </div>
+            )
+          ) : (
+            <div className={`transition-opacity ${contactsStale ? "opacity-60" : ""}`}>
+              {contactRows.length === 0 ? (
+                contactsUnfiltered ? (
+                  <div className="py-12 text-center">
+                    <p className="text-[13.5px] text-faint">Todavía no tiene contactos registrados.</p>
+                    {canWrite && (
+                      <div className="mt-3 flex justify-center">
+                        <Button size="sm" onClick={() => setContactModal("nuevo")}>
+                          <Plus className="h-[15px] w-[15px]" />
+                          Agregar el primero
+                        </Button>
                       </div>
-                    </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-        ))}
+                    )}
+                  </div>
+                ) : (
+                  <p className="py-14 text-center text-[13.5px] text-faint">
+                    Ningún contacto coincide con este filtro o búsqueda.
+                  </p>
+                )
+              ) : (
+                <DataTable>
+                  <thead>
+                    <HeadRow>
+                      <Th>Nombre</Th>
+                      <Th>Correo</Th>
+                      <Th>Teléfono</Th>
+                      <Th>Cargo</Th>
+                      <Th>Principal</Th>
+                      <Th>Estado</Th>
+                      {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                    </HeadRow>
+                  </thead>
+
+                  <tbody>
+                    {contactRows.map((contact) => (
+                      <Row key={contact.id} busy={busyContactId === contact.id}>
+                        <Td className="text-[13px] font-medium text-ink">
+                          {contact.firstName} {contact.lastName}
+                        </Td>
+                        <Td className="text-[12.5px] text-brand-gray">{contact.email ?? "—"}</Td>
+                        <Td className="text-[12.5px] text-brand-gray">{contact.phone ?? "—"}</Td>
+                        <Td className="text-[12.5px] text-brand-gray">{contact.position ?? "—"}</Td>
+                        <Td>
+                          {contact.isPrimary ? (
+                            // Gris, no rojo: marcar el registro designado no es ni la accion
+                            // primaria ni el estado activo, los dos unicos usos del 185 C.
+                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
+                              <Star aria-hidden className="h-3.5 w-3.5 fill-brand-gray text-brand-gray" />
+                              Principal
+                            </span>
+                          ) : canWrite && contact.isActive ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="-mx-3.5"
+                              onClick={() => makePrimary(contact)}
+                              disabled={busyContactId === contact.id}
+                            >
+                              Hacer principal
+                            </Button>
+                          ) : (
+                            <span className="text-[12.5px] text-faint">—</span>
+                          )}
+                        </Td>
+                        <Td>
+                          <StatusDot active={contact.isActive} />
+                        </Td>
+                        {canWrite && (
+                          <Td>
+                            <div className="flex items-center justify-end gap-1">
+                              <RowAction
+                                label={`Editar a ${contact.firstName} ${contact.lastName}`}
+                                icon={Pencil}
+                                onClick={() => setContactModal(contact)}
+                                disabled={busyContactId === contact.id}
+                              />
+                              <RowAction
+                                label={
+                                  contact.isPrimary && contact.isActive
+                                    ? "El contacto principal no se desactiva: marca otro como principal primero"
+                                    : contact.isActive
+                                      ? `Desactivar a ${contact.firstName}`
+                                      : `Reactivar a ${contact.firstName}`
+                                }
+                                icon={Power}
+                                onClick={() => askDeactivateContact(contact)}
+                                disabled={(contact.isPrimary && contact.isActive) || busyContactId === contact.id}
+                              />
+                            </div>
+                          </Td>
+                        )}
+                      </Row>
+                    ))}
+                  </tbody>
+                </DataTable>
+              )}
+
+              <Pagination
+                page={contactPage.page}
+                pageSize={contactPage.pageSize}
+                total={contactPage.total}
+                totalPages={contactPage.totalPages}
+                onPageChange={setContactPage}
+                onPageSizeChange={setContactPageSize}
+                noun="contactos"
+              />
+            </div>
+          )}
+        </>
+      )}
 
       {section === "historial" && (
         <p className="py-14 text-center text-[13.5px] text-faint">
@@ -371,9 +503,9 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
         <ContactModal
           clientId={client.id}
           contact={contactModal === "nuevo" ? undefined : contactModal}
-          isFirst={contacts.length === 0}
+          isFirst={totalContacts === 0}
           onClose={() => setContactModal(null)}
-          onSaved={() => void reloadOrReport()}
+          onSaved={() => void refreshAfterContactChange()}
         />
       )}
 

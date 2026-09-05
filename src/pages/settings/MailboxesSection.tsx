@@ -1,5 +1,5 @@
 import { CheckCircle2, Pencil, Plug, Plus, Power, XCircle } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
@@ -14,12 +14,12 @@ import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { useLocalPage } from "../../hooks/useLocalPage";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { DepartmentResponse } from "../../types/api";
-import type { Mailbox } from "../../types/settings";
+import { providerLabel, type Mailbox } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass, useSectionLoad } from "./catalogState";
+import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { MailboxModal } from "./MailboxModal";
 import { SettingsLayout } from "./SettingsLayout";
 
@@ -51,62 +51,51 @@ function TestingRing({ className = "" }: { className?: string }) {
   );
 }
 
-const listMailboxes = () => settingsApi.mailboxes.list({ page: 1, pageSize: 100 });
-
 export function MailboxesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
-  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
+  const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nuevo" | Mailbox | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [testingId, setTestingId] = useState<number | null>(null);
   const [testResult, setTestResult] = useState<{ id: number; result: TestResult } | null>(null);
 
-  const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search).trim();
 
-  const load = useCallback(async () => {
-    const [mailboxPage, departmentList] = await Promise.all([listMailboxes(), departmentsApi.list()]);
-    setMailboxes(mailboxPage.items);
-    setDepartments(departmentList);
-  }, []);
+  // Seccion 4.1: la pagina, el filtro, la busqueda y los contadores los resuelve
+  // SQL. La vista solo dibuja lo que llega.
+  const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    fetch: settingsApi.mailboxes.list,
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      status: chip === "todos" ? undefined : chip,
+    },
+    fallbackError: "No se pudieron cargar los buzones",
+  });
 
-  const { status, isRefetching, error, reload, retry } = useSectionLoad(
-    load,
-    "No se pudieron cargar los buzones",
-  );
+  // Los departamentos nombran una columna y llenan el desplegable del dialogo:
+  // es catalogo de apoyo, no el listado que se pagina.
+  const departmentsRef = useReferenceData<DepartmentResponse[]>(departmentsApi.list, []);
+  const departments = departmentsRef.data;
 
-  const all = mailboxes;
-  const activeCount = all.filter((mailbox) => mailbox.isActive).length;
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const isFirstLoad = data === null && error === null;
+  // Sin criterio activo, una pagina vacia significa catalogo vacio; con
+  // criterio, que nada coincide. Los contadores no distinguen ese caso: se
+  // calculan sobre el filtro base, no sobre la tabla entera.
+  const isFiltering = debouncedSearch !== "" || chip !== "todos";
 
   function departmentName(id: number) {
     return departments.find((department) => department.id === id)?.name ?? "—";
   }
-
-  const rows = all.filter((mailbox) => {
-    const byChip =
-      chip === "todos" ||
-      (chip === "activos" && mailbox.isActive) ||
-      (chip === "inactivos" && !mailbox.isActive);
-
-    const bySearch =
-      debouncedSearch === "" ||
-      mailbox.address.toLowerCase().includes(debouncedSearch) ||
-      mailbox.displayName.toLowerCase().includes(debouncedSearch);
-
-    return byChip && bySearch;
-  });
-
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
-    rows,
-    JSON.stringify([debouncedSearch, chip]),
-  );
 
   // El resultado pertenece a una fila concreta y a un instante concreto: si
   // cambia lo que se esta mirando, deja de describir nada. Se limpia desde el
@@ -135,7 +124,7 @@ export function MailboxesSection() {
       ) : (
         <>
           <strong className="font-semibold text-ink">{mailbox.displayName}</strong> vuelve a
-          sincronizarse con {mailbox.provider}.
+          sincronizarse con {providerLabel(mailbox.provider)}.
         </>
       ),
       confirmLabel: mailbox.isActive ? "Desactivar" : "Reactivar",
@@ -143,7 +132,12 @@ export function MailboxesSection() {
         setBusyId(mailbox.id);
         setTestResult(null);
         try {
-          const current = await freshCopy(listMailboxes, mailbox);
+          const current = await freshCopy(settingsApi.mailboxes.get, mailbox);
+          // La referencia al secreto solo baja a quien puede escribir. Sin ella
+          // el PUT la borraria: mejor detenerse y decirlo.
+          if (current.secretRef === null) {
+            throw new Error("No se pudo leer la referencia al secreto de este buzón.");
+          }
           await settingsApi.mailboxes.update(current.id, {
             address: current.address,
             displayName: current.displayName,
@@ -152,7 +146,7 @@ export function MailboxesSection() {
             secretRef: current.secretRef,
             isActive: !current.isActive,
           });
-          await reload();
+          refresh();
         } finally {
           setBusyId(null);
         }
@@ -201,29 +195,36 @@ export function MailboxesSection() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <ChipGroup label="Filtrar por estado" ready={status === "ready"}>
+        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
           <FilterChip
             label="Todos"
-            count={all.length}
+            count={counts?.all ?? 0}
             active={chip === "todos"}
             onClick={() => changeCriteria(() => setChip("todos"))}
           />
           <FilterChip
             label="Activos"
-            count={activeCount}
+            count={counts?.active ?? 0}
             active={chip === "activos"}
             onClick={() => changeCriteria(() => setChip("activos"))}
           />
           <FilterChip
             label="Inactivos"
-            count={all.length - activeCount}
+            count={counts?.inactive ?? 0}
             active={chip === "inactivos"}
             onClick={() => changeCriteria(() => setChip("inactivos"))}
           />
         </ChipGroup>
       </div>
 
-      {error && <LoadErrorAlert message={error} onRetry={retry} />}
+      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
+
+      {departmentsRef.failed && (
+        <LoadErrorAlert
+          message="No se pudieron cargar los departamentos: la columna queda sin nombre."
+          onRetry={departmentsRef.reload}
+        />
+      )}
 
       {testResult && (
         <div className="mb-3">
@@ -233,18 +234,18 @@ export function MailboxesSection() {
         </div>
       )}
 
-      {status === "loading" ? (
+      {isFirstLoad ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : status === "error" ? null : rows.length === 0 ? (
+      ) : data === null ? null : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          {all.length === 0
-            ? "Todavía no hay ningún buzón configurado."
-            : "Ningún buzón coincide con este filtro o búsqueda."}
+          {isFiltering
+            ? "Ningún buzón coincide con este filtro o búsqueda."
+            : "Todavía no hay ningún buzón configurado."}
         </p>
       ) : (
-        <div className={staleClass(isRefetching)}>
+        <div className={staleClass(isStale)}>
           <DataTable>
             <thead>
               <HeadRow>
@@ -258,7 +259,7 @@ export function MailboxesSection() {
             </thead>
 
             <tbody>
-              {pageRows.map((mailbox) => (
+              {rows.map((mailbox) => (
                 <Row key={mailbox.id} busy={busyId === mailbox.id}>
                   <Td>
                     <span className="flex flex-col gap-0.5">
@@ -269,7 +270,7 @@ export function MailboxesSection() {
                     </span>
                   </Td>
                   <Td>
-                    <Badge>{mailbox.provider}</Badge>
+                    <Badge>{providerLabel(mailbox.provider)}</Badge>
                   </Td>
                   <Td className="text-[12.5px] text-brand-gray">
                     {departmentName(mailbox.departmentId)}
@@ -330,14 +331,14 @@ export function MailboxesSection() {
         </div>
       )}
 
-      {status === "ready" && rows.length > 0 && (
+      {data !== null && data.total > 0 && (
         <Pagination
           page={page}
           pageSize={pageSize}
-          total={total}
-          totalPages={totalPages}
+          total={data.total}
+          totalPages={data.totalPages}
           onPageChange={(next) => changeCriteria(() => setPage(next))}
-          onPageSizeChange={(size) => changeCriteria(() => changePageSize(size))}
+          onPageSizeChange={(size) => changeCriteria(() => setPageSize(size))}
           noun="buzones"
         />
       )}
@@ -354,9 +355,7 @@ export function MailboxesSection() {
           mailbox={modal === "nuevo" ? undefined : modal}
           departments={departments}
           onClose={() => setModal(null)}
-          onSaved={() => {
-            void reload();
-          }}
+          onSaved={refresh}
         />
       )}
 

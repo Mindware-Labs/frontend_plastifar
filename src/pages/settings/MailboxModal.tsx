@@ -140,7 +140,7 @@ export function MailboxModal({ mailbox, departments, onClose, onSaved }: Mailbox
                 value={field.value}
                 onChange={field.onChange}
                 onBlur={field.onBlur}
-                options={MAILBOX_PROVIDERS.map((value) => ({ value, label: value }))}
+                options={MAILBOX_PROVIDERS}
                 state={stateOf("provider")}
                 error={errors.provider?.message}
               />

@@ -1,8 +1,7 @@
-// Contrato anticipado del modulo de Reportes. Todavia no existe en el backend
-// -ni puede: la mayoria agrega sobre Tickets, que tampoco existe todavia- asi
-// que esto es el catalogo completo de la seccion 11.2 del plan mas los datos
-// de demostracion de las dos familias que ya se pueden ilustrar con lo que
-// otros modulos definieron (Catalogos, Clientes).
+// Catalogo completo de los 31 reportes de la seccion 11.2 del plan. La mayoria
+// agrega sobre Tickets y sigue bloqueada hasta que exista la Bandeja; los que
+// ya se calculan tienen su endpoint en ReportsController y su tipo en
+// src/api/reports.ts.
 
 export type ReportFamily =
   | "operacion"
@@ -75,7 +74,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
   { id: "accesos-por-usuario", family: "auditoria", name: "Accesos por usuario", description: "Quién entró, cuándo y desde dónde." },
   { id: "cambios-estado-tickets", family: "auditoria", name: "Cambios de estado de tickets", description: "Todo tránsito de estado, con actor." },
   { id: "bajas-desactivaciones", family: "auditoria", name: "Bajas y desactivaciones", description: "Registros dados de baja en el período." },
-  { id: "sesiones-revocadas", family: "auditoria", name: "Sesiones revocadas", description: "Cierres forzados de sesión, con motivo." },
+  { id: "sesiones-revocadas", family: "auditoria", name: "Sesiones revocadas", description: "Cierres forzados de sesión, con quién los ordenó." },
 ];
 
 export interface DateRange {

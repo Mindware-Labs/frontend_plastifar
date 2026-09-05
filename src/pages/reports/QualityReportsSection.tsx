@@ -3,6 +3,7 @@ import { reportsApi, type QualityReport } from "../../api/reports";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { downloadCsvSections } from "../../lib/csv";
 import { formatAmount } from "../../lib/quality";
+
 import { REPORT_CATALOG } from "../../types/reports";
 import { BlockedReports } from "./BlockedReports";
 import { DateRangeBar } from "./DateRangeBar";
@@ -28,6 +29,19 @@ const monthFormat = new Intl.DateTimeFormat("es-DO", { month: "long", year: "num
 
 function monthLabel(key: string) {
   return monthFormat.format(new Date(`${key}-01T00:00:00`));
+}
+
+/**
+ * El promedio llega con un decimal. Antes venia redondeado a entero, y una
+ * media real de medio dia se convertia en `0` que la pantalla pintaba como
+ * «—»: «se cierran el mismo dia» y «no se cerro ninguna» acababan diciendo lo
+ * mismo. Ahora el `null` es lo unico que significa «no hay dato».
+ */
+const daysFormat = new Intl.NumberFormat("es-DO", { maximumFractionDigits: 1 });
+
+function closureDaysLabel(days: number | null): string {
+  if (days === null) return "Sin cierres";
+  return `${daysFormat.format(days)} ${days === 1 ? "día" : "días"}`;
 }
 
 export function QualityReportsSection() {
@@ -60,7 +74,9 @@ export function QualityReportsSection() {
           ["Vencidas hoy", data.overdueNow],
           [
             "Tiempo medio de cierre (días)",
-            data.averageClosureDays === 0 ? "—" : data.averageClosureDays,
+            // Numero crudo, no el texto de la pantalla: la celda tiene que
+            // poder promediarse con la de otro mes.
+            data.averageClosureDays === null ? "Sin cierres" : data.averageClosureDays,
           ],
         ],
       },
@@ -76,11 +92,15 @@ export function QualityReportsSection() {
       },
       {
         title: "Notas de crédito emitidas y monto acumulado",
+        // La moneda va en su propia columna y el acumulado viaja como numero
+        // crudo. Exportarlo con símbolo y separadores de millar dejaba a Excel
+        // una columna de texto que no se puede sumar, y un importe que no se
+        // suma no es una exportación util por muy fiel que sea a la pantalla.
         headers: ["Moneda", "Notas", "Acumulado"],
         rows: data.credits.byCurrency.map((entry) => [
           entry.currency,
           entry.count,
-          formatAmount(entry.total, entry.currency),
+          entry.total,
         ]),
       },
     ]);
@@ -105,8 +125,12 @@ export function QualityReportsSection() {
             />
             <StatTile
               label="Tiempo medio de cierre"
-              value={data.averageClosureDays === 0 ? "—" : `${data.averageClosureDays} días`}
-              hint="Desde detectada hasta cerrada"
+              value={closureDaysLabel(data.averageClosureDays)}
+              hint={
+                data.averageClosureDays === null
+                  ? "Ninguna HCA se cerró en el período"
+                  : "Desde detectada hasta cerrada"
+              }
             />
           </div>
 
@@ -114,7 +138,7 @@ export function QualityReportsSection() {
             <SectionHeading>HCA abiertas y cerradas por período</SectionHeading>
             {data.byMonth.length === 0 ? (
               <p className="py-8 text-center text-[13.5px] text-faint">
-                Ninguna hoja de corrección cae en este rango de fechas.
+                Ninguna HCA cae en este rango de fechas.
               </p>
             ) : (
               <DataTable>
@@ -154,7 +178,7 @@ export function QualityReportsSection() {
               </DataTable>
             )}
             <p className="mt-2 text-[12px] text-faint">
-              Una diferencia positiva significa que se abrieron más hojas de las que se cerraron en
+              Una diferencia positiva significa que se abrieron más HCA de las que se cerraron en
               ese mes.
             </p>
           </section>

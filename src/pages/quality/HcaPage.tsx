@@ -83,6 +83,11 @@ export function HcaPage() {
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
+  // Estos catalogos ya no resuelven ningun nombre de la tabla —eso lo hace el
+  // servidor— y solo alimentan los desplegables de filtro y el formulario de
+  // alta. Aun asi vienen recortados a 100: un filtro que no ofrece al cliente
+  // 101 es un limite conocido, mientras que una columna que decia «—» a partir
+  // del cliente 101 era un dato perdido (seccion 4.1).
   useEffect(() => {
     clientsApi
       .list({ page: 1, pageSize: 100 })
@@ -99,19 +104,6 @@ export function HcaPage() {
       .then((data) => setStaff(data.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))))
       .catch(() => setStaff([]));
   }, []);
-
-  function clientName(id: number) {
-    return clients.find((client) => client.id === id)?.name ?? "—";
-  }
-
-  function lineName(id: number) {
-    return productLines.find((line) => line.id === id)?.name ?? "—";
-  }
-
-  function staffName(id: number | null) {
-    if (id === null) return "—";
-    return staff.find((person) => person.id === id)?.name ?? "—";
-  }
 
   const criteria: Omit<SheetQuery, "page"> = {
     pageSize,
@@ -323,10 +315,10 @@ export function HcaPage() {
                         {sheet.number}
                       </Link>
                     </Td>
-                    <Td className="text-[12.5px] text-brand-gray">{clientName(sheet.clientId)}</Td>
-                    <Td className="text-[12.5px] text-brand-gray">{lineName(sheet.productLineId)}</Td>
+                    <Td className="text-[12.5px] text-brand-gray">{sheet.clientName}</Td>
+                    <Td className="text-[12.5px] text-brand-gray">{sheet.productLineName}</Td>
                     <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
-                      {staffName(sheet.responsibleStaffId)}
+                      {sheet.responsibleName}
                     </Td>
                     <Td className="whitespace-nowrap">
                       <span className="block text-[12.5px] tabular-nums text-brand-gray">

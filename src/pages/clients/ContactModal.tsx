@@ -9,15 +9,17 @@ import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import type { Contact } from "../../types/clients";
+import { fieldForServerError, type FieldRule } from "./serverFieldErrors";
 
 /**
  * Espejo de la validacion del servidor en POST/PUT /api/clients/{id}/contacts:
- * nombre y apellido obligatorios, correo unico dentro del mismo cliente — es la
- * llave de la futura ingesta por correo (seccion 7.3).
+ * nombre y apellido de 2 a 80 caracteres, correo valido de hasta 120 y unico
+ * dentro del mismo cliente — es la llave de la futura ingesta por correo
+ * (seccion 7.3) —, telefono hasta 30 y cargo hasta 80.
  */
 const schema = z.object({
-  firstName: z.string().trim().min(1, "Obligatorio").max(80, "Máximo 80 caracteres"),
-  lastName: z.string().trim().min(1, "Obligatorio").max(80, "Máximo 80 caracteres"),
+  firstName: z.string().trim().min(2, "Al menos 2 caracteres").max(80, "Máximo 80 caracteres"),
+  lastName: z.string().trim().min(2, "Al menos 2 caracteres").max(80, "Máximo 80 caracteres"),
   email: z.string().trim().max(120, "Máximo 120 caracteres").email("Formato de correo inválido, revisa el @ y el dominio").or(z.literal("")),
   phone: z.string().trim().max(30, "Máximo 30 caracteres"),
   position: z.string().trim().max(80, "Máximo 80 caracteres"),
@@ -26,6 +28,19 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+/**
+ * A que campo pertenece cada 400 o 409 de ContactsController. «apellido» va
+ * antes que «nombre» porque el mensaje del apellido tambien lleva la palabra
+ * nombre en algunas redacciones. Ver ./serverFieldErrors por que se hace asi.
+ */
+const fieldRules: FieldRule<keyof FormValues>[] = [
+  { field: "email", matches: ["correo"] },
+  { field: "lastName", matches: ["apellido"] },
+  { field: "phone", matches: ["telefono"] },
+  { field: "position", matches: ["cargo"] },
+  { field: "firstName", matches: ["nombre"] },
+];
 
 interface ContactModalProps {
   clientId: number;
@@ -85,9 +100,13 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
       onSaved(saved);
       onClose();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setError("email", { message: err.message });
-        setFocus("email");
+      // Seccion 4.2: en su campo y con el foco de vuelta. Antes solo el 409 del
+      // correo duplicado llegaba a su campo; los 400 de longitud o formato
+      // acababan en el aviso general de arriba.
+      const field = fieldForServerError(err, fieldRules);
+      if (field) {
+        setError(field.field, { message: field.message });
+        setFocus(field.field);
         return;
       }
 

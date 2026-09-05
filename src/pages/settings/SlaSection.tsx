@@ -1,5 +1,5 @@
 import { Pencil, Plus, Power, Star } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import { ApiError } from "../../api/client";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
@@ -15,18 +15,38 @@ import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { useLocalPage } from "../../hooks/useLocalPage";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { humanizeMinutes, workdayMinutes } from "../../lib/sla";
 import { PRIORITIES, type Holiday, type Priority, type SlaPolicy } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert, WarnNotice } from "./catalogSection";
-import { freshCopy, staleClass, useSectionLoad } from "./catalogState";
+import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { SettingsLayout } from "./SettingsLayout";
 import { SlaModal } from "./SlaModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
 
-const listPolicies = () => settingsApi.slaPolicies.list({ page: 1, pageSize: 100 });
+/**
+ * Prioridades sin política predeterminada activa. Se pregunta por prioridad en
+ * vez de recorrer el listado cargado, que ahora es una página: cada consulta
+ * trae solo las activas de esa prioridad. Sigue habiendo un tope de cien por
+ * prioridad; cerrarlo del todo pide un filtro `isDefault` en el API.
+ */
+async function loadUncovered(): Promise<Priority[]> {
+  const covered = await Promise.all(
+    PRIORITIES.map((priority) =>
+      settingsApi.slaPolicies
+        .list({ page: 1, pageSize: 100, priority, status: "activas" })
+        .then(({ items }) => items.some((policy) => policy.isDefault)),
+    ),
+  );
+
+  return PRIORITIES.filter((_, index) => !covered[index]);
+}
+
+/** El calendario que el diálogo usa para previsualizar vencimientos. */
+const loadHolidays = () =>
+  settingsApi.holidays.list({ page: 1, pageSize: 100, status: "activos" }).then(({ items }) => items);
 
 /** Cuerpo del PUT: el identificador viaja en la ruta, nunca en el DTO. */
 function toRequest(policy: SlaPolicy): Omit<SlaPolicy, "id"> {
@@ -48,69 +68,59 @@ export function SlaSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [policies, setPolicies] = useState<SlaPolicy[]>([]);
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState<Priority | "todas">("todas");
   const [chip, setChip] = useState<ChipKey>("todas");
+  const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nueva" | SlaPolicy | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
-  const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search).trim();
 
-  const load = useCallback(async () => {
-    const [policyPage, holidayPage] = await Promise.all([
-      listPolicies(),
-      settingsApi.holidays.list({ page: 1, pageSize: 100 }),
-    ]);
-    setPolicies(policyPage.items);
-    setHolidays(holidayPage.items);
-  }, []);
-
-  const { status, isRefetching, error, reload, retry } = useSectionLoad(
-    load,
-    "No se pudieron cargar las políticas de SLA",
-  );
-
-  const all = policies;
-  const activeCount = all.filter((policy) => policy.isActive).length;
-
-  /** Prioridades que hoy no tienen ninguna política predeterminada activa. */
-  const uncovered = useMemo(
-    () =>
-      PRIORITIES.filter(
-        (value) =>
-          !all.some((policy) => policy.priority === value && policy.isDefault && policy.isActive),
-      ),
-    [all],
-  );
-
-  const rows = all.filter((policy) => {
-    const byChip =
-      chip === "todas" ||
-      (chip === "activas" && policy.isActive) ||
-      (chip === "inactivas" && !policy.isActive);
-    const byPriority = priority === "todas" || policy.priority === priority;
-    const bySearch = debouncedSearch === "" || policy.name.toLowerCase().includes(debouncedSearch);
-    return byChip && byPriority && bySearch;
+  // Seccion 4.1: la pagina, el filtro, la busqueda y los contadores los resuelve
+  // SQL. La vista solo dibuja lo que llega.
+  const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    fetch: settingsApi.slaPolicies.list,
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      status: chip === "todas" ? undefined : chip,
+      priority: priority === "todas" ? undefined : priority,
+    },
+    fallbackError: "No se pudieron cargar las políticas de SLA",
   });
 
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
-    rows,
-    JSON.stringify([debouncedSearch, priority, chip]),
-  );
+  const uncoveredRef = useReferenceData<Priority[]>(loadUncovered, []);
+  const uncovered = uncoveredRef.data;
+
+  const holidaysRef = useReferenceData<Holiday[]>(loadHolidays, []);
+  const holidays = holidaysRef.data;
+
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const isFirstLoad = data === null && error === null;
+  // Sin criterio activo, una pagina vacia significa catalogo vacio; con
+  // criterio, que nada coincide. Los contadores no distinguen ese caso: se
+  // calculan sobre el filtro base, no sobre la tabla entera.
+  const isFiltering = debouncedSearch !== "" || chip !== "todas" || priority !== "todas";
+
+  /** Marcar o desactivar una predeterminada cambia la cobertura: se relee. */
+  function reloadAll() {
+    refresh();
+    uncoveredRef.reload();
+  }
 
   async function makeDefault(policy: SlaPolicy) {
     setBusyId(policy.id);
     setActionError(null);
     try {
-      const current = await freshCopy(listPolicies, policy);
+      const current = await freshCopy(settingsApi.slaPolicies.get, policy);
       await settingsApi.slaPolicies.update(current.id, { ...toRequest(current), isDefault: true });
-      await reload();
+      reloadAll();
     } catch (err) {
       setActionError(
         err instanceof ApiError ? err.message : "No se pudo marcar como predeterminada",
@@ -146,13 +156,13 @@ export function SlaSection() {
       onConfirm: async () => {
         setBusyId(policy.id);
         try {
-          const current = await freshCopy(listPolicies, policy);
+          const current = await freshCopy(settingsApi.slaPolicies.get, policy);
           await settingsApi.slaPolicies.update(current.id, {
             ...toRequest(current),
             isActive: !current.isActive,
             isDefault: current.isActive ? false : current.isDefault,
           });
-          await reload();
+          reloadAll();
         } finally {
           setBusyId(null);
         }
@@ -193,29 +203,29 @@ export function SlaSection() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <ChipGroup label="Filtrar por estado" ready={status === "ready"}>
+        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
           <FilterChip
             label="Todas"
-            count={all.length}
+            count={counts?.all ?? 0}
             active={chip === "todas"}
             onClick={() => setChip("todas")}
           />
           <FilterChip
             label="Activas"
-            count={activeCount}
+            count={counts?.active ?? 0}
             active={chip === "activas"}
             onClick={() => setChip("activas")}
           />
           <FilterChip
             label="Inactivas"
-            count={all.length - activeCount}
+            count={counts?.inactive ?? 0}
             active={chip === "inactivas"}
             onClick={() => setChip("inactivas")}
           />
         </ChipGroup>
       </div>
 
-      {error && <LoadErrorAlert message={error} onRetry={retry} />}
+      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {actionError && (
         <div className="mb-3">
@@ -233,18 +243,18 @@ export function SlaSection() {
         </div>
       )}
 
-      {status === "loading" ? (
+      {isFirstLoad ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : status === "error" ? null : rows.length === 0 ? (
+      ) : data === null ? null : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          {all.length === 0
-            ? "Todavía no hay ninguna política de SLA configurada."
-            : "Ninguna política coincide con este filtro o búsqueda."}
+          {isFiltering
+            ? "Ninguna política coincide con este filtro o búsqueda."
+            : "Todavía no hay ninguna política de SLA configurada."}
         </p>
       ) : (
-        <div className={staleClass(isRefetching)}>
+        <div className={staleClass(isStale)}>
           <DataTable>
             <thead>
               <HeadRow>
@@ -260,7 +270,7 @@ export function SlaSection() {
             </thead>
 
             <tbody>
-              {pageRows.map((policy) => (
+              {rows.map((policy) => (
                 <Row key={policy.id} busy={busyId === policy.id}>
                   <Td className="text-[12.5px] font-medium text-ink">{policy.name}</Td>
                   <Td>
@@ -338,14 +348,14 @@ export function SlaSection() {
         </div>
       )}
 
-      {status === "ready" && rows.length > 0 && (
+      {data !== null && data.total > 0 && (
         <Pagination
           page={page}
           pageSize={pageSize}
-          total={total}
-          totalPages={totalPages}
+          total={data.total}
+          totalPages={data.totalPages}
           onPageChange={setPage}
-          onPageSizeChange={changePageSize}
+          onPageSizeChange={setPageSize}
           noun="políticas"
         />
       )}
@@ -361,9 +371,7 @@ export function SlaSection() {
           policy={modal === "nueva" ? undefined : modal}
           holidays={holidays}
           onClose={() => setModal(null)}
-          onSaved={() => {
-            void reload();
-          }}
+          onSaved={reloadAll}
         />
       )}
 

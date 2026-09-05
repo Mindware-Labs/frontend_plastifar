@@ -24,8 +24,8 @@ export interface ClientQuery {
 }
 
 export interface ContactQuery {
-  page?: number;
-  pageSize?: number;
+  page: number;
+  pageSize: number;
   search?: string;
   /** todos | activos | inactivos */
   status?: string;
@@ -71,10 +71,11 @@ export const clientsApi = {
     }),
 
   contacts: {
-    list: (clientId: number, query: ContactQuery = {}) =>
-      apiRequest<ContactListResponse>(
-        `/api/clients/${clientId}/contacts${toQuery({ pageSize: 100, ...query })}`,
-      ),
+    // Sin `pageSize` por defecto: el tamano lo decide la pestana, y el tope de
+    // 1..100 lo impone el servidor (seccion 4.1). Pedir 100 de oficio era traer
+    // la tabla entera con otro nombre.
+    list: (clientId: number, query: ContactQuery) =>
+      apiRequest<ContactListResponse>(`/api/clients/${clientId}/contacts${toQuery({ ...query })}`),
 
     create: (clientId: number, data: SaveContactRequest) =>
       apiRequest<Contact>(`/api/clients/${clientId}/contacts`, {

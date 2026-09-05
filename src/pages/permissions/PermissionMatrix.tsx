@@ -56,16 +56,18 @@ export function PermissionMatrix({
   const cellRefs = useRef(new Map<string, HTMLButtonElement | null>());
 
   /**
-   * Columnas por las que pasa el cursor de la rejilla. La del administrador
-   * queda fuera —concede todo el catalogo y su celda es un candado—, pero el
-   * modo consulta no quita ninguna: dejar de ser accionable no es dejar de ser
+   * Columnas por las que pasa el cursor de la rejilla. Solo queda fuera la del
+   * rol que concede el catalogo entero y ademas no se edita: su celda es un
+   * candado sin valor que leer. Un rol del sistema con lista parcial si es
+   * alcanzable —sus celdas dicen algo, aunque no se puedan cambiar—, y el modo
+   * consulta no quita ninguna: dejar de ser accionable no es dejar de ser
    * contenido, y sin paradas la matriz entera queda fuera del alcance del
-   * teclado. Si todos los roles conceden todo, se conserva la primera columna
-   * para que la rejilla siga siendo legible.
+   * teclado. Si todas quedaran fuera, se conserva la primera columna para que
+   * la rejilla siga siendo legible.
    */
   const reachable = useMemo(() => {
     const columns = roles.reduce<number[]>((acc, role, index) => {
-      if (!isLocked(role)) acc.push(index);
+      if (!showsLock(role)) acc.push(index);
       return acc;
     }, []);
     if (columns.length > 0) return columns;
@@ -105,13 +107,27 @@ export function PermissionMatrix({
   }
 
   /**
-   * Lo que bloquea una columna es ser rol del sistema, no cubrir el catalogo
-   * entero. Son dos hechos distintos y estaban colapsados en `grantsAll`: un
-   * rol del sistema con lista parcial se pintaba editable y el servidor lo
-   * rechazaba con 409 al guardar.
+   * Dos hechos distintos que la matriz llego a colapsar en uno solo:
+   *
+   * - `isSystem` dice que la lista del rol no se edita (seccion 6.3 regla 4).
+   * - `grantsAll` dice que el rol concede el catalogo completo, y lo calcula el
+   *   servidor a partir de su lista, no de si es del sistema.
+   *
+   * Pintarlos juntos hacia que todo rol del sistema anunciara «todo el catalogo»
+   * y escondiera detras de un candado los permisos que de verdad concede.
    */
   function isLocked(role: RoleSummary) {
     return role.isSystem;
+  }
+
+  /**
+   * El candado sustituye al valor solo cuando no hay valor que leer: el rol lo
+   * concede todo y ademas no se edita. Un rol del sistema con lista parcial
+   * pinta su check o su guion como cualquier otro; que no sea editable se dice
+   * con el cursor, el `aria-disabled` y la explicacion bajo la rejilla.
+   */
+  function showsLock(role: RoleSummary) {
+    return role.grantsAll && isLocked(role);
   }
 
   function isGranted(role: RoleSummary, key: PermissionKey) {
@@ -125,6 +141,7 @@ export function PermissionMatrix({
 
   /** Que hace —o por que no hace nada— la celda que se esta mirando. */
   function explain(role: RoleSummary, granted: boolean) {
+    if (showsLock(role)) return "Concede el catálogo completo y no se edita: es un rol del sistema";
     if (isLocked(role)) return "Es un rol del sistema: su lista de permisos no se edita";
     if (readOnly) return "Modo consulta: para cambiar esta celda necesitas el permiso roles.write";
     return granted ? "Quitar este permiso" : "Conceder este permiso";
@@ -192,7 +209,11 @@ export function PermissionMatrix({
                         {role.name}
                       </span>
                       <span className="text-[10.5px] font-normal normal-case tracking-normal text-faint">
-                        {isLocked(role)
+                        {/* Lo que se anuncia aqui es el alcance real del rol
+                            (`grantsAll`), no si se puede editar: un rol del
+                            sistema con lista parcial decia «todo el catálogo»
+                            y concedia tres permisos. */}
+                        {role.grantsAll
                           ? "todo el catálogo"
                           : role.isActive
                             ? `${role.assignedStaff} ${role.assignedStaff === 1 ? "persona" : "personas"}`
@@ -229,10 +250,12 @@ export function PermissionMatrix({
                 {group.permissions.map((permission) => {
                   const row = rowOf.get(permission.key) ?? 0;
                   const isRowActive = crosshair.row === permission.key;
-                  // El administrador concede todo por definicion: si contara, ningun
+                  // Quien concede el catalogo entero no cuenta: si contara, ningun
                   // permiso quedaria nunca «sin asignar» y el aviso no diria nada.
+                  // Los demas roles del sistema si cuentan —conceden de verdad—, y
+                  // excluirlos marcaba «sin asignar» un permiso ya otorgado.
                   const grantedBy = roles.filter(
-                    (role) => !isLocked(role) && isGranted(role, permission.key),
+                    (role) => !role.grantsAll && isGranted(role, permission.key),
                   ).length;
 
                   return (
@@ -322,7 +345,7 @@ export function PermissionMatrix({
                                 }
                                 ${changed ? "ring-2 ring-inset ring-warn/45" : ""}`}
                             >
-                              {isLocked(role) ? (
+                              {showsLock(role) ? (
                                 <Lock aria-hidden className="h-3 w-3" />
                               ) : granted ? (
                                 <Check aria-hidden className="h-3.5 w-3.5" strokeWidth={2.75} />

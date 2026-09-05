@@ -1,5 +1,5 @@
 import { CalendarOff, Pencil, Plus, Power } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -12,11 +12,11 @@ import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { useLocalPage } from "../../hooks/useLocalPage";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { WEEKDAYS, type Holiday, type SlaPolicy } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass, useSectionLoad } from "./catalogState";
+import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { HolidayModal } from "./HolidayModal";
 import { SettingsLayout } from "./SettingsLayout";
 
@@ -36,71 +36,85 @@ function asLocalDate(iso: string): Date {
   return new Date(year, month - 1, day, 12);
 }
 
-const listHolidays = () => settingsApi.holidays.list({ page: 1, pageSize: 100 });
+/**
+ * Los años del desplegable salen del calendario, no de la página que se ve: se
+ * piden el feriado más antiguo y el más reciente --una fila cada uno-- y se
+ * ofrece el tramo entre ambos. Derivarlos de lo cargado ocultaba todo año que
+ * no cupiera en la página.
+ */
+async function loadYears(): Promise<string[]> {
+  const [oldest, newest] = await Promise.all([
+    settingsApi.holidays.list({ page: 1, pageSize: 1, dir: "asc" }),
+    settingsApi.holidays.list({ page: 1, pageSize: 1, dir: "desc" }),
+  ]);
+
+  const from = oldest.items[0]?.date.slice(0, 4);
+  const to = newest.items[0]?.date.slice(0, 4);
+  if (from === undefined || to === undefined) return [];
+
+  const years: string[] = [];
+  for (let year = Number(to); year >= Number(from); year -= 1) years.push(String(year));
+  return years;
+}
+
+/**
+ * Las políticas de jornada que un feriado mueve. Es catalogo de apoyo --una
+ * consulta de referencia, no el listado que se pagina-- y por eso se pide
+ * entero; si algún día pasan de cien, hará falta que el API cuente esto.
+ */
+const loadWorkdayPolicies = () =>
+  settingsApi.slaPolicies
+    .list({ page: 1, pageSize: 100, status: "activas" })
+    .then(({ items }) => items.filter((policy) => policy.businessHoursOnly));
 
 export function HolidaysSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
-  const [policies, setPolicies] = useState<SlaPolicy[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [year, setYear] = useState<string>("todos");
   const [chip, setChip] = useState<ChipKey>("todos");
+  const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nuevo" | Holiday | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
-  const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search).trim();
 
-  const load = useCallback(async () => {
-    const [holidayPage, policyPage] = await Promise.all([
-      listHolidays(),
-      settingsApi.slaPolicies.list({ page: 1, pageSize: 100 }),
-    ]);
-    setHolidays(holidayPage.items);
-    setPolicies(policyPage.items);
-  }, []);
+  // Seccion 4.1: la pagina, el filtro, la busqueda y los contadores los resuelve
+  // SQL. La vista solo dibuja lo que llega.
+  const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    fetch: settingsApi.holidays.list,
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      status: chip === "todos" ? undefined : chip,
+      year: year === "todos" ? undefined : Number(year),
+    },
+    fallbackError: "No se pudieron cargar los días no laborables",
+  });
 
-  const { status, isRefetching, error, reload, retry } = useSectionLoad(
-    load,
-    "No se pudieron cargar los días no laborables",
-  );
+  const yearsRef = useReferenceData<string[]>(loadYears, []);
+  const years = yearsRef.data;
 
-  const all = holidays;
-  const activeCount = all.filter((holiday) => holiday.isActive).length;
+  const policiesRef = useReferenceData<SlaPolicy[]>(loadWorkdayPolicies, []);
+  const policies = policiesRef.data;
 
-  const years = useMemo(
-    () => [...new Set(all.map((holiday) => holiday.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a)),
-    [all],
-  );
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const isFirstLoad = data === null && error === null;
+  // Sin criterio activo, una pagina vacia significa calendario vacio; con
+  // criterio, que nada coincide. Los contadores no distinguen ese caso: se
+  // calculan sobre el filtro base, no sobre la tabla entera.
+  const isFiltering = debouncedSearch !== "" || chip !== "todos" || year !== "todos";
 
-  const rows = useMemo(
-    () =>
-      all
-        .filter((holiday) => {
-          const byChip =
-            chip === "todos" ||
-            (chip === "activos" && holiday.isActive) ||
-            (chip === "inactivos" && !holiday.isActive);
-          const byYear = year === "todos" || holiday.date.startsWith(year);
-          const bySearch =
-            debouncedSearch === "" || holiday.name.toLowerCase().includes(debouncedSearch);
-          return byChip && byYear && bySearch;
-        })
-        .sort((a, b) => a.date.localeCompare(b.date)),
-    [all, chip, year, debouncedSearch],
-  );
-
-  // RF-K2: los listados de catalogo paginan como cualquier otro. El corte
-  // lo hace la vista solo mientras no exista /api/settings/...; el endpoint
-  // devuelve la pagina ya cortada en SQL (anexo 12.1).
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
-    rows,
-    JSON.stringify([debouncedSearch, year, chip]),
-  );
+  /** Tras escribir, el calendario puede estrenar año: los años se releen tambien. */
+  function reloadAll() {
+    refresh();
+    yearsRef.reload();
+  }
 
   /**
    * Un feriado solo mueve vencimientos en las politicas con reloj de jornada que
@@ -111,9 +125,7 @@ export function HolidaysSection() {
     const weekday = WEEKDAYS.find((day) => day.jsDay === asLocalDate(holiday.date).getDay())?.key;
     if (!weekday || !holiday.isActive) return [];
 
-    return policies.filter(
-      (policy) => policy.isActive && policy.businessHoursOnly && policy.workDays.includes(weekday),
-    );
+    return policies.filter((policy) => policy.workDays.includes(weekday));
   }
 
   function askToggle(holiday: Holiday) {
@@ -137,13 +149,13 @@ export function HolidaysSection() {
       onConfirm: async () => {
         setBusyId(holiday.id);
         try {
-          const current = await freshCopy(listHolidays, holiday);
+          const current = await freshCopy(settingsApi.holidays.get, holiday);
           await settingsApi.holidays.update(current.id, {
             date: current.date,
             name: current.name,
             isActive: !current.isActive,
           });
-          await reload();
+          reloadAll();
         } finally {
           setBusyId(null);
         }
@@ -184,42 +196,49 @@ export function HolidaysSection() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <ChipGroup label="Filtrar por estado" ready={status === "ready"}>
+        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
           <FilterChip
             label="Todos"
-            count={all.length}
+            count={counts?.all ?? 0}
             active={chip === "todos"}
             onClick={() => setChip("todos")}
           />
           <FilterChip
             label="Activos"
-            count={activeCount}
+            count={counts?.active ?? 0}
             active={chip === "activos"}
             onClick={() => setChip("activos")}
           />
           <FilterChip
             label="Inactivos"
-            count={all.length - activeCount}
+            count={counts?.inactive ?? 0}
             active={chip === "inactivos"}
             onClick={() => setChip("inactivos")}
           />
         </ChipGroup>
       </div>
 
-      {error && <LoadErrorAlert message={error} onRetry={retry} />}
+      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
-      {status === "loading" ? (
+      {policiesRef.failed && (
+        <LoadErrorAlert
+          message="No se pudieron cargar las políticas: la columna «mueve vencimientos» queda sin calcular."
+          onRetry={policiesRef.reload}
+        />
+      )}
+
+      {isFirstLoad ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : status === "error" ? null : rows.length === 0 ? (
+      ) : data === null ? null : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          {all.length === 0
-            ? "Todavía no hay ningún día no laborable registrado."
-            : "Ningún día coincide con este filtro o búsqueda."}
+          {isFiltering
+            ? "Ningún día coincide con este filtro o búsqueda."
+            : "Todavía no hay ningún día no laborable registrado."}
         </p>
       ) : (
-        <div className={staleClass(isRefetching)}>
+        <div className={staleClass(isStale)}>
           <DataTable>
             <thead>
               <HeadRow>
@@ -233,7 +252,7 @@ export function HolidaysSection() {
             </thead>
 
             <tbody>
-              {pageRows.map((holiday) => (
+              {rows.map((holiday) => (
                 <Row key={holiday.id} busy={busyId === holiday.id}>
                   <Td className="text-[12.5px] font-medium tabular-nums text-ink">
                     {dateFormat.format(asLocalDate(holiday.date))}
@@ -296,14 +315,14 @@ export function HolidaysSection() {
         </div>
       )}
 
-      {status === "ready" && rows.length > 0 && (
+      {data !== null && data.total > 0 && (
         <Pagination
           page={page}
           pageSize={pageSize}
-          total={total}
-          totalPages={totalPages}
+          total={data.total}
+          totalPages={data.totalPages}
           onPageChange={setPage}
-          onPageSizeChange={changePageSize}
+          onPageSizeChange={setPageSize}
           noun="días"
         />
       )}
@@ -317,9 +336,7 @@ export function HolidaysSection() {
         <HolidayModal
           holiday={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={() => {
-            void reload();
-          }}
+          onSaved={reloadAll}
         />
       )}
 

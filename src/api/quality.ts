@@ -68,13 +68,19 @@ export interface SavePlanItemRequest {
 export interface PlanItemQuery {
   page?: number;
   pageSize?: number;
-  /** todas | pendientes | cumplidas | anuladas */
+  /** todas | pendientes | encurso | cumplidas | anuladas */
   status?: string;
 }
 
+/**
+ * Espejo de `PlanItemCounts` en QualityDtos.cs. «En curso» tiene casilla
+ * propia: el servidor conserva ese estado, y sin contarlo una accion ya
+ * empezada no caeria en ninguna pastilla.
+ */
 export interface PlanItemCounts {
   all: number;
   pending: number;
+  inProgress: number;
   done: number;
   cancelled: number;
 }
@@ -167,7 +173,7 @@ export const qualityApi = {
   planItems: {
     /**
      * La ficha de la HCA sigue trayendo su plan completo en el detalle; esto es
-     * para pintar el plan por si solo sin volver a pedir la hoja entera.
+     * para pintar el plan por si solo sin volver a pedir la HCA entera.
      */
     list: (sheetId: number, query: PlanItemQuery = {}) =>
       apiRequest<ActionPlanListResponse>(
@@ -185,6 +191,14 @@ export const qualityApi = {
         method: "PUT",
         body: JSON.stringify(data),
       }),
+
+    /**
+     * Marca la accion como empezada. Sin esta transicion «En curso» era un
+     * estado inalcanzable: lo que nadie ha tocado y lo que ya se esta haciendo
+     * se veian igual.
+     */
+    start: (id: number) =>
+      apiRequest<ActionPlanItem>(`/api/quality/plan-items/${id}/start`, { method: "POST" }),
 
     complete: (id: number) =>
       apiRequest<ActionPlanItem>(`/api/quality/plan-items/${id}/complete`, { method: "POST" }),

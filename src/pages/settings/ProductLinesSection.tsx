@@ -1,7 +1,6 @@
 import { Pencil, Plus, Power } from "lucide-react";
-import { useCallback, useState, type ReactNode } from "react";
+import { useState } from "react";
 import { settingsApi } from "../../api/settings";
-import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -12,91 +11,58 @@ import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { useLocalPage } from "../../hooks/useLocalPage";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { ProductLine } from "../../types/settings";
-import { ChipGroup, LoadErrorAlert, NoticeDialog } from "./catalogSection";
-import { freshCopy, staleClass, useSectionLoad } from "./catalogState";
+import { ChipGroup, LoadErrorAlert } from "./catalogSection";
+import { freshCopy, staleClass } from "./catalogState";
 import { ProductLineModal } from "./ProductLineModal";
 import { SettingsLayout } from "./SettingsLayout";
 
 type ChipKey = "todas" | "activas" | "inactivas";
 
-const listLines = () => settingsApi.productLines.list({ page: 1, pageSize: 100 });
-
 export function ProductLinesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [lines, setLines] = useState<ProductLine[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
+  const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nueva" | ProductLine | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
-  const [notice, setNotice] = useState<{ title: string; body: ReactNode } | null>(null);
 
-  const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search).trim();
 
-  const load = useCallback(async () => {
-    const { items } = await listLines();
-    setLines(items);
-  }, []);
-
-  const { status, isRefetching, error, reload, retry } = useSectionLoad(
-    load,
-    "No se pudieron cargar las líneas de producto",
-  );
-
-  const all = lines;
-  const activeCount = all.filter((line) => line.isActive).length;
-  const inUseCount = all.filter((line) => line.isActive && line.usedByTopics > 0).length;
-
-  const rows = all.filter((line) => {
-    const byChip =
-      chip === "todas" ||
-      (chip === "activas" && line.isActive) ||
-      (chip === "inactivas" && !line.isActive);
-
-    const bySearch =
-      debouncedSearch === "" ||
-      line.name.toLowerCase().includes(debouncedSearch) ||
-      line.code.toLowerCase().includes(debouncedSearch);
-
-    return byChip && bySearch;
+  // Seccion 4.1: la pagina, el filtro, la busqueda y los contadores los resuelve
+  // SQL. La vista solo dibuja lo que llega.
+  const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    fetch: settingsApi.productLines.list,
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      status: chip === "todas" ? undefined : chip,
+    },
+    fallbackError: "No se pudieron cargar las líneas de producto",
   });
 
-  // RF-K2: los listados de catalogo paginan como cualquier otro. El corte
-  // lo hace la vista solo mientras no exista /api/settings/...; el endpoint
-  // devuelve la pagina ya cortada en SQL (anexo 12.1).
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
-    rows,
-    JSON.stringify([debouncedSearch, chip]),
-  );
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const isFirstLoad = data === null && error === null;
+  // Sin criterio activo, una pagina vacia significa catalogo vacio; con
+  // criterio, que nada coincide. Los contadores no distinguen ese caso: se
+  // calculan sobre el filtro base, no sobre la tabla entera.
+  const isFiltering = debouncedSearch !== "" || chip !== "todas";
 
   /**
-   * RF-K5: no se desactiva la ultima linea en uso. Los motivos marcados con
-   * «exige linea de producto» dejarian de poder abrirse.
+   * RF-K5: no se desactiva la ultima linea en uso. La regla la aplica el
+   * servidor, que es el unico que sabe cuantos motivos la exigen: su 409 sube al
+   * dialogo. Adelantarla aqui exigia contar sobre lo cargado, y lo cargado es
+   * una pagina.
    */
   function askToggle(line: ProductLine) {
-    const isLastInUse = line.isActive && line.usedByTopics > 0 && inUseCount === 1;
-
-    if (isLastInUse) {
-      setNotice({
-        title: "No se puede desactivar",
-        body: (
-          <>
-            <strong className="font-semibold text-ink">{line.name}</strong> es la única línea activa
-            que usan los motivos que la exigen. Sin ella, esos motivos no podrían abrirse: activa
-            otra línea antes de desactivar esta.
-          </>
-        ),
-      });
-      return;
-    }
-
     setConfirmation({
       tone: "warn",
       icon: Power,
@@ -116,13 +82,13 @@ export function ProductLinesSection() {
       onConfirm: async () => {
         setBusyId(line.id);
         try {
-          const current = await freshCopy(listLines, line);
+          const current = await freshCopy(settingsApi.productLines.get, line);
           await settingsApi.productLines.update(current.id, {
             code: current.code,
             name: current.name,
             isActive: !current.isActive,
           });
-          await reload();
+          refresh();
         } finally {
           setBusyId(null);
         }
@@ -151,69 +117,59 @@ export function ProductLinesSection() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <ChipGroup label="Filtrar por estado" ready={status === "ready"}>
+        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
           <FilterChip
             label="Todas"
-            count={all.length}
+            count={counts?.all ?? 0}
             active={chip === "todas"}
             onClick={() => setChip("todas")}
           />
           <FilterChip
             label="Activas"
-            count={activeCount}
+            count={counts?.active ?? 0}
             active={chip === "activas"}
             onClick={() => setChip("activas")}
           />
           <FilterChip
             label="Inactivas"
-            count={all.length - activeCount}
+            count={counts?.inactive ?? 0}
             active={chip === "inactivas"}
             onClick={() => setChip("inactivas")}
           />
         </ChipGroup>
       </div>
 
-      {error && <LoadErrorAlert message={error} onRetry={retry} />}
+      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
-      {status === "loading" ? (
+      {isFirstLoad ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : status === "error" ? null : rows.length === 0 ? (
+      ) : data === null ? null : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          {all.length === 0
-            ? "Todavía no hay ninguna línea de producto configurada."
-            : "Ninguna línea coincide con este filtro o búsqueda."}
+          {isFiltering
+            ? "Ninguna línea coincide con este filtro o búsqueda."
+            : "Todavía no hay ninguna línea de producto configurada."}
         </p>
       ) : (
-        <div className={staleClass(isRefetching)}>
+        <div className={staleClass(isStale)}>
           <DataTable>
             <thead>
               <HeadRow>
                 <Th>Código</Th>
                 <Th>Línea</Th>
-                <Th>Motivos que la exigen</Th>
                 <Th>Estado</Th>
                 {canWrite && <Th className="w-24 text-right">Acciones</Th>}
               </HeadRow>
             </thead>
 
             <tbody>
-              {pageRows.map((line) => (
+              {rows.map((line) => (
                 <Row key={line.id} busy={busyId === line.id}>
                   <Td>
                     <span className="font-mono text-[12px] text-brand-gray">{line.code}</span>
                   </Td>
                   <Td className="text-[12.5px] font-medium text-ink">{line.name}</Td>
-                  <Td>
-                    {line.usedByTopics > 0 ? (
-                      <Badge>
-                        <span className="tabular-nums">{line.usedByTopics}</span>
-                      </Badge>
-                    ) : (
-                      <span className="text-[12.5px] text-faint">Ninguno</span>
-                    )}
-                  </Td>
                   <Td>
                     <StatusDot active={line.isActive} />
                   </Td>
@@ -242,14 +198,14 @@ export function ProductLinesSection() {
         </div>
       )}
 
-      {status === "ready" && rows.length > 0 && (
+      {data !== null && data.total > 0 && (
         <Pagination
           page={page}
           pageSize={pageSize}
-          total={total}
-          totalPages={totalPages}
+          total={data.total}
+          totalPages={data.totalPages}
           onPageChange={setPage}
-          onPageSizeChange={changePageSize}
+          onPageSizeChange={setPageSize}
           noun="líneas"
         />
       )}
@@ -263,19 +219,11 @@ export function ProductLinesSection() {
         <ProductLineModal
           line={modal === "nueva" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={() => {
-            void reload();
-          }}
+          onSaved={refresh}
         />
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
-
-      {notice && (
-        <NoticeDialog title={notice.title} icon={Power} onClose={() => setNotice(null)}>
-          {notice.body}
-        </NoticeDialog>
-      )}
     </SettingsLayout>
   );
 }

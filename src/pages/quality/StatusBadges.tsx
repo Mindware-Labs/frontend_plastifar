@@ -34,7 +34,7 @@ const hcaTones: Record<HcaStatus, { tone: Tone; icon: LucideIcon }> = {
   Cerrada: { tone: "green", icon: Check },
 };
 
-/** El vencimiento no es un estado de la hoja, pero es lo primero que hay que
+/** El vencimiento no es un estado de la HCA, pero es lo primero que hay que
  *  ver: cuando aplica, sustituye a la pastilla de estado y la deja al lado. */
 export function HcaStatusBadge({ status, overdue }: { status: HcaStatus; overdue?: boolean }) {
   const { tone, icon } = hcaTones[status];

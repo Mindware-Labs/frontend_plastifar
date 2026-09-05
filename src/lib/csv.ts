@@ -27,10 +27,17 @@ const UNSAFE_FILENAME = /[\u0000-\u001f\u007f\\/:*?"<>|]/g;
 /**
  * El CSV de bitacora arrastra texto escrito por usuarios. Se antepone una
  * comilla simple para que Excel lea la celda como texto y no como codigo.
+ *
+ * Un numero nunca se blinda, aunque empiece por signo menos. La version
+ * anterior si lo hacia, y la columna "Diferencia" de Calidad —negativa cada mes
+ * que se cerraron mas HCA de las que se abrieron— llegaba a Excel como el texto
+ * '-3: no se podia sumar ni graficar. Un `-` solo es peligroso cuando encabeza
+ * una formula, no cuando encabeza una cifra.
  */
 function escape(value: string | number): string {
-  const raw = String(value);
-  const text = FORMULA_START.test(raw) ? `'${raw}` : raw;
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+
+  const text = FORMULA_START.test(value) ? `'${value}` : value;
   return MUST_QUOTE.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

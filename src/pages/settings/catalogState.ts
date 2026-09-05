@@ -1,100 +1,117 @@
-// Ciclo de carga compartido por los ocho catalogos de Configuracion.
+// Piezas de estado compartidas por los catalogos de Configuracion.
 //
-// Vive aparte de catalogSection.tsx porque mezclar hooks y componentes en un
+// Viven aparte de catalogSection.tsx porque mezclar hooks y componentes en un
 // mismo modulo rompe el refresco rapido de Vite.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-export type SectionStatus = "loading" | "ready" | "error";
+/** Atenuacion del 60 % mientras hay una relectura en vuelo (DESIGN.md, «Stale data»). */
+export function staleClass(isStale: boolean): string {
+  return `transition-opacity ${isStale ? "opacity-60" : ""}`;
+}
 
 /**
- * Ciclo de carga de una seccion.
+ * Catalogo de apoyo de una seccion: departamentos, politicas, los años que
+ * tienen feriados. No es el listado que se pagina --ese lo lleva usePagedList
+ * contra el servidor-- sino lo que la tabla necesita para nombrar lo que
+ * muestra y lo que el dialogo necesita para ofrecer opciones.
  *
- * Distingue la primera carga del refresco porque son dos cosas distintas en
- * pantalla: la primera muestra el spinner, el refresco solo atenua la tabla al
- * 60 % (DESIGN.md, «Stale data»). Un fallo de primera carga deja la seccion en
- * error con reintento, nunca en un spinner eterno.
+ * Un fallo aqui no vacia la pantalla: se expone en `failed` para que la seccion
+ * lo diga con su reintento en vez de pintar guiones como si no hubiera datos.
  */
-export function useSectionLoad(load: () => Promise<unknown>, errorMessage: string) {
-  const [status, setStatus] = useState<SectionStatus>("loading");
-  const [isRefetching, setIsRefetching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function useReferenceData<T>(load: () => Promise<T>, initial: T) {
+  const [data, setData] = useState<T>(initial);
+  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // El efecto de arranque no debe depender de `load`: la seccion la vuelve a
-  // crear en cada render y el listado se recargaria en bucle.
+  // La funcion se lee por ref: la seccion la vuelve a crear en cada render y el
+  // efecto no debe reejecutarse por eso.
   const loadRef = useRef(load);
   useEffect(() => {
     loadRef.current = load;
   });
 
-  // `status` ya arranca en "loading", asi que la carga inicial no necesita
-  // fijarlo: hacerlo era un setState sincrono dentro del efecto de montaje, un
-  // render extra antes de la primera pintura. Quien reintenta si lo fija, pero
-  // desde el manejador del boton, que es donde ese cambio pertenece.
-  const run = useCallback(
-    async (mode: "first" | "refetch") => {
-      if (mode === "refetch") setIsRefetching(true);
-
-      try {
-        await loadRef.current();
-        setError(null);
-        setStatus("ready");
-      } catch {
-        setError(errorMessage);
-        // Un refresco fallido conserva lo que ya se ve: tirar la tabla porque
-        // una relectura no llego seria perder datos buenos.
-        if (mode === "first") setStatus("error");
-      } finally {
-        setIsRefetching(false);
-      }
-    },
-    [errorMessage],
-  );
-
   useEffect(() => {
-    // `run("first")` no fija nada de forma sincrona: la rama que lo hacia es
-    // la de "refetch", y
-    // todo lo demas ocurre ya resuelta la promesa. El linter no puede seguir
-    // esa distincion a traves de una funcion async, pero el arranque de una
-    // seccion es sincronizacion con algo externo, que es justo para lo que el
-    // efecto existe.
-    // eslint-disable-next-line react/set-state-in-effect
-    void run("first");
-  }, [run]);
+    let cancelled = false;
 
-  const reload = useCallback(() => run("refetch"), [run]);
-  const retry = useCallback(() => {
-    setStatus("loading");
-    return run("first");
-  }, [run]);
+    loadRef
+      .current()
+      .then((value) => {
+        if (cancelled) return;
+        setData(value);
+        setFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
 
-  return { status, isRefetching, error, setError, reload, retry };
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  function reload() {
+    setReloadKey((value) => value + 1);
+  }
+
+  return { data, failed, reload };
 }
 
-/** Atenuacion del 60 % mientras hay una relectura en vuelo. */
-export function staleClass(isRefetching: boolean): string {
-  return `transition-opacity ${isRefetching ? "opacity-60" : ""}`;
+/**
+ * Resuelve por identificador los registros que la pagina actual menciona --el
+ * motivo padre de un sub-motivo, por ejemplo-- y los recuerda.
+ *
+ * Con paginacion en servidor lo referido casi nunca esta en la pagina: buscarlo
+ * en la lista cargada devolvia nada y la fila perdia su contexto. Cada
+ * identificador se pide una sola vez; si su lectura falla, se queda sin
+ * resolver y la fila lo omite en vez de desaparecer.
+ */
+export function useRecordCache<T>(read: (id: number) => Promise<T>, ids: number[]) {
+  const [cache, setCache] = useState<Record<number, T>>({});
+  const asked = useRef(new Set<number>());
+
+  const readRef = useRef(read);
+  useEffect(() => {
+    readRef.current = read;
+  });
+
+  const wanted = [...new Set(ids)].sort((a, b) => a - b);
+  const wantedKey = wanted.join(",");
+
+  useEffect(() => {
+    for (const id of wantedKey === "" ? [] : wantedKey.split(",").map(Number)) {
+      if (asked.current.has(id)) continue;
+      asked.current.add(id);
+
+      readRef
+        .current(id)
+        .then((value) => setCache((current) => ({ ...current, [id]: value })))
+        .catch(() => {
+          // Se reintenta la proxima vez que la pagina lo vuelva a mencionar.
+          asked.current.delete(id);
+        });
+    }
+  }, [wantedKey]);
+
+  return cache;
 }
 
 /**
  * Relee el registro justo antes de escribirlo.
  *
- * El API no expone activar/desactivar por separado: hay que reenviar el registro
- * entero con una bandera cambiada. Reenviar el que se capturo al abrir el
- * dialogo revierte en silencio cualquier cambio hecho entretanto, asi que se
- * vuelve a leer del listado. La ventana entre esta lectura y el PUT sigue
- * abierta: se cierra el dia que exista un PATCH de estado.
+ * El API no expone activar/desactivar por separado: hay que reenviar el
+ * registro entero con una bandera cambiada, y reenviar el que se capturo al
+ * pintar la fila revierte en silencio cualquier cambio hecho entretanto.
+ *
+ * La relectura va por identificador contra GET /{id}, no buscando en la pagina
+ * cargada: con paginacion en servidor el registro casi nunca esta en memoria, y
+ * la version anterior --que en ese caso escribia la copia vieja-- provocaba
+ * justo el pisoton que existia para evitar. Si la relectura falla, el error
+ * sube: el dialogo lo muestra y no se escribe nada.
  */
-export async function freshCopy<T extends { id: number }>(
-  list: () => Promise<{ items: T[] }>,
+export function freshCopy<T extends { id: number }>(
+  read: (id: number) => Promise<T>,
   record: T,
 ): Promise<T> {
-  try {
-    const { items } = await list();
-    return items.find((item) => item.id === record.id) ?? record;
-  } catch {
-    // Si la relectura falla se escribe lo que se tenia: peor seria dejar al
-    // administrador sin poder desactivar nada porque el listado no respondio.
-    return record;
-  }
+  return read(record.id);
 }

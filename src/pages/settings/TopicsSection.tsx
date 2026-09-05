@@ -1,5 +1,5 @@
 import { CornerDownRight, Pencil, Plus, Power } from "lucide-react";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { settingsApi } from "../../api/settings";
 import { Badge } from "../../components/ui/Badge";
@@ -14,12 +14,12 @@ import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { useLocalPage } from "../../hooks/useLocalPage";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { DepartmentResponse } from "../../types/api";
 import type { SlaPolicy, TicketTopic } from "../../types/settings";
-import { ChipGroup, LoadErrorAlert, NoticeDialog } from "./catalogSection";
-import { freshCopy, staleClass, useSectionLoad } from "./catalogState";
+import { ChipGroup, LoadErrorAlert } from "./catalogSection";
+import { freshCopy, staleClass, useRecordCache, useReferenceData } from "./catalogState";
 import { SettingsLayout } from "./SettingsLayout";
 import { TopicModal } from "./TopicModal";
 
@@ -32,45 +32,78 @@ const priorityTone: Record<string, "red" | "green" | "neutral"> = {
   Baja: "neutral",
 };
 
-const listTopics = () => settingsApi.topics.list({ page: 1, pageSize: 100 });
+/**
+ * Catálogos de apoyo del diálogo: las políticas que puede elegir y los motivos
+ * de primer nivel que puede tomar como padre. Son listas de opciones, no el
+ * listado que se pagina; el tope de cien es el del desplegable.
+ */
+const loadPolicies = () =>
+  settingsApi.slaPolicies.list({ page: 1, pageSize: 100 }).then(({ items }) => items);
+
+const loadTopicOptions = () =>
+  settingsApi.topics.list({ page: 1, pageSize: 100 }).then(({ items }) => items);
 
 export function TopicsSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [topics, setTopics] = useState<TicketTopic[]>([]);
-  const [policies, setPolicies] = useState<SlaPolicy[]>([]);
-  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
   const [departmentId, setDepartmentId] = useState("todos");
   const [chip, setChip] = useState<ChipKey>("todos");
+  const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nuevo" | TicketTopic | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
-  const [notice, setNotice] = useState<{ title: string; body: ReactNode } | null>(null);
 
-  const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search).trim();
 
-  const load = useCallback(async () => {
-    const [topicPage, policyPage, departmentList] = await Promise.all([
-      listTopics(),
-      settingsApi.slaPolicies.list({ page: 1, pageSize: 100 }),
-      departmentsApi.list(),
-    ]);
-    setTopics(topicPage.items);
-    setPolicies(policyPage.items);
-    setDepartments(departmentList);
-  }, []);
+  // Seccion 4.1: la pagina, el filtro, la busqueda y los contadores los resuelve
+  // SQL. La vista solo dibuja lo que llega.
+  const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    fetch: settingsApi.topics.list,
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      status: chip === "todos" ? undefined : chip,
+      departmentId: departmentId === "todos" ? undefined : Number(departmentId),
+    },
+    fallbackError: "No se pudieron cargar los motivos",
+  });
 
-  const { status, isRefetching, error, reload, retry } = useSectionLoad(
-    load,
-    "No se pudieron cargar los motivos",
-  );
+  const departmentsRef = useReferenceData<DepartmentResponse[]>(departmentsApi.list, []);
+  const departments = departmentsRef.data;
 
-  const all = topics;
-  const activeCount = all.filter((topic) => topic.isActive).length;
+  const policiesRef = useReferenceData<SlaPolicy[]>(loadPolicies, []);
+  const policies = policiesRef.data;
+
+  const topicOptionsRef = useReferenceData<TicketTopic[]>(loadTopicOptions, []);
+
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const isFirstLoad = data === null && error === null;
+  // Sin criterio activo, una pagina vacia significa catalogo vacio; con
+  // criterio, que nada coincide. Los contadores no distinguen ese caso: se
+  // calculan sobre el filtro base, no sobre la tabla entera.
+  const isFiltering = debouncedSearch !== "" || chip !== "todos" || departmentId !== "todos";
+
+  /**
+   * El segundo nivel deja de dibujarse con sangría y pasa a decirse con la
+   * leyenda «en ‹padre›» en cada sub-motivo.
+   *
+   * La sangría solo significa algo si el padre está encima, en la misma
+   * pantalla, y con el corte en servidor padre e hijo caen en páginas
+   * distintas cuando toca. La leyenda dice lo mismo sin depender de eso, y
+   * ningún hijo se queda fuera por no tener a su padre a la vista.
+   */
+  const parents = useRecordCache(settingsApi.topics.get, rows.flatMap((topic) => topic.parentId ?? []));
+
+  /** Un alta o una edicion cambia tambien los padres que el dialogo ofrece. */
+  function reloadAll() {
+    refresh();
+    topicOptionsRef.reload();
+  }
 
   function departmentName(id: number) {
     return departments.find((department) => department.id === id)?.name ?? "—";
@@ -97,96 +130,16 @@ export function TopicsSection() {
   }
 
   function parentName(topic: TicketTopic) {
-    return all.find((candidate) => candidate.id === topic.parentId)?.name ?? null;
+    return topic.parentId === null ? null : (parents[topic.parentId]?.name ?? null);
   }
 
   /**
-   * Solo la busqueda libre aplana el arbol: un termino puede encontrar al hijo
-   * sin encontrar al padre, y una jerarquia con la mitad de las ramas ocultas
-   * miente. El departamento y el estado siguen leyendose en dos niveles, porque
-   * filtran por una propiedad que padre e hijo declaran cada uno por su cuenta.
-   */
-  const isFlat = debouncedSearch !== "";
-
-  const { list: rows, nested } = useMemo(() => {
-    const matches = (topic: TicketTopic) => {
-      const byChip =
-        chip === "todos" ||
-        (chip === "activos" && topic.isActive) ||
-        (chip === "inactivos" && !topic.isActive);
-
-      const byDepartment =
-        departmentId === "todos" || topic.defaultDepartmentId === Number(departmentId);
-
-      const bySearch =
-        debouncedSearch === "" || topic.name.toLowerCase().includes(debouncedSearch);
-
-      return byChip && byDepartment && bySearch;
-    };
-
-    const filtered = all.filter(matches);
-    if (isFlat) return { list: filtered, nested: new Set<number>() };
-
-    const kept = new Set(filtered.map((topic) => topic.id));
-    const list: TicketTopic[] = [];
-    const indented = new Set<number>();
-    const placed = new Set<number>();
-
-    for (const parent of all.filter((topic) => topic.parentId === null)) {
-      const children = all.filter((child) => child.parentId === parent.id && kept.has(child.id));
-      if (!kept.has(parent.id) && children.length === 0) continue;
-
-      if (kept.has(parent.id)) {
-        list.push(parent);
-        placed.add(parent.id);
-      }
-
-      for (const child of children) {
-        list.push(child);
-        placed.add(child.id);
-        // Sangrado solo cuando el padre esta encima: sangrar bajo un padre que
-        // el filtro dejo fuera dibujaria una rama que no esta en pantalla.
-        if (kept.has(parent.id)) indented.add(child.id);
-      }
-    }
-
-    // Un sub-motivo cuyo padre no esta en el catalogo existe y cuenta: se
-    // muestra suelto en vez de desaparecer sin dejar rastro.
-    for (const topic of filtered) if (!placed.has(topic.id)) list.push(topic);
-
-    return { list, nested: indented };
-  }, [all, chip, departmentId, debouncedSearch, isFlat]);
-
-  /**
-   * RF-K2: los listados de catalogo paginan como cualquier otro, y la unidad de
-   * pagina es la fila que se ve. Cortar por grupos padre-hijo hacia que el pie
-   * contara doce y la tabla enseñara veinte; cuando el corte separa a un hijo de
-   * su padre, la fila lo dice con «en <padre>» en vez de fingir la sangria.
-   */
-  const { page, pageSize, total, totalPages, pageRows, setPage, changePageSize } = useLocalPage(
-    rows,
-    JSON.stringify([debouncedSearch, departmentId, chip]),
-  );
-
-  /**
-   * RF-K5: no se desactiva el ultimo motivo activo. Sin motivos no hay forma de
-   * abrir un ticket, asi que el sistema se quedaria sin puerta de entrada.
+   * RF-K5: no se desactiva el ultimo motivo activo; sin ninguno no hay forma de
+   * clasificar lo que entra. Quien lo sabe es el servidor --cuenta sobre la
+   * tabla, no sobre una pagina-- y su 409 sube al dialogo. Adelantarlo aqui
+   * llegaba a prohibir desactivaciones legitimas y a permitir la ultima.
    */
   function askToggle(topic: TicketTopic) {
-    if (topic.isActive && activeCount === 1) {
-      setNotice({
-        title: "No se puede desactivar",
-        body: (
-          <>
-            <strong className="font-semibold text-ink">{topic.name}</strong> es el único motivo
-            activo. Sin ninguno no habría forma de abrir un ticket: activa otro antes de desactivar
-            este.
-          </>
-        ),
-      });
-      return;
-    }
-
     setConfirmation({
       tone: "warn",
       icon: Power,
@@ -194,9 +147,18 @@ export function TopicsSection() {
       description: topic.isActive ? (
         <>
           <strong className="font-semibold text-ink">{topic.name}</strong> dejará de ofrecerse al
-          abrir un ticket. {topic.ticketCount.toLocaleString("es-DO")}{" "}
-          {topic.ticketCount === 1 ? "ticket que ya lo usa conserva" : "tickets que ya lo usan conservan"}{" "}
-          su motivo y su historial.
+          abrir un ticket.{" "}
+          {/* El API devuelve null mientras la Bandeja no exista: no hay tickets
+              que contar. Se calla en vez de afirmar que no hay ninguno. */}
+          {topic.ticketCount !== null && (
+            <>
+              {topic.ticketCount.toLocaleString("es-DO")}{" "}
+              {topic.ticketCount === 1
+                ? "ticket que ya lo usa conserva"
+                : "tickets que ya lo usan conservan"}{" "}
+              su motivo y su historial.
+            </>
+          )}
         </>
       ) : (
         <>
@@ -208,7 +170,7 @@ export function TopicsSection() {
       onConfirm: async () => {
         setBusyId(topic.id);
         try {
-          const current = await freshCopy(listTopics, topic);
+          const current = await freshCopy(settingsApi.topics.get, topic);
           await settingsApi.topics.update(current.id, {
             name: current.name,
             parentId: current.parentId,
@@ -218,7 +180,7 @@ export function TopicsSection() {
             requiresProductLine: current.requiresProductLine,
             isActive: !current.isActive,
           });
-          await reload();
+          reloadAll();
         } finally {
           setBusyId(null);
         }
@@ -262,42 +224,52 @@ export function TopicsSection() {
 
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <ChipGroup label="Filtrar por estado" ready={status === "ready"}>
+        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
           <FilterChip
             label="Todos"
-            count={all.length}
+            count={counts?.all ?? 0}
             active={chip === "todos"}
             onClick={() => setChip("todos")}
           />
           <FilterChip
             label="Activos"
-            count={activeCount}
+            count={counts?.active ?? 0}
             active={chip === "activos"}
             onClick={() => setChip("activos")}
           />
           <FilterChip
             label="Inactivos"
-            count={all.length - activeCount}
+            count={counts?.inactive ?? 0}
             active={chip === "inactivos"}
             onClick={() => setChip("inactivos")}
           />
         </ChipGroup>
       </div>
 
-      {error && <LoadErrorAlert message={error} onRetry={retry} />}
+      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
-      {status === "loading" ? (
+      {(departmentsRef.failed || policiesRef.failed) && (
+        <LoadErrorAlert
+          message="No se pudieron cargar los departamentos y las políticas: esas columnas quedan sin nombre."
+          onRetry={() => {
+            if (departmentsRef.failed) departmentsRef.reload();
+            if (policiesRef.failed) policiesRef.reload();
+          }}
+        />
+      )}
+
+      {isFirstLoad ? (
         <div className="flex justify-center py-16">
           <Spinner />
         </div>
-      ) : status === "error" ? null : rows.length === 0 ? (
+      ) : data === null ? null : rows.length === 0 ? (
         <p className="py-14 text-center text-[13.5px] text-faint">
-          {all.length === 0
-            ? "Todavía no hay ningún motivo configurado."
-            : "Ningún motivo coincide con este filtro o búsqueda."}
+          {isFiltering
+            ? "Ningún motivo coincide con este filtro o búsqueda."
+            : "Todavía no hay ningún motivo configurado."}
         </p>
       ) : (
-        <div className={staleClass(isRefetching)}>
+        <div className={staleClass(isStale)}>
           <DataTable>
             <thead>
               <HeadRow>
@@ -312,25 +284,23 @@ export function TopicsSection() {
             </thead>
 
             <tbody>
-              {pageRows.map((topic, index) => {
+              {rows.map((topic) => {
                 const policy = policyFor(topic);
                 const parent = parentName(topic);
                 const isChild = topic.parentId !== null;
-                // La sangria solo vale si el padre esta en pantalla, encima.
-                const isNested = nested.has(topic.id) && index > 0;
 
                 return (
                   <Row key={topic.id} busy={busyId === topic.id}>
                     <Td>
-                      <span className={`flex items-center gap-2 ${isNested ? "pl-5" : ""}`}>
-                        {isNested && (
+                      <span className="flex items-center gap-2">
+                        {isChild && (
                           <CornerDownRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-faint" />
                         )}
                         <span className="flex flex-col gap-0.5">
                           <span className="text-[12.5px] font-medium leading-tight text-ink">
                             {topic.name}
                           </span>
-                          {isChild && !isNested && parent && (
+                          {isChild && parent !== null && (
                             <span className="text-[11px] leading-tight text-faint">en {parent}</span>
                           )}
                         </span>
@@ -354,6 +324,10 @@ export function TopicsSection() {
                             </span>
                           )}
                         </span>
+                      ) : policies.length === 0 ? (
+                        // Sin el catalogo de politicas no se sabe cual aplica;
+                        // el ambar afirmaria que no hay ninguna.
+                        <span className="text-faint">—</span>
                       ) : (
                         <span className="text-warn">
                           Sin política para {topic.defaultPriority.toLowerCase()}
@@ -398,14 +372,14 @@ export function TopicsSection() {
         </div>
       )}
 
-      {status === "ready" && rows.length > 0 && (
+      {data !== null && data.total > 0 && (
         <Pagination
           page={page}
           pageSize={pageSize}
-          total={total}
-          totalPages={totalPages}
+          total={data.total}
+          totalPages={data.totalPages}
           onPageChange={setPage}
-          onPageSizeChange={changePageSize}
+          onPageSizeChange={setPageSize}
           noun="motivos"
         />
       )}
@@ -419,23 +393,15 @@ export function TopicsSection() {
       {modal !== null && (
         <TopicModal
           topic={modal === "nuevo" ? undefined : modal}
-          topics={all}
+          topics={topicOptionsRef.data}
           policies={policies}
           departments={departments}
           onClose={() => setModal(null)}
-          onSaved={() => {
-            void reload();
-          }}
+          onSaved={reloadAll}
         />
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
-
-      {notice && (
-        <NoticeDialog title={notice.title} icon={Power} onClose={() => setNotice(null)}>
-          {notice.body}
-        </NoticeDialog>
-      )}
     </SettingsLayout>
   );
 }

@@ -1,8 +1,6 @@
 import { AlertTriangle } from "lucide-react";
-import type { ComponentType, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
-import { Modal } from "../../components/ui/Modal";
 
 /**
  * Piezas comunes a los ocho catalogos de Configuracion.
@@ -49,45 +47,6 @@ export function WarnNotice({ children }: { children: ReactNode }) {
       <AlertTriangle className="mt-px h-4 w-4 shrink-0" />
       <span>{children}</span>
     </div>
-  );
-}
-
-/**
- * Mensaje que solo informa: una sola salida. Pasarlo por un dialogo de
- * confirmacion obligaria a inventar un «si» para algo que no se puede aceptar
- * ni rechazar.
- */
-export function NoticeDialog({
-  title,
-  icon: Icon = AlertTriangle,
-  children,
-  onClose,
-}: {
-  title: string;
-  icon?: ComponentType<{ className?: string }>;
-  children: ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <Modal
-      title={title}
-      onClose={onClose}
-      footer={
-        <Button type="button" onClick={onClose}>
-          Entendido
-        </Button>
-      }
-    >
-      <div className="flex gap-4">
-        <span
-          aria-hidden
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-edge bg-warn/10 text-warn"
-        >
-          <Icon className="h-5 w-5" />
-        </span>
-        <div className="text-[13.5px] leading-relaxed text-brand-gray">{children}</div>
-      </div>
-    </Modal>
   );
 }
 

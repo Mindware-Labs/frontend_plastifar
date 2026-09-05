@@ -1,7 +1,10 @@
-// Contrato anticipado del modulo de Calidad (seccion 10 del plan de
-// construccion). Todavia no existe en el backend: cuando los endpoints
-// /api/quality/... esten escritos, esto pasa a types/api.ts como espejo de los
-// DTOs reales.
+// Espejo de api/Dtos/QualityDtos.cs (seccion 10 del plan de construccion).
+//
+// Los nombres visibles —cliente, linea de producto, responsable, solicitante—
+// viajan ya resueltos desde el servidor. Reconstruirlos aqui contra un catalogo
+// propio obligaba a traerse la tabla entera al navegador, que es justo lo que
+// prohibe la seccion 4.1: con mas registros de los que ese catalogo alcanzaba a
+// traer, la columna se quedaba en «—».
 
 /** Estados de una HCA, en el orden en que avanzan. Se guardan como texto. */
 export const HCA_STATUSES = [
@@ -23,8 +26,11 @@ export interface CorrectiveActionSheet {
   ticketId: number | null;
   ticketNumber: string | null;
   clientId: number;
+  /** Nombre del cliente, resuelto por el servidor. */
+  clientName: string;
   /** Obligatoria: es el eje del seguimiento por linea de producto. */
   productLineId: number;
+  productLineName: string;
   /** Instante UTC en que se detecto la no conformidad. */
   detectedAt: string;
   /** Que ocurrio; obligatorio desde el alta. */
@@ -33,8 +39,9 @@ export interface CorrectiveActionSheet {
   immediateAction: string | null;
   /** Obligatoria para pasar a ejecucion. */
   rootCause: string | null;
-  /** Dueño de la hoja. */
+  /** Dueño de la HCA. */
   responsibleStaffId: number;
+  responsibleName: string;
   /** Fecha comprometida de cierre, en ISO corto: es un dia, no un instante. */
   dueDate: string;
   status: HcaStatus;
@@ -43,6 +50,9 @@ export interface CorrectiveActionSheet {
   effectivenessNotes: string | null;
   closedAt: string | null;
   closedByStaffId: number | null;
+  /** Resuelto en SQL: buscarlo en la lista de personal activo dejaba un
+   *  guion cuando quien cerro la hoja se desactivo despues. */
+  closedByName: string | null;
   /** Nota de cierre: una hoja abierta por error se cierra explicandolo, no se borra. */
   closingNote: string | null;
   createdAt: string;
@@ -59,6 +69,8 @@ export interface ActionPlanItem {
   sheetId: number;
   description: string;
   responsibleStaffId: number;
+  /** Resuelto por el servidor: la tabla ya no lo busca contra una lista topada. */
+  responsibleName: string;
   /** Fecha comprometida, ISO corto. */
   dueDate: string;
   /** Fecha de cumplimiento, ISO corto; null mientras no se cumpla. */
@@ -83,6 +95,7 @@ export interface CreditRequest {
   ticketId: number | null;
   ticketNumber: string | null;
   clientId: number;
+  clientName: string;
   /** Obligatorio y positivo; no se modifica una vez aprobado. */
   amount: number;
   currency: Currency;
@@ -91,16 +104,23 @@ export interface CreditRequest {
   invoiceRef: string | null;
   status: CreditStatus;
   requestedByStaffId: number;
+  requestedByName: string;
   requestedAt: string;
   /** Quien aprobo o rechazo; nunca puede ser el solicitante. */
   decidedByStaffId: number | null;
+  decidedByName: string | null;
   decidedAt: string | null;
   decisionNote: string | null;
   /** Por qué quien mira no puede decidir esta solicitud; null cuando sí puede. */
   decisionBlockedReason: string | null;
 }
 
-/** Personal referenciado por las hojas y las solicitudes. */
+/**
+ * Personal disponible para los desplegables de Calidad. Los nombres que se
+ * muestran ya vienen resueltos en cada respuesta; esto solo alimenta los
+ * `<select>` de filtro y de formulario, y el responsable de cada accion del
+ * plan, que es el unico nombre que el servidor todavia no resuelve.
+ */
 export interface QualityStaff {
   id: number;
   name: string;

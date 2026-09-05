@@ -15,6 +15,7 @@ import {
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { CLIENT_TYPES, type Client } from "../../types/clients";
+import { fieldForServerError, type FieldRule } from "./serverFieldErrors";
 
 /**
  * Espejo de la validacion del servidor en POST/PUT /api/clients
@@ -36,6 +37,25 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+/**
+ * A que campo pertenece cada 400 o 409 de ClientsController. Van de lo mas
+ * especifico a lo mas general: «RNC» antes que «codigo», porque el 409 de
+ * duplicado nombra uno u otro y el generico se los quedaria todos.
+ * El acoplamiento al texto del servidor esta explicado en ./serverFieldErrors.
+ */
+const fieldRules: FieldRule<keyof FormValues>[] = [
+  { field: "taxId", matches: ["rnc", "registro nacional"] },
+  { field: "code", matches: ["codigo"] },
+  { field: "territoryId", matches: ["territorio"] },
+  { field: "salesRepStaffId", matches: ["vendedor"] },
+  { field: "email", matches: ["correo"] },
+  { field: "phone", matches: ["telefono"] },
+  { field: "address", matches: ["direccion"] },
+  { field: "notes", matches: ["nota"] },
+  { field: "type", matches: ["tipo"] },
+  { field: "name", matches: ["nombre"] },
+];
 
 interface ClientModalProps {
   client?: Client;
@@ -102,16 +122,14 @@ export function ClientModal({ client, territories, salesReps, onClose, onSaved }
       onSaved(saved);
       onClose();
     } catch (err) {
-      // 409 de codigo o RNC duplicado: se marca en su campo, no en un aviso
-      // general que obliga a adivinar cual es (seccion 4.2).
-      if (err instanceof ApiError && err.status === 409) {
-        if (err.message.toLowerCase().includes("rnc")) {
-          setError("taxId", { message: err.message });
-          setFocus("taxId");
-        } else {
-          setError("code", { message: err.message });
-          setFocus("code");
-        }
+      // Seccion 4.2: el error de un campo se marca en su campo y le devuelve el
+      // foco. Vale para el 409 de duplicado y tambien para los 400 —territorio
+      // inexistente, vendedor inactivo, correo mal formado—, que hasta ahora
+      // caian en el aviso general y obligaban a adivinar cual era.
+      const field = fieldForServerError(err, fieldRules);
+      if (field) {
+        setError(field.field, { message: field.message });
+        setFocus(field.field);
         return;
       }
 

@@ -7,7 +7,6 @@ import {
   type CreditListResponse,
   type CreditQuery,
 } from "../../api/quality";
-import { staffApi } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -27,7 +26,7 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatAmount, formatDay, formatInstant } from "../../lib/quality";
 import type { Client } from "../../types/clients";
-import type { CreditRequest, CreditStatus, QualityStaff } from "../../types/quality";
+import type { CreditRequest, CreditStatus } from "../../types/quality";
 import { CreditDecisionModal } from "./CreditDecisionModal";
 import { CreditRequestModal } from "./CreditRequestModal";
 import { CreditStatusBadge } from "./StatusBadges";
@@ -58,12 +57,18 @@ function listDebt(counts: CreditCounts): string {
   return `${head}. Nadie puede aprobar la suya propia: esas las decide otra persona.`;
 }
 
-/** Por que esta fila no ofrece ninguna accion. */
-function inactionReason(status: CreditStatus, canWrite: boolean): string {
+/**
+ * Por que esta fila no ofrece ninguna accion.
+ *
+ * El permiso que se nombra es el que exige el endpoint, no el que parezca
+ * razonable: decirle a alguien que le falta `quality.write` cuando el servidor
+ * comprueba `quality.approve` lo manda a pedir el permiso equivocado.
+ */
+function inactionReason(status: CreditStatus, canApprove: boolean): string {
   if (status === "Aprobada") {
-    return canWrite
+    return canApprove
       ? "Aprobada: solo queda marcarla como aplicada."
-      : "Aprobada. Marcarla como aplicada requiere el permiso quality.write.";
+      : "Aprobada. Marcarla como aplicada requiere el permiso quality.approve.";
   }
   if (status === "Aplicada") return "Ya aplicada: la nota de crédito está registrada.";
   if (status === "Rechazada") return "Rechazada: para cambiar el monto se crea otra solicitud.";
@@ -75,10 +80,18 @@ export function CreditRequestsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const canWrite = can("quality.write");
+  /**
+   * `POST /credit-requests/{id}/apply` esta anotado con `quality.approve` en
+   * CreditRequestsController. El boton se apaga con el permiso que el endpoint
+   * comprueba de verdad: ofrecerlo con `quality.write` mandaba a quien solo
+   * escribe a chocar contra un 403 que la pantalla podia haberle evitado
+   * (RF-P6). Que ese sea el permiso correcto para Contabilidad es otra
+   * discusion, y es de Plastifar, no de la interfaz.
+   */
+  const canApply = can("quality.approve");
   const viewerStaffId = user?.staffId ?? null;
 
   const [clients, setClients] = useState<Client[]>([]);
-  const [staff, setStaff] = useState<QualityStaff[]>([]);
 
   const [search, setSearch] = useState("");
   const [clientId, setClientId] = useState("todos");
@@ -98,26 +111,20 @@ export function CreditRequestsPage() {
   // cinco consultas y devolvia la lista a la primera pagina cinco veces.
   const debouncedMinAmount = useDebouncedValue(minAmount);
 
+  // El catalogo de clientes ya no resuelve la columna Cliente —eso viene del
+  // servidor— y queda solo para el desplegable de filtro y el formulario de
+  // alta. El de personal desaparecio con la columna que alimentaba.
   useEffect(() => {
     clientsApi
       .list({ page: 1, pageSize: 100 })
       .then((data) => setClients(data.items))
       .catch(() => setClients([]));
-
-    staffApi
-      .list({ page: 1, pageSize: 100, status: "activos" })
-      .then((data) => setStaff(data.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))))
-      .catch(() => setStaff([]));
   }, []);
 
-  function clientName(id: number) {
-    return clients.find((client) => client.id === id)?.name ?? "—";
-  }
-
-  function staffName(id: number | null) {
+  /** «Tú» cuando es quien mira: la regla de la seccion 10.3 es sobre personas. */
+  function staffLabel(id: number | null, name: string | null) {
     if (id === null) return "—";
-    if (id === viewerStaffId) return "Tú";
-    return staff.find((person) => person.id === id)?.name ?? "—";
+    return id === viewerStaffId ? "Tú" : (name ?? "—");
   }
 
   const minimum = debouncedMinAmount === "" ? undefined : Number(debouncedMinAmount);
@@ -271,14 +278,14 @@ export function CreditRequestsPage() {
                     </Td>
                     <Td className="text-[12.5px] text-brand-gray">
                       <span
-                        title={clientName(request.clientId)}
+                        title={request.clientName}
                         className="block max-w-[130px] truncate sm:max-w-none sm:overflow-visible"
                       >
-                        {clientName(request.clientId)}
+                        {request.clientName}
                       </span>
                     </Td>
                     <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
-                      {staffName(request.requestedByStaffId)}
+                      {staffLabel(request.requestedByStaffId, request.requestedByName)}
                     </Td>
                     <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
                       {formatDay(request.requestedAt.slice(0, 10))}
@@ -288,7 +295,7 @@ export function CreditRequestsPage() {
                         <CreditStatusBadge status={request.status} />
                         {request.decidedAt && (
                           <span className="whitespace-nowrap text-[11.5px] text-faint">
-                            {staffName(request.decidedByStaffId)} ·{" "}
+                            {staffLabel(request.decidedByStaffId, request.decidedByName)} ·{" "}
                             {formatInstant(request.decidedAt)}
                           </span>
                         )}
@@ -321,7 +328,7 @@ export function CreditRequestsPage() {
                               </span>
                             </Tooltip>
                           )
-                        ) : request.status === "Aprobada" && canWrite ? (
+                        ) : request.status === "Aprobada" && canApply ? (
                           <RowAction
                             label={`Marcar ${request.number} como aplicada`}
                             icon={BadgeCheck}
@@ -330,7 +337,7 @@ export function CreditRequestsPage() {
                         ) : (
                           // Una raya sola no dice nada. La rama hermana explica
                           // su propio bloqueo con un Tooltip; esta tambien.
-                          <Tooltip content={inactionReason(request.status, canWrite)}>
+                          <Tooltip content={inactionReason(request.status, canApply)}>
                             <span className="text-[11.5px] text-faint">—</span>
                           </Tooltip>
                         )}
@@ -369,8 +376,11 @@ export function CreditRequestsPage() {
         <CreditDecisionModal
           request={deciding.request}
           decision={deciding.decision}
-          requesterName={staffName(deciding.request.requestedByStaffId)}
-          clientName={clientName(deciding.request.clientId)}
+          requesterName={staffLabel(
+            deciding.request.requestedByStaffId,
+            deciding.request.requestedByName,
+          )}
+          clientName={deciding.request.clientName}
           onClose={() => setDeciding(null)}
           onSaved={() => {
             setDeciding(null);
@@ -391,7 +401,7 @@ export function CreditRequestsPage() {
               <strong className="font-medium text-ink">
                 {formatAmount(applying.amount, applying.currency)}
               </strong>{" "}
-              de {clientName(applying.clientId)} como aplicada. Hazlo solo cuando ya
+              de {applying.clientName} como aplicada. Hazlo solo cuando ya
               esté registrada en el sistema contable. Esta acción no se puede deshacer.
             </>
           }

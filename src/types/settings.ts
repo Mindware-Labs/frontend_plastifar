@@ -1,6 +1,4 @@
-// Contrato anticipado del modulo de Catalogos y configuracion. Todavia no existe
-// en el backend: cuando los endpoints /api/settings/... esten escritos, esto
-// pasa a types/api.ts como espejo de los DTOs reales.
+// Espejo de los DTOs de /api/settings/... (api/Dtos/SettingsDtos.cs).
 
 /** Se guardan como texto legible, nunca como numeros. */
 export type Priority = "Emergencia" | "Alta" | "Normal" | "Baja";
@@ -34,8 +32,9 @@ export interface TicketTopic {
   /** Obliga a indicar linea de producto (reclamaciones de calidad). */
   requiresProductLine: boolean;
   isActive: boolean;
-  /** Tickets que ya lo usan: un motivo en uso no se elimina, se desactiva. */
-  ticketCount: number;
+  /** Tickets que ya lo usan. Es null mientras la Bandeja no exista: no hay
+   *  tabla que contar, y un cero afirmaria que ninguno lo usa. */
+  ticketCount: number | null;
 }
 
 export interface SlaPolicy {
@@ -68,8 +67,6 @@ export interface ProductLine {
   code: string;
   name: string;
   isActive: boolean;
-  /** Motivos que la exigen: la ultima en uso no se desactiva. */
-  usedByTopics: number;
 }
 
 /** Variables permitidas en una plantilla. Una desconocida se rechaza al guardar. */
@@ -92,9 +89,20 @@ export interface EmailTemplate {
   isActive: boolean;
 }
 
-export type MailboxProvider = "IMAP" | "Gmail" | "Office 365";
+/** Valor de cable, tal como lo emite y espera el enum del servidor. */
+export type MailboxProvider = "IMAP" | "Gmail" | "Office365";
 
-export const MAILBOX_PROVIDERS: MailboxProvider[] = ["IMAP", "Gmail", "Office 365"];
+/** El "Office 365" con espacio es solo como se lee en pantalla: mandarlo como
+ *  valor dejaba el desplegable en blanco al reabrir el buzon para editarlo. */
+export const MAILBOX_PROVIDERS: { value: MailboxProvider; label: string }[] = [
+  { value: "IMAP", label: "IMAP" },
+  { value: "Gmail", label: "Gmail" },
+  { value: "Office365", label: "Office 365" },
+];
+
+export function providerLabel(provider: MailboxProvider): string {
+  return MAILBOX_PROVIDERS.find((option) => option.value === provider)?.label ?? provider;
+}
 
 /**
  * Buzon de entrada. Solo administracion (RF-K4): la lectura real del correo
@@ -110,8 +118,9 @@ export interface Mailbox {
   departmentId: number;
   /** Referencia al secreto en la configuracion protegida del servidor; nunca
    *  la contraseña en si. Una contraseña de correo en una columna es una fuga
-   *  esperando su turno. */
-  secretRef: string;
+   *  esperando su turno. Solo baja a quien puede escribir la configuracion;
+   *  para el resto es null. */
+  secretRef: string | null;
   isActive: boolean;
   lastSyncedAt: string | null;
 }

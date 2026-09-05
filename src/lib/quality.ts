@@ -31,11 +31,28 @@ export function formatInstant(value: string | null) {
   return Number.isNaN(parsed.getTime()) ? "—" : dateTimeFormat.format(parsed);
 }
 
-/** Hoy en ISO corto, en hora local: la fecha comprometida es un dia de calendario. */
+/**
+ * República Dominicana es UTC−4 todo el año: no hay horario de verano desde
+ * 2000. Espejo de `QualityRules.DominicanOffset` en el servidor.
+ */
+const DOMINICAN_OFFSET_MS = -4 * 60 * 60 * 1000;
+
+/**
+ * Hoy según la operación, no según el reloj de quien mira.
+ *
+ * La fecha comprometida de una HCA es un día del calendario —sin hora y sin
+ * zona—, el día que una persona escribió en la hoja. Compararlo contra un
+ * «ahora» en otra zona corre el vencimiento: contra UTC lo adelanta cuatro
+ * horas, y entre las 20:00 y la medianoche de aquí el servidor ya contaba una
+ * HCA como vencida mientras la pantalla seguía diciendo «Vence hoy». Contra la
+ * hora del navegador el desfase es el que tenga esa máquina, que puede ser
+ * cualquiera. Por eso las dos partes anclan el día a la zona de la operación.
+ *
+ * Espejo exacto de `QualityRules.DominicanToday()` en el backend: si una
+ * cambia, cambia la otra.
+ */
 export function today(): string {
-  const now = new Date();
-  const offset = now.getTimezoneOffset() * 60_000;
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+  return new Date(Date.now() + DOMINICAN_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 /** Dias que faltan para una fecha comprometida. Negativo si ya paso. */
@@ -46,7 +63,12 @@ export function daysUntil(dueDate: string, from = today()): number {
   return Math.round((due - base) / 86_400_000);
 }
 
-/** Cerrada nunca esta vencida: el vencimiento es del compromiso, no del registro. */
+/**
+ * Cerrada nunca está vencida: el vencimiento es del compromiso, no del
+ * registro. El «hoy» por defecto es el día de la operación, el mismo con el que
+ * el servidor arma la pastilla «Vencidas»: si fueran dos días distintos, el
+ * contador y la fila se contradirían durante las últimas horas de cada día.
+ */
 export function isSheetOverdue(sheet: CorrectiveActionSheet, from = today()): boolean {
   return sheet.status !== "Cerrada" && daysUntil(sheet.dueDate, from) < 0;
 }
@@ -72,7 +94,7 @@ export function isPlanItemSettled(item: ActionPlanItem): boolean {
 }
 
 /**
- * Siguiente estado al que puede avanzar la hoja, y que se lo impide.
+ * Siguiente estado al que puede avanzar la HCA, y que se lo impide.
  * `Cerrada` no sale de aqui: el cierre tiene su propio dialogo y sus tres
  * condiciones.
  */

@@ -72,6 +72,12 @@ export interface ClientListResponse {
 
 export interface ClientDetailResponse {
   client: Client;
+  /**
+   * Primera pagina de contactos, no la coleccion completa: el backend la acota
+   * para no romper la seccion 4.1. La pestana de Contactos no la lee —pagina
+   * contra `GET /api/clients/{id}/contacts`— y el total real es
+   * `client.contactCount`, nunca `contacts.length`.
+   */
   contacts: Contact[];
 }
 

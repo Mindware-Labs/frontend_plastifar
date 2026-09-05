@@ -72,10 +72,12 @@ export function AccessModal({
 
   const available = departments.filter((department) => isEdit || !taken.includes(department.id));
 
-  // Un rol inactivo no puede asignarse a nadie nuevo, pero si ya estaba asignado
-  // se muestra para no romper la ficha de quien lo tiene.
+  // El rol ya asignado siempre aparece, sea del sistema o inactivo: sin el, el
+  // desplegable recibia un `value` sin opcion, se pintaba vacio en un campo
+  // obligatorio y guardar cambiaba el rol en silencio. El veto de la seccion 6.3
+  // regla 4 es sobre editar y eliminar roles del sistema, no sobre asignarlos.
   const assignableRoles = roles.filter(
-    (role) => !role.isSystem && (role.isActive || (access && role.id === access.roleId)),
+    (role) => (access && role.id === access.roleId) || (!role.isSystem && role.isActive),
   );
 
   async function onSubmit(values: FormValues) {
