@@ -8,6 +8,9 @@ import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { RolesPage } from "./pages/roles/RolesPage";
 import { StaffPage } from "./pages/staff/StaffPage";
 import { SupresionesPage } from "./pages/supresiones/SupresionesPage";
+import { RespuestasPage } from "./pages/respuestas/RespuestasPage";
+import { MetricasPage } from "./pages/metricas/MetricasPage";
+import { WebhooksPage } from "./pages/webhooks/WebhooksPage";
 
 export default function App() {
   return (
@@ -37,6 +40,9 @@ export default function App() {
         <Route path="/bandeja/papelera" element={<BandejaPage folder="trash" />} />
         <Route path="/bandeja/enviados" element={<BandejaPage folder="sent" />} />
         <Route path="/bandeja/supresion" element={<SupresionesPage />} />
+        <Route path="/bandeja/respuestas" element={<RespuestasPage />} />
+        <Route path="/bandeja/metricas" element={<MetricasPage />} />
+        <Route path="/bandeja/webhooks" element={<WebhooksPage />} />
         <Route path="/staff" element={<StaffPage />} />
         <Route path="/roles" element={<RolesPage />} />
         <Route path="/" element={<Navigate to="/bandeja" replace />} />

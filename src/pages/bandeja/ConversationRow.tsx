@@ -5,6 +5,7 @@ import { formatEmailListDate, formatTicketCode } from "../../lib/format";
 import type { EmailSummaryResponse } from "../../types/api";
 import { ticketBadgeClass } from "./badgeStyles";
 import { SelectBox } from "./SelectionBar";
+import { TagChip } from "./ConversationTools";
 
 interface ConversationRowProps {
   email: EmailSummaryResponse;
@@ -160,6 +161,25 @@ export function ConversationRow({
         </div>
 
         <div className="line-clamp-1 w-full text-[11.5px] text-subtle">{email.preview}</div>
+
+        {((email.tags ?? []).length > 0 || email.assignedStaffName) && (
+          <div className="mt-0.5 flex w-full flex-wrap items-center gap-1">
+            {(email.tags ?? []).map((tag) => (
+              <TagChip key={tag} tag={tag} small />
+            ))}
+            {email.assignedStaffName && (
+              <span
+                title={`Atiende ${email.assignedStaffName}`}
+                className="ml-auto inline-flex items-center gap-1 text-[10px] font-medium text-faint"
+              >
+                <span className="flex size-3.5 items-center justify-center rounded-full bg-fill text-[8px] font-bold text-brand-gray">
+                  {initials(email.assignedStaffName)}
+                </span>
+                {email.assignedStaffName.split(" ")[0]}
+              </span>
+            )}
+          </div>
+        )}
       </button>
 
       {selectable && (

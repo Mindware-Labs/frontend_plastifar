@@ -1,6 +1,7 @@
 import {
   Archive,
   Ban,
+  BarChart3,
   Bell,
   ChevronDown,
   Inbox,
@@ -8,11 +9,13 @@ import {
   LogOut,
   PanelLeft,
   PenLine,
+  MessageSquareText,
   Send,
   ShieldAlert,
   ShieldCheck,
   Trash2,
   Users,
+  Webhook,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -21,6 +24,7 @@ import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import type { EmailFolderCounts } from "../../types/api";
 import { Logo } from "../Logo";
+import { formatDisplayName, formatInitials } from "../../lib/format";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { NotificationsModal } from "./NotificationsModal";
 import { SignatureModal } from "./SignatureModal";
@@ -33,6 +37,8 @@ interface NavItem {
   end?: boolean;
   /** Carpeta de correo cuyo contador se refleja al final del renglón. */
   folder?: keyof EmailFolderCounts;
+  /** Solo lo ve un administrador. */
+  adminOnly?: boolean;
 }
 
 interface NavGroup {
@@ -54,6 +60,9 @@ const groups: NavGroup[] = [
       { label: "No deseado", to: "/bandeja/junk", folder: "junk", icon: ShieldAlert },
       { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
       { label: "Supresión", to: "/bandeja/supresion", icon: Ban },
+      { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
+      { label: "Métricas", to: "/bandeja/metricas", icon: BarChart3 },
+      { label: "Webhooks", to: "/bandeja/webhooks", icon: Webhook, adminOnly: true },
     ],
   },
   {
@@ -122,6 +131,11 @@ function readCollapsed() {
 /** Barra lateral: logotipo, arbol de modulos y, al pie, la persona conectada. */
 export function Sidebar() {
   const { user, logout } = useAuth();
+
+  // Lo marcado como solo administradores no aparece para el resto.
+  function visibleChildren(group: NavGroup) {
+    return (group.children ?? []).filter((child) => !child.adminOnly || user?.isAdmin);
+  }
   const { counts } = useEmailCounts();
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -200,16 +214,8 @@ export function Sidebar() {
     return targets.some((to) => pathname === to || pathname.startsWith(`${to}/`));
   }
 
-  const primerNombre = user?.firstName?.trim().split(/\s+/)[0];
-  const primerApellido = user?.lastName?.trim().split(/\s+/)[0];
-  const displayName =
-    primerNombre && primerApellido
-      ? `${primerNombre} ${primerApellido}`
-      : user?.firstName || (user?.email.split("@")[0] ?? "");
-  const initials =
-    primerNombre && primerApellido
-      ? `${primerNombre[0]}${primerApellido[0]}`.toUpperCase()
-      : (user?.email.split("@")[0] ?? "").slice(0, 2).toUpperCase() || "PF";
+  const displayName = formatDisplayName(user?.firstName, user?.lastName, user?.email);
+  const initials = formatInitials(user?.firstName, user?.lastName, user?.email);
   const pendingMail = counts
     ? counts.inbox.unread + counts.archived.unread + counts.junk.unread + counts.trash.unread
     : 0;
@@ -319,7 +325,7 @@ export function Sidebar() {
                 )}
               </div>
               <div className="flex flex-col gap-0.5">
-                {group.children?.map((child) => (
+                {visibleChildren(group).map((child) => (
                   <NavLink
                     key={child.to}
                     to={child.to}
@@ -384,7 +390,7 @@ export function Sidebar() {
             )}
           </div>
           <div className="mt-1 flex flex-col gap-0.5">
-            {flyout.group.children?.map((child) => (
+            {visibleChildren(flyout.group).map((child) => (
               <NavLink
                 key={child.to}
                 to={child.to}

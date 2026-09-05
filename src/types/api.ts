@@ -118,8 +118,13 @@ export interface EmailAttachmentResponse {
   fileName: string;
   contentType: string;
   sizeBytes: number;
-  /** false = el archivo se purgó por antigüedad; la ficha queda para el historial. */
+  /** false = el archivo se purgó por antigüedad o el antivirus lo rechazó; la ficha queda para el historial. */
   available: boolean;
+  /** Tipo ejecutable: solo se descarga tras un aviso, nunca se abre en linea. */
+  dangerous: boolean;
+  /** Pending | Clean | Infected | Skipped. */
+  scanStatus: string;
+  scanDetail: string | null;
 }
 
 /** Enlace firmado al documento; inline = el navegador lo muestra en vez de descargarlo. */
@@ -149,6 +154,9 @@ export interface EmailSummaryResponse {
   answered: boolean;
   /** Solo en lo nuestro (Enviados): Queued | Sent | Delayed | Delivered | Bounced | Complained | Failed. */
   deliveryStatus: string | null;
+  assignedStaffId: number | null;
+  assignedStaffName: string | null;
+  tags: string[];
 }
 
 export type EmailFolder = "Inbox" | "Archived" | "Junk" | "Trash";
@@ -171,6 +179,9 @@ export interface EmailDetailResponse {
   otherRecipients: string[];
   attachments: EmailAttachmentResponse[];
   thread: EmailThreadMessageResponse[];
+  assignedStaffId: number | null;
+  assignedStaffName: string | null;
+  tags: string[];
 }
 
 /** Un correo de la conversacion, venga del cliente o de nosotros. */
@@ -202,7 +213,7 @@ export interface EmailListResponse {
   pageSize: number;
   total: number;
   totalPages: number;
-  counts: { all: number; unlinked: number; linked: number; unanswered: number };
+  counts: { all: number; unlinked: number; linked: number; unanswered: number; mine: number; unassigned: number };
   folderCounts: EmailFolderCounts;
 }
 
@@ -272,6 +283,95 @@ export interface EmailSuppressionResponse {
   /** El envio que la provoco, si vino de un rebote o una queja. */
   emailId: number | null;
   createdAt: string;
+}
+
+export interface StaffOptionResponse {
+  id: number;
+  name: string;
+}
+
+export interface TagCountResponse {
+  tag: string;
+  count: number;
+}
+
+export interface EmailNoteResponse {
+  id: number;
+  staffId: number;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+/** Direccion conocida, para completar el "Para" mientras se escribe. */
+export interface ContactResponse {
+  email: string;
+  name: string | null;
+}
+
+export interface CannedResponseResponse {
+  id: number;
+  title: string;
+  body: string;
+  createdByStaffId: number;
+  createdByName: string;
+  updatedAt: string;
+}
+
+export interface AgentMetricsResponse {
+  staffId: number;
+  name: string;
+  sent: number;
+  conversationsAnswered: number;
+  avgFirstResponseMinutes: number | null;
+}
+
+export interface DailyCountResponse {
+  day: string;
+  received: number;
+  sent: number;
+}
+
+export interface EmailMetricsResponse {
+  since: string;
+  until: string;
+  received: number;
+  sent: number;
+  conversations: number;
+  conversationsAnswered: number;
+  conversationsUnanswered: number;
+  avgFirstResponseMinutes: number | null;
+  medianFirstResponseMinutes: number | null;
+  agents: AgentMetricsResponse[];
+  daily: DailyCountResponse[];
+}
+
+export interface WebhookFailureResponse {
+  id: number;
+  svixId: string | null;
+  eventType: string | null;
+  lastError: string;
+  attempts: number;
+  nextAttemptAt: string;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export interface WebhookFailureListResponse {
+  items: WebhookFailureResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  pending: number;
+}
+
+/** Quien esta escribiendo en que conversacion; active false = dejo de hacerlo. */
+export interface ComposingPresence {
+  emailId: number;
+  staffId: number;
+  name: string;
+  active: boolean;
 }
 
 export interface EmailSuppressionListResponse {

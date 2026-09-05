@@ -10,6 +10,8 @@ import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes } from "../../lib/format";
 import { fieldLabelClass } from "./toolbarStyles";
 import { SendValidationButton } from "./SendValidationButton";
+import { CannedPicker, textToBlocks } from "./CannedPicker";
+import { RecipientInput } from "./RecipientInput";
 import { type ValidationItem } from "./sendValidation";
 
 interface NewEmailComposerProps {
@@ -28,6 +30,8 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const [bccOpen, setBccOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [blocks, setBlocks] = useState<unknown>(null);
+  const [initialBlocks, setInitialBlocks] = useState<unknown>(null);
+  const [editorKey, setEditorKey] = useState(0);
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +48,14 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   useEffect(() => {
     toRef.current?.focus();
   }, []);
+
+  // El texto elegido se suma a lo escrito; el editor se vuelve a montar porque solo lee el contenido inicial.
+  function insertCanned(text: string) {
+    const next = [...(Array.isArray(blocks) ? (blocks as unknown[]) : []), ...textToBlocks(text)];
+    setInitialBlocks(next);
+    setBlocks(next);
+    setEditorKey((key) => key + 1);
+  }
 
   useNoticeInset(44);
 
@@ -172,12 +184,11 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
         transition-colors focus-within:bg-canvas">
         <span className={fieldLabelClass}>Para</span>
-        <input
-          ref={toRef}
+        <RecipientInput
+          inputRef={toRef}
           value={to}
-          onChange={(event) => setTo(event.target.value)}
+          onChange={setTo}
           placeholder="correo@dominio.com, otro@dominio.com"
-          className="min-w-0 flex-1 bg-transparent text-[12px] text-ink outline-none placeholder:text-faint"
         />
         {!ccOpen && (
           <button
@@ -209,12 +220,11 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
           transition-colors focus-within:bg-canvas">
           <span className={fieldLabelClass}>CC</span>
-          <input
-            ref={ccRef}
+          <RecipientInput
+            inputRef={ccRef}
             value={cc}
-            onChange={(event) => setCc(event.target.value)}
+            onChange={setCc}
             placeholder="correo@dominio.com, otro@dominio.com"
-            className="min-w-0 flex-1 bg-transparent text-[12px] text-ink outline-none placeholder:text-faint"
           />
           <button
             type="button"
@@ -237,12 +247,11 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
           transition-colors focus-within:bg-canvas">
           <span className={fieldLabelClass}>CCO</span>
-          <input
-            ref={bccRef}
+          <RecipientInput
+            inputRef={bccRef}
             value={bcc}
-            onChange={(event) => setBcc(event.target.value)}
+            onChange={setBcc}
             placeholder="Nadie más ve a quién va esta copia"
-            className="min-w-0 flex-1 bg-transparent text-[12px] text-ink outline-none placeholder:text-faint"
           />
           <button
             type="button"
@@ -282,7 +291,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
           }
         }}
       >
-        <LazyBlockEditor onChange={setBlocks} placeholder="Escribe el mensaje…" />
+        <LazyBlockEditor key={editorKey} initialContent={initialBlocks} onChange={setBlocks} placeholder="Escribe el mensaje…" />
       </div>
 
       {files.length > 0 && (
@@ -338,6 +347,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
             event.target.value = "";
           }}
         />
+        <CannedPicker onPick={insertCanned} />
         <span className="truncate text-[11px] text-faint">
           Sale de la casilla de soporte, con tu nombre y tu firma.
         </span>

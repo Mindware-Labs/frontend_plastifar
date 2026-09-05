@@ -36,3 +36,88 @@ export function formatBytes(bytes: number): string {
 export function formatTicketCode(ticketId: number): string {
   return `PLT-${String(ticketId).padStart(6, "0")}`;
 }
+
+/**
+ * Extrae el primer apellido respetando partículas compuestas comunes en español
+ * y otros orígenes (ej: "De León", "De la Cruz", "Del Rosario", "De los Santos",
+ * "San Martín", "Santa María", "Dos Santos", "Van der Bilt", etc.).
+ */
+export function getFirstSurname(lastName?: string | null): string {
+  if (!lastName) return "";
+  const normalized = lastName.trim().replace(/\s+/g, " ");
+  if (!normalized) return "";
+
+  // Prefijos de 3 palabras (partícula + artículo + sustantivo)
+  // Ej: "De la Cruz", "De los Santos", "De las Nieves", "Van der Bilt"
+  const multiParticleMatch = normalized.match(
+    /^((?:de\s+(?:la|las|los)|van\s+der)\s+\S+)/i,
+  );
+  if (multiParticleMatch) {
+    return multiParticleMatch[1];
+  }
+
+  // Prefijos de 2 palabras (partícula + sustantivo)
+  // Ej: "De León", "Del Rosario", "San Martín", "Santa María", "Santo Domingo", "Da Silva", "Dos Santos", "Di Stefano", "Von Trapp", "Van Damme"
+  const singleParticleMatch = normalized.match(
+    /^((?:de|del|san|santa|santo|da|do|dos|das|di|von|van)\s+\S+)/i,
+  );
+  if (singleParticleMatch) {
+    return singleParticleMatch[1];
+  }
+
+  // Apellido simple: toma la primera palabra (ej: "Pérez Gómez" -> "Pérez")
+  return normalized.split(" ")[0] ?? "";
+}
+
+/**
+ * Formatea el nombre a mostrar (primer nombre + primer apellido compuesto si aplica).
+ * Ej: "Richard De León", "María De la Cruz", "Carlos Pérez".
+ */
+export function formatDisplayName(
+  firstName?: string | null,
+  lastName?: string | null,
+  fallbackEmail?: string | null,
+): string {
+  const primerNombre = firstName?.trim().split(/\s+/)[0];
+  const primerApellido = getFirstSurname(lastName);
+
+  if (primerNombre && primerApellido) {
+    return `${primerNombre} ${primerApellido}`;
+  }
+  if (primerNombre) {
+    return primerNombre;
+  }
+  if (primerApellido) {
+    return primerApellido;
+  }
+  if (fallbackEmail) {
+    const raw = fallbackEmail.split("@")[0] ?? "";
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+  return "Colaborador";
+}
+
+/**
+ * Calcula las 2 iniciales representativas para el avatar de usuario.
+ * Ej: "Richard" + "De León" -> "RD"
+ *     "Carlos" + "Pérez" -> "CP"
+ */
+export function formatInitials(
+  firstName?: string | null,
+  lastName?: string | null,
+  fallbackEmail?: string | null,
+): string {
+  const primerNombre = firstName?.trim().split(/\s+/)[0];
+  const primerApellido = getFirstSurname(lastName);
+
+  if (primerNombre && primerApellido) {
+    return `${primerNombre[0]}${primerApellido[0]}`.toUpperCase();
+  }
+  if (primerNombre) {
+    return primerNombre.slice(0, 2).toUpperCase();
+  }
+  if (fallbackEmail) {
+    return (fallbackEmail.split("@")[0] ?? "").slice(0, 2).toUpperCase() || "PF";
+  }
+  return "PF";
+}

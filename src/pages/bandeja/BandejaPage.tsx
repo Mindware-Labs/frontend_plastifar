@@ -28,7 +28,7 @@ import { SelectionBar } from "./SelectionBar";
 import { InboxTriageEmptyState } from "./InboxTriageEmptyState";
 
 export type FolderKey = "inbox" | "archived" | "junk" | "trash" | "sent";
-type TicketFilter = "todos" | "sin-ticket" | "sin-responder";
+type TicketFilter = "todos" | "sin-ticket" | "sin-responder" | "mios";
 
 const folderMeta: Record<FolderKey, { title: string; emptyText: string }> = {
   inbox: { title: "Bandeja", emptyText: "Todavía no llegó ningún correo." },
@@ -499,6 +499,9 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                             </TabsTrigger>
                             <TabsTrigger value="sin-responder" className={tabTriggerClass}>
                               Sin responder
+                            </TabsTrigger>
+                            <TabsTrigger value="mios" className={tabTriggerClass}>
+                              Míos
                             </TabsTrigger>
                           </TabsList>
                         </Tabs>

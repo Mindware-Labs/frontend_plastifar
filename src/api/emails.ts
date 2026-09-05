@@ -1,6 +1,11 @@
-import { apiRequest, toQuery } from "./client";
+import { apiBlob, apiRequest, toQuery } from "./client";
 import type {
   AttachmentLinkResponse,
+  ContactResponse,
+  EmailMetricsResponse,
+  EmailNoteResponse,
+  StaffOptionResponse,
+  TagCountResponse,
   EmailBulkAction,
   EmailBulkResponse,
   EmailDetailResponse,
@@ -25,6 +30,8 @@ export interface EmailQuery {
   since?: string;
   until?: string;
   hasAttachments?: string;
+  /** Etiqueta exacta de la conversacion. */
+  tag?: string;
 }
 
 /** Lo que comparten respuesta, correo nuevo y reenvio. */
@@ -108,6 +115,36 @@ export const emailsApi = {
   // Vuelve a poner en la cola de salida un correo que agoto sus reintentos.
   retry: (id: number) =>
     apiRequest<EmailThreadMessageResponse>(`/api/emails/${id}/retry`, { method: "POST" }),
+
+  // ---- Conversacion: quien la atiende, etiquetas, notas, exportar ----
+
+  assign: (id: number, staffId: number | null) =>
+    apiRequest<{ assignedStaffId: number | null; assignedStaffName: string | null }>(`/api/emails/${id}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ staffId }),
+    }),
+
+  updateTags: (id: number, tags: string[]) =>
+    apiRequest<{ tags: string[] }>(`/api/emails/${id}/tags`, { method: "PUT", body: JSON.stringify({ tags }) }),
+
+  tags: () => apiRequest<TagCountResponse[]>("/api/emails/tags"),
+
+  notes: (id: number) => apiRequest<EmailNoteResponse[]>(`/api/emails/${id}/notes`),
+
+  addNote: (id: number, body: string) =>
+    apiRequest<EmailNoteResponse>(`/api/emails/${id}/notes`, { method: "POST", body: JSON.stringify({ body }) }),
+
+  removeNote: (noteId: number) => apiRequest<void>(`/api/emails/notes/${noteId}`, { method: "DELETE" }),
+
+  contacts: (q: string) => apiRequest<ContactResponse[]>(`/api/emails/contacts${toQuery({ q })}`),
+
+  // El archivo llega con la sesion: se baja como blob y se entrega al navegador.
+  exportConversation: (id: number) => apiBlob(`/api/emails/${id}/export`),
+
+  metrics: (since?: string, until?: string) =>
+    apiRequest<EmailMetricsResponse>(`/api/emails/metrics${toQuery({ since, until })}`),
+
+  staffOptions: () => apiRequest<StaffOptionResponse[]>("/api/staff/options"),
 
   createTicket: (id: number) =>
     apiRequest<TicketSummaryResponse>(`/api/emails/${id}/ticket`, { method: "POST" }),

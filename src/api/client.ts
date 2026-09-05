@@ -88,6 +88,25 @@ export function toQuery(params: Record<string, string | number | undefined>): st
   return query ? `?${query}` : "";
 }
 
+/** Descarga autenticada: devuelve el archivo y el nombre que propuso el servidor. */
+export async function apiBlob(path: string): Promise<{ blob: Blob; fileName: string | null }> {
+  const headers = new Headers();
+  const accessToken = tokenStore.getAccessToken();
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+
+  let response = await fetch(`${BASE_URL}${path}`, { headers });
+  if (response.status === 401 && tokenStore.getRefreshToken() && (await refreshSession())) {
+    headers.set("Authorization", `Bearer ${tokenStore.getAccessToken() ?? ""}`);
+    response = await fetch(`${BASE_URL}${path}`, { headers });
+  }
+
+  if (!response.ok) throw await readError(response);
+
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+  return { blob: await response.blob(), fileName: match ? decodeURIComponent(match[1]) : null };
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},

@@ -1,11 +1,18 @@
-import { HubConnectionBuilder, HttpTransportType, LogLevel } from "@microsoft/signalr";
+import {
+  HubConnectionBuilder,
+  HubConnectionState,
+  HttpTransportType,
+  LogLevel,
+  type HubConnection,
+} from "@microsoft/signalr";
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { emailsApi } from "../api/emails";
 import { tokenStore } from "../api/tokenStore";
-import type { EmailFolderCounts, InboxArrival } from "../types/api";
+import type { ComposingPresence, EmailFolderCounts, InboxArrival } from "../types/api";
 
 type Listener = () => void;
 type ArrivalListener = (arrival: InboxArrival) => void;
+type ComposingListener = (presence: ComposingPresence) => void;
 
 interface EmailCountsValue {
   counts: EmailFolderCounts | null;
@@ -14,6 +21,12 @@ interface EmailCountsValue {
   onInboxChanged: (listener: Listener) => () => void;
   /** Correo recibido, con remitente y asunto: para sonar o avisar en el escritorio. */
   onInboxReceived: (listener: ArrivalListener) => () => void;
+  /** Otra persona empezo o dejo de escribir en una conversacion. */
+  onComposing: (listener: ComposingListener) => () => void;
+  /** Avisa al resto que se esta escribiendo (o ya no) en esta conversacion. */
+  setComposing: (emailId: number, active: boolean) => void;
+  /** Quienes estan escribiendo ahora mismo en la conversacion. */
+  whoIsComposing: (emailId: number) => Promise<ComposingPresence[]>;
 }
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
@@ -24,6 +37,9 @@ export const EmailCountsContext = createContext<EmailCountsValue>({
   refresh: () => undefined,
   onInboxChanged: () => () => undefined,
   onInboxReceived: () => () => undefined,
+  onComposing: () => () => undefined,
+  setComposing: () => undefined,
+  whoIsComposing: () => Promise.resolve([]),
 });
 
 /** Contadores del menu y canal en vivo: viven arriba porque los comparten la barra y la bandeja. */
@@ -31,6 +47,8 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
   const [counts, setCounts] = useState<EmailFolderCounts | null>(null);
   const listeners = useRef(new Set<Listener>());
   const arrivalListeners = useRef(new Set<ArrivalListener>());
+  const composingListeners = useRef(new Set<ComposingListener>());
+  const connectionRef = useRef<HubConnection | null>(null);
 
   const refresh = useCallback(() => {
     emailsApi
@@ -47,6 +65,28 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
   const onInboxReceived = useCallback((listener: ArrivalListener) => {
     arrivalListeners.current.add(listener);
     return () => arrivalListeners.current.delete(listener) as unknown as void;
+  }, []);
+
+  const onComposing = useCallback((listener: ComposingListener) => {
+    composingListeners.current.add(listener);
+    return () => composingListeners.current.delete(listener) as unknown as void;
+  }, []);
+
+  // Si el canal esta caido el aviso se pierde: es una cortesia, no un dato.
+  const setComposing = useCallback((emailId: number, active: boolean) => {
+    const connection = connectionRef.current;
+    if (connection?.state !== HubConnectionState.Connected) return;
+    connection.invoke("SetComposing", emailId, active).catch(() => undefined);
+  }, []);
+
+  const whoIsComposing = useCallback(async (emailId: number) => {
+    const connection = connectionRef.current;
+    if (connection?.state !== HubConnectionState.Connected) return [];
+    try {
+      return (await connection.invoke<ComposingPresence[]>("WhoIsComposing", emailId)) ?? [];
+    } catch {
+      return [];
+    }
   }, []);
 
   useEffect(refresh, [refresh]);
@@ -71,6 +111,10 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
       arrivalListeners.current.forEach((listener) => listener(arrival));
     }
 
+    function composing(presence: ComposingPresence) {
+      composingListeners.current.forEach((listener) => listener(presence));
+    }
+
     const connection = new HubConnectionBuilder()
       .withUrl(`${BASE_URL}/hubs/inbox`, {
         accessTokenFactory: () => tokenStore.getAccessToken() ?? "",
@@ -82,19 +126,25 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
 
     connection.on("inbox:changed", announce);
     connection.on("inbox:received", received);
+    connection.on("inbox:composing", composing);
     // Mientras estuvo caido pudo entrar correo: al volver se recarga sin esperar el proximo aviso.
     connection.onreconnected(announce);
+    connectionRef.current = connection;
     connection.start().catch(() => undefined);
 
     return () => {
       connection.off("inbox:changed", announce);
       connection.off("inbox:received", received);
+      connection.off("inbox:composing", composing);
+      connectionRef.current = null;
       void connection.stop();
     };
   }, [refresh]);
 
   return (
-    <EmailCountsContext.Provider value={{ counts, refresh, onInboxChanged, onInboxReceived }}>
+    <EmailCountsContext.Provider
+      value={{ counts, refresh, onInboxChanged, onInboxReceived, onComposing, setComposing, whoIsComposing }}
+    >
       {children}
     </EmailCountsContext.Provider>
   );

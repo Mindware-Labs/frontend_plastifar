@@ -3,8 +3,10 @@ import {
   ArchiveRestore,
   CornerDownRight,
   CornerUpLeft,
+  Download,
   Forward,
   Paperclip,
+  PencilLine,
   RotateCcw,
   ShieldAlert,
   Ticket as TicketIcon,
@@ -32,11 +34,14 @@ import {
   formatEmailListDate,
   formatTicketCode,
 } from "../../lib/format";
-import type { EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
+import type { ComposingPresence, EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
+import { CannedPicker, textToBlocks } from "./CannedPicker";
+import { AssignmentControl, NotesPanel, TagEditor } from "./ConversationTools";
+import { RecipientInput } from "./RecipientInput";
 import { fieldLabelClass } from "./toolbarStyles";
 import { ticketBadgeClass } from "./badgeStyles";
 import { SendValidationButton } from "./SendValidationButton";
@@ -135,9 +140,6 @@ const fieldToggleClass =
   "tracking-[0.08em] text-faint outline-none transition-colors hover:bg-fill hover:text-brand-red " +
   "focus-visible:ring-3 focus-visible:ring-brand-red/20";
 
-const fieldInputClass =
-  "min-w-0 flex-1 bg-transparent text-[12px] text-ink outline-none placeholder:text-faint";
-
 const fieldCloseClass =
   "flex h-5 w-5 shrink-0 items-center justify-center rounded-edge text-faint outline-none " +
   "transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20";
@@ -190,12 +192,17 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   const bccRef = useRef<HTMLInputElement>(null);
   const replyContainerRef = useRef<HTMLDivElement>(null);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
-  const isAdmin = Boolean(useAuth().user?.isAdmin);
+  const [composers, setComposers] = useState<ComposingPresence[]>([]);
+  const [editorKey, setEditorKey] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [dangerousToDownload, setDangerousToDownload] = useState<EmailAttachmentResponse | null>(null);
+  const { user } = useAuth();
+  const isAdmin = Boolean(user?.isAdmin);
 
   // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
   const replyText = blocksToText(replyBlocks);
   const [reloadKey, setReloadKey] = useState(0);
-  const { onInboxChanged } = useEmailCounts();
+  const { onInboxChanged, onComposing, setComposing, whoIsComposing } = useEmailCounts();
   const receipts = useReceipts();
   const isForward = composerMode === "forward";
 
@@ -244,6 +251,36 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   }, [emailId, reloadKey]);
 
   useEffect(() => onInboxChanged(() => setReloadKey((current) => current + 1)), [onInboxChanged]);
+
+  // Quien mas esta escribiendo aqui: lo que ya estaba en curso al abrir, y lo que avise despues.
+  useEffect(() => {
+    let cancelled = false;
+    whoIsComposing(emailId)
+      .then((list) => {
+        if (!cancelled) setComposers(list.filter((p) => p.staffId !== user?.staffId));
+      })
+      .catch(() => undefined);
+
+    const off = onComposing((presence) => {
+      if (presence.emailId !== emailId || presence.staffId === user?.staffId) return;
+      setComposers((current) => {
+        const others = current.filter((p) => p.staffId !== presence.staffId);
+        return presence.active ? [...others, presence] : others;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      off();
+    };
+  }, [emailId, onComposing, whoIsComposing, user?.staffId]);
+
+  // Mientras el editor esta abierto, el resto del equipo lo sabe; al cerrar o cambiar de correo, deja de saberlo.
+  useEffect(() => {
+    if (!replyOpen) return;
+    setComposing(emailId, true);
+    return () => setComposing(emailId, false);
+  }, [replyOpen, emailId, setComposing]);
 
   async function handleCreateTicket() {
     if (!email) return;
@@ -428,6 +465,61 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
     setReplyError(null);
   }
 
+  // El texto elegido se suma a lo escrito; el editor se vuelve a montar porque solo lee el contenido inicial.
+  function insertCanned(body: string) {
+    const current = Array.isArray(replyBlocks) ? (replyBlocks as unknown[]) : [];
+    const next = [...current, ...textToBlocks(body)];
+    setDraftBlocks(next);
+    setReplyBlocks(next);
+    setEditorKey((key) => key + 1);
+  }
+
+  async function handleExport() {
+    if (!email || exporting) return;
+    setExporting(true);
+    try {
+      const { blob, fileName } = await emailsApi.exportConversation(email.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName ?? `conversacion-${email.id}.html`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      receipts.failed({
+        action: "exportar",
+        title: "No se pudo exportar",
+        detail: err instanceof ApiError ? err.message : undefined,
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  // Un ejecutable no se abre en el visor: solo baja, y despues de avisar.
+  async function downloadDangerous(attachment: EmailAttachmentResponse) {
+    if (!email) return;
+    try {
+      const link = await emailsApi.attachmentLink(email.id, attachment.id, true);
+      window.open(link.url, "_blank", "noopener");
+    } catch (err) {
+      receipts.failed({
+        action: "descargar",
+        title: "No se pudo descargar",
+        detail: err instanceof ApiError ? err.message : undefined,
+      });
+    }
+  }
+
+  function openAttachment(target: PreviewTarget) {
+    const attachment = target.attachments[target.index];
+    if (attachment.dangerous) {
+      setDangerousToDownload(attachment);
+      return;
+    }
+    setPreview(target);
+  }
+
   /**
    * El servidor ya movio el correo cuando esto vuelve, asi que el recibo no promete
    * deshacer: ofrece la accion inversa, que es otro viaje y puede fallar por su cuenta.
@@ -595,6 +687,15 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
 
           <Tooltip>
             <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={toolButtonClass} disabled={exporting} onClick={handleExport}>
+                <Download />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Exportar la conversación</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className={toolButtonClass} onClick={onClose}>
                 <X />
               </Button>
@@ -639,6 +740,26 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
             {formatDateTime(email.createdAt)}
           </span>
         </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <AssignmentControl
+            emailId={email.id}
+            assignedStaffId={email.assignedStaffId ?? null}
+            assignedStaffName={email.assignedStaffName ?? null}
+            onChanged={(staffId, name) => setEmail({ ...email, assignedStaffId: staffId, assignedStaffName: name })}
+          />
+          <TagEditor emailId={email.id} tags={email.tags ?? []} onChanged={(tags) => setEmail({ ...email, tags })} />
+        </div>
+
+        {composers.length > 0 && (
+          <div className="mt-2 flex items-center gap-2 rounded-edge border border-warn/40 bg-warn/[0.08] px-2.5 py-1.5 text-[11.5px] text-ink">
+            <PencilLine className="h-3.5 w-3.5 shrink-0 text-warn" />
+            <span>
+              <strong className="font-semibold">{composers.map((p) => p.name).join(", ")}</strong>
+              {composers.length === 1 ? " está respondiendo este correo ahora mismo." : " están respondiendo este correo ahora mismo."}
+            </span>
+          </div>
+        )}
       </div>
 
       <Separator className="bg-line" />
@@ -683,13 +804,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               transition-colors focus-within:bg-canvas">
               <span className={fieldLabelClass}>Para</span>
               {isForward ? (
-                <input
-                  ref={toRef}
+                <RecipientInput
+                  inputRef={toRef}
                   value={forwardTo}
-                  onChange={(event) => setForwardTo(event.target.value)}
+                  onChange={setForwardTo}
                   placeholder="correo@dominio.com, otro@dominio.com"
                   autoFocus
-                  className={fieldInputClass}
                 />
               ) : (
                 <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">
@@ -730,12 +850,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
                 transition-colors focus-within:bg-canvas">
                 <span className={fieldLabelClass}>CC</span>
-                <input
-                  ref={ccRef}
+                <RecipientInput
+                  inputRef={ccRef}
                   value={replyCc}
-                  onChange={(event) => setReplyCc(event.target.value)}
+                  onChange={setReplyCc}
                   placeholder="correo@dominio.com, otro@dominio.com"
-                  className={fieldInputClass}
                 />
                 <button
                   type="button"
@@ -756,12 +875,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
                 transition-colors focus-within:bg-canvas">
                 <span className={fieldLabelClass}>CCO</span>
-                <input
-                  ref={bccRef}
+                <RecipientInput
+                  inputRef={bccRef}
                   value={replyBcc}
-                  onChange={(event) => setReplyBcc(event.target.value)}
+                  onChange={setReplyBcc}
                   placeholder="Nadie más ve a quién va esta copia"
-                  className={fieldInputClass}
                 />
                 <button
                   type="button"
@@ -800,6 +918,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               }}
             >
               <LazyBlockEditor
+                key={editorKey}
                 initialContent={draftBlocks}
                 onChange={setReplyBlocks}
                 placeholder={isForward ? "Comentario opcional…" : "Escribe la respuesta…"}
@@ -860,6 +979,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                   event.target.value = "";
                 }}
               />
+              <CannedPicker onPick={insertCanned} />
               <span className="truncate text-[11px] text-faint">
                 Hasta {MAX_FILES} archivos, 10 MB · también puedes soltarlos aquí
               </span>
@@ -966,8 +1086,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                   <button
                     key={attachment.id}
                     type="button"
+                    disabled={!attachment.available}
                     onClick={() =>
-                      setPreview({
+                      openAttachment({
                         emailId: openReply.id,
                         attachments: openReply.attachments,
                         index: position,
@@ -1021,12 +1142,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                   type="button"
                   disabled={!attachment.available}
                   onClick={() =>
-                    setPreview({ emailId: email.id, attachments: email.attachments, index: position })
+                    openAttachment({ emailId: email.id, attachments: email.attachments, index: position })
                   }
                   title={
-                    attachment.available
-                      ? `Ver ${attachment.fileName}`
-                      : "El archivo se eliminó por antigüedad"
+                    attachment.scanStatus === "Infected"
+                      ? `El antivirus detectó una amenaza (${attachment.scanDetail ?? "sin detalle"})`
+                      : !attachment.available
+                        ? "El archivo se eliminó por antigüedad"
+                        : attachment.dangerous
+                          ? "Archivo de tipo peligroso: solo se descarga"
+                          : `Ver ${attachment.fileName}`
                   }
                   className="group inline-flex items-center gap-1.5 rounded-edge border border-line
                     bg-canvas px-2 py-1 text-[11.5px] text-brand-gray outline-none
@@ -1036,7 +1161,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                     disabled:cursor-not-allowed disabled:line-through disabled:opacity-50
                     disabled:hover:border-line disabled:hover:bg-canvas disabled:hover:text-brand-gray"
                 >
-                  <Paperclip className="h-3.5 w-3.5 text-faint transition-colors group-hover:text-brand-red" />
+                  {attachment.dangerous || attachment.scanStatus === "Infected" ? (
+                    <ShieldAlert className="h-3.5 w-3.5 text-brand-red" />
+                  ) : (
+                    <Paperclip className="h-3.5 w-3.5 text-faint transition-colors group-hover:text-brand-red" />
+                  )}
                   {attachment.fileName}
                   <span className="text-subtle">· {formatBytes(attachment.sizeBytes)}</span>
                 </button>
@@ -1045,6 +1174,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
           </div>
         </>
       )}
+
+      <NotesPanel emailId={email.id} />
 
       <Separator className="bg-line" />
 
@@ -1138,6 +1269,28 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
             onMoved();
           }}
           onClose={() => setConfirmingDelete(false)}
+        />
+      )}
+
+      {dangerousToDownload && (
+        <ConfirmDialog
+          eyebrow="Adjuntos"
+          icon={ShieldAlert}
+          title="Archivo potencialmente peligroso"
+          description={
+            <>
+              <strong className="font-semibold text-ink">{dangerousToDownload.fileName}</strong> es un
+              ejecutable, un guion o una imagen de disco. No se abre en el visor: solo se descarga, y
+              conviene no ejecutarlo si no esperabas recibirlo.
+              {dangerousToDownload.scanStatus === "Skipped" && " El antivirus no lo revisó."}
+            </>
+          }
+          confirmLabel="Descargar igual"
+          onConfirm={async () => {
+            await downloadDangerous(dangerousToDownload);
+            setDangerousToDownload(null);
+          }}
+          onClose={() => setDangerousToDownload(null)}
         />
       )}
 

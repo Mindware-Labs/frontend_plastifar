@@ -9,6 +9,7 @@ import {
 import { useAuth } from "../../context/useAuth";
 import { Logo } from "../../components/Logo";
 import { Button as PfButton } from "../../components/ui/Button";
+import { formatDisplayName } from "../../lib/format";
 import type { EmailFolderCounts } from "../../types/api";
 import type { FolderKey } from "./BandejaPage";
 
@@ -30,21 +31,8 @@ function getGreeting(
   const greeting =
     hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
 
-  const primerNombre = firstName?.trim().split(/\s+/)[0];
-  const primerApellido = lastName?.trim().split(/\s+/)[0];
-
-  if (primerNombre && primerApellido) {
-    return { greeting, name: `${primerNombre} ${primerApellido}` };
-  }
-  if (primerNombre) {
-    return { greeting, name: primerNombre };
-  }
-  if (email) {
-    const raw = email.split("@")[0] ?? "";
-    const name = raw.charAt(0).toUpperCase() + raw.slice(1);
-    return { greeting, name };
-  }
-  return { greeting, name: "Equipo" };
+  const name = formatDisplayName(firstName, lastName, email);
+  return { greeting, name: name || "Equipo" };
 }
 
 export function InboxTriageEmptyState({
