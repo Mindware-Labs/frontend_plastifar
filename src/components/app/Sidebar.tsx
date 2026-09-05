@@ -1,7 +1,6 @@
 import {
   Archive,
   Ban,
-  BarChart3,
   Bell,
   ChevronDown,
   Inbox,
@@ -15,7 +14,6 @@ import {
   ShieldCheck,
   Trash2,
   Users,
-  Webhook,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -61,8 +59,6 @@ const groups: NavGroup[] = [
       { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
       { label: "Supresión", to: "/bandeja/supresion", icon: Ban },
       { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
-      { label: "Métricas", to: "/bandeja/metricas", icon: BarChart3 },
-      { label: "Webhooks", to: "/bandeja/webhooks", icon: Webhook, adminOnly: true },
     ],
   },
   {

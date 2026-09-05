@@ -318,54 +318,6 @@ export interface CannedResponseResponse {
   updatedAt: string;
 }
 
-export interface AgentMetricsResponse {
-  staffId: number;
-  name: string;
-  sent: number;
-  conversationsAnswered: number;
-  avgFirstResponseMinutes: number | null;
-}
-
-export interface DailyCountResponse {
-  day: string;
-  received: number;
-  sent: number;
-}
-
-export interface EmailMetricsResponse {
-  since: string;
-  until: string;
-  received: number;
-  sent: number;
-  conversations: number;
-  conversationsAnswered: number;
-  conversationsUnanswered: number;
-  avgFirstResponseMinutes: number | null;
-  medianFirstResponseMinutes: number | null;
-  agents: AgentMetricsResponse[];
-  daily: DailyCountResponse[];
-}
-
-export interface WebhookFailureResponse {
-  id: number;
-  svixId: string | null;
-  eventType: string | null;
-  lastError: string;
-  attempts: number;
-  nextAttemptAt: string;
-  resolvedAt: string | null;
-  createdAt: string;
-}
-
-export interface WebhookFailureListResponse {
-  items: WebhookFailureResponse[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-  pending: number;
-}
-
 /** Quien esta escribiendo en que conversacion; active false = dejo de hacerlo. */
 export interface ComposingPresence {
   emailId: number;

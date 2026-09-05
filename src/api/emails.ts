@@ -2,7 +2,6 @@ import { apiBlob, apiRequest, toQuery } from "./client";
 import type {
   AttachmentLinkResponse,
   ContactResponse,
-  EmailMetricsResponse,
   EmailNoteResponse,
   StaffOptionResponse,
   TagCountResponse,
@@ -140,9 +139,6 @@ export const emailsApi = {
 
   // El archivo llega con la sesion: se baja como blob y se entrega al navegador.
   exportConversation: (id: number) => apiBlob(`/api/emails/${id}/export`),
-
-  metrics: (since?: string, until?: string) =>
-    apiRequest<EmailMetricsResponse>(`/api/emails/metrics${toQuery({ since, until })}`),
 
   staffOptions: () => apiRequest<StaffOptionResponse[]>("/api/staff/options"),
 
