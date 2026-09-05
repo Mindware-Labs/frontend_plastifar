@@ -4,7 +4,6 @@ import {
   CornerDownRight,
   CornerUpLeft,
   Paperclip,
-  Send,
   ShieldAlert,
   Ticket as TicketIcon,
   Trash2,
@@ -37,6 +36,8 @@ import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { fieldLabelClass } from "./toolbarStyles";
 import { ticketBadgeClass } from "./badgeStyles";
+import { SendValidationButton } from "./SendValidationButton";
+import { type ValidationItem } from "./sendValidation";
 
 /** Que adjunto se esta mirando: puede ser del correo o de una respuesta nuestra. */
 interface PreviewTarget {
@@ -149,6 +150,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   const [replyError, setReplyError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
+  const replyContainerRef = useRef<HTMLDivElement>(null);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
 
   // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
@@ -156,6 +158,23 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   const [reloadKey, setReloadKey] = useState(0);
   const { onInboxChanged } = useEmailCounts();
   const receipts = useReceipts();
+
+  const replyMissingItems: ValidationItem[] = [];
+  if (replyText.trim() === "") {
+    replyMissingItems.push({
+      id: "body",
+      label: "Falta escribir el mensaje de respuesta",
+      short: "el mensaje de respuesta",
+    });
+  }
+  const replyReady = replyMissingItems.length === 0;
+
+  function handleFocusReplyField(fieldId: string) {
+    if (fieldId === "body") {
+      const editorEl = replyContainerRef.current?.querySelector('[contenteditable="true"]');
+      if (editorEl instanceof HTMLElement) editorEl.focus();
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -505,6 +524,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
       <div className="relative min-h-0 flex-1">
         {replyOpen && (
           <div
+            ref={replyContainerRef}
             className="absolute inset-0 z-20 flex flex-col bg-white"
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
@@ -599,7 +619,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
             <div
               className="min-h-0 flex-1 overflow-y-auto"
               onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) handleReply();
+                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                  if (replyReady) handleReply();
+                }
               }}
             >
               <LazyBlockEditor
@@ -671,16 +693,13 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                 <PfButton variant="ghost" size="sm" className="h-7 px-3" onClick={closeComposer}>
                   Cancelar
                 </PfButton>
-                <PfButton
-                  size="sm"
-                  className="h-7 px-3"
-                  onClick={handleReply}
-                  isLoading={sending}
-                  disabled={replyText.trim() === ""}
-                >
-                  <Send className="h-[15px] w-[15px]" />
-                  Enviar
-                </PfButton>
+                <SendValidationButton
+                  ready={replyReady}
+                  sending={sending}
+                  missingItems={replyMissingItems}
+                  onSend={handleReply}
+                  onFocusField={handleFocusReplyField}
+                />
               </div>
             </div>
           </div>

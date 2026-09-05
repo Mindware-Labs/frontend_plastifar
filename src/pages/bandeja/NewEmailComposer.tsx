@@ -1,4 +1,4 @@
-import { PenLine, Paperclip, Send, X } from "lucide-react";
+import { PenLine, Paperclip, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
@@ -9,6 +9,8 @@ import { useNoticeInset, useReceipts } from "../../context/useReceipts";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes } from "../../lib/format";
 import { fieldLabelClass } from "./toolbarStyles";
+import { SendValidationButton } from "./SendValidationButton";
+import { type ValidationItem } from "./sendValidation";
 
 interface NewEmailComposerProps {
   onSent: () => void;
@@ -28,7 +30,9 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const receipts = useReceipts();
+  const containerRef = useRef<HTMLDivElement>(null);
   const toRef = useRef<HTMLInputElement>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // La marca del envio nace con el editor: un reintento la repite y no duplica el correo.
@@ -94,10 +98,46 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   }
 
   const body = blocksToText(blocks);
-  const ready = to.trim() !== "" && subject.trim() !== "" && body.trim() !== "";
+
+  const missingItems: ValidationItem[] = [];
+  if (!to.trim()) {
+    missingItems.push({
+      id: "to",
+      label: "Falta el destinatario (Para)",
+      short: "el destinatario (Para)",
+    });
+  }
+  if (!subject.trim()) {
+    missingItems.push({
+      id: "subject",
+      label: "Falta el asunto",
+      short: "el asunto",
+    });
+  }
+  if (!body.trim()) {
+    missingItems.push({
+      id: "body",
+      label: "Falta el cuerpo del mensaje",
+      short: "el mensaje",
+    });
+  }
+
+  const ready = missingItems.length === 0;
+
+  function handleFocusField(fieldId: string) {
+    if (fieldId === "to") {
+      toRef.current?.focus();
+    } else if (fieldId === "subject") {
+      subjectRef.current?.focus();
+    } else if (fieldId === "body") {
+      const editorEl = containerRef.current?.querySelector('[contenteditable="true"]');
+      if (editorEl instanceof HTMLElement) editorEl.focus();
+    }
+  }
 
   return (
     <div
+      ref={containerRef}
       className="flex h-full flex-col bg-white"
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
@@ -177,6 +217,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         transition-colors focus-within:bg-canvas">
         <span className={fieldLabelClass}>Asunto</span>
         <input
+          ref={subjectRef}
           value={subject}
           onChange={(event) => setSubject(event.target.value)}
           placeholder="De qué se trata"
@@ -188,7 +229,9 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       <div
         className="min-h-0 flex-1 overflow-y-auto"
         onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) handleSend();
+          if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+            if (ready) handleSend();
+          }
         }}
       >
         <LazyBlockEditor onChange={setBlocks} placeholder="Escribe el mensaje…" />
@@ -255,16 +298,13 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
           <PfButton variant="ghost" size="sm" className="h-7 px-3" onClick={onCancel}>
             Descartar
           </PfButton>
-          <PfButton
-            size="sm"
-            className="h-7 px-3"
-            onClick={handleSend}
-            isLoading={sending}
-            disabled={!ready}
-          >
-            <Send className="h-[15px] w-[15px]" />
-            Enviar
-          </PfButton>
+          <SendValidationButton
+            ready={ready}
+            sending={sending}
+            missingItems={missingItems}
+            onSend={handleSend}
+            onFocusField={handleFocusField}
+          />
         </div>
       </div>
     </div>
