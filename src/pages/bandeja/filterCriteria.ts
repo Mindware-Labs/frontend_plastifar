@@ -1,15 +1,15 @@
 /** Criterios ademas del texto libre. Las fechas van como YYYY-MM-DD del calendario local. */
 export interface AdvancedFilters {
-  from: string;
   since: string;
   until: string;
   hasAttachments: boolean;
 }
 
-export const EMPTY_FILTERS: AdvancedFilters = { from: "", since: "", until: "", hasAttachments: false };
+export const EMPTY_FILTERS: AdvancedFilters = { since: "", until: "", hasAttachments: false };
 
 export function countActive(filters: AdvancedFilters) {
-  return [filters.from, filters.since, filters.until].filter(Boolean).length + (filters.hasAttachments ? 1 : 0);
+  const hasDate = Boolean(filters.since || filters.until);
+  return (hasDate ? 1 : 0) + (filters.hasAttachments ? 1 : 0);
 }
 
 /** Medianoche local del dia: la persona piensa en su calendario, no en UTC. */
@@ -27,7 +27,6 @@ function nextDay(day: string) {
 /** Lo que viaja al servidor: fechas en ISO con zona, y "hasta" exclusivo para incluir el dia entero. */
 export function toQueryParams(filters: AdvancedFilters) {
   return {
-    from: filters.from.trim() || undefined,
     since: filters.since ? dayStart(filters.since).toISOString() : undefined,
     until: filters.until ? nextDay(filters.until).toISOString() : undefined,
     hasAttachments: filters.hasAttachments ? "true" : undefined,

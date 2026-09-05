@@ -170,6 +170,32 @@ input:-webkit-autofill:focus {
   }
 }
 
+@keyframes plf-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.975);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes plf-popover-out {
+  from {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.975);
+    filter: blur(1.5px);
+  }
+}
+
 /* El recibo se va mas rapido de lo que llega: el aviso pesa al aparecer, no al irse. */
 @keyframes plf-receipt-out {
   to { opacity: 0; transform: translateY(6px); }
@@ -189,6 +215,8 @@ input:-webkit-autofill:focus {
 .animate-plf-selection-out { animation: plf-selection-bar-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-tabs-in { animation: plf-tabs-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-tabs-out { animation: plf-tabs-fade-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
+.animate-plf-popover-in { animation: plf-popover-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-popover-out { animation: plf-popover-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-scrim-in { animation: plf-scrim-in 0.18s ease-out both; }
 .animate-plf-modal-in { animation: plf-modal-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
@@ -203,6 +231,7 @@ input:-webkit-autofill:focus {
   .animate-plf-toast-in,
   .animate-plf-selection-in,
   .animate-plf-tabs-in,
+  .animate-plf-popover-in,
   .animate-plf-scrim-in,
   .animate-plf-modal-in,
   .animate-plf-shake,
@@ -214,6 +243,7 @@ input:-webkit-autofill:focus {
      y el elemento se quedaria pegado en pantalla. */
   .animate-plf-selection-out,
   .animate-plf-tabs-out,
+  .animate-plf-popover-out,
   .animate-plf-receipt-out {
     animation-duration: 1ms !important;
   }

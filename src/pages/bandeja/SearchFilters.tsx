@@ -1,52 +1,66 @@
-import { Paperclip, SlidersHorizontal, X } from "lucide-react";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { Calendar, Paperclip, SlidersHorizontal, X } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/Button";
-import { CheckboxField, TextField } from "../../components/ui/Field";
+import { CheckboxField } from "../../components/ui/Field";
+import { DateRangePicker } from "../../components/ui/DateRangePicker";
 import { EMPTY_FILTERS, countActive, formatDay, type AdvancedFilters } from "./filterCriteria";
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PANEL_WIDTH = 300;
+const PANEL_WIDTH = 310;
 
 interface FilterButtonProps {
   value: AdvancedFilters;
   onChange: (value: AdvancedFilters) => void;
 }
 
-/**
- * Boton con panel desplegable. Los criterios se aplican juntos, no a cada tecla.
- * El panel se dibuja en un portal: el listado vive dentro de un panel con scroll que lo recortaria.
- */
+
 export function FilterButton({ value, onChange }: FilterButtonProps) {
   const [open, setOpen] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
   const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
   const [draft, setDraft] = useState<AdvancedFilters>(value);
   const [error, setError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLFormElement>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const panelId = useId();
   const active = countActive(value);
 
+  const close = useCallback(() => {
+    if (!open || isExiting) return;
+    setIsExiting(true);
+    closeTimerRef.current = setTimeout(() => {
+      setOpen(false);
+      setIsExiting(false);
+    }, 160);
+  }, [open, isExiting]);
+
   useEffect(() => {
-    if (!open) return;
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open || isExiting) return;
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node;
       if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      setOpen(false);
+      close();
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setOpen(false);
+        close();
         triggerRef.current?.focus();
       }
     }
-    // Reposicionar en cada scroll seria un baile: se cierra, como haria un menu nativo.
+    // Reposicionar en cada scroll seria un baile: se cierra suavemente.
     function handleViewportChange() {
-      setOpen(false);
+      close();
     }
 
-    panelRef.current?.querySelector<HTMLElement>("input")?.focus();
+    panelRef.current?.querySelector<HTMLElement>("button, input")?.focus();
 
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
@@ -58,11 +72,16 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
     };
-  }, [open]);
+  }, [open, isExiting, close]);
 
   function toggle() {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+
     if (open) {
-      setOpen(false);
+      close();
       return;
     }
 
@@ -74,31 +93,27 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
     // El borrador arranca de lo aplicado: lo que se descarto no reaparece.
     setDraft(value);
     setError(null);
+    setIsExiting(false);
     setOpen(true);
   }
 
   function apply(event: FormEvent) {
     event.preventDefault();
 
-    const from = draft.from.trim();
-    if (from && !EMAIL.test(from)) {
-      setError("Escribe una dirección completa, como nombre@dominio.com.");
-      return;
-    }
     if (draft.since && draft.until && draft.until < draft.since) {
       setError("La fecha final no puede ser anterior a la inicial.");
       return;
     }
 
-    onChange({ ...draft, from });
-    setOpen(false);
+    onChange(draft);
+    close();
   }
 
   function clear() {
     setDraft(EMPTY_FILTERS);
     setError(null);
     onChange(EMPTY_FILTERS);
-    setOpen(false);
+    close();
   }
 
   return (
@@ -107,14 +122,14 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
         ref={triggerRef}
         type="button"
         onClick={toggle}
-        aria-expanded={open}
+        aria-expanded={open && !isExiting}
         aria-controls={open ? panelId : undefined}
         aria-label={active > 0 ? `Filtros (${active} activos)` : "Filtros"}
-        title="Filtros avanzados"
+        title="Filtros"
         data-active={active > 0}
         className="relative flex h-8 w-8 items-center justify-center rounded-edge border border-line-strong
-          bg-white text-brand-gray outline-none transition-colors hover:border-zinc-400 hover:text-ink
-          focus-visible:border-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/10
+          bg-white text-brand-gray outline-none transition-all duration-150 hover:border-zinc-400 hover:text-ink
+          active:scale-95 focus-visible:border-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/10
           data-[active=true]:border-brand-red/40 data-[active=true]:text-brand-red-dark
           aria-expanded:bg-fill aria-expanded:text-ink"
       >
@@ -136,40 +151,25 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
           ref={panelRef}
           id={panelId}
           onSubmit={apply}
+          inert={isExiting ? true : undefined}
           style={{ position: "fixed", top: anchor.top, left: anchor.left, width: PANEL_WIDTH }}
-          className="animate-plf-toast-in z-[60] flex flex-col gap-3.5 rounded-edge border border-line
-            bg-white p-4 shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
+          className={`${
+            isExiting ? "animate-plf-popover-out pointer-events-none" : "animate-plf-popover-in"
+          } z-[60] flex flex-col gap-3.5 origin-top-right rounded-edge border border-line/90
+            bg-white/98 backdrop-blur-md p-4 shadow-[0_4px_16px_-2px_rgba(27,27,29,0.08),0_12px_32px_-4px_rgba(27,27,29,0.14)]`}
         >
           <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
-            Filtros avanzados
+            Filtros
           </p>
 
-          <TextField
-            label="Dirección"
-            type="email"
-            autoComplete="off"
-            placeholder="nombre@dominio.com"
-            value={draft.from}
-            onChange={(event) => setDraft({ ...draft, from: event.target.value })}
-            hint="Exacta. Vale como remitente o como destinatario en el hilo."
+          <DateRangePicker
+            since={draft.since}
+            until={draft.until}
+            onChange={(since, until) => {
+              setError(null);
+              setDraft({ ...draft, since, until });
+            }}
           />
-
-          <div className="grid grid-cols-2 gap-3">
-            <TextField
-              label="Desde"
-              type="date"
-              value={draft.since}
-              max={draft.until || undefined}
-              onChange={(event) => setDraft({ ...draft, since: event.target.value })}
-            />
-            <TextField
-              label="Hasta"
-              type="date"
-              value={draft.until}
-              min={draft.since || undefined}
-              onChange={(event) => setDraft({ ...draft, until: event.target.value })}
-            />
-          </div>
 
           <CheckboxField
             label="Solo con adjuntos"
@@ -231,14 +231,25 @@ function Chip({ label, onRemove, icon: Icon }: ChipProps) {
 export function FilterChips({ value, onChange }: FilterButtonProps) {
   if (countActive(value) === 0) return null;
 
+  const dateLabel =
+    value.since && value.until
+      ? value.since === value.until
+        ? formatDay(value.since)
+        : `${formatDay(value.since)} – ${formatDay(value.until)}`
+      : value.since
+        ? `Desde ${formatDay(value.since)}`
+        : value.until
+          ? `Hasta ${formatDay(value.until)}`
+          : null;
+
   return (
     <div className="flex flex-wrap gap-1.5">
-      {value.from && <Chip label={value.from} onRemove={() => onChange({ ...value, from: "" })} />}
-      {value.since && (
-        <Chip label={`Desde ${formatDay(value.since)}`} onRemove={() => onChange({ ...value, since: "" })} />
-      )}
-      {value.until && (
-        <Chip label={`Hasta ${formatDay(value.until)}`} onRemove={() => onChange({ ...value, until: "" })} />
+      {dateLabel && (
+        <Chip
+          icon={Calendar}
+          label={dateLabel}
+          onRemove={() => onChange({ ...value, since: "", until: "" })}
+        />
       )}
       {value.hasAttachments && (
         <Chip
