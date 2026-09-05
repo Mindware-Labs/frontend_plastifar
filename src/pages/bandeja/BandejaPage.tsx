@@ -250,6 +250,51 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     setChecked(pageState === true ? new Set() : new Set(rows.map((row) => row.id)));
   }
 
+  const isSelecting = selectable && checked.size > 0;
+  const [prevSelecting, setPrevSelecting] = useState(isSelecting);
+  const [selectionExiting, setSelectionExiting] = useState(false);
+  const [tabsExiting, setTabsExiting] = useState(false);
+  const [hasExitedOnce, setHasExitedOnce] = useState(false);
+  const [preservedSelection, setPreservedSelection] = useState({
+    count: checked.size,
+    pageState,
+  });
+
+  if (isSelecting && (preservedSelection.count !== checked.size || preservedSelection.pageState !== pageState)) {
+    setPreservedSelection({ count: checked.size, pageState });
+  }
+
+  if (prevSelecting !== isSelecting) {
+    setPrevSelecting(isSelecting);
+    if (isSelecting) {
+      setSelectionExiting(false);
+      setTabsExiting(true);
+    } else {
+      setSelectionExiting(true);
+      setTabsExiting(false);
+      setHasExitedOnce(true);
+    }
+  }
+
+  useEffect(() => {
+    if (!selectionExiting) return;
+    const timer = setTimeout(() => {
+      setSelectionExiting(false);
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [selectionExiting]);
+
+  useEffect(() => {
+    if (!tabsExiting) return;
+    const timer = setTimeout(() => {
+      setTabsExiting(false);
+    }, 160);
+    return () => clearTimeout(timer);
+  }, [tabsExiting]);
+
+  const showSelection = isSelecting || selectionExiting;
+  const showTabs = !isSelecting || tabsExiting;
+
   async function runBulk(action: EmailBulkAction, ids: number[]) {
     const info = BULK[action];
     setBusy(true);
@@ -426,34 +471,55 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                 </div>
 
                 <div className={`shrink-0 px-4 pb-3 ${folder === "sent" ? "hidden" : ""}`}>
-                  {selectable && checked.size > 0 ? (
-                    <SelectionBar
-                      folder={folder}
-                      count={checked.size}
-                      pageState={pageState}
-                      busy={busy}
-                      onTogglePage={togglePage}
-                      onClear={() => setChecked(new Set())}
-                      onAction={handleBulk}
-                    />
-                  ) : (
-                    <Tabs
-                      value={ticketFilter}
-                      onValueChange={(value) => setTicketFilter(value as TicketFilter)}
-                    >
-                      <TabsList className="w-full border border-line bg-canvas">
-                        <TabsTrigger value="todos" className={tabTriggerClass}>
-                          Todos
-                        </TabsTrigger>
-                        <TabsTrigger value="sin-ticket" className={tabTriggerClass}>
-                          Sin ticket
-                        </TabsTrigger>
-                        <TabsTrigger value="sin-responder" className={tabTriggerClass}>
-                          Sin responder
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  )}
+                  <div className="grid grid-cols-1 grid-rows-1 h-9 items-center">
+                    {showTabs && (
+                      <div
+                        className={`col-start-1 row-start-1 w-full ${
+                          tabsExiting
+                            ? "animate-plf-tabs-out pointer-events-none"
+                            : hasExitedOnce
+                              ? "animate-plf-tabs-in"
+                              : ""
+                        }`}
+                        inert={tabsExiting ? true : undefined}
+                      >
+                        <Tabs
+                          value={ticketFilter}
+                          onValueChange={(value) => setTicketFilter(value as TicketFilter)}
+                        >
+                          <TabsList className="h-9 w-full border border-line bg-canvas">
+                            <TabsTrigger value="todos" className={tabTriggerClass}>
+                              Todos
+                            </TabsTrigger>
+                            <TabsTrigger value="sin-ticket" className={tabTriggerClass}>
+                              Sin ticket
+                            </TabsTrigger>
+                            <TabsTrigger value="sin-responder" className={tabTriggerClass}>
+                              Sin responder
+                            </TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                      </div>
+                    )}
+
+                    {showSelection && (
+                      <div
+                        className="col-start-1 row-start-1 w-full"
+                        inert={selectionExiting ? true : undefined}
+                      >
+                        <SelectionBar
+                          folder={folder as Exclude<FolderKey, "sent">}
+                          count={isSelecting ? checked.size : preservedSelection.count}
+                          pageState={isSelecting ? pageState : preservedSelection.pageState}
+                          busy={busy}
+                          isExiting={selectionExiting}
+                          onTogglePage={togglePage}
+                          onClear={() => setChecked(new Set())}
+                          onAction={handleBulk}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <ScrollArea className="min-h-0 flex-1">

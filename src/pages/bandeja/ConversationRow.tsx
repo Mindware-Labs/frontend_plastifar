@@ -49,7 +49,7 @@ export function ConversationRow({
       data-checked={checked}
       data-selecting={selecting}
       className="group relative rounded-edge border border-line bg-white
-        transition-[background-color,border-color,box-shadow]
+        transition-[background-color,border-color,box-shadow] duration-200 ease-out
         data-[unread=false]:bg-canvas/60
         data-[unread=false]:hover:border-line-strong data-[unread=false]:hover:bg-canvas
         data-[unread=true]:data-[selected=false]:border-brand-red/40
@@ -62,6 +62,7 @@ export function ConversationRow({
         data-[selected=true]:hover:border-brand-red data-[selected=true]:hover:bg-brand-red/[0.085]
         data-[selected=true]:hover:shadow-[0_6px_16px_-10px_rgba(228,0,43,0.5)]
         data-[checked=true]:border-brand-red/45 data-[checked=true]:bg-brand-red/[0.06]
+        data-[checked=true]:shadow-[0_0_0_1px_rgba(228,0,43,0.18),0_2px_8px_-2px_rgba(228,0,43,0.2)]
         has-[button[role=checkbox]:focus-visible]:border-brand-red/40"
     >
       <button
@@ -74,7 +75,7 @@ export function ConversationRow({
           {/* El avatar cede su sitio a la casilla; el hueco se conserva para que nada salte. */}
           <span className="relative size-5 shrink-0">
             <Avatar
-              className={`size-5 transition-opacity ${
+              className={`size-5 transition-opacity duration-200 ease-out ${
                 selectable
                   ? "group-hover:opacity-0 group-data-[selecting=true]:opacity-0 group-has-[button[role=checkbox]:focus-visible]:opacity-0"
                   : ""
@@ -146,7 +147,7 @@ export function ConversationRow({
           checked={checked}
           label={checked ? `Quitar de la selección: ${name}` : `Seleccionar: ${name}`}
           onToggle={onToggle}
-          className="absolute left-2.5 top-2 opacity-0 transition-opacity
+          className="absolute left-2.5 top-2 opacity-0 transition-opacity duration-200 ease-out
             group-hover:opacity-100 group-data-[selecting=true]:opacity-100 focus-visible:opacity-100"
         />
       )}

@@ -122,6 +122,54 @@ input:-webkit-autofill:focus {
   to { opacity: 1; transform: none; }
 }
 
+@keyframes plf-selection-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+    filter: blur(1.5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes plf-selection-bar-out {
+  from {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+    filter: blur(1.5px);
+  }
+}
+
+@keyframes plf-tabs-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plf-tabs-fade-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+}
+
 /* El recibo se va mas rapido de lo que llega: el aviso pesa al aparecer, no al irse. */
 @keyframes plf-receipt-out {
   to { opacity: 0; transform: translateY(6px); }
@@ -137,6 +185,10 @@ input:-webkit-autofill:focus {
 .animate-plf-rise { animation: plf-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-fade { animation: plf-fade 1.1s ease-out both; }
 .animate-plf-toast-in { animation: plf-toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-selection-in { animation: plf-selection-bar-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-selection-out { animation: plf-selection-bar-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
+.animate-plf-tabs-in { animation: plf-tabs-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-tabs-out { animation: plf-tabs-fade-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-scrim-in { animation: plf-scrim-in 0.18s ease-out both; }
 .animate-plf-modal-in { animation: plf-modal-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
@@ -149,6 +201,8 @@ input:-webkit-autofill:focus {
   .animate-plf-rise,
   .animate-plf-fade,
   .animate-plf-toast-in,
+  .animate-plf-selection-in,
+  .animate-plf-tabs-in,
   .animate-plf-scrim-in,
   .animate-plf-modal-in,
   .animate-plf-shake,
@@ -157,7 +211,9 @@ input:-webkit-autofill:focus {
   }
 
   /* La salida se acorta en vez de anularse: con animation:none nunca llega animationend
-     y la tarjeta se quedaria pegada en pantalla. */
+     y el elemento se quedaria pegado en pantalla. */
+  .animate-plf-selection-out,
+  .animate-plf-tabs-out,
   .animate-plf-receipt-out {
     animation-duration: 1ms !important;
   }

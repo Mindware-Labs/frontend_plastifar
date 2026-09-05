@@ -34,17 +34,21 @@ export function SelectBox({ checked, label, onToggle, className = "" }: SelectBo
         onToggle(event.shiftKey);
       }}
       className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] border outline-none
-        transition-[background-color,border-color,box-shadow]
+        transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out active:scale-90
         focus-visible:ring-3 focus-visible:ring-brand-red/20 ${
           checked
-            ? "border-brand-red bg-brand-red text-white"
+            ? "border-brand-red bg-brand-red text-white shadow-[0_1px_3px_rgba(228,0,43,0.3)]"
             : "border-line-strong bg-white text-transparent hover:border-zinc-400"
         } ${className}`}
     >
       {checked === "mixed" ? (
-        <Minus className="h-3 w-3" strokeWidth={3} />
+        <Minus className="h-3 w-3 strokeWidth={3} transition-transform duration-150 scale-100" />
       ) : (
-        <Check className="h-3 w-3" strokeWidth={3} />
+        <Check
+          className={`h-3 w-3 strokeWidth={3} transition-all duration-150 ${
+            checked ? "scale-100 opacity-100" : "scale-75 opacity-0"
+          }`}
+        />
       )}
     </button>
   );
@@ -54,7 +58,6 @@ interface Tool {
   action: EmailBulkAction;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  /** Solo el borrado definitivo va en rojo: es el unico sin vuelta atras. */
   destructive?: boolean;
 }
 
@@ -63,7 +66,6 @@ const READ_TOOLS: Tool[] = [
   { action: "unread", label: "Marcar como no leído", icon: Mail },
 ];
 
-/** Lo que tiene sentido en cada carpeta; restaurar no aparece donde ya se esta. */
 const MOVE_TOOLS: Record<Exclude<FolderKey, "sent">, Tool[]> = {
   inbox: [
     { action: "archive", label: "Archivar", icon: Archive },
@@ -87,24 +89,24 @@ const MOVE_TOOLS: Record<Exclude<FolderKey, "sent">, Tool[]> = {
 interface SelectionBarProps {
   folder: Exclude<FolderKey, "sent">;
   count: number;
-  /** Marcadas de las que hay en pantalla: entera, parcial o ninguna. */
   pageState: boolean | "mixed";
   busy: boolean;
+  isExiting?: boolean;
   onTogglePage: () => void;
   onClear: () => void;
   onAction: (action: EmailBulkAction) => void;
 }
 
 const toolClass =
-  "flex h-7 w-7 items-center justify-center rounded-edge outline-none transition-colors " +
-  "focus-visible:ring-3 focus-visible:ring-brand-red/20 disabled:cursor-not-allowed disabled:opacity-40";
+  "flex h-7 w-7 items-center justify-center rounded-edge outline-none transition-all duration-150 " +
+  "hover:scale-105 active:scale-95 focus-visible:ring-3 focus-visible:ring-brand-red/20 disabled:cursor-not-allowed disabled:opacity-40";
 
-/** Sustituye a las pestanas mientras hay seleccion: las acciones de fila pasan a ser de grupo. */
 export function SelectionBar({
   folder,
   count,
   pageState,
   busy,
+  isExiting = false,
   onTogglePage,
   onClear,
   onAction,
@@ -115,8 +117,11 @@ export function SelectionBar({
     <div
       role="toolbar"
       aria-label="Acciones sobre la selección"
-      className="animate-plf-toast-in flex h-9 items-center gap-1.5 rounded-edge border border-brand-red/25
-        bg-brand-red/[0.04] pl-2.5 pr-1"
+      className={`${
+        isExiting ? "animate-plf-selection-out pointer-events-none" : "animate-plf-selection-in"
+      } flex h-9 w-full items-center gap-1.5 rounded-edge border border-brand-red/30
+        bg-gradient-to-r from-brand-red/[0.07] via-brand-red/[0.04] to-brand-red/[0.07]
+        shadow-[0_1px_4px_-1px_rgba(228,0,43,0.18)] pl-2.5 pr-1`}
     >
       <SelectBox
         checked={pageState}
@@ -134,7 +139,7 @@ export function SelectionBar({
             <TooltipTrigger asChild>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || isExiting}
                 onClick={() => onAction(tool.action)}
                 aria-label={tool.label}
                 className={`${toolClass} ${
@@ -154,6 +159,7 @@ export function SelectionBar({
           <TooltipTrigger asChild>
             <button
               type="button"
+              disabled={isExiting}
               onClick={onClear}
               aria-label="Quitar la selección"
               className={`${toolClass} ml-1 text-subtle hover:bg-white hover:text-ink`}
