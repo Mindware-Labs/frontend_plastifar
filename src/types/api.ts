@@ -147,6 +147,8 @@ export interface EmailSummaryResponse {
   unread: boolean;
   /** El ultimo correo de la conversacion salio de aca. */
   answered: boolean;
+  /** Solo en lo nuestro (Enviados): Queued | Sent | Delayed | Delivered | Bounced | Complained | Failed. */
+  deliveryStatus: string | null;
 }
 
 export type EmailFolder = "Inbox" | "Archived" | "Junk" | "Trash";
@@ -159,6 +161,7 @@ export interface EmailDetailResponse {
   fromName: string | null;
   toEmails: string[];
   ccEmails: string[];
+  bccEmails: string[];
   subject: string;
   bodyHtml: string | null;
   bodyText: string | null;
@@ -179,13 +182,14 @@ export interface EmailThreadMessageResponse {
   fromName: string | null;
   toEmails: string[];
   ccEmails: string[];
+  bccEmails: string[];
   subject: string;
   bodyHtml: string | null;
   bodyText: string;
   /** Quien la escribio, si salio de aca. Vacio en lo que manda el cliente. */
   authorName: string;
   createdAt: string;
-  /** Sent | Delayed | Delivered | Bounced | Complained. */
+  /** Queued | Sent | Delayed | Delivered | Bounced | Complained | Failed. */
   deliveryStatus: string | null;
   deliveryDetail: string | null;
   attachments: EmailAttachmentResponse[];
@@ -257,4 +261,23 @@ export interface EmptyTrashResponse {
   deleted: number;
   /** Conversaciones con ticket que se conservan como historial del caso. */
   kept: number;
+}
+
+/** Direccion a la que no se envia; reason: Bounced | Complained | Manual. */
+export interface EmailSuppressionResponse {
+  id: number;
+  address: string;
+  reason: string;
+  detail: string | null;
+  /** El envio que la provoco, si vino de un rebote o una queja. */
+  emailId: number | null;
+  createdAt: string;
+}
+
+export interface EmailSuppressionListResponse {
+  items: EmailSuppressionResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 }

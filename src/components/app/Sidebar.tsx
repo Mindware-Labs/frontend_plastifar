@@ -1,5 +1,6 @@
 import {
   Archive,
+  Ban,
   Bell,
   ChevronDown,
   Inbox,
@@ -52,6 +53,7 @@ const groups: NavGroup[] = [
       { label: "Archivados", to: "/bandeja/archivados", folder: "archived", icon: Archive },
       { label: "No deseado", to: "/bandeja/junk", folder: "junk", icon: ShieldAlert },
       { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
+      { label: "Supresión", to: "/bandeja/supresion", icon: Ban },
     ],
   },
   {

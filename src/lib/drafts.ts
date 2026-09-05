@@ -6,6 +6,7 @@ export interface Draft {
   blocks?: unknown;
   body: string;
   cc?: string;
+  bcc?: string;
   subject?: string;
   to?: string;
 }
@@ -20,7 +21,8 @@ export function readDraft(key: string): Draft | null {
 }
 
 export function writeDraft(key: string, draft: Draft) {
-  const empty = !draft.body.trim() && !draft.cc?.trim() && !draft.subject?.trim() && !draft.to?.trim();
+  const empty =
+    !draft.body.trim() && !draft.cc?.trim() && !draft.bcc?.trim() && !draft.subject?.trim() && !draft.to?.trim();
 
   try {
     if (empty) localStorage.removeItem(PREFIX + key);

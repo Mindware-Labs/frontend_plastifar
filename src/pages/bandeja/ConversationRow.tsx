@@ -18,6 +18,13 @@ interface ConversationRowProps {
   onToggle: (shiftKey: boolean) => void;
 }
 
+/** Solo lo que no es normal: en cola o fallido. Lo entregado no necesita distintivo. */
+const deliveryBadges: Record<string, { label: string; className: string }> = {
+  Queued: { label: "En cola", className: "bg-warn/10 text-warn" },
+  Failed: { label: "No enviado", className: "bg-brand-red/10 text-brand-red" },
+  Bounced: { label: "Rebotó", className: "bg-brand-red/10 text-brand-red" },
+};
+
 function initials(name: string) {
   return name
     .split(" ")
@@ -41,6 +48,7 @@ export function ConversationRow({
   onToggle,
 }: ConversationRowProps) {
   const name = email.fromName ?? email.fromEmail;
+  const delivery = email.deliveryStatus ? deliveryBadges[email.deliveryStatus] : undefined;
 
   return (
     <div
@@ -118,8 +126,15 @@ export function ConversationRow({
           >
             {email.subject || "(sin asunto)"}
           </span>
-          {(email.messageCount > 1 || email.attachmentCount > 0 || email.ticketId) && (
+          {(email.messageCount > 1 || email.attachmentCount > 0 || email.ticketId || delivery) && (
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
+              {delivery && (
+                <span
+                  className={`rounded-full px-1.5 py-px font-heading text-[9.5px] font-bold uppercase tracking-[0.06em] ${delivery.className}`}
+                >
+                  {delivery.label}
+                </span>
+              )}
               {email.messageCount > 1 && (
                 <span
                   title={`${email.messageCount} correos en la conversación`}

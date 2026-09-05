@@ -88,6 +88,8 @@ const MOVE_TOOLS: Record<Exclude<FolderKey, "sent">, Tool[]> = {
 
 interface SelectionBarProps {
   folder: Exclude<FolderKey, "sent">;
+  /** Eliminar definitivamente es de administradores: a los demas no se les muestra. */
+  canDelete: boolean;
   count: number;
   pageState: boolean | "mixed";
   busy: boolean;
@@ -103,6 +105,7 @@ const toolClass =
 
 export function SelectionBar({
   folder,
+  canDelete,
   count,
   pageState,
   busy,
@@ -111,7 +114,9 @@ export function SelectionBar({
   onClear,
   onAction,
 }: SelectionBarProps) {
-  const tools = [...READ_TOOLS, ...MOVE_TOOLS[folder]];
+  const tools = [...READ_TOOLS, ...MOVE_TOOLS[folder]].filter(
+    (tool) => tool.action !== "delete" || canDelete,
+  );
 
   return (
     <div

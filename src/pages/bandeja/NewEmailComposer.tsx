@@ -24,6 +24,8 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
   const [ccOpen, setCcOpen] = useState(false);
+  const [bcc, setBcc] = useState("");
+  const [bccOpen, setBccOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [blocks, setBlocks] = useState<unknown>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -34,6 +36,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const toRef = useRef<HTMLInputElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
+  const bccRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // La marca del envio nace con el editor: un reintento la repite y no duplica el correo.
   const tokenRef = useRef(crypto.randomUUID());
@@ -47,6 +50,10 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   useEffect(() => {
     if (ccOpen) ccRef.current?.focus();
   }, [ccOpen]);
+
+  useEffect(() => {
+    if (bccOpen) bccRef.current?.focus();
+  }, [bccOpen]);
 
   function addFiles(incoming: File[]) {
     if (incoming.length === 0) return;
@@ -77,6 +84,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       await emailsApi.compose({
         to,
         cc: cc.trim() || undefined,
+        bcc: bcc.trim() || undefined,
         subject,
         body,
         bodyHtml: blocksToEmailHtml(blocks),
@@ -183,6 +191,18 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
             CC
           </button>
         )}
+        {!bccOpen && (
+          <button
+            type="button"
+            onClick={() => setBccOpen(true)}
+            title="Agregar copia oculta"
+            className="shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10.5px] font-bold
+              uppercase tracking-[0.08em] text-faint outline-none transition-colors
+              hover:bg-fill hover:text-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/20"
+          >
+            CCO
+          </button>
+        )}
       </div>
 
       {ccOpen && (
@@ -204,6 +224,34 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
             }}
             aria-label="Quitar la copia"
             title="Quitar la copia"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-edge text-faint
+              outline-none transition-colors hover:bg-fill hover:text-ink
+              focus-visible:ring-3 focus-visible:ring-brand-red/20"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
+      {bccOpen && (
+        <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
+          transition-colors focus-within:bg-canvas">
+          <span className={fieldLabelClass}>CCO</span>
+          <input
+            ref={bccRef}
+            value={bcc}
+            onChange={(event) => setBcc(event.target.value)}
+            placeholder="Nadie más ve a quién va esta copia"
+            className="min-w-0 flex-1 bg-transparent text-[12px] text-ink outline-none placeholder:text-faint"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setBccOpen(false);
+              setBcc("");
+            }}
+            aria-label="Quitar la copia oculta"
+            title="Quitar la copia oculta"
             className="flex h-5 w-5 shrink-0 items-center justify-center rounded-edge text-faint
               outline-none transition-colors hover:bg-fill hover:text-ink
               focus-visible:ring-3 focus-visible:ring-brand-red/20"

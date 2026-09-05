@@ -7,6 +7,7 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { RolesPage } from "./pages/roles/RolesPage";
 import { StaffPage } from "./pages/staff/StaffPage";
+import { SupresionesPage } from "./pages/supresiones/SupresionesPage";
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/bandeja/junk" element={<BandejaPage folder="junk" />} />
         <Route path="/bandeja/papelera" element={<BandejaPage folder="trash" />} />
         <Route path="/bandeja/enviados" element={<BandejaPage folder="sent" />} />
+        <Route path="/bandeja/supresion" element={<SupresionesPage />} />
         <Route path="/staff" element={<StaffPage />} />
         <Route path="/roles" element={<RolesPage />} />
         <Route path="/" element={<Navigate to="/bandeja" replace />} />

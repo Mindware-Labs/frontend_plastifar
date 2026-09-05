@@ -3,7 +3,9 @@ import {
   ArchiveRestore,
   CornerDownRight,
   CornerUpLeft,
+  Forward,
   Paperclip,
+  RotateCcw,
   ShieldAlert,
   Ticket as TicketIcon,
   Trash2,
@@ -16,6 +18,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button as PfButton } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Spinner } from "../../components/ui/Spinner";
+import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useNoticeInset, useReceipts } from "../../context/useReceipts";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
@@ -99,6 +102,13 @@ const MOVES: Record<string, MoveKind> = {
   },
 };
 
+/** Botones que abren el editor al pie: responder y reenviar. */
+const composerOpenerClass =
+  "flex w-full min-w-0 items-center justify-center gap-2 rounded-edge border border-line bg-canvas px-3 py-2 " +
+  "text-[12px] font-medium text-subtle outline-none transition-[background-color,border-color,color] " +
+  "hover:border-line-strong hover:bg-white hover:text-ink " +
+  "focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12";
+
 /** Acciones de la barra: gris de texto en reposo, tinta sobre relleno al pasar. */
 const toolButtonClass =
   "size-7 text-brand-gray transition-colors hover:bg-fill hover:text-ink " +
@@ -106,11 +116,31 @@ const toolButtonClass =
 
 /** Lo que informa el proveedor del envio. "Sent" no se muestra: es el estado normal. */
 const deliveryLabels: Record<string, { label: string; className: string }> = {
+  Queued: { label: "En cola", className: "text-warn" },
   Delivered: { label: "Entregado", className: "text-brand-green" },
   Delayed: { label: "Demorado", className: "text-warn" },
   Bounced: { label: "No entregado", className: "text-brand-red" },
   Complained: { label: "Marcado como spam", className: "text-brand-red" },
+  Failed: { label: "No se pudo enviar", className: "text-brand-red" },
 };
+
+/** Estados que merecen un aviso al abrir el correo, no solo una etiqueta en la tira. */
+const alertingStatuses = new Set(["Queued", "Bounced", "Complained", "Failed"]);
+
+type ComposerMode = "reply" | "forward";
+
+/** Boton pequeno de la fila "Para": abre CC, CCO o pone a todos en copia. */
+const fieldToggleClass =
+  "shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10.5px] font-bold uppercase " +
+  "tracking-[0.08em] text-faint outline-none transition-colors hover:bg-fill hover:text-brand-red " +
+  "focus-visible:ring-3 focus-visible:ring-brand-red/20";
+
+const fieldInputClass =
+  "min-w-0 flex-1 bg-transparent text-[12px] text-ink outline-none placeholder:text-faint";
+
+const fieldCloseClass =
+  "flex h-5 w-5 shrink-0 items-center justify-center rounded-edge text-faint outline-none " +
+  "transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20";
 
 /** Primer renglon con contenido: es el resumen que cabe en una linea de la lista. */
 function firstLine(text: string) {
@@ -140,27 +170,45 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
+  const [composerMode, setComposerMode] = useState<ComposerMode>("reply");
   const [replyBlocks, setReplyBlocks] = useState<unknown>(null);
   const [draftBlocks, setDraftBlocks] = useState<unknown>(null);
   const tokenRef = useRef<string>("");
+  const [forwardTo, setForwardTo] = useState("");
   const [replyCc, setReplyCc] = useState("");
   const [ccOpen, setCcOpen] = useState(false);
+  const [replyBcc, setReplyBcc] = useState("");
+  const [bccOpen, setBccOpen] = useState(false);
+  const [includeAttachments, setIncludeAttachments] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const toRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
+  const bccRef = useRef<HTMLInputElement>(null);
   const replyContainerRef = useRef<HTMLDivElement>(null);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
+  const isAdmin = Boolean(useAuth().user?.isAdmin);
 
   // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
   const replyText = blocksToText(replyBlocks);
   const [reloadKey, setReloadKey] = useState(0);
   const { onInboxChanged } = useEmailCounts();
   const receipts = useReceipts();
+  const isForward = composerMode === "forward";
 
+  // Al reenviar el comentario es opcional: lo que no puede faltar es a quien va.
   const replyMissingItems: ValidationItem[] = [];
-  if (replyText.trim() === "") {
+  if (isForward && forwardTo.trim() === "") {
+    replyMissingItems.push({
+      id: "to",
+      label: "Falta el destinatario (Para)",
+      short: "el destinatario (Para)",
+    });
+  }
+  if (!isForward && replyText.trim() === "") {
     replyMissingItems.push({
       id: "body",
       label: "Falta escribir el mensaje de respuesta",
@@ -170,7 +218,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   const replyReady = replyMissingItems.length === 0;
 
   function handleFocusReplyField(fieldId: string) {
-    if (fieldId === "body") {
+    if (fieldId === "to") {
+      toRef.current?.focus();
+    } else if (fieldId === "body") {
       const editorEl = replyContainerRef.current?.querySelector('[contenteditable="true"]');
       if (editorEl instanceof HTMLElement) editorEl.focus();
     }
@@ -212,12 +262,22 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
 
   useEffect(() => {
     if (!replyOpen) return;
-    writeDraft(String(emailId), { blocks: replyBlocks, body: replyText, cc: replyCc });
-  }, [replyOpen, emailId, replyBlocks, replyText, replyCc]);
+    writeDraft(String(emailId), {
+      blocks: replyBlocks,
+      body: replyText,
+      cc: replyCc,
+      bcc: replyBcc,
+      to: isForward ? forwardTo : undefined,
+    });
+  }, [replyOpen, emailId, replyBlocks, replyText, replyCc, replyBcc, forwardTo, isForward]);
 
   useEffect(() => {
     if (ccOpen) ccRef.current?.focus();
   }, [ccOpen]);
+
+  useEffect(() => {
+    if (bccOpen) bccRef.current?.focus();
+  }, [bccOpen]);
 
   useEffect(() => {
     if (openReplyId === null) return;
@@ -231,38 +291,93 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   }, [openReplyId]);
 
   async function handleReply() {
-    if (!email || sending || replyText.trim() === "") return;
+    if (!email || sending || !replyReady) return;
     setSending(true);
     setReplyError(null);
 
-    try {
-      const reply = await emailsApi.reply(email.id, {
-        body: replyText,
-        bodyHtml: blocksToEmailHtml(replyBlocks),
-        cc: replyCc.trim() || undefined,
-        files,
-        clientToken: tokenRef.current,
-      });
+    const input = {
+      body: replyText,
+      bodyHtml: blocksToEmailHtml(replyBlocks),
+      cc: replyCc.trim() || undefined,
+      bcc: replyBcc.trim() || undefined,
+      files,
+      clientToken: tokenRef.current,
+    };
 
+    try {
+      const sent = isForward
+        ? await emailsApi.forward(email.id, { ...input, to: forwardTo, includeAttachments })
+        : await emailsApi.reply(email.id, input);
+
+      // En cola: el proveedor no respondio y saldra solo; conviene decirlo en vez de "enviado".
+      const queued = sent.deliveryStatus === "Queued";
       receipts.done({
-        action: "responder",
-        title: "Respuesta enviada",
-        detail: email.fromName ?? email.fromEmail,
+        action: isForward ? "reenviar" : "responder",
+        title: queued
+          ? "Guardado en la cola de salida"
+          : isForward
+            ? "Correo reenviado"
+            : "Respuesta enviada",
+        detail: queued
+          ? "El proveedor no respondió; se reintentará solo"
+          : isForward
+            ? forwardTo
+            : (email.fromName ?? email.fromEmail),
       });
 
       clearDraft(String(email.id));
-      setEmail({ ...email, thread: [...(email.thread ?? []), reply] });
-      setOpenReplyId(reply.id);
-      setReplyBlocks(null);
-      setDraftBlocks(null);
-      setReplyCc("");
-      setCcOpen(false);
-      setFiles([]);
+      // El reenvio abre conversacion propia: no forma parte de este hilo.
+      if (!isForward) {
+        setEmail({ ...email, thread: [...(email.thread ?? []), sent] });
+        setOpenReplyId(sent.id);
+      }
+      resetComposer();
       setReplyOpen(false);
     } catch (err) {
-      setReplyError(err instanceof ApiError ? err.message : "No se pudo enviar la respuesta");
+      setReplyError(
+        err instanceof ApiError
+          ? err.message
+          : isForward
+            ? "No se pudo reenviar el correo"
+            : "No se pudo enviar la respuesta",
+      );
     } finally {
       setSending(false);
+    }
+  }
+
+  function resetComposer() {
+    setReplyBlocks(null);
+    setDraftBlocks(null);
+    setForwardTo("");
+    setReplyCc("");
+    setCcOpen(false);
+    setReplyBcc("");
+    setBccOpen(false);
+    setIncludeAttachments(true);
+    setFiles([]);
+  }
+
+  // Vuelve a encolar un envio que agoto sus reintentos; el estado pasa a "en cola" al instante.
+  async function handleRetry(messageId: number) {
+    if (!email || retrying) return;
+    setRetrying(true);
+
+    try {
+      const updated = await emailsApi.retry(messageId);
+      setEmail({
+        ...email,
+        thread: (email.thread ?? []).map((message) => (message.id === updated.id ? updated : message)),
+      });
+      receipts.done({ action: "reintentar", title: "Vuelto a la cola de salida", detail: updated.toEmails.join(", ") });
+    } catch (err) {
+      receipts.failed({
+        action: "reintentar",
+        title: "No se pudo reintentar",
+        detail: err instanceof ApiError ? err.message : undefined,
+      });
+    } finally {
+      setRetrying(false);
     }
   }
 
@@ -286,8 +401,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
     setFiles(merged);
   }
 
-  function openComposer() {
+  function openComposer(mode: ComposerMode) {
     tokenRef.current = crypto.randomUUID();
+    setComposerMode(mode);
     const draft = readDraft(String(emailId));
 
     if (draft) {
@@ -297,6 +413,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
         setReplyCc(draft.cc);
         setCcOpen(true);
       }
+      if (draft.bcc) {
+        setReplyBcc(draft.bcc);
+        setBccOpen(true);
+      }
+      if (mode === "forward" && draft.to) setForwardTo(draft.to);
     }
 
     setReplyOpen(true);
@@ -438,7 +559,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                 </TooltipTrigger>
                 <TooltipContent>Restaurar a la bandeja</TooltipContent>
               </Tooltip>
-              {email.folder === "Trash" && (
+              {email.folder === "Trash" && isAdmin && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -511,6 +632,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
             <p className="truncate text-[11px] text-faint">
               Para: {email.toEmails.join(", ") || "—"}
               {email.ccEmails.length > 0 && ` · CC: ${email.ccEmails.join(", ")}`}
+              {(email.bccEmails ?? []).length > 0 && ` · CCO: ${email.bccEmails.join(", ")}`}
             </p>
           </div>
           <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] font-medium text-faint">
@@ -533,10 +655,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
             }}
           >
             <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2">
-              <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-brand-red" />
-              <span className="shrink-0 text-[12.5px] font-semibold text-ink">Responder</span>
+              {isForward ? (
+                <Forward className="h-3.5 w-3.5 shrink-0 text-brand-red" />
+              ) : (
+                <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-brand-red" />
+              )}
+              <span className="shrink-0 text-[12.5px] font-semibold text-ink">
+                {isForward ? "Reenviar" : "Responder"}
+              </span>
               <span className="truncate text-[11.5px] text-subtle">
-                {email.subject ? `Re: ${email.subject}` : "(sin asunto)"}
+                {email.subject ? `${isForward ? "Fwd" : "Re"}: ${email.subject}` : "(sin asunto)"}
               </span>
               <button
                 type="button"
@@ -551,12 +679,24 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               </button>
             </div>
 
-            <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5">
+            <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
+              transition-colors focus-within:bg-canvas">
               <span className={fieldLabelClass}>Para</span>
-              <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">
-                {email.fromEmail}
-              </span>
-              {!ccOpen && replyAll.length > 0 && (
+              {isForward ? (
+                <input
+                  ref={toRef}
+                  value={forwardTo}
+                  onChange={(event) => setForwardTo(event.target.value)}
+                  placeholder="correo@dominio.com, otro@dominio.com"
+                  autoFocus
+                  className={fieldInputClass}
+                />
+              ) : (
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">
+                  {email.fromEmail}
+                </span>
+              )}
+              {!isForward && !ccOpen && replyAll.length > 0 && (
                 <button
                   type="button"
                   onClick={() => {
@@ -564,25 +704,24 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                     setReplyCc(replyAll.join(", "));
                   }}
                   title="Copiar a todos los de la conversación"
-                  className="shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10.5px] font-bold
-                    uppercase tracking-[0.08em] text-faint outline-none transition-colors
-                    hover:bg-fill hover:text-brand-red
-                    focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                  className={fieldToggleClass}
                 >
                   Todos
                 </button>
               )}
               {!ccOpen && (
+                <button type="button" onClick={() => setCcOpen(true)} title="Agregar copia" className={fieldToggleClass}>
+                  CC
+                </button>
+              )}
+              {!bccOpen && (
                 <button
                   type="button"
-                  onClick={() => setCcOpen(true)}
-                  title="Agregar copia"
-                  className="shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10.5px] font-bold
-                    uppercase tracking-[0.08em] text-faint outline-none transition-colors
-                    hover:bg-fill hover:text-brand-red
-                    focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                  onClick={() => setBccOpen(true)}
+                  title="Agregar copia oculta"
+                  className={fieldToggleClass}
                 >
-                  CC
+                  CCO
                 </button>
               )}
             </div>
@@ -596,8 +735,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                   value={replyCc}
                   onChange={(event) => setReplyCc(event.target.value)}
                   placeholder="correo@dominio.com, otro@dominio.com"
-                  className="min-w-0 flex-1 bg-transparent text-[12px] text-ink outline-none
-                    placeholder:text-faint"
+                  className={fieldInputClass}
                 />
                 <button
                   type="button"
@@ -607,13 +745,50 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                   }}
                   aria-label="Quitar la copia"
                   title="Quitar la copia"
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-edge text-faint
-                    outline-none transition-colors hover:bg-fill hover:text-ink
-                    focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                  className={fieldCloseClass}
                 >
                   <X className="h-3 w-3" />
                 </button>
               </div>
+            )}
+
+            {bccOpen && (
+              <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
+                transition-colors focus-within:bg-canvas">
+                <span className={fieldLabelClass}>CCO</span>
+                <input
+                  ref={bccRef}
+                  value={replyBcc}
+                  onChange={(event) => setReplyBcc(event.target.value)}
+                  placeholder="Nadie más ve a quién va esta copia"
+                  className={fieldInputClass}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBccOpen(false);
+                    setReplyBcc("");
+                  }}
+                  aria-label="Quitar la copia oculta"
+                  title="Quitar la copia oculta"
+                  className={fieldCloseClass}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+
+            {isForward && email.attachments.length > 0 && (
+              <label className="flex shrink-0 cursor-pointer items-center gap-2 border-b border-line px-4 py-1.5
+                text-[11.5px] text-brand-gray">
+                <input
+                  type="checkbox"
+                  checked={includeAttachments}
+                  onChange={(event) => setIncludeAttachments(event.target.checked)}
+                  className="h-3.5 w-3.5 accent-brand-red"
+                />
+                Incluir {email.attachments.length === 1 ? "el adjunto original" : `los ${email.attachments.length} adjuntos originales`}
+              </label>
             )}
 
             <div
@@ -627,7 +802,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               <LazyBlockEditor
                 initialContent={draftBlocks}
                 onChange={setReplyBlocks}
-                placeholder="Escribe la respuesta…"
+                placeholder={isForward ? "Comentario opcional…" : "Escribe la respuesta…"}
               />
             </div>
 
@@ -725,6 +900,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                   {openReply.fromName ?? openReply.fromEmail}
                   {" · Para: "}
                   {openReply.toEmails.join(", ")}
+                  {(openReply.bccEmails ?? []).length > 0 && ` · CCO: ${openReply.bccEmails.join(", ")}`}
                 </p>
               </div>
               <span className="shrink-0 whitespace-nowrap text-[11px] font-medium text-faint">
@@ -743,12 +919,29 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
               </button>
             </div>
 
-            {(openReply.deliveryStatus === "Bounced" ||
-              openReply.deliveryStatus === "Complained") && (
+            {openReply.deliveryStatus && alertingStatuses.has(openReply.deliveryStatus) && (
               <div className="shrink-0 border-b border-line px-4 py-2">
-                <Alert variant="error">
-                  {deliveryLabels[openReply.deliveryStatus].label}.{" "}
-                  {openReply.deliveryDetail ?? "El proveedor no dio más detalle."}
+                <Alert variant={openReply.deliveryStatus === "Queued" ? "info" : "error"}>
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>
+                      {deliveryLabels[openReply.deliveryStatus].label}.{" "}
+                      {openReply.deliveryStatus === "Queued"
+                        ? `Se reintentará solo. ${openReply.deliveryDetail ?? ""}`
+                        : (openReply.deliveryDetail ?? "El proveedor no dio más detalle.")}
+                    </span>
+                    {openReply.deliveryStatus === "Failed" && (
+                      <PfButton
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2"
+                        isLoading={retrying}
+                        onClick={() => handleRetry(openReply.id)}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reintentar
+                      </PfButton>
+                    )}
+                  </span>
                 </Alert>
               </div>
             )}
@@ -855,7 +1048,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
 
       <Separator className="bg-line" />
 
-      <div className={`shrink-0 px-4 py-2.5 ${isOutbound && others.length === 0 ? "hidden" : ""}`}>
+      <div className="shrink-0 px-4 py-2.5">
         {others.length > 0 && (
           <div className="mb-2 max-h-24 overflow-y-auto pr-0.5">
             {others.map((reply) => (
@@ -902,19 +1095,29 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
           </div>
         )}
 
-        <button
-          type="button"
-          hidden={isOutbound}
-          onClick={openComposer}
-          className="flex w-full items-center gap-2 rounded-edge border border-line bg-canvas
-            px-3 py-2 text-left text-[12px] text-subtle outline-none
-            transition-[background-color,border-color,color]
-            hover:border-line-strong hover:bg-white hover:text-ink
-            focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12"
-        >
-          <CornerUpLeft className="h-3.5 w-3.5 text-faint" />
-          Responder a {email.fromName ?? email.fromEmail}
-        </button>
+        {/* Dos botones iguales a todo el ancho; lo enviado no se responde, asi que queda solo reenviar. */}
+        <div className={`grid gap-2 ${isOutbound ? "grid-cols-1" : "grid-cols-2"}`}>
+          {!isOutbound && (
+            <button
+              type="button"
+              onClick={() => openComposer("reply")}
+              title={`Responder a ${email.fromName ?? email.fromEmail}`}
+              className={composerOpenerClass}
+            >
+              <CornerUpLeft className="h-3.5 w-3.5 text-faint" />
+              Responder
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => openComposer("forward")}
+            title="Reenviar este correo a otra dirección"
+            className={composerOpenerClass}
+          >
+            <Forward className="h-3.5 w-3.5 text-faint" />
+            Reenviar
+          </button>
+        </div>
       </div>
 
       {confirmingDelete && (

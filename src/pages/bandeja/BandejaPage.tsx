@@ -12,6 +12,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../comp
 import { ScrollArea } from "../../components/shadcn/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "../../components/shadcn/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/shadcn/tooltip";
+import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -136,6 +137,8 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const [params, setParams] = useSearchParams();
   const { counts, refresh: refreshCounts, onInboxChanged } = useEmailCounts();
   const receipts = useReceipts();
+  // Eliminar definitivamente y vaciar la papelera son de administradores.
+  const isAdmin = Boolean(useAuth().user?.isAdmin);
   const prefs = useNotifyPrefs();
   const debouncedSearch = useDebouncedValue(search).trim();
   const meta = folderMeta[folder];
@@ -418,7 +421,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                     {meta.title}
                   </h2>
 
-                  {folder === "trash" && (
+                  {folder === "trash" && isAdmin && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
@@ -509,6 +512,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                       >
                         <SelectionBar
                           folder={folder as Exclude<FolderKey, "sent">}
+                          canDelete={isAdmin}
                           count={isSelecting ? checked.size : preservedSelection.count}
                           pageState={isSelecting ? pageState : preservedSelection.pageState}
                           busy={busy}
