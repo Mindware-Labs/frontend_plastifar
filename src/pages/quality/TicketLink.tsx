@@ -21,7 +21,7 @@ export function TicketLink({ number }: TicketLinkProps) {
     <Tooltip
       content="La Bandeja de tickets todavía no existe: el vínculo se activa cuando se entregue."
     >
-      <span className="inline-flex cursor-not-allowed items-center gap-1.5 whitespace-nowrap text-[12.5px] text-muted">
+      <span className="inline-flex cursor-not-allowed items-center gap-1.5 whitespace-nowrap text-[12.5px] text-subtle">
         <Ticket aria-hidden className="h-3.5 w-3.5 text-faint" />
         <span className="font-mono text-[12px]">{number}</span>
       </span>

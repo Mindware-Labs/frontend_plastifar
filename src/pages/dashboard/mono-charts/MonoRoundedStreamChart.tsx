@@ -50,7 +50,7 @@ export function MonoRoundedStreamChart({ data, peak, compact = false }: MonoRoun
             </span>
           </div>
           <p className="text-xl font-bold tracking-tight tabular-nums mt-0.5 font-heading text-ink">
-            {peak} <span className="text-xs font-normal text-muted">pico de tickets</span>
+            {peak} <span className="text-xs font-normal text-subtle">pico de tickets</span>
           </p>
         </div>
       </div>

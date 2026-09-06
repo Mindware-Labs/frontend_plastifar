@@ -1,6 +1,7 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { GuestRoute, PermissionRoute, ProtectedRoute } from "./components/RouteGuards";
 import { AppLayout } from "./layouts/AppLayout";
+import { BandejaPage } from "./pages/bandeja/BandejaPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
@@ -49,6 +50,17 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
+
+        {/* Bandeja de tickets y correo (modulo de Richard De Leon). Lleva el
+            mismo guard de lectura que el resto: la seccion 6.2 define
+            tickets.read y RF-P6 pide que la interfaz no ofrezca lo que el
+            servidor va a rechazar. */}
+        <Route element={<PermissionRoute permission="tickets.read"><Outlet /></PermissionRoute>}>
+          <Route path="/bandeja" element={<BandejaPage folder="inbox" />} />
+          <Route path="/bandeja/archivados" element={<BandejaPage folder="archived" />} />
+          <Route path="/bandeja/junk" element={<BandejaPage folder="junk" />} />
+          <Route path="/bandeja/papelera" element={<BandejaPage folder="trash" />} />
+        </Route>
 
         {/* RF-P6: cada familia de rutas declara el permiso de lectura que exige,
             el mismo que el endpoint que va a consultar. */}
@@ -116,7 +128,9 @@ export default function App() {
           <Route path="/reportes/auditoria" element={<AuditReportsSection />} />
         </Route>
 
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        {/* La raiz entra a la Bandeja, no al Dashboard: es donde la operacion
+            pasa el dia (seccion 9.1). Criterio de la rama de Richard. */}
+        <Route path="/" element={<Navigate to="/bandeja" replace />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

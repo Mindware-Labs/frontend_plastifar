@@ -38,14 +38,14 @@ export function Breadcrumb({ crumbs }: BreadcrumbProps) {
             {crumb.to ? (
               <Link
                 to={crumb.to}
-                className="whitespace-nowrap rounded-edge text-[13px] font-medium text-muted
+                className="whitespace-nowrap rounded-edge text-[13px] font-medium text-subtle
                   outline-none transition-colors hover:text-ink focus-visible:ring-3
                   focus-visible:ring-brand-red/25"
               >
                 {crumb.label}
               </Link>
             ) : (
-              <span className="whitespace-nowrap text-[13px] font-medium text-muted">{crumb.label}</span>
+              <span className="whitespace-nowrap text-[13px] font-medium text-subtle">{crumb.label}</span>
             )}
             <ChevronRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-line-strong" />
           </li>

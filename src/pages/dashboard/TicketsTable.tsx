@@ -142,7 +142,7 @@ export function TicketsTable({ tickets }: TicketsTableProps) {
           <h2 className="font-heading text-[13px] font-bold tracking-[-0.01em] text-ink">
             Bandeja de tickets
           </h2>
-          <p className="mt-0.5 text-[12px] tabular-nums text-muted">
+          <p className="mt-0.5 text-[12px] tabular-nums text-subtle">
             {rows.length} de {tickets.length} tickets · datos de demostración
           </p>
         </div>

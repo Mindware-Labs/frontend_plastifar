@@ -1,9 +1,12 @@
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 
 interface ModalProps {
   title: string;
+  /** Linea corta sobre el titulo: situa la accion dentro del modulo. */
+  eyebrow?: string;
   description?: ReactNode;
   onClose: () => void;
   /** Acciones del pie, separadas del cuerpo por un filete. */
@@ -11,77 +14,16 @@ interface ModalProps {
   children: ReactNode;
 }
 
-const focusableSelector =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 /**
  * Dialogo modal del panel. Se monta en un portal sobre document.body para que
  * ningun ancestro con transform o overflow lo recorte ni lo desplace.
  */
-export function Modal({ title, description, onClose, footer, children }: ModalProps) {
+export function Modal({ title, eyebrow, description, onClose, footer, children }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
 
-  // El efecto de montaje no debe depender de onClose: si el padre recrea esa
-  // funcion en cada render, el efecto se reiniciaria y devolveria el foco al
-  // primer campo en mitad del tecleo.
-  const closeRef = useRef(onClose);
-  useEffect(() => {
-    closeRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    // El foco entra al primer campo, no al aspa: se llega a escribir de inmediato.
-    // El Select del panel es un <button role="combobox">, no un <select>, asi que
-    // sin [role="combobox"] un dialogo que empieza por un desplegable enfocaba el
-    // aspa. Se excluye lo deshabilitado: focus() sobre un campo apagado no hace
-    // nada y el dialogo se quedaba sin foco inicial.
-    const panel = panelRef.current;
-    const firstField = panel?.querySelector<HTMLElement>(
-      "input:not([type='hidden']):not([disabled]), textarea:not([disabled]), [role='combobox']:not([disabled])",
-    );
-    (firstField ?? panel?.querySelector<HTMLElement>("button"))?.focus();
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closeRef.current();
-        return;
-      }
-      if (event.key !== "Tab" || !panel) return;
-
-      // Trampa de foco: el tabulador no debe escaparse al fondo de la pagina.
-      // Hueco conocido: solo recorre los descendientes del panel, y Select dibuja
-      // su listbox en un portal colgado de document.body. Con la lista abierta sus
-      // opciones quedan fuera de la trampa. No es urgente porque el listbox se
-      // maneja con flechas y cierra con Tab, pero si algun dia un portal necesita
-      // recorrido propio, hay que registrarlo aqui en vez de ampliar el selector.
-      const items = Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector));
-      if (items.length === 0) return;
-
-      const first = items[0];
-      const last = items[items.length - 1];
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = originalOverflow;
-      previouslyFocused?.focus();
-    };
-  }, []);
+  useDialogBehavior(panelRef, onClose);
 
   return createPortal(
     <div
@@ -98,18 +40,24 @@ export function Modal({ title, description, onClose, footer, children }: ModalPr
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         className="animate-plf-modal-in flex max-h-full w-full max-w-lg flex-col overflow-hidden
-          rounded-edge border border-line bg-white shadow-dialog"
+          rounded-edge border border-line bg-white
+          shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]"
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 pb-4 pt-5">
-          <div className="flex flex-col gap-1">
+          <div>
+            {eyebrow && (
+              <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
+                {eyebrow}
+              </p>
+            )}
             <h2
               id={titleId}
-              className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink"
+              className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink"
             >
               {title}
             </h2>
             {description && (
-              <p id={descriptionId} className="text-[12.5px] leading-relaxed text-muted">
+              <p id={descriptionId} className="mt-1.5 text-[12.5px] leading-relaxed text-subtle">
                 {description}
               </p>
             )}
@@ -119,7 +67,7 @@ export function Modal({ title, description, onClose, footer, children }: ModalPr
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-muted
+            className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle
               transition-colors hover:bg-fill hover:text-ink"
           >
             <X className="h-4 w-4" />

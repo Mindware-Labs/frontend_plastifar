@@ -87,7 +87,7 @@ function FieldFrame({
       >
         <span
           className={`shrink-0 transition-colors duration-200 ${
-            error ? "text-brand-red" : "text-muted group-focus-within:text-brand-red"
+            error ? "text-brand-red" : "text-subtle group-focus-within:text-brand-red"
           }`}
         >
           {icon}
@@ -110,7 +110,7 @@ function FieldFrame({
       {(hint || action) && (
         <div className="mt-1 flex min-h-[18px] items-center justify-between gap-4">
           {hint ? (
-            <span id={`${inputId}-hint`} className="animate-plf-rise text-[12.5px] text-muted">
+            <span id={`${inputId}-hint`} className="animate-plf-rise text-[12.5px] text-subtle">
               {hint}
             </span>
           ) : (
@@ -189,7 +189,7 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             onClick={() => setVisible((v) => !v)}
             tabIndex={-1}
             aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
-            className="flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition-colors duration-150 hover:bg-fill hover:text-ink"
+            className="flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full text-subtle transition-colors duration-150 hover:bg-fill hover:text-ink"
           >
             {visible ? (
               <EyeOff className="h-[17px] w-[17px]" />

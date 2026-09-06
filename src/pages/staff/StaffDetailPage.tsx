@@ -396,7 +396,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
           <h2 className="mb-1 mt-9 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
             Permiso efectivo
           </h2>
-          <p className="mb-3 max-w-[76ch] text-[12.5px] leading-relaxed text-muted">
+          <p className="mb-3 max-w-[76ch] text-[12.5px] leading-relaxed text-subtle">
             Lo que esta persona puede hacer hoy, resultado de sumar los permisos de los roles que
             tiene en cada departamento. No se edita aquí: se cambia el rol arriba, o los permisos del
             rol en la matriz.

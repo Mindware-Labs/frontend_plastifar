@@ -155,7 +155,7 @@ export function ColumnPicker({ columns, visible, onChange, label = "Columnas" }:
         <Columns3 aria-hidden className="h-4 w-4 text-faint" />
         {label}
         {hiddenCount > 0 && (
-          <span className="rounded-full bg-fill px-1.5 py-px text-[11px] font-semibold text-muted">
+          <span className="rounded-full bg-fill px-1.5 py-px text-[11px] font-semibold text-subtle">
             {hideable.length - hiddenCount}/{hideable.length}
           </span>
         )}

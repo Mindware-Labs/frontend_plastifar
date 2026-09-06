@@ -13,7 +13,7 @@ export type FieldState = "idle" | "error" | "valid";
  */
 export const controlBaseUnsized =
   "rounded-edge border bg-white text-left text-ink outline-none transition-colors " +
-  "disabled:cursor-not-allowed disabled:bg-canvas disabled:text-muted";
+  "disabled:cursor-not-allowed disabled:bg-canvas disabled:text-subtle";
 
 export const controlBase = `w-full ${controlBaseUnsized}`;
 

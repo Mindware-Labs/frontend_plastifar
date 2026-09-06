@@ -55,7 +55,7 @@ export function MonoChartLegend({ items }: { items: LegendItem[] }) {
   return (
     <ul className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">
       {items.map((item) => (
-        <li key={item.label} className="flex items-center gap-1.5 text-[11px] text-muted">
+        <li key={item.label} className="flex items-center gap-1.5 text-[11px] text-subtle">
           <Swatch item={item} />
           <item.icon className="h-3 w-3 shrink-0" aria-hidden />
           <span>{item.label}</span>

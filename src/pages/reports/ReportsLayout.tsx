@@ -27,7 +27,7 @@ export function ReportsLayout({ action, children }: ReportsLayoutProps) {
         <ModuleHeader />
         <div className="flex items-start gap-2.5 py-8">
           <ShieldAlert aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-faint" />
-          <p className="max-w-[76ch] text-[13.5px] leading-relaxed text-muted">
+          <p className="max-w-[76ch] text-[13.5px] leading-relaxed text-subtle">
             No tienes el permiso <span className="font-mono text-[10.5px] text-faint">reports.read</span>,
             necesario para consultar los reportes. Pídelo al administrador del panel.
           </p>

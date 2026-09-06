@@ -277,7 +277,7 @@ export function Select({
                   className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge px-2.5 py-2
                     text-[13px] transition-colors ${
                       option.disabled
-                        ? "cursor-not-allowed text-muted"
+                        ? "cursor-not-allowed text-subtle"
                         : isActive
                           ? "bg-fill text-ink"
                           : "text-brand-gray"

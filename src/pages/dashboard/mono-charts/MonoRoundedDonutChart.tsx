@@ -28,7 +28,7 @@ interface MonoRoundedDonutChartProps {
 const SEGMENT_COLORS = [
   "var(--color-brand-red)",
   "var(--color-brand-gray)",
-  "var(--color-muted)",
+  "var(--color-subtle)",
   "var(--color-faint)",
 ];
 
@@ -54,7 +54,7 @@ export function MonoRoundedDonutChart({ data, compact = false }: MonoRoundedDonu
             </span>
           </div>
           <p className="text-xl font-bold tracking-tight tabular-nums mt-0.5 font-heading text-ink">
-            {total} <span className="text-xs font-normal text-muted">tickets</span>
+            {total} <span className="text-xs font-normal text-subtle">tickets</span>
           </p>
         </div>
       </div>
@@ -113,7 +113,7 @@ export function MonoRoundedDonutChart({ data, compact = false }: MonoRoundedDonu
           <span className="text-sm font-bold tabular-nums font-heading text-ink">
             {hoverIndex !== null ? `${data[hoverIndex].value}` : total}
           </span>
-          <span className="text-[10px] text-muted">{hoverIndex !== null ? data[hoverIndex].name : "Total"}</span>
+          <span className="text-[10px] text-subtle">{hoverIndex !== null ? data[hoverIndex].name : "Total"}</span>
         </div>
       </div>
 
@@ -127,7 +127,7 @@ export function MonoRoundedDonutChart({ data, compact = false }: MonoRoundedDonu
               className="w-1.5 h-1.5 rounded-full"
               style={{ backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length] }}
             />
-            <span className="text-muted">{seg.name}</span>
+            <span className="text-subtle">{seg.name}</span>
             <span className="tabular-nums text-faint">{seg.value}</span>
           </li>
         ))}

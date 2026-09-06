@@ -44,7 +44,7 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
           </h1>
 
           {subtitle && (
-            <p className="mx-auto mt-2.5 max-w-[36ch] text-[14px] leading-relaxed text-muted">
+            <p className="mx-auto mt-2.5 max-w-[36ch] text-[14px] leading-relaxed text-subtle">
               {subtitle}
             </p>
           )}
@@ -76,7 +76,7 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
           draggable={false}
           className="select-none opacity-80"
         />
-        <span className="font-medium text-muted">Center Quest</span>
+        <span className="font-medium text-subtle">Center Quest</span>
       </p>
     </div>
   );

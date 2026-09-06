@@ -17,16 +17,16 @@ export function FilterChip({ label, count, active, onClick, disabled }: FilterCh
       className={`inline-flex h-8 items-center gap-[7px] rounded-full border px-3.5 text-[12.5px] font-medium
         outline-none transition-colors focus-visible:ring-3 focus-visible:ring-brand-red/25
         disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-line
-        disabled:hover:text-muted ${
+        disabled:hover:text-subtle ${
           active
             ? "border-brand-red bg-brand-red text-white"
-            : "border-line bg-white text-muted hover:border-line-strong hover:text-ink"
+            : "border-line bg-white text-subtle hover:border-line-strong hover:text-ink"
         }`}
     >
       {label}
       <span
         className={`rounded-full px-1.5 py-px text-[11px] font-semibold ${
-          active ? "bg-white/22 text-white" : "bg-fill text-muted"
+          active ? "bg-white/22 text-white" : "bg-fill text-subtle"
         }`}
       >
         {count}

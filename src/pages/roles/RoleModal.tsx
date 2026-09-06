@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link } from "react-router-dom";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { rolesApi } from "../../api/roles";
@@ -79,6 +78,7 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
 
   return (
     <Modal
+      eyebrow="Personal · Roles"
       title={isEdit ? "Editar rol" : "Nuevo rol"}
       description="Los roles agrupan permisos y se asignan al personal por departamento."
       onClose={onClose}
@@ -114,15 +114,9 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
           />
         )}
 
-        <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
-          Los permisos de este rol se editan en{" "}
-          <Link
-            to="/permisos"
-            className="font-medium text-brand-red underline-offset-2 hover:underline"
-          >
-            Permisos
-          </Link>
-          , donde se ven todos los roles a la vez y se compara qué concede cada uno.
+        <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-subtle">
+          Los permisos del rol se configuran en un paso posterior, cuando existan las entidades
+          sobre las que aplican (tickets, departamentos, etc.).
         </p>
       </form>
     </Modal>

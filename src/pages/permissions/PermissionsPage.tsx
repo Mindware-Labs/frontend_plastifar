@@ -444,7 +444,7 @@ export function PermissionsPage() {
       <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
         Un permiso concede la acción, pero solo sobre los recursos de los departamentos donde esa
         persona tiene el rol que lo otorga. La única excepción es{" "}
-        <span className="font-mono text-[11px] text-muted">tickets.read_all</span>, pensada para
+        <span className="font-mono text-[11px] text-subtle">tickets.read_all</span>, pensada para
         supervisión: amplía la lectura a todos los departamentos sin conceder escritura. Dentro de la
         matriz se navega con las flechas del teclado.
       </p>

@@ -301,7 +301,7 @@ export function SlaSection() {
                       <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
                         {/* Marcador de estado, no accion: el rojo 185 C esta
                             reservado a la primaria y al estado activo. */}
-                        <Star aria-hidden className="h-3.5 w-3.5 fill-muted text-muted" />
+                        <Star aria-hidden className="h-3.5 w-3.5 fill-subtle text-subtle" />
                         De {policy.priority.toLowerCase()}
                       </span>
                     ) : (

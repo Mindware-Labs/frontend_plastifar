@@ -36,7 +36,7 @@ export function PasswordStrength({ value, className = "" }: { value: string; cla
           aria-live="polite"
           className={`inline-flex h-[20px] min-w-[80px] items-center justify-center rounded-full px-2
             font-heading text-[10px] font-semibold uppercase tracking-[0.08em]
-            transition-colors ${empty ? "bg-line-strong text-muted" : `${styles.badge} text-white`}`}
+            transition-colors ${empty ? "bg-line-strong text-subtle" : `${styles.badge} text-white`}`}
         >
           {empty ? "—" : tier.label}
         </span>

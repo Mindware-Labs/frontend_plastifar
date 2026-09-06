@@ -81,7 +81,7 @@ export function LoginPage() {
             </span>
             <span className="h-px flex-1 bg-line" />
           </div>
-          <p className="mt-4 text-center text-[12.5px] leading-relaxed text-muted">
+          <p className="mt-4 text-center text-[12.5px] leading-relaxed text-subtle">
             ¿Aún no tienes acceso?{" "}
             <span className="font-medium text-brand-gray">Solicítalo a tu administrador.</span>
           </p>
@@ -120,7 +120,7 @@ export function LoginPage() {
           action={
             <Link
               to="/forgot-password"
-              className="ml-auto rounded text-[12.5px] font-medium text-muted underline-offset-4 transition-colors hover:text-brand-red hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+              className="ml-auto rounded text-[12.5px] font-medium text-subtle underline-offset-4 transition-colors hover:text-brand-red hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
             >
               ¿Olvidaste tu contraseña?
             </Link>

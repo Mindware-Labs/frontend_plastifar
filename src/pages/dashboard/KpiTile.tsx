@@ -65,7 +65,7 @@ export function KpiTile({
       className={`flex h-full flex-col gap-4 ${emphasis ? `ring-2 ${toneRing[tone]}` : ""}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted">
+        <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-subtle">
           <span className={`flex h-5 w-5 shrink-0 items-center justify-center ${INSET_RADIUS} ${toneIconBadge[tone]}`}>
             <Icon className="h-3 w-3" />
           </span>

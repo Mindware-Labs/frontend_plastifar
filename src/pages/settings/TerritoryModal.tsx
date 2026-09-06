@@ -142,7 +142,7 @@ export function TerritoryModal({ territory, onClose, onSaved }: TerritoryModalPr
             />
 
             {territory.clientCount > 0 && (
-              <p className="rounded-edge border border-line px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
+              <p className="rounded-edge border border-line px-3.5 py-3 text-[11.5px] leading-relaxed text-subtle">
                 {territory.clientCount}{" "}
                 {territory.clientCount === 1 ? "cliente lo usa" : "clientes lo usan"}. Desactivarlo
                 no rompe el historial, pero deja de poder elegirse en clientes nuevos.

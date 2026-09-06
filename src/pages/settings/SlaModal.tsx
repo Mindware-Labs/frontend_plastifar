@@ -322,7 +322,7 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
                             has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-brand-red/25 ${
                               checked
                                 ? "border-brand-red bg-brand-red text-white"
-                                : "border-line-strong bg-white text-muted hover:border-zinc-400 hover:text-ink"
+                                : "border-line-strong bg-white text-subtle hover:border-zinc-400 hover:text-ink"
                             }`}
                         >
                           <input

@@ -1,6 +1,5 @@
 import { LogOut, Pencil, Plus, Trash2, UserX } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -18,7 +17,6 @@ import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
-import { usePermissions } from "../../hooks/usePermissions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
@@ -44,10 +42,7 @@ const columns: { key: SortKey; label: string }[] = [
 
 export function StaffPage() {
   const { user } = useAuth();
-  // El permiso, no el perfil: un administrador lo tiene por definicion, pero un
-  // rol con staff.write tambien, y hasta ahora la interfaz no lo contemplaba.
-  const { can } = usePermissions();
-  const canWrite = can("staff.write");
+  const isAdmin = Boolean(user?.isAdmin);
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -105,7 +100,7 @@ export function StaffPage() {
 
   /** Desactivar y eliminar nunca aplican sobre uno mismo; editar si. */
   function canManage(member: StaffResponse) {
-    return canWrite && member.id !== user?.staffId;
+    return isAdmin && member.id !== user?.staffId;
   }
 
   /** El error sube al dialogo, que lo muestra sin cerrarse. */
@@ -123,6 +118,7 @@ export function StaffPage() {
     setConfirmation({
       tone: "warn",
       icon: UserX,
+      eyebrow: "Personal",
       title: "Desactivar colaborador",
       description: (
         <>
@@ -140,6 +136,7 @@ export function StaffPage() {
     setConfirmation({
       tone: "warn",
       icon: LogOut,
+      eyebrow: "Personal",
       title: "Cerrar sesiones",
       description: (
         <>
@@ -157,6 +154,7 @@ export function StaffPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
+      eyebrow: "Personal",
       title: "Eliminar colaborador",
       description: (
         <>
@@ -171,181 +169,172 @@ export function StaffPage() {
   }
 
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <ModuleHeader
+        title="Personal"
+        summary={
+          counts
+            ? `${counts.all} colaboradores · ${counts.active} activos · ${counts.admins} con permisos de administrador`
+            : "Cargando el personal con acceso al sistema…"
+        }
         action={
-          canWrite && (
+          isAdmin && (
             <Button size="sm" onClick={() => setModal("nuevo")}>
               <Plus className="h-[15px] w-[15px]" />
-              Nuevo colaborador
+              Agregar personal
             </Button>
           )
         }
       />
 
-      {/* Criterios: busqueda, departamento y pastillas de estado */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar por nombre o correo…"
-          className="w-[240px]"
-        />
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        {/* Criterios: busqueda, departamento y pastillas de estado */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar por nombre o correo…"
+            className="w-[240px]"
+          />
 
-        <Select
-          size="sm"
-          className="w-[220px]"
-          aria-label="Filtrar por departamento"
-          value={String(departmentId)}
-          onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
-          options={[
-            { value: "todos", label: "Todos los departamentos" },
-            ...departments.map((department) => ({
-              value: String(department.id),
-              label: department.name,
-            })),
-          ]}
-        />
+          <Select
+            size="sm"
+            className="w-[220px]"
+            aria-label="Filtrar por departamento"
+            value={String(departmentId)}
+            onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+            options={[
+              { value: "todos", label: "Todos los departamentos" },
+              ...departments.map((department) => ({
+                value: String(department.id),
+                label: department.name,
+              })),
+            ]}
+          />
 
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        {/* Esqueleto antes de la primera respuesta: un cero es una afirmacion. */}
-        {counts === undefined
-          ? filters.map(({ key }) => (
-              <span key={key} aria-hidden className="h-8 w-[104px] animate-pulse rounded-full bg-fill" />
-            ))
-          : filters.map(({ key, label, countKey }) => (
-              <FilterChip
-                key={key}
-                label={label}
-                count={counts[countKey]}
-                active={filter === key}
-                onClick={() => setFilter(key)}
-              />
-            ))}
-      </div>
-
-      {error && (
-        <div className="mb-3 flex items-start gap-3">
-          <Alert variant="error">{error}</Alert>
-          <Button size="sm" variant="secondary" onClick={refresh}>
-            Reintentar
-          </Button>
+          {filters.map(({ key, label, countKey }) => (
+            <FilterChip
+              key={key}
+              label={label}
+              count={counts?.[countKey] ?? 0}
+              active={filter === key}
+              onClick={() => setFilter(key)}
+            />
+          ))}
         </div>
-      )}
 
-      {/* Con error no queda spinner girando debajo del aviso. */}
-      {data === null ? (
-        error === null && (
+        {error && (
+          <div className="mb-3">
+            <Alert variant="error">{error}</Alert>
+          </div>
+        )}
+
+        {data === null ? (
           <div className="flex justify-center py-16">
             <Spinner />
           </div>
-        )
-      ) : (
-        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-          {/* Sin filas se retira la tabla entera: dejar la cabecera puesta deja
-              el mensaje colgando bajo un filete de columnas que no existen. */}
-          {rows.length === 0 ? (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {unfiltered
-                ? "Todavía no hay personal registrado."
-                : "Ningún colaborador coincide con este filtro o búsqueda."}
-            </p>
-          ) : (
-          <DataTable>
-            <thead>
-              <HeadRow>
-                {columns.map(({ key, label }) => (
-                  <Th
-                    key={key}
-                    sort={{ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) }}
-                  >
-                    {label}
-                  </Th>
-                ))}
-                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
-
-            <tbody>
-              {rows.map((member) => (
-                <Row key={member.id} busy={busyId === member.id}>
-                  <Td>
-                    <Link
-                      to={`/staff/${member.id}`}
-                      className="flex items-center gap-2.5 rounded-edge underline-offset-4
-                        outline-none focus-visible:ring-3 focus-visible:ring-brand-red/20"
+        ) : (
+          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  {columns.map(({ key, label }) => (
+                    <Th
+                      key={key}
+                      sort={{ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) }}
                     >
-                      <Avatar name={fullName(member)} seed={member.id} />
-                      <span className="whitespace-nowrap text-[13px] font-medium text-ink hover:underline">
-                        {fullName(member)}
-                      </span>
-                    </Link>
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">{member.email}</Td>
-                  <Td className="text-[12.5px] text-brand-gray">
-                    {departmentName(member.primaryDepartmentId)}
-                  </Td>
-                  <Td>
-                    {member.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
-                  </Td>
-                  <Td>
-                    <StatusDot active={member.isActive} />
-                  </Td>
-                  {canWrite && (
-                    <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Editar a ${fullName(member)}`}
-                          icon={Pencil}
-                          onClick={() => setModal(member)}
-                          disabled={busyId === member.id}
-                        />
-                        {member.isActive && canManage(member) && (
-                          <>
-                            <RowAction
-                              label={`Cerrar las sesiones de ${fullName(member)}`}
-                              icon={LogOut}
-                              onClick={() => askRevokeSessions(member)}
-                              disabled={busyId === member.id}
-                            />
-                            <RowAction
-                              label={`Desactivar a ${fullName(member)}`}
-                              icon={UserX}
-                              onClick={() => askDeactivate(member)}
-                              disabled={busyId === member.id}
-                            />
-                          </>
-                        )}
-                        {canManage(member) && (
-                          <RowAction
-                            label={`Eliminar a ${fullName(member)}`}
-                            icon={Trash2}
-                            onClick={() => askDelete(member)}
-                            disabled={busyId === member.id}
-                            danger
-                          />
-                        )}
-                      </div>
-                    </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-          )}
+                      {label}
+                    </Th>
+                  ))}
+                  {isAdmin && <Th className="w-36 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
 
-          <Pagination
-            page={data.page}
-            pageSize={data.pageSize}
-            total={data.total}
-            totalPages={data.totalPages}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            noun="colaboradores"
-          />
-        </div>
-      )}
+              <tbody>
+                {rows.map((member) => (
+                  <Row key={member.id} busy={busyId === member.id}>
+                    <Td>
+                      <span className="flex items-center gap-2.5">
+                        <Avatar name={fullName(member)} seed={member.id} />
+                        <span className="whitespace-nowrap text-[13px] font-medium text-ink">
+                          {fullName(member)}
+                        </span>
+                      </span>
+                    </Td>
+                    <Td className="text-[12.5px] text-brand-gray">{member.email}</Td>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      {departmentName(member.primaryDepartmentId)}
+                    </Td>
+                    <Td>
+                      {member.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
+                    </Td>
+                    <Td>
+                      <StatusDot active={member.isActive} />
+                    </Td>
+                    {isAdmin && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Editar a ${fullName(member)}`}
+                            icon={Pencil}
+                            onClick={() => setModal(member)}
+                            disabled={busyId === member.id}
+                          />
+                          {member.isActive && canManage(member) && (
+                            <>
+                              <RowAction
+                                label={`Cerrar las sesiones de ${fullName(member)}`}
+                                icon={LogOut}
+                                onClick={() => askRevokeSessions(member)}
+                                disabled={busyId === member.id}
+                              />
+                              <RowAction
+                                label={`Desactivar a ${fullName(member)}`}
+                                icon={UserX}
+                                onClick={() => askDeactivate(member)}
+                                disabled={busyId === member.id}
+                              />
+                            </>
+                          )}
+                          {canManage(member) && (
+                            <RowAction
+                              label={`Eliminar a ${fullName(member)}`}
+                              icon={Trash2}
+                              onClick={() => askDelete(member)}
+                              disabled={busyId === member.id}
+                              danger
+                            />
+                          )}
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+
+            {rows.length === 0 && (
+              <p className="py-14 text-center text-[13.5px] text-faint">
+                {unfiltered
+                  ? "Todavía no hay personal registrado."
+                  : "Ningún colaborador coincide con este filtro o búsqueda."}
+              </p>
+            )}
+
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="colaboradores"
+            />
+          </div>
+        )}
+      </div>
 
       {confirmation && (
         <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />

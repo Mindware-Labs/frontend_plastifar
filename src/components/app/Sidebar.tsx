@@ -1,245 +1,373 @@
-import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
-import { usePermissions } from "../../hooks/usePermissions";
-import { SIDEBAR_NAV, type ModuleEntry, type ModuleLink } from "../../lib/navigation";
+import { ChevronDown, Inbox, KeyRound, LogOut, PanelLeft, Users } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "../../context/useAuth";
+import { useEmailCounts } from "../../context/useEmailCounts";
+import type { EmailFolderCounts } from "../../types/api";
 import { Logo } from "../Logo";
+import { ChangePasswordModal } from "./ChangePasswordModal";
 
-interface SidebarProps {
-  collapsed: boolean;
-  onToggleCollapse: () => void;
-  /** Solo aplica por debajo de lg: el panel se desliza sobre el contenido. */
-  mobileOpen: boolean;
-  onCloseMobile: () => void;
+interface NavItem {
+  label: string;
+  to: string;
+  /** Coincidencia exacta: sin esto, "/bandeja" quedaria activo tambien en "/bandeja/junk". */
+  end?: boolean;
+  /** Carpeta de correo cuyo contador se pinta al final del renglon. */
+  folder?: keyof EmailFolderCounts;
 }
 
-/** Mismo recorrido que la trampa de foco de Modal, para no divergir del kit. */
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+interface NavGroup {
+  label: string;
+  icon: typeof Inbox;
+  /** Un item propio (Bandeja) o una familia de sub-secciones (Personal). */
+  to?: string;
+  children?: NavItem[];
+}
 
-/**
- * Navegacion completa del panel: los modulos y, para los que tienen catalogo
- * o familia de secciones, sus rutas hijas tambien — todo en un solo arbol,
- * nada de eso vive ya como pestanas dentro de la vista.
- */
-export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }: SidebarProps) {
-  const { pathname } = useLocation();
-  const { can } = usePermissions();
+/** Arbol de navegacion del panel: los modulos nuevos entran aqui sin tocar el layout. */
+const groups: NavGroup[] = [
+  {
+    label: "Correo",
+    icon: Inbox,
+    children: [
+      { label: "Bandeja", to: "/bandeja", end: true, folder: "inbox" },
+      { label: "Archivados", to: "/bandeja/archivados", folder: "archived" },
+      { label: "No deseado", to: "/bandeja/junk", folder: "junk" },
+      { label: "Papelera", to: "/bandeja/papelera", folder: "trash" },
+    ],
+  },
+  {
+    label: "Personal",
+    icon: Users,
+    children: [
+      { label: "Colaboradores", to: "/staff" },
+      { label: "Roles", to: "/roles" },
+    ],
+  },
+];
 
-  /**
-   * RF-P6: el menu solo ofrece lo que la persona puede abrir. Un grupo se pinta
-   * mientras le quede al menos una ruta hija visible, y si su propia ruta cae
-   * fuera de sus permisos —Personal apunta a /staff, que exige staff.read—
-   * la fila del modulo lleva a la primera hija que si puede abrir, en vez de
-   * desaparecer un modulo al que todavia tiene entrada por Roles o Permisos.
-   */
-  const visibleNav = useMemo(() => {
-    return SIDEBAR_NAV.reduce<ModuleEntry[]>((acc, module) => {
-      const allowed = (entry: { permission?: string }) =>
-        entry.permission === undefined || can(entry.permission);
+/** Panel de hijos anclado al icono: se posiciona fijo para que el riel no lo recorte. */
+interface Flyout {
+  group: NavGroup;
+  top: number;
+  left: number;
+}
 
-      if (module.children === undefined) {
-        if (allowed(module)) acc.push(module);
-        return acc;
-      }
+const linkBase =
+  "flex items-center gap-2.5 rounded-edge px-3 py-2 text-[13px] font-medium transition-colors";
 
-      const children: ModuleLink[] = module.children.filter(allowed);
-      if (children.length === 0) return acc;
-
-      acc.push({ ...module, children, to: allowed(module) ? module.to : children[0].to });
-      return acc;
-    }, []);
-  }, [can]);
-
-  // Solo guarda los toggles explicitos de la persona; sin uno, un grupo esta
-  // abierto si su modulo esta activo — derivado en el render, no en un
-  // efecto, para no encadenar otro renderizado por cada cambio de ruta.
-  const [expandedOverride, setExpandedOverride] = useState<Record<string, boolean>>({});
-  const mobilePanelRef = useRef<HTMLElement>(null);
-
-  // onCloseMobile suele ser una flecha nueva en cada render: se lee por ref para
-  // que el efecto no se reinicie y vuelva a mover el foco al primer enlace.
-  const closeRef = useRef(onCloseMobile);
-  useEffect(() => {
-    closeRef.current = onCloseMobile;
-  });
-
-  // El panel movil se anuncia como dialogo (mismo scrim y misma sombra que
-  // Modal), asi que debe comportarse como uno: el foco entra, no se escapa con
-  // el tabulador, la pagina de debajo no hace scroll y al cerrar el foco vuelve
-  // al boton de menu. Sin esto, en ancho de telefono el teclado se quedaba
-  // atrapado en una barra superior que el scrim ya habia tapado.
-  useEffect(() => {
-    if (!mobileOpen) return;
-
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const panel = mobilePanelRef.current;
-    panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closeRef.current();
-        return;
-      }
-      if (event.key !== "Tab" || !panel) return;
-
-      const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-      if (items.length === 0) return;
-
-      const first = items[0];
-      const last = items[items.length - 1];
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = originalOverflow;
-      previouslyFocused?.focus();
-    };
-  }, [mobileOpen]);
-
-  /** El panel movil siempre va expandido: colapsar solo tiene sentido cuando
-   *  el sidebar compite por ancho con el contenido, y en movil es superpuesto.
-   *  En modo icono no se listan las rutas hijas: no hay espacio para el
-   *  texto, así que ese estado es solo un atajo al primer nivel. */
-  function renderContent(isCollapsed: boolean, withCollapseToggle = true) {
+/** Sin leer manda en rojo; si todo esta leido, el total queda en gris de apoyo. */
+function FolderBadge({ count }: { count: { total: number; unread: number } }) {
+  if (count.unread > 0) {
     return (
-      <>
-        <div
-          className={`flex h-16 shrink-0 items-center border-b border-line px-4 ${
-            isCollapsed ? "justify-center" : "justify-between"
-          }`}
-        >
-          {!isCollapsed && <Logo variant="color" height={24} />}
-          {/* En el panel movil no se dibuja: esta oculto por CSS y un boton
-              invisible dentro de la trampa de foco es una parada muerta. */}
-          {withCollapseToggle && (
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            aria-label={isCollapsed ? "Expandir menú" : "Contraer menú"}
-            className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-edge text-faint
-              outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3
-              focus-visible:ring-brand-red/25 lg:flex"
-          >
-            {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </button>
-          )}
-        </div>
-
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2.5">
-          {visibleNav.map((module) => {
-            const { label, icon: Icon, to, match, children } = module;
-            const isActive = match.some((path) => pathname.startsWith(path));
-            const isOpen =
-              !isCollapsed && Boolean(children) && (expandedOverride[label] ?? isActive);
-
-            return (
-              <div key={label}>
-                <div className={`flex items-center ${isCollapsed ? "" : "pr-1"}`}>
-                  <NavLink
-                    to={to}
-                    onClick={onCloseMobile}
-                    title={isCollapsed ? label : undefined}
-                    className={`flex h-10 flex-1 items-center gap-3 rounded-edge border-l-2 px-3 text-[13.5px]
-                      outline-none transition-colors focus-visible:ring-3 focus-visible:ring-brand-red/25
-                      ${isCollapsed ? "justify-center px-0" : ""} ${
-                        isActive
-                          ? "border-brand-red bg-brand-red/[0.04] font-semibold text-ink"
-                          : "border-transparent font-medium text-muted hover:bg-fill hover:text-ink"
-                      }`}
-                  >
-                    <Icon className="h-[17px] w-[17px] shrink-0" />
-                    {!isCollapsed && <span className="truncate">{label}</span>}
-                  </NavLink>
-
-                  {!isCollapsed && children && (
-                    <button
-                      type="button"
-                      onClick={() => setExpandedOverride((previous) => ({ ...previous, [label]: !isOpen }))}
-                      aria-label={isOpen ? `Contraer ${label}` : `Expandir ${label}`}
-                      aria-expanded={isOpen}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-edge text-faint
-                        outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3
-                        focus-visible:ring-brand-red/25"
-                    >
-                      <ChevronDown
-                        className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                      />
-                    </button>
-                  )}
-                </div>
-
-                {isOpen && (
-                  <div className="ml-[26px] mt-0.5 flex flex-col gap-0.5 border-l border-line pl-3.5">
-                    {children!.map((child) => (
-                      <NavLink
-                        key={child.to}
-                        to={child.to}
-                        end
-                        onClick={onCloseMobile}
-                        className={({ isActive: childActive }) =>
-                          `flex h-8 items-center truncate rounded-edge px-2.5 text-[12.5px] outline-none
-                          transition-colors focus-visible:ring-3 focus-visible:ring-brand-red/25 ${
-                            childActive
-                              ? "font-semibold text-brand-red"
-                              : "font-medium text-muted hover:bg-fill hover:text-ink"
-                          }`
-                        }
-                      >
-                        {child.label}
-                      </NavLink>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-      </>
+      <span
+        className="ml-auto flex h-[18px] min-w-[18px] shrink-0 items-center justify-center
+          rounded-full bg-brand-red px-1.5 font-heading text-[10.5px] font-bold tabular-nums
+          text-white shadow-[0_2px_6px_-2px_rgba(228,0,43,0.6)]"
+      >
+        {count.unread > 99 ? "99+" : count.unread}
+      </span>
     );
   }
 
-  return (
-    <>
-      {/* Escritorio: parte del flujo, siempre visible. */}
-      <aside
-        className={`hidden shrink-0 flex-col border-r border-line bg-white transition-[width] duration-200
-          lg:flex ${collapsed ? "w-16" : "w-[220px]"}`}
-      >
-        {renderContent(collapsed)}
-      </aside>
+  if (count.total === 0) return null;
 
-      {/* Movil: panel superpuesto con scrim, igual vocabulario que Modal. */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div
-            aria-hidden
-            onClick={onCloseMobile}
-            className="animate-plf-scrim-in absolute inset-0 bg-ink/45 backdrop-blur-[2px]"
-          />
-          <aside
-            ref={mobilePanelRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Módulos"
-            className="animate-plf-modal-in absolute inset-y-0 left-0 flex w-[240px] flex-col bg-white shadow-dialog"
+  return (
+    <span className="ml-auto shrink-0 text-[11px] font-medium tabular-nums text-faint">
+      {count.total}
+    </span>
+  );
+}
+const linkInactive = "text-brand-gray hover:bg-fill hover:text-ink";
+const linkActive = "bg-brand-red/8 font-semibold text-brand-red-dark";
+
+/** Icono suelto de la barra contraida. */
+const railBase = "flex h-9 w-9 shrink-0 items-center justify-center rounded-edge transition-colors";
+
+const collapsedKey = "plf.sidebar-collapsed";
+
+/** En navegacion privada leer localStorage lanza: la barra abre expandida. */
+function readCollapsed() {
+  try {
+    return localStorage.getItem(collapsedKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Barra lateral: logotipo, arbol de modulos y, al pie, la persona conectada. */
+export function Sidebar() {
+  const { user, logout } = useAuth();
+  const { counts } = useEmailCounts();
+  const { pathname } = useLocation();
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [flyout, setFlyout] = useState<Flyout | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!flyout) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setFlyout(null);
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [flyout]);
+
+  useEffect(() => () => cancelClose(), []);
+
+  function cancelClose() {
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  }
+
+  function openFlyout(group: NavGroup, anchor: HTMLElement) {
+    if (!group.children) return;
+    cancelClose();
+    const rect = anchor.getBoundingClientRect();
+    setFlyout({ group, top: rect.top - 6, left: rect.right + 8 });
+  }
+
+  /** Retardo corto: da tiempo a cruzar el hueco entre el icono y el panel. */
+  function scheduleClose() {
+    cancelClose();
+    closeTimer.current = window.setTimeout(() => setFlyout(null), 140);
+  }
+
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    setMenuOpen(false);
+    setFlyout(null);
+    try {
+      localStorage.setItem(collapsedKey, next ? "1" : "0");
+    } catch {
+      // Sin almacenamiento la barra funciona igual, solo no recuerda el estado.
+    }
+  }
+
+  /** Contraida no se ven los hijos: el icono se enciende con cualquier ruta del grupo. */
+  function isGroupActive(group: NavGroup) {
+    const targets = group.children?.map((child) => child.to) ?? [group.to!];
+    return targets.some((to) => pathname === to || pathname.startsWith(`${to}/`));
+  }
+
+  const local = user?.email.split("@")[0] ?? "";
+  const initials = local.slice(0, 2).toUpperCase() || "PF";
+  const pendingMail = counts
+    ? counts.inbox.unread + counts.archived.unread + counts.junk.unread + counts.trash.unread
+    : 0;
+
+  return (
+    <aside
+      className={`flex h-screen shrink-0 flex-col border-r border-line bg-white
+        transition-[width] duration-200 ease-out ${collapsed ? "w-[68px]" : "w-60"}`}
+    >
+      <div
+        className={`flex h-16 shrink-0 items-center ${
+          collapsed ? "justify-center px-2" : "justify-between px-5"
+        }`}
+      >
+        {!collapsed && <Logo height={22} />}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? "Expandir la barra lateral" : "Contraer la barra lateral"}
+          title={collapsed ? "Expandir" : "Contraer"}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-edge text-faint
+            transition-colors hover:bg-fill hover:text-ink"
+        >
+          <PanelLeft className={`h-4 w-4 transition-transform ${collapsed ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      <nav
+        className={`flex-1 overflow-y-auto overflow-x-hidden py-1 ${
+          collapsed ? "flex flex-col items-center gap-1 px-2" : "px-3"
+        }`}
+      >
+        {groups.map((group) =>
+          collapsed ? (
+            <Link
+              key={group.label}
+              to={group.to ?? group.children![0].to}
+              aria-label={group.label}
+              onMouseEnter={(event) => openFlyout(group, event.currentTarget)}
+              onMouseLeave={scheduleClose}
+              onFocus={(event) => openFlyout(group, event.currentTarget)}
+              onBlur={scheduleClose}
+              className={`${railBase} relative ${isGroupActive(group) ? linkActive : linkInactive}`}
+            >
+              <group.icon className="h-[18px] w-[18px]" />
+              {/* Contraida no hay sitio para cifras: un punto avisa que hay algo sin leer. */}
+              {group.label === "Correo" && pendingMail > 0 && (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-brand-red" />
+              )}
+            </Link>
+          ) : group.children ? (
+            <div key={group.label} className="mt-5 first:mt-0">
+              <div
+                className="flex items-center gap-2.5 px-3 pb-1.5 font-heading text-[10px] font-semibold
+                  uppercase tracking-[0.1em] text-faint"
+              >
+                <group.icon className="h-[13px] w-[13px]" />
+                {group.label}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {group.children.map((child) => (
+                  <NavLink
+                    key={child.to}
+                    to={child.to}
+                    end={child.end}
+                    className={({ isActive }) => `${linkBase} pl-9 ${isActive ? linkActive : linkInactive}`}
+                  >
+                    {child.label}
+                    {child.folder && counts && <FolderBadge count={counts[child.folder]} />}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <NavLink
+              key={group.to}
+              to={group.to!}
+              className={({ isActive }) => `${linkBase} ${isActive ? linkActive : linkInactive}`}
+            >
+              <group.icon className="h-4 w-4" />
+              {group.label}
+            </NavLink>
+          ),
+        )}
+      </nav>
+
+      <div className="shrink-0 border-t border-line p-3" ref={menuRef}>
+        <div className="relative">
+          {menuOpen && (
+            <div
+              role="menu"
+              className="animate-plf-toast-in absolute bottom-[52px] left-0 z-20 w-full min-w-[224px]
+                rounded-edge border border-line bg-white p-1.5
+                shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.22)]"
+            >
+              <div className="mb-1 border-b border-line-soft px-2.5 pb-2.5 pt-2">
+                <p className="truncate font-heading text-[12.5px] font-semibold text-ink">{local}</p>
+                <p className="mt-0.5 truncate text-[11.5px] text-faint">{user?.email}</p>
+              </div>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setChangingPassword(true);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-2 text-left text-[13px]
+                  text-brand-gray transition-colors hover:bg-fill hover:text-ink"
+              >
+                <KeyRound className="h-4 w-4" />
+                Cambiar contraseña
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => logout()}
+                className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-2 text-left text-[13px]
+                  font-medium text-brand-red-dark transition-colors hover:bg-red-50"
+              >
+                <LogOut className="h-4 w-4" />
+                Cerrar sesión
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            title={collapsed ? local : undefined}
+            className={`flex w-full items-center rounded-edge transition-colors
+              ${collapsed ? "justify-center py-1.5" : "gap-2.5 py-1.5 pl-1.5 pr-2"}
+              ${menuOpen ? "bg-fill" : "hover:bg-fill"}`}
           >
-            {renderContent(false, false)}
-          </aside>
+            <span
+              className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-ink
+                font-heading text-[12px] font-semibold text-white"
+            >
+              {initials}
+            </span>
+            {!collapsed && (
+              <>
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-[12.5px] font-semibold leading-tight text-ink">
+                    {local}
+                  </span>
+                  <span className="block truncate text-[11px] leading-tight text-faint">
+                    {user?.isAdmin ? "Administrador" : "Staff"}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-faint transition-transform ${menuOpen ? "rotate-180" : ""}`}
+                />
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {collapsed && flyout && (
+        <div
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          style={{ top: flyout.top, left: flyout.left }}
+          className="animate-plf-toast-in fixed z-30 w-[196px] rounded-edge border border-line
+            bg-white p-1.5 shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.22)]"
+        >
+          <p
+            className="flex items-center gap-2 px-2.5 pb-1.5 pt-1 font-heading text-[10px]
+              font-semibold uppercase tracking-[0.1em] text-faint"
+          >
+            <flyout.group.icon className="h-[13px] w-[13px]" />
+            {flyout.group.label}
+          </p>
+          <div className="flex flex-col gap-0.5">
+            {flyout.group.children?.map((child) => (
+              <NavLink
+                key={child.to}
+                to={child.to}
+                end={child.end}
+                onClick={() => setFlyout(null)}
+                className={({ isActive }) => `${linkBase} ${isActive ? linkActive : linkInactive}`}
+              >
+                {child.label}
+              </NavLink>
+            ))}
+          </div>
         </div>
       )}
-    </>
+
+      {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
+    </aside>
   );
 }

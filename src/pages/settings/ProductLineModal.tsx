@@ -139,7 +139,7 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
             {/* El API ya no dice cuantos motivos la exigen --nunca lo supo: el
                 contador era un cero fijo-- asi que la nota se limita a lo que
                 si es cierto de cualquier linea. */}
-            <p className="rounded-edge border border-line px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
+            <p className="rounded-edge border border-line px-3.5 py-3 text-[11.5px] leading-relaxed text-subtle">
               Desactivarla no rompe el historial, pero deja de poder elegirse en tickets nuevos. Si
               algún motivo la exige y es la última activa, el sistema no dejará desactivarla.
             </p>

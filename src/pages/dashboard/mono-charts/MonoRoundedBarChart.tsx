@@ -55,7 +55,7 @@ export function MonoRoundedBarChart({ data, total, compact = false }: MonoRounde
             </span>
           </div>
           <p className="text-xl font-bold tracking-tight tabular-nums mt-0.5 font-heading text-ink">
-            {total} <span className="text-xs font-normal text-muted">tickets creados</span>
+            {total} <span className="text-xs font-normal text-subtle">tickets creados</span>
           </p>
         </div>
 
@@ -67,7 +67,7 @@ export function MonoRoundedBarChart({ data, total, compact = false }: MonoRounde
               onClick={() => setLayout(l)}
               aria-pressed={layout === l}
               className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium capitalize transition-all cursor-pointer ${
-                layout === l ? "bg-brand-red text-white font-semibold shadow-sm" : "text-muted hover:text-ink"
+                layout === l ? "bg-brand-red text-white font-semibold shadow-sm" : "text-subtle hover:text-ink"
               }`}
             >
               {l === "vertical" ? "Col" : "Fila"}

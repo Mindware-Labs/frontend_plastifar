@@ -22,7 +22,7 @@ export function BlockedReports({ note, reports }: BlockedReportsProps) {
     <div>
       <div className="mb-1 flex items-start gap-2.5 py-2">
         <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-faint" />
-        <p className="max-w-[76ch] text-[12.5px] leading-relaxed text-muted">{note}</p>
+        <p className="max-w-[76ch] text-[12.5px] leading-relaxed text-subtle">{note}</p>
       </div>
 
       <ul className="border-t border-line-soft">

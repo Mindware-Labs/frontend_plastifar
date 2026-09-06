@@ -15,7 +15,7 @@ export function PriorityBars({ rows }: PriorityBarsProps) {
     <div className="flex w-full flex-col gap-1.5">
       {rows.map((row) => (
         <div key={row.priority} className="flex items-center gap-2">
-          <span className="w-[64px] shrink-0 truncate text-[11px] text-muted">{row.priority}</span>
+          <span className="w-[64px] shrink-0 truncate text-[11px] text-subtle">{row.priority}</span>
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-fill">
             <div className={`h-full rounded-full ${tone(row.compliance)}`} style={{ width: `${row.compliance}%` }} />
           </div>

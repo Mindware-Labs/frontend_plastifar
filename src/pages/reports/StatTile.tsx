@@ -26,7 +26,7 @@ export function StatTile({ label, value, tone = "neutral", hint }: StatTileProps
       >
         {value}
       </span>
-      {hint && <span className="text-[11.5px] text-muted">{hint}</span>}
+      {hint && <span className="text-[11.5px] text-subtle">{hint}</span>}
     </div>
   );
 }

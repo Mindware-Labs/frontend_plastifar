@@ -340,7 +340,7 @@ export function PermissionMatrix({
                                   granted
                                     ? "border-brand-red/35 bg-brand-red/8 text-brand-red"
                                     : `border-line-strong bg-white text-zinc-400 ${
-                                        locked ? "" : "hover:border-zinc-400 hover:text-muted"
+                                        locked ? "" : "hover:border-zinc-400 hover:text-subtle"
                                       }`
                                 }
                                 ${changed ? "ring-2 ring-inset ring-warn/45" : ""}`}

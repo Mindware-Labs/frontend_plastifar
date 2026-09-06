@@ -28,13 +28,13 @@ export function SystemStatusCard({ onRefresh, isRefreshing, lastSync }: SystemSt
         </span>
 
         <div>
-          <p className="text-[12px] font-medium text-muted">Estado del panel</p>
+          <p className="text-[12px] font-medium text-subtle">Estado del panel</p>
           <p className="mt-0.5 font-heading text-[20px] font-bold tracking-[-0.02em] text-ink">
             Datos de demostración
           </p>
         </div>
 
-        <p className="text-[12px] leading-relaxed text-muted">
+        <p className="text-[12px] leading-relaxed text-subtle">
           Todo lo que ves aquí es generado localmente. Cuando la Bandeja de tickets exista, este panel
           se conecta a datos reales sin cambiar de lugar.
         </p>
