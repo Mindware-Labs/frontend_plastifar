@@ -9,11 +9,16 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 /** Sobre el rojo 185 C pleno un matiz no se percibe: el hover cambia de color y de sombra. */
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
+  // Apagado el primario pierde el rojo y la sombra, no solo opacidad: el 185 C
+  // al 60 % sigue siendo un rojo intenso, y "Guardar cambios" se leia como
+  // disponible cuando no habia nada que guardar. Un boton que parece pulsable y
+  // no responde es peor que uno que no esta.
   primary:
     "bg-brand-red text-white shadow-[0_10px_20px_-12px_rgba(228,0,43,0.55)] " +
     "hover:bg-brand-red-dark hover:shadow-[0_14px_24px_-10px_rgba(228,0,43,0.7)] " +
     "active:translate-y-px active:bg-brand-red-dark active:shadow-[0_6px_12px_-9px_rgba(228,0,43,0.6)] " +
-    "disabled:hover:bg-brand-red disabled:hover:shadow-[0_10px_20px_-12px_rgba(228,0,43,0.55)]",
+    "disabled:bg-line-strong disabled:text-subtle disabled:shadow-none " +
+    "disabled:hover:bg-line-strong disabled:hover:shadow-none",
   secondary:
     "border border-line-strong bg-white text-brand-gray hover:border-zinc-400 hover:bg-canvas hover:text-ink",
   danger: "border border-brand-red bg-white text-brand-red hover:bg-red-50",
@@ -41,7 +46,7 @@ export function Button({
         font-heading text-[11.5px] font-semibold uppercase tracking-[0.06em]
         transition-[background-color,border-color,color,box-shadow,transform] outline-none
         focus-visible:ring-3 focus-visible:ring-brand-red/25
-        disabled:cursor-not-allowed disabled:opacity-60
+        disabled:cursor-not-allowed disabled:opacity-70
         ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
       {...props}
     >

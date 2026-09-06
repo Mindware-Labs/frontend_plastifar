@@ -276,9 +276,20 @@ export function PermissionMatrix({
                             <span className="text-[13px] font-medium leading-tight text-ink">
                               {permission.label}
                             </span>
+                            {/* Un punto, no una pastilla. En una instalacion
+                                recien montada casi todo esta sin asignar, y
+                                dieciseis pastillas ambar seguidas dejan de
+                                senalar la excepcion para volverse el fondo
+                                —compitiendo ademas con el nombre del permiso,
+                                que es lo que se viene a leer—. El punto se ve
+                                al recorrer la columna y desaparece cuando ya
+                                no aplica; el nombre accesible lo dice entero. */}
                             {grantedBy === 0 && (
-                              <span className="shrink-0 rounded-full bg-warn/10 px-1.5 py-px text-[10px] font-semibold text-warn">
-                                sin asignar
+                              <span
+                                title="Ningún rol concede este permiso"
+                                className="h-1.5 w-1.5 shrink-0 rounded-full bg-warn"
+                              >
+                                <span className="sr-only">Sin asignar</span>
                               </span>
                             )}
                           </span>

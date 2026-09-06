@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { ApiError } from "../../api/client";
 import { rolesApi } from "../../api/roles";
@@ -287,6 +288,9 @@ export function PermissionsPage() {
     [matrix, visibleRoles],
   );
 
+  /** Roles que la matriz puede comparar de verdad: los que se pueden editar. */
+  const comparableRoles = editableRoles.length;
+
   const isEmpty = matrix !== null && groups.length === 0;
   /** Catalogo vacio y filtro vacio no son el mismo vacio y no se dicen igual. */
   const catalogIsEmpty = catalog.length === 0;
@@ -430,6 +434,22 @@ export function PermissionsPage() {
         </p>
       ) : (
         <div className={`transition-opacity ${isRefetching ? "opacity-60" : ""}`}>
+          {/* Con una sola columna esto no es una tabulacion cruzada, y la
+              pantalla se lee como si estuviera rota: media hoja en blanco al
+              lado de una columna sola. Decirlo es mas honesto que dejar que
+              la persona lo interprete —y es donde de verdad esta la salida. */}
+          {comparableRoles < 2 && (
+            <p className="mb-3 border-l-2 border-line-strong bg-canvas px-3.5 py-2.5 text-[12.5px] leading-relaxed text-subtle">
+              {comparableRoles === 0
+                ? "No hay ningún rol editable todavía. La matriz compara lo que concede cada rol, así que necesita al menos uno."
+                : "Solo hay un rol editable. La matriz sirve para comparar lo que concede cada uno, y con una sola columna no hay nada contra qué comparar."}{" "}
+              <Link to="/roles" className="font-medium text-brand-red-dark underline">
+                Crear otro rol
+              </Link>
+              .
+            </p>
+          )}
+
           <PermissionMatrix
             groups={groups}
             roles={roles}
