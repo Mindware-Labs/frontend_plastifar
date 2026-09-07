@@ -508,7 +508,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = fileName ?? `conversacion-${email.id}.html`;
+      anchor.download = fileName ?? `conversacion-${email.id}.pdf`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -717,7 +717,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                 <Download />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Exportar la conversación</TooltipContent>
+            <TooltipContent>Exportar conversación (PDF)</TooltipContent>
           </Tooltip>
 
           <Tooltip>
