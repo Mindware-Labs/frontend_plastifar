@@ -79,9 +79,9 @@ interface Flyout {
 }
 
 /**
- * Pastilla de conteo:
- * - Sin leer: rojo corporativo Plastifar (Pantone 185 C) con micro-relieve.
- * - Leído: total neutro discreto.
+ * Contador numérico estilo Gmail:
+ * - Con correos sin leer: tipografía destacada con acento de marca.
+ * - Solo leídos: número fino y neutro.
  */
 function FolderBadge({
   count,
@@ -90,30 +90,22 @@ function FolderBadge({
   count: { total: number; unread: number };
   isActive?: boolean;
 }) {
-  if (count.unread > 0) {
-    return (
-      <span
-        className="ml-auto flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-brand-red px-1.5 font-heading text-[10px] font-bold tabular-nums text-white shadow-xs transition-transform duration-150 group-hover:scale-105"
-      >
-        {count.unread > 99 ? "99+" : count.unread}
-      </span>
-    );
-  }
-
-  if (count.total === 0) return null;
+  if (count.unread <= 0) return null;
 
   return (
     <span
-      className={`ml-auto shrink-0 text-[11px] tabular-nums transition-colors ${
-        isActive ? "font-semibold text-brand-gray" : "font-medium text-faint group-hover:text-subtle"
+      className={`ml-auto shrink-0 font-heading text-[12px] font-bold tabular-nums transition-colors ${
+        isActive ? "text-brand-red-dark" : "text-zinc-900 group-hover:text-black"
       }`}
     >
-      {count.total}
+      {count.unread > 99 ? "99+" : count.unread}
     </span>
   );
 }
 
 const collapsedKey = "plf.sidebar-collapsed";
+const mailExpandedKey = "plf.sidebar-mail-expanded";
+const personalExpandedKey = "plf.sidebar-personal-expanded";
 
 /** En navegacion privada leer localStorage lanza: la barra abre expandida. */
 function readCollapsed() {
@@ -121,6 +113,15 @@ function readCollapsed() {
     return localStorage.getItem(collapsedKey) === "1";
   } catch {
     return false;
+  }
+}
+
+function readGroupExpanded(key: string, defaultValue = true) {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved !== null ? saved === "1" : defaultValue;
+  } catch {
+    return defaultValue;
   }
 }
 
@@ -135,6 +136,8 @@ export function Sidebar() {
   const { counts } = useEmailCounts();
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [mailExpanded, setMailExpanded] = useState(() => readGroupExpanded(mailExpandedKey));
+  const [personalExpanded, setPersonalExpanded] = useState(() => readGroupExpanded(personalExpandedKey));
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [editingSignature, setEditingSignature] = useState(false);
@@ -142,6 +145,34 @@ export function Sidebar() {
   const [flyout, setFlyout] = useState<Flyout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<number | null>(null);
+
+  function toggleGroup(label: string) {
+    if (label === "Correo") {
+      setMailExpanded((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem(mailExpandedKey, next ? "1" : "0");
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    } else if (label === "Personal") {
+      setPersonalExpanded((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem(personalExpandedKey, next ? "1" : "0");
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    }
+  }
+
+  function isGroupExpanded(label: string) {
+    return label === "Correo" ? mailExpanded : personalExpanded;
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -275,8 +306,8 @@ export function Sidebar() {
 
       {/* 2. Árbol de Navegación Principal */}
       <nav
-        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${
-          collapsed ? "flex flex-col items-center gap-2 px-2" : "px-3 space-y-4"
+        className={`flex-1 overflow-y-auto overflow-x-hidden py-2.5 ${
+          collapsed ? "flex flex-col items-center gap-2 px-2" : "pl-0 pr-3 space-y-3"
         }`}
       >
         {groups.map((group) =>
@@ -309,57 +340,83 @@ export function Sidebar() {
           ) : (
             /* Modo Extendido (Expandido) */
             <div key={group.label} className="flex flex-col">
-              <div className="flex items-center justify-between px-3 pb-1.5">
-                <span className="flex items-center gap-1.5 font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-subtle/85">
-                  <group.icon className="h-3 w-3 text-subtle" />
+              {/* Cabecera interactiva colapsable tipo select / acordeón */}
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.label)}
+                aria-expanded={isGroupExpanded(group.label)}
+                className="group/header flex w-full items-center justify-between pl-5 pr-3 py-1 text-left transition-colors duration-150 rounded-r-full hover:bg-zinc-100/70 outline-none focus-visible:ring-1 focus-visible:ring-brand-red/30 cursor-pointer select-none"
+                title={isGroupExpanded(group.label) ? `Ocultar ${group.label}` : `Mostrar ${group.label}`}
+              >
+                <span className="flex items-center gap-2 font-heading text-[10.5px] font-bold tracking-[0.08em] uppercase text-zinc-500 group-hover/header:text-zinc-800 transition-colors">
+                  <group.icon className="h-3.5 w-3.5 text-zinc-400 group-hover/header:text-zinc-600 transition-colors" />
                   {group.label}
                 </span>
-                {group.label === "Correo" && pendingMail > 0 && (
-                  <span className="font-heading text-[10px] font-bold tabular-nums text-brand-red">
-                    {pendingMail} pendientes
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-col gap-0.5">
-                {visibleChildren(group).map((child) => (
-                  <NavLink
-                    key={child.to}
-                    to={child.to}
-                    end={child.end}
-                    className={({ isActive }) =>
-                      `group relative flex items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-[13px] transition-all duration-150 outline-none ${
-                        isActive
-                          ? "bg-canvas border border-line-strong/70 text-ink font-heading font-semibold shadow-2xs"
-                          : "text-[#4e4e56] hover:bg-canvas/75 hover:text-ink border border-transparent hover:border-line-soft/80"
-                      }`
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        {/* Micro-contenedor del icono */}
-                        <div
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-edge transition-all duration-150 ${
+                <div className="flex items-center gap-1.5">
+                  {!isGroupExpanded(group.label) && group.label === "Correo" && pendingMail > 0 && (
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand-red px-1.5 font-heading text-[9.5px] font-bold text-white shadow-2xs">
+                      {pendingMail > 99 ? "99+" : pendingMail}
+                    </span>
+                  )}
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 ease-out group-hover/header:text-zinc-700 ${
+                      isGroupExpanded(group.label) ? "rotate-0" : "-rotate-90"
+                    }`}
+                  />
+                </div>
+              </button>
+
+              {/* Opciones con animación suave de colapso y estilo Gmail */}
+              <div
+                className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                  isGroupExpanded(group.label)
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0 pointer-events-none"
+                }`}
+              >
+                <div className="overflow-hidden flex flex-col gap-0.5 pt-0.5">
+                  {visibleChildren(group).map((child) => {
+                    const hasUnread = Boolean(child.folder && counts && counts[child.folder]?.unread > 0);
+                    return (
+                      <NavLink
+                        key={child.to}
+                        to={child.to}
+                        end={child.end}
+                        className={({ isActive }) =>
+                          `group relative flex h-[34px] items-center gap-3.5 rounded-r-full pl-5 pr-3 text-[13px] transition-colors duration-150 outline-none select-none ${
                             isActive
-                              ? "bg-white text-ink border border-line/80 shadow-2xs"
-                              : "text-subtle group-hover:text-ink"
-                          }`}
-                        >
-                          <child.icon className="h-3.5 w-3.5" />
-                        </div>
+                              ? "bg-brand-red/[0.08] text-brand-red-dark font-bold"
+                              : hasUnread
+                              ? "text-zinc-900 font-bold hover:bg-zinc-100/80"
+                              : "text-zinc-700 font-medium hover:bg-zinc-100/80 hover:text-zinc-900"
+                          }`
+                        }
+                      >
+                        {({ isActive }) => (
+                          <>
+                            <child.icon
+                              className={`h-4 w-4 shrink-0 transition-colors ${
+                                isActive
+                                  ? "text-brand-red"
+                                  : hasUnread
+                                  ? "text-zinc-800"
+                                  : "text-zinc-500 group-hover:text-zinc-800"
+                              }`}
+                            />
 
-                        {/* Etiqueta del módulo o carpeta */}
-                        <span className="min-w-0 flex-1 truncate transition-colors duration-150">
-                          {child.label}
-                        </span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {child.label}
+                            </span>
 
-                        {/* Badge de conteo numérico */}
-                        {child.folder && counts && (
-                          <FolderBadge count={counts[child.folder]} isActive={isActive} />
+                            {child.folder && counts && (
+                              <FolderBadge count={counts[child.folder]} isActive={isActive} />
+                            )}
+                          </>
                         )}
-                      </>
-                    )}
-                  </NavLink>
-                ))}
+                      </NavLink>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           ),
@@ -372,7 +429,7 @@ export function Sidebar() {
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
           style={{ top: flyout.top, left: flyout.left }}
-          className="animate-plf-toast-in fixed z-40 w-[210px] rounded-edge border border-line bg-white/98 p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.14),0_2px_6px_rgba(27,27,29,0.04)] backdrop-blur-md"
+          className="animate-plf-toast-in fixed z-40 w-[210px] rounded-lg border border-line bg-white/98 p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.14),0_2px_6px_rgba(27,27,29,0.04)] backdrop-blur-md"
         >
           <div className="flex items-center justify-between border-b border-line-soft px-2.5 pb-2 pt-1.5">
             <span className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-subtle">
@@ -386,39 +443,44 @@ export function Sidebar() {
             )}
           </div>
           <div className="mt-1 flex flex-col gap-0.5">
-            {visibleChildren(flyout.group).map((child) => (
-              <NavLink
-                key={child.to}
-                to={child.to}
-                end={child.end}
-                onClick={() => setFlyout(null)}
-                className={({ isActive }) =>
-                  `group flex items-center gap-2 rounded-edge px-2.5 py-1.5 text-[12.5px] transition-colors ${
-                    isActive
-                      ? "bg-canvas border border-line-strong/70 text-ink font-heading font-semibold shadow-2xs"
-                      : "text-[#4e4e56] hover:bg-canvas/75 hover:text-ink border border-transparent"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <div
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-edge transition-colors ${
-                        isActive
-                          ? "bg-white text-ink border border-line/80 shadow-2xs"
-                          : "text-subtle group-hover:text-ink"
-                      }`}
-                    >
-                      <child.icon className="h-3.5 w-3.5" />
-                    </div>
-                    <span className="truncate flex-1">{child.label}</span>
-                    {child.folder && counts && (
-                      <FolderBadge count={counts[child.folder]} isActive={isActive} />
-                    )}
-                  </>
-                )}
-              </NavLink>
-            ))}
+            {visibleChildren(flyout.group).map((child) => {
+              const hasUnread = Boolean(child.folder && counts && counts[child.folder]?.unread > 0);
+              return (
+                <NavLink
+                  key={child.to}
+                  to={child.to}
+                  end={child.end}
+                  onClick={() => setFlyout(null)}
+                  className={({ isActive }) =>
+                    `group flex h-[32px] items-center gap-3 rounded-md px-2.5 text-[12.5px] transition-colors ${
+                      isActive
+                        ? "bg-brand-red/[0.08] text-brand-red-dark font-bold"
+                        : hasUnread
+                        ? "text-zinc-900 font-bold hover:bg-zinc-100/80"
+                        : "text-zinc-700 font-medium hover:bg-zinc-100/80 hover:text-zinc-900"
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <child.icon
+                        className={`h-4 w-4 shrink-0 transition-colors ${
+                          isActive
+                            ? "text-brand-red"
+                            : hasUnread
+                            ? "text-zinc-800"
+                            : "text-zinc-500 group-hover:text-zinc-800"
+                        }`}
+                      />
+                      <span className="truncate flex-1">{child.label}</span>
+                      {child.folder && counts && (
+                        <FolderBadge count={counts[child.folder]} isActive={isActive} />
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              );
+            })}
           </div>
         </div>
       )}
