@@ -3,15 +3,13 @@ export interface AdvancedFilters {
   since: string;
   until: string;
   hasAttachments: boolean;
-  /** Etiqueta exacta de la conversacion; vacio = cualquiera. */
-  tag: string;
 }
 
-export const EMPTY_FILTERS: AdvancedFilters = { since: "", until: "", hasAttachments: false, tag: "" };
+export const EMPTY_FILTERS: AdvancedFilters = { since: "", until: "", hasAttachments: false };
 
 export function countActive(filters: AdvancedFilters) {
   const hasDate = Boolean(filters.since || filters.until);
-  return (hasDate ? 1 : 0) + (filters.hasAttachments ? 1 : 0) + (filters.tag ? 1 : 0);
+  return (hasDate ? 1 : 0) + (filters.hasAttachments ? 1 : 0);
 }
 
 /** Medianoche local del dia: la persona piensa en su calendario, no en UTC. */
@@ -32,7 +30,6 @@ export function toQueryParams(filters: AdvancedFilters) {
     since: filters.since ? dayStart(filters.since).toISOString() : undefined,
     until: filters.until ? nextDay(filters.until).toISOString() : undefined,
     hasAttachments: filters.hasAttachments ? "true" : undefined,
-    tag: filters.tag || undefined,
   };
 }
 

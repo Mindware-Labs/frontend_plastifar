@@ -1,5 +1,5 @@
-import { Plus, StickyNote, Tag, Trash2, UserRound, X } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { StickyNote, Trash2, UserRound } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
@@ -9,45 +9,7 @@ import { Select, type SelectOption } from "../../components/ui/Select";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatDateTime } from "../../lib/format";
-import type { EmailNoteResponse, StaffOptionResponse, TagCountResponse } from "../../types/api";
-
-/** Color estable por etiqueta: la misma palabra siempre se pinta igual. */
-const TAG_TONES = [
-  "bg-brand-red/10 text-brand-red-dark",
-  "bg-brand-green/10 text-brand-green",
-  "bg-warn/10 text-warn",
-  "bg-sky-500/10 text-sky-700",
-  "bg-violet-500/10 text-violet-700",
-  "bg-fill text-brand-gray",
-];
-
-export function tagTone(tag: string) {
-  let hash = 0;
-  for (const char of tag) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return TAG_TONES[hash % TAG_TONES.length];
-}
-
-export function TagChip({ tag, small = false, onRemove }: { tag: string; small?: boolean; onRemove?: () => void }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full font-heading font-bold uppercase tracking-[0.06em] ${tagTone(tag)} ${
-        small ? "px-1.5 py-px text-[9.5px]" : "h-5 px-2 text-[10px]"
-      }`}
-    >
-      {tag}
-      {onRemove && (
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`Quitar la etiqueta ${tag}`}
-          className="opacity-60 transition-opacity hover:opacity-100"
-        >
-          <X className="h-2.5 w-2.5" />
-        </button>
-      )}
-    </span>
-  );
-}
+import type { EmailNoteResponse, StaffOptionResponse } from "../../types/api";
 
 const labelClass = "font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint";
 
@@ -263,10 +225,21 @@ export function AssignmentControl({
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <UserRound className="h-3.5 w-3.5 shrink-0 text-faint" />
+    <div className="flex min-w-0 items-center gap-1.5">
       <Select
-        size="sm"
+        size="xs"
+        variant="subtle"
+        leftIcon={
+          <UserRound
+            className={`h-3 w-3 shrink-0 ${
+              mine
+                ? "text-brand-red"
+                : assignedStaffId !== null
+                  ? "text-ink/80"
+                  : "text-faint"
+            }`}
+          />
+        }
         value={assignedStaffId !== null ? String(assignedStaffId) : ""}
         disabled={busy || options === null}
         onChange={(next) => {
@@ -287,16 +260,16 @@ export function AssignmentControl({
         placeholder="Sin asignar"
         state={error ? "error" : "idle"}
         aria-label="Asignar la conversación"
-        className="w-[190px] sm:w-[200px]"
+        className="w-auto min-w-[130px] max-w-[190px]"
       />
       {!mine && user && (
         <button
           type="button"
           disabled={busy}
           onClick={() => assign(user.staffId)}
-          className="shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10px] font-bold uppercase
-            tracking-[0.08em] text-brand-red-dark outline-none transition-colors hover:bg-brand-red/[0.06]
-            focus-visible:ring-3 focus-visible:ring-brand-red/20 disabled:opacity-50"
+          className="flex h-7 shrink-0 items-center rounded-edge px-2 font-heading text-[10px] font-bold uppercase
+            tracking-[0.06em] text-brand-red-dark outline-none transition-colors hover:bg-brand-red/[0.06]
+            focus-visible:ring-2 focus-visible:ring-brand-red/20 disabled:opacity-50"
         >
           Asignarme
         </button>
@@ -315,120 +288,6 @@ export function AssignmentControl({
           }}
         />
       )}
-    </div>
-  );
-}
-
-interface TagEditorProps {
-  emailId: number;
-  tags: string[];
-  onChanged: (tags: string[]) => void;
-}
-
-/** Etiquetas libres de la conversacion, con las ya usadas como sugerencia. */
-export function TagEditor({ emailId, tags, onChanged }: TagEditorProps) {
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [known, setKnown] = useState<TagCountResponse[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!adding) return;
-    emailsApi
-      .tags()
-      .then(setKnown)
-      .catch(() => undefined);
-  }, [adding]);
-
-  async function save(next: string[]) {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await emailsApi.updateTags(emailId, next);
-      onChanged(result.tags);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudieron guardar las etiquetas");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function add(raw: string) {
-    const tag = raw.trim().toLowerCase();
-    if (!tag) return;
-    setDraft("");
-    if (tags.includes(tag)) return;
-    void save([...tags, tag]);
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter" || event.key === ",") {
-      event.preventDefault();
-      add(draft);
-    } else if (event.key === "Escape") {
-      setAdding(false);
-      setDraft("");
-    }
-  }
-
-  const term = draft.trim().toLowerCase();
-  const suggestions = known.filter((k) => !tags.includes(k.tag) && (!term || k.tag.includes(term))).slice(0, 6);
-
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-      <Tag className="h-3.5 w-3.5 shrink-0 text-faint" />
-      {tags.map((tag) => (
-        <TagChip key={tag} tag={tag} onRemove={() => save(tags.filter((t) => t !== tag))} />
-      ))}
-
-      {adding ? (
-        <div className="relative">
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={() => setTimeout(() => setAdding(false), 150)}
-            placeholder="etiqueta"
-            maxLength={30}
-            autoFocus
-            className="h-5 w-28 rounded-edge border border-line bg-white px-1.5 text-[11px] text-ink outline-none
-              focus-visible:border-brand-red/40"
-          />
-          {suggestions.length > 0 && (
-            <ul className="absolute left-0 top-full z-30 mt-1 w-44 rounded-edge border border-line bg-white py-1 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.14)]">
-              {suggestions.map((suggestion) => (
-                <li key={suggestion.tag}>
-                  <button
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => add(suggestion.tag)}
-                    className="flex w-full items-center justify-between px-2.5 py-1 text-left text-[11.5px] text-ink hover:bg-brand-red/[0.05]"
-                  >
-                    {suggestion.tag}
-                    <span className="text-[10px] text-faint">{suggestion.count}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          disabled={busy}
-          title="Agregar etiqueta"
-          className="inline-flex h-5 items-center gap-0.5 rounded-full border border-dashed border-line px-1.5
-            font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint transition-colors
-            hover:border-brand-red/40 hover:text-brand-red-dark disabled:opacity-50"
-        >
-          <Plus className="h-2.5 w-2.5" />
-          Etiqueta
-        </button>
-      )}
-      {error && <span className="text-[11px] text-brand-red-dark">{error}</span>}
     </div>
   );
 }

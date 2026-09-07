@@ -5,7 +5,6 @@ import { formatEmailListDate, formatTicketCode } from "../../lib/format";
 import type { EmailSummaryResponse } from "../../types/api";
 import { ticketBadgeClass } from "./badgeStyles";
 import { SelectBox } from "./SelectionBar";
-import { TagChip } from "./ConversationTools";
 
 interface ConversationRowProps {
   email: EmailSummaryResponse;
@@ -194,38 +193,33 @@ export function ConversationRow({
 
         <div className="line-clamp-1 w-full text-[11.5px] text-subtle">{email.preview}</div>
 
-        {((email.tags ?? []).length > 0 || email.assignedStaffName) && (
+        {email.assignedStaffName && (
           <div className="mt-0.5 flex w-full flex-wrap items-center gap-1">
-            {(email.tags ?? []).map((tag) => (
-              <TagChip key={tag} tag={tag} small />
-            ))}
-            {email.assignedStaffName && (
+            <span
+              title={
+                email.assignedUnseen
+                  ? `Te asignaron esta conversación · Atiende ${email.assignedStaffName}`
+                  : `Atiende ${email.assignedStaffName}`
+              }
+              className={`ml-auto inline-flex items-center gap-1 text-[10px] font-medium ${
+                email.assignedUnseen ? "text-brand-red-dark font-semibold" : "text-faint"
+              }`}
+            >
+              {email.assignedUnseen && (
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red shadow-[0_0_6px_rgba(228,0,43,0.5)]"
+                />
+              )}
               <span
-                title={
-                  email.assignedUnseen
-                    ? `Te asignaron esta conversación · Atiende ${email.assignedStaffName}`
-                    : `Atiende ${email.assignedStaffName}`
-                }
-                className={`ml-auto inline-flex items-center gap-1 text-[10px] font-medium ${
-                  email.assignedUnseen ? "text-brand-red-dark font-semibold" : "text-faint"
+                className={`flex size-3.5 items-center justify-center rounded-full text-[8px] font-bold ${
+                  email.assignedUnseen ? "bg-brand-red/15 text-brand-red-dark" : "bg-fill text-brand-gray"
                 }`}
               >
-                {email.assignedUnseen && (
-                  <span
-                    aria-hidden
-                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red shadow-[0_0_6px_rgba(228,0,43,0.5)]"
-                  />
-                )}
-                <span
-                  className={`flex size-3.5 items-center justify-center rounded-full text-[8px] font-bold ${
-                    email.assignedUnseen ? "bg-brand-red/15 text-brand-red-dark" : "bg-fill text-brand-gray"
-                  }`}
-                >
-                  {initials(email.assignedStaffName)}
-                </span>
-                {email.assignedStaffName.split(" ")[0]}
+                {initials(email.assignedStaffName)}
               </span>
-            )}
+              {email.assignedStaffName.split(" ")[0]}
+            </span>
           </div>
         )}
       </div>

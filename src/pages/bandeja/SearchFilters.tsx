@@ -1,12 +1,9 @@
-import { Calendar, Paperclip, SlidersHorizontal, Tag, X } from "lucide-react";
-import { emailsApi } from "../../api/emails";
-import type { TagCountResponse } from "../../types/api";
+import { Calendar, Paperclip, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField } from "../../components/ui/Field";
 import { DateRangePicker } from "../../components/ui/DateRangePicker";
-import { Select } from "../../components/ui/Select";
 import { EMPTY_FILTERS, countActive, formatDay, type AdvancedFilters } from "./filterCriteria";
 
 const PANEL_WIDTH = 310;
@@ -23,16 +20,6 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
   const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
   const [draft, setDraft] = useState<AdvancedFilters>(value);
   const [error, setError] = useState<string | null>(null);
-  const [tags, setTags] = useState<TagCountResponse[]>([]);
-
-  // Las etiquetas en uso se piden al abrir el panel: cambian poco y no vale la pena tenerlas siempre.
-  useEffect(() => {
-    if (!open) return;
-    emailsApi
-      .tags()
-      .then(setTags)
-      .catch(() => undefined);
-  }, [open]);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLFormElement>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -198,33 +185,6 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
             onChange={(event) => setDraft({ ...draft, hasAttachments: event.target.checked })}
           />
 
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="filter-tag-select"
-              className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint"
-            >
-              Etiqueta
-            </label>
-            <Select
-              id="filter-tag-select"
-              size="sm"
-              value={draft.tag}
-              onChange={(tag) => setDraft({ ...draft, tag })}
-              options={[
-                { value: "", label: "Cualquiera" },
-                ...tags.map((item) => ({
-                  value: item.tag,
-                  label: `${item.tag} (${item.count})`,
-                })),
-                ...(draft.tag && !tags.some((item) => item.tag === draft.tag)
-                  ? [{ value: draft.tag, label: draft.tag }]
-                  : []),
-              ]}
-              placeholder="Cualquiera"
-              aria-label="Filtrar por etiqueta"
-            />
-          </div>
-
           {error && (
             <p role="alert" className="text-[11.5px] font-medium text-brand-red-dark">
               {error}
@@ -304,9 +264,6 @@ export function FilterChips({ value, onChange }: FilterButtonProps) {
           label="Con adjuntos"
           onRemove={() => onChange({ ...value, hasAttachments: false })}
         />
-      )}
-      {value.tag && (
-        <Chip icon={Tag} label={value.tag} onRemove={() => onChange({ ...value, tag: "" })} />
       )}
     </div>
   );

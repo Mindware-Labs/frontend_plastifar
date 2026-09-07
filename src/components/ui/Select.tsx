@@ -23,10 +23,13 @@ interface SelectProps {
   options: SelectOption[];
   placeholder?: string;
   size?: ControlSize;
+  variant?: "default" | "subtle";
+  leftIcon?: React.ReactNode;
   state?: FieldState;
   disabled?: boolean;
   id?: string;
   className?: string;
+  buttonClassName?: string;
   "aria-label"?: string;
   "aria-describedby"?: string;
 }
@@ -48,10 +51,13 @@ export function Select({
   options,
   placeholder = "Selecciona una opción",
   size = "md",
+  variant = "default",
+  leftIcon,
   state = "idle",
   disabled,
   id,
   className = "",
+  buttonClassName = "",
   "aria-label": ariaLabel,
   "aria-describedby": ariaDescribedBy,
 }: SelectProps) {
@@ -217,6 +223,24 @@ export function Select({
   }
 
   const resolved: FieldState = state;
+  const isSubtle = variant === "subtle";
+  const sizeClass = controlSizes[size];
+  const paddingClass =
+    size === "xs"
+      ? "px-2 py-0.5 gap-1.5"
+      : size === "sm"
+        ? "pl-2.5 pr-2 gap-2"
+        : "pl-3 pr-2.5 gap-2";
+
+  const subtleStateClasses: Record<FieldState, string> = {
+    idle: "border-line bg-canvas/70 hover:bg-canvas hover:border-line-strong text-ink shadow-2xs focus:border-brand-red/60 focus:ring-2 focus:ring-brand-red/15",
+    error: "border-brand-red/60 bg-brand-red/[0.04] text-ink focus:ring-2 focus:ring-brand-red/15",
+    valid: "border-brand-green/60 bg-brand-green/[0.03] focus:ring-2 focus:ring-brand-green/15",
+  };
+
+  const triggerVariantClass = isSubtle
+    ? subtleStateClasses[resolved]
+    : `${controlBase} ${stateClasses[resolved]}`;
 
   return (
     <div className={`relative ${className}`}>
@@ -235,14 +259,23 @@ export function Select({
         disabled={disabled}
         onClick={() => (open ? closeList() : openList())}
         onKeyDown={handleKeyDown}
-        className={`${controlBase} ${stateClasses[resolved]} ${controlSizes[size]}
-          flex items-center justify-between gap-2 pl-3 pr-2.5 font-medium
-          ${selected ? "text-ink" : "text-zinc-400"}`}
+        className={`${
+          isSubtle
+            ? "w-full rounded-edge border text-left outline-none transition-all disabled:cursor-not-allowed disabled:bg-canvas disabled:text-muted"
+            : ""
+        } ${triggerVariantClass} ${sizeClass} ${paddingClass}
+          flex items-center justify-between font-medium
+          ${selected ? "text-ink" : "text-zinc-400"} ${buttonClassName}`}
       >
-        <span className="truncate">{selected?.label ?? placeholder}</span>
+        <div className="flex min-w-0 items-center gap-1.5 truncate">
+          {leftIcon}
+          <span className="truncate">{selected?.label ?? placeholder}</span>
+        </div>
         <ChevronDown
           aria-hidden
-          className={`h-4 w-4 shrink-0 text-faint transition-transform ${open ? "rotate-180" : ""}`}
+          className={`${
+            size === "xs" ? "h-3 w-3" : "h-4 w-4"
+          } shrink-0 text-faint transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -270,7 +303,7 @@ export function Select({
                 left: anchor.left,
                 top: anchor.top,
                 bottom: anchor.bottom,
-                width: anchor.width,
+                width: Math.max(anchor.width, size === "xs" || isSubtle ? 180 : anchor.width),
                 maxHeight: PANEL_MAX_HEIGHT,
               }}
               className="animate-plf-toast-in z-[80] overflow-y-auto rounded-edge border border-line bg-white p-1
@@ -290,17 +323,25 @@ export function Select({
                     aria-disabled={option.disabled}
                     onMouseEnter={() => !option.disabled && setActiveIndex(index)}
                     onClick={() => commit(index)}
-                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge px-2.5 py-2
-                      text-[13px] transition-colors ${
-                        option.disabled
-                          ? "cursor-not-allowed text-zinc-300"
-                          : isActive
-                            ? "bg-fill text-ink"
-                            : "text-brand-gray"
-                      } ${isSelected ? "font-semibold text-ink" : ""}`}
+                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge transition-colors ${
+                      size === "xs" ? "px-2 py-1.5 text-[11.5px]" : "px-2.5 py-2 text-[13px]"
+                    } ${
+                      option.disabled
+                        ? "cursor-not-allowed text-zinc-300"
+                        : isActive
+                          ? "bg-fill text-ink"
+                          : "text-brand-gray"
+                    } ${isSelected ? "font-semibold text-ink" : ""}`}
                   >
                     <span className="truncate">{option.label}</span>
-                    {isSelected && <Check aria-hidden className="h-4 w-4 shrink-0 text-brand-red" />}
+                    {isSelected && (
+                      <Check
+                        aria-hidden
+                        className={`${
+                          size === "xs" ? "h-3.5 w-3.5" : "h-4 w-4"
+                        } shrink-0 text-brand-red`}
+                      />
+                    )}
                   </li>
                 );
               })}

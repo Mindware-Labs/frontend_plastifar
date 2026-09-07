@@ -15,10 +15,11 @@ export const stateClasses: Record<FieldState, string> = {
   valid: "border-brand-green/50 focus:border-brand-green focus:ring-3 focus:ring-brand-green/10",
 };
 
-/** Alturas: md para formularios, sm para barras de criterios y paginacion. */
+/** Alturas: md para formularios, sm para barras de criterios y paginacion, xs para cabeceras y barras compactas. */
 export const controlSizes = {
   md: "h-10 text-[13.5px]",
   sm: "h-8 text-[12.5px]",
+  xs: "h-7 text-[11.5px]",
 } as const;
 
 export type ControlSize = keyof typeof controlSizes;

@@ -4,7 +4,6 @@ import type {
   ContactResponse,
   EmailNoteResponse,
   StaffOptionResponse,
-  TagCountResponse,
   EmailBulkAction,
   EmailBulkResponse,
   EmailDetailResponse,
@@ -118,18 +117,13 @@ export const emailsApi = {
   retry: (id: number) =>
     apiRequest<EmailThreadMessageResponse>(`/api/emails/${id}/retry`, { method: "POST" }),
 
-  // ---- Conversacion: quien la atiende, etiquetas, notas, exportar ----
+  // ---- Conversacion: quien la atiende, notas, exportar ----
 
   assign: (id: number, staffId: number | null) =>
     apiRequest<{ assignedStaffId: number | null; assignedStaffName: string | null }>(`/api/emails/${id}/assign`, {
       method: "POST",
       body: JSON.stringify({ staffId }),
     }),
-
-  updateTags: (id: number, tags: string[]) =>
-    apiRequest<{ tags: string[] }>(`/api/emails/${id}/tags`, { method: "PUT", body: JSON.stringify({ tags }) }),
-
-  tags: () => apiRequest<TagCountResponse[]>("/api/emails/tags"),
 
   notes: (id: number) => apiRequest<EmailNoteResponse[]>(`/api/emails/${id}/notes`),
 

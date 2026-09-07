@@ -1,10 +1,10 @@
 import {
   ArrowRight,
   Clock,
+  HelpCircle,
   Inbox,
   Mail,
   PenLine,
-  Tag,
 } from "lucide-react";
 import { useAuth } from "../../context/useAuth";
 import { Logo } from "../../components/Logo";
@@ -132,7 +132,7 @@ export function InboxTriageEmptyState({
                   <span className="h-1.5 w-1.5 rounded-full bg-warn" />
                   Por clasificar
                 </span>
-                <Tag className="h-3.5 w-3.5 text-warn/60 transition-transform group-hover:scale-110" />
+                <HelpCircle className="h-3.5 w-3.5 text-warn/60 transition-transform group-hover:scale-110" />
               </div>
               <p className="mt-2 font-heading text-[22px] font-bold tabular-nums leading-none text-ink group-hover:text-warn">
                 {unlinkedCount}

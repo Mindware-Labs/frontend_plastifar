@@ -41,7 +41,7 @@ import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { CannedPicker, textToBlocks } from "./CannedPicker";
-import { AssignmentControl, TagEditor } from "./ConversationTools";
+import { AssignmentControl } from "./ConversationTools";
 import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
 import { RecipientInput } from "./RecipientInput";
 import { fieldLabelClass } from "./toolbarStyles";
@@ -728,7 +728,15 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           )}
         </div>
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1.5">
+          <AssignmentControl
+            emailId={email.id}
+            assignedStaffId={email.assignedStaffId ?? null}
+            assignedStaffName={email.assignedStaffName ?? null}
+            onChanged={(staffId, name) => setEmail({ ...email, assignedStaffId: staffId, assignedStaffName: name })}
+            onNoteAdded={() => setNotesRefreshKey((k) => k + 1)}
+          />
+
           {email.ticketId ? (
             <Badge variant="secondary" className={ticketBadgeClass}>
               {formatTicketCode(email.ticketId)}
@@ -770,14 +778,14 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         </div>
       )}
 
-      <div className="px-4 pb-3 pt-2.5">
+      <div className="px-4 pb-2.5 pt-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="font-heading text-[17px] font-bold leading-tight tracking-[-0.02em] text-ink">
               {email.subject || "(sin asunto)"}
             </h2>
 
-            <div className="mt-1.5 flex items-center gap-2">
+            <div className="mt-1 flex items-center gap-2">
               <Avatar className="size-7 shrink-0">
                 <AvatarFallback className="text-[10px]">{initials(displayName)}</AvatarFallback>
               </Avatar>
@@ -804,17 +812,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               {formatDateTime(email.createdAt)}
             </span>
           </div>
-        </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-          <AssignmentControl
-            emailId={email.id}
-            assignedStaffId={email.assignedStaffId ?? null}
-            assignedStaffName={email.assignedStaffName ?? null}
-            onChanged={(staffId, name) => setEmail({ ...email, assignedStaffId: staffId, assignedStaffName: name })}
-            onNoteAdded={() => setNotesRefreshKey((k) => k + 1)}
-          />
-          <TagEditor emailId={email.id} tags={email.tags ?? []} onChanged={(tags) => setEmail({ ...email, tags })} />
         </div>
 
         {composers.length > 0 && (

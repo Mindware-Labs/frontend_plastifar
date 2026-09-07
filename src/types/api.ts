@@ -158,7 +158,6 @@ export interface EmailSummaryResponse {
   assignedStaffName: string | null;
   /** Se la asignaron a quien consulta y todavia no la abrio desde entonces. */
   assignedUnseen: boolean;
-  tags: string[];
   starred: boolean;
 }
 
@@ -184,7 +183,6 @@ export interface EmailDetailResponse {
   thread: EmailThreadMessageResponse[];
   assignedStaffId: number | null;
   assignedStaffName: string | null;
-  tags: string[];
   starred: boolean;
 }
 
@@ -304,11 +302,6 @@ export interface EmailSuppressionResponse {
 export interface StaffOptionResponse {
   id: number;
   name: string;
-}
-
-export interface TagCountResponse {
-  tag: string;
-  count: number;
 }
 
 export interface EmailNoteResponse {
