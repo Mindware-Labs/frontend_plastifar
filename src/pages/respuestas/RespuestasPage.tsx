@@ -1,4 +1,4 @@
-import { MessageSquareText, Pencil, Plus, Trash2 } from "lucide-react";
+import { HelpCircle, MessageSquareText, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cannedApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
@@ -13,7 +13,8 @@ import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/useAuth";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse } from "../../types/api";
-import { CannedResponseModal } from "./CannedResponseModal";
+import { CannedResponseStudio } from "./CannedResponseStudio";
+import { RespuestasHelpSheet } from "./RespuestasHelpSheet";
 
 /** Respuestas predefinidas: se insertan en el editor desde "Respuestas rápidas". */
 export function RespuestasPage() {
@@ -24,6 +25,7 @@ export function RespuestasPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [modal, setModal] = useState<"nueva" | CannedResponseResponse | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   function load() {
     cannedApi
@@ -86,8 +88,17 @@ export function RespuestasPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <SearchInput value={search} onChange={setSearch} placeholder="Buscar por título o texto…" className="w-[260px]" />
+
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-edge border border-line bg-white px-3 py-1.5 text-[12px] font-medium text-brand-gray transition-[background-color,border-color,color] hover:border-line-strong hover:bg-canvas hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20 shadow-2xs"
+          >
+            <HelpCircle className="h-3.5 w-3.5 text-brand-red" />
+            <span>¿Para qué sirve?</span>
+          </button>
         </div>
 
         {error && (
@@ -149,7 +160,18 @@ export function RespuestasPage() {
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
 
       {modal !== null && (
-        <CannedResponseModal item={modal === "nueva" ? undefined : modal} onClose={() => setModal(null)} onSaved={load} />
+        <CannedResponseStudio
+          item={modal === "nueva" ? undefined : modal}
+          onClose={() => setModal(null)}
+          onSaved={load}
+        />
+      )}
+
+      {helpOpen && (
+        <RespuestasHelpSheet
+          onClose={() => setHelpOpen(false)}
+          onNewResponse={() => setModal("nueva")}
+        />
       )}
     </div>
   );
