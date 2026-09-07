@@ -1,6 +1,5 @@
 import {
   Archive,
-  Ban,
   Bell,
   ChevronDown,
   Inbox,
@@ -10,7 +9,6 @@ import {
   PenLine,
   MessageSquareText,
   Send,
-  Settings,
   ShieldCheck,
   Star,
   Trash2,
@@ -68,13 +66,6 @@ const groups: NavGroup[] = [
       { label: "Roles", to: "/roles", icon: ShieldCheck },
     ],
   },
-  {
-    label: "Configuración",
-    icon: Settings,
-    children: [
-      { label: "Supresión", to: "/configuracion/supresion", icon: Ban },
-    ],
-  },
 ];
 
 /** Panel de hijos anclado al icono: se posiciona fijo para que el riel no lo recorte. */
@@ -112,7 +103,6 @@ function FolderBadge({
 const collapsedKey = "plf.sidebar-collapsed";
 const mailExpandedKey = "plf.sidebar-mail-expanded";
 const personalExpandedKey = "plf.sidebar-personal-expanded";
-const configExpandedKey = "plf.sidebar-config-expanded";
 
 /** En navegacion privada leer localStorage lanza: la barra abre expandida. */
 function readCollapsed() {
@@ -145,7 +135,6 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [mailExpanded, setMailExpanded] = useState(() => readGroupExpanded(mailExpandedKey));
   const [personalExpanded, setPersonalExpanded] = useState(() => readGroupExpanded(personalExpandedKey));
-  const [configExpanded, setConfigExpanded] = useState(() => readGroupExpanded(configExpandedKey));
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [editingSignature, setEditingSignature] = useState(false);
@@ -175,23 +164,12 @@ export function Sidebar() {
         }
         return next;
       });
-    } else if (label === "Configuración") {
-      setConfigExpanded((prev) => {
-        const next = !prev;
-        try {
-          localStorage.setItem(configExpandedKey, next ? "1" : "0");
-        } catch {
-          // ignore
-        }
-        return next;
-      });
     }
   }
 
   function isGroupExpanded(label: string) {
     if (label === "Correo") return mailExpanded;
     if (label === "Personal") return personalExpanded;
-    if (label === "Configuración") return configExpanded;
     return true;
   }
 

@@ -288,16 +288,6 @@ export interface EmptyTrashResponse {
   kept: number;
 }
 
-/** Direccion a la que no se envia; reason: Bounced | Complained | Manual. */
-export interface EmailSuppressionResponse {
-  id: number;
-  address: string;
-  reason: string;
-  detail: string | null;
-  /** El envio que la provoco, si vino de un rebote o una queja. */
-  emailId: number | null;
-  createdAt: string;
-}
 
 export interface StaffOptionResponse {
   id: number;
@@ -335,10 +325,3 @@ export interface ComposingPresence {
   active: boolean;
 }
 
-export interface EmailSuppressionListResponse {
-  items: EmailSuppressionResponse[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-}
