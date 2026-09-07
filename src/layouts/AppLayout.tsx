@@ -4,7 +4,7 @@ import { Sidebar } from "../components/app/Sidebar";
 import { ReceiptStack } from "../components/app/ReceiptStack";
 import { EmailCountsProvider } from "../context/EmailCountsContext";
 import { ReceiptProvider } from "../context/ReceiptContext";
-
+// .
 export function AppLayout() {
   return (
     <EmailCountsProvider>
