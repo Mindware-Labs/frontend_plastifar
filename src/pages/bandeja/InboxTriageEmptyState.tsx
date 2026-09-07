@@ -81,7 +81,9 @@ export function InboxTriageEmptyState({
             ? "Historial de conversaciones resueltas y archivadas"
             : folder === "trash"
             ? "Papelera de reciclaje y retención de historial"
-            : "Carpeta de correo no deseado"}
+            : folder === "starred"
+            ? "Conversaciones marcadas con estrella para acceso rápido"
+            : "Bandeja de correo"}
         </p>
 
         {/* Tarjetas operativas de estado (solo en bandeja de entrada) */}

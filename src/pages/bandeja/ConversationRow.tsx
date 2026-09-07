@@ -1,4 +1,4 @@
-import { CornerUpLeft, MessagesSquare, Paperclip } from "lucide-react";
+import { CornerUpLeft, MessagesSquare, Paperclip, Star } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
 import { Badge } from "../../components/shadcn/badge";
 import { formatEmailListDate, formatTicketCode } from "../../lib/format";
@@ -17,6 +17,7 @@ interface ConversationRowProps {
   selectable: boolean;
   onOpen: () => void;
   onToggle: (shiftKey: boolean) => void;
+  onToggleStar?: () => void;
 }
 
 /** Solo lo que no es normal: en cola o fallido. Lo entregado no necesita distintivo. */
@@ -47,6 +48,7 @@ export function ConversationRow({
   selectable,
   onOpen,
   onToggle,
+  onToggleStar,
 }: ConversationRowProps) {
   const name = email.fromName ?? email.fromEmail;
   const delivery = email.deliveryStatus ? deliveryBadges[email.deliveryStatus] : undefined;
@@ -70,10 +72,17 @@ export function ConversationRow({
         data-[checked=true]:border-line-strong data-[checked=true]:bg-fill/60
         has-[button[role=checkbox]:focus-visible]:border-line-strong"
     >
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onOpen}
-        className="flex w-full flex-col items-start gap-0.5 rounded-edge px-2.5 py-2 text-left outline-none
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpen();
+          }
+        }}
+        className="flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-edge px-2.5 py-2 text-left outline-none
           focus-visible:ring-3 focus-visible:ring-line-strong/30"
       >
         <div className="flex w-full items-center gap-1.5">
@@ -111,9 +120,32 @@ export function ConversationRow({
           >
             {name}
           </span>
-          <span className="ml-auto shrink-0 text-[10.5px] font-medium text-faint">
-            {formatEmailListDate(email.createdAt)}
-          </span>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <span className="text-[10.5px] font-medium text-faint">
+              {formatEmailListDate(email.createdAt)}
+            </span>
+            {onToggleStar && (
+              <button
+                type="button"
+                aria-label={email.starred ? "Quitar de destacados" : "Destacar"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleStar();
+                }}
+                className={`flex size-4 items-center justify-center rounded outline-none transition-all focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                  email.starred
+                    ? "text-amber-500 hover:text-amber-600 opacity-100"
+                    : "text-zinc-300 opacity-0 group-hover:opacity-100 hover:text-amber-500"
+                }`}
+              >
+                <Star
+                  className={`size-3.5 transition-transform active:scale-90 ${
+                    email.starred ? "fill-amber-400 text-amber-500" : ""
+                  }`}
+                />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Distintivos al final del asunto: se ahorra una fila entera por tarjeta. */}
@@ -196,7 +228,7 @@ export function ConversationRow({
             )}
           </div>
         )}
-      </button>
+      </div>
 
       {selectable && (
         <SelectBox

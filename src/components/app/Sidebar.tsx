@@ -10,8 +10,8 @@ import {
   PenLine,
   MessageSquareText,
   Send,
-  ShieldAlert,
   ShieldCheck,
+  Star,
   Trash2,
   Users,
   type LucideIcon,
@@ -33,7 +33,7 @@ interface NavItem {
   /** Coincidencia exacta: evita que "/bandeja" quede activa también en sus subcarpetas. */
   end?: boolean;
   /** Carpeta de correo cuyo contador se refleja al final del renglón. */
-  folder?: "inbox" | "archived" | "junk" | "trash" | "sent";
+  folder?: "inbox" | "archived" | "starred" | "trash" | "sent";
   /** Solo lo ve un administrador. */
   adminOnly?: boolean;
 }
@@ -52,9 +52,9 @@ const groups: NavGroup[] = [
     icon: Inbox,
     children: [
       { label: "Bandeja", to: "/bandeja", end: true, folder: "inbox", icon: Inbox },
+      { label: "Destacados", to: "/bandeja/destacados", folder: "starred", icon: Star },
       { label: "Enviados", to: "/bandeja/enviados", folder: "sent", icon: Send },
       { label: "Archivados", to: "/bandeja/archivados", folder: "archived", icon: Archive },
-      { label: "No deseado", to: "/bandeja/junk", folder: "junk", icon: ShieldAlert },
       { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
       { label: "Supresión", to: "/bandeja/supresion", icon: Ban },
       { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
@@ -243,7 +243,7 @@ export function Sidebar() {
   const displayName = formatDisplayName(user?.firstName, user?.lastName, user?.email);
   const initials = formatInitials(user?.firstName, user?.lastName, user?.email);
   const pendingMail = counts
-    ? counts.inbox.unread + counts.archived.unread + counts.junk.unread + counts.trash.unread
+    ? counts.inbox.unread + counts.archived.unread + counts.starred.unread + counts.trash.unread
     : 0;
 
   return (

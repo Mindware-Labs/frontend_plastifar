@@ -5,7 +5,8 @@ import {
   Mail,
   MailOpen,
   Minus,
-  ShieldAlert,
+  Star,
+  StarOff,
   Trash2,
   X,
 } from "lucide-react";
@@ -69,15 +70,17 @@ const READ_TOOLS: Tool[] = [
 const MOVE_TOOLS: Record<Exclude<FolderKey, "sent">, Tool[]> = {
   inbox: [
     { action: "archive", label: "Archivar", icon: Archive },
-    { action: "junk", label: "Marcar como no deseado", icon: ShieldAlert },
+    { action: "star", label: "Destacar", icon: Star },
     { action: "trash", label: "Mover a la papelera", icon: Trash2 },
   ],
   archived: [
     { action: "restore", label: "Devolver a la bandeja", icon: ArchiveRestore },
+    { action: "star", label: "Destacar", icon: Star },
     { action: "trash", label: "Mover a la papelera", icon: Trash2 },
   ],
-  junk: [
-    { action: "restore", label: "Devolver a la bandeja", icon: ArchiveRestore },
+  starred: [
+    { action: "unstar", label: "Quitar de destacados", icon: StarOff },
+    { action: "archive", label: "Archivar", icon: Archive },
     { action: "trash", label: "Mover a la papelera", icon: Trash2 },
   ],
   trash: [

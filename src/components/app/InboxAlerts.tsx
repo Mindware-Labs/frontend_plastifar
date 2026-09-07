@@ -15,8 +15,8 @@ export function InboxAlerts() {
   useEffect(
     () =>
       onInboxReceived((arrival) => {
-        // Lo que cae en No deseado no merece un aviso.
-        if (arrival.folder === "Junk") return;
+        // Lo que cae en la papelera no merece un aviso.
+        if (arrival.folder === "Trash") return;
 
         const prefs = readPrefs();
         if (prefs.sound) playChime();

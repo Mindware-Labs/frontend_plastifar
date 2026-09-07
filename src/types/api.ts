@@ -159,6 +159,7 @@ export interface EmailSummaryResponse {
   /** Se la asignaron a quien consulta y todavia no la abrio desde entonces. */
   assignedUnseen: boolean;
   tags: string[];
+  starred: boolean;
 }
 
 export type EmailFolder = "Inbox" | "Archived" | "Junk" | "Trash";
@@ -184,6 +185,7 @@ export interface EmailDetailResponse {
   assignedStaffId: number | null;
   assignedStaffName: string | null;
   tags: string[];
+  starred: boolean;
 }
 
 /** Un correo de la conversacion, venga del cliente o de nosotros. */
@@ -242,7 +244,7 @@ export interface FolderCount {
 export interface EmailFolderCounts {
   inbox: FolderCount;
   archived: FolderCount;
-  junk: FolderCount;
+  starred: FolderCount;
   trash: FolderCount;
   sent: FolderCount;
   /** Asignadas a quien consulta y sin abrir desde entonces, en cualquier carpeta. */
@@ -275,7 +277,7 @@ export interface EmailAssignment {
 }
 
 /** Cada id representa a su conversacion entera, como en las acciones sueltas. */
-export type EmailBulkAction = "archive" | "junk" | "trash" | "restore" | "read" | "unread" | "delete";
+export type EmailBulkAction = "archive" | "star" | "unstar" | "trash" | "restore" | "read" | "unread" | "delete";
 
 export interface EmailBulkResponse {
   /** En delete pueden ser menos que las pedidas: las que tienen ticket se conservan. */

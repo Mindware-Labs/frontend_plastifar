@@ -27,13 +27,13 @@ import { EMPTY_FILTERS, countActive, toQueryParams, type AdvancedFilters } from 
 import { SelectionBar } from "./SelectionBar";
 import { InboxTriageEmptyState } from "./InboxTriageEmptyState";
 
-export type FolderKey = "inbox" | "archived" | "junk" | "trash" | "sent";
+export type FolderKey = "inbox" | "archived" | "starred" | "trash" | "sent";
 type TicketFilter = "todos" | "sin-ticket" | "sin-responder" | "mios";
 
 const folderMeta: Record<FolderKey, { title: string; emptyText: string }> = {
   inbox: { title: "Bandeja", emptyText: "Todavía no llegó ningún correo." },
+  starred: { title: "Destacados", emptyText: "No tienes correos destacados. Marca cualquier correo con la estrella para encontrarlo aquí." },
   archived: { title: "Archivados", emptyText: "No hay correos archivados." },
-  junk: { title: "No deseado", emptyText: "No hay correos marcados como no deseados." },
   trash: { title: "Papelera", emptyText: "La papelera está vacía." },
   sent: { title: "Enviados", emptyText: "Todavía no enviaste ningún correo." },
 };
@@ -77,12 +77,19 @@ const BULK: Record<EmailBulkAction, BulkMeta> = {
     undo: { action: "restore", label: "Devolver a la bandeja" },
     closesOpen: true,
   },
-  junk: {
-    receipt: "junk",
-    done: (n) => conversations(n, "movida a No deseado", "movidas a No deseado"),
-    failed: "No se pudo mover a No deseado",
-    undo: { action: "restore", label: "Devolver a la bandeja" },
-    closesOpen: true,
+  star: {
+    receipt: "destacar",
+    done: (n) => conversations(n, "destacada", "destacadas"),
+    failed: "No se pudo destacar",
+    undo: { action: "unstar", label: "Quitar de destacados" },
+    closesOpen: false,
+  },
+  unstar: {
+    receipt: "quitar-destacado",
+    done: (n) => conversations(n, "quitada de destacados", "quitadas de destacados"),
+    failed: "No se pudo quitar de destacados",
+    undo: { action: "star", label: "Destacar" },
+    closesOpen: false,
   },
   trash: {
     receipt: "papelera",
@@ -228,6 +235,22 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     }
   }
 
+  async function handleToggleStar(id: number) {
+    const target = rows.find((row) => row.id === id);
+    if (!target) return;
+    const nextStarred = !target.starred;
+    try {
+      await emailsApi.toggleStar(id, nextStarred);
+      refresh();
+      refreshCounts();
+    } catch {
+      receipts.failed({
+        action: "destacar",
+        title: "No se pudo actualizar destacados",
+      });
+    }
+  }
+
   /** Shift extiende la marca desde la ultima fila tocada, como en cualquier lista de archivos. */
   function toggleChecked(email: EmailSummaryResponse, shiftKey: boolean) {
     const index = rows.findIndex((row) => row.id === email.id);
@@ -329,7 +352,9 @@ export function BandejaPage({ folder }: BandejaPageProps) {
           : undefined,
       });
 
-      if (info.closesOpen && selectedId !== null && ids.includes(selectedId)) setSelectedId(null);
+      if ((info.closesOpen || (folder === "starred" && action === "unstar")) && selectedId !== null && ids.includes(selectedId)) {
+        setSelectedId(null);
+      }
       setChecked(new Set());
       refreshAll();
     } catch (err) {
@@ -563,6 +588,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                           selectable={selectable}
                           onOpen={() => handleOpen(email)}
                           onToggle={(shiftKey) => toggleChecked(email, shiftKey)}
+                          onToggleStar={() => handleToggleStar(email.id)}
                         />
                       ))}
                     </div>
@@ -613,6 +639,13 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                     emailId={selectedId}
                     onTicketCreated={refresh}
                     onMoved={handleMoved}
+                    onStarred={(starred) => {
+                      refresh();
+                      refreshCounts();
+                      if (folder === "starred" && !starred) {
+                        setSelectedId(null);
+                      }
+                    }}
                     onClose={() => setSelectedId(null)}
                   />
                 ) : (

@@ -33,8 +33,9 @@ export default function App() {
         }
       >
         <Route path="/bandeja" element={<BandejaPage folder="inbox" />} />
+        <Route path="/bandeja/destacados" element={<BandejaPage folder="starred" />} />
+        <Route path="/bandeja/junk" element={<Navigate to="/bandeja/destacados" replace />} />
         <Route path="/bandeja/archivados" element={<BandejaPage folder="archived" />} />
-        <Route path="/bandeja/junk" element={<BandejaPage folder="junk" />} />
         <Route path="/bandeja/papelera" element={<BandejaPage folder="trash" />} />
         <Route path="/bandeja/enviados" element={<BandejaPage folder="sent" />} />
         <Route path="/bandeja/supresion" element={<SupresionesPage />} />

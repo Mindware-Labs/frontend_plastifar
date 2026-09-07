@@ -18,7 +18,7 @@ import type {
 export interface EmailQuery {
   page: number;
   pageSize: number;
-  /** inbox | archived | junk | trash | sent */
+  /** inbox | archived | starred | trash | sent */
   folder?: string;
   /** todos | sin-ticket | con-ticket | sin-responder */
   filter?: string;
@@ -150,7 +150,11 @@ export const emailsApi = {
 
   archive: (id: number) => apiRequest<void>(`/api/emails/${id}/archive`, { method: "POST" }),
 
-  markAsJunk: (id: number) => apiRequest<void>(`/api/emails/${id}/junk`, { method: "POST" }),
+  toggleStar: (id: number, starred?: boolean) =>
+    apiRequest<{ starred: boolean }>(`/api/emails/${id}/star`, {
+      method: "POST",
+      body: JSON.stringify({ starred }),
+    }),
 
   trash: (id: number) => apiRequest<void>(`/api/emails/${id}/trash`, { method: "POST" }),
 

@@ -9,6 +9,7 @@ import {
   PencilLine,
   RotateCcw,
   ShieldAlert,
+  Star,
   Ticket as TicketIcon,
   Trash2,
   X,
@@ -64,6 +65,8 @@ interface EmailDetailPaneProps {
   onTicketCreated: () => void;
   /** El correo cambió de carpeta: ya no pertenece a la vista actual. */
   onMoved: () => void;
+  /** El correo cambió su estado de destacado. */
+  onStarred?: (starred: boolean) => void;
   /** Cierra el panel y deja la lista sin seleccion. */
   onClose: () => void;
 }
@@ -87,12 +90,6 @@ const MOVES: Record<string, MoveKind> = {
     done: "Archivado",
     failed: "No se pudo archivar",
     run: (id) => emailsApi.archive(id),
-  },
-  junk: {
-    action: "junk",
-    done: "Movido a No deseado",
-    failed: "No se pudo mover a No deseado",
-    run: (id) => emailsApi.markAsJunk(id),
   },
   papelera: {
     action: "papelera",
@@ -189,12 +186,13 @@ function initials(name: string) {
  * dangerouslySetInnerHTML. Un iframe con sandbox vacio lo aisla por completo
  * (sin scripts, sin acceso al DOM de la app) y aun asi se ve con su formato.
  */
-export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: EmailDetailPaneProps) {
+export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, onClose }: EmailDetailPaneProps) {
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
+  const [starring, setStarring] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
@@ -591,6 +589,30 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
     }
   }
 
+  async function handleToggleStar() {
+    if (!email || starring) return;
+    setStarring(true);
+    const nextStarred = !email.starred;
+    try {
+      await emailsApi.toggleStar(email.id, nextStarred);
+      setEmail({ ...email, starred: nextStarred });
+      receipts.done({
+        action: nextStarred ? "destacar" : "quitar-destacado",
+        title: nextStarred ? "Añadido a destacados" : "Quitado de destacados",
+        detail: email.subject || "(sin asunto)",
+      });
+      onStarred?.(nextStarred);
+    } catch (err) {
+      receipts.failed({
+        action: "destacar",
+        title: "No se pudo actualizar destacados",
+        detail: err instanceof ApiError ? err.message : undefined,
+      });
+    } finally {
+      setStarring(false);
+    }
+  }
+
   if (error) {
     return (
       <div className="p-6">
@@ -623,6 +645,22 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
     <div className="flex h-full flex-col">
       <div className="flex items-center px-2 py-1.5">
         <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`${toolButtonClass} ${email.starred ? "text-amber-500 hover:text-amber-600" : ""}`}
+                disabled={starring}
+                onClick={handleToggleStar}
+                aria-label={email.starred ? "Quitar de destacados" : "Destacar"}
+              >
+                <Star className={`h-4 w-4 ${email.starred ? "fill-amber-400 text-amber-500" : ""}`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{email.starred ? "Quitar de destacados" : "Destacar"}</TooltipContent>
+          </Tooltip>
+
           {isInInbox ? (
             <>
               <Tooltip>
@@ -638,20 +676,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Archivar</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={toolButtonClass}
-                    disabled={moving}
-                    onClick={() => handleMove(MOVES.junk)}
-                  >
-                    <ShieldAlert />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Marcar como no deseado</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
