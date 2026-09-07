@@ -1,4 +1,4 @@
-import type { InboxArrival } from "../types/api";
+import type { EmailAssignment, InboxArrival } from "../types/api";
 
 /** Preferencias de aviso de cada persona. Viven en este navegador, como los borradores. */
 export interface NotifyPrefs {
@@ -117,6 +117,32 @@ export function showArrival(arrival: InboxArrival, onOpen: () => void): Notifica
       body: arrival.hasAttachments ? `${subject} · con adjuntos` : subject,
       // El mismo correo reintentado por el servidor no apila dos avisos.
       tag: `plf-mail-${arrival.emailId}`,
+      icon: "/brand/plastifar-isotipo.png",
+    });
+
+    notification.onclick = () => {
+      onOpen();
+      notification.close();
+    };
+
+    return notification;
+  } catch {
+    return null;
+  }
+}
+
+/** Notificacion del sistema para una conversacion recien asignada. */
+export function showAssignment(assignment: EmailAssignment, onOpen: () => void): Notification | null {
+  if (desktopState() !== "granted") return null;
+
+  const from = assignment.fromName ?? assignment.fromEmail;
+  const subject = assignment.subject.trim() || "(sin asunto)";
+
+  try {
+    const notification = new Notification(`${assignment.assignedByName} te asignó un correo`, {
+      body: `De ${from} · ${subject}`,
+      // La misma asignacion reintentada por el servidor no apila dos avisos.
+      tag: `plf-assign-${assignment.emailId}`,
       icon: "/brand/plastifar-isotipo.png",
     });
 

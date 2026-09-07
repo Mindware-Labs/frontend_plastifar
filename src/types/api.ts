@@ -260,6 +260,16 @@ export interface InboxArrival {
   hasAttachments: boolean;
 }
 
+/** Aviso en vivo de que a esta persona le asignaron una conversacion. */
+export interface EmailAssignment {
+  emailId: number;
+  subject: string;
+  fromEmail: string;
+  fromName: string | null;
+  assignedStaffId: number;
+  assignedByName: string;
+}
+
 /** Cada id representa a su conversacion entera, como en las acciones sueltas. */
 export type EmailBulkAction = "archive" | "junk" | "trash" | "restore" | "read" | "unread" | "delete";
 

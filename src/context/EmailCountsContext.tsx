@@ -8,10 +8,11 @@ import {
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { emailsApi } from "../api/emails";
 import { tokenStore } from "../api/tokenStore";
-import type { ComposingPresence, EmailFolderCounts, InboxArrival } from "../types/api";
+import type { ComposingPresence, EmailAssignment, EmailFolderCounts, InboxArrival } from "../types/api";
 
 type Listener = () => void;
 type ArrivalListener = (arrival: InboxArrival) => void;
+type AssignmentListener = (assignment: EmailAssignment) => void;
 type ComposingListener = (presence: ComposingPresence) => void;
 
 interface EmailCountsValue {
@@ -21,6 +22,8 @@ interface EmailCountsValue {
   onInboxChanged: (listener: Listener) => () => void;
   /** Correo recibido, con remitente y asunto: para sonar o avisar en el escritorio. */
   onInboxReceived: (listener: ArrivalListener) => () => void;
+  /** Le asignaron una conversacion a esta persona: para sonar o avisar en el escritorio. */
+  onInboxAssigned: (listener: AssignmentListener) => () => void;
   /** Otra persona empezo o dejo de escribir en una conversacion. */
   onComposing: (listener: ComposingListener) => () => void;
   /** Avisa al resto que se esta escribiendo (o ya no) en esta conversacion. */
@@ -37,6 +40,7 @@ export const EmailCountsContext = createContext<EmailCountsValue>({
   refresh: () => undefined,
   onInboxChanged: () => () => undefined,
   onInboxReceived: () => () => undefined,
+  onInboxAssigned: () => () => undefined,
   onComposing: () => () => undefined,
   setComposing: () => undefined,
   whoIsComposing: () => Promise.resolve([]),
@@ -47,6 +51,7 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
   const [counts, setCounts] = useState<EmailFolderCounts | null>(null);
   const listeners = useRef(new Set<Listener>());
   const arrivalListeners = useRef(new Set<ArrivalListener>());
+  const assignmentListeners = useRef(new Set<AssignmentListener>());
   const composingListeners = useRef(new Set<ComposingListener>());
   const connectionRef = useRef<HubConnection | null>(null);
 
@@ -65,6 +70,11 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
   const onInboxReceived = useCallback((listener: ArrivalListener) => {
     arrivalListeners.current.add(listener);
     return () => arrivalListeners.current.delete(listener) as unknown as void;
+  }, []);
+
+  const onInboxAssigned = useCallback((listener: AssignmentListener) => {
+    assignmentListeners.current.add(listener);
+    return () => assignmentListeners.current.delete(listener) as unknown as void;
   }, []);
 
   const onComposing = useCallback((listener: ComposingListener) => {
@@ -111,6 +121,10 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
       arrivalListeners.current.forEach((listener) => listener(arrival));
     }
 
+    function assigned(assignment: EmailAssignment) {
+      assignmentListeners.current.forEach((listener) => listener(assignment));
+    }
+
     function composing(presence: ComposingPresence) {
       composingListeners.current.forEach((listener) => listener(presence));
     }
@@ -126,6 +140,7 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
 
     connection.on("inbox:changed", announce);
     connection.on("inbox:received", received);
+    connection.on("inbox:assigned", assigned);
     connection.on("inbox:composing", composing);
     // Mientras estuvo caido pudo entrar correo: al volver se recarga sin esperar el proximo aviso.
     connection.onreconnected(announce);
@@ -135,6 +150,7 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
     return () => {
       connection.off("inbox:changed", announce);
       connection.off("inbox:received", received);
+      connection.off("inbox:assigned", assigned);
       connection.off("inbox:composing", composing);
       connectionRef.current = null;
       void connection.stop();
@@ -143,7 +159,16 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
 
   return (
     <EmailCountsContext.Provider
-      value={{ counts, refresh, onInboxChanged, onInboxReceived, onComposing, setComposing, whoIsComposing }}
+      value={{
+        counts,
+        refresh,
+        onInboxChanged,
+        onInboxReceived,
+        onInboxAssigned,
+        onComposing,
+        setComposing,
+        whoIsComposing,
+      }}
     >
       {children}
     </EmailCountsContext.Provider>

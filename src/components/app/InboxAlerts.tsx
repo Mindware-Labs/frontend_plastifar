@@ -1,14 +1,15 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEmailCounts } from "../../context/useEmailCounts";
-import { playChime, readPrefs, showArrival } from "../../lib/notifications";
+import { playChime, readPrefs, showArrival, showAssignment } from "../../lib/notifications";
 
 /**
- * Escucha los correos que entran y avisa segun la preferencia de la persona.
- * No pinta nada: vive en el layout para que el aviso llegue desde cualquier pagina.
+ * Escucha los correos que entran y las conversaciones que le asignan a esta
+ * persona, y avisa segun su preferencia. No pinta nada: vive en el layout
+ * para que el aviso llegue desde cualquier pagina.
  */
 export function InboxAlerts() {
-  const { onInboxReceived } = useEmailCounts();
+  const { onInboxReceived, onInboxAssigned } = useEmailCounts();
   const navigate = useNavigate();
 
   useEffect(
@@ -30,6 +31,23 @@ export function InboxAlerts() {
         }
       }),
     [onInboxReceived, navigate],
+  );
+
+  useEffect(
+    () =>
+      onInboxAssigned((assignment) => {
+        const prefs = readPrefs();
+        if (prefs.sound) playChime();
+
+        const away = document.visibilityState !== "visible" || !document.hasFocus();
+        if (prefs.desktop && away) {
+          showAssignment(assignment, () => {
+            window.focus();
+            navigate(`/bandeja?correo=${assignment.emailId}`);
+          });
+        }
+      }),
+    [onInboxAssigned, navigate],
   );
 
   return null;
