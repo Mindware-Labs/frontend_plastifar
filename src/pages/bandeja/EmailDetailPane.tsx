@@ -4,6 +4,7 @@ import {
   CornerUpLeft,
   Download,
   Forward,
+  LoaderCircle,
   Paperclip,
   PencilLine,
   RotateCcw,
@@ -511,6 +512,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
       anchor.download = fileName ?? `conversacion-${email.id}.pdf`;
       anchor.click();
       URL.revokeObjectURL(url);
+
+      receipts.done({
+        action: "exportar",
+        title: "Conversación exportada",
+        detail: anchor.download,
+      });
     } catch (err) {
       receipts.failed({
         action: "exportar",
@@ -714,10 +721,10 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className={toolButtonClass} disabled={exporting} onClick={handleExport}>
-                <Download />
+                {exporting ? <LoaderCircle className="animate-spin" /> : <Download />}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Exportar conversación (PDF)</TooltipContent>
+            <TooltipContent>{exporting ? "Exportando…" : "Exportar conversación (PDF)"}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
