@@ -2,6 +2,7 @@ import { Plus, StickyNote, Tag, Trash2, UserRound, X } from "lucide-react";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
+import { Select, type SelectOption } from "../../components/ui/Select";
 import { useAuth } from "../../context/useAuth";
 import { formatDateTime } from "../../lib/format";
 import type { EmailNoteResponse, StaffOptionResponse, TagCountResponse } from "../../types/api";
@@ -83,24 +84,41 @@ export function AssignmentControl({ emailId, assignedStaffId, assignedStaffName,
 
   const mine = user !== null && assignedStaffId === user.staffId;
 
+  const staffList = options
+    ? assignedStaffId !== null && assignedStaffName && !options.some((o) => o.id === assignedStaffId)
+      ? [...options, { id: assignedStaffId, name: assignedStaffName }]
+      : options
+    : assignedStaffId !== null && assignedStaffName
+      ? [{ id: assignedStaffId, name: assignedStaffName }]
+      : [];
+
+  const selectOptions: SelectOption[] = [
+    { value: "", label: "Sin asignar" },
+    ...staffList.map((option) => ({
+      value: String(option.id),
+      label: option.name,
+    })),
+  ];
+
   return (
     <div className="flex min-w-0 items-center gap-2">
       <UserRound className="h-3.5 w-3.5 shrink-0 text-faint" />
-      <select
-        value={assignedStaffId ?? ""}
+      <Select
+        size="sm"
+        value={assignedStaffId !== null ? String(assignedStaffId) : ""}
         disabled={busy || options === null}
-        onChange={(event) => assign(event.target.value ? Number(event.target.value) : null)}
+        onChange={(next) => {
+          const nextId = next === "" ? null : Number(next);
+          if (nextId !== assignedStaffId) {
+            void assign(nextId);
+          }
+        }}
+        options={selectOptions}
+        placeholder="Sin asignar"
+        state={error ? "error" : "idle"}
         aria-label="Asignar la conversación"
-        className="h-6 max-w-[190px] rounded-edge border border-line bg-white px-1.5 text-[11.5px] text-ink
-          outline-none focus-visible:border-brand-red/40 disabled:opacity-60"
-      >
-        <option value="">Sin asignar</option>
-        {(options ?? (assignedStaffId ? [{ id: assignedStaffId, name: assignedStaffName ?? "" }] : [])).map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.name}
-          </option>
-        ))}
-      </select>
+        className="w-[190px] sm:w-[200px]"
+      />
       {!mine && user && (
         <button
           type="button"

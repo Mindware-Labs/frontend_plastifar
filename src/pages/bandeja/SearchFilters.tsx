@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField } from "../../components/ui/Field";
 import { DateRangePicker } from "../../components/ui/DateRangePicker";
+import { Select } from "../../components/ui/Select";
 import { EMPTY_FILTERS, countActive, formatDay, type AdvancedFilters } from "./filterCriteria";
 
 const PANEL_WIDTH = 310;
@@ -58,7 +59,14 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node;
-      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      if (
+        triggerRef.current?.contains(target) ||
+        panelRef.current?.contains(target) ||
+        (target instanceof Element &&
+          (target.closest("[data-select-portal]") !== null || target.closest("[data-select-backdrop]") !== null))
+      ) {
+        return;
+      }
       close();
     }
     function handleKeyDown(event: KeyboardEvent) {
@@ -190,27 +198,32 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
             onChange={(event) => setDraft({ ...draft, hasAttachments: event.target.checked })}
           />
 
-          <label className="flex flex-col gap-1.5">
-            <span className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">
-              Etiqueta
-            </span>
-            <select
-              value={draft.tag}
-              onChange={(event) => setDraft({ ...draft, tag: event.target.value })}
-              className="h-8 rounded-edge border border-line bg-white px-2 text-[12.5px] text-ink outline-none
-                focus-visible:border-brand-red/40"
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="filter-tag-select"
+              className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint"
             >
-              <option value="">Cualquiera</option>
-              {tags.map((item) => (
-                <option key={item.tag} value={item.tag}>
-                  {item.tag} ({item.count})
-                </option>
-              ))}
-              {draft.tag && !tags.some((item) => item.tag === draft.tag) && (
-                <option value={draft.tag}>{draft.tag}</option>
-              )}
-            </select>
-          </label>
+              Etiqueta
+            </label>
+            <Select
+              id="filter-tag-select"
+              size="sm"
+              value={draft.tag}
+              onChange={(tag) => setDraft({ ...draft, tag })}
+              options={[
+                { value: "", label: "Cualquiera" },
+                ...tags.map((item) => ({
+                  value: item.tag,
+                  label: `${item.tag} (${item.count})`,
+                })),
+                ...(draft.tag && !tags.some((item) => item.tag === draft.tag)
+                  ? [{ value: draft.tag, label: draft.tag }]
+                  : []),
+              ]}
+              placeholder="Cualquiera"
+              aria-label="Filtrar por etiqueta"
+            />
+          </div>
 
           {error && (
             <p role="alert" className="text-[11.5px] font-medium text-brand-red-dark">

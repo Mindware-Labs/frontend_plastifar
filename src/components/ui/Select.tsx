@@ -114,7 +114,7 @@ export function Select({
   useEffect(() => {
     if (!open) return;
 
-    function handlePointerDown(event: PointerEvent) {
+    function handlePointerDown(event: PointerEvent | MouseEvent) {
       const target = event.target as Node;
       if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
       setOpen(false);
@@ -126,13 +126,22 @@ export function Select({
       setOpen(false);
     }
 
-    document.addEventListener("pointerdown", handlePointerDown);
+    function handleWindowBlur() {
+      setOpen(false);
+      onBlur?.();
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("mousedown", handlePointerDown, true);
     window.addEventListener("scroll", handleViewportChange, true);
     window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("blur", handleWindowBlur);
     return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("mousedown", handlePointerDown, true);
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("blur", handleWindowBlur);
     };
   }, [open, onBlur]);
 
@@ -235,54 +244,66 @@ export function Select({
       {open &&
         anchor &&
         createPortal(
-          <ul
-            ref={panelRef}
-            id={listId}
-            role="listbox"
-            aria-label={ariaLabel}
-            style={{
-              position: "fixed",
-              left: anchor.left,
-              top: anchor.top,
-              bottom: anchor.bottom,
-              width: anchor.width,
-              maxHeight: PANEL_MAX_HEIGHT,
-            }}
-            className="animate-plf-toast-in z-[60] overflow-y-auto rounded-edge border border-line bg-white p-1
-              shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
-          >
-            {options.map((option, index) => {
-              const isSelected = option.value === value;
-              const isActive = index === activeIndex;
+          <>
+            <div
+              data-select-backdrop="true"
+              className="fixed inset-0 z-[70]"
+              aria-hidden="true"
+              onPointerDown={() => {
+                setOpen(false);
+                onBlur?.();
+              }}
+            />
+            <ul
+              data-select-portal="true"
+              ref={panelRef}
+              id={listId}
+              role="listbox"
+              aria-label={ariaLabel}
+              style={{
+                position: "fixed",
+                left: anchor.left,
+                top: anchor.top,
+                bottom: anchor.bottom,
+                width: anchor.width,
+                maxHeight: PANEL_MAX_HEIGHT,
+              }}
+              className="animate-plf-toast-in z-[80] overflow-y-auto rounded-edge border border-line bg-white p-1
+                shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
+            >
+              {options.map((option, index) => {
+                const isSelected = option.value === value;
+                const isActive = index === activeIndex;
 
-              return (
-                <li
-                  key={option.value}
-                  id={`${listId}-${index}`}
-                  role="option"
-                  aria-selected={isSelected}
-                  aria-disabled={option.disabled}
-                  onMouseEnter={() => !option.disabled && setActiveIndex(index)}
-                  onClick={() => commit(index)}
-                  className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge px-2.5 py-2
-                    text-[13px] transition-colors ${
-                      option.disabled
-                        ? "cursor-not-allowed text-zinc-300"
-                        : isActive
-                          ? "bg-fill text-ink"
-                          : "text-brand-gray"
-                    } ${isSelected ? "font-semibold text-ink" : ""}`}
-                >
-                  <span className="truncate">{option.label}</span>
-                  {isSelected && <Check aria-hidden className="h-4 w-4 shrink-0 text-brand-red" />}
-                </li>
-              );
-            })}
+                return (
+                  <li
+                    key={option.value}
+                    id={`${listId}-${index}`}
+                    role="option"
+                    aria-selected={isSelected}
+                    aria-disabled={option.disabled}
+                    onMouseEnter={() => !option.disabled && setActiveIndex(index)}
+                    onClick={() => commit(index)}
+                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge px-2.5 py-2
+                      text-[13px] transition-colors ${
+                        option.disabled
+                          ? "cursor-not-allowed text-zinc-300"
+                          : isActive
+                            ? "bg-fill text-ink"
+                            : "text-brand-gray"
+                      } ${isSelected ? "font-semibold text-ink" : ""}`}
+                  >
+                    <span className="truncate">{option.label}</span>
+                    {isSelected && <Check aria-hidden className="h-4 w-4 shrink-0 text-brand-red" />}
+                  </li>
+                );
+              })}
 
-            {options.length === 0 && (
-              <li className="px-2.5 py-3 text-center text-[12.5px] text-faint">Sin opciones</li>
-            )}
-          </ul>,
+              {options.length === 0 && (
+                <li className="px-2.5 py-3 text-center text-[12.5px] text-faint">Sin opciones</li>
+              )}
+            </ul>
+          </>,
           document.body,
         )}
     </div>
