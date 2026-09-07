@@ -1,7 +1,6 @@
 import {
   Archive,
   ArchiveRestore,
-  CornerDownRight,
   CornerUpLeft,
   Download,
   Forward,
@@ -132,6 +131,31 @@ const deliveryLabels: Record<string, { label: string; className: string }> = {
 
 /** Estados que merecen un aviso al abrir el correo, no solo una etiqueta en la tira. */
 const alertingStatuses = new Set(["Queued", "Bounced", "Complained", "Failed"]);
+
+
+function getThreadMessageBadge(message: { direction: string; subject?: string }) {
+  if (message.direction !== "Outbound") {
+    return {
+      label: "Recibido por",
+      className: "bg-zinc-100 text-zinc-700 border border-zinc-200/90",
+    };
+  }
+
+  const sub = (message.subject ?? "").trim().toLowerCase();
+  const isReply = sub.startsWith("re:");
+
+  if (isReply) {
+    return {
+      label: "Respondido a",
+      className: "bg-brand-red/10 text-brand-red-dark border border-brand-red/20",
+    };
+  }
+
+  return {
+    label: "Enviado a",
+    className: "bg-sky-500/10 text-sky-800 border border-sky-500/25",
+  };
+}
 
 type ComposerMode = "reply" | "forward";
 
@@ -1013,12 +1037,18 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
 
         {openReply && (
           <div className="absolute inset-0 z-10 flex flex-col bg-white">
-            <div className="flex shrink-0 items-start gap-2 border-b border-line px-4 py-2.5">
-              {openReply.direction === "Outbound" ? (
-                <CornerUpLeft className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-red" />
-              ) : (
-                <CornerDownRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-faint" />
-              )}
+            <div className="flex shrink-0 items-start gap-2.5 border-b border-line px-4 py-2.5">
+              {(() => {
+                const openBadge = getThreadMessageBadge(openReply);
+                return (
+                  <span
+                    className={`mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 font-heading
+                      text-[9px] font-bold uppercase tracking-[0.05em] ${openBadge.className}`}
+                  >
+                    {openBadge.label}
+                  </span>
+                );
+              })()}
               <div className="min-w-0 flex-1">
                 <p className="truncate font-heading text-[13.5px] font-bold tracking-[-0.01em] text-ink">
                   {openReply.subject}
@@ -1193,47 +1223,63 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
       <div className="shrink-0 px-4 py-2.5">
         {others.length > 0 && (
           <div className="mb-2 max-h-24 overflow-y-auto pr-0.5">
-            {others.map((reply) => (
-              <button
-                key={reply.id}
-                type="button"
-                onClick={() => setOpenReplyId(reply.id === openReplyId ? null : reply.id)}
-                data-open={reply.id === openReplyId}
-                className="flex w-full items-center gap-1.5 rounded-edge px-1.5 py-1 text-left
-                  outline-none transition-colors hover:bg-fill
-                  focus-visible:ring-3 focus-visible:ring-brand-red/12
-                  data-[open=true]:bg-brand-red/[0.06]"
-              >
-                {reply.direction === "Outbound" ? (
-                  <CornerUpLeft className="h-3 w-3 shrink-0 text-brand-red" />
-                ) : (
-                  <CornerDownRight className="h-3 w-3 shrink-0 text-faint" />
-                )}
-                <span className="shrink-0 text-[11.5px] font-semibold text-ink">
-                  {reply.direction === "Outbound"
-                    ? reply.authorName
-                    : reply.fromName ?? reply.fromEmail}
-                </span>
-                <span className="truncate text-[11.5px] text-subtle">
-                  {firstLine(reply.bodyText)}
-                </span>
-                {reply.deliveryStatus && deliveryLabels[reply.deliveryStatus] && (
-                  <span
-                    className={`ml-auto shrink-0 text-[10.5px] font-semibold
-                      ${deliveryLabels[reply.deliveryStatus].className}`}
-                  >
-                    {deliveryLabels[reply.deliveryStatus].label}
-                  </span>
-                )}
-                <span
-                  className={`shrink-0 text-[10.5px] font-medium text-faint ${
-                    reply.deliveryStatus && deliveryLabels[reply.deliveryStatus] ? "" : "ml-auto"
-                  }`}
+            {others.map((reply) => {
+              const badge = getThreadMessageBadge(reply);
+              const contactName =
+                reply.direction === "Outbound"
+                  ? reply.toEmails.join(", ") || reply.fromEmail || reply.authorName
+                  : reply.fromName ?? reply.fromEmail;
+              const authorNote =
+                reply.direction === "Outbound" && reply.authorName && reply.authorName !== contactName
+                  ? reply.authorName
+                  : null;
+
+              return (
+                <button
+                  key={reply.id}
+                  type="button"
+                  onClick={() => setOpenReplyId(reply.id === openReplyId ? null : reply.id)}
+                  data-open={reply.id === openReplyId}
+                  className="flex w-full items-center gap-2 rounded-edge px-1.5 py-1 text-left
+                    outline-none transition-colors hover:bg-fill
+                    focus-visible:ring-3 focus-visible:ring-brand-red/12
+                    data-[open=true]:bg-brand-red/[0.06]"
                 >
-                  {formatEmailListDate(reply.createdAt)}
-                </span>
-              </button>
-            ))}
+                  <span
+                    className={`inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 font-heading
+                      text-[9px] font-bold uppercase tracking-[0.05em] ${badge.className}`}
+                  >
+                    {badge.label}
+                  </span>
+                  <span className="shrink-0 text-[11.5px] font-semibold text-ink">
+                    {contactName}
+                  </span>
+                  {authorNote && (
+                    <span className="shrink-0 text-[10.5px] text-faint">
+                      por {authorNote}
+                    </span>
+                  )}
+                  <span className="truncate text-[11.5px] text-subtle">
+                    {firstLine(reply.bodyText)}
+                  </span>
+                  {reply.deliveryStatus && deliveryLabels[reply.deliveryStatus] && (
+                    <span
+                      className={`ml-auto shrink-0 text-[10.5px] font-semibold
+                        ${deliveryLabels[reply.deliveryStatus].className}`}
+                    >
+                      {deliveryLabels[reply.deliveryStatus].label}
+                    </span>
+                  )}
+                  <span
+                    className={`shrink-0 text-[10.5px] font-medium text-faint ${
+                      reply.deliveryStatus && deliveryLabels[reply.deliveryStatus] ? "" : "ml-auto"
+                    }`}
+                  >
+                    {formatEmailListDate(reply.createdAt)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
