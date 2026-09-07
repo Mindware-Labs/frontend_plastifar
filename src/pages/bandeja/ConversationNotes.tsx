@@ -27,6 +27,25 @@ function formatNoteTime(iso: string): string {
   return date.toLocaleDateString("es-419", { day: "2-digit", month: "short" });
 }
 
+/**
+ * Ajusta la altura del textarea de notas según su contenido.
+ * Inicia en un tamaño base de 2 líneas (~54px) y crece automáticamente
+ * a medida que se agregan líneas, evitando que haga scroll interno.
+ */
+function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
+  if (!textarea) return;
+  textarea.style.height = "auto";
+  const borderOffset = textarea.offsetHeight - textarea.clientHeight;
+  const targetHeight = Math.max(textarea.scrollHeight + borderOffset, 54);
+  if (targetHeight >= 340) {
+    textarea.style.height = "340px";
+    textarea.style.overflowY = "auto";
+  } else {
+    textarea.style.height = `${targetHeight}px`;
+    textarea.style.overflowY = "hidden";
+  }
+}
+
 export function ConversationNotes({ emailId, onNotesCountChange }: ConversationNotesProps) {
   const { user } = useAuth();
   const [notes, setNotes] = useState<EmailNoteResponse[] | null>(null);
@@ -104,12 +123,21 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
     };
   }, [open, isClosing, closePopover]);
 
-  // Foco automático en el textarea cuando se abre el formulario
+  // Foco automático y auto-ajuste de altura en el textarea cuando se abre el formulario
   useEffect(() => {
-    if ((open && (notes?.length === 0 || showAddForm)) || (open && notes && notes.length > 0 && showAddForm)) {
-      setTimeout(() => textareaRef.current?.focus(), 80);
+    if (open && (notes?.length === 0 || showAddForm)) {
+      setTimeout(() => {
+        textareaRef.current?.focus();
+        autoResizeTextarea(textareaRef.current);
+      }, 80);
     }
   }, [open, showAddForm, notes]);
+
+  useEffect(() => {
+    if (open && (notes?.length === 0 || showAddForm)) {
+      autoResizeTextarea(textareaRef.current);
+    }
+  }, [open, showAddForm, notes, draft]);
 
   async function handleAdd() {
     const body = draft.trim();
@@ -306,13 +334,17 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
               <textarea
                 ref={textareaRef}
                 value={draft}
-                onChange={(event) => setDraft(event.target.value)}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  autoResizeTextarea(event.target);
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder="Escribe una nota para el equipo… (Ctrl+Enter para guardar)"
                 rows={2}
                 maxLength={4000}
-                className="w-full resize-none rounded-edge border border-line bg-white px-2.5 py-1.5 text-[12px]
-                  text-ink outline-none placeholder:text-faint focus-visible:border-brand-red/40"
+                className="w-full min-h-[54px] max-h-[340px] resize-none overflow-hidden rounded-edge border border-line
+                  bg-white px-2.5 py-1.5 text-[12px] leading-[18px] text-ink outline-none placeholder:text-faint
+                  focus-visible:border-brand-red/40"
               />
               {error && <span className="text-[11px] text-brand-red-dark">{error}</span>}
               <div className="flex items-center justify-between pt-0.5">
@@ -364,9 +396,18 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
 
   useEffect(() => {
     if (open) {
-      setTimeout(() => textareaRef.current?.focus(), 80);
+      setTimeout(() => {
+        textareaRef.current?.focus();
+        autoResizeTextarea(textareaRef.current);
+      }, 80);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      autoResizeTextarea(textareaRef.current);
+    }
+  }, [open, draft]);
 
   async function add() {
     const body = draft.trim();
@@ -404,7 +445,10 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
           <textarea
             ref={textareaRef}
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              autoResizeTextarea(event.target);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
                 event.preventDefault();
@@ -414,8 +458,9 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
             placeholder="Escribe una nota para el equipo… (Ctrl+Enter para guardar)"
             rows={2}
             maxLength={4000}
-            className="w-full resize-none rounded-edge border border-line bg-white px-2.5 py-1.5 text-[12px] text-ink
-              outline-none placeholder:text-faint focus-visible:border-brand-red/40"
+            className="w-full min-h-[54px] max-h-[340px] resize-none overflow-hidden rounded-edge border border-line
+              bg-white px-2.5 py-1.5 text-[12px] leading-[18px] text-ink outline-none placeholder:text-faint
+              focus-visible:border-brand-red/40"
           />
           {error && <span className="text-[11px] text-brand-red-dark">{error}</span>}
           <div className="flex items-center justify-between">
