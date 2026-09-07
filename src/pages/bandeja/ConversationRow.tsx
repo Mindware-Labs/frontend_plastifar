@@ -169,10 +169,26 @@ export function ConversationRow({
             ))}
             {email.assignedStaffName && (
               <span
-                title={`Atiende ${email.assignedStaffName}`}
-                className="ml-auto inline-flex items-center gap-1 text-[10px] font-medium text-faint"
+                title={
+                  email.assignedUnseen
+                    ? `Te asignaron esta conversación · Atiende ${email.assignedStaffName}`
+                    : `Atiende ${email.assignedStaffName}`
+                }
+                className={`ml-auto inline-flex items-center gap-1 text-[10px] font-medium ${
+                  email.assignedUnseen ? "text-brand-red-dark font-semibold" : "text-faint"
+                }`}
               >
-                <span className="flex size-3.5 items-center justify-center rounded-full bg-fill text-[8px] font-bold text-brand-gray">
+                {email.assignedUnseen && (
+                  <span
+                    aria-hidden
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red shadow-[0_0_6px_rgba(228,0,43,0.5)]"
+                  />
+                )}
+                <span
+                  className={`flex size-3.5 items-center justify-center rounded-full text-[8px] font-bold ${
+                    email.assignedUnseen ? "bg-brand-red/15 text-brand-red-dark" : "bg-fill text-brand-gray"
+                  }`}
+                >
                   {initials(email.assignedStaffName)}
                 </span>
                 {email.assignedStaffName.split(" ")[0]}

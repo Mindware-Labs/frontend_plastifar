@@ -20,7 +20,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
-import type { EmailFolderCounts } from "../../types/api";
 import { Logo } from "../Logo";
 import { formatDisplayName, formatInitials } from "../../lib/format";
 import { ChangePasswordModal } from "./ChangePasswordModal";
@@ -34,7 +33,7 @@ interface NavItem {
   /** Coincidencia exacta: evita que "/bandeja" quede activa también en sus subcarpetas. */
   end?: boolean;
   /** Carpeta de correo cuyo contador se refleja al final del renglón. */
-  folder?: keyof EmailFolderCounts;
+  folder?: "inbox" | "archived" | "junk" | "trash" | "sent";
   /** Solo lo ve un administrador. */
   adminOnly?: boolean;
 }

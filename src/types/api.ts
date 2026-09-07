@@ -156,6 +156,8 @@ export interface EmailSummaryResponse {
   deliveryStatus: string | null;
   assignedStaffId: number | null;
   assignedStaffName: string | null;
+  /** Se la asignaron a quien consulta y todavia no la abrio desde entonces. */
+  assignedUnseen: boolean;
   tags: string[];
 }
 
@@ -243,6 +245,8 @@ export interface EmailFolderCounts {
   junk: FolderCount;
   trash: FolderCount;
   sent: FolderCount;
+  /** Asignadas a quien consulta y sin abrir desde entonces, en cualquier carpeta. */
+  assignedUnseen: number;
 }
 
 /** La firma que se agrega al pie de los correos que envia esta persona. */

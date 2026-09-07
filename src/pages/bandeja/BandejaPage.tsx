@@ -209,15 +209,23 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     refreshAll();
   }
 
-  // Abrir una conversacion la marca leida solo para quien la abre.
+  // Abrir una conversacion la marca leida, y si se la acaban de asignar, tambien "vista".
   function handleOpen(email: EmailSummaryResponse) {
     setSelectedId(email.id);
-    if (!email.unread) return;
 
-    emailsApi
-      .markRead(email.id)
-      .then(refreshAll)
-      .catch(() => undefined);
+    if (email.unread) {
+      emailsApi
+        .markRead(email.id)
+        .then(refreshAll)
+        .catch(() => undefined);
+    }
+
+    if (email.assignedUnseen) {
+      emailsApi
+        .markAssignmentSeen(email.id)
+        .then(refreshAll)
+        .catch(() => undefined);
+    }
   }
 
   /** Shift extiende la marca desde la ultima fila tocada, como en cualquier lista de archivos. */
@@ -502,6 +510,12 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                             </TabsTrigger>
                             <TabsTrigger value="mios" className={tabTriggerClass}>
                               Míos
+                              {Boolean(counts?.assignedUnseen) && (
+                                <span
+                                  aria-label={`${counts?.assignedUnseen} sin ver`}
+                                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red shadow-[0_0_6px_rgba(228,0,43,0.5)]"
+                                />
+                              )}
                             </TabsTrigger>
                           </TabsList>
                         </Tabs>

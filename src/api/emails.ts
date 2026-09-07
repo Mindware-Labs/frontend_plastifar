@@ -74,6 +74,9 @@ export const emailsApi = {
 
   markUnread: (id: number) => apiRequest<void>(`/api/emails/${id}/unread`, { method: "POST" }),
 
+  // Limpia el "recien asignada" de quien la abre; a nadie mas le toca verla desaparecer.
+  markAssignmentSeen: (id: number) => apiRequest<void>(`/api/emails/${id}/assign/seen`, { method: "POST" }),
+
   get: (id: number) => apiRequest<EmailDetailResponse>(`/api/emails/${id}`),
 
   // download fuerza la descarga: sin el, los tipos que el navegador sabe mostrar se abren.
