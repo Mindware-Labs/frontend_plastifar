@@ -163,7 +163,7 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
           className={`${
             isExiting ? "animate-plf-popover-out pointer-events-none" : "animate-plf-popover-in"
           } z-[60] flex flex-col gap-3.5 origin-top-right rounded-edge border border-line/90
-            bg-white/98 backdrop-blur-md p-4 shadow-[0_4px_16px_-2px_rgba(27,27,29,0.08),0_12px_32px_-4px_rgba(27,27,29,0.14)]`}
+            bg-white p-4 shadow-[0_4px_16px_-2px_rgba(27,27,29,0.08),0_12px_32px_-4px_rgba(27,27,29,0.14)]`}
         >
           <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
             Filtros

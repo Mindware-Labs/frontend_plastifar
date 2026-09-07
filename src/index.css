@@ -112,13 +112,11 @@ input:-webkit-autofill:focus {
 @keyframes plf-modal-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.985);
-    filter: blur(1.5px);
+    transform: translateY(8px) scale(0.985);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: blur(0);
   }
 }
 
@@ -126,12 +124,10 @@ input:-webkit-autofill:focus {
   from {
     opacity: 1;
     transform: none;
-    filter: blur(0);
   }
   to {
     opacity: 0;
-    transform: translateY(8px) scale(0.985);
-    filter: blur(1.5px);
+    transform: translateY(6px) scale(0.985);
   }
 }
 
@@ -152,12 +148,10 @@ input:-webkit-autofill:focus {
   from {
     opacity: 0;
     transform: translateY(-8px) scale(0.985);
-    filter: blur(1.5px);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: blur(0);
   }
 }
 
@@ -165,12 +159,10 @@ input:-webkit-autofill:focus {
   from {
     opacity: 1;
     transform: none;
-    filter: blur(0);
   }
   to {
     opacity: 0;
     transform: translateY(-8px) scale(0.985);
-    filter: blur(1.5px);
   }
 }
 
@@ -199,13 +191,11 @@ input:-webkit-autofill:focus {
 @keyframes plf-popover-in {
   from {
     opacity: 0;
-    transform: translateY(-8px) scale(0.975);
-    filter: blur(2px);
+    transform: translateY(-6px) scale(0.98);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: blur(0);
   }
 }
 
@@ -213,12 +203,10 @@ input:-webkit-autofill:focus {
   from {
     opacity: 1;
     transform: none;
-    filter: blur(0);
   }
   to {
     opacity: 0;
-    transform: translateY(-6px) scale(0.975);
-    filter: blur(1.5px);
+    transform: translateY(-4px) scale(0.98);
   }
 }
 

@@ -450,7 +450,7 @@ export function Sidebar() {
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
           style={{ top: flyout.top, left: flyout.left }}
-          className="animate-plf-toast-in fixed z-40 w-[210px] rounded-lg border border-line bg-white/98 p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.14),0_2px_6px_rgba(27,27,29,0.04)] backdrop-blur-md"
+          className="animate-plf-toast-in fixed z-40 w-[210px] rounded-lg border border-line bg-white p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.14),0_2px_6px_rgba(27,27,29,0.04)]"
         >
           <div className="flex items-center justify-between border-b border-line-soft px-2.5 pb-2 pt-1.5">
             <span className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-subtle">
@@ -513,7 +513,7 @@ export function Sidebar() {
           {menuOpen && (
             <div
               role="menu"
-              className="animate-plf-toast-in absolute bottom-[calc(100%+8px)] left-0 z-30 w-full min-w-[240px] rounded-edge border border-line bg-white/98 p-1.5 shadow-[0_12px_32px_-6px_rgba(27,27,29,0.16),0_2px_8px_rgba(27,27,29,0.06)] backdrop-blur-md"
+              className="animate-plf-toast-in absolute bottom-[calc(100%+8px)] left-0 z-30 w-full min-w-[240px] rounded-edge border border-line bg-white p-1.5 shadow-[0_12px_32px_-6px_rgba(27,27,29,0.16),0_2px_8px_rgba(27,27,29,0.06)]"
             >
               {/* Encabezado del usuario */}
               <div className="mb-1.5 flex items-center gap-2.5 border-b border-line-soft p-2">

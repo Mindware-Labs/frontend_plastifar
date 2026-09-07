@@ -136,7 +136,7 @@ export function AttachmentPreviewModal({
   return createPortal(
     <div
       inert={isExiting ? true : undefined}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-ink/55 p-4 backdrop-blur-[2px] ${
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-ink/55 p-4 ${
         isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
       }`}
       onMouseDown={(event) => {
