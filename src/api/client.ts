@@ -79,7 +79,9 @@ async function readError(response: Response): Promise<ApiError> {
 }
 
 /** Arma el query string omitiendo lo vacio, para no enviar filtros sin valor. */
-export function toQuery(params: Record<string, string | number | undefined>): string {
+export function toQuery(
+  params: Record<string, string | number | boolean | undefined>,
+): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== "") search.set(key, String(value));

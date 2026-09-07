@@ -98,6 +98,8 @@ export function ProductLinesSection() {
 
   return (
     <SettingsLayout
+      title="Líneas de producto"
+      note="La línea de producto es obligatoria en los motivos marcados para ello, y es el eje por el que Calidad sigue las reclamaciones. Una línea con historial no se elimina: se desactiva."
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
@@ -210,10 +212,6 @@ export function ProductLinesSection() {
         />
       )}
 
-      <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
-        La línea de producto es obligatoria en los motivos marcados para ello, y es el eje por el que
-        Calidad sigue las reclamaciones. Una línea con historial no se elimina: se desactiva.
-      </p>
 
       {modal !== null && (
         <ProductLineModal

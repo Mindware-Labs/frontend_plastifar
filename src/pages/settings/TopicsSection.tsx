@@ -190,6 +190,8 @@ export function TopicsSection() {
 
   return (
     <SettingsLayout
+      title="Motivos"
+      note="El motivo decide a qué cola entra el ticket y con qué prioridad nace. Si no tiene política de SLA propia se aplica la predeterminada de su prioridad, y esas fechas se copian al ticket al crearlo: cambiar la política después no altera los tickets ya abiertos."
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
@@ -384,11 +386,6 @@ export function TopicsSection() {
         />
       )}
 
-      <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
-        El motivo decide a qué cola entra el ticket y con qué prioridad nace. Si no tiene política de
-        SLA propia se aplica la predeterminada de su prioridad, y esas fechas se copian al ticket al
-        crearlo: cambiar la política después no altera los tickets ya abiertos.
-      </p>
 
       {modal !== null && (
         <TopicModal

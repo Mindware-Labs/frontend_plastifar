@@ -8,7 +8,7 @@ import {
   Plus,
   ShieldCheck,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
@@ -20,6 +20,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
 import { RowAction } from "../../components/ui/RowAction";
 import { Spinner } from "../../components/ui/Spinner";
 import { Tooltip } from "../../components/ui/Tooltip";
@@ -311,8 +312,8 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
       <div className={`transition-opacity ${isRefetching ? "opacity-60" : ""}`}>
       {section === "datos" && (
         <>
-          <DataTable>
-            <tbody>
+          <DetailTable>
+            <DetailGroup title="La hoja">
               <DetailRow label="Número">
                 <span className="font-mono text-[12.5px] text-ink">{sheet.number}</span>
               </DetailRow>
@@ -328,44 +329,56 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                   )}
                 </span>
               </DetailRow>
+              <DetailRow label="Responsable">{sheet.responsibleName}</DetailRow>
+            </DetailGroup>
+
+            <DetailGroup title="Origen" hint="A quién y a qué afecta.">
               <DetailRow label="Cliente">{sheet.clientName}</DetailRow>
               <DetailRow label="Línea de producto">{sheet.productLineName}</DetailRow>
               <DetailRow label="Ticket de origen">
                 <TicketLink number={sheet.ticketNumber} />
               </DetailRow>
+            </DetailGroup>
+
+            <DetailGroup title="Plazos">
               <DetailRow label="Detectada el">{formatDay(sheet.detectedAt.slice(0, 10))}</DetailRow>
               <DetailRow label="Cierre comprometido">{formatDay(sheet.dueDate)}</DetailRow>
-              <DetailRow label="Responsable">{sheet.responsibleName}</DetailRow>
-              <DetailRow label="Qué ocurrió">
-                <p className="max-w-[76ch] whitespace-pre-line">{sheet.description}</p>
+            </DetailGroup>
+
+            {/* Los tres son prosa, no un dato corto: a dos columnas arrancaban a
+                220px del margen y se leian en una franja angosta. */}
+            <DetailGroup title="El hallazgo">
+              <DetailRow label="Qué ocurrió" wide>
+                <p className="whitespace-pre-line">{sheet.description}</p>
               </DetailRow>
-              <DetailRow label="Acción inmediata">
+              <DetailRow label="Acción inmediata" wide>
                 {sheet.immediateAction ? (
-                  <p className="max-w-[76ch] whitespace-pre-line">{sheet.immediateAction}</p>
+                  <p className="whitespace-pre-line">{sheet.immediateAction}</p>
                 ) : (
                   <span className="text-faint">Ninguna registrada</span>
                 )}
               </DetailRow>
-              <DetailRow label="Causa raíz">
+              <DetailRow label="Causa raíz" wide>
                 {sheet.rootCause ? (
-                  <p className="max-w-[76ch] whitespace-pre-line">{sheet.rootCause}</p>
+                  <p className="whitespace-pre-line">{sheet.rootCause}</p>
                 ) : (
                   <span className="text-faint">
                     Sin escribir: es obligatoria para pasar a ejecución y para cerrar.
                   </span>
                 )}
               </DetailRow>
-              {isClosed && (
-                <>
-                  <DetailRow label="Cerrada el">{formatInstant(sheet.closedAt)}</DetailRow>
-                  <DetailRow label="Cerrada por">{sheet.closedByName ?? "—"}</DetailRow>
-                  <DetailRow label="Nota de cierre">
-                    {sheet.closingNote ?? <span className="text-faint">Sin nota</span>}
-                  </DetailRow>
-                </>
-              )}
-            </tbody>
-          </DataTable>
+            </DetailGroup>
+
+            {isClosed && (
+              <DetailGroup title="Cierre">
+                <DetailRow label="Cerrada el">{formatInstant(sheet.closedAt)}</DetailRow>
+                <DetailRow label="Cerrada por">{sheet.closedByName ?? "—"}</DetailRow>
+                <DetailRow label="Nota de cierre" wide>
+                  {sheet.closingNote ?? <span className="text-faint">Sin nota</span>}
+                </DetailRow>
+              </DetailGroup>
+            )}
+          </DetailTable>
 
           {canWrite && !isClosed && advance.status !== null && (
             <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
@@ -492,43 +505,50 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
               Condiciones de cierre
             </h2>
 
-            <ul className="flex flex-col">
-              {conditions.map((condition) => (
-                <li
-                  key={condition.id}
-                  className="flex items-start gap-3 border-b border-line-soft py-3 last:border-b-0"
-                >
-                  <span
-                    aria-hidden
-                    className={`mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-edge ${
-                      condition.met ? "bg-brand-green/10 text-brand-green" : "bg-warn/10 text-warn"
-                    }`}
-                  >
-                    {condition.met ? (
-                      <Check className="h-3.5 w-3.5" />
-                    ) : (
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                    )}
-                  </span>
-
-                  {/* Estado y motivo van en un solo nodo detras de su etiqueta:
-                      antes el lector de pantalla leia las tres etiquetas y luego
-                      tres explicaciones sueltas, sin saber cual era de cual. */}
-                  <span className="flex flex-col gap-0.5">
-                    <span className="text-[13px] font-medium text-ink">{condition.label}</span>
-                    <span
-                      className={
-                        condition.met
-                          ? "sr-only"
-                          : "max-w-[76ch] text-[12.5px] leading-relaxed text-warn"
-                      }
-                    >
-                      {condition.met ? "Cumplida." : `Falta: ${condition.missing}`}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {/* Condicion y estado son dos columnas, no una lista: asi se ve de un
+                vistazo cuantas faltan sin leer las tres entradas enteras. */}
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Condición</Th>
+                  <Th>Estado</Th>
+                </HeadRow>
+              </thead>
+              <tbody>
+                {conditions.map((condition) => (
+                  <Row key={condition.id}>
+                    <Td className="w-[300px] py-3 align-top text-[13px] font-medium text-ink">
+                      {condition.label}
+                    </Td>
+                    <Td className="py-3 align-top">
+                      <span className="flex items-start gap-2">
+                        <span
+                          aria-hidden
+                          className={`mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-edge ${
+                            condition.met
+                              ? "bg-brand-green/10 text-brand-green"
+                              : "bg-warn/10 text-warn"
+                          }`}
+                        >
+                          {condition.met ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                          )}
+                        </span>
+                        <span
+                          className={`max-w-[76ch] text-[12.5px] leading-relaxed ${
+                            condition.met ? "text-brand-green" : "text-warn"
+                          }`}
+                        >
+                          {condition.met ? "Cumplida" : `Falta: ${condition.missing}`}
+                        </span>
+                      </span>
+                    </Td>
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
           </section>
 
           <section>
@@ -537,22 +557,26 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
             </h2>
 
             {sheet.effectivenessCheckAt ? (
-              <div className="flex flex-col gap-1.5">
-                <p className="text-[12.5px] text-faint">
-                  Verificada el {formatDay(sheet.effectivenessCheckAt.slice(0, 10))}
-                </p>
-                <p className="max-w-[76ch] whitespace-pre-line text-[13px] leading-relaxed text-brand-gray">
-                  {sheet.effectivenessNotes}
-                </p>
+              <>
+                <DetailTable>
+                  <tbody>
+                    <DetailRow label="Verificada el">
+                      {formatDay(sheet.effectivenessCheckAt.slice(0, 10))}
+                    </DetailRow>
+                    <DetailRow label="Qué se comprobó" wide>
+                      <p className="whitespace-pre-line">{sheet.effectivenessNotes}</p>
+                    </DetailRow>
+                  </tbody>
+                </DetailTable>
                 {canWrite && !isClosed && (
-                  <div className="mt-2">
+                  <div className="mt-3">
                     <Button variant="secondary" size="sm" onClick={() => setVerifying(true)}>
                       <Pencil className="h-[15px] w-[15px]" />
                       Corregir verificación
                     </Button>
                   </div>
                 )}
-              </div>
+              </>
             ) : (
               <div className="flex flex-col items-start gap-3">
                 <p className="max-w-[76ch] text-[13px] leading-relaxed text-brand-gray">
@@ -574,14 +598,15 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
               <h2 className="mb-3 font-heading text-[17px] font-bold leading-tight tracking-[-0.01em] text-ink">
                 Cierre
               </h2>
-              <p className="text-[13px] leading-relaxed text-brand-gray">
-                Cerrada el {formatInstant(sheet.closedAt)} por {sheet.closedByName ?? "—"}.
-              </p>
-              {sheet.closingNote && (
-                <p className="mt-1.5 max-w-[76ch] text-[13px] leading-relaxed text-brand-gray">
-                  {sheet.closingNote}
-                </p>
-              )}
+              <DetailTable>
+                <tbody>
+                  <DetailRow label="Cerrada el">{formatInstant(sheet.closedAt)}</DetailRow>
+                  <DetailRow label="Cerrada por">{sheet.closedByName ?? "—"}</DetailRow>
+                  <DetailRow label="Nota de cierre" wide>
+                    {sheet.closingNote ?? <span className="text-faint">Sin nota</span>}
+                  </DetailRow>
+                </tbody>
+              </DetailTable>
             </section>
           )}
         </div>
@@ -657,17 +682,6 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
 }
 
 /** Fila de la ficha: etiqueta a la izquierda, valor a la derecha, sin tarjeta. */
-function DetailRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <Row>
-      <Td className="w-[220px] py-3 align-top font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
-        {label}
-      </Td>
-      <Td className="py-3 text-[13px] text-brand-gray">{children}</Td>
-    </Row>
-  );
-}
-
 /**
  * Lo que el plan debe, antes de lo que contiene: la pestana abria con una
  * tabla muda mientras Datos y Cierre si decian que faltaba.

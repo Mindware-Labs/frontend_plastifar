@@ -1,164 +1,373 @@
-import { AlertTriangle, CheckCircle2, Inbox, RefreshCcw, UserX } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock,
+  FileText,
+  Inbox,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../api/client";
+import { reportsApi, type ClientsReport, type QualityReport } from "../../api/reports";
 import { Alert } from "../../components/ui/Alert";
-import { Spinner } from "../../components/ui/Spinner";
-import { dashboardMock } from "../../mocks/dashboard";
-import type { DashboardData, KpiKey } from "../../types/dashboard";
-import { DashboardCard } from "./DashboardCard";
-import { KpiTile } from "./KpiTile";
-import { MonoRoundedBarChart } from "./mono-charts/MonoRoundedBarChart";
-import { MonoRoundedDonutChart } from "./mono-charts/MonoRoundedDonutChart";
-import { MonoRoundedStreamChart } from "./mono-charts/MonoRoundedStreamChart";
-import { PriorityBars } from "./PriorityBars";
-import { SlaDonut } from "./SlaDonut";
-import { SystemStatusCard } from "./SystemStatusCard";
-import { TicketsTable } from "./TicketsTable";
-
-const kpiIcon: Record<KpiKey, typeof Inbox> = {
-  open: Inbox,
-  inProgress: RefreshCcw,
-  unassigned: UserX,
-  slaAtRisk: AlertTriangle,
-  resolved: CheckCircle2,
-};
+import { Button } from "../../components/ui/Button";
+import { Select } from "../../components/ui/Select";
+import { formatAmount } from "../../lib/quality";
+import { useAuth } from "../../context/useAuth";
+import { DistributionDonut, DotLegend, MonthlyBars } from "./charts";
+import { ClientsTable } from "./ClientsTable";
+import { Panel, QuickOverview, RefreshButton, StatCard } from "./panels";
 
 /**
- * Sangrado a borde completo. <main> (src/layouts/AppLayout.tsx, que NO es de
- * este modulo) aplica `px-8 pt-4 pb-12` y no expone ningun token con esos
- * valores; el tinte del Dashboard tiene que cancelarlos para llegar al borde.
- * Los tres valores ya no viven aqui: son `--plf-page-x/-t/-b`, declarados una
- * sola vez en src/index.css y leidos tanto por AppLayout como por esta pagina.
- * Mientras fueron dos numeros escritos a mano en dos archivos, cambiar el
- * padding del marco rompia el tinte del Dashboard sin que nada avisara.
+ * Tablero del panel.
+ *
+ * ------------------------------------------------------------------
+ * DE DONDE SALE LA FORMA
+ * ------------------------------------------------------------------
+ * La disposicion es la de la referencia aprobada por el cliente: fila de cuatro
+ * cifras con chip de icono, debajo un grafico ancho a dos tercios junto a un
+ * reparto en dona a un tercio, y al pie una tabla con su propia barra de
+ * busqueda y orden.
+ *
+ * El acento es el 185 C de Plastifar y no el azul del ejemplo: el Brandbook
+ * 2026 es vinculante y este seria el unico modulo del panel que no se ve de la
+ * empresa. Lo que se copio es la anatomia, que es lo que hace que se lea rapido.
+ *
+ * ------------------------------------------------------------------
+ * TODO SALE DEL SERVIDOR
+ * ------------------------------------------------------------------
+ * Las cuatro cifras, las barras, la dona y la tabla salen de
+ * GET /api/reports/quality y GET /api/reports/clients, que agregan en SQL.
+ *
+ * Lo que la referencia trae y aqui NO esta, por no tener con que sostenerlo:
+ * las pastillas de variacion contra el periodo anterior (ningun endpoint
+ * devuelve la comparacion) y las acciones por fila de la tabla (un vendedor no
+ * tiene ficha propia). La ranura de la variacion queda cableada en `StatCard` y
+ * se enciende sola el dia que el servidor la calcule.
  */
-const BLEED_CLASS =
-  "mx-[calc(var(--plf-page-x)*-1)] mt-[calc(var(--plf-page-t)*-1)] mb-[calc(var(--plf-page-b)*-1)] " +
-  "px-[var(--plf-page-x)] pt-6 pb-[var(--plf-page-b)]";
+
+/**
+ * Ventanas que el control de periodo ofrece.
+ *
+ * Son reales: `GET /api/reports/quality` recibe el rango, asi que cambiar el
+ * selector cambia lo que el servidor agrega. Doce meses es el tope que admite
+ * por consulta y por eso es el ultimo paso.
+ */
+const PERIODS = [
+  { key: "3m", label: "Últimos 3 meses", months: 3 },
+  { key: "6m", label: "Últimos 6 meses", months: 6 },
+  { key: "12m", label: "Últimos 12 meses", months: 12 },
+] as const;
+
+type PeriodKey = (typeof PERIODS)[number]["key"];
+
+function periodRange(months: number) {
+  const to = new Date();
+  const from = new Date(to);
+  from.setMonth(from.getMonth() - (months - 1));
+  from.setDate(1);
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { from: iso(from), to: iso(to) };
+}
+
+/**
+ * Variacion del ultimo mes cerrado contra el anterior, en porcentaje.
+ *
+ * Se calcula de `byMonth`, que es una serie real: no es una comparacion
+ * inventada contra "el periodo anterior" que ningun endpoint devuelve. Da
+ * `undefined` cuando no hay dos meses con que comparar o cuando el mes previo
+ * fue cero —dividir por cero produce un infinito, no una tendencia.
+ */
+function monthOverMonth(series: number[]): number | undefined {
+  if (series.length < 2) return undefined;
+  const previous = series[series.length - 2];
+  const last = series[series.length - 1];
+  if (previous === 0) return undefined;
+  return ((last - previous) / previous) * 100;
+}
+
+const monthFormat = new Intl.DateTimeFormat("es-DO", { month: "short" });
+const longDateFormat = new Intl.DateTimeFormat("es-DO", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
+
+/**
+ * Saludo segun la hora local de quien mira.
+ *
+ * Las tres franjas son las del habla dominicana, no las de un reloj partido en
+ * dos: "buenas tardes" arranca al mediodia y "buenas noches" a las siete.
+ */
+function greeting(hour: number) {
+  if (hour < 12) return "Buenos días";
+  return hour < 19 ? "Buenas tardes" : "Buenas noches";
+}
 
 export function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const { user } = useAuth();
+  const [quality, setQuality] = useState<QualityReport | null>(null);
+  const [clients, setClients] = useState<ClientsReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Arranca en true: la primera carga sale ya en vuelo desde el primer render.
-  const [refreshing, setRefreshing] = useState(true);
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Una sola via de carga para el primer render y para "Actualizar": el exito
-  // limpia el error (si no, un fallo pasajero dejaba el aviso pegado para
-  // siempre) y sella la hora que muestra SystemStatusCard.
-  const fetchData = useCallback(() => {
-    dashboardMock
-      .data()
-      .then((fresh) => {
-        setData(fresh);
-        setLastSync(new Date());
-        setError(null);
-      })
-      .catch(() => setError("No se pudo cargar el dashboard"))
-      .finally(() => setRefreshing(false));
-  }, []);
+  const [period, setPeriod] = useState<PeriodKey>("12m");
 
-  // Re-carga a peticion: marca el vuelo y reusa exactamente el mismo camino.
+  const periodEntry = PERIODS.find((entry) => entry.key === period) ?? PERIODS[2];
+  const range = useMemo(() => periodRange(periodEntry.months), [periodEntry.months]);
+
   const load = useCallback(() => {
-    setRefreshing(true);
-    fetchData();
-  }, [fetchData]);
+    setError(null);
+    setIsLoading(true);
+    Promise.all([reportsApi.quality(range.from, range.to), reportsApi.clients()])
+      .then(([q, c]) => {
+        setQuality(q);
+        setClients(c);
+      })
+      .catch((err) =>
+        setError(
+          err instanceof ApiError
+            ? `${err.message} Vuelve a intentarlo.`
+            : "No se pudo cargar el resumen. Vuelve a intentarlo.",
+        ),
+      )
+      .finally(() => setIsLoading(false));
+  }, [range.from, range.to]);
 
-  useEffect(fetchData, [fetchData]);
+  useEffect(load, [load]);
 
-  const categoryBreakdown = useMemo(() => {
-    if (!data) return [];
-    const counts = new Map<string, number>();
-    for (const ticket of data.tickets) counts.set(ticket.category, (counts.get(ticket.category) ?? 0) + 1);
-    return [...counts.entries()]
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 4);
-  }, [data]);
+  const months = useMemo(
+    () =>
+      (quality?.byMonth ?? []).map((entry) => ({
+        label: monthFormat.format(new Date(`${entry.month}-01T00:00:00`)).replace(".", ""),
+        opened: entry.opened,
+        closed: entry.closed,
+      })),
+    [quality],
+  );
+
+  /** Promedio de aperturas del periodo, redondeado: es la linea del grafico. */
+  const average = useMemo(() => {
+    if (months.length === 0) return 0;
+    return Math.round(months.reduce((sum, m) => sum + m.opened, 0) / months.length);
+  }, [months]);
+
+  const territories = useMemo(
+    () =>
+      (clients?.byTerritory ?? [])
+        .filter((entry) => entry.total > 0)
+        .map((entry) => ({ name: entry.territory, value: entry.total })),
+    [clients],
+  );
+
+  const ready = quality !== null && clients !== null;
+
+  /** Variacion mes contra mes de las dos series que el servidor sí devuelve. */
+  const openedDelta = useMemo(
+    () => monthOverMonth((quality?.byMonth ?? []).map((m) => m.opened)),
+    [quality],
+  );
+  const closedDelta = useMemo(
+    () => monthOverMonth((quality?.byMonth ?? []).map((m) => m.closed)),
+    [quality],
+  );
+
+  // El token solo trae el correo: no hay nombre completo que mostrar, asi que
+  // se saluda con la parte local capitalizada, igual que hace el Sidebar. Un
+  // "Buenos dias, usuario" generico seria peor que no saludar.
+  const local = user?.email.split("@")[0] ?? "";
+  const name = local.charAt(0).toUpperCase() + local.slice(1);
+  const today = new Date();
+
+  /** Concentracion de la cartera: los cuatro primeros y el resto agrupado. */
+  const repSlices = useMemo(
+    () => (clients?.bySalesRep ?? []).map((row) => ({ name: row.salesRep, value: row.clients })),
+    [clients],
+  );
 
   return (
-    // Tinte propio del Dashboard: rompe con el blanco del resto del panel a
-    // proposito (excepcion ya documentada en DESIGN.md) para que las tarjetas
-    // blancas tengan de verdad contra que superficie destacar.
-    <div className={`bg-fill ${BLEED_CLASS}`}>
-      <h1 className="sr-only">Panel de operaciones</h1>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b border-line pb-4">
+        <div>
+          <h1 className="font-heading text-[20px] font-bold tracking-[-0.02em] text-ink">
+            {greeting(today.getHours())}
+            {name && `, ${name}`}
+          </h1>
+          {/* La fecha va aqui y no en un selector: el tablero mira siempre los
+              ultimos doce meses, y un control que solo ofrece una opcion es un
+              adorno con forma de control. */}
+          <p className="mt-1 text-[12.5px] text-subtle">
+            <span className="first-letter:uppercase">{longDateFormat.format(today)}</span> · Calidad
+            y cartera
+          </p>
+        </div>
+        {/* Fila de controles de la referencia. Los dos son reales: el periodo
+            viaja al endpoint y el boton vuelve a pedir los dos reportes. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 text-faint">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <Select
+              size="sm"
+              aria-label="Período"
+              value={period}
+              onChange={(value) => setPeriod(value as PeriodKey)}
+              options={PERIODS.map((entry) => ({ value: entry.key, label: entry.label }))}
+              className="w-[164px]"
+            />
+          </span>
+          <RefreshButton onClick={load} busy={isLoading} />
+          <Button size="sm" onClick={load} isLoading={isLoading}>
+            Generar reporte
+          </Button>
+        </div>
+      </div>
 
-      <div className="flex flex-col gap-6">
-        {error && (
-          <Alert variant="error">
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {error}
-              <button
-                type="button"
-                onClick={load}
-                disabled={refreshing}
-                className="rounded-edge font-heading text-[11px] font-semibold uppercase tracking-[0.06em]
-                  underline underline-offset-2 outline-none focus-visible:ring-3
-                  focus-visible:ring-brand-red/25 disabled:cursor-wait disabled:opacity-60"
-              >
-                Reintentar
-              </button>
-            </span>
-          </Alert>
-        )}
+      {error && (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-[240px] flex-1">
+            <Alert variant="error">{error}</Alert>
+          </div>
+          <Button size="sm" variant="secondary" onClick={load} disabled={isLoading}>
+            Reintentar
+          </Button>
+        </div>
+      )}
 
-        {/* El spinner es solo para la primera carga; un refetch con datos ya en
-            pantalla los atenua al 60% en vez de vaciarlos. Y si la primera
-            carga falla no hay nada que esperar: el aviso con "Reintentar" es
-            todo lo que debe quedar, nunca un spinner eterno debajo. */}
-        {data === null ? (
-          refreshing && (
-            <div className="flex flex-1 items-center justify-center py-24">
-              <Spinner />
-            </div>
-          )
-        ) : (
-          <div
-            aria-busy={refreshing}
-            className={`flex flex-col gap-6 transition-opacity duration-200 ${refreshing ? "opacity-60" : ""}`}
-          >
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-              {data.kpis.map((kpi) => (
-                <KpiTile
-                  key={kpi.key}
-                  icon={kpiIcon[kpi.key]}
-                  label={kpi.label}
-                  value={kpi.value}
-                  tone={kpi.tone}
-                  emphasis={kpi.emphasis}
-                  delta={kpi.delta}
-                  sparkline={kpi.sparkline}
-                />
-              ))}
-            </div>
+      {!ready ? (
+        error === null && (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} aria-hidden className="h-[132px] animate-pulse rounded-card bg-fill" />
+            ))}
+          </div>
+        )
+      ) : (
+        <div className={`flex flex-col gap-4 ${isLoading ? "opacity-60" : ""}`}>
+          {/* 1 — banda de contexto: el tamano de la cartera, en una linea. */}
+          <QuickOverview
+            title="Resumen rápido"
+            stats={[
+              { label: "Clientes en cartera", value: clients.total.toLocaleString("es-DO") },
+              { label: "Clientes activos", value: clients.active.toLocaleString("es-DO") },
+              { label: "Sin vendedor", value: String(clients.withoutSalesRep) },
+              { label: "Territorios", value: String(territories.length) },
+              { label: "Vendedores", value: String(clients.bySalesRep.length) },
+            ]}
+          />
 
-            {/* Charts adaptados de mono-charts (github.com/Subhan-code/Amicro,
-                MIT) — estructura original, recoloreados a la paleta de marca. */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              <MonoRoundedBarChart data={data.weeklyBars} total={data.weeklyTotal} />
-              <MonoRoundedDonutChart data={categoryBreakdown} />
-              <MonoRoundedStreamChart data={data.activityStream} peak={data.activityPeak} />
-            </div>
+          {/* 2 — reparto a la izquierda, cifras de Calidad a la derecha: es la
+                 fila de la referencia, y separa "como esta repartido" de "que
+                 hay que atender". */}
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+            <Panel
+              title="Cartera por territorio"
+              actions={<RefreshButton onClick={load} busy={isLoading} />}
+            >
+              <DistributionDonut data={territories} unit="clientes" />
+            </Panel>
 
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
-              <div className="flex flex-col gap-5">
-                <SystemStatusCard onRefresh={load} isRefreshing={refreshing} lastSync={lastSync} />
-
-                <DashboardCard className="flex flex-col items-center">
-                  <h2 className="mb-3 self-start font-heading text-[13px] font-bold tracking-[-0.01em] text-ink">
-                    Cumplimiento de SLA
-                  </h2>
-                  <SlaDonut compliance={data.slaCompliance} label="a tiempo" />
-                  <div className="mt-4 w-full">
-                    <PriorityBars rows={data.priorityCompliance} />
-                  </div>
-                </DashboardCard>
-              </div>
-
-              <TicketsTable tickets={data.tickets} />
+            <div className="grid auto-rows-min content-start grid-cols-1 gap-3 sm:grid-cols-2 xl:col-span-2">
+              <StatCard
+                icon={ClipboardCheck}
+                label="HCA abiertas"
+                value={String(quality.openNow)}
+                help="Hojas de acción correctiva sin cerrar a día de hoy."
+              />
+              <StatCard
+                icon={AlertTriangle}
+                label="HCA vencidas"
+                value={String(quality.overdueNow)}
+                tone={quality.overdueNow > 0 ? "red" : "green"}
+                help="Pasaron su fecha comprometida y siguen abiertas."
+              />
+              <StatCard
+                icon={Inbox}
+                label="HCA del período"
+                value={String(quality.openedInRange)}
+                // La pastilla sale de `byMonth`, que es una serie real: compara
+                // el ultimo mes cerrado contra el anterior. Donde el servidor no
+                // tiene con que comparar, la ranura queda vacia en vez de
+                // inventarse un porcentaje.
+                delta={openedDelta}
+                help={`Abiertas en ${periodEntry.label.toLowerCase()}. La variación compara el último mes con el anterior.`}
+              />
+              <StatCard
+                icon={CheckCircle2}
+                label="HCA cerradas"
+                value={String(quality.closedInRange)}
+                tone="green"
+                delta={closedDelta}
+                help={`Cerradas en ${periodEntry.label.toLowerCase()}. La variación compara el último mes con el anterior.`}
+              />
+              <StatCard
+                icon={Clock}
+                label="Cierre promedio"
+                value={
+                  quality.averageClosureDays === null
+                    ? "Sin datos"
+                    : `${quality.averageClosureDays} d`
+                }
+                tone={quality.averageClosureDays === null ? "warn" : "neutral"}
+                help="Días desde la apertura hasta el cierre. Sin datos si no se cerró ninguna."
+              />
+              <StatCard
+                icon={FileText}
+                label="Notas de crédito"
+                value={String(quality.credits.count)}
+                tone={quality.credits.count > 0 ? "warn" : "neutral"}
+                help={
+                  quality.credits.byCurrency.length === 0
+                    ? "Ninguna emitida en el período."
+                    : quality.credits.byCurrency
+                        .map((entry) => formatAmount(entry.total, entry.currency))
+                        .join(" · ")
+                }
+              />
             </div>
           </div>
-        )}
-      </div>
+
+          {/* 3 — el grafico ancho y, a su lado, que tan concentrada esta la
+                 cartera: la dona responde "¿depende todo de dos personas?",
+                 la tabla de abajo da el listado. Son dos preguntas. */}
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+            <Panel
+              title="HCA por mes"
+              className="xl:col-span-2"
+              actions={<RefreshButton onClick={load} busy={isLoading} />}
+            >
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+                <div>
+                  <p className="font-heading text-[28px] font-bold leading-none tabular-nums text-ink">
+                    {quality.openedInRange.toLocaleString("es-DO")}
+                  </p>
+                  <p className="mt-1 text-[11.5px] text-faint">
+                    abiertas en el período · {quality.closedInRange} cerradas
+                  </p>
+                </div>
+                <DotLegend
+                  items={[
+                    { label: "Abiertas", color: "var(--color-line-strong)" },
+                    { label: "Cerradas", color: "var(--color-brand-red)" },
+                  ]}
+                />
+              </div>
+              <MonthlyBars data={months} average={average} />
+            </Panel>
+
+            <Panel
+              title="Concentración de la cartera"
+              actions={<RefreshButton onClick={load} busy={isLoading} />}
+            >
+              <DistributionDonut data={repSlices} unit="clientes" />
+            </Panel>
+          </div>
+
+          {/* 4 — la tabla al pie, con casilla, filtro, estado y acciones. */}
+          <ClientsTable />
+        </div>
+      )}
     </div>
   );
 }

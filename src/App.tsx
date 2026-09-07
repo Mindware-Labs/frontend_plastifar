@@ -12,10 +12,7 @@ import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
 import { HcaPage } from "./pages/quality/HcaPage";
-import { AuditReportsSection } from "./pages/reports/AuditReportsSection";
-import { ClientsReportsSection } from "./pages/reports/ClientsReportsSection";
-import { QualityReportsSection } from "./pages/reports/QualityReportsSection";
-import { ReportCatalogSection } from "./pages/reports/ReportCatalogSection";
+import { ReportsPage } from "./pages/reports/ReportsPage";
 import { RolesPage } from "./pages/roles/RolesPage";
 import { HolidaysSection } from "./pages/settings/HolidaysSection";
 import { MailboxesSection } from "./pages/settings/MailboxesSection";
@@ -106,26 +103,25 @@ export default function App() {
         {/* El servidor ya exige reports.read en los tres endpoints; sin este
             guard la pantalla se pintaba entera y se llenaba de 403. */}
         <Route element={<PermissionRoute permission="reports.read"><Outlet /></PermissionRoute>}>
-          <Route path="/reportes" element={<Navigate to="/reportes/operacion" replace />} />
+          <Route path="/reportes" element={<ReportsPage />} />
+
+          {/* Las siete rutas de familia se colapsaron en el generador. Se dejan
+              redirigiendo en vez de caer al 404 global: son enlaces que la gente
+              tiene guardados y compartidos por chat, y las tres que si tenian
+              datos abren directamente su reporte. */}
           <Route
-            path="/reportes/operacion"
-            element={<ReportCatalogSection family="operacion" blockedBy="la Bandeja de tickets" />}
+            path="/reportes/calidad"
+            element={<Navigate to="/reportes?reporte=hca-por-periodo" replace />}
           />
           <Route
-            path="/reportes/sla"
-            element={<ReportCatalogSection family="sla" blockedBy="la Bandeja de tickets" />}
+            path="/reportes/clientes"
+            element={<Navigate to="/reportes?reporte=cartera-por-territorio" replace />}
           />
           <Route
-            path="/reportes/productividad"
-            element={<ReportCatalogSection family="productividad" blockedBy="la Bandeja de tickets" />}
+            path="/reportes/auditoria"
+            element={<Navigate to="/reportes?reporte=bitacora-completa" replace />}
           />
-          <Route path="/reportes/calidad" element={<QualityReportsSection />} />
-          <Route path="/reportes/clientes" element={<ClientsReportsSection />} />
-          <Route
-            path="/reportes/volumen"
-            element={<ReportCatalogSection family="volumen" blockedBy="la Bandeja de tickets" />}
-          />
-          <Route path="/reportes/auditoria" element={<AuditReportsSection />} />
+          <Route path="/reportes/:familia" element={<Navigate to="/reportes" replace />} />
         </Route>
 
         {/* La raiz entra a la Bandeja, no al Dashboard: es donde la operacion

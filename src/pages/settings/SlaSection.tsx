@@ -172,6 +172,8 @@ export function SlaSection() {
 
   return (
     <SettingsLayout
+      title="Políticas de SLA"
+      note="La política se copia al ticket como dos fechas de vencimiento calculadas al crearlo, así que cambiarla no altera los tickets ya abiertos. El reloj se detiene mientras el ticket está en espera del cliente y se reanuda al volver a abierto."
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
@@ -360,11 +362,6 @@ export function SlaSection() {
         />
       )}
 
-      <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
-        La política se copia al ticket como dos fechas de vencimiento calculadas al crearlo, así que
-        cambiarla no altera los tickets ya abiertos. El reloj se detiene mientras el ticket está en
-        espera del cliente y se reanuda al volver a abierto.
-      </p>
 
       {modal !== null && (
         <SlaModal

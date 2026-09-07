@@ -27,6 +27,16 @@ function isoDaysAgo(days: number): string {
 }
 
 /**
+ * El rango de reposo, los ultimos 30 dias. Lo usa el generador, que guarda sus
+ * criterios en estado y no en la direccion —son ocho, no dos— y necesitaba el
+ * mismo punto de partida que `useDateRange` sin arrastrar su acoplamiento a la
+ * cadena de consulta.
+ */
+export function defaultRange(): DateRange {
+  return { from: isoDaysAgo(30), to: isoDaysAgo(0) };
+}
+
+/**
  * Tope maximo del rango, en meses. Espejo de `Reports:MaxRangeMonths` en el
  * servidor (`ReportsController.MaxRangeMonths`, 12 por defecto): la seccion 4.2
  * pide que el formulario y el endpoint digan lo mismo, y descubrir el limite

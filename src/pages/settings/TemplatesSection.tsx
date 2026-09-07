@@ -96,6 +96,8 @@ export function TemplatesSection() {
 
   return (
     <SettingsLayout
+      title="Plantillas"
+      note="Las variables se escriben entre llaves dobles y se sustituyen al enviar. Una variable desconocida se rechaza al guardar, no al enviar: un error de plantilla no puede descubrirse con el correo ya en camino."
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
@@ -237,11 +239,6 @@ export function TemplatesSection() {
         />
       )}
 
-      <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
-        Las variables se escriben entre llaves dobles y se sustituyen al enviar. Una variable
-        desconocida se rechaza al guardar, no al enviar: un error de plantilla no puede descubrirse
-        con el correo ya en camino.
-      </p>
 
       {modal !== null && (
         <TemplateModal

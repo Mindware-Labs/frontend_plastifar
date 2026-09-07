@@ -11,6 +11,8 @@ export interface ConfirmDialogProps {
   tone?: ConfirmTone;
   icon?: ComponentType<{ className?: string }>;
   title: string;
+  /** Linea corta sobre el titulo: situa la accion dentro del modulo. */
+  eyebrow?: string;
   description: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
@@ -29,6 +31,7 @@ export function ConfirmDialog({
   tone = "danger",
   icon: Icon = AlertTriangle,
   title,
+  eyebrow,
   description,
   confirmLabel,
   cancelLabel = "Cancelar",
@@ -59,6 +62,7 @@ export function ConfirmDialog({
   return (
     <Modal
       title={title}
+      eyebrow={eyebrow}
       onClose={requestClose}
       footer={
         <>

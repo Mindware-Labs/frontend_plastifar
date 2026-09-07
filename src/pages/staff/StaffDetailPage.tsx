@@ -12,6 +12,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
 import { RowAction } from "../../components/ui/RowAction";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
@@ -265,8 +266,8 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
       )}
 
       {section === "datos" ? (
-        <DataTable>
-          <tbody>
+        <DetailTable>
+          <DetailGroup title="Persona">
             <DetailRow label="Nombre">
               <span className="flex items-center gap-2.5">
                 <Avatar name={fullName} seed={staff.id} />
@@ -275,18 +276,24 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
             </DetailRow>
             <DetailRow label="Correo">{staff.email}</DetailRow>
             <DetailRow label="Extensión">{staff.phoneExt ?? "—"}</DetailRow>
+          </DetailGroup>
+
+          <DetailGroup title="Puesto">
             <DetailRow label="Departamento principal">
               {primary ? primary.departmentName : "—"}
             </DetailRow>
             <DetailRow label="Perfil">
               {staff.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
             </DetailRow>
+          </DetailGroup>
+
+          <DetailGroup title="Cuenta" hint="Qué puede hacer hoy en el panel.">
             <DetailRow label="Estado">
               <StatusDot active={staff.isActive} />
             </DetailRow>
             <DetailRow label="Último acceso">{formatDate(staff.lastLoginAt)}</DetailRow>
-          </tbody>
-        </DataTable>
+          </DetailGroup>
+        </DetailTable>
       ) : (
         <>
           {staff.isAdmin && (
@@ -475,16 +482,3 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
  * La etiqueta es la cabecera de su fila, no una celda mas: sin `th scope="row"`
  * un lector de pantalla recita los valores sin decir de que son.
  */
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Row>
-      <th
-        scope="row"
-        className="w-[220px] py-3 pl-0 pr-3.5 text-left align-middle font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint"
-      >
-        {label}
-      </th>
-      <Td className="py-3 text-[13px] text-brand-gray">{children}</Td>
-    </Row>
-  );
-}

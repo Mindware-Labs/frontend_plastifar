@@ -9,7 +9,7 @@ import { MonoChartTable } from "./MonoChartA11y";
 import { MonoChartTooltip } from "./MonoChartTooltip";
 import { INSET_RADIUS } from "../radii";
 import { CARD_WHITE } from "./chartTheme";
-import { useIsMobile } from "./useIsMobile";
+import { useIsMobile } from "../../../hooks/useIsMobile";
 
 interface DonutSegment {
   name: string;
@@ -18,6 +18,14 @@ interface DonutSegment {
 
 interface MonoRoundedDonutChartProps {
   data: DonutSegment[];
+  /** Encabezado de la tarjeta. */
+  title: string;
+  /** Insignia del corte que representa `data`. */
+  badge: string;
+  /** Sustantivo que acompana al total: "clientes", "tickets". */
+  unit: string;
+  /** Como se llama cada porcion: "territorios", "categorias". */
+  segmentNoun: string;
   compact?: boolean;
 }
 
@@ -32,7 +40,14 @@ const SEGMENT_COLORS = [
   "var(--color-faint)",
 ];
 
-export function MonoRoundedDonutChart({ data, compact = false }: MonoRoundedDonutChartProps) {
+export function MonoRoundedDonutChart({
+  data,
+  title,
+  badge,
+  unit,
+  segmentNoun,
+  compact = false,
+}: MonoRoundedDonutChartProps) {
   const isMobile = useIsMobile();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
@@ -48,20 +63,20 @@ export function MonoRoundedDonutChart({ data, compact = false }: MonoRoundedDonu
       <div className="flex items-center justify-between mb-1">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-xs font-semibold tracking-wider uppercase text-faint">Tickets por categoría</h2>
+            <h2 className="text-xs font-semibold tracking-wider uppercase text-faint">{title}</h2>
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-brand-red/8 text-brand-red border border-brand-red/20">
-              Distribución
+              {badge}
             </span>
           </div>
           <p className="text-xl font-bold tracking-tight tabular-nums mt-0.5 font-heading text-ink">
-            {total} <span className="text-xs font-normal text-subtle">tickets</span>
+            {total} <span className="text-xs font-normal text-subtle">{unit}</span>
           </p>
         </div>
       </div>
 
       <div
         role="img"
-        aria-label={`Distribución de ${total} tickets entre ${data.length} categorías.`}
+        aria-label={`Distribución de ${total} ${unit} entre ${data.length} ${segmentNoun}.`}
         className={`relative w-full flex-1 ${INSET_RADIUS} overflow-hidden p-2 bg-canvas flex items-center justify-center touch-pan-y`}
       >
         <ResponsiveContainer width="100%" height={compact ? 130 : 160}>
@@ -134,8 +149,8 @@ export function MonoRoundedDonutChart({ data, compact = false }: MonoRoundedDonu
       </ul>
 
       <MonoChartTable
-        caption="Tickets por categoría"
-        columns={["Categoría", "Tickets"]}
+        caption={title}
+        columns={[segmentNoun, unit]}
         rows={data.map((seg) => [seg.name, seg.value])}
       />
     </DashboardCard>

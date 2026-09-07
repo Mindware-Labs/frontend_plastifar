@@ -17,6 +17,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -286,8 +287,8 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       )}
 
       {section === "datos" && (
-        <DataTable>
-          <tbody>
+        <DetailTable>
+          <DetailGroup title="Identificación">
             <DetailRow label="Nombre">
               <span className="flex items-center gap-2.5">
                 <Avatar name={client.name} seed={client.id} />
@@ -300,6 +301,12 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
               <span className="tabular-nums">{client.code}</span>
             </DetailRow>
             <DetailRow label="RNC">{client.taxId ?? "—"}</DetailRow>
+            <DetailRow label="Estado">
+              <StatusDot active={client.isActive} />
+            </DetailRow>
+          </DetailGroup>
+
+          <DetailGroup title="Clasificación comercial" hint="Quién lo atiende y desde dónde.">
             <DetailRow label="Tipo">
               <Badge tone="neutral">{client.type}</Badge>
             </DetailRow>
@@ -309,17 +316,20 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   Mismas palabras que el listado. */}
               {repName(client.salesRepStaffId) ?? <span className="text-warn">Sin vendedor</span>}
             </DetailRow>
+          </DetailGroup>
+
+          <DetailGroup title="Contacto">
             <DetailRow label="Teléfono">{client.phone ?? "—"}</DetailRow>
             <DetailRow label="Correo">{client.email ?? "—"}</DetailRow>
             <DetailRow label="Dirección">{client.address ?? "—"}</DetailRow>
-            <DetailRow label="Notas internas">
+          </DetailGroup>
+
+          <DetailGroup title="Uso interno" hint="No se comparte con el cliente.">
+            <DetailRow label="Notas internas" wide>
               {client.notes ?? <span className="text-faint">Sin notas internas</span>}
             </DetailRow>
-            <DetailRow label="Estado">
-              <StatusDot active={client.isActive} />
-            </DetailRow>
-          </tbody>
-        </DataTable>
+          </DetailGroup>
+        </DetailTable>
       )}
 
       {section === "contactos" && (
@@ -519,16 +529,3 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
  * La etiqueta es la cabecera de su fila, no una celda mas: sin `th scope="row"`
  * un lector de pantalla recita once valores sin decir de que son.
  */
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Row>
-      <th
-        scope="row"
-        className="w-[220px] py-3 pl-0 pr-3.5 text-left align-middle font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint"
-      >
-        {label}
-      </th>
-      <Td className="py-3 text-[13px] text-brand-gray">{children}</Td>
-    </Row>
-  );
-}

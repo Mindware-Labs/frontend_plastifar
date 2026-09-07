@@ -165,6 +165,8 @@ export function HolidaysSection() {
 
   return (
     <SettingsLayout
+      title="Días no laborables"
+      note="Estos días se saltan al calcular vencimientos, pero solo en las políticas con reloj de jornada: una política de reloj continuo cuenta igual un feriado que un martes."
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
@@ -327,10 +329,6 @@ export function HolidaysSection() {
         />
       )}
 
-      <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
-        Estos días se saltan al calcular vencimientos, pero solo en las políticas con reloj de
-        jornada: una política de reloj continuo cuenta igual un feriado que un martes.
-      </p>
 
       {modal !== null && (
         <HolidayModal

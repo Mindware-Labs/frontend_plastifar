@@ -13,7 +13,33 @@ export interface QualityReport {
    */
   averageClosureDays: number | null;
   byMonth: { month: string; opened: number; closed: number }[];
-  credits: { count: number; byCurrency: { currency: string; count: number; total: number }[] };
+  credits: {
+    count: number;
+    byCurrency: { currency: string; count: number; total: number }[];
+    /**
+     * `false` cuando hay un filtro activo que este bloque no puede honrar. Una
+     * solicitud de credito se emite contra un cliente, no contra una linea de
+     * producto ni contra el responsable de una HCA, asi que con esos dos filtros
+     * las notas siguen contando todo el periodo. El numero es cierto; lo que
+     * cambia es a que pregunta responde, y la pantalla tiene que decirlo.
+     */
+    scoped: boolean;
+  };
+}
+
+/** Lo que acota un reporte de Calidad ademas del rango de fechas. */
+export interface QualityFilters {
+  clientId?: number;
+  productLineId?: number;
+  responsibleStaffId?: number;
+}
+
+/** Lo que acota el reporte de Clientes. Es una foto: no lleva rango. */
+export interface ClientsFilters {
+  territoryId?: number;
+  salesRepStaffId?: number;
+  type?: string;
+  activeOnly?: boolean;
 }
 
 export interface ClientsReport {
@@ -95,10 +121,11 @@ function auditSlice(path: string) {
 }
 
 export const reportsApi = {
-  quality: (from: string, to: string) =>
-    apiRequest<QualityReport>(`/api/reports/quality${toQuery({ from, to })}`),
+  quality: (from: string, to: string, filters: QualityFilters = {}) =>
+    apiRequest<QualityReport>(`/api/reports/quality${toQuery({ from, to, ...filters })}`),
 
-  clients: () => apiRequest<ClientsReport>("/api/reports/clients"),
+  clients: (filters: ClientsFilters = {}) =>
+    apiRequest<ClientsReport>(`/api/reports/clients${toQuery({ ...filters })}`),
 
   audit: (from: string, to: string, page: number, pageSize: number) =>
     apiRequest<AuditReport>(`/api/reports/audit${toQuery({ from, to, page, pageSize })}`),

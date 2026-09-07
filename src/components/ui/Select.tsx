@@ -128,7 +128,16 @@ export function Select({
     }
 
     // Reposicionar en cada scroll seria un baile: se cierra, como haria el nativo.
-    function handleViewportChange() {
+    //
+    // Pero el scroll DEL PROPIO PANEL no mueve el ancla. Sin esta guarda,
+    // cualquier lista que no cupiera se cerraba en el mismo instante de abrirse:
+    // al abrir, el efecto que lleva la opcion activa a la vista hace
+    // scrollIntoView, eso emite un `scroll`, y este listener —que escucha en
+    // fase de captura, o sea todos— lo leia como si se hubiera movido la pagina.
+    // Solo se notaba con muchas opciones; con seis no hay nada que desplazar.
+    function handleViewportChange(event: Event) {
+      const target = event.target;
+      if (target instanceof Node && panelRef.current?.contains(target)) return;
       setOpen(false);
     }
 

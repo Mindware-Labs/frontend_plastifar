@@ -11,7 +11,7 @@ import { MonoChartLegend, MonoChartTable, type LegendItem } from "./MonoChartA11
 import { MonoChartTooltip } from "./MonoChartTooltip";
 import { INSET_RADIUS } from "../radii";
 import { AXIS_TICK, GRID_STROKE } from "./chartTheme";
-import { useIsMobile } from "./useIsMobile";
+import { useIsMobile } from "../../../hooks/useIsMobile";
 
 interface BarPoint {
   label: string;
@@ -22,18 +22,36 @@ interface BarPoint {
 interface MonoRoundedBarChartProps {
   data: BarPoint[];
   total: number;
+  /** Encabezado de la tarjeta. */
+  title: string;
+  /** Insignia del periodo que cubre `data`. */
+  badge: string;
+  /** Sustantivo que acompana a `total`: "HCA abiertas", "tickets creados". */
+  unit: string;
+  /** Nombre de cada serie, en el mismo orden que las barras. */
+  series: { primary: string; secondary: string };
+  /** Que recorre el eje: "mes", "dia de la semana". */
+  axisNoun: string;
   compact?: boolean;
 }
 
-// Creados vs. resueltos es el semaforo que ya usa el resto del Dashboard. No se
-// reutiliza un gris de la escala de filetes como identidad de serie: `line-strong`
-// sobre `bg-canvas` daba ~1.1:1 y la barra practicamente no se veia.
-const LEGEND: LegendItem[] = [
-  { label: "Creados", color: "var(--color-brand-red)", shape: "solid", icon: Plus },
-  { label: "Resueltos", color: "var(--color-brand-green)", shape: "hatch", icon: CheckCircle2 },
-];
-
-export function MonoRoundedBarChart({ data, total, compact = false }: MonoRoundedBarChartProps) {
+export function MonoRoundedBarChart({
+  data,
+  total,
+  title,
+  badge,
+  unit,
+  series,
+  axisNoun,
+  compact = false,
+}: MonoRoundedBarChartProps) {
+  // El par rojo/verde es el semaforo que ya usa el resto del Dashboard. No se
+  // reutiliza un gris de la escala de filetes como identidad de serie:
+  // `line-strong` sobre `bg-canvas` daba ~1.1:1 y la barra casi no se veia.
+  const legend: LegendItem[] = [
+    { label: series.primary, color: "var(--color-brand-red)", shape: "solid", icon: Plus },
+    { label: series.secondary, color: "var(--color-brand-green)", shape: "hatch", icon: CheckCircle2 },
+  ];
   const isMobile = useIsMobile();
   const idPrefix = useId().replace(/:/g, "");
   const [layout, setLayout] = useState<"vertical" | "horizontal">("vertical");
@@ -49,13 +67,13 @@ export function MonoRoundedBarChart({ data, total, compact = false }: MonoRounde
       <div className="flex items-center justify-between mb-2">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-xs font-semibold tracking-wider uppercase text-faint">Volumen de tickets</h2>
+            <h2 className="text-xs font-semibold tracking-wider uppercase text-faint">{title}</h2>
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-brand-red/8 text-brand-red border border-brand-red/20">
-              Esta semana
+              {badge}
             </span>
           </div>
           <p className="text-xl font-bold tracking-tight tabular-nums mt-0.5 font-heading text-ink">
-            {total} <span className="text-xs font-normal text-subtle">tickets creados</span>
+            {total} <span className="text-xs font-normal text-subtle">{unit}</span>
           </p>
         </div>
 
@@ -78,7 +96,7 @@ export function MonoRoundedBarChart({ data, total, compact = false }: MonoRounde
 
       <div
         role="img"
-        aria-label={`Tickets creados y resueltos por dia de la semana. Total creados: ${total}.`}
+        aria-label={`${series.primary} y ${series.secondary} por ${axisNoun}. Total: ${total} ${unit}.`}
         className={`relative w-full flex-1 ${INSET_RADIUS} overflow-hidden p-2 bg-canvas touch-pan-y`}
       >
         <ResponsiveContainer width="100%" height={compact ? 130 : 160}>
@@ -106,17 +124,17 @@ export function MonoRoundedBarChart({ data, total, compact = false }: MonoRounde
             )}
             <Tooltip content={<MonoChartTooltip indicator="dot" />} />
 
-            <Bar dataKey="primary" name="Creados" fill="var(--color-brand-red)" radius={isHorizontal ? [0, 8, 8, 0] : [8, 8, 8, 8]} barSize={isHorizontal ? 12 : 16} isAnimationActive={!isMobile} animationDuration={isMobile ? 0 : 800} />
-            <Bar dataKey="secondary" name="Resueltos" fill={`url(#${idPrefix}bar-hatch)`} radius={isHorizontal ? [0, 8, 8, 0] : [8, 8, 8, 8]} barSize={isHorizontal ? 12 : 16} isAnimationActive={!isMobile} animationDuration={isMobile ? 0 : 1000} />
+            <Bar dataKey="primary" name={series.primary} fill="var(--color-brand-red)" radius={isHorizontal ? [0, 8, 8, 0] : [8, 8, 8, 8]} barSize={isHorizontal ? 12 : 16} isAnimationActive={!isMobile} animationDuration={isMobile ? 0 : 800} />
+            <Bar dataKey="secondary" name={series.secondary} fill={`url(#${idPrefix}bar-hatch)`} radius={isHorizontal ? [0, 8, 8, 0] : [8, 8, 8, 8]} barSize={isHorizontal ? 12 : 16} isAnimationActive={!isMobile} animationDuration={isMobile ? 0 : 1000} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      <MonoChartLegend items={LEGEND} />
+      <MonoChartLegend items={legend} />
 
       <MonoChartTable
-        caption="Tickets creados y resueltos por dia"
-        columns={["Dia", "Creados", "Resueltos"]}
+        caption={`${series.primary} y ${series.secondary} por ${axisNoun}`}
+        columns={[axisNoun, series.primary, series.secondary]}
         rows={data.map((point) => [point.label, point.primary, point.secondary])}
       />
     </DashboardCard>

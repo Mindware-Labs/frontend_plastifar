@@ -172,6 +172,8 @@ export function MailboxesSection() {
 
   return (
     <SettingsLayout
+      title="Buzones"
+      note="Este catálogo administra el buzón, no la lectura del correo: la ingesta que convierte un mensaje entrante en ticket es una decisión pendiente con Plastifar (sección 9.7 del plan de construcción). Probar conexión confirma que el buzón está activo y tiene su secreto configurado, sin exponer la credencial."
       action={
         canWrite && (
           <Button
@@ -343,12 +345,6 @@ export function MailboxesSection() {
         />
       )}
 
-      <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
-        Este catálogo administra el buzón, no la lectura del correo: la ingesta que convierte un
-        mensaje entrante en ticket es una decisión pendiente con Plastifar (sección 9.7 del plan de
-        construcción). Probar conexión confirma que el buzón está activo y tiene su secreto
-        configurado, sin exponer la credencial.
-      </p>
 
       {modal !== null && (
         <MailboxModal

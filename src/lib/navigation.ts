@@ -13,7 +13,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { PermissionKey } from "./permissions";
-import { REPORT_FAMILIES } from "../types/reports";
 
 export interface ModuleLink {
   label: string;
@@ -73,12 +72,14 @@ export const SIDEBAR_NAV: ModuleEntry[] = [
     ],
   },
   {
+    // Sin hijos: las siete familias dejaron de ser rutas y pasaron a ser la
+    // agrupacion del selector dentro del generador. El breadcrumb de un reporte
+    // es "Reportes", y cual se genero lo dice la propia pantalla.
     label: "Reportes",
     icon: BarChart3,
-    to: REPORT_FAMILIES[0].to,
+    to: "/reportes",
     match: ["/reportes"],
     permission: "reports.read",
-    children: REPORT_FAMILIES.map(({ label, to }) => ({ label, to, permission: "reports.read" })),
   },
   {
     label: "Configuración",

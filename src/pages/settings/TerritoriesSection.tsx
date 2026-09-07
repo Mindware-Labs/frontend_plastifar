@@ -103,6 +103,8 @@ export function TerritoriesSection() {
 
   return (
     <SettingsLayout
+      title="Territorios"
+      note="El territorio es obligatorio al registrar un cliente: alimenta el ranking comercial por zona y vendedor. Uno con historial no se elimina: se desactiva."
       action={
         canWrite && (
           <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
@@ -229,10 +231,6 @@ export function TerritoriesSection() {
         />
       )}
 
-      <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
-        El territorio es obligatorio al registrar un cliente: alimenta el ranking comercial por zona
-        y vendedor. Uno con historial no se elimina: se desactiva.
-      </p>
 
       {modal !== null && (
         <TerritoryModal
