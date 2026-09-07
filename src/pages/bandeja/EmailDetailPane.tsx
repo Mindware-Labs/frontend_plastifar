@@ -40,7 +40,8 @@ import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { CannedPicker, textToBlocks } from "./CannedPicker";
-import { AssignmentControl, NotesPanel, TagEditor } from "./ConversationTools";
+import { AssignmentControl, TagEditor } from "./ConversationTools";
+import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
 import { RecipientInput } from "./RecipientInput";
 import { fieldLabelClass } from "./toolbarStyles";
 import { ticketBadgeClass } from "./badgeStyles";
@@ -202,6 +203,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
   // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
   const replyText = blocksToText(replyBlocks);
   const [reloadKey, setReloadKey] = useState(0);
+  const [notesRefreshKey, setNotesRefreshKey] = useState(0);
   const { onInboxChanged, onComposing, setComposing, whoIsComposing } = useEmailCounts();
   const receipts = useReceipts();
   const isForward = composerMode === "forward";
@@ -714,31 +716,39 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
       )}
 
       <div className="px-4 pb-3 pt-2.5">
-        <h2 className="font-heading text-[17px] font-bold leading-tight tracking-[-0.02em] text-ink">
-          {email.subject || "(sin asunto)"}
-        </h2>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-heading text-[17px] font-bold leading-tight tracking-[-0.02em] text-ink">
+              {email.subject || "(sin asunto)"}
+            </h2>
 
-        <div className="mt-2 flex items-center gap-2">
-          <Avatar className="size-7 shrink-0">
-            <AvatarFallback className="text-[10px]">{initials(displayName)}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="truncate text-[12.5px] font-semibold text-ink">
-              {displayName}
-              {/* El nombre puede ser el propio correo: repetirlo no aporta. */}
-              {displayName !== email.fromEmail && (
-                <span className="ml-1.5 font-normal text-subtle">{email.fromEmail}</span>
-              )}
-            </p>
-            <p className="truncate text-[11px] text-faint">
-              Para: {email.toEmails.join(", ") || "—"}
-              {email.ccEmails.length > 0 && ` · CC: ${email.ccEmails.join(", ")}`}
-              {(email.bccEmails ?? []).length > 0 && ` · CCO: ${email.bccEmails.join(", ")}`}
-            </p>
+            <div className="mt-1.5 flex items-center gap-2">
+              <Avatar className="size-7 shrink-0">
+                <AvatarFallback className="text-[10px]">{initials(displayName)}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="truncate text-[12.5px] font-semibold text-ink">
+                  {displayName}
+                  {/* El nombre puede ser el propio correo: repetirlo no aporta. */}
+                  {displayName !== email.fromEmail && (
+                    <span className="ml-1.5 font-normal text-subtle">{email.fromEmail}</span>
+                  )}
+                </p>
+                <p className="truncate text-[11px] text-faint">
+                  Para: {email.toEmails.join(", ") || "—"}
+                  {email.ccEmails.length > 0 && ` · CC: ${email.ccEmails.join(", ")}`}
+                  {(email.bccEmails ?? []).length > 0 && ` · CCO: ${email.bccEmails.join(", ")}`}
+                </p>
+              </div>
+            </div>
           </div>
-          <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] font-medium text-faint">
-            {formatDateTime(email.createdAt)}
-          </span>
+
+          <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
+            <ConversationNotes key={notesRefreshKey} emailId={email.id} />
+            <span className="whitespace-nowrap text-[11px] font-medium text-faint">
+              {formatDateTime(email.createdAt)}
+            </span>
+          </div>
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
@@ -1175,7 +1185,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
         </>
       )}
 
-      <NotesPanel emailId={email.id} />
+      <AddNotePanel emailId={email.id} onNoteAdded={() => setNotesRefreshKey((k) => k + 1)} />
 
       <Separator className="bg-line" />
 
