@@ -10,6 +10,7 @@ import {
   PenLine,
   MessageSquareText,
   Send,
+  Settings,
   ShieldCheck,
   Star,
   Trash2,
@@ -56,7 +57,6 @@ const groups: NavGroup[] = [
       { label: "Enviados", to: "/bandeja/enviados", folder: "sent", icon: Send },
       { label: "Archivados", to: "/bandeja/archivados", folder: "archived", icon: Archive },
       { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
-      { label: "Supresión", to: "/bandeja/supresion", icon: Ban },
       { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
     ],
   },
@@ -66,6 +66,13 @@ const groups: NavGroup[] = [
     children: [
       { label: "Colaboradores", to: "/staff", icon: Users },
       { label: "Roles", to: "/roles", icon: ShieldCheck },
+    ],
+  },
+  {
+    label: "Configuración",
+    icon: Settings,
+    children: [
+      { label: "Supresión", to: "/configuracion/supresion", icon: Ban },
     ],
   },
 ];
@@ -105,6 +112,7 @@ function FolderBadge({
 const collapsedKey = "plf.sidebar-collapsed";
 const mailExpandedKey = "plf.sidebar-mail-expanded";
 const personalExpandedKey = "plf.sidebar-personal-expanded";
+const configExpandedKey = "plf.sidebar-config-expanded";
 
 /** En navegacion privada leer localStorage lanza: la barra abre expandida. */
 function readCollapsed() {
@@ -137,6 +145,7 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [mailExpanded, setMailExpanded] = useState(() => readGroupExpanded(mailExpandedKey));
   const [personalExpanded, setPersonalExpanded] = useState(() => readGroupExpanded(personalExpandedKey));
+  const [configExpanded, setConfigExpanded] = useState(() => readGroupExpanded(configExpandedKey));
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [editingSignature, setEditingSignature] = useState(false);
@@ -166,11 +175,24 @@ export function Sidebar() {
         }
         return next;
       });
+    } else if (label === "Configuración") {
+      setConfigExpanded((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem(configExpandedKey, next ? "1" : "0");
+        } catch {
+          // ignore
+        }
+        return next;
+      });
     }
   }
 
   function isGroupExpanded(label: string) {
-    return label === "Correo" ? mailExpanded : personalExpanded;
+    if (label === "Correo") return mailExpanded;
+    if (label === "Personal") return personalExpanded;
+    if (label === "Configuración") return configExpanded;
+    return true;
   }
 
   useEffect(() => {

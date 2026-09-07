@@ -49,7 +49,7 @@ export function SupresionesPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Correo · Supresión",
+      eyebrow: "Configuración · Supresión",
       title: "Desbloquear dirección",
       description: (
         <>

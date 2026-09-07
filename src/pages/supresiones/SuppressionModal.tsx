@@ -61,7 +61,7 @@ export function SuppressionModal({ onClose, onSaved }: SuppressionModalProps) {
 
   return (
     <Modal
-      eyebrow="Correo · Supresión"
+      eyebrow="Configuración · Supresión"
       title="Bloquear dirección"
       description="A partir de ahora ningún correo saldrá hacia esta dirección hasta que un administrador la desbloquee."
       onClose={onClose}
