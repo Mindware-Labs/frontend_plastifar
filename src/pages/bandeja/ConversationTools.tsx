@@ -1,9 +1,13 @@
 import { Plus, StickyNote, Tag, Trash2, UserRound, X } from "lucide-react";
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
+import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
+import { Modal } from "../../components/ui/Modal";
 import { Select, type SelectOption } from "../../components/ui/Select";
 import { useAuth } from "../../context/useAuth";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatDateTime } from "../../lib/format";
 import type { EmailNoteResponse, StaffOptionResponse, TagCountResponse } from "../../types/api";
 
@@ -47,19 +51,140 @@ export function TagChip({ tag, small = false, onRemove }: { tag: string; small?:
 
 const labelClass = "font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint";
 
+function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
+  if (!textarea) return;
+  textarea.style.height = "auto";
+  const borderOffset = textarea.offsetHeight - textarea.clientHeight;
+  const targetHeight = Math.max(textarea.scrollHeight + borderOffset, 64);
+  if (targetHeight >= 220) {
+    textarea.style.height = "220px";
+    textarea.style.overflowY = "auto";
+  } else {
+    textarea.style.height = `${targetHeight}px`;
+    textarea.style.overflowY = "hidden";
+  }
+}
+
+interface AssignWithNoteModalProps {
+  targetStaffName: string;
+  isSaving: boolean;
+  error: string | null;
+  onConfirm: (noteText: string) => Promise<void> | void;
+  onClose: () => void;
+}
+
+function AssignWithNoteModal({
+  targetStaffName,
+  isSaving,
+  error,
+  onConfirm,
+  onClose,
+}: AssignWithNoteModalProps) {
+  const [note, setNote] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { isExiting, requestClose } = useModalAnimation(onClose);
+
+  useEffect(() => {
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      autoResizeTextarea(textareaRef.current);
+    }, 80);
+  }, []);
+
+  function handleCancel() {
+    if (!isSaving) requestClose();
+  }
+
+  function handleSubmit() {
+    void onConfirm(note);
+  }
+
+  return (
+    <Modal
+      eyebrow="Asignación de conversación"
+      title={`Asignar a ${targetStaffName}`}
+      onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={handleCancel}
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start gap-3 rounded-edge border border-warn/30 bg-warn/[0.07] p-3 text-[12.5px] text-ink">
+          <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
+          <div className="flex flex-col gap-0.5">
+            <p className="font-semibold text-ink">¿Deseas agregar una nota interna?</p>
+            <p className="text-[12px] leading-relaxed text-subtle">
+              Puedes agregar una indicación o contexto para que <strong>{targetStaffName}</strong> sepa qué hacer al recibir este correo. Este paso es opcional.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="assign-modal-note" className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">
+            Nota interna (opcional)
+          </label>
+          <textarea
+            id="assign-modal-note"
+            ref={textareaRef}
+            value={note}
+            onChange={(e) => {
+              setNote(e.target.value);
+              autoResizeTextarea(e.target);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder={`Escribe una indicación o contexto para ${targetStaffName}… (Ctrl+Enter para confirmar)`}
+            rows={2}
+            maxLength={4000}
+            className="w-full min-h-[64px] max-h-[220px] resize-none overflow-hidden rounded-edge border border-line
+              bg-white px-3 py-2 text-[12.5px] leading-relaxed text-ink outline-none placeholder:text-faint
+              focus-visible:border-brand-red/40"
+          />
+          <div className="flex items-center justify-between text-[10.5px] text-faint">
+            <span>Presiona Ctrl+Enter para confirmar</span>
+            <span>{note.length}/4000</span>
+          </div>
+        </div>
+
+        {error && <Alert variant="error">{error}</Alert>}
+      </div>
+
+      <div className="mt-6 flex justify-end gap-2 border-t border-line pt-4">
+        <Button type="button" variant="secondary" onClick={handleCancel} disabled={isSaving}>
+          Cancelar
+        </Button>
+        <Button type="button" onClick={handleSubmit} isLoading={isSaving}>
+          {note.trim() ? "Asignar con nota" : "Asignar sin nota"}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 interface AssignmentProps {
   emailId: number;
   assignedStaffId: number | null;
   assignedStaffName: string | null;
   onChanged: (staffId: number | null, name: string | null) => void;
+  onNoteAdded?: () => void;
 }
 
 /** Quien atiende la conversacion: un selector con el equipo activo y un atajo para tomarla. */
-export function AssignmentControl({ emailId, assignedStaffId, assignedStaffName, onChanged }: AssignmentProps) {
+export function AssignmentControl({
+  emailId,
+  assignedStaffId,
+  assignedStaffName,
+  onChanged,
+  onNoteAdded,
+}: AssignmentProps) {
   const { user } = useAuth();
   const [options, setOptions] = useState<StaffOptionResponse[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingAssignment, setPendingAssignment] = useState<{ staffId: number; staffName: string } | null>(null);
 
   useEffect(() => {
     emailsApi
@@ -82,6 +207,26 @@ export function AssignmentControl({ emailId, assignedStaffId, assignedStaffName,
     }
   }
 
+  async function handleConfirmAssignment(noteText: string) {
+    if (!pendingAssignment) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await emailsApi.assign(emailId, pendingAssignment.staffId);
+      const trimmed = noteText.trim();
+      if (trimmed) {
+        await emailsApi.addNote(emailId, trimmed);
+        onNoteAdded?.();
+      }
+      onChanged(result.assignedStaffId, result.assignedStaffName);
+      setPendingAssignment(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo completar la asignación");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const mine = user !== null && assignedStaffId === user.staffId;
 
   const staffList = options
@@ -94,11 +239,28 @@ export function AssignmentControl({ emailId, assignedStaffId, assignedStaffName,
 
   const selectOptions: SelectOption[] = [
     { value: "", label: "Sin asignar" },
-    ...staffList.map((option) => ({
-      value: String(option.id),
-      label: option.name,
-    })),
   ];
+
+  // Si está asignado a mí actualmente, añadimos la opción con hidden: true
+  // para que el botón de Select muestre "Asignado a mí", pero NO salga en el desplegable.
+  if (mine && user) {
+    selectOptions.push({
+      value: String(user.staffId),
+      label: "Asignado a mí",
+      hidden: true,
+    });
+  }
+
+  // Añadimos al resto del personal (excluyendo siempre al usuario actual)
+  for (const staff of staffList) {
+    if (user && staff.id === user.staffId) {
+      continue;
+    }
+    selectOptions.push({
+      value: String(staff.id),
+      label: staff.name,
+    });
+  }
 
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -109,8 +271,16 @@ export function AssignmentControl({ emailId, assignedStaffId, assignedStaffName,
         disabled={busy || options === null}
         onChange={(next) => {
           const nextId = next === "" ? null : Number(next);
-          if (nextId !== assignedStaffId) {
-            void assign(nextId);
+          if (nextId === assignedStaffId) return;
+
+          if (nextId === null) {
+            void assign(null);
+          } else {
+            const target = staffList.find((s) => s.id === nextId);
+            setPendingAssignment({
+              staffId: nextId,
+              staffName: target?.name ?? "esta persona",
+            });
           }
         }}
         options={selectOptions}
@@ -131,7 +301,20 @@ export function AssignmentControl({ emailId, assignedStaffId, assignedStaffName,
           Asignarme
         </button>
       )}
-      {error && <span className="truncate text-[11px] text-brand-red-dark">{error}</span>}
+      {error && !pendingAssignment && <span className="truncate text-[11px] text-brand-red-dark">{error}</span>}
+
+      {pendingAssignment && (
+        <AssignWithNoteModal
+          targetStaffName={pendingAssignment.staffName}
+          isSaving={busy}
+          error={error}
+          onConfirm={handleConfirmAssignment}
+          onClose={() => {
+            setPendingAssignment(null);
+            setError(null);
+          }}
+        />
+      )}
     </div>
   );
 }

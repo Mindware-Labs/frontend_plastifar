@@ -13,6 +13,7 @@ export interface SelectOption {
   value: string;
   label: string;
   disabled?: boolean;
+  hidden?: boolean;
 }
 
 interface SelectProps {
@@ -86,7 +87,11 @@ export function Select({
   function openList() {
     if (disabled) return;
     measure();
-    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    const initialIndex =
+      selectedIndex >= 0 && !options[selectedIndex]?.hidden
+        ? selectedIndex
+        : options.findIndex((o) => !o.disabled && !o.hidden);
+    setActiveIndex(initialIndex >= 0 ? initialIndex : 0);
     setOpen(true);
   }
 
@@ -97,7 +102,7 @@ export function Select({
 
   function commit(index: number) {
     const option = options[index];
-    if (!option || option.disabled) return;
+    if (!option || option.disabled || option.hidden) return;
     onChange(option.value);
     closeList();
     triggerRef.current?.focus();
@@ -106,7 +111,7 @@ export function Select({
   /** Salta a la siguiente opcion utilizable en la direccion dada. */
   function move(from: number, step: number) {
     for (let index = from + step; index >= 0 && index < options.length; index += step) {
-      if (!options[index].disabled) return index;
+      if (!options[index].disabled && !options[index].hidden) return index;
     }
     return from;
   }
@@ -205,7 +210,7 @@ export function Select({
       }, 600);
 
       const match = options.findIndex(
-        (option) => !option.disabled && option.label.toLowerCase().startsWith(typeahead.current.term),
+        (option) => !option.disabled && !option.hidden && option.label.toLowerCase().startsWith(typeahead.current.term),
       );
       if (match >= 0) setActiveIndex(match);
     }
@@ -272,6 +277,7 @@ export function Select({
                 shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
             >
               {options.map((option, index) => {
+                if (option.hidden) return null;
                 const isSelected = option.value === value;
                 const isActive = index === activeIndex;
 
@@ -299,7 +305,7 @@ export function Select({
                 );
               })}
 
-              {options.length === 0 && (
+              {options.filter((o) => !o.hidden).length === 0 && (
                 <li className="px-2.5 py-3 text-center text-[12.5px] text-faint">Sin opciones</li>
               )}
             </ul>

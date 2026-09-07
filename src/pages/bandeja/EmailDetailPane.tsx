@@ -757,6 +757,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onClose }: 
             assignedStaffId={email.assignedStaffId ?? null}
             assignedStaffName={email.assignedStaffName ?? null}
             onChanged={(staffId, name) => setEmail({ ...email, assignedStaffId: staffId, assignedStaffName: name })}
+            onNoteAdded={() => setNotesRefreshKey((k) => k + 1)}
           />
           <TagEditor emailId={email.id} tags={email.tags ?? []} onChanged={(tags) => setEmail({ ...email, tags })} />
         </div>
