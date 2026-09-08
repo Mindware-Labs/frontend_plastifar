@@ -1135,6 +1135,14 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               </div>
             )}
 
+            {openReply.direction === "Inbound" && openReply.authFailed && (
+              <div className="shrink-0 border-b border-line px-4 py-2" title={openReply.authResult ?? undefined}>
+                <Alert variant="error">
+                  Este correo no pasó la verificación de remitente (SPF/DKIM/DMARC): podría ser una suplantación.
+                </Alert>
+              </div>
+            )}
+
             {openReply.bodyHtml && openReply.direction === "Inbound" ? (
               <iframe
                 key={openReply.id}
@@ -1176,6 +1184,14 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {email.direction === "Inbound" && email.authFailed && (
+          <div className="shrink-0 px-4 pb-2 pt-2" title={email.authResult ?? undefined}>
+            <Alert variant="error">
+              Este correo no pasó la verificación de remitente (SPF/DKIM/DMARC): podría ser una suplantación.
+            </Alert>
           </div>
         )}
 

@@ -184,6 +184,10 @@ export interface EmailDetailResponse {
   assignedStaffId: number | null;
   assignedStaffName: string | null;
   starred: boolean;
+  /** spf=/dkim=/dmarc= tal como los resumió el proveedor. Null si no llegó la cabecera. */
+  authResult: string | null;
+  /** true si spf, dkim o dmarc marcaron fail: el remitente podría estar suplantado. */
+  authFailed: boolean;
 }
 
 /** Un correo de la conversacion, venga del cliente o de nosotros. */
@@ -206,6 +210,8 @@ export interface EmailThreadMessageResponse {
   deliveryStatus: string | null;
   deliveryDetail: string | null;
   attachments: EmailAttachmentResponse[];
+  authResult: string | null;
+  authFailed: boolean;
 }
 
 /** Respuesta paginada de la bandeja (GET /api/emails). */
