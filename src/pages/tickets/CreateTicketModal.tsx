@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Info,
   Mail,
+  MessageSquareText,
   RotateCcw,
   Tag,
   Ticket as TicketIcon,
@@ -90,6 +91,14 @@ const PRIORITIES = [
 
 const FORM_ID = "create-ticket-form";
 
+/** Crece o encoge con el contenido: nunca queda con scroll propio. */
+function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
+  if (!textarea) return;
+  textarea.style.height = "auto";
+  const borderOffset = textarea.offsetHeight - textarea.clientHeight;
+  textarea.style.height = `${Math.max(textarea.scrollHeight + borderOffset, 96)}px`;
+}
+
 export function CreateTicketModal({
   onClose,
   onCreated,
@@ -109,6 +118,7 @@ export function CreateTicketModal({
   const { isExiting, requestClose } = useModalAnimation(onClose, 220);
 
   const panelRef = useRef<HTMLDivElement>(null);
+  const messageTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const titleId = useId();
   const descriptionId = useId();
   useDialogBehavior(panelRef, requestClose);
@@ -143,6 +153,13 @@ export function CreateTicketModal({
   const selectedPriority = watch("priority") || "Normal";
   const currentSubject = watch("subject") || "";
   const currentMessage = watch("initialMessage") || "";
+  const initialMessageField = register("initialMessage");
+
+  // Se recalcula con cada cambio, incluidos los programaticos (ej. "Restaurar
+  // texto original"), que no disparan el evento nativo "input" del textarea.
+  useEffect(() => {
+    autoResizeTextarea(messageTextareaRef.current);
+  }, [currentMessage]);
 
   useEffect(() => {
     ticketsApi
@@ -384,36 +401,6 @@ export function CreateTicketModal({
                 {...register("subject")}
               />
 
-              {/* Prioridad, debajo del asunto */}
-              <div className="flex flex-col gap-1.5">
-                <label className="font-heading text-[11.5px] font-semibold text-faint">
-                  Nivel de prioridad
-                </label>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {PRIORITIES.map((p) => {
-                    const isSelected = selectedPriority === p.value;
-                    return (
-                      <button
-                        key={p.value}
-                        type="button"
-                        onClick={() => setValue("priority", p.value, { shouldValidate: true })}
-                        className={`flex flex-col items-start gap-0.5 rounded-edge border p-2.5 text-left transition-all cursor-pointer ${
-                          isSelected
-                            ? p.activeClass
-                            : "border-line bg-white text-subtle hover:border-line-strong hover:bg-canvas"
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <span className={`h-2 w-2 shrink-0 rounded-full ${p.dot}`} />
-                          <span className="text-xs font-semibold">{p.label}</span>
-                        </span>
-                        <span className="text-[10.5px] text-faint">{p.desc}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Clasificación: Motivo, Departamento y Responsable */}
               <div className="space-y-3.5 rounded-edge border border-line-soft bg-canvas/40 p-4">
                 <div className="flex items-center justify-between">
@@ -518,6 +505,36 @@ export function CreateTicketModal({
                 </div>
               </div>
 
+              {/* Prioridad, debajo de clasificación y enrutamiento */}
+              <div className="flex flex-col gap-1.5">
+                <label className="font-heading text-[11.5px] font-semibold text-faint">
+                  Nivel de prioridad
+                </label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {PRIORITIES.map((p) => {
+                    const isSelected = selectedPriority === p.value;
+                    return (
+                      <button
+                        key={p.value}
+                        type="button"
+                        onClick={() => setValue("priority", p.value, { shouldValidate: true })}
+                        className={`flex flex-col items-start gap-0.5 rounded-edge border p-2.5 text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? p.activeClass
+                            : "border-line bg-white text-subtle hover:border-line-strong hover:bg-canvas"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${p.dot}`} />
+                          <span className="text-xs font-semibold">{p.label}</span>
+                        </span>
+                        <span className="text-[10.5px] text-faint">{p.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Vinculación de Cliente & Contacto */}
               <div className="space-y-3 rounded-edge border border-line-soft bg-canvas/40 p-4">
                 <div className="flex items-center justify-between">
@@ -618,36 +635,57 @@ export function CreateTicketModal({
               </div>
 
               {/* Mensaje Inicial / Descripción */}
-              <div className="flex flex-1 flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="ticket-initial-message"
-                    className="font-heading text-[11.5px] font-semibold text-ink"
-                  >
-                    Mensaje inicial / Descripción de la incidencia
-                    <span className="ml-1 font-normal text-faint">(Opcional)</span>
-                  </label>
-                  {initialMessage && currentMessage !== initialMessage && (
-                    <button
-                      type="button"
-                      onClick={handleResetMessage}
-                      className="inline-flex items-center gap-1 text-[11px] text-brand-red hover:underline cursor-pointer"
+              <div className="flex flex-col gap-2.5 rounded-edge border border-line-soft bg-canvas/40 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <label
+                      htmlFor="ticket-initial-message"
+                      className="flex cursor-pointer items-center gap-1.5 font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-ink"
                     >
-                      <RotateCcw className="h-3 w-3" />
-                      Restaurar texto original
-                    </button>
-                  )}
+                      <MessageSquareText className="h-3.5 w-3.5 text-brand-red" />
+                      {emailId ? "Mensaje inicial del ticket" : "Descripción de la incidencia"}
+                    </label>
+                    <p className="mt-1 text-[11.5px] leading-relaxed text-subtle">
+                      {emailId
+                        ? "Cuerpo del correo original; será el primer mensaje del ticket y puedes editarlo."
+                        : "Cuenta brevemente la solicitud o incidencia. Quedará como el primer mensaje del historial del ticket."}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[10.5px] text-faint">Opcional</span>
                 </div>
+
+                {initialMessage && currentMessage !== initialMessage && (
+                  <button
+                    type="button"
+                    onClick={handleResetMessage}
+                    className="inline-flex items-center gap-1 self-start text-[11px] font-medium text-brand-red hover:underline cursor-pointer"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Restaurar el texto original del correo
+                  </button>
+                )}
+
                 <textarea
                   id="ticket-initial-message"
-                  rows={6}
                   placeholder="Detalles de la incidencia, antecedentes o instrucciones para el equipo que atenderá el caso…"
-                  className="w-full min-h-[140px] flex-1 resize-none rounded-edge border border-line bg-white px-3 py-2.5 text-[12.5px] leading-relaxed text-ink placeholder:text-zinc-400 focus:border-brand-red focus:ring-2 focus:ring-brand-red/15 focus:outline-none transition-all"
-                  {...register("initialMessage")}
+                  className="w-full min-h-[96px] resize-none overflow-hidden rounded-edge border border-line bg-white px-3 py-2.5 text-[12.5px] leading-relaxed text-ink placeholder:text-zinc-400 focus:border-brand-red focus:ring-2 focus:ring-brand-red/15 focus:outline-none transition-all"
+                  name={initialMessageField.name}
+                  onChange={(event) => {
+                    initialMessageField.onChange(event);
+                    autoResizeTextarea(event.target);
+                  }}
+                  onBlur={initialMessageField.onBlur}
+                  ref={(el) => {
+                    initialMessageField.ref(el);
+                    messageTextareaRef.current = el;
+                    // El textarea recien se monta cuando terminan de cargar los catalogos
+                    // (antes hay un spinner): sin esto, un mensaje largo precargado desde
+                    // el correo queda con la altura minima y el texto se corta sin aviso.
+                    autoResizeTextarea(el);
+                  }}
                 />
-                <p className="text-[11px] text-faint">
-                  Este texto quedará registrado como el primer mensaje del historial del ticket.
-                </p>
+
+                <p className="text-right text-[11px] text-faint">{currentMessage.length} caracteres</p>
               </div>
             </form>
           )}

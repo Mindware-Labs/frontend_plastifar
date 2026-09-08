@@ -17,6 +17,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useEmailCounts } from "../../context/useEmailCounts";
+import { useReceipts } from "../../context/useReceipts";
 import { formatDateTime, formatSlaRemaining } from "../../lib/format";
 import type {
   DepartmentResponse,
@@ -100,6 +101,7 @@ export function TicketsPage() {
   }, []);
 
   const { onTicketsChanged } = useEmailCounts();
+  const receipts = useReceipts();
 
   const { data, isStale, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
     fetch: ticketsApi.list,
@@ -571,6 +573,11 @@ export function TicketsPage() {
           onCreated={(created) => {
             refresh();
             navigate(`/tickets/${created.id}`);
+            receipts.done({
+              action: "crear-ticket",
+              title: "Ticket creado",
+              detail: `${created.code} · ${created.subject}`,
+            });
           }}
         />
       )}

@@ -1398,6 +1398,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             setEmail({ ...email, ticketId: created.id });
             onTicketCreated();
             setIsCreateTicketModalOpen(false);
+            receipts.done({
+              action: "crear-ticket",
+              title: "Ticket creado",
+              detail: `${created.code} · ${created.subject}`,
+            });
           }}
         />
       )}
