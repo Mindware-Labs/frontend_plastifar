@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import { LookupSelect, type LookupSelectProps } from "./LookupSelect";
 import { Select, type SelectOption } from "./Select";
 
 interface CriteriaFieldProps {
@@ -69,6 +70,30 @@ export function CriteriaSelect({
         onChange={onChange}
         options={options}
       />
+    </CriteriaField>
+  );
+}
+
+interface CriteriaLookupProps extends Omit<LookupSelectProps, "size" | "className" | "aria-label"> {
+  label: string;
+  ariaLabel: string;
+  width?: string;
+}
+
+/**
+ * Buscador de la fila de criterios: mismo rótulo y misma medida que
+ * `CriteriaSelect`, pero consultando al servidor. Para acotar por cliente o por
+ * persona, que no son catálogos que quepan en un desplegable.
+ */
+export function CriteriaLookup({
+  label,
+  ariaLabel,
+  width = "w-[180px]",
+  ...props
+}: CriteriaLookupProps) {
+  return (
+    <CriteriaField label={label}>
+      <LookupSelect {...props} size="sm" className={width} aria-label={ariaLabel} />
     </CriteriaField>
   );
 }

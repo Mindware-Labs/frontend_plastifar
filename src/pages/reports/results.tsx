@@ -383,8 +383,8 @@ export function AuditSliceResult({
 
       {data.total > data.items.length && (
         <p className="mt-2 text-[12px] text-faint">
-          Se muestran las {data.items.length} más recientes de {data.total}. Exporta el CSV para
-          llevarte el período completo.
+          Se muestran las {data.items.length} más recientes de {data.total}. «Exportar CSV» genera
+          el período completo en el servidor, no solo esta página.
         </p>
       )}
     </>

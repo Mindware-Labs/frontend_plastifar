@@ -7,13 +7,14 @@ import { qualityApi } from "../../api/quality";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
+  LookupField,
   SelectField,
   TextAreaField,
   TextField,
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import type { Client } from "../../types/clients";
+import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import { CURRENCIES, type CreditRequest } from "../../types/quality";
 
 // Espejo de la validacion del servidor de POST /api/quality/credit-requests.
@@ -36,14 +37,13 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 interface CreditRequestModalProps {
-  clients: Client[];
   onClose: () => void;
   onSaved: (request: CreditRequest) => void;
 }
 
 /** RF-Q7: alta de solicitud con monto, motivo y referencia de factura. Nace de
  *  un ticket cuando exista la Bandeja; hasta entonces, alta manual. */
-export function CreditRequestModal({ clients, onClose, onSaved }: CreditRequestModalProps) {
+export function CreditRequestModal({ onClose, onSaved }: CreditRequestModalProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -111,15 +111,17 @@ export function CreditRequestModal({ clients, onClose, onSaved }: CreditRequestM
           name="clientId"
           control={control}
           render={({ field }) => (
-            <SelectField
+            <LookupField
               label="Cliente"
               required
               name={field.name}
               value={field.value}
-              onChange={field.onChange}
+              onChange={(value) => field.onChange(value)}
               onBlur={field.onBlur}
               placeholder="Elige uno"
-              options={clients.map((client) => ({ value: String(client.id), label: client.name }))}
+              searchPlaceholder="Buscar cliente…"
+              search={searchClients}
+              resolveSelectedLabel={resolveClientLabel}
               state={stateOf("clientId")}
               error={errors.clientId?.message}
             />

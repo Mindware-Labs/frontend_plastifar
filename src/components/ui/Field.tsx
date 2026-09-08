@@ -8,6 +8,7 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { controlBase, controlSizes, stateClasses, type FieldState } from "./fieldStyles";
+import { LookupSelect, type LookupSelectProps } from "./LookupSelect";
 import { Select, type SelectOption } from "./Select";
 
 /**
@@ -207,6 +208,46 @@ export function SelectField({
         placeholder={placeholder}
         state={resolved}
         disabled={disabled}
+        aria-invalid={resolved === "error"}
+        aria-describedby={describedBy(fieldId, error, hint)}
+      />
+    </FieldShell>
+  );
+}
+
+interface LookupFieldProps extends Omit<LookupSelectProps, "aria-invalid" | "aria-describedby"> {
+  label: string;
+  error?: string;
+  hint?: ReactNode;
+  required?: boolean;
+  name?: string;
+}
+
+/**
+ * Campo de búsqueda contra el servidor, con la misma etiqueta y validación que
+ * `SelectField`. Se usa donde el catálogo no tiene tope --clientes y personal--
+ * y por eso no cabe en un desplegable cargado de antemano.
+ */
+export function LookupField({
+  label,
+  error,
+  hint,
+  state = "idle",
+  required,
+  id,
+  name,
+  ...props
+}: LookupFieldProps) {
+  const generated = useId();
+  const fieldId = id ?? name ?? generated;
+  const resolved: FieldState = error ? "error" : state;
+
+  return (
+    <FieldShell id={fieldId} label={label} error={error} hint={hint} required={required}>
+      <LookupSelect
+        {...props}
+        id={fieldId}
+        state={resolved}
         aria-invalid={resolved === "error"}
         aria-describedby={describedBy(fieldId, error, hint)}
       />

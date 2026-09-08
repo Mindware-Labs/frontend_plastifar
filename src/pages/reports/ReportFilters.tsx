@@ -1,6 +1,12 @@
 import { Lock } from "lucide-react";
 import { useId } from "react";
-import { SelectField, TextField } from "../../components/ui/Field";
+import { LookupField, SelectField, TextField } from "../../components/ui/Field";
+import {
+  resolveClientLabel,
+  resolveStaffLabel,
+  searchActiveStaff,
+  searchClients,
+} from "../../lib/lookups";
 import {
   REPORT_CATALOG,
   REPORT_FAMILIES,
@@ -27,10 +33,13 @@ export interface ReferenceOption {
   label: string;
 }
 
+/**
+ * Solo catalogos acotados. Cliente, responsable y vendedor no estan aqui a
+ * proposito: se buscan en el servidor con `LookupField`, porque ni la cartera de
+ * clientes ni el personal caben en una lista precargada.
+ */
 export interface ReferenceData {
-  clients: ReferenceOption[];
   productLines: ReferenceOption[];
-  staff: ReferenceOption[];
   territories: ReferenceOption[];
   clientTypes: ReferenceOption[];
 }
@@ -114,12 +123,16 @@ export function ReportFilters({
       )}
 
       {has("client") && (
-        <SelectField
+        <LookupField
           label="Cliente"
           id={`${id}-cliente`}
           value={criteria.clientId}
           onChange={(value) => set({ clientId: value })}
-          options={[{ value: ANY, label: "Todos los clientes" }, ...reference.clients]}
+          placeholder="Todos los clientes"
+          searchPlaceholder="Buscar cliente…"
+          clearLabel="Todos los clientes"
+          search={searchClients}
+          resolveSelectedLabel={resolveClientLabel}
         />
       )}
 
@@ -134,12 +147,16 @@ export function ReportFilters({
       )}
 
       {has("responsible") && (
-        <SelectField
+        <LookupField
           label="Responsable"
           id={`${id}-responsable`}
           value={criteria.responsibleStaffId}
           onChange={(value) => set({ responsibleStaffId: value })}
-          options={[{ value: ANY, label: "Cualquiera" }, ...reference.staff]}
+          placeholder="Cualquiera"
+          searchPlaceholder="Buscar responsable…"
+          clearLabel="Cualquiera"
+          search={searchActiveStaff}
+          resolveSelectedLabel={resolveStaffLabel}
         />
       )}
 
@@ -154,12 +171,16 @@ export function ReportFilters({
       )}
 
       {has("salesRep") && (
-        <SelectField
+        <LookupField
           label="Vendedor"
           id={`${id}-vendedor`}
           value={criteria.salesRepStaffId}
           onChange={(value) => set({ salesRepStaffId: value })}
-          options={[{ value: ANY, label: "Todos los vendedores" }, ...reference.staff]}
+          placeholder="Todos los vendedores"
+          searchPlaceholder="Buscar vendedor…"
+          clearLabel="Todos los vendedores"
+          search={searchActiveStaff}
+          resolveSelectedLabel={resolveStaffLabel}
         />
       )}
 

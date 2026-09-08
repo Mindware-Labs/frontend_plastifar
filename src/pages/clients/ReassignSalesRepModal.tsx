@@ -4,19 +4,19 @@ import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { SelectField } from "../../components/ui/Field";
+import { LookupField } from "../../components/ui/Field";
+import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import { Modal } from "../../components/ui/Modal";
 import type { Client } from "../../types/clients";
 
 interface ReassignSalesRepModalProps {
   client: Client;
-  salesReps: { id: number; name: string }[];
   onClose: () => void;
   onSaved: () => void;
 }
 
 /** Accion rapida de fila (RF-C7): reasignar vendedor sin abrir la ficha completa. */
-export function ReassignSalesRepModal({ client, salesReps, onClose, onSaved }: ReassignSalesRepModalProps) {
+export function ReassignSalesRepModal({ client, onClose, onSaved }: ReassignSalesRepModalProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const { control, handleSubmit, formState } = useForm<{ salesRepStaffId: string }>({
     defaultValues: { salesRepStaffId: client.salesRepStaffId ? String(client.salesRepStaffId) : "" },
@@ -73,17 +73,17 @@ export function ReassignSalesRepModal({ client, salesReps, onClose, onSaved }: R
           name="salesRepStaffId"
           control={control}
           render={({ field }) => (
-            <SelectField
+            <LookupField
               label="Vendedor"
               name={field.name}
               value={field.value}
-              onChange={field.onChange}
+              onChange={(value) => field.onChange(value)}
               onBlur={field.onBlur}
               placeholder="Sin vendedor asignado"
-              options={[
-                { value: "", label: "Sin vendedor asignado" },
-                ...salesReps.map((rep) => ({ value: String(rep.id), label: rep.name })),
-              ]}
+              searchPlaceholder="Buscar vendedor…"
+              clearLabel="Sin vendedor asignado"
+              search={searchActiveStaff}
+              resolveSelectedLabel={resolveStaffLabel}
             />
           )}
         />

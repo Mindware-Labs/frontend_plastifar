@@ -7,6 +7,7 @@ import { qualityApi } from "../../api/quality";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
+  LookupField,
   SelectField,
   TextAreaField,
   TextField,
@@ -14,8 +15,8 @@ import {
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { today } from "../../lib/quality";
-import type { Client } from "../../types/clients";
-import type { CorrectiveActionSheet, QualityStaff } from "../../types/quality";
+import { resolveClientLabel, resolveStaffLabel, searchActiveStaff, searchClients } from "../../lib/lookups";
+import type { CorrectiveActionSheet } from "../../types/quality";
 import type { ProductLine } from "../../types/settings";
 
 // Espejo de la validacion del servidor: cuando exista POST/PUT /api/quality/sheets,
@@ -45,18 +46,14 @@ type FormValues = z.infer<typeof schema>;
 interface HcaModalProps {
   /** Ausente = alta. */
   sheet?: CorrectiveActionSheet;
-  clients: Client[];
   productLines: ProductLine[];
-  staff: QualityStaff[];
   onClose: () => void;
   onSaved: (sheet: CorrectiveActionSheet) => void;
 }
 
 export function HcaModal({
   sheet,
-  clients,
   productLines,
-  staff,
   onClose,
   onSaved,
 }: HcaModalProps) {
@@ -146,18 +143,17 @@ export function HcaModal({
             name="clientId"
             control={control}
             render={({ field }) => (
-              <SelectField
+              <LookupField
                 label="Cliente"
                 required
                 name={field.name}
                 value={field.value}
-                onChange={field.onChange}
+                onChange={(value) => field.onChange(value)}
                 onBlur={field.onBlur}
                 placeholder="Elige uno"
-                options={clients.map((client) => ({
-                  value: String(client.id),
-                  label: client.name,
-                }))}
+                searchPlaceholder="Buscar cliente…"
+                search={searchClients}
+                resolveSelectedLabel={resolveClientLabel}
                 state={stateOf("clientId")}
                 error={errors.clientId?.message}
               />
@@ -210,15 +206,17 @@ export function HcaModal({
           name="responsibleStaffId"
           control={control}
           render={({ field }) => (
-            <SelectField
+            <LookupField
               label="Responsable"
               required
               name={field.name}
               value={field.value}
-              onChange={field.onChange}
+              onChange={(value) => field.onChange(value)}
               onBlur={field.onBlur}
               placeholder="Elige a quien responde por la hoja"
-              options={staff.map((person) => ({ value: String(person.id), label: person.name }))}
+              searchPlaceholder="Buscar responsable…"
+              search={searchActiveStaff}
+              resolveSelectedLabel={resolveStaffLabel}
               state={stateOf("responsibleStaffId")}
               error={errors.responsibleStaffId?.message}
             />

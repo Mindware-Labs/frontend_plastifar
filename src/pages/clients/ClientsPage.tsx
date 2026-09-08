@@ -2,6 +2,7 @@ import { Pencil, Plus, Power, Trash2, UserCog, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { clientsApi, type ClientQuery } from "../../api/clients";
+import { fetchAllPages } from "../../api/paging";
 import { staffApi } from "../../api/staff";
 import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -16,12 +17,14 @@ import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { LookupSelect } from "../../components/ui/LookupSelect";
 import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import type { Client, ClientListResponse, Territory } from "../../types/clients";
 import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
 import { ClientModal } from "./ClientModal";
@@ -108,10 +111,21 @@ export function ClientsPage() {
   function loadReferenceData() {
     setReferenceError(null);
     return Promise.all([
-      territoriesApi.list().then((res) => setTerritories(res.items)),
-      staffApi
-        .list({ page: 1, pageSize: 100, status: "activos", sort: "nombre", dir: "asc" })
-        .then((res) => setSalesReps(res.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })))),
+      // Catalogo acotado: se recorre entero. Con el tope de cien, un territorio
+      // mas alla de esa cifra no existia para el filtro ni para la tabla.
+      fetchAllPages<Territory>((page, pageSize) => territoriesApi.list({ page, pageSize })).then(
+        setTerritories,
+      ),
+      // Los SELECTORES de vendedor ya no salen de aqui: buscan en el servidor.
+      // Esta lista solo resuelve el nombre de la columna «Vendedor», porque el
+      // DTO del listado trae el id y no el nombre. Se recorre entera para no
+      // pintar «Sin vendedor» sobre un cliente que si lo tiene; el arreglo de
+      // fondo es que el API devuelva `salesRepName` en la fila.
+      fetchAllPages((page, pageSize) =>
+        staffApi.list({ page, pageSize, status: "activos", sort: "nombre", dir: "asc" }),
+      ).then((items) =>
+        setSalesReps(items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))),
+      ),
     ]).catch(() =>
       setReferenceError(
         "No se pudieron cargar los territorios ni los vendedores: la tabla los muestra como «—» y sus dos filtros quedan vacíos.",
@@ -290,16 +304,20 @@ export function ClientsPage() {
           ]}
         />
 
-        <Select
+        {/* Buscador contra el servidor: el personal crece sin tope y un
+            desplegable precargado dejaba fuera a quien no cupiera. */}
+        <LookupSelect
           size="sm"
           className="w-[200px]"
           aria-label="Filtrar por vendedor"
-          value={salesRepId}
-          onChange={setSalesRepId}
-          options={[
-            { value: "todos", label: "Todos los vendedores" },
-            ...salesReps.map((rep) => ({ value: String(rep.id), label: rep.name })),
-          ]}
+          placeholder="Todos los vendedores"
+          searchPlaceholder="Buscar vendedor…"
+          clearLabel="Todos los vendedores"
+          value={salesRepId === "todos" ? "" : salesRepId}
+          selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
+          resolveSelectedLabel={resolveStaffLabel}
+          search={searchActiveStaff}
+          onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
         />
 
         <Select
@@ -540,7 +558,6 @@ export function ClientsPage() {
         <ClientModal
           client={modal === "nuevo" ? undefined : modal}
           territories={territories}
-          salesReps={salesReps}
           onClose={() => setModal(null)}
           onSaved={refresh}
         />
@@ -549,7 +566,6 @@ export function ClientsPage() {
       {reassigning && (
         <ReassignSalesRepModal
           client={reassigning}
-          salesReps={salesReps}
           onClose={() => setReassigning(null)}
           onSaved={refresh}
         />
@@ -558,7 +574,6 @@ export function ClientsPage() {
       {bulkReassigning && (
         <BulkReassignSalesRepModal
           clients={selected}
-          salesReps={salesReps}
           onClose={() => setBulkReassigning(false)}
           onSaved={() => {
             setSelectedIds([]);

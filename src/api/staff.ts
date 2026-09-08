@@ -51,6 +51,8 @@ export const staffApi = {
   deactivate: (id: number) =>
     apiRequest<void>(`/api/staff/${id}/deactivate`, { method: "POST" }),
 
+  activate: (id: number) => apiRequest<void>(`/api/staff/${id}/activate`, { method: "POST" }),
+
   remove: (id: number) => apiRequest<void>(`/api/staff/${id}`, { method: "DELETE" }),
 
   /** RF-P4: accesos vigentes y permiso efectivo, resuelto por el servidor. */

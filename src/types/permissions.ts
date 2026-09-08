@@ -46,6 +46,20 @@ export interface PermissionMatrixResponse {
   grants: Record<number, PermissionKey[]>;
 }
 
+/** Concesiones de un rol tal como viajan en el guardado de la matriz. */
+export interface RolePermissionsInput {
+  roleId: number;
+  permissions: PermissionKey[];
+}
+
+/**
+ * Cuerpo de POST /api/permissions/matrix. El servidor aplica los roles en una
+ * sola transaccion: o entran todos o no entra ninguno.
+ */
+export interface SavePermissionMatrixRequest {
+  roles: RolePermissionsInput[];
+}
+
 export interface DepartmentAccess {
   departmentId: number;
   departmentName: string;

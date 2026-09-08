@@ -22,12 +22,11 @@ export const productLinesApi = {
   /**
    * Solo lectura aqui: el alta y edicion viven en Catalogos y configuracion.
    *
-   * Acepta pagina porque el endpoint la acepta; los 100 son el valor por
-   * omision de quien pide el catalogo entero para llenar un desplegable, no un
-   * tope impuesto al que quiera recorrerlo.
+   * Sin `pageSize` por omision: los 100 de oficio no eran un valor por defecto
+   * sino un tope invisible --pasada esa cifra la linea dejaba de aparecer en el
+   * desplegable sin aviso ninguno--. Quien quiere el catalogo entero lo recorre
+   * con `fetchAllPages`.
    */
   list: (query: ProductLineQuery = {}) =>
-    apiRequest<ProductLineListResponse>(
-      `/api/settings/product-lines${toQuery({ pageSize: 100, ...query })}`,
-    ),
+    apiRequest<ProductLineListResponse>(`/api/settings/product-lines${toQuery({ ...query })}`),
 };

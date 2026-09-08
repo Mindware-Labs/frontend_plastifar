@@ -1,5 +1,6 @@
 import { CalendarOff, Pencil, Plus, Power } from "lucide-react";
 import { useState } from "react";
+import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -59,13 +60,14 @@ async function loadYears(): Promise<string[]> {
 
 /**
  * Las políticas de jornada que un feriado mueve. Es catalogo de apoyo --una
- * consulta de referencia, no el listado que se pagina-- y por eso se pide
- * entero; si algún día pasan de cien, hará falta que el API cuente esto.
+ * consulta de referencia, no el listado que se pagina-- y por eso se recorre
+ * entero: pedir solo cien dejaba fuera políticas que el feriado sí mueve, y la
+ * sección afirmaba que afecta a menos de las que afecta.
  */
 const loadWorkdayPolicies = () =>
-  settingsApi.slaPolicies
-    .list({ page: 1, pageSize: 100, status: "activas" })
-    .then(({ items }) => items.filter((policy) => policy.businessHoursOnly));
+  fetchAllPages<SlaPolicy>((page, pageSize) =>
+    settingsApi.slaPolicies.list({ page, pageSize, status: "activas" }),
+  ).then((items) => items.filter((policy) => policy.businessHoursOnly));
 
 export function HolidaysSection() {
   const { can } = usePermissions();

@@ -1,4 +1,4 @@
-import { apiRequest, toQuery } from "./client";
+import { apiRequest, downloadFile, toQuery } from "./client";
 
 export interface QualityReport {
   range: { from: string; to: string };
@@ -120,6 +120,15 @@ function auditSlice(path: string) {
     apiRequest<AuditSliceReport>(`/api/reports/${path}${toQuery({ from, to, page, pageSize })}`);
 }
 
+/**
+ * Todo lo que el generador puede acotar, junto. La exportacion acepta los
+ * mismos filtros que los endpoints JSON porque exporta el mismo resultado.
+ */
+export interface ExportFilters extends QualityFilters, ClientsFilters {
+  from?: string;
+  to?: string;
+}
+
 export const reportsApi = {
   quality: (from: string, to: string, filters: QualityFilters = {}) =>
     apiRequest<QualityReport>(`/api/reports/quality${toQuery({ from, to, ...filters })}`),
@@ -138,4 +147,12 @@ export const reportsApi = {
 
   /** «Sesiones revocadas» (seccion 11.2). */
   auditRevokedSessions: auditSlice("audit/revoked-sessions"),
+
+  /**
+   * CSV del reporte entero, no de la pagina que se ve: lo arma el servidor
+   * sobre el mismo conjunto filtrado que devuelven los endpoints JSON, con BOM
+   * UTF-8 y su propio nombre de archivo en Content-Disposition.
+   */
+  exportCsv: (report: string, filters: ExportFilters, fallbackFilename: string) =>
+    downloadFile(`/api/reports/export${toQuery({ report, ...filters })}`, fallbackFilename),
 };

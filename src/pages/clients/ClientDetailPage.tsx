@@ -8,7 +8,7 @@ import {
   type ContactListResponse,
   type ContactQuery,
 } from "../../api/clients";
-import { staffApi } from "../../api/staff";
+import { fetchAllPages } from "../../api/paging";
 import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
@@ -28,6 +28,7 @@ import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { resolveStaffLabel } from "../../lib/lookups";
 import type { Client, Contact, Territory } from "../../types/clients";
 import { ClientModal } from "./ClientModal";
 import { ContactModal } from "./ContactModal";
@@ -60,7 +61,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
   const [client, setClient] = useState<Client | null>(null);
   const [territories, setTerritories] = useState<Territory[]>([]);
-  const [salesReps, setSalesReps] = useState<{ id: number; name: string }[]>([]);
+  const [salesRepName, setSalesRepName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Los catalogos de apoyo solo alimentan nombres para mostrar: que fallen no
   // justifica borrar una ficha que si cargo, pero tampoco callarse.
@@ -135,13 +136,14 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   function loadReferenceData() {
     setReferenceError(null);
     return Promise.all([
-      territoriesApi.list().then((res) => setTerritories(res.items)),
-      staffApi
-        .list({ page: 1, pageSize: 100, status: "activos", sort: "nombre", dir: "asc" })
-        .then((res) => setSalesReps(res.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })))),
+      // Catalogo acotado: se recorre entero, porque el territorio de esta ficha
+      // puede estar mas alla de la primera pagina y la ficha lo mostraba como «—».
+      fetchAllPages<Territory>((page, pageSize) => territoriesApi.list({ page, pageSize })).then(
+        setTerritories,
+      ),
     ]).catch(() =>
       setReferenceError(
-        "No se pudieron cargar los territorios ni los vendedores: abajo aparecen sin nombre, y el diálogo de edición se abrirá con esas listas vacías.",
+        "No se pudieron cargar los territorios: abajo aparecen sin nombre, y el diálogo de edición se abrirá con esa lista vacía.",
       ),
     );
   }
@@ -157,10 +159,33 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     return territories.find((territory) => territory.id === territoryId)?.name ?? "—";
   }
 
-  function repName(staffId: number | null) {
-    if (staffId === null) return null;
-    return salesReps.find((rep) => rep.id === staffId)?.name ?? null;
-  }
+  /**
+   * El nombre del vendedor se resuelve por su id, no buscandolo en un catalogo
+   * precargado: el personal no tiene tope y quien no cupiera en las primeras
+   * cien filas se pintaba como «Sin vendedor» siendo falso. Aqui solo hace falta
+   * uno, asi que se pide uno.
+   */
+  useEffect(() => {
+    const staffId = client?.salesRepStaffId ?? null;
+    if (staffId === null) {
+      setSalesRepName(null);
+      return;
+    }
+
+    let cancelled = false;
+    resolveStaffLabel(String(staffId))
+      .then((name) => {
+        if (!cancelled) setSalesRepName(name);
+      })
+      .catch(() => {
+        // Se queda sin nombre; la ficha ya avisa del fallo de referencias.
+        if (!cancelled) setSalesRepName(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client?.salesRepStaffId]);
 
   async function makePrimary(contact: Contact) {
     setBusyContactId(contact.id);
@@ -314,7 +339,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
             <DetailRow label="Vendedor">
               {/* Ambar: "sin asignar" es un estado intermedio, no un dato ausente.
                   Mismas palabras que el listado. */}
-              {repName(client.salesRepStaffId) ?? <span className="text-warn">Sin vendedor</span>}
+              {salesRepName ?? <span className="text-warn">Sin vendedor</span>}
             </DetailRow>
           </DetailGroup>
 
@@ -503,7 +528,6 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
         <ClientModal
           client={client}
           territories={territories}
-          salesReps={salesReps}
           onClose={() => setEditingClient(false)}
           onSaved={setClient}
         />

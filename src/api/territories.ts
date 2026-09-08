@@ -26,12 +26,12 @@ export interface TerritoryListResponse {
 }
 
 export const territoriesApi = {
-  /**
-   * El pageSize de 100 es solo el valor por omision para quien pide el catalogo
-   * como lista de opciones; el listado de Configuracion manda su propia pagina.
-   */
+  // Sin `pageSize` por omision, igual que clientsApi.contacts: el tamano lo
+  // decide quien llama. Los 100 de oficio hacian que un catalogo mas largo
+  // desapareciera del desplegable sin decirlo; quien necesita el catalogo entero
+  // lo recorre con `fetchAllPages`.
   list: (query: TerritoryQuery = {}) =>
-    apiRequest<TerritoryListResponse>(`/api/territories${toQuery({ pageSize: 100, ...query })}`),
+    apiRequest<TerritoryListResponse>(`/api/territories${toQuery({ ...query })}`),
 
   /** Relectura previa a una escritura: el listado ya no tiene el registro en memoria. */
   get: (id: number) => apiRequest<Territory>(`/api/territories/${id}`),

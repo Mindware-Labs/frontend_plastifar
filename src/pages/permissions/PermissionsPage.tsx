@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { ApiError } from "../../api/client";
-import { rolesApi } from "../../api/roles";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -101,29 +100,26 @@ export function PermissionsPage() {
     return new Set(catalog.map(({ permission }) => permission.key).filter((key) => !assigned.has(key)));
   }, [catalog, editableRoles, grants]);
 
-  /** Permisos con al menos una celda distinta de como llegó del servidor. */
-  const dirtyKeys = useMemo(() => {
+  /**
+   * Un solo recorrido para las dos lecturas del mismo hecho: qué permisos
+   * cambiaron (`keys`, para el filtro «Con cambios») y cuántas celdas lo
+   * hicieron (`cells`, para el contador del botón). Antes eran dos memos con
+   * el bucle repetido palabra por palabra.
+   */
+  const { dirtyKeys, dirtyCells } = useMemo(() => {
     const keys = new Set<PermissionKey>();
+    let cells = 0;
     for (const role of editableRoles) {
       const before = new Set(original[role.id] ?? []);
       const after = new Set(grants[role.id] ?? []);
       for (const key of new Set([...before, ...after])) {
-        if (before.has(key) !== after.has(key)) keys.add(key);
+        if (before.has(key) !== after.has(key)) {
+          keys.add(key);
+          cells += 1;
+        }
       }
     }
-    return keys;
-  }, [editableRoles, grants, original]);
-
-  const dirtyCells = useMemo(() => {
-    let total = 0;
-    for (const role of editableRoles) {
-      const before = new Set(original[role.id] ?? []);
-      const after = new Set(grants[role.id] ?? []);
-      for (const key of new Set([...before, ...after])) {
-        if (before.has(key) !== after.has(key)) total += 1;
-      }
-    }
-    return total;
+    return { dirtyKeys: keys, dirtyCells: cells };
   }, [editableRoles, grants, original]);
 
   const counts = {
@@ -163,14 +159,13 @@ export function PermissionsPage() {
   }
 
   /**
-   * No existe un endpoint de matriz completa: cada rol se guarda con su propio
-   * PUT /api/roles/{id} (seccion 12.3 — se sigue el criterio del modulo de
-   * Personal, que ya expone ese endpoint). Solo se manda lo que cambio.
+   * La matriz se guarda entera en una sola peticion: POST /api/permissions/matrix
+   * aplica todos los roles cambiados dentro de la misma transaccion. Antes se
+   * mandaba un PUT por rol y un fallo a mitad dejaba media politica aplicada,
+   * que es justo lo que una matriz de permisos no puede permitirse.
    *
-   * Cada rol se resuelve por separado: si el tercero guarda y el cuarto falla,
-   * el tercero deja de estar sucio igualmente. Con un `Promise.all` un fallo
-   * parcial dejaba el anillo ambar sobre celdas ya guardadas y el siguiente
-   * intento las volvia a mandar.
+   * Al ser todo o nada ya no hay fallo parcial que enumerar: si la peticion
+   * falla no se guardo nada y basta un unico aviso con el motivo del servidor.
    */
   async function save() {
     setIsSaving(true);
@@ -182,37 +177,21 @@ export function PermissionsPage() {
         return before.size !== after.size || [...before].some((key) => !after.has(key));
       });
 
-      const results = await Promise.allSettled(
-        changedRoles.map((role) =>
-          rolesApi.update(role.id, {
-            name: role.name,
-            isActive: role.isActive,
-            permissions: grants[role.id] ?? [],
-          }),
-        ),
-      );
+      if (changedRoles.length === 0) return;
 
-      const failed = changedRoles.filter((_, index) => results[index].status === "rejected");
+      await permissionsApi.save({
+        roles: changedRoles.map((role) => ({
+          roleId: role.id,
+          permissions: grants[role.id] ?? [],
+        })),
+      });
 
-      if (failed.length === changedRoles.length && failed.length > 0) {
-        const reason = results[0];
-        setError(
-          reason.status === "rejected" && reason.reason instanceof ApiError
-            ? `${reason.reason.message} Vuelve a intentarlo.`
-            : "No se pudieron guardar los permisos. Vuelve a intentarlo.",
-        );
-        return;
-      }
-
-      // Lo guardado deja de estar sucio aunque otro rol haya fallado.
-      await refreshAfterSave();
-
-      if (failed.length > 0) {
-        setError(
-          `Se guardaron ${changedRoles.length - failed.length} de ${changedRoles.length} roles. ` +
-            `Quedó sin guardar: ${failed.map((role) => role.name).join(", ")}. Vuelve a intentarlo.`,
-        );
-        return;
+      // La relectura ya no forma parte del guardado: si falla, los permisos
+      // estan guardados igual y decir «no se pudieron guardar» seria mentir.
+      try {
+        await refreshAfterSave();
+      } catch {
+        setError("Se guardaron los permisos, pero no se pudo releer la matriz. Recarga la página.");
       }
 
       // Con el filtro «Con cambios» puesto, guardar vacia el listado: ya no hay

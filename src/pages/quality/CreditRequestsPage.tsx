@@ -1,6 +1,5 @@
 import { BadgeCheck, Check, Plus, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { clientsApi } from "../../api/clients";
+import { useState } from "react";
 import {
   qualityApi,
   type CreditCounts,
@@ -12,7 +11,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { ControlInput } from "../../components/ui/ControlInput";
-import { CriteriaField, CriteriaSelect } from "../../components/ui/CriteriaField";
+import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
@@ -24,8 +23,8 @@ import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import { formatAmount, formatDay, formatInstant } from "../../lib/quality";
-import type { Client } from "../../types/clients";
 import type { CreditRequest, CreditStatus } from "../../types/quality";
 import { CreditDecisionModal } from "./CreditDecisionModal";
 import { CreditRequestModal } from "./CreditRequestModal";
@@ -91,7 +90,6 @@ export function CreditRequestsPage() {
   const canApply = can("quality.approve");
   const viewerStaffId = user?.staffId ?? null;
 
-  const [clients, setClients] = useState<Client[]>([]);
 
   const [search, setSearch] = useState("");
   const [clientId, setClientId] = useState("todos");
@@ -110,16 +108,6 @@ export function CreditRequestsPage() {
   // El monto tambien se escribe tecla a tecla: sin retardo, «12500» disparaba
   // cinco consultas y devolvia la lista a la primera pagina cinco veces.
   const debouncedMinAmount = useDebouncedValue(minAmount);
-
-  // El catalogo de clientes ya no resuelve la columna Cliente —eso viene del
-  // servidor— y queda solo para el desplegable de filtro y el formulario de
-  // alta. El de personal desaparecio con la columna que alimentaba.
-  useEffect(() => {
-    clientsApi
-      .list({ page: 1, pageSize: 100 })
-      .then((data) => setClients(data.items))
-      .catch(() => setClients([]));
-  }, []);
 
   /** «Tú» cuando es quien mira: la regla de la seccion 10.3 es sobre personas. */
   function staffLabel(id: number | null, name: string | null) {
@@ -171,16 +159,17 @@ export function CreditRequestsPage() {
           />
         </CriteriaField>
 
-        <CriteriaSelect
+        <CriteriaLookup
           label="Cliente"
           ariaLabel="Filtrar por cliente"
-          value={clientId}
-          onChange={setClientId}
-          options={[
-            { value: "todos", label: "Todos los clientes" },
-            ...clients.map((client) => ({ value: String(client.id), label: client.name })),
-          ]}
           width="w-[220px]"
+          placeholder="Todos los clientes"
+          searchPlaceholder="Buscar cliente…"
+          clearLabel="Todos los clientes"
+          value={clientId === "todos" ? "" : clientId}
+          onChange={(value) => setClientId(value === "" ? "todos" : value)}
+          search={searchClients}
+          resolveSelectedLabel={resolveClientLabel}
         />
 
         <CriteriaField label="Monto desde" htmlFor="credito-monto">
@@ -363,7 +352,6 @@ export function CreditRequestsPage() {
 
       {creating && (
         <CreditRequestModal
-          clients={clients}
           onClose={() => setCreating(false)}
           onSaved={() => {
             setCreating(false);

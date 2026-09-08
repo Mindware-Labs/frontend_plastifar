@@ -1,6 +1,7 @@
 import { Pencil, Plus, Power, Star } from "lucide-react";
 import { useState } from "react";
 import { ApiError } from "../../api/client";
+import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
@@ -27,26 +28,32 @@ import { SlaModal } from "./SlaModal";
 type ChipKey = "todas" | "activas" | "inactivas";
 
 /**
- * Prioridades sin política predeterminada activa. Se pregunta por prioridad en
- * vez de recorrer el listado cargado, que ahora es una página: cada consulta
- * trae solo las activas de esa prioridad. Sigue habiendo un tope de cien por
- * prioridad; cerrarlo del todo pide un filtro `isDefault` en el API.
+ * Prioridades sin política predeterminada activa. Se pregunta por prioridad y se
+ * recorre el catálogo entero: con el tope fijo de cien, la política
+ * predeterminada de una prioridad con muchas activas caía fuera de la consulta y
+ * la sección avisaba de una falta que no existía.
  */
 async function loadUncovered(): Promise<Priority[]> {
   const covered = await Promise.all(
     PRIORITIES.map((priority) =>
-      settingsApi.slaPolicies
-        .list({ page: 1, pageSize: 100, priority, status: "activas" })
-        .then(({ items }) => items.some((policy) => policy.isDefault)),
+      fetchAllPages((page, pageSize) =>
+        settingsApi.slaPolicies.list({ page, pageSize, priority, status: "activas" }),
+      ).then((items) => items.some((policy) => policy.isDefault)),
     ),
   );
 
   return PRIORITIES.filter((_, index) => !covered[index]);
 }
 
-/** El calendario que el diálogo usa para previsualizar vencimientos. */
+/**
+ * El calendario que el diálogo usa para previsualizar vencimientos. Se pide
+ * entero: un feriado que no cupiera en la primera página desaparecía del
+ * cálculo sin decirlo, y el vencimiento previsto salía mal.
+ */
 const loadHolidays = () =>
-  settingsApi.holidays.list({ page: 1, pageSize: 100, status: "activos" }).then(({ items }) => items);
+  fetchAllPages<Holiday>((page, pageSize) =>
+    settingsApi.holidays.list({ page, pageSize, status: "activos" }),
+  );
 
 /** Cuerpo del PUT: el identificador viaja en la ruta, nunca en el DTO. */
 function toRequest(policy: SlaPolicy): Omit<SlaPolicy, "id"> {

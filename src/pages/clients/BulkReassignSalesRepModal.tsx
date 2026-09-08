@@ -4,13 +4,13 @@ import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { SelectField } from "../../components/ui/Field";
+import { LookupField } from "../../components/ui/Field";
+import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import { Modal } from "../../components/ui/Modal";
 import type { Client } from "../../types/clients";
 
 interface BulkReassignSalesRepModalProps {
   clients: Client[];
-  salesReps: { id: number; name: string }[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -23,7 +23,7 @@ interface BulkReassignSalesRepModalProps {
  * El dialogo nombra a quien va a tocar antes de tocarlo: una accion sobre una
  * seleccion que no se ve es una accion a ciegas.
  */
-export function BulkReassignSalesRepModal({ clients, salesReps, onClose, onSaved }: BulkReassignSalesRepModalProps) {
+export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkReassignSalesRepModalProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const { control, handleSubmit, formState } = useForm<{ salesRepStaffId: string }>({
     defaultValues: { salesRepStaffId: "" },
@@ -91,17 +91,17 @@ export function BulkReassignSalesRepModal({ clients, salesReps, onClose, onSaved
           name="salesRepStaffId"
           control={control}
           render={({ field }) => (
-            <SelectField
+            <LookupField
               label="Vendedor"
               name={field.name}
               value={field.value}
-              onChange={field.onChange}
+              onChange={(value) => field.onChange(value)}
               onBlur={field.onBlur}
               placeholder="Sin vendedor asignado"
-              options={[
-                { value: "", label: "Sin vendedor asignado" },
-                ...salesReps.map((rep) => ({ value: String(rep.id), label: rep.name })),
-              ]}
+              searchPlaceholder="Buscar vendedor…"
+              clearLabel="Sin vendedor asignado"
+              search={searchActiveStaff}
+              resolveSelectedLabel={resolveStaffLabel}
               hint="Se aplica a todos los clientes de la lista, incluidos los que ya tenían vendedor."
             />
           )}

@@ -172,12 +172,12 @@ export const qualityApi = {
 
   planItems: {
     /**
-     * La ficha de la HCA sigue trayendo su plan completo en el detalle; esto es
-     * para pintar el plan por si solo sin volver a pedir la HCA entera.
+     * El plan de la HCA por si solo, paginado, sin volver a pedir la ficha
+     * entera. Sin `pageSize` por omision: el tamano lo decide la tabla.
      */
     list: (sheetId: number, query: PlanItemQuery = {}) =>
       apiRequest<ActionPlanListResponse>(
-        `/api/quality/sheets/${sheetId}/plan${toQuery({ pageSize: 100, ...query })}`,
+        `/api/quality/sheets/${sheetId}/plan${toQuery({ ...query })}`,
       ),
 
     create: (sheetId: number, data: SavePlanItemRequest) =>

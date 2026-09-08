@@ -1,4 +1,4 @@
-import { LogOut, Pencil, Plus, Trash2, UserX } from "lucide-react";
+import { LogOut, Pencil, Plus, Trash2, UserCheck, UserX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
@@ -130,6 +130,24 @@ export function StaffPage() {
       ),
       confirmLabel: "Desactivar",
       onConfirm: () => runOnRow(member.id, () => staffApi.deactivate(member.id)),
+    });
+  }
+
+  function askActivate(member: StaffResponse) {
+    setConfirmation({
+      tone: "warn",
+      icon: UserCheck,
+      eyebrow: "Personal",
+      title: "Reactivar colaborador",
+      description: (
+        <>
+          <strong className="font-semibold text-ink">{fullName(member)}</strong> volverá a poder
+          iniciar sesión con los accesos que ya tenía asignados. Revisa que sigan siendo los
+          correctos antes de reactivarlo.
+        </>
+      ),
+      confirmLabel: "Reactivar",
+      onConfirm: () => runOnRow(member.id, () => staffApi.activate(member.id)),
     });
   }
 
@@ -306,6 +324,14 @@ export function StaffPage() {
                                 disabled={busyId === member.id}
                               />
                             </>
+                          )}
+                          {!member.isActive && canManage(member) && (
+                            <RowAction
+                              label={`Reactivar a ${fullName(member)}`}
+                              icon={UserCheck}
+                              onClick={() => askActivate(member)}
+                              disabled={busyId === member.id}
+                            />
                           )}
                           {canManage(member) && (
                             <RowAction

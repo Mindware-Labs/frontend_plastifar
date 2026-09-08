@@ -11,20 +11,26 @@ import {
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
-import { clientsApi } from "../../api/clients";
+import { fetchAllPages } from "../../api/paging";
 import { productLinesApi } from "../../api/productLines";
-import { qualityApi, type ClosureCondition } from "../../api/quality";
-import { staffApi } from "../../api/staff";
+import {
+  qualityApi,
+  type ActionPlanListResponse,
+  type ClosureCondition,
+  type PlanItemCounts,
+} from "../../api/quality";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
+import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { Spinner } from "../../components/ui/Spinner";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import {
   describeDue,
@@ -35,8 +41,7 @@ import {
   isSheetOverdue,
   nextStatus,
 } from "../../lib/quality";
-import type { Client } from "../../types/clients";
-import type { ActionPlanItem, CorrectiveActionSheet, QualityStaff } from "../../types/quality";
+import type { ActionPlanItem, CorrectiveActionSheet } from "../../types/quality";
 import type { ProductLine } from "../../types/settings";
 import { ActionPlanItemModal } from "./ActionPlanItemModal";
 import { CancelPlanItemModal } from "./CancelPlanItemModal";
@@ -45,6 +50,13 @@ import { EffectivenessModal } from "./EffectivenessModal";
 import { HcaModal } from "./HcaModal";
 import { HcaStatusBadge, PlanItemStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
+
+/** Criterios de la lista paginada del plan; `sheetId` entra para que cambiar de HCA la reinicie. */
+interface PlanListQuery {
+  page: number;
+  pageSize: number;
+  sheetId: number;
+}
 
 interface HcaDetailPageProps {
   section: "datos" | "plan" | "cierre";
@@ -59,12 +71,10 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   const sheetId = Number(id);
 
   const [sheet, setSheet] = useState<CorrectiveActionSheet | null>(null);
-  const [items, setItems] = useState<ActionPlanItem[] | null>(null);
   const [conditions, setConditions] = useState<ClosureCondition[]>([]);
   const [closable, setClosable] = useState(false);
-  const [clients, setClients] = useState<Client[]>([]);
   const [productLines, setProductLines] = useState<ProductLine[]>([]);
-  const [staff, setStaff] = useState<QualityStaff[]>([]);
+  const [planPageSize, setPlanPageSize] = useState(10);
   const [error, setError] = useState<string | null>(null);
   /** Error de una accion sobre la pagina ya cargada: no reemplaza la ficha. */
   const [actionError, setActionError] = useState<string | null>(null);
@@ -83,6 +93,19 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   useDynamicBreadcrumb(sheet?.number ?? null);
 
   /**
+   * El plan sale de su propio endpoint paginado, no del array que la ficha trae
+   * embebido: una HCA con muchas acciones volcaba la lista entera en la tabla.
+   *
+   * `sheetId` va dentro de los criterios a proposito: asi cambiar de HCA vuelve
+   * a la primera pagina y relee, en vez de dejar el plan de la hoja anterior.
+   */
+  const plan = usePagedList<PlanListQuery, ActionPlanListResponse>({
+    fetch: ({ sheetId: id, page, pageSize }) => qualityApi.planItems.list(id, { page, pageSize }),
+    criteria: { sheetId, pageSize: planPageSize },
+    fallbackError: "No se pudo cargar el plan de acción. Vuelve a intentarlo.",
+  });
+
+  /**
    * Relectura tras una accion sobre la ficha ya cargada. No se vacia nada: la
    * tabla se atenua y se repinta. Nunca rechaza —el fallo se cuenta arriba—,
    * porque quien la llama es el `onSaved` de un dialogo que ya se cerro.
@@ -92,7 +115,6 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     try {
       const data = await qualityApi.sheets.get(sheetId);
       setSheet(data.sheet);
-      setItems(data.planItems);
       setConditions(data.closureConditions);
       setClosable(data.canClose);
       setActionError(null);
@@ -108,6 +130,22 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   }
 
   /**
+   * Relectura tras tocar una accion del plan. Son dos cosas y hacen falta las
+   * dos: la pagina del plan, que es lo que cambio, y la ficha, porque
+   * `closureConditions` y `canClose` los calcula el servidor a partir del plan
+   * --agregar una accion nueva vuelve a cerrar la puerta que estaba abierta--.
+   * Quedarse solo con la lista dejaba el boton «Cerrar HCA» habilitado sobre una
+   * hoja que el servidor ya iba a rechazar.
+   *
+   * Lo que NO se toca aqui es el estado de la hoja ni su historial: eso solo lo
+   * mueven las acciones de hoja, que siguen releyendo la ficha por su cuenta.
+   */
+  async function reloadAfterPlanChange() {
+    plan.refresh();
+    await reload();
+  }
+
+  /**
    * Carga de la ficha. Se vacia primero y se descarta la respuesta si el id
    * cambio: sin esto, ir de HCA-001 a HCA-002 seguia pintando la 001 bajo la
    * miga de la 002, y dos navegaciones rapidas podian resolverse al reves y
@@ -120,7 +158,6 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   if (sheetId !== lastSheetId) {
     setLastSheetId(sheetId);
     setSheet(null);
-    setItems(null);
     setConditions([]);
     setClosable(false);
     setError(null);
@@ -130,23 +167,19 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   useEffect(() => {
     let cancelled = false;
 
+    // Las lineas de producto son catalogo acotado y se recorren enteras; el
+    // cliente y el responsable ya no se precargan: sus selectores buscan en el
+    // servidor porque ninguno de los dos catalogos tiene tope.
     Promise.all([
       qualityApi.sheets.get(sheetId),
-      clientsApi.list({ page: 1, pageSize: 100 }),
-      productLinesApi.list(),
-      staffApi.list({ page: 1, pageSize: 100, status: "activos" }),
+      fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize })),
     ])
-      .then(([detail, clientsPage, linesPage, staffPage]) => {
+      .then(([detail, lines]) => {
         if (cancelled) return;
         setSheet(detail.sheet);
-        setItems(detail.planItems);
         setConditions(detail.closureConditions);
         setClosable(detail.canClose);
-        setClients(clientsPage.items);
-        setProductLines(linesPage.items);
-        setStaff(
-          staffPage.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })),
-        );
+        setProductLines(lines);
       })
       .catch(() => {
         if (!cancelled) setError("No se pudo cargar la HCA. Vuelve a intentarlo.");
@@ -186,13 +219,27 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     );
   }
 
-  if (sheet === null || items === null) {
+  if (sheet === null) {
     return (
       <div className="flex justify-center py-16">
         <Spinner />
       </div>
     );
   }
+
+  const planData = plan.data;
+  const planItems = planData?.items ?? [];
+  const planCounts = planData?.counts;
+  const planError = plan.error;
+  /**
+   * Vencidas de verdad, o `null` cuando no se puede saber: solo se cuentan
+   * comparando fechas y solo hay a la vista una pagina. Con el plan entero
+   * delante la cifra es exacta; repartido, no se afirma nada.
+   */
+  const overdueOnPage =
+    planData !== null && planData.totalPages <= 1
+      ? planItems.filter((item) => isPlanItemOverdue(item) && !isPlanItemSettled(item)).length
+      : null;
 
   const isClosed = sheet.status === "Cerrada";
   const overdue = isSheetOverdue(sheet);
@@ -218,7 +265,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     setActionError(null);
     try {
       await qualityApi.planItems.start(item.id);
-      await reload();
+      await reloadAfterPlanChange();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "No se pudo poner la acción en curso");
     }
@@ -238,7 +285,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
       confirmLabel: "Marcar cumplida",
       onConfirm: async () => {
         await qualityApi.planItems.complete(item.id);
-        await reload();
+        await reloadAfterPlanChange();
       },
     });
   }
@@ -399,14 +446,31 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
         </>
       )}
 
-      {section === "plan" && items.length > 0 && (
+      {section === "plan" && planError !== null && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="min-w-[240px] flex-1">
+            <Alert variant="error">{planError}</Alert>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => plan.refresh()}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
+      {section === "plan" && planCounts !== undefined && planCounts.all > 0 && (
         <p className="mb-3 text-[12.5px] text-brand-gray">
-          {planDebt(items)}
+          {planDebt(planCounts, overdueOnPage)}
         </p>
       )}
 
-      {section === "plan" &&
-        (items.length === 0 ? (
+      {section === "plan" && planData === null ? (
+        planError === null && (
+          <div className="flex justify-center py-12">
+            <Spinner />
+          </div>
+        )
+      ) : section !== "plan" ? null : (
+        planItems.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-[13.5px] text-faint">
               Esta HCA todavía no tiene plan de acción.
@@ -421,6 +485,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
             )}
           </div>
         ) : (
+          <div className={`transition-opacity ${plan.isStale ? "opacity-60" : ""}`}>
           <DataTable>
             <thead>
               <HeadRow>
@@ -434,7 +499,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
             </thead>
 
             <tbody>
-              {items.map((item) => {
+              {planItems.map((item) => {
                 const itemOverdue = isPlanItemOverdue(item);
                 const settled = isPlanItemSettled(item);
 
@@ -496,7 +561,22 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
               })}
             </tbody>
           </DataTable>
-        ))}
+          </div>
+        )
+      )}
+
+      {section === "plan" && planData !== null && planData.total > 0 && (
+        <Pagination
+          page={plan.page}
+          pageSize={planPageSize}
+          total={planData.total}
+          totalPages={planData.totalPages}
+          onPageChange={plan.setPage}
+          onPageSizeChange={setPlanPageSize}
+          noun="acciones"
+          nounSingular="acción"
+        />
+      )}
 
       {section === "cierre" && (
         <div className="flex flex-col gap-6">
@@ -617,9 +697,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
       {editing && (
         <HcaModal
           sheet={sheet}
-          clients={clients}
           productLines={productLines}
-          staff={staff}
           onClose={() => setEditing(false)}
           onSaved={() => {
             setEditing(false);
@@ -633,11 +711,10 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           sheetId={sheet.id}
           sheetNumber={sheet.number}
           item={itemModal === "nueva" ? undefined : itemModal}
-          staff={staff}
           onClose={() => setItemModal(null)}
           onSaved={() => {
             setItemModal(null);
-            void reload();
+            void reloadAfterPlanChange();
           }}
         />
       )}
@@ -648,7 +725,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           onClose={() => setCancelling(null)}
           onSaved={() => {
             setCancelling(null);
-            void reload();
+            void reloadAfterPlanChange();
           }}
         />
       )}
@@ -686,16 +763,21 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
  * Lo que el plan debe, antes de lo que contiene: la pestana abria con una
  * tabla muda mientras Datos y Cierre si decian que faltaba.
  */
-function planDebt(items: ActionPlanItem[]): string {
-  const pending = items.filter((item) => !isPlanItemSettled(item));
-  const overdue = pending.filter((item) => isPlanItemOverdue(item)).length;
+function planDebt(counts: PlanItemCounts, overdue: number | null): string {
+  // Lo pendiente lo cuenta el servidor sobre el plan entero: pendientes y en
+  // curso son las dos formas de «sin resolver».
+  const pending = counts.pending + counts.inProgress;
 
-  if (pending.length === 0) {
+  if (pending === 0) {
     return "Todas las acciones del plan están resueltas.";
   }
 
   const head =
-    pending.length === 1 ? "Queda 1 acción sin resolver" : `Quedan ${pending.length} acciones sin resolver`;
-  const tail = overdue === 0 ? "" : overdue === 1 ? " · 1 vencida" : ` · ${overdue} vencidas`;
+    pending === 1 ? "Queda 1 acción sin resolver" : `Quedan ${pending} acciones sin resolver`;
+  // Lo vencido se sabe comparando fechas, y eso solo alcanza a lo que esta
+  // cargado. Con el plan repartido en paginas se calla: dar la cifra de una
+  // pagina como si fuera la del plan entero es peor que no darla.
+  const tail =
+    overdue === null || overdue === 0 ? "" : overdue === 1 ? " · 1 vencida" : ` · ${overdue} vencidas`;
   return `${head}${tail}. La HCA no se cierra hasta que se cumplan o se anulen con justificación.`;
 }

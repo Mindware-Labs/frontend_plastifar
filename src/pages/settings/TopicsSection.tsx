@@ -1,6 +1,7 @@
 import { CornerDownRight, Pencil, Plus, Power } from "lucide-react";
 import { useState } from "react";
 import { departmentsApi } from "../../api/departments";
+import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -34,14 +35,16 @@ const priorityTone: Record<string, "red" | "green" | "neutral"> = {
 
 /**
  * Catálogos de apoyo del diálogo: las políticas que puede elegir y los motivos
- * de primer nivel que puede tomar como padre. Son listas de opciones, no el
- * listado que se pagina; el tope de cien es el del desplegable.
+ * de primer nivel que puede tomar como padre. Son catálogos acotados, así que se
+ * recorren enteros: con el tope fijo de cien, la política o el motivo padre que
+ * no cupiera desaparecía del desplegable sin ninguna señal —y la columna
+ * «Política de SLA» de la tabla llegaba a decir «Sin política» por eso mismo.
  */
 const loadPolicies = () =>
-  settingsApi.slaPolicies.list({ page: 1, pageSize: 100 }).then(({ items }) => items);
+  fetchAllPages<SlaPolicy>((page, pageSize) => settingsApi.slaPolicies.list({ page, pageSize }));
 
 const loadTopicOptions = () =>
-  settingsApi.topics.list({ page: 1, pageSize: 100 }).then(({ items }) => items);
+  fetchAllPages<TicketTopic>((page, pageSize) => settingsApi.topics.list({ page, pageSize }));
 
 export function TopicsSection() {
   const { can } = usePermissions();

@@ -8,12 +8,14 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
   CheckboxField,
+  LookupField,
   SelectField,
   TextAreaField,
   TextField,
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import { CLIENT_TYPES, type Client } from "../../types/clients";
 import { fieldForServerError, type FieldRule } from "./serverFieldErrors";
 
@@ -60,12 +62,11 @@ const fieldRules: FieldRule<keyof FormValues>[] = [
 interface ClientModalProps {
   client?: Client;
   territories: { id: number; name: string; isActive: boolean }[];
-  salesReps: { id: number; name: string }[];
   onClose: () => void;
   onSaved: (client: Client) => void;
 }
 
-export function ClientModal({ client, territories, salesReps, onClose, onSaved }: ClientModalProps) {
+export function ClientModal({ client, territories, onClose, onSaved }: ClientModalProps) {
   const isEdit = client !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -230,17 +231,17 @@ export function ClientModal({ client, territories, salesReps, onClose, onSaved }
           name="salesRepStaffId"
           control={control}
           render={({ field }) => (
-            <SelectField
+            <LookupField
               label="Vendedor"
               name={field.name}
               value={field.value}
-              onChange={field.onChange}
+              onChange={(value) => field.onChange(value)}
               onBlur={field.onBlur}
               placeholder="Sin vendedor asignado"
-              options={[
-                { value: "", label: "Sin vendedor asignado" },
-                ...salesReps.map((rep) => ({ value: String(rep.id), label: rep.name })),
-              ]}
+              searchPlaceholder="Buscar vendedor…"
+              clearLabel="Sin vendedor asignado"
+              search={searchActiveStaff}
+              resolveSelectedLabel={resolveStaffLabel}
               state={stateOf("salesRepStaffId")}
               error={errors.salesRepStaffId?.message}
             />

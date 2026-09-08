@@ -2,7 +2,7 @@ import { BarChart3, Download, Lock, ShieldAlert, SlidersHorizontal } from "lucid
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
-import { clientsApi } from "../../api/clients";
+import { fetchAllPages } from "../../api/paging";
 import { productLinesApi } from "../../api/productLines";
 import {
   reportsApi,
@@ -11,7 +11,6 @@ import {
   type ClientsReport,
   type QualityReport,
 } from "../../api/reports";
-import { staffApi } from "../../api/staff";
 import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
@@ -19,8 +18,9 @@ import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { Pagination } from "../../components/ui/Pagination";
 import { usePermissions } from "../../hooks/usePermissions";
-import { downloadCsv } from "../../lib/csv";
+import type { Territory } from "../../types/clients";
 import { REPORT_CATALOG, type ReportDefinition } from "../../types/reports";
+import type { ProductLine } from "../../types/settings";
 import { ReportFilters, type ReferenceData, type ReportCriteria } from "./ReportFilters";
 import { AuditSliceResult, ClientsResult, QualityResult } from "./results";
 import { defaultRange } from "./useDateRange";
@@ -96,33 +96,29 @@ export function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasRun, setHasRun] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  /** Un fallo al exportar no invalida el reporte que se esta viendo: va aparte. */
+  const [exportError, setExportError] = useState<string | null>(null);
   const [reference, setReference] = useState<ReferenceData>({
-    clients: [],
     productLines: [],
-    staff: [],
     territories: [],
     clientTypes: CLIENT_TYPES,
   });
 
-  // Los catalogos de los selectores se piden una vez, no por reporte: son los
-  // mismos y no dependen de lo elegido.
+  // Solo los catalogos acotados —lineas y territorios— se precargan, y enteros:
+  // el corte de 200 dejaba fuera cualquiera que pasara de ahi. Cliente,
+  // responsable y vendedor no se precargan: sus tres selectores buscan en el
+  // servidor porque ni la cartera ni el personal tienen tope.
   useEffect(() => {
     if (!canRead) return;
     void Promise.all([
-      clientsApi.list({ page: 1, pageSize: 200, sort: "nombre", dir: "asc" }),
-      productLinesApi.list(),
-      staffApi.list({ page: 1, pageSize: 200, status: "activos", sort: "nombre", dir: "asc" }),
-      territoriesApi.list(),
+      fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize })),
+      fetchAllPages<Territory>((page, pageSize) => territoriesApi.list({ page, pageSize })),
     ])
-      .then(([clients, lines, staff, territories]) =>
+      .then(([lines, territories]) =>
         setReference({
-          clients: clients.items.map((c) => ({ value: String(c.id), label: c.name })),
-          productLines: lines.items.map((l) => ({ value: String(l.id), label: l.name })),
-          staff: staff.items.map((s) => ({
-            value: String(s.id),
-            label: `${s.firstName} ${s.lastName}`,
-          })),
-          territories: territories.items.map((t) => ({ value: String(t.id), label: t.name })),
+          productLines: lines.map((l) => ({ value: String(l.id), label: l.name })),
+          territories: territories.map((t) => ({ value: String(t.id), label: t.name })),
           clientTypes: CLIENT_TYPES,
         }),
       )
@@ -216,61 +212,43 @@ export function ReportsPage() {
   }
 
   /**
-   * El CSV exporta el reporte que se esta viendo, con sus criterios ya
-   * aplicados: es el resultado tal como se ve (seccion 11.3), no un volcado de
-   * todo. Los importes viajan como numero crudo —sin simbolo ni separador de
-   * millar— porque una columna de texto no se puede sumar en Excel, y un importe
-   * que no se suma no es una exportacion util por muy fiel que sea a la pantalla.
+   * El CSV lo arma el servidor sobre el conjunto filtrado COMPLETO, no sobre la
+   * pagina cargada. La version anterior serializaba `payload.data.items` --lo
+   * que ya estaba en memoria-- mientras la pantalla invitaba a exportar «para
+   * llevarte el período completo»: el archivo decia una cosa y el texto otra.
+   *
+   * El nombre lo pone Content-Disposition; el de aqui solo cubre el caso de que
+   * esa cabecera no llegue.
    */
-  function exportCsv() {
-    if (payload === null) return;
-    const stamp = report.filters.includes("range") ? `_${criteria.from}_${criteria.to}` : "";
-    const filename = `${report.id}${stamp}.csv`;
-
-    if (payload.kind === "quality") {
-      const q = payload.data;
-      if (report.id === "creditos-emitidos") {
-        downloadCsv(
-          filename,
-          ["Moneda", "Notas", "Acumulado"],
-          q.credits.byCurrency.map((e) => [e.currency, e.count, e.total]),
-        );
-        return;
-      }
-      downloadCsv(
-        filename,
-        ["Mes", "Abiertas", "Cerradas", "Diferencia"],
-        q.byMonth.map((e) => [e.month, e.opened, e.closed, e.opened - e.closed]),
+  async function exportCsv() {
+    setExportError(null);
+    setIsExporting(true);
+    try {
+      const stamp = report.filters.includes("range") ? `_${criteria.from}_${criteria.to}` : "";
+      await reportsApi.exportCsv(
+        report.id,
+        {
+          from: report.filters.includes("range") ? criteria.from : undefined,
+          to: report.filters.includes("range") ? criteria.to : undefined,
+          clientId: num(criteria.clientId),
+          productLineId: num(criteria.productLineId),
+          responsibleStaffId: num(criteria.responsibleStaffId),
+          territoryId: num(criteria.territoryId),
+          salesRepStaffId: num(criteria.salesRepStaffId),
+          type: criteria.clientType === "" ? undefined : criteria.clientType,
+          activeOnly: criteria.activeOnly ? true : undefined,
+        },
+        `${report.id}${stamp}.csv`,
       );
-      return;
-    }
-
-    if (payload.kind === "clients") {
-      const c = payload.data;
-      if (report.id === "cartera-por-territorio") {
-        downloadCsv(
-          filename,
-          ["Territorio", "Clientes", "Activos"],
-          c.byTerritory.map((e) => [e.territory, e.total, e.active]),
-        );
-        return;
-      }
-      downloadCsv(
-        filename,
-        ["Vendedor", "Clientes"],
-        c.bySalesRep.map((e) => [e.salesRep, e.clients]),
+    } catch (err) {
+      setExportError(
+        err instanceof ApiError
+          ? `${err.message} Vuelve a intentarlo.`
+          : "No se pudo exportar el CSV. Vuelve a intentarlo.",
       );
-      return;
+    } finally {
+      setIsExporting(false);
     }
-
-    // La bitacora exporta la pagina que se ve. Llevarse el periodo entero
-    // exigiria pedirlo otra vez sin paginar, y eso es otra decision: mejor que
-    // el archivo diga lo mismo que la pantalla a que diga otra cosa en silencio.
-    downloadCsv(
-      filename,
-      ["Cuándo", "Quién", "Acción", "Entidad", "Id"],
-      payload.data.items.map((i) => [i.createdAt, i.actor, i.action, i.entity, i.entityId]),
-    );
   }
 
   if (!canRead) {
@@ -303,9 +281,14 @@ export function ReportsPage() {
                 Cambiar criterios
               </Button>
               {payload !== null && (
-                <Button size="sm" variant="ghost" onClick={exportCsv}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void exportCsv()}
+                  isLoading={isExporting}
+                >
                   <Download className="h-[15px] w-[15px]" />
-                  Exportar CSV
+                  {isExporting ? "Exportando…" : "Exportar CSV"}
                 </Button>
               )}
             </div>
@@ -355,6 +338,12 @@ export function ReportsPage() {
               >
                 Reintentar
               </Button>
+            </div>
+          )}
+
+          {exportError && (
+            <div className="mb-4">
+              <Alert variant="error">{exportError}</Alert>
             </div>
           )}
 

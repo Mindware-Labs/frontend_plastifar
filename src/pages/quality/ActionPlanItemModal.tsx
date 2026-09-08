@@ -7,13 +7,14 @@ import { qualityApi } from "../../api/quality";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
-  SelectField,
+  LookupField,
   TextAreaField,
   TextField,
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import type { ActionPlanItem, QualityStaff } from "../../types/quality";
+import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
+import type { ActionPlanItem } from "../../types/quality";
 
 // Espejo de la validacion del servidor de POST/PUT /api/quality/sheets/{id}/plan.
 const schema = z.object({
@@ -33,7 +34,6 @@ interface ActionPlanItemModalProps {
   sheetNumber: string;
   /** Ausente = alta. */
   item?: ActionPlanItem;
-  staff: QualityStaff[];
   onClose: () => void;
   onSaved: (item: ActionPlanItem) => void;
 }
@@ -44,7 +44,6 @@ export function ActionPlanItemModal({
   sheetId,
   sheetNumber,
   item,
-  staff,
   onClose,
   onSaved,
 }: ActionPlanItemModalProps) {
@@ -129,15 +128,17 @@ export function ActionPlanItemModal({
             name="responsibleStaffId"
             control={control}
             render={({ field }) => (
-              <SelectField
+              <LookupField
                 label="Responsable"
                 required
                 name={field.name}
                 value={field.value}
-                onChange={field.onChange}
+                onChange={(value) => field.onChange(value)}
                 onBlur={field.onBlur}
                 placeholder="Elige uno"
-                options={staff.map((person) => ({ value: String(person.id), label: person.name }))}
+                searchPlaceholder="Buscar responsable…"
+                search={searchActiveStaff}
+                resolveSelectedLabel={resolveStaffLabel}
                 state={stateOf("responsibleStaffId")}
                 error={errors.responsibleStaffId?.message}
               />

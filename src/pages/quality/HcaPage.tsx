@@ -1,7 +1,7 @@
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { clientsApi } from "../../api/clients";
+import { fetchAllPages } from "../../api/paging";
 import { productLinesApi } from "../../api/productLines";
 import {
   qualityApi,
@@ -9,13 +9,12 @@ import {
   type SheetListResponse,
   type SheetQuery,
 } from "../../api/quality";
-import { staffApi } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { ControlInput } from "../../components/ui/ControlInput";
-import { CriteriaField, CriteriaSelect } from "../../components/ui/CriteriaField";
+import { CriteriaField, CriteriaLookup, CriteriaSelect } from "../../components/ui/CriteriaField";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -23,10 +22,14 @@ import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import {
+  resolveClientLabel,
+  resolveStaffLabel,
+  searchActiveStaff,
+  searchClients,
+} from "../../lib/lookups";
 import { describeDue, formatDay, isSheetOverdue } from "../../lib/quality";
-import type { Client } from "../../types/clients";
 import type { ProductLine } from "../../types/settings";
-import type { QualityStaff } from "../../types/quality";
 import { HcaModal } from "./HcaModal";
 import { HcaStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
@@ -65,9 +68,7 @@ export function HcaPage() {
   const { can } = usePermissions();
   const canWrite = can("quality.write");
 
-  const [clients, setClients] = useState<Client[]>([]);
   const [productLines, setProductLines] = useState<ProductLine[]>([]);
-  const [staff, setStaff] = useState<QualityStaff[]>([]);
 
   const [search, setSearch] = useState("");
   const [productLineId, setProductLineId] = useState("todas");
@@ -83,26 +84,14 @@ export function HcaPage() {
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  // Estos catalogos ya no resuelven ningun nombre de la tabla —eso lo hace el
-  // servidor— y solo alimentan los desplegables de filtro y el formulario de
-  // alta. Aun asi vienen recortados a 100: un filtro que no ofrece al cliente
-  // 101 es un limite conocido, mientras que una columna que decia «—» a partir
-  // del cliente 101 era un dato perdido (seccion 4.1).
+  // Las lineas de producto son catalogo acotado: se recorren enteras. Clientes
+  // y personal no lo son, y por eso sus dos filtros y el formulario de alta
+  // buscan en el servidor en vez de comer de una lista precargada: el corte
+  // fijo de cien hacia que el cliente 101 no existiera para quien filtraba.
   useEffect(() => {
-    clientsApi
-      .list({ page: 1, pageSize: 100 })
-      .then((data) => setClients(data.items))
-      .catch(() => setClients([]));
-
-    productLinesApi
-      .list()
-      .then((data) => setProductLines(data.items))
+    fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize }))
+      .then(setProductLines)
       .catch(() => setProductLines([]));
-
-    staffApi
-      .list({ page: 1, pageSize: 100, status: "activos" })
-      .then((data) => setStaff(data.items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))))
-      .catch(() => setStaff([]));
   }, []);
 
   const criteria: Omit<SheetQuery, "page"> = {
@@ -176,28 +165,30 @@ export function HcaPage() {
           ]}
         />
 
-        <CriteriaSelect
+        <CriteriaLookup
           label="Responsable"
           ariaLabel="Filtrar por responsable"
-          value={responsibleId}
-          onChange={setResponsibleId}
           width="w-[170px]"
-          options={[
-            { value: "todos", label: "Todos los responsables" },
-            ...staff.map((person) => ({ value: String(person.id), label: person.name })),
-          ]}
+          placeholder="Todos los responsables"
+          searchPlaceholder="Buscar responsable…"
+          clearLabel="Todos los responsables"
+          value={responsibleId === "todos" ? "" : responsibleId}
+          onChange={(value) => setResponsibleId(value === "" ? "todos" : value)}
+          search={searchActiveStaff}
+          resolveSelectedLabel={resolveStaffLabel}
         />
 
-        <CriteriaSelect
+        <CriteriaLookup
           label="Cliente"
           ariaLabel="Filtrar por cliente"
-          value={clientId}
-          onChange={setClientId}
-          options={[
-            { value: "todos", label: "Todos los clientes" },
-            ...clients.map((client) => ({ value: String(client.id), label: client.name })),
-          ]}
           width="w-[200px]"
+          placeholder="Todos los clientes"
+          searchPlaceholder="Buscar cliente…"
+          clearLabel="Todos los clientes"
+          value={clientId === "todos" ? "" : clientId}
+          onChange={(value) => setClientId(value === "" ? "todos" : value)}
+          search={searchClients}
+          resolveSelectedLabel={resolveClientLabel}
         />
 
         <div className="flex items-end gap-2">
@@ -360,9 +351,7 @@ export function HcaPage() {
 
       {modalOpen && (
         <HcaModal
-          clients={clients}
           productLines={productLines}
-          staff={staff}
           onClose={() => setModalOpen(false)}
           onSaved={() => {
             setModalOpen(false);
