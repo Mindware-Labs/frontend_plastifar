@@ -10,6 +10,7 @@ import {
   Mail,
   Package,
   Paperclip,
+  Pencil,
   Phone,
   RotateCcw,
   Send,
@@ -30,6 +31,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { formatDateTime, formatSlaRemaining } from "../../lib/format";
 import type {
   TicketAttachmentResponse,
+  TicketCreateOptionsResponse,
   TicketDetailResponse,
   TicketEventResponse,
   TicketMessageResponse,
@@ -346,6 +348,75 @@ export function TicketDetailPage() {
       );
     } finally {
       setAssigning(false);
+    }
+  };
+
+  // Edit ticket details modal state (Fase 8, PUT /api/tickets/{id})
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editSubject, setEditSubject] = useState("");
+  const [editTopicId, setEditTopicId] = useState<number>(0);
+  const [editPriority, setEditPriority] = useState<string>("Normal");
+  const [editDepartmentId, setEditDepartmentId] = useState<number>(0);
+  const [editProductLineId, setEditProductLineId] = useState<number | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editCatalogs, setEditCatalogs] = useState<TicketCreateOptionsResponse | null>(null);
+  const [loadingEditCatalogs, setLoadingEditCatalogs] = useState(false);
+
+  const handleOpenEditModal = async () => {
+    if (!ticket) return;
+    setEditSubject(ticket.subject);
+    setEditTopicId(ticket.topicId);
+    setEditPriority(ticket.priority);
+    setEditDepartmentId(ticket.departmentId);
+    setEditProductLineId(ticket.productLineId ?? null);
+    setEditError(null);
+    setShowEditModal(true);
+
+    if (!editCatalogs) {
+      try {
+        setLoadingEditCatalogs(true);
+        const cats = await ticketsApi.createOptions();
+        setEditCatalogs(cats);
+      } catch {
+        // Ignorar
+      } finally {
+        setLoadingEditCatalogs(false);
+      }
+    }
+  };
+
+  const handleConfirmEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editSubject.trim()) {
+      setEditError("El asunto no puede estar vacío.");
+      return;
+    }
+
+    const currentTopic = editCatalogs?.topics.find((t) => t.id === editTopicId);
+    if (currentTopic?.requiresProductLine && !editProductLineId) {
+      setEditError(`El motivo '${currentTopic.name}' exige indicar una línea de producto.`);
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setEditError(null);
+      await ticketsApi.update(ticketId, {
+        subject: editSubject.trim(),
+        topicId: editTopicId,
+        priority: editPriority,
+        departmentId: editDepartmentId,
+        productLineId: editProductLineId,
+      });
+      setShowEditModal(false);
+      await refreshTicket();
+    } catch (err) {
+      setEditError(
+        err instanceof Error ? err.message : "Error al actualizar los detalles del ticket.",
+      );
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -1021,10 +1092,23 @@ export function TicketDetailPage() {
 
             {/* Tarjeta 2: Atributos del Caso */}
             <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-faint">
-                <User className="h-4 w-4 text-brand-red" />
-                Atributos del Ticket
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-faint">
+                  <User className="h-4 w-4 text-brand-red" />
+                  Atributos del Ticket
+                </h3>
+                {ticket.status !== "Cancelado" && ticket.status !== "Cerrado" && (
+                  <button
+                    type="button"
+                    onClick={() => void handleOpenEditModal()}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-red transition-colors hover:underline cursor-pointer"
+                    title="Editar campos clave del ticket"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Editar
+                  </button>
+                )}
+              </div>
               <div className="mt-3.5 space-y-2.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-subtle">Departamento:</span>
@@ -1316,6 +1400,160 @@ export function TicketDetailPage() {
                     className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink placeholder:text-subtle focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
                   />
                 </div>
+              </>
+            )}
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal para Editar Atributos del Ticket (RF-T10 / PUT /api/tickets/{id}) */}
+      {showEditModal && (
+        <Modal
+          eyebrow={ticket.number}
+          title="Editar detalles del ticket"
+          description="Modifica el asunto, motivo, prioridad, departamento o línea de producto. La fecha límite de SLA se recalculará automáticamente."
+          onClose={() => {
+            if (!savingEdit) setShowEditModal(false);
+          }}
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={savingEdit}
+                onClick={() => setShowEditModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                form="edit-ticket-form"
+                variant="primary"
+                isLoading={savingEdit}
+              >
+                Guardar cambios
+              </Button>
+            </>
+          }
+        >
+          <form id="edit-ticket-form" onSubmit={handleConfirmEdit} className="space-y-4">
+            {editError && <Alert variant="error">{editError}</Alert>}
+
+            {loadingEditCatalogs ? (
+              <div className="flex items-center justify-center py-8">
+                <Spinner size="md" />
+                <span className="ml-2 text-xs text-subtle">Cargando catálogos...</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="edit-subject" className="text-xs font-semibold text-ink">
+                    Asunto <span className="text-brand-red">*</span>
+                  </label>
+                  <input
+                    id="edit-subject"
+                    type="text"
+                    required
+                    maxLength={200}
+                    value={editSubject}
+                    onChange={(e) => setEditSubject(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="edit-topic" className="text-xs font-semibold text-ink">
+                      Motivo / Tema <span className="text-brand-red">*</span>
+                    </label>
+                    <select
+                      id="edit-topic"
+                      value={editTopicId}
+                      onChange={(e) => {
+                        const newId = Number(e.target.value);
+                        setEditTopicId(newId);
+                        const foundTopic = editCatalogs?.topics.find((t) => t.id === newId);
+                        if (foundTopic) {
+                          if (foundTopic.defaultDepartmentId) {
+                            setEditDepartmentId(foundTopic.defaultDepartmentId);
+                          }
+                          if (foundTopic.defaultPriority) {
+                            setEditPriority(foundTopic.defaultPriority);
+                          }
+                        }
+                      }}
+                      className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                    >
+                      {(editCatalogs?.topics ?? []).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="edit-priority" className="text-xs font-semibold text-ink">
+                      Prioridad <span className="text-brand-red">*</span>
+                    </label>
+                    <select
+                      id="edit-priority"
+                      value={editPriority}
+                      onChange={(e) => setEditPriority(e.target.value)}
+                      className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                    >
+                      <option value="Emergencia">Emergencia</option>
+                      <option value="Alta">Alta</option>
+                      <option value="Normal">Normal</option>
+                      <option value="Baja">Baja</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="edit-dept" className="text-xs font-semibold text-ink">
+                      Departamento <span className="text-brand-red">*</span>
+                    </label>
+                    <select
+                      id="edit-dept"
+                      value={editDepartmentId}
+                      onChange={(e) => setEditDepartmentId(Number(e.target.value))}
+                      className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                    >
+                      {(editCatalogs?.departments ?? []).map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="edit-line" className="text-xs font-semibold text-ink">
+                      Línea de producto
+                    </label>
+                    <select
+                      id="edit-line"
+                      value={editProductLineId ?? ""}
+                      onChange={(e) =>
+                        setEditProductLineId(e.target.value ? Number(e.target.value) : null)
+                      }
+                      className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                    >
+                      <option value="">— Ninguna / No aplica —</option>
+                      {(editCatalogs?.productLines ?? []).map((pl) => (
+                        <option key={pl.id} value={pl.id}>
+                          {pl.name} ({pl.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <p className="text-[11.5px] text-subtle leading-relaxed">
+                  Nota: Si cambias el departamento y el colaborador actualmente asignado no pertenece al nuevo departamento, será desasignado automáticamente según la regla 9.4.8.
+                </p>
               </>
             )}
           </form>

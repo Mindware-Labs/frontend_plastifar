@@ -46,5 +46,33 @@ export const ticketsApi = {
 
   getAssignableStaff: (id: number) =>
     apiRequest<TicketStaffOptionResponse[]>(`/api/tickets/${id}/assignable-staff`),
+
+  createOptions: () =>
+    apiRequest<import("../types/api").TicketCreateOptionsResponse>("/api/tickets/create-options"),
+
+  create: (input: import("../types/api").CreateManualTicketRequest) =>
+    apiRequest<import("../types/api").TicketSummaryResponse>("/api/tickets", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  update: (id: number, input: import("../types/api").UpdateTicketDetailsRequest) =>
+    apiRequest<unknown>(`/api/tickets/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
+  bulkAssign: (input: import("../types/api").BulkAssignTicketsRequest) =>
+    apiRequest<import("../types/api").BulkActionResult>("/api/tickets/bulk/assign", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  bulkPriority: (input: import("../types/api").BulkPriorityTicketsRequest) =>
+    apiRequest<import("../types/api").BulkActionResult>("/api/tickets/bulk/priority", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
 };
+
 

@@ -1,4 +1,4 @@
-import { Clock, Ticket as TicketIcon } from "lucide-react";
+import { Clock, Flag, Plus, Ticket as TicketIcon, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
@@ -6,8 +6,10 @@ import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { Modal } from "../../components/ui/Modal";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
@@ -22,7 +24,9 @@ import type {
   TicketListItemResponse,
   TicketListResponse,
   TicketQuery,
+  TicketStaffOptionResponse,
 } from "../../types/api";
+import { CreateTicketModal } from "./CreateTicketModal";
 
 type TicketFilterKey = "todos" | "abiertos" | "por-vencer" | "vencidos" | "espera" | "cerrados";
 type SortKey = "numero" | "asunto" | "cliente" | "departamento" | "prioridad" | "estado" | "sla" | "actividad";
@@ -77,6 +81,17 @@ export function TicketsPage() {
   const [pageSize, setPageSize] = useState(10);
   const debouncedSearch = useDebouncedValue(search).trim();
 
+  // Fase 8: Selección múltiple, acciones en lote y alta manual
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkPriorityOpen, setBulkPriorityOpen] = useState(false);
+  const [bulkStaffId, setBulkStaffId] = useState<string>("");
+  const [bulkPriority, setBulkPriority] = useState<string>("Normal");
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkFeedback, setBulkFeedback] = useState<{ variant: "success" | "error" | "info"; message: string } | null>(null);
+  const [staffOptions, setStaffOptions] = useState<TicketStaffOptionResponse[]>([]);
+
   useEffect(() => {
     departmentsApi
       .list()
@@ -109,6 +124,117 @@ export function TicketsPage() {
   const rows: TicketListItemResponse[] = data?.items ?? [];
   const counts = data?.counts;
 
+  const allVisibleIds = rows.map((r) => r.id);
+  const allVisibleSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = allVisibleIds.some((id) => selectedIds.has(id));
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        allVisibleIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        allVisibleIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  }
+
+  function openBulkAssign() {
+    if (staffOptions.length === 0) {
+      ticketsApi
+        .createOptions()
+        .then((opts) => {
+          setStaffOptions(opts.assignableStaff);
+        })
+        .catch(() => {});
+    }
+    setBulkAssignOpen(true);
+  }
+
+  async function handleBulkAssignSubmit() {
+    setBulkSubmitting(true);
+    setBulkFeedback(null);
+    try {
+      const targetStaffId = bulkStaffId ? parseInt(bulkStaffId, 10) : null;
+      const res = await ticketsApi.bulkAssign({
+        ticketIds: Array.from(selectedIds),
+        staffId: targetStaffId,
+      });
+      setBulkAssignOpen(false);
+      setSelectedIds(new Set());
+      refresh();
+      if (res.updatedCount < res.totalRequested) {
+        const skipped = res.totalRequested - res.updatedCount;
+        setBulkFeedback({
+          variant: "info",
+          message: `Se reasignaron ${res.updatedCount} de ${res.totalRequested} tickets (${skipped} omitidos por estar cerrados o no autorizados).`,
+        });
+      } else {
+        setBulkFeedback({
+          variant: "success",
+          message: `Se asignaron exitosamente los ${res.updatedCount} tickets seleccionados.`,
+        });
+      }
+    } catch (err) {
+      setBulkFeedback({
+        variant: "error",
+        message: err instanceof Error ? err.message : "Error al asignar tickets en lote",
+      });
+    } finally {
+      setBulkSubmitting(false);
+    }
+  }
+
+  async function handleBulkPrioritySubmit() {
+    setBulkSubmitting(true);
+    setBulkFeedback(null);
+    try {
+      const res = await ticketsApi.bulkPriority({
+        ticketIds: Array.from(selectedIds),
+        priority: bulkPriority,
+      });
+      setBulkPriorityOpen(false);
+      setSelectedIds(new Set());
+      refresh();
+      if (res.updatedCount < res.totalRequested) {
+        const skipped = res.totalRequested - res.updatedCount;
+        setBulkFeedback({
+          variant: "info",
+          message: `Se actualizó la prioridad a '${bulkPriority}' en ${res.updatedCount} de ${res.totalRequested} tickets (${skipped} omitidos por estar cerrados).`,
+        });
+      } else {
+        setBulkFeedback({
+          variant: "success",
+          message: `Se actualizó la prioridad a '${bulkPriority}' en los ${res.updatedCount} tickets seleccionados.`,
+        });
+      }
+    } catch (err) {
+      setBulkFeedback({
+        variant: "error",
+        message: err instanceof Error ? err.message : "Error al cambiar prioridad en lote",
+      });
+    } finally {
+      setBulkSubmitting(false);
+    }
+  }
+
   function toggleSort(key: SortKey) {
     setSort((prev) =>
       prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
@@ -116,13 +242,19 @@ export function TicketsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col relative">
       <ModuleHeader
         title="Tickets"
         summary={
           counts
             ? `${counts.all} tickets · ${counts.open} abiertos · ${counts.overdue} vencidos · ${counts.waitingOnClient} en espera`
             : "Cargando bandeja de tickets…"
+        }
+        action={
+          <Button size="sm" onClick={() => setCreateModalOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nuevo ticket
+          </Button>
         }
       />
 
@@ -179,6 +311,23 @@ export function TicketsPage() {
           ))}
         </div>
 
+        {bulkFeedback && (
+          <div className="mb-3">
+            <Alert variant={bulkFeedback.variant}>
+              <div className="flex items-center justify-between w-full">
+                <span>{bulkFeedback.message}</span>
+                <button
+                  type="button"
+                  onClick={() => setBulkFeedback(null)}
+                  className="ml-2 text-xs underline cursor-pointer hover:opacity-80"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </Alert>
+          </div>
+        )}
+
         {error && (
           <div className="mb-3">
             <Alert variant="error">{error}</Alert>
@@ -194,6 +343,20 @@ export function TicketsPage() {
             <DataTable>
               <thead>
                 <HeadRow>
+                  <Th className="w-10 !px-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Seleccionar todos los tickets visibles"
+                      className="h-4 w-4 rounded-[2px] border-line text-brand-red focus:ring-brand-red cursor-pointer accent-brand-red"
+                      checked={allVisibleSelected}
+                      ref={(input) => {
+                        if (input) {
+                          input.indeterminate = someVisibleSelected && !allVisibleSelected;
+                        }
+                      }}
+                      onChange={toggleSelectAll}
+                    />
+                  </Th>
                   {columns.map(({ key, label }) => (
                     <Th
                       key={key}
@@ -211,7 +374,7 @@ export function TicketsPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={columns.length + 1} className="py-16 text-center text-subtle">
+                    <td colSpan={columns.length + 2} className="py-16 text-center text-subtle">
                       <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
                         <TicketIcon className="h-8 w-8 text-subtle/50" />
                         <p className="text-[14px] font-medium text-ink">No se encontraron tickets</p>
@@ -228,8 +391,26 @@ export function TicketsPage() {
                       <Row
                         key={t.id}
                         onClick={() => navigate(`/tickets/${t.id}`)}
-                        className="cursor-pointer hover:bg-slate-50/80 transition-colors"
+                        className={`cursor-pointer hover:bg-slate-50/80 transition-colors ${
+                          selectedIds.has(t.id) ? "bg-red-50/30" : ""
+                        }`}
                       >
+                        {/* Selección */}
+                        <Td
+                          className="w-10 !px-3"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            aria-label={`Seleccionar ticket ${t.number}`}
+                            className="h-4 w-4 rounded-[2px] border-line text-brand-red focus:ring-brand-red cursor-pointer accent-brand-red"
+                            checked={selectedIds.has(t.id)}
+                            onChange={() => toggleSelect(t.id)}
+                          />
+                        </Td>
+
                         {/* Número */}
                         <Td className="whitespace-nowrap font-mono text-[12px] font-semibold text-ink">
                           {t.number}
@@ -344,6 +525,159 @@ export function TicketsPage() {
           </div>
         )}
       </div>
+
+      {/* Barra flotante de acciones en lote (RF-T11) */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-[2px] border border-slate-700 bg-ink px-4 py-2.5 text-white shadow-2xl animate-plf-toast-in">
+          <div className="flex items-center gap-2 text-[12.5px] font-medium text-slate-200">
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-red px-1.5 text-[10.5px] font-bold text-white">
+              {selectedIds.size}
+            </span>
+            <span>{selectedIds.size === 1 ? "ticket seleccionado" : "tickets seleccionados"}</span>
+          </div>
+          <span className="h-4 w-px bg-slate-700" />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openBulkAssign}
+              className="flex items-center gap-1.5 rounded-[2px] bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-white/20 cursor-pointer"
+            >
+              <UserCheck className="h-3.5 w-3.5 text-brand-red" />
+              Asignar en lote
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkPriorityOpen(true)}
+              className="flex items-center gap-1.5 rounded-[2px] bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-white/20 cursor-pointer"
+            >
+              <Flag className="h-3.5 w-3.5 text-amber-400" />
+              Cambiar prioridad
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="rounded-[2px] px-2.5 py-1.5 text-[12px] text-slate-400 transition hover:text-white cursor-pointer"
+            >
+              Deseleccionar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal alta manual de ticket (RF-T10) */}
+      {createModalOpen && (
+        <CreateTicketModal
+          onClose={() => setCreateModalOpen(false)}
+          onCreated={(created) => {
+            refresh();
+            navigate(`/tickets/${created.id}`);
+          }}
+        />
+      )}
+
+      {/* Modal asignación en lote (RF-T11) */}
+      {bulkAssignOpen && (
+        <Modal
+          eyebrow="Acciones en lote"
+          title="Asignar tickets en lote"
+          description={`Selecciona el colaborador al que deseas asignar los ${selectedIds.size} tickets seleccionados.`}
+          onClose={() => {
+            if (!bulkSubmitting) setBulkAssignOpen(false);
+          }}
+          footer={({ requestClose }) => (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={requestClose}
+                disabled={bulkSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleBulkAssignSubmit}
+                isLoading={bulkSubmitting}
+              >
+                Confirmar asignación
+              </Button>
+            </>
+          )}
+        >
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-ink">Colaborador asignado</label>
+              <Select
+                size="sm"
+                value={bulkStaffId}
+                onChange={(val) => setBulkStaffId(val)}
+                options={[
+                  { value: "", label: "— Sin asignar (desasignar) —" },
+                  ...staffOptions.map((s) => ({
+                    value: String(s.id),
+                    label: `${s.fullName} (${s.email})`,
+                  })),
+                ]}
+              />
+            </div>
+            <p className="text-[12px] text-subtle leading-relaxed">
+              Se validará que el colaborador tenga acceso a los departamentos de cada ticket.
+              Los tickets resueltos o cancelados se omitirán automáticamente.
+            </p>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal cambio de prioridad en lote (RF-T11) */}
+      {bulkPriorityOpen && (
+        <Modal
+          eyebrow="Acciones en lote"
+          title="Cambiar prioridad en lote"
+          description={`Selecciona la nueva prioridad para los ${selectedIds.size} tickets seleccionados.`}
+          onClose={() => {
+            if (!bulkSubmitting) setBulkPriorityOpen(false);
+          }}
+          footer={({ requestClose }) => (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={requestClose}
+                disabled={bulkSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleBulkPrioritySubmit}
+                isLoading={bulkSubmitting}
+              >
+                Actualizar prioridad
+              </Button>
+            </>
+          )}
+        >
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-ink">Nueva prioridad</label>
+              <Select
+                size="sm"
+                value={bulkPriority}
+                onChange={(val) => setBulkPriority(val)}
+                options={[
+                  { value: "Emergencia", label: "Emergencia" },
+                  { value: "Alta", label: "Alta" },
+                  { value: "Normal", label: "Normal" },
+                  { value: "Baja", label: "Baja" },
+                ]}
+              />
+            </div>
+            <p className="text-[12px] text-subtle leading-relaxed">
+              Se recalculará la fecha límite de SLA según la política correspondiente a la nueva prioridad.
+            </p>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

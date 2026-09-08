@@ -576,4 +576,85 @@ export interface TicketSlaNotice {
   assignedStaffId?: number | null;
 }
 
+export interface TicketContactOption {
+  id: number;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  position: string | null;
+  isPrimary: boolean;
+}
+
+export interface TicketClientOption {
+  id: number;
+  code: string;
+  name: string;
+  taxId: string | null;
+  contacts: TicketContactOption[];
+}
+
+export interface TicketTopicOption {
+  id: number;
+  name: string;
+  defaultDepartmentId: number;
+  defaultPriority: string;
+  requiresProductLine: boolean;
+  slaPolicyId: number | null;
+}
+
+export interface TicketProductLineOption {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface TicketDepartmentOption {
+  id: number;
+  name: string;
+}
+
+export interface TicketCreateOptionsResponse {
+  clients: TicketClientOption[];
+  topics: TicketTopicOption[];
+  productLines: TicketProductLineOption[];
+  departments: TicketDepartmentOption[];
+  assignableStaff: TicketStaffOptionResponse[];
+}
+
+export interface CreateManualTicketRequest {
+  clientId: number;
+  contactId?: number | null;
+  topicId: number;
+  productLineId?: number | null;
+  subject: string;
+  initialMessage?: string | null;
+  priority?: string | null;
+  departmentId?: number | null;
+  assignedStaffId?: number | null;
+}
+
+export interface UpdateTicketDetailsRequest {
+  subject?: string | null;
+  topicId?: number | null;
+  priority?: string | null;
+  departmentId?: number | null;
+  productLineId?: number | null;
+}
+
+export interface BulkAssignTicketsRequest {
+  ticketIds: number[];
+  staffId: number | null;
+}
+
+export interface BulkPriorityTicketsRequest {
+  ticketIds: number[];
+  priority: string;
+}
+
+export interface BulkActionResult {
+  updatedCount: number;
+  totalRequested: number;
+}
+
+
 
