@@ -331,3 +331,99 @@ export interface ComposingPresence {
   active: boolean;
 }
 
+export interface TicketListItemResponse {
+  id: number;
+  number: string;
+  subject: string;
+  topicId: number;
+  topicName: string;
+  clientId: number;
+  clientName: string;
+  clientCode: string;
+  contactId: number | null;
+  contactName: string | null;
+  departmentId: number;
+  departmentName: string;
+  productLineId: number | null;
+  productLineName: string | null;
+  priority: string;
+  status: string;
+  channel: string;
+  assignedStaffId: number | null;
+  assignedStaffName: string | null;
+  firstResponseDueAt: string | null;
+  resolutionDueAt: string | null;
+  firstResponseAt: string | null;
+  pausedAt: string | null;
+  pausedMinutes: number;
+  closedAt: string | null;
+  lastActivityAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketCounts {
+  all: number;
+  open: number;
+  upcoming: number;
+  overdue: number;
+  waitingOnClient: number;
+  closed: number;
+}
+
+export interface TicketListResponse {
+  items: TicketListItemResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: TicketCounts;
+}
+
+export interface TicketQuery {
+  page: number;
+  pageSize: number;
+  search?: string;
+  /** todos | abiertos | por-vencer | vencidos | espera | cerrados */
+  status?: string;
+  departmentId?: number;
+  assignedStaffId?: number;
+  priority?: string;
+  topicId?: number;
+  clientId?: number;
+  fromDate?: string;
+  toDate?: string;
+  /** numero | asunto | cliente | departamento | prioridad | estado | sla | actividad */
+  sort?: string;
+  dir?: "asc" | "desc";
+}
+
+export interface TicketEmailResponse {
+  id: number;
+  direction: string;
+  fromEmail: string;
+  fromName: string | null;
+  toEmails: string[];
+  subject: string;
+  bodyHtml: string | null;
+  bodyText: string | null;
+  createdAt: string;
+  attachments: EmailAttachmentResponse[];
+}
+
+export interface TicketDetailResponse {
+  id: number;
+  code: string;
+  subject: string;
+  status: string;
+  priority: string;
+  source: string;
+  requesterEmail: string;
+  requesterName: string | null;
+  departmentId: number | null;
+  assignedStaffId: number | null;
+  createdAt: string;
+  updatedAt: string;
+  emails: TicketEmailResponse[];
+}
+

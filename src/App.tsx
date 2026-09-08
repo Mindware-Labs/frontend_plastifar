@@ -8,6 +8,7 @@ import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { RolesPage } from "./pages/roles/RolesPage";
 import { StaffPage } from "./pages/staff/StaffPage";
 import { RespuestasPage } from "./pages/respuestas/RespuestasPage";
+import { TicketsPage } from "./pages/tickets/TicketsPage";
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
           </ProtectedRoute>
         }
       >
+        <Route path="/tickets" element={<TicketsPage />} />
         <Route path="/bandeja" element={<BandejaPage folder="inbox" />} />
         <Route path="/bandeja/destacados" element={<BandejaPage folder="starred" />} />
         <Route path="/bandeja/junk" element={<Navigate to="/bandeja/destacados" replace />} />

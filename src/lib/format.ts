@@ -124,3 +124,37 @@ export function formatInitials(
   }
   return "PF";
 }
+
+/**
+ * Calcula el tiempo restante o vencido de un compromiso de SLA para la bandeja (RF-T6).
+ */
+export function formatSlaRemaining(
+  dueAtIso: string | null,
+  isPaused: boolean,
+): { text: string; tone: "overdue" | "warning" | "ok" | "paused" } {
+  if (isPaused) {
+    return { text: "Pausado", tone: "paused" };
+  }
+  if (!dueAtIso) {
+    return { text: "Sin SLA", tone: "ok" };
+  }
+  const due = new Date(dueAtIso).getTime();
+  const now = Date.now();
+  const diffMs = due - now;
+
+  if (diffMs <= 0) {
+    const overdueMin = Math.max(1, Math.floor(Math.abs(diffMs) / 60000));
+    if (overdueMin < 60) return { text: `Vencido (${overdueMin}m)`, tone: "overdue" };
+    const overdueHours = Math.floor(overdueMin / 60);
+    if (overdueHours < 24) return { text: `Vencido (${overdueHours}h)`, tone: "overdue" };
+    const overdueDays = Math.floor(overdueHours / 24);
+    return { text: `Vencido (${overdueDays}d)`, tone: "overdue" };
+  }
+
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 60) return { text: `${diffMin}m restantes`, tone: "warning" };
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return { text: `${diffHours}h restantes`, tone: diffHours <= 4 ? "warning" : "ok" };
+  const diffDays = Math.floor(diffHours / 24);
+  return { text: `${diffDays}d restantes`, tone: "ok" };
+}

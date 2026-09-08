@@ -13,6 +13,7 @@ import {
   Star,
   Trash2,
   Users,
+  Ticket as TicketIcon,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -46,6 +47,13 @@ interface NavGroup {
 
 /** Árbol de navegación: cada elemento cuenta con su propio icono vectorizado y ruta. */
 const groups: NavGroup[] = [
+  {
+    label: "Tickets",
+    icon: TicketIcon,
+    children: [
+      { label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon },
+    ],
+  },
   {
     label: "Correo",
     icon: Inbox,
@@ -101,6 +109,7 @@ function FolderBadge({
 }
 
 const collapsedKey = "plf.sidebar-collapsed";
+const ticketsExpandedKey = "plf.sidebar-tickets-expanded";
 const mailExpandedKey = "plf.sidebar-mail-expanded";
 const personalExpandedKey = "plf.sidebar-personal-expanded";
 
@@ -133,6 +142,7 @@ export function Sidebar() {
   const { counts } = useEmailCounts();
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [ticketsExpanded, setTicketsExpanded] = useState(() => readGroupExpanded(ticketsExpandedKey));
   const [mailExpanded, setMailExpanded] = useState(() => readGroupExpanded(mailExpandedKey));
   const [personalExpanded, setPersonalExpanded] = useState(() => readGroupExpanded(personalExpandedKey));
   const [menuOpen, setMenuOpen] = useState(false);
@@ -144,7 +154,17 @@ export function Sidebar() {
   const closeTimer = useRef<number | null>(null);
 
   function toggleGroup(label: string) {
-    if (label === "Correo") {
+    if (label === "Tickets") {
+      setTicketsExpanded((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem(ticketsExpandedKey, next ? "1" : "0");
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    } else if (label === "Correo") {
       setMailExpanded((prev) => {
         const next = !prev;
         try {
@@ -168,6 +188,7 @@ export function Sidebar() {
   }
 
   function isGroupExpanded(label: string) {
+    if (label === "Tickets") return ticketsExpanded;
     if (label === "Correo") return mailExpanded;
     if (label === "Personal") return personalExpanded;
     return true;
