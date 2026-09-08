@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
@@ -723,9 +724,14 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           />
 
           {email.ticketId ? (
-            <Badge variant="secondary" className={ticketBadgeClass}>
-              {formatTicketCode(email.ticketId)}
-            </Badge>
+            <Link to={`/tickets/${email.ticketId}`} title="Ver el detalle del ticket">
+              <Badge
+                variant="secondary"
+                className={`${ticketBadgeClass} cursor-pointer transition-colors hover:bg-brand-red/15`}
+              >
+                {formatTicketCode(email.ticketId)}
+              </Badge>
+            </Link>
           ) : (
             <PfButton size="sm" className="h-7 px-3" onClick={() => setIsCreateTicketModalOpen(true)}>
               <TicketIcon className="h-[15px] w-[15px]" />
