@@ -504,3 +504,37 @@ export interface TicketEmailResponse {
   attachments: EmailAttachmentResponse[];
 }
 
+export interface AssignTicketRequest {
+  staffId: number | null;
+  comment?: string | null;
+}
+
+export interface AssignTicketResponse {
+  ticketId: number;
+  assignedStaffId: number | null;
+  assignedStaffName: string | null;
+  updatedAt: string;
+}
+
+export interface UpdateTicketStatusRequest {
+  status: string;
+  reason?: string | null;
+}
+
+export interface UpdateTicketStatusResponse {
+  ticketId: number;
+  status: string;
+  updatedAt: string;
+  pausedAt: string | null;
+  pausedMinutes: number;
+  resolvedAt: string | null;
+  closedAt: string | null;
+  reopenedCount: number;
+}
+
+export interface TicketStaffOptionResponse {
+  id: number;
+  fullName: string;
+  email: string;
+}
+

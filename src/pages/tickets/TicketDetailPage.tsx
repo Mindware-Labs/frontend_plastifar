@@ -8,11 +8,14 @@ import {
   FileText,
   Lock,
   Mail,
+  Package,
   Paperclip,
   Phone,
+  RotateCcw,
   Send,
   ShieldAlert,
   User,
+  UserCheck,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -21,6 +24,7 @@ import { ticketsApi } from "../../api/tickets";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
 import { formatDateTime, formatSlaRemaining } from "../../lib/format";
 import type {
@@ -28,6 +32,7 @@ import type {
   TicketDetailResponse,
   TicketEventResponse,
   TicketMessageResponse,
+  TicketStaffOptionResponse,
 } from "../../types/api";
 
 function formatBytes(bytes: number): string {
@@ -219,6 +224,104 @@ export function TicketDetailPage() {
     }
   };
 
+  // Status transitions state (Fase 4, tickets.close y sección 9.3)
+  const [transitioning, setTransitioning] = useState(false);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
+
+  // Cancel modal state
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+
+  // Assign modal state (Fase 4, tickets.assign y sección 9.4)
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignableStaff, setAssignableStaff] = useState<TicketStaffOptionResponse[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>("");
+  const [assignComment, setAssignComment] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+
+  const handleUpdateStatus = async (targetStatus: string, reason?: string) => {
+    try {
+      setTransitioning(true);
+      setTransitionError(null);
+      await ticketsApi.updateStatus(ticketId, { status: targetStatus, reason });
+      await refreshTicket();
+    } catch (err) {
+      setTransitionError(
+        err instanceof Error ? err.message : "Error al cambiar el estado del ticket.",
+      );
+    } finally {
+      setTransitioning(false);
+    }
+  };
+
+  const handleConfirmCancel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cancelReason.trim()) {
+      setTransitionError("La cancelación exige un motivo escrito explicativo.");
+      return;
+    }
+
+    try {
+      setTransitioning(true);
+      setTransitionError(null);
+      await ticketsApi.updateStatus(ticketId, {
+        status: "Cancelado",
+        reason: cancelReason.trim(),
+      });
+      setShowCancelModal(false);
+      setCancelReason("");
+      await refreshTicket();
+    } catch (err) {
+      setTransitionError(
+        err instanceof Error ? err.message : "Error al cancelar el ticket.",
+      );
+    } finally {
+      setTransitioning(false);
+    }
+  };
+
+  const handleOpenAssignModal = async () => {
+    if (!ticket) return;
+    setSelectedStaffId(ticket.assignedStaffId ? String(ticket.assignedStaffId) : "");
+    setAssignComment("");
+    setAssignError(null);
+    setShowAssignModal(true);
+    try {
+      setLoadingStaff(true);
+      const staffList = await ticketsApi.getAssignableStaff(ticketId);
+      setAssignableStaff(staffList);
+    } catch (err) {
+      setAssignError(
+        err instanceof Error ? err.message : "No se pudo cargar el personal asignable.",
+      );
+    } finally {
+      setLoadingStaff(false);
+    }
+  };
+
+  const handleConfirmAssign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setAssigning(true);
+      setAssignError(null);
+      const staffId = selectedStaffId ? parseInt(selectedStaffId, 10) : null;
+      await ticketsApi.assign(ticketId, {
+        staffId,
+        comment: assignComment.trim() || undefined,
+      });
+      setShowAssignModal(false);
+      await refreshTicket();
+    } catch (err) {
+      setAssignError(
+        err instanceof Error ? err.message : "Error al asignar el ticket.",
+      );
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -312,19 +415,185 @@ export function TicketDetailPage() {
 
       {/* Contenedor principal de 2 columnas */}
       <div className="mx-auto max-w-7xl px-6 py-6">
-        {/* Título y metadatos rápidos */}
-        <div className="mb-6">
-          <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl">
-            {ticket.subject}
-          </h1>
-          <p className="mt-1 text-xs text-subtle">
-            Creado el {formatDateTime(ticket.createdAt)} por{" "}
-            <span className="font-medium text-ink">
-              {ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}
-            </span>{" "}
-            · Canal: <span className="font-medium text-ink">{ticket.channel}</span>
-          </p>
+        {/* Título, metadatos rápidos y botones de acción rápida de estado (Sección 9.3) */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl">
+              {ticket.subject}
+            </h1>
+            <p className="mt-1 text-xs text-subtle">
+              Creado el {formatDateTime(ticket.createdAt)} por{" "}
+              <span className="font-medium text-ink">
+                {ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}
+              </span>{" "}
+              · Canal: <span className="font-medium text-ink">{ticket.channel}</span>
+            </p>
+          </div>
+
+          {/* Barra de acciones de cambio de estado de la máquina de estados 9.3 */}
+          <div className="flex flex-wrap items-center gap-2">
+            {ticket.status === "Abierto" && (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => handleUpdateStatus("En espera del cliente")}
+                  title="Pausa el SLA mientras se espera respuesta del cliente"
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  En espera
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => handleUpdateStatus("Reenvío de producto")}
+                  title="Marca el caso para reenvío de producto"
+                >
+                  <Package className="h-3.5 w-3.5" />
+                  Reenvío
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => {
+                    const hasOutbound = ticket.messages.some((m) => m.direction === "Saliente");
+                    if (!hasOutbound) {
+                      setTransitionError(
+                        "No se puede marcar como solucionado un ticket sin haber enviado al menos una respuesta al cliente.",
+                      );
+                      return;
+                    }
+                    handleUpdateStatus("Solucionado");
+                  }}
+                  title="Marca como solucionado (requiere respuesta previa al cliente)"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Solucionar
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => {
+                    setTransitionError(null);
+                    setShowCancelModal(true);
+                  }}
+                  title="Cancela el ticket definitivamente (exige motivo escrito)"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Cancelar
+                </Button>
+              </>
+            )}
+
+            {ticket.status === "En espera del cliente" && (
+              <>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => handleUpdateStatus("Abierto")}
+                  title="Reanuda la atención y el cómputo de SLA"
+                >
+                  Reanudar a Abierto
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => {
+                    setTransitionError(null);
+                    setShowCancelModal(true);
+                  }}
+                  title="Cancela el ticket definitivamente"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Cancelar
+                </Button>
+              </>
+            )}
+
+            {ticket.status === "Reenvío de producto" && (
+              <>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => handleUpdateStatus("Solucionado")}
+                  title="Marca el ticket como solucionado"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Marcar Solucionado
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => {
+                    setTransitionError(null);
+                    setShowCancelModal(true);
+                  }}
+                  title="Cancela el ticket definitivamente"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Cancelar
+                </Button>
+              </>
+            )}
+
+            {ticket.status === "Solucionado" && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={transitioning}
+                onClick={() => handleUpdateStatus("Abierto")}
+                title="Reabre el ticket (incrementa el contador de reaperturas)"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reabrir ticket
+              </Button>
+            )}
+
+            {ticket.status === "Cancelado" && (
+              <span className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                Cancelado (Cerrado definitivo)
+              </span>
+            )}
+          </div>
         </div>
+
+        {/* Alerta visible para conflictos 409 o errores de transición */}
+        {transitionError && (
+          <div className="mb-6">
+            <Alert variant="error">
+              <div className="flex items-center justify-between">
+                <span>{transitionError}</span>
+                <button
+                  type="button"
+                  onClick={() => setTransitionError(null)}
+                  className="ml-3 text-xs font-semibold underline hover:opacity-80"
+                >
+                  Entendido
+                </button>
+              </div>
+            </Alert>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Columna Izquierda: Hilo de conversación y redactor (8 cols) */}
@@ -607,7 +876,36 @@ export function TicketDetailPage() {
                     </label>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    {direction === "Saliente" && ticket.status !== "Cancelado" && (
+                      <div className="flex items-center gap-1.5 text-xs text-subtle">
+                        <label htmlFor="composer-status" className="whitespace-nowrap font-medium text-ink">
+                          Estado:
+                        </label>
+                        <select
+                          id="composer-status"
+                          value={statusChange}
+                          onChange={(e) => setStatusChange(e.target.value)}
+                          className="h-8 rounded-lg border border-line-strong bg-white px-2 text-xs text-ink focus:border-brand-red focus:outline-none"
+                        >
+                          <option value="">(Sin cambio — {ticket.status})</option>
+                          {ticket.status === "Abierto" && (
+                            <>
+                              <option value="En espera del cliente">En espera del cliente</option>
+                              <option value="Reenvío de producto">Reenvío de producto</option>
+                              <option value="Solucionado">Solucionado</option>
+                            </>
+                          )}
+                          {ticket.status === "En espera del cliente" && (
+                            <option value="Abierto">Abierto</option>
+                          )}
+                          {ticket.status === "Reenvío de producto" && (
+                            <option value="Solucionado">Solucionado</option>
+                          )}
+                        </select>
+                      </div>
+                    )}
+
                     {direction === "Interna" ? (
                       <button
                         type="submit"
@@ -702,11 +1000,24 @@ export function TicketDetailPage() {
                     <span className="font-medium text-ink">{ticket.productLineName}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between">
                   <span className="text-subtle">Asignado a:</span>
-                  <span className="font-semibold text-ink">
-                    {ticket.assignedStaffName ?? "Sin asignar"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-ink">
+                      {ticket.assignedStaffName ?? "Sin asignar"}
+                    </span>
+                    {ticket.status !== "Cancelado" && (
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenAssignModal()}
+                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-brand-red transition-colors hover:bg-red-50 hover:underline"
+                        title="Asignar o reasignar ticket"
+                      >
+                        <UserCheck className="h-3 w-3" />
+                        {ticket.assignedStaffId ? "Cambiar" : "Asignar"}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-subtle">Canal de origen:</span>
@@ -761,6 +1072,27 @@ export function TicketDetailPage() {
                   <div className="flex justify-between text-subtle">
                     <span>Tiempo total en pausa:</span>
                     <span className="font-medium text-ink">{ticket.pausedMinutes} minutos</span>
+                  </div>
+                )}
+
+                {ticket.reopenedCount > 0 && (
+                  <div className="flex justify-between text-subtle">
+                    <span>Reaperturas:</span>
+                    <span className="font-semibold text-amber-700">{ticket.reopenedCount}</span>
+                  </div>
+                )}
+
+                {ticket.resolvedAt && (
+                  <div className="flex justify-between text-subtle">
+                    <span>Resuelto el:</span>
+                    <span className="font-medium text-ink">{formatDateTime(ticket.resolvedAt)}</span>
+                  </div>
+                )}
+
+                {ticket.closedAt && (
+                  <div className="flex justify-between text-subtle">
+                    <span>Cerrado el:</span>
+                    <span className="font-medium text-ink">{formatDateTime(ticket.closedAt)}</span>
                   </div>
                 )}
               </div>
@@ -821,6 +1153,134 @@ export function TicketDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal para Cancelar Ticket (Sección 9.3: exige motivo explicativo) */}
+      {showCancelModal && (
+        <Modal
+          eyebrow={ticket.number}
+          title="Cancelar ticket"
+          description="La cancelación es definitiva y cerrará el caso de forma permanente. Debes indicar un motivo explicativo obligatorio."
+          onClose={() => {
+            if (!transitioning) setShowCancelModal(false);
+          }}
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={transitioning}
+                onClick={() => setShowCancelModal(false)}
+              >
+                Volver
+              </Button>
+              <Button
+                type="submit"
+                form="cancel-ticket-form"
+                variant="danger"
+                isLoading={transitioning}
+              >
+                Confirmar cancelación
+              </Button>
+            </>
+          }
+        >
+          <form id="cancel-ticket-form" onSubmit={handleConfirmCancel} className="space-y-4">
+            {transitionError && <Alert variant="error">{transitionError}</Alert>}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="cancel-reason" className="text-xs font-semibold text-ink">
+                Motivo de cancelación <span className="text-brand-red">*</span>
+              </label>
+              <textarea
+                id="cancel-reason"
+                rows={4}
+                required
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Explica detalladamente por qué se cancela este ticket..."
+                className="w-full rounded-lg border border-line-strong p-3 text-xs text-ink placeholder:text-subtle focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+              />
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal para Asignar Ticket (Sección 9.4) */}
+      {showAssignModal && (
+        <Modal
+          eyebrow={ticket.number}
+          title="Asignar ticket"
+          description="Selecciona el agente del personal para atender este caso. Solo se muestran colaboradores activos con acceso al departamento."
+          onClose={() => {
+            if (!assigning) setShowAssignModal(false);
+          }}
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={assigning}
+                onClick={() => setShowAssignModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                form="assign-ticket-form"
+                variant="primary"
+                isLoading={assigning}
+              >
+                Guardar asignación
+              </Button>
+            </>
+          }
+        >
+          <form id="assign-ticket-form" onSubmit={handleConfirmAssign} className="space-y-4">
+            {assignError && <Alert variant="error">{assignError}</Alert>}
+
+            {loadingStaff ? (
+              <div className="flex items-center justify-center py-8">
+                <Spinner size="md" />
+                <span className="ml-2 text-xs text-subtle">Cargando personal disponible...</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="assign-staff-select" className="text-xs font-semibold text-ink">
+                    Colaborador asignado
+                  </label>
+                  <select
+                    id="assign-staff-select"
+                    value={selectedStaffId}
+                    onChange={(e) => setSelectedStaffId(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                  >
+                    <option value="">— Sin asignar (desasignar) —</option>
+                    {assignableStaff.map((s) => (
+                      <option key={s.id} value={String(s.id)}>
+                        {s.fullName} ({s.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="assign-comment-input" className="text-xs font-semibold text-ink">
+                    Nota o comentario interno (opcional)
+                  </label>
+                  <input
+                    id="assign-comment-input"
+                    type="text"
+                    value={assignComment}
+                    onChange={(e) => setAssignComment(e.target.value)}
+                    placeholder="Ej: Reasignado para soporte especializado de producto..."
+                    className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink placeholder:text-subtle focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                  />
+                </div>
+              </>
+            )}
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
