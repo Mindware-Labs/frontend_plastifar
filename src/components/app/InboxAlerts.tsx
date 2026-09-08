@@ -1,15 +1,21 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEmailCounts } from "../../context/useEmailCounts";
-import { playChime, readPrefs, showArrival, showAssignment } from "../../lib/notifications";
+import {
+  playChime,
+  readPrefs,
+  showArrival,
+  showAssignment,
+  showTicketAssignment,
+  showTicketSlaAlert,
+} from "../../lib/notifications";
 
 /**
- * Escucha los correos que entran y las conversaciones que le asignan a esta
- * persona, y avisa segun su preferencia. No pinta nada: vive en el layout
- * para que el aviso llegue desde cualquier pagina.
+ * Escucha los correos y tickets en vivo, y avisa segun las preferencias de la persona.
+ * No pinta nada: vive en el layout para que el aviso llegue desde cualquier pagina.
  */
 export function InboxAlerts() {
-  const { onInboxReceived, onInboxAssigned } = useEmailCounts();
+  const { onInboxReceived, onInboxAssigned, onTicketAssigned, onTicketSlaAlert } = useEmailCounts();
   const navigate = useNavigate();
 
   useEffect(
@@ -48,6 +54,40 @@ export function InboxAlerts() {
         }
       }),
     [onInboxAssigned, navigate],
+  );
+
+  useEffect(
+    () =>
+      onTicketAssigned((notice) => {
+        const prefs = readPrefs();
+        if (prefs.sound) playChime();
+
+        const away = document.visibilityState !== "visible" || !document.hasFocus();
+        if (prefs.desktop && away) {
+          showTicketAssignment(notice, () => {
+            window.focus();
+            navigate(`/tickets/${notice.ticketId}`);
+          });
+        }
+      }),
+    [onTicketAssigned, navigate],
+  );
+
+  useEffect(
+    () =>
+      onTicketSlaAlert((notice) => {
+        const prefs = readPrefs();
+        if (prefs.sound) playChime();
+
+        const away = document.visibilityState !== "visible" || !document.hasFocus();
+        if (prefs.desktop && away) {
+          showTicketSlaAlert(notice, () => {
+            window.focus();
+            navigate(`/tickets/${notice.ticketId}`);
+          });
+        }
+      }),
+    [onTicketSlaAlert, navigate],
   );
 
   return null;

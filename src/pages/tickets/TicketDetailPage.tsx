@@ -21,6 +21,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ticketsApi } from "../../api/tickets";
+import { useEmailCounts } from "../../context/useEmailCounts";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -144,6 +145,32 @@ export function TicketDetailPage() {
       active = false;
     };
   }, [ticketId]);
+
+  const { onTicketsChanged, onTicketStatusChanged, onTicketNewMessage } = useEmailCounts();
+
+  useEffect(() => {
+    if (!ticketId) return;
+
+    const unsubs = [
+      onTicketsChanged(() => {
+        void refreshTicket();
+      }),
+      onTicketStatusChanged((notice) => {
+        if (notice.ticketId === ticketId) {
+          void refreshTicket();
+        }
+      }),
+      onTicketNewMessage((notice) => {
+        if (notice.ticketId === ticketId) {
+          void refreshTicket();
+        }
+      }),
+    ];
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+    };
+  }, [ticketId, onTicketsChanged, onTicketStatusChanged, onTicketNewMessage, refreshTicket]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;

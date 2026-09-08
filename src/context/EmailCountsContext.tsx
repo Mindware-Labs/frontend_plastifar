@@ -8,12 +8,25 @@ import {
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { emailsApi } from "../api/emails";
 import { tokenStore } from "../api/tokenStore";
-import type { ComposingPresence, EmailAssignment, EmailFolderCounts, InboxArrival } from "../types/api";
+import type {
+  ComposingPresence,
+  EmailAssignment,
+  EmailFolderCounts,
+  InboxArrival,
+  TicketAssignmentNotice,
+  TicketNewMessageNotice,
+  TicketSlaNotice,
+  TicketStatusChangeNotice,
+} from "../types/api";
 
 type Listener = () => void;
 type ArrivalListener = (arrival: InboxArrival) => void;
 type AssignmentListener = (assignment: EmailAssignment) => void;
 type ComposingListener = (presence: ComposingPresence) => void;
+type TicketAssignmentListener = (notice: TicketAssignmentNotice) => void;
+type TicketStatusChangeListener = (notice: TicketStatusChangeNotice) => void;
+type TicketNewMessageListener = (notice: TicketNewMessageNotice) => void;
+type TicketSlaListener = (notice: TicketSlaNotice) => void;
 
 interface EmailCountsValue {
   counts: EmailFolderCounts | null;
@@ -30,6 +43,16 @@ interface EmailCountsValue {
   setComposing: (emailId: number, active: boolean) => void;
   /** Quienes estan escribiendo ahora mismo en la conversacion. */
   whoIsComposing: (emailId: number) => Promise<ComposingPresence[]>;
+  /** Avisos del servidor cuando la bandeja de tickets cambia. */
+  onTicketsChanged: (listener: Listener) => () => void;
+  /** Aviso de ticket asignado en tiempo real. */
+  onTicketAssigned: (listener: TicketAssignmentListener) => () => void;
+  /** Aviso de cambio de estado de un ticket. */
+  onTicketStatusChanged: (listener: TicketStatusChangeListener) => () => void;
+  /** Aviso de nuevo mensaje en un ticket. */
+  onTicketNewMessage: (listener: TicketNewMessageListener) => () => void;
+  /** Alerta de SLA (vencido o por vencer). */
+  onTicketSlaAlert: (listener: TicketSlaListener) => () => void;
 }
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
@@ -44,6 +67,11 @@ export const EmailCountsContext = createContext<EmailCountsValue>({
   onComposing: () => () => undefined,
   setComposing: () => undefined,
   whoIsComposing: () => Promise.resolve([]),
+  onTicketsChanged: () => () => undefined,
+  onTicketAssigned: () => () => undefined,
+  onTicketStatusChanged: () => () => undefined,
+  onTicketNewMessage: () => () => undefined,
+  onTicketSlaAlert: () => () => undefined,
 });
 
 /** Contadores del menu y canal en vivo: viven arriba porque los comparten la barra y la bandeja. */
@@ -53,6 +81,11 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
   const arrivalListeners = useRef(new Set<ArrivalListener>());
   const assignmentListeners = useRef(new Set<AssignmentListener>());
   const composingListeners = useRef(new Set<ComposingListener>());
+  const ticketChangeListeners = useRef(new Set<Listener>());
+  const ticketAssignListeners = useRef(new Set<TicketAssignmentListener>());
+  const ticketStatusListeners = useRef(new Set<TicketStatusChangeListener>());
+  const ticketMessageListeners = useRef(new Set<TicketNewMessageListener>());
+  const ticketSlaListeners = useRef(new Set<TicketSlaListener>());
   const connectionRef = useRef<HubConnection | null>(null);
 
   const refresh = useCallback(() => {
@@ -80,6 +113,31 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
   const onComposing = useCallback((listener: ComposingListener) => {
     composingListeners.current.add(listener);
     return () => composingListeners.current.delete(listener) as unknown as void;
+  }, []);
+
+  const onTicketsChanged = useCallback((listener: Listener) => {
+    ticketChangeListeners.current.add(listener);
+    return () => ticketChangeListeners.current.delete(listener) as unknown as void;
+  }, []);
+
+  const onTicketAssigned = useCallback((listener: TicketAssignmentListener) => {
+    ticketAssignListeners.current.add(listener);
+    return () => ticketAssignListeners.current.delete(listener) as unknown as void;
+  }, []);
+
+  const onTicketStatusChanged = useCallback((listener: TicketStatusChangeListener) => {
+    ticketStatusListeners.current.add(listener);
+    return () => ticketStatusListeners.current.delete(listener) as unknown as void;
+  }, []);
+
+  const onTicketNewMessage = useCallback((listener: TicketNewMessageListener) => {
+    ticketMessageListeners.current.add(listener);
+    return () => ticketMessageListeners.current.delete(listener) as unknown as void;
+  }, []);
+
+  const onTicketSlaAlert = useCallback((listener: TicketSlaListener) => {
+    ticketSlaListeners.current.add(listener);
+    return () => ticketSlaListeners.current.delete(listener) as unknown as void;
   }, []);
 
   // Si el canal esta caido el aviso se pierde: es una cortesia, no un dato.
@@ -129,6 +187,26 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
       composingListeners.current.forEach((listener) => listener(presence));
     }
 
+    function ticketChanged() {
+      ticketChangeListeners.current.forEach((listener) => listener());
+    }
+
+    function ticketAssigned(notice: TicketAssignmentNotice) {
+      ticketAssignListeners.current.forEach((listener) => listener(notice));
+    }
+
+    function ticketStatusChanged(notice: TicketStatusChangeNotice) {
+      ticketStatusListeners.current.forEach((listener) => listener(notice));
+    }
+
+    function ticketNewMessage(notice: TicketNewMessageNotice) {
+      ticketMessageListeners.current.forEach((listener) => listener(notice));
+    }
+
+    function ticketSlaAlert(notice: TicketSlaNotice) {
+      ticketSlaListeners.current.forEach((listener) => listener(notice));
+    }
+
     const connection = new HubConnectionBuilder()
       .withUrl(`${BASE_URL}/hubs/inbox`, {
         accessTokenFactory: () => tokenStore.getAccessToken() ?? "",
@@ -142,8 +220,17 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
     connection.on("inbox:received", received);
     connection.on("inbox:assigned", assigned);
     connection.on("inbox:composing", composing);
-    // Mientras estuvo caido pudo entrar correo: al volver se recarga sin esperar el proximo aviso.
-    connection.onreconnected(announce);
+    connection.on("tickets:changed", ticketChanged);
+    connection.on("tickets:assigned", ticketAssigned);
+    connection.on("tickets:status_changed", ticketStatusChanged);
+    connection.on("tickets:new_message", ticketNewMessage);
+    connection.on("tickets:sla_alert", ticketSlaAlert);
+
+    // Mientras estuvo caido pudo entrar correo o haber cambios en tickets: al volver se recarga sin esperar el proximo aviso.
+    connection.onreconnected(() => {
+      announce();
+      ticketChanged();
+    });
     connectionRef.current = connection;
     connection.start().catch(() => undefined);
 
@@ -152,6 +239,11 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
       connection.off("inbox:received", received);
       connection.off("inbox:assigned", assigned);
       connection.off("inbox:composing", composing);
+      connection.off("tickets:changed", ticketChanged);
+      connection.off("tickets:assigned", ticketAssigned);
+      connection.off("tickets:status_changed", ticketStatusChanged);
+      connection.off("tickets:new_message", ticketNewMessage);
+      connection.off("tickets:sla_alert", ticketSlaAlert);
       connectionRef.current = null;
       void connection.stop();
     };
@@ -168,6 +260,11 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
         onComposing,
         setComposing,
         whoIsComposing,
+        onTicketsChanged,
+        onTicketAssigned,
+        onTicketStatusChanged,
+        onTicketNewMessage,
+        onTicketSlaAlert,
       }}
     >
       {children}

@@ -14,6 +14,7 @@ import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { useEmailCounts } from "../../context/useEmailCounts";
 import { formatDateTime, formatSlaRemaining } from "../../lib/format";
 import type {
   DepartmentResponse,
@@ -83,7 +84,9 @@ export function TicketsPage() {
       .catch(() => setDepartments([]));
   }, []);
 
-  const { data, isStale, error, setPage } = usePagedList<TicketQuery, TicketListResponse>({
+  const { onTicketsChanged } = useEmailCounts();
+
+  const { data, isStale, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
     fetch: ticketsApi.list,
     criteria: {
       pageSize,
@@ -96,6 +99,12 @@ export function TicketsPage() {
     },
     fallbackError: "No se pudieron cargar los tickets",
   });
+
+  useEffect(() => {
+    return onTicketsChanged(() => {
+      refresh();
+    });
+  }, [onTicketsChanged, refresh]);
 
   const rows: TicketListItemResponse[] = data?.items ?? [];
   const counts = data?.counts;

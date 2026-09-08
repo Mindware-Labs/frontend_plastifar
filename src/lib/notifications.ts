@@ -1,4 +1,4 @@
-import type { EmailAssignment, InboxArrival } from "../types/api";
+import type { EmailAssignment, InboxArrival, TicketAssignmentNotice, TicketSlaNotice } from "../types/api";
 
 /** Preferencias de aviso de cada persona. Viven en este navegador, como los borradores. */
 export interface NotifyPrefs {
@@ -156,3 +156,58 @@ export function showAssignment(assignment: EmailAssignment, onOpen: () => void):
     return null;
   }
 }
+
+/** Notificacion del sistema para un ticket recién asignado. */
+export function showTicketAssignment(notice: TicketAssignmentNotice, onOpen: () => void): Notification | null {
+  if (desktopState() !== "granted") return null;
+
+  const actor = notice.assignedByName?.trim() || "El sistema";
+  const title = `${actor} te asignó el ticket ${notice.ticketNumber}`;
+  const body = `${notice.subject} · Prioridad: ${notice.priority}`;
+
+  try {
+    const notification = new Notification(title, {
+      body,
+      tag: `plf-ticket-assign-${notice.ticketId}`,
+      icon: "/brand/plastifar-isotipo.png",
+    });
+
+    notification.onclick = () => {
+      onOpen();
+      notification.close();
+    };
+
+    return notification;
+  } catch {
+    return null;
+  }
+}
+
+/** Notificacion del sistema para alertas de SLA (por vencer o vencido). */
+export function showTicketSlaAlert(notice: TicketSlaNotice, onOpen: () => void): Notification | null {
+  if (desktopState() !== "granted") return null;
+
+  const isBreach = notice.noticeType === "breach";
+  const title = isBreach
+    ? `⚠️ SLA Incumplido: ${notice.ticketNumber}`
+    : `⏳ SLA Próximo a Vencer: ${notice.ticketNumber}`;
+  const body = `${notice.subject} · ${notice.details}`;
+
+  try {
+    const notification = new Notification(title, {
+      body,
+      tag: `plf-ticket-sla-${notice.ticketId}-${notice.noticeType}`,
+      icon: "/brand/plastifar-isotipo.png",
+    });
+
+    notification.onclick = () => {
+      onOpen();
+      notification.close();
+    };
+
+    return notification;
+  } catch {
+    return null;
+  }
+}
+

@@ -538,3 +538,42 @@ export interface TicketStaffOptionResponse {
   email: string;
 }
 
+export interface TicketAssignmentNotice {
+  ticketId: number;
+  ticketNumber: string;
+  subject: string;
+  priority: string;
+  assignedStaffId: number;
+  assignedByName?: string | null;
+  departmentName?: string | null;
+  resolutionDueAt?: string | null;
+}
+
+export interface TicketStatusChangeNotice {
+  ticketId: number;
+  ticketNumber: string;
+  oldStatus: string;
+  newStatus: string;
+  actorStaffId?: number | null;
+  actorName?: string | null;
+}
+
+export interface TicketNewMessageNotice {
+  ticketId: number;
+  ticketNumber: string;
+  messageId: number;
+  direction: string;
+  authorName?: string | null;
+  createdAt: string;
+}
+
+export interface TicketSlaNotice {
+  ticketId: number;
+  ticketNumber: string;
+  subject: string;
+  noticeType: "breach" | "warning";
+  details: string;
+  assignedStaffId?: number | null;
+}
+
+
