@@ -354,9 +354,9 @@ export function TicketDetailPage() {
   // Edit ticket details modal state (Fase 8, PUT /api/tickets/{id})
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSubject, setEditSubject] = useState("");
-  const [editTopicId, setEditTopicId] = useState<number>(0);
+  const [editTopicId, setEditTopicId] = useState<number | null>(null);
   const [editPriority, setEditPriority] = useState<string>("Normal");
-  const [editDepartmentId, setEditDepartmentId] = useState<number>(0);
+  const [editDepartmentId, setEditDepartmentId] = useState<number | null>(null);
   const [editProductLineId, setEditProductLineId] = useState<number | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -366,9 +366,9 @@ export function TicketDetailPage() {
   const handleOpenEditModal = async () => {
     if (!ticket) return;
     setEditSubject(ticket.subject);
-    setEditTopicId(ticket.topicId);
+    setEditTopicId(ticket.topicId ?? null);
     setEditPriority(ticket.priority);
-    setEditDepartmentId(ticket.departmentId);
+    setEditDepartmentId(ticket.departmentId ?? null);
     setEditProductLineId(ticket.productLineId ?? null);
     setEditError(null);
     setShowEditModal(true);
@@ -1058,12 +1058,14 @@ export function TicketDetailPage() {
               <div className="mt-3.5 space-y-2 text-xs">
                 <div>
                   <span className="text-subtle">Razón social:</span>
-                  <p className="font-semibold text-ink">{ticket.clientName}</p>
+                  <p className="font-semibold text-ink">{ticket.clientName || "Sin cliente asignado"}</p>
                 </div>
-                <div>
-                  <span className="text-subtle">Código:</span>
-                  <p className="font-mono text-ink">{ticket.clientCode}</p>
-                </div>
+                {ticket.clientCode && (
+                  <div>
+                    <span className="text-subtle">Código:</span>
+                    <p className="font-mono text-ink">{ticket.clientCode}</p>
+                  </div>
+                )}
                 {ticket.contactName && (
                   <div className="border-t border-line-soft pt-2">
                     <span className="text-subtle">Contacto:</span>
@@ -1112,11 +1114,11 @@ export function TicketDetailPage() {
               <div className="mt-3.5 space-y-2.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-subtle">Departamento:</span>
-                  <span className="font-semibold text-ink">{ticket.departmentName}</span>
+                  <span className="font-semibold text-ink">{ticket.departmentName || "Sin departamento"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-subtle">Tema / Motivo:</span>
-                  <span className="font-medium text-ink">{ticket.topicName}</span>
+                  <span className="font-medium text-ink">{ticket.topicName || "Sin motivo"}</span>
                 </div>
                 {ticket.productLineName && (
                   <div className="flex justify-between">
@@ -1464,26 +1466,30 @@ export function TicketDetailPage() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="edit-topic" className="text-xs font-semibold text-ink">
-                      Motivo / Tema <span className="text-brand-red">*</span>
+                      Motivo / Tema
                     </label>
                     <select
                       id="edit-topic"
-                      value={editTopicId}
+                      value={editTopicId ?? ""}
                       onChange={(e) => {
-                        const newId = Number(e.target.value);
+                        const val = e.target.value;
+                        const newId = val ? Number(val) : null;
                         setEditTopicId(newId);
-                        const foundTopic = editCatalogs?.topics.find((t) => t.id === newId);
-                        if (foundTopic) {
-                          if (foundTopic.defaultDepartmentId) {
-                            setEditDepartmentId(foundTopic.defaultDepartmentId);
-                          }
-                          if (foundTopic.defaultPriority) {
-                            setEditPriority(foundTopic.defaultPriority);
+                        if (newId) {
+                          const foundTopic = editCatalogs?.topics.find((t) => t.id === newId);
+                          if (foundTopic) {
+                            if (foundTopic.defaultDepartmentId) {
+                              setEditDepartmentId(foundTopic.defaultDepartmentId);
+                            }
+                            if (foundTopic.defaultPriority) {
+                              setEditPriority(foundTopic.defaultPriority);
+                            }
                           }
                         }
                       }}
                       className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
                     >
+                      <option value="">— Sin motivo —</option>
                       {(editCatalogs?.topics ?? []).map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.name}
@@ -1513,14 +1519,18 @@ export function TicketDetailPage() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="edit-dept" className="text-xs font-semibold text-ink">
-                      Departamento <span className="text-brand-red">*</span>
+                      Departamento
                     </label>
                     <select
                       id="edit-dept"
-                      value={editDepartmentId}
-                      onChange={(e) => setEditDepartmentId(Number(e.target.value))}
+                      value={editDepartmentId ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditDepartmentId(val ? Number(val) : null);
+                      }}
                       className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
                     >
+                      <option value="">— Sin departamento —</option>
                       {(editCatalogs?.departments ?? []).map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.name}

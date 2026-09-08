@@ -335,15 +335,15 @@ export interface TicketListItemResponse {
   id: number;
   number: string;
   subject: string;
-  topicId: number;
-  topicName: string;
-  clientId: number;
-  clientName: string;
-  clientCode: string;
+  topicId: number | null;
+  topicName: string | null;
+  clientId: number | null;
+  clientName: string | null;
+  clientCode: string | null;
   contactId: number | null;
   contactName: string | null;
-  departmentId: number;
-  departmentName: string;
+  departmentId: number | null;
+  departmentName: string | null;
   productLineId: number | null;
   productLineName: string | null;
   priority: string;
@@ -449,17 +449,17 @@ export interface TicketDetailResponse {
   id: number;
   number: string;
   subject: string;
-  topicId: number;
-  topicName: string;
-  clientId: number;
-  clientName: string;
-  clientCode: string;
+  topicId: number | null;
+  topicName: string | null;
+  clientId: number | null;
+  clientName: string | null;
+  clientCode: string | null;
   contactId: number | null;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
-  departmentId: number;
-  departmentName: string;
+  departmentId: number | null;
+  departmentName: string | null;
   productLineId: number | null;
   productLineName: string | null;
   priority: string;
@@ -622,15 +622,16 @@ export interface TicketCreateOptionsResponse {
 }
 
 export interface CreateManualTicketRequest {
-  clientId: number;
+  clientId?: number | null;
   contactId?: number | null;
-  topicId: number;
+  topicId?: number | null;
   productLineId?: number | null;
   subject: string;
   initialMessage?: string | null;
   priority?: string | null;
   departmentId?: number | null;
   assignedStaffId?: number | null;
+  emailId?: number | null;
 }
 
 export interface UpdateTicketDetailsRequest {

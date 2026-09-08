@@ -39,6 +39,7 @@ import type { ComposingPresence, EmailAttachmentResponse, EmailDetailResponse } 
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
+import { CreateTicketModal } from "../tickets/CreateTicketModal";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { CannedPicker, textToBlocks } from "./CannedPicker";
 import { AssignmentControl } from "./ConversationTools";
@@ -189,8 +190,7 @@ function initials(name: string) {
 export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, onClose }: EmailDetailPaneProps) {
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
   const [moving, setMoving] = useState(false);
   const [starring, setStarring] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -306,21 +306,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
     setComposing(emailId, true);
     return () => setComposing(emailId, false);
   }, [replyOpen, emailId, setComposing]);
-
-  async function handleCreateTicket() {
-    if (!email) return;
-    setCreating(true);
-    setCreateError(null);
-    try {
-      const ticket = await emailsApi.createTicket(email.id);
-      setEmail({ ...email, ticketId: ticket.id });
-      onTicketCreated();
-    } catch (err) {
-      setCreateError(err instanceof ApiError ? err.message : "No se pudo crear el ticket");
-    } finally {
-      setCreating(false);
-    }
-  }
 
   useEffect(() => {
     if (!replyOpen) return;
@@ -643,7 +628,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center px-2 py-1.5">
+      <div className="flex h-10 shrink-0 items-center px-2">
         <div className="flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -742,7 +727,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               {formatTicketCode(email.ticketId)}
             </Badge>
           ) : (
-            <PfButton size="sm" className="h-7 px-3" onClick={handleCreateTicket} isLoading={creating}>
+            <PfButton size="sm" className="h-7 px-3" onClick={() => setIsCreateTicketModalOpen(true)}>
               <TicketIcon className="h-[15px] w-[15px]" />
               Crear ticket
             </PfButton>
@@ -772,11 +757,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       <Separator className="bg-line" />
 
-      {createError && (
-        <div className="px-4 pt-3">
-          <Alert variant="error">{createError}</Alert>
-        </div>
-      )}
 
       <div className="px-4 pb-2.5 pt-2">
         <div className="flex items-start justify-between gap-3">
@@ -1402,6 +1382,23 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           index={preview.index}
           onIndexChange={(index) => setPreview({ ...preview, index })}
           onClose={() => setPreview(null)}
+        />
+      )}
+
+      {isCreateTicketModalOpen && email && (
+        <CreateTicketModal
+          emailId={email.id}
+          initialSubject={email.subject}
+          initialMessage={email.bodyText || ""}
+          senderEmail={email.fromEmail}
+          senderName={email.fromName ?? undefined}
+          initialAssignedStaffId={email.assignedStaffId}
+          onClose={() => setIsCreateTicketModalOpen(false)}
+          onCreated={(created) => {
+            setEmail({ ...email, ticketId: created.id });
+            onTicketCreated();
+            setIsCreateTicketModalOpen(false);
+          }}
         />
       )}
     </div>

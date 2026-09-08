@@ -12,6 +12,7 @@ import type {
   EmailThreadMessageResponse,
   EmptyTrashResponse,
   TicketSummaryResponse,
+  CreateManualTicketRequest,
 } from "../types/api";
 
 export interface EmailQuery {
@@ -139,8 +140,11 @@ export const emailsApi = {
 
   staffOptions: () => apiRequest<StaffOptionResponse[]>("/api/staff/options"),
 
-  createTicket: (id: number) =>
-    apiRequest<TicketSummaryResponse>(`/api/emails/${id}/ticket`, { method: "POST" }),
+  createTicket: (id: number, data?: CreateManualTicketRequest) =>
+    apiRequest<TicketSummaryResponse>(`/api/emails/${id}/ticket`, {
+      method: "POST",
+      body: data ? JSON.stringify(data) : undefined,
+    }),
 
   archive: (id: number) => apiRequest<void>(`/api/emails/${id}/archive`, { method: "POST" }),
 

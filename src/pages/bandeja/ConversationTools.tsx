@@ -199,9 +199,16 @@ export function AssignmentControl({
       ? [{ id: assignedStaffId, name: assignedStaffName }]
       : [];
 
-  const selectOptions: SelectOption[] = [
-    { value: "", label: "Sin asignar" },
-  ];
+  const ASSIGN_ME_VALUE = "__assign_me__";
+
+  const selectOptions: SelectOption[] = [];
+
+  // Atajo al inicio del desplegable: asignarme sin ocupar espacio propio junto al Select.
+  if (!mine && user) {
+    selectOptions.push({ value: ASSIGN_ME_VALUE, label: "Asignarme" });
+  }
+
+  selectOptions.push({ value: "", label: "Sin asignar" });
 
   // Si está asignado a mí actualmente, añadimos la opción con hidden: true
   // para que el botón de Select muestre "Asignado a mí", pero NO salga en el desplegable.
@@ -243,6 +250,11 @@ export function AssignmentControl({
         value={assignedStaffId !== null ? String(assignedStaffId) : ""}
         disabled={busy || options === null}
         onChange={(next) => {
+          if (next === ASSIGN_ME_VALUE) {
+            if (user) void assign(user.staffId);
+            return;
+          }
+
           const nextId = next === "" ? null : Number(next);
           if (nextId === assignedStaffId) return;
 
@@ -262,18 +274,6 @@ export function AssignmentControl({
         aria-label="Asignar la conversación"
         className="w-auto min-w-[130px] max-w-[190px]"
       />
-      {!mine && user && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => assign(user.staffId)}
-          className="flex h-7 shrink-0 items-center rounded-edge px-2 font-heading text-[10px] font-bold uppercase
-            tracking-[0.06em] text-brand-red-dark outline-none transition-colors hover:bg-brand-red/[0.06]
-            focus-visible:ring-2 focus-visible:ring-brand-red/20 disabled:opacity-50"
-        >
-          Asignarme
-        </button>
-      )}
       {error && !pendingAssignment && <span className="truncate text-[11px] text-brand-red-dark">{error}</span>}
 
       {pendingAssignment && (

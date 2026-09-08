@@ -16,6 +16,7 @@ export interface ModalProps {
   /** Si el padre ya controla la animación de salida (ej: useModalAnimation) */
   isExiting?: boolean;
   onRequestClose?: () => void;
+  maxWidth?: string;
 }
 
 /**
@@ -33,6 +34,7 @@ export function Modal({
   children,
   isExiting: externalIsExiting,
   onRequestClose: externalRequestClose,
+  maxWidth = "max-w-lg",
 }: ModalProps) {
   const internal = useModalAnimation(onClose);
   const isExiting = externalIsExiting ?? internal.isExiting;
@@ -62,7 +64,7 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         className={`${
           isExiting ? "animate-plf-modal-out pointer-events-none" : "animate-plf-modal-in"
-        } flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-edge border border-line bg-white shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]`}
+        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-edge border border-line bg-white shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 pb-4 pt-5">
           <div>

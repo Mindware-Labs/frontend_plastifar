@@ -422,23 +422,23 @@ export function TicketsPage() {
                             {t.subject}
                           </div>
                           <div className="text-[11.5px] text-subtle">
-                            {t.topicName}
+                            {t.topicName || "Sin motivo"}
                             {t.productLineName && ` · ${t.productLineName}`}
                           </div>
                         </Td>
 
                         {/* Cliente */}
                         <Td className="max-w-[200px]">
-                          <div className="truncate font-medium text-ink" title={t.clientName}>
-                            {t.clientName}
+                          <div className="truncate font-medium text-ink" title={t.clientName || "Sin cliente"}>
+                            {t.clientName || "Sin cliente"}
                           </div>
                           <div className="text-[11.5px] text-subtle">
-                            {t.contactName ?? t.clientCode}
+                            {t.contactName ?? t.clientCode ?? "—"}
                           </div>
                         </Td>
 
                         {/* Departamento */}
-                        <Td className="whitespace-nowrap text-subtle">{t.departmentName}</Td>
+                        <Td className="whitespace-nowrap text-subtle">{t.departmentName || "Sin departamento"}</Td>
 
                         {/* Prioridad */}
                         <Td className="whitespace-nowrap">
