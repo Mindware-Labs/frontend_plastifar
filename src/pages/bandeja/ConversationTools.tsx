@@ -81,7 +81,7 @@ function AssignWithNoteModal({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="assign-modal-note" className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">
+          <label htmlFor="assign-modal-note" className="font-heading text-[11.5px] font-semibold text-faint">
             Nota interna (opcional)
           </label>
           <textarea
