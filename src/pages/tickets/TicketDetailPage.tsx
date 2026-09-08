@@ -612,23 +612,36 @@ export function TicketDetailPage() {
                 timeline.map((item, idx) => {
                   if (item.kind === "event") {
                     const evt = item.data;
+                    const isBreach =
+                      evt.eventType === "SlaBreached" ||
+                      Boolean(evt.details?.toLowerCase().includes("incumplimiento de sla"));
                     return (
                       <div
                         key={`evt-${evt.id}-${idx}`}
                         className="my-3 flex items-center justify-center gap-2 text-xs text-subtle"
                       >
-                        <span className="h-px flex-1 bg-line-soft" />
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-line-soft bg-white px-3 py-1 text-[11px] shadow-2xs">
-                          <CheckCircle2 className="h-3 w-3 text-brand-red" />
-                          <span className="font-medium text-ink">
+                        <span className={`h-px flex-1 ${isBreach ? "bg-red-200" : "bg-line-soft"}`} />
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] shadow-2xs ${
+                            isBreach
+                              ? "border-red-300 bg-red-50 text-red-700 font-semibold"
+                              : "border-line-soft bg-white text-ink"
+                          }`}
+                        >
+                          {isBreach ? (
+                            <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3 text-brand-red" />
+                          )}
+                          <span className={isBreach ? "text-red-900" : "font-medium text-ink"}>
                             {evt.actorStaffName ?? "Sistema"}:
                           </span>
                           <span>{evt.details ?? evt.eventType}</span>
-                          <span className="text-subtle/70">
+                          <span className={isBreach ? "text-red-500 font-normal" : "text-subtle/70"}>
                             ({formatDateTime(evt.createdAt)})
                           </span>
                         </span>
-                        <span className="h-px flex-1 bg-line-soft" />
+                        <span className={`h-px flex-1 ${isBreach ? "bg-red-200" : "bg-line-soft"}`} />
                       </div>
                     );
                   }
