@@ -398,6 +398,99 @@ export interface TicketQuery {
   dir?: "asc" | "desc";
 }
 
+export interface TicketAttachmentResponse {
+  id: number;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  ticketMessageId: number | null;
+  uploadedByStaffId: number | null;
+  uploadedByStaffName: string | null;
+  createdAt: string;
+}
+
+export interface TicketMessageResponse {
+  id: number;
+  ticketId: number;
+  direction: string;
+  authorStaffId: number | null;
+  authorStaffName: string | null;
+  authorContactId: number | null;
+  authorContactName: string | null;
+  bodyHtml: string | null;
+  bodyText: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  attachments: TicketAttachmentResponse[];
+}
+
+export interface TicketEventResponse {
+  id: number;
+  ticketId: number;
+  eventType: string;
+  actorStaffId: number | null;
+  actorStaffName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  details: string | null;
+  createdAt: string;
+}
+
+export interface TicketWatcherResponse {
+  id: number;
+  ticketId: number;
+  staffId: number;
+  staffName: string;
+  staffEmail: string;
+  createdAt: string;
+}
+
+export interface TicketDetailResponse {
+  id: number;
+  number: string;
+  subject: string;
+  topicId: number;
+  topicName: string;
+  clientId: number;
+  clientName: string;
+  clientCode: string;
+  contactId: number | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  departmentId: number;
+  departmentName: string;
+  productLineId: number | null;
+  productLineName: string | null;
+  priority: string;
+  status: string;
+  channel: string;
+  assignedStaffId: number | null;
+  assignedStaffName: string | null;
+  createdByStaffId: number | null;
+  createdByStaffName: string | null;
+  firstResponseDueAt: string | null;
+  resolutionDueAt: string | null;
+  firstResponseAt: string | null;
+  pausedAt: string | null;
+  pausedMinutes: number;
+  resolvedAt: string | null;
+  closedAt: string | null;
+  reopenedCount: number;
+  lastActivityAt: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: TicketMessageResponse[];
+  events: TicketEventResponse[];
+  watchers: TicketWatcherResponse[];
+  attachments: TicketAttachmentResponse[];
+  requesterEmail?: string | null;
+  requesterName?: string | null;
+  // Campos retrocompatibles
+  code?: string;
+  source?: string;
+}
+
 export interface TicketEmailResponse {
   id: number;
   direction: string;
@@ -409,21 +502,5 @@ export interface TicketEmailResponse {
   bodyText: string | null;
   createdAt: string;
   attachments: EmailAttachmentResponse[];
-}
-
-export interface TicketDetailResponse {
-  id: number;
-  code: string;
-  subject: string;
-  status: string;
-  priority: string;
-  source: string;
-  requesterEmail: string;
-  requesterName: string | null;
-  departmentId: number | null;
-  assignedStaffId: number | null;
-  createdAt: string;
-  updatedAt: string;
-  emails: TicketEmailResponse[];
 }
 

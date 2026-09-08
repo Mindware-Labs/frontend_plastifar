@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
-import type { ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
+import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
 
 /**
  * Tabla de listado del panel. Sin tarjeta: la tabla es la pagina y solo lleva
@@ -59,17 +59,18 @@ export function Th({ sort, className = "", children, ...props }: ThProps) {
   );
 }
 
-interface RowProps {
+interface RowProps extends HTMLAttributes<HTMLTableRowElement> {
   /** Atenuada mientras una accion sobre ella esta en curso. */
   busy?: boolean;
   children: ReactNode;
 }
 
-export function Row({ busy = false, children }: RowProps) {
+export function Row({ busy = false, className = "", children, ...props }: RowProps) {
   return (
     <tr
       className={`border-b border-line-soft transition-colors last:border-0 hover:bg-canvas
-        [&>td:first-child]:pl-0 [&>td:last-child]:pr-0 ${busy ? "opacity-50" : ""}`}
+        [&>td:first-child]:pl-0 [&>td:last-child]:pr-0 ${busy ? "opacity-50" : ""} ${className}`}
+      {...props}
     >
       {children}
     </tr>

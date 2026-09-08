@@ -1,5 +1,6 @@
 import { Clock, Ticket as TicketIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -62,6 +63,7 @@ function priorityBadgeClass(priority: string) {
 
 
 export function TicketsPage() {
+  const navigate = useNavigate();
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<TicketFilterKey>("todos");
@@ -214,7 +216,11 @@ export function TicketsPage() {
                   rows.map((t) => {
                     const sla = formatSlaRemaining(t.resolutionDueAt, Boolean(t.pausedAt));
                     return (
-                      <Row key={t.id}>
+                      <Row
+                        key={t.id}
+                        onClick={() => navigate(`/tickets/${t.id}`)}
+                        className="cursor-pointer hover:bg-slate-50/80 transition-colors"
+                      >
                         {/* Número */}
                         <Td className="whitespace-nowrap font-mono text-[12px] font-semibold text-ink">
                           {t.number}
