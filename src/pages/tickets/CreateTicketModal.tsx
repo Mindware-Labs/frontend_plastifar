@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   Building2,
   CheckCircle2,
+  Flag,
   Info,
   Mail,
   MessageSquareText,
@@ -91,6 +92,28 @@ const PRIORITIES = [
 
 const FORM_ID = "create-ticket-form";
 
+/**
+ * Los correos en texto plano suelen venir con saltos de linea forzados cada
+ * ~70-80 caracteres (formato clasico de cliente de correo). Si se pegan tal
+ * cual en el textarea, cada salto corta el parrafo aunque sobre ancho: el
+ * cuadro nunca aprovecha su ancho real. Se reconstruyen los parrafos uniendo
+ * lineas sueltas con espacio y conservando solo los saltos entre parrafos
+ * (linea en blanco), para que el textarea vuelva a ajustar el texto solo.
+ */
+function reflowPlainText(text: string): string {
+  return text
+    .replace(/\r\n/g, "\n")
+    .split(/\n{2,}/)
+    .map((paragraph) =>
+      paragraph
+        .split("\n")
+        .map((line) => line.trim())
+        .join(" ")
+        .trim(),
+    )
+    .join("\n\n");
+}
+
 /** Crece o encoge con el contenido: nunca queda con scroll propio. */
 function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
   if (!textarea) return;
@@ -116,6 +139,11 @@ export function CreateTicketModal({
   const [formError, setFormError] = useState<string | null>(null);
   const [detectedMatch, setDetectedMatch] = useState<{ clientName: string; contactName: string } | null>(null);
   const { isExiting, requestClose } = useModalAnimation(onClose, 220);
+
+  const normalizedInitialMessage = useMemo(
+    () => (initialMessage ? reflowPlainText(initialMessage) : ""),
+    [initialMessage],
+  );
 
   const panelRef = useRef<HTMLDivElement>(null);
   const messageTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -144,7 +172,7 @@ export function CreateTicketModal({
       priority: "Normal",
       departmentId: "",
       assignedStaffId: initialAssignedStaffId ? String(initialAssignedStaffId) : "",
-      initialMessage: initialMessage ?? "",
+      initialMessage: normalizedInitialMessage,
     },
   });
 
@@ -241,7 +269,7 @@ export function CreateTicketModal({
   }
 
   function handleResetMessage() {
-    setValue("initialMessage", initialMessage ?? "");
+    setValue("initialMessage", normalizedInitialMessage);
   }
 
   async function onSubmit(values: FormValues) {
@@ -307,7 +335,7 @@ export function CreateTicketModal({
             </div>
             <div>
               <h2 id={titleId} className="font-heading text-[16px] font-bold tracking-[-0.01em] text-ink">
-                {emailId ? "Convertir correo a ticket" : "Nuevo ticket"}
+                {emailId ? "Crear ticket desde correo" : "Nuevo ticket"}
               </h2>
               <p id={descriptionId} className="mt-0.5 max-w-[48ch] text-[12px] leading-relaxed text-subtle">
                 {emailId
@@ -383,28 +411,32 @@ export function CreateTicketModal({
                 </div>
               )}
 
-              {/* Asunto: campo protagonista, en su propia línea */}
-              <TextField
-                id="ticket-subject"
-                label="Asunto del ticket"
-                required
-                maxLength={200}
-                hint={
-                  <span className="flex items-center justify-between text-[11px] text-faint">
-                    <span>Resumen claro y conciso de la solicitud.</span>
-                    <span className="font-mono">{currentSubject.length}/200</span>
-                  </span>
-                }
-                placeholder="Ej: Solicitud de cotización de empaques biodegradables…"
-                state={stateOf("subject")}
-                error={errors.subject?.message}
-                {...register("subject")}
-              />
+              {/* Asunto: campo protagonista, en su propia línea. El mismo inset horizontal
+                  (px-4) que el padding interno de las tarjetas de abajo, para que su label
+                  e input arranquen alineados con los campos de Motivo, Cliente, etc. */}
+              <div className="px-4">
+                <TextField
+                  id="ticket-subject"
+                  label="Asunto del ticket"
+                  required
+                  maxLength={200}
+                  hint={
+                    <span className="flex items-center justify-between text-[11px] text-faint">
+                      <span>Resumen claro y conciso de la solicitud.</span>
+                      <span className="font-mono">{currentSubject.length}/200</span>
+                    </span>
+                  }
+                  placeholder="Ej: Solicitud de cotización de empaques biodegradables…"
+                  state={stateOf("subject")}
+                  error={errors.subject?.message}
+                  {...register("subject")}
+                />
+              </div>
 
               {/* Clasificación: Motivo, Departamento y Responsable */}
               <div className="space-y-3.5 rounded-edge border border-line-soft bg-canvas/40 p-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="flex items-center gap-1.5 font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-ink">
+                  <h4 className="flex items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink">
                     <Tag className="h-3.5 w-3.5 text-brand-red" />
                     Clasificación y enrutamiento
                   </h4>
@@ -423,9 +455,9 @@ export function CreateTicketModal({
                         onChange={field.onChange}
                         state={stateOf("topicId")}
                         error={errors.topicId?.message}
-                        placeholder="— Sin motivo asignado —"
+                        placeholder="Aún sin motivo"
                         options={[
-                          { value: "", label: "— Sin motivo (opcional) —" },
+                          { value: "", label: "Aún sin motivo" },
                           ...(catalogs?.topics ?? []).map((t) => ({
                             value: String(t.id),
                             label: t.name,
@@ -444,9 +476,9 @@ export function CreateTicketModal({
                         size="sm"
                         value={field.value ?? ""}
                         onChange={field.onChange}
-                        placeholder="— Sin departamento asignado —"
+                        placeholder="Aún sin departamento"
                         options={[
-                          { value: "", label: "— Sin departamento (opcional) —" },
+                          { value: "", label: "Aún sin departamento" },
                           ...(catalogs?.departments ?? []).map((d) => ({
                             value: String(d.id),
                             label: d.name,
@@ -457,59 +489,58 @@ export function CreateTicketModal({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                  <Controller
-                    control={control}
-                    name="assignedStaffId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Asignar a colaborador"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder="— Sin asignar (en cola general) —"
-                        options={[
-                          { value: "", label: "— Sin asignar (en cola) —" },
-                          ...(catalogs?.assignableStaff ?? []).map((s) => ({
-                            value: String(s.id),
-                            label: s.fullName,
-                          })),
-                        ]}
-                      />
-                    )}
-                  />
+                <Controller
+                  control={control}
+                  name="assignedStaffId"
+                  render={({ field }) => (
+                    <SelectField
+                      label="Asignar a colaborador"
+                      size="sm"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="Sin asignar, en cola general"
+                      options={[
+                        { value: "", label: "Sin asignar, en cola general" },
+                        ...(catalogs?.assignableStaff ?? []).map((s) => ({
+                          value: String(s.id),
+                          label: s.fullName,
+                        })),
+                      ]}
+                    />
+                  )}
+                />
 
-                  <Controller
-                    control={control}
-                    name="productLineId"
-                    render={({ field }) => (
-                      <SelectField
-                        label={requiresProductLine ? "Línea de producto *" : "Línea de producto"}
-                        size="sm"
-                        required={requiresProductLine}
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        state={requiresProductLine && !field.value ? stateOf("productLineId") : "idle"}
-                        error={errors.productLineId?.message}
-                        placeholder="— Seleccionar línea —"
-                        options={[
-                          { value: "", label: "— Ninguna línea —" },
-                          ...(catalogs?.productLines ?? []).map((pl) => ({
-                            value: String(pl.id),
-                            label: `${pl.name} (${pl.code})`,
-                          })),
-                        ]}
-                      />
-                    )}
-                  />
-                </div>
+                <Controller
+                  control={control}
+                  name="productLineId"
+                  render={({ field }) => (
+                    <SelectField
+                      label={requiresProductLine ? "Línea de producto *" : "Línea de producto"}
+                      size="sm"
+                      required={requiresProductLine}
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      state={requiresProductLine && !field.value ? stateOf("productLineId") : "idle"}
+                      error={errors.productLineId?.message}
+                      placeholder="Selecciona una línea"
+                      options={[
+                        { value: "", label: "Aún sin línea" },
+                        ...(catalogs?.productLines ?? []).map((pl) => ({
+                          value: String(pl.id),
+                          label: `${pl.name} (${pl.code})`,
+                        })),
+                      ]}
+                    />
+                  )}
+                />
               </div>
 
               {/* Prioridad, debajo de clasificación y enrutamiento */}
-              <div className="flex flex-col gap-1.5">
-                <label className="font-heading text-[11.5px] font-semibold text-faint">
+              <div className="space-y-3 rounded-edge border border-line-soft bg-canvas/40 p-4">
+                <h4 className="flex items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink">
+                  <Flag className="h-3.5 w-3.5 text-brand-red" />
                   Nivel de prioridad
-                </label>
+                </h4>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {PRIORITIES.map((p) => {
                     const isSelected = selectedPriority === p.value;
@@ -538,7 +569,7 @@ export function CreateTicketModal({
               {/* Vinculación de Cliente & Contacto */}
               <div className="space-y-3 rounded-edge border border-line-soft bg-canvas/40 p-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="flex items-center gap-1.5 font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-ink">
+                  <h4 className="flex items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink">
                     <Building2 className="h-3.5 w-3.5 text-brand-red" />
                     Cliente y contacto comercial
                   </h4>
@@ -573,58 +604,56 @@ export function CreateTicketModal({
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                  <Controller
-                    control={control}
-                    name="clientId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Cliente registrado"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        state={stateOf("clientId")}
-                        error={errors.clientId?.message}
-                        placeholder="— Sin cliente asociado —"
-                        options={[
-                          { value: "", label: "— Sin cliente asociado —" },
-                          ...(catalogs?.clients ?? []).map((c) => ({
-                            value: String(c.id),
-                            label: `${c.name} (${c.code})`,
-                          })),
-                        ]}
-                      />
-                    )}
-                  />
+                <Controller
+                  control={control}
+                  name="clientId"
+                  render={({ field }) => (
+                    <SelectField
+                      label="Cliente registrado"
+                      size="sm"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      state={stateOf("clientId")}
+                      error={errors.clientId?.message}
+                      placeholder="Aún sin cliente asociado"
+                      options={[
+                        { value: "", label: "Aún sin cliente asociado" },
+                        ...(catalogs?.clients ?? []).map((c) => ({
+                          value: String(c.id),
+                          label: `${c.name} (${c.code})`,
+                        })),
+                      ]}
+                    />
+                  )}
+                />
 
-                  <Controller
-                    control={control}
-                    name="contactId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Contacto del cliente"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder={
-                          contactOptions.length === 0
-                            ? "Sin contactos registrados"
-                            : "— Sin contacto específico —"
-                        }
-                        disabled={contactOptions.length === 0}
-                        options={[
-                          { value: "", label: "— Sin contacto específico —" },
-                          ...contactOptions.map((k) => ({
-                            value: String(k.id),
-                            label: `${k.fullName}${k.isPrimary ? " (Principal)" : ""}${
-                              k.email ? ` · ${k.email}` : ""
-                            }`,
-                          })),
-                        ]}
-                      />
-                    )}
-                  />
-                </div>
+                <Controller
+                  control={control}
+                  name="contactId"
+                  render={({ field }) => (
+                    <SelectField
+                      label="Contacto del cliente"
+                      size="sm"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder={
+                        contactOptions.length === 0
+                          ? "Aún no hay contactos registrados"
+                          : "Aún sin contacto específico"
+                      }
+                      disabled={contactOptions.length === 0}
+                      options={[
+                        { value: "", label: "Aún sin contacto específico" },
+                        ...contactOptions.map((k) => ({
+                          value: String(k.id),
+                          label: `${k.fullName}${k.isPrimary ? " (Principal)" : ""}${
+                            k.email ? ` · ${k.email}` : ""
+                          }`,
+                        })),
+                      ]}
+                    />
+                  )}
+                />
 
                 {!selectedClientId && (
                   <p className="flex items-center gap-1.5 text-[11px] text-faint">
@@ -640,7 +669,7 @@ export function CreateTicketModal({
                   <div className="min-w-0">
                     <label
                       htmlFor="ticket-initial-message"
-                      className="flex cursor-pointer items-center gap-1.5 font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-ink"
+                      className="flex cursor-pointer items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink"
                     >
                       <MessageSquareText className="h-3.5 w-3.5 text-brand-red" />
                       {emailId ? "Mensaje inicial del ticket" : "Descripción de la incidencia"}
@@ -654,7 +683,7 @@ export function CreateTicketModal({
                   <span className="shrink-0 text-[10.5px] text-faint">Opcional</span>
                 </div>
 
-                {initialMessage && currentMessage !== initialMessage && (
+                {normalizedInitialMessage && currentMessage !== normalizedInitialMessage && (
                   <button
                     type="button"
                     onClick={handleResetMessage}

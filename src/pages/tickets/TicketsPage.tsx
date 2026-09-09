@@ -1,5 +1,6 @@
-import { Clock, Flag, Plus, Ticket as TicketIcon, UserCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Clock, Flag, Plus, SlidersHorizontal, Ticket as TicketIcon, UserCheck } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
@@ -41,6 +42,13 @@ const filters: { key: TicketFilterKey; label: string; countKey: keyof TicketCoun
   { key: "cerrados", label: "Cerrados", countKey: "closed" },
 ];
 
+// Las pastillas nunca deben partirse a una segunda línea: solo se muestran fijas
+// las 3 vistas más usadas en la operación diaria; el resto vive detrás del botón
+// de filtros (mismo patrón que el ícono de filtros de la bandeja de correo).
+const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos", "vencidos"];
+const primaryFilters = filters.filter((f) => PRIMARY_FILTER_KEYS.includes(f.key));
+const secondaryFilters = filters.filter((f) => !PRIMARY_FILTER_KEYS.includes(f.key));
+
 const columns: { key: SortKey; label: string }[] = [
   { key: "numero", label: "Número" },
   { key: "asunto", label: "Asunto / Motivo" },
@@ -67,6 +75,139 @@ function priorityBadgeClass(priority: string) {
   }
 }
 
+const STATUS_MENU_WIDTH = 224;
+
+interface TicketStatusMenuProps {
+  options: { key: TicketFilterKey; label: string; countKey: keyof TicketCounts }[];
+  activeKey: TicketFilterKey;
+  counts?: TicketCounts;
+  onSelect: (key: TicketFilterKey) => void;
+}
+
+/** Botón de filtros con panel flotante para las vistas de estado menos usadas
+ * (mismo patrón que el ícono de filtros de la bandeja de correo). */
+function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatusMenuProps) {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+  const activeInMenu = options.some((option) => option.key === activeKey);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+    function handleViewportChange() {
+      setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener("resize", handleViewportChange);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener("resize", handleViewportChange);
+    };
+  }, [open]);
+
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setAnchor({ top: rect.bottom + 6, left: Math.max(8, rect.right - STATUS_MENU_WIDTH) });
+    setOpen(true);
+  }
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={toggle}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
+        aria-label={activeInMenu ? `Más filtros (activo: ${options.find((o) => o.key === activeKey)?.label})` : "Más filtros"}
+        title="Más filtros"
+        data-active={activeInMenu}
+        className="relative flex h-8 w-8 items-center justify-center rounded-edge border border-line-strong
+          bg-white text-brand-gray outline-none transition-all duration-150 hover:border-zinc-400 hover:text-ink
+          active:scale-95 focus-visible:border-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/10
+          data-[active=true]:border-brand-red/40 data-[active=true]:text-brand-red-dark
+          aria-expanded:bg-fill aria-expanded:text-ink"
+      >
+        <SlidersHorizontal className="h-4 w-4" />
+        {activeInMenu && (
+          <span
+            aria-hidden
+            className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-brand-red"
+          />
+        )}
+      </button>
+
+      {open &&
+        anchor &&
+        createPortal(
+          <div
+            ref={panelRef}
+            id={panelId}
+            role="menu"
+            aria-label="Más filtros de estado"
+            style={{ position: "fixed", top: anchor.top, left: anchor.left, width: STATUS_MENU_WIDTH }}
+            className="animate-plf-popover-in z-[60] flex flex-col gap-0.5 rounded-edge border border-line/90
+              bg-white p-1.5 shadow-[0_4px_16px_-2px_rgba(27,27,29,0.08),0_12px_32px_-4px_rgba(27,27,29,0.14)]"
+          >
+            {options.map(({ key, label, countKey }) => {
+              const isActive = key === activeKey;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={isActive}
+                  onClick={() => {
+                    onSelect(key);
+                    setOpen(false);
+                  }}
+                  className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge px-2.5 py-1.5
+                    text-left text-[12.5px] font-medium transition-colors ${
+                      isActive ? "bg-brand-red/[0.06] text-brand-red-dark" : "text-ink hover:bg-fill"
+                    }`}
+                >
+                  <span>{label}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-px text-[11px] font-semibold ${
+                      isActive ? "bg-brand-red/15 text-brand-red-dark" : "bg-fill text-subtle"
+                    }`}
+                  >
+                    {counts?.[countKey] ?? 0}
+                  </span>
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
 
 export function TicketsPage() {
   const navigate = useNavigate();
@@ -267,7 +408,7 @@ export function TicketsPage() {
             value={search}
             onChange={setSearch}
             placeholder="Buscar por número, asunto o cliente…"
-            className="w-[260px]"
+            className="min-w-[200px] flex-1"
           />
 
           <Select
@@ -302,7 +443,7 @@ export function TicketsPage() {
 
           <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-          {filters.map(({ key, label, countKey }) => (
+          {primaryFilters.map(({ key, label, countKey }) => (
             <FilterChip
               key={key}
               label={label}
@@ -311,6 +452,13 @@ export function TicketsPage() {
               onClick={() => setFilter(key)}
             />
           ))}
+
+          <TicketStatusMenu
+            options={secondaryFilters}
+            activeKey={filter}
+            counts={counts}
+            onSelect={setFilter}
+          />
         </div>
 
         {bulkFeedback && (
