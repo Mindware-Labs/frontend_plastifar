@@ -41,11 +41,11 @@ export function Th({ sort, className = "", children, ...props }: ThProps) {
         <button
           type="button"
           onClick={sort.onToggle}
-          className="inline-flex items-center gap-1.5 transition-colors hover:text-ink"
+          className="group inline-flex items-center gap-1.5 transition-colors hover:text-ink"
         >
           {children}
           {sort.dir === null ? (
-            <ChevronsUpDown className="h-3 w-3" />
+            <ChevronsUpDown className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
           ) : sort.dir === "asc" ? (
             <ChevronUp className="h-3 w-3 text-brand-red" />
           ) : (

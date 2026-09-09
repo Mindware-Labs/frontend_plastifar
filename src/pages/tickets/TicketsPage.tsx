@@ -1,4 +1,4 @@
-import { Clock, Flag, Plus, SlidersHorizontal, Ticket as TicketIcon, UserCheck } from "lucide-react";
+import { Clock, Flag, Info, MousePointerClick, Plus, SlidersHorizontal, Ticket as TicketIcon, UserCheck } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -209,6 +209,93 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
   );
 }
 
+/** Señal discreta junto al resumen del encabezado: al hacer clic despliega el
+ * aviso de que las filas de la tabla son interactivas y abren el detalle. */
+function RowClickHint() {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+    function handleViewportChange() {
+      setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener("resize", handleViewportChange);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener("resize", handleViewportChange);
+    };
+  }, [open]);
+
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setAnchor({ top: rect.bottom + 8, left: rect.left });
+    setOpen(true);
+  }
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
+        aria-label="Cómo ver el detalle de un ticket"
+        className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-red/15 text-brand-red-dark
+          outline-none transition-colors hover:bg-brand-red/25 focus-visible:ring-2 focus-visible:ring-brand-red/25
+          cursor-pointer animate-pulse"
+      >
+        <Info className="h-2.5 w-2.5" />
+      </button>
+
+      {open &&
+        anchor &&
+        createPortal(
+          <div
+            ref={panelRef}
+            id={panelId}
+            role="tooltip"
+            style={{ position: "fixed", top: anchor.top, left: anchor.left, width: 230 }}
+            className="animate-plf-popover-in z-[60] flex items-start gap-1.5 rounded-edge border border-line/90
+              bg-white p-2.5 text-[11.5px] leading-relaxed text-subtle
+              shadow-[0_4px_16px_-2px_rgba(27,27,29,0.08),0_12px_32px_-4px_rgba(27,27,29,0.14)]"
+          >
+            <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-brand-red" />
+            Haz clic en una fila para ver todos los detalles del ticket.
+          </div>,
+          document.body,
+        )}
+    </span>
+  );
+}
+
 export function TicketsPage() {
   const navigate = useNavigate();
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
@@ -389,9 +476,14 @@ export function TicketsPage() {
       <ModuleHeader
         title="Tickets"
         summary={
-          counts
-            ? `${counts.all} tickets · ${counts.open} abiertos · ${counts.overdue} vencidos · ${counts.waitingOnClient} en espera`
-            : "Cargando bandeja de tickets…"
+          counts ? (
+            <span className="inline-flex items-center gap-1.5">
+              {`${counts.all} tickets · ${counts.open} abiertos · ${counts.overdue} vencidos · ${counts.waitingOnClient} en espera`}
+              <RowClickHint />
+            </span>
+          ) : (
+            "Cargando bandeja de tickets…"
+          )
         }
         action={
           <Button size="sm" onClick={() => setCreateModalOpen(true)}>
@@ -428,7 +520,7 @@ export function TicketsPage() {
 
           <Select
             size="sm"
-            className="w-[150px]"
+            className="w-[200px]"
             aria-label="Filtrar por prioridad"
             value={priority}
             onChange={(next) => setPriority(next)}
@@ -541,9 +633,7 @@ export function TicketsPage() {
                       <Row
                         key={t.id}
                         onClick={() => navigate(`/tickets/${t.id}`)}
-                        className={`cursor-pointer hover:bg-slate-50/80 transition-colors ${
-                          selectedIds.has(t.id) ? "bg-red-50/30" : ""
-                        }`}
+                        className={`cursor-pointer ${selectedIds.has(t.id) ? "bg-brand-red/[0.03]" : ""}`}
                       >
                         {/* Selección */}
                         <Td
@@ -588,7 +678,14 @@ export function TicketsPage() {
                         </Td>
 
                         {/* Departamento */}
-                        <Td className="whitespace-nowrap text-subtle">{t.departmentName || "Sin departamento"}</Td>
+                        <Td className="max-w-[160px]">
+                          <div
+                            className="truncate text-[12.5px] text-subtle"
+                            title={t.departmentName || "Sin departamento"}
+                          >
+                            {t.departmentName || "Sin departamento"}
+                          </div>
+                        </Td>
 
                         {/* Prioridad */}
                         <Td className="whitespace-nowrap">
@@ -628,16 +725,16 @@ export function TicketsPage() {
                               </span>
                             </Badge>
                           ) : sla.tone === "warning" ? (
-                            <span className="inline-flex h-[22px] items-center whitespace-nowrap rounded-full bg-amber-500/10 px-2.5 text-[11.5px] font-semibold text-amber-800">
-                              <Clock className="mr-1 h-3 w-3" />
-                              {sla.text}
-                            </span>
+                            <Badge tone="amber">
+                              <span className="inline-flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {sla.text}
+                              </span>
+                            </Badge>
                           ) : sla.tone === "paused" ? (
-                            <span className="inline-flex h-[22px] items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 text-[11.5px] font-semibold text-slate-600">
-                              {sla.text}
-                            </span>
+                            <Badge tone="slate">{sla.text}</Badge>
                           ) : (
-                            <span className="text-[11.5px] text-subtle">{sla.text}</span>
+                            <Badge tone="neutral">{sla.text}</Badge>
                           )}
                         </Td>
 
@@ -647,11 +744,13 @@ export function TicketsPage() {
                         </Td>
 
                         {/* Asignado */}
-                        <Td className="whitespace-nowrap text-[12px]">
+                        <Td className="max-w-[160px] text-[12px]">
                           {t.assignedStaffName ? (
-                            <span className="font-medium text-ink">{t.assignedStaffName}</span>
+                            <div className="truncate font-medium text-ink" title={t.assignedStaffName}>
+                              {t.assignedStaffName}
+                            </div>
                           ) : (
-                            <span className="text-subtle/70 italic">Sin asignar</span>
+                            <span className="text-subtle/70">Sin asignar</span>
                           )}
                         </Td>
                       </Row>
