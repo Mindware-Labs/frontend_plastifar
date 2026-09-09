@@ -281,7 +281,7 @@ export function Select({
         onKeyDown={handleKeyDown}
         className={`${
           isSubtle
-            ? "w-full rounded-edge border text-left outline-none transition-all disabled:cursor-not-allowed disabled:bg-canvas disabled:text-muted"
+            ? "w-full rounded-edge border text-left outline-none transition-all disabled:cursor-not-allowed disabled:bg-canvas disabled:text-faint"
             : ""
         } ${triggerVariantClass} ${sizeClass} ${paddingClass}
           flex items-center justify-between font-medium

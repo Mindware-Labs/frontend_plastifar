@@ -125,9 +125,7 @@ export function formatInitials(
   return "PF";
 }
 
-/**
- * Calcula el tiempo restante o vencido de un compromiso de SLA para la bandeja (RF-T6).
- */
+/** Calcula el tiempo restante o vencido de un compromiso de SLA para la bandeja. */
 export function formatSlaRemaining(
   dueAtIso: string | null,
   isPaused: boolean,

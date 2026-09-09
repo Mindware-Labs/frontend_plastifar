@@ -6,15 +6,19 @@ import {
   Clock,
   Download,
   FileText,
+  History,
+  Info,
   Lock,
   Mail,
   Package,
   Paperclip,
   Pencil,
   Phone,
+  RefreshCw,
   RotateCcw,
   Send,
   ShieldAlert,
+  Tag,
   User,
   UserCheck,
   X,
@@ -26,6 +30,7 @@ import { useEmailCounts } from "../../context/useEmailCounts";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { SelectField, TextField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
 import { formatDateTime, formatSlaRemaining } from "../../lib/format";
@@ -82,6 +87,133 @@ type TimelineItem =
   | { kind: "message"; data: TicketMessageResponse; createdAt: string }
   | { kind: "event"; data: TicketEventResponse; createdAt: string };
 
+const MAX_SINGLE_ATTACHMENT = 10 * 1024 * 1024;
+const MAX_TOTAL_ATTACHMENTS = 25 * 1024 * 1024;
+
+/** Valida un lote nuevo de adjuntos contra el limite individual y el total acumulado. */
+function validateAttachments(chosen: File[], existing: File[]): string | null {
+  const oversized = chosen.find((f) => f.size > MAX_SINGLE_ATTACHMENT);
+  if (oversized) return `El archivo "${oversized.name}" supera el límite individual de 10 MB.`;
+
+  const currentTotal = existing.reduce((acc, f) => acc + f.size, 0);
+  const newTotal = chosen.reduce((acc, f) => acc + f.size, 0);
+  if (currentTotal + newTotal > MAX_TOTAL_ATTACHMENTS) {
+    return "El total de los adjuntos excede los 25 MB permitidos por mensaje.";
+  }
+  return null;
+}
+
+/** Estados alcanzables desde el estado actual, para el selector del redactor de respuestas. */
+function nextStatusOptions(status: string): string[] {
+  switch (status) {
+    case "Abierto":
+      return ["En espera del cliente", "Reenvío de producto", "Solucionado"];
+    case "En espera del cliente":
+      return ["Abierto"];
+    case "Reenvío de producto":
+      return ["Solucionado"];
+    default:
+      return [];
+  }
+}
+
+/** Categorías de cierre para un ticket solucionado (sin catálogo propio en el backend
+ * aún: se envían como parte del texto de motivo, visible en el historial del ticket). */
+const SOLUTION_TYPES = [
+  "Consulta resuelta",
+  "Reemplazo de producto",
+  "Reenvío del pedido",
+  "Reembolso",
+  "Corrección de información",
+  "Otro",
+];
+
+interface StatusTransitionOption {
+  target: string;
+  label: string;
+  description: string;
+  icon: typeof Clock;
+  danger?: boolean;
+}
+
+/** Transiciones válidas desde el estado actual, para el modal "Actualizar ticket"
+ * (sustituye a los botones sueltos de En espera / Reenvío / Solucionar / Cancelar). */
+function getAvailableTransitions(status: string): StatusTransitionOption[] {
+  switch (status) {
+    case "Abierto":
+      return [
+        {
+          target: "En espera del cliente",
+          label: "Poner en espera del cliente",
+          description: "Pausa el SLA mientras se espera respuesta del cliente.",
+          icon: Clock,
+        },
+        {
+          target: "Reenvío de producto",
+          label: "Marcar para reenvío de producto",
+          description: "Se gestiona un reenvío físico del producto.",
+          icon: Package,
+        },
+        {
+          target: "Solucionado",
+          label: "Marcar como solucionado",
+          description: "Requiere haber enviado antes al menos una respuesta al cliente.",
+          icon: CheckCircle2,
+        },
+        {
+          target: "Cancelado",
+          label: "Cancelar ticket",
+          description: "Cierre definitivo; exige un motivo explicativo.",
+          icon: X,
+          danger: true,
+        },
+      ];
+    case "En espera del cliente":
+      return [
+        {
+          target: "Abierto",
+          label: "Reanudar a Abierto",
+          description: "Reanuda la atención y el cómputo de SLA.",
+          icon: RotateCcw,
+        },
+        {
+          target: "Cancelado",
+          label: "Cancelar ticket",
+          description: "Cierre definitivo; exige un motivo explicativo.",
+          icon: X,
+          danger: true,
+        },
+      ];
+    case "Reenvío de producto":
+      return [
+        {
+          target: "Solucionado",
+          label: "Marcar como solucionado",
+          description: "Cierra el caso como resuelto.",
+          icon: CheckCircle2,
+        },
+        {
+          target: "Cancelado",
+          label: "Cancelar ticket",
+          description: "Cierre definitivo; exige un motivo explicativo.",
+          icon: X,
+          danger: true,
+        },
+      ];
+    case "Solucionado":
+      return [
+        {
+          target: "Abierto",
+          label: "Reabrir ticket",
+          description: "Incrementa el contador de reaperturas.",
+          icon: RotateCcw,
+        },
+      ];
+    default:
+      return [];
+  }
+}
+
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -93,16 +225,26 @@ export function TicketDetailPage() {
     ticketId ? null : "Identificador de ticket no válido.",
   );
 
-  // Composer state
-  const [direction, setDirection] = useState<"Saliente" | "Interna">("Saliente");
-  const [messageBody, setMessageBody] = useState("");
-  const [statusChange, setStatusChange] = useState<string>("");
-  const [attachments, setAttachments] = useState<File[]>([]);
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
-  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  // Navegación por pestañas: respuestas al cliente, notas internas
+  // (el timeline ya no es una pestaña: vive fijo en la columna derecha)
+  const [activeTab, setActiveTab] = useState<"respuestas" | "notas">("respuestas");
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Composer: Respuesta al cliente (modo correo)
+  const [replyBody, setReplyBody] = useState("");
+  const [replyStatusChange, setReplyStatusChange] = useState<string>("");
+  const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
+  const [replySending, setReplySending] = useState(false);
+  const [replySendError, setReplySendError] = useState<string | null>(null);
+  const replyFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Composer: Nota interna
+  const [noteBody, setNoteBody] = useState("");
+  const [noteAttachments, setNoteAttachments] = useState<File[]>([]);
+  const [noteSending, setNoteSending] = useState(false);
+  const [noteSendError, setNoteSendError] = useState<string | null>(null);
+  const noteFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const refreshTicket = useCallback(async () => {
     if (!ticketId) return;
@@ -174,34 +316,38 @@ export function TicketDetailPage() {
     };
   }, [ticketId, onTicketsChanged, onTicketStatusChanged, onTicketNewMessage, refreshTicket]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReplyFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const chosen = Array.from(e.target.files);
-
-    // Validación individual y total
-    const maxSingle = 10 * 1024 * 1024;
-    const maxTotal = 25 * 1024 * 1024;
-
-    const oversized = chosen.find((f) => f.size > maxSingle);
-    if (oversized) {
-      setSendError(`El archivo "${oversized.name}" supera el límite individual de 10 MB.`);
+    const err = validateAttachments(chosen, replyAttachments);
+    if (err) {
+      setReplySendError(err);
       return;
     }
-
-    const currentTotal = attachments.reduce((acc, f) => acc + f.size, 0);
-    const newTotal = chosen.reduce((acc, f) => acc + f.size, 0);
-    if (currentTotal + newTotal > maxTotal) {
-      setSendError("El total de los adjuntos excede los 25 MB permitidos por mensaje.");
-      return;
-    }
-
-    setSendError(null);
-    setAttachments((prev) => [...prev, ...chosen]);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    setReplySendError(null);
+    setReplyAttachments((prev) => [...prev, ...chosen]);
+    if (replyFileInputRef.current) replyFileInputRef.current.value = "";
   };
 
-  const removeFile = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  const removeReplyFile = (index: number) => {
+    setReplyAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleNoteFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const chosen = Array.from(e.target.files);
+    const err = validateAttachments(chosen, noteAttachments);
+    if (err) {
+      setNoteSendError(err);
+      return;
+    }
+    setNoteSendError(null);
+    setNoteAttachments((prev) => [...prev, ...chosen]);
+    if (noteFileInputRef.current) noteFileInputRef.current.value = "";
+  };
+
+  const removeNoteFile = (index: number) => {
+    setNoteAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleDownloadAttachment = async (attachment: TicketAttachmentResponse) => {
@@ -216,52 +362,84 @@ export function TicketDetailPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageBody.trim()) {
-      setSendError("Escribe el contenido del mensaje o nota.");
+    if (!replyBody.trim()) {
+      setReplySendError("Escribe el contenido de la respuesta.");
       return;
     }
 
     try {
-      setSending(true);
-      setSendError(null);
+      setReplySending(true);
+      setReplySendError(null);
 
       const formData = new FormData();
-      formData.append("Direction", direction);
-      formData.append("BodyText", messageBody.trim());
-      if (statusChange) {
-        formData.append("Status", statusChange);
+      formData.append("Direction", "Saliente");
+      formData.append("BodyText", replyBody.trim());
+      if (replyStatusChange) {
+        formData.append("Status", replyStatusChange);
       }
-      attachments.forEach((file) => {
+      replyAttachments.forEach((file) => {
         formData.append("Attachments", file);
       });
 
       await ticketsApi.createMessage(ticketId, formData);
 
-      // Limpiar formulario y recargar
-      setMessageBody("");
-      setAttachments([]);
-      setStatusChange("");
+      setReplyBody("");
+      setReplyAttachments([]);
+      setReplyStatusChange("");
       await refreshTicket();
     } catch (err) {
-      setSendError(
-        err instanceof Error ? err.message : "Ocurrió un error al enviar el mensaje.",
+      setReplySendError(
+        err instanceof Error ? err.message : "Ocurrió un error al enviar la respuesta.",
       );
     } finally {
-      setSending(false);
+      setReplySending(false);
     }
   };
 
-  // Status transitions state (Fase 4, tickets.close y sección 9.3)
+  const handleSaveNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!noteBody.trim()) {
+      setNoteSendError("Escribe el contenido de la nota.");
+      return;
+    }
+
+    try {
+      setNoteSending(true);
+      setNoteSendError(null);
+
+      const formData = new FormData();
+      formData.append("Direction", "Interna");
+      formData.append("BodyText", noteBody.trim());
+      noteAttachments.forEach((file) => {
+        formData.append("Attachments", file);
+      });
+
+      await ticketsApi.createMessage(ticketId, formData);
+
+      setNoteBody("");
+      setNoteAttachments([]);
+      await refreshTicket();
+    } catch (err) {
+      setNoteSendError(
+        err instanceof Error ? err.message : "Ocurrió un error al guardar la nota.",
+      );
+    } finally {
+      setNoteSending(false);
+    }
+  };
+
+  // Actualización de estado: un único modal reemplaza los botones sueltos de
+  // En espera / Reenvío / Solucionar / Cancelar.
   const [transitioning, setTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
+  const [updateTargetStatus, setUpdateTargetStatus] = useState<string>("");
+  const [updateSolutionType, setUpdateSolutionType] = useState<string>("");
+  const [updateComment, setUpdateComment] = useState("");
 
-  // Cancel modal state
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
-
-  // Assign modal state (Fase 4, tickets.assign y sección 9.4)
+  // Assign modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignableStaff, setAssignableStaff] = useState<TicketStaffOptionResponse[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
@@ -270,41 +448,58 @@ export function TicketDetailPage() {
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
 
-  const handleUpdateStatus = async (targetStatus: string, reason?: string) => {
-    try {
-      setTransitioning(true);
-      setTransitionError(null);
-      await ticketsApi.updateStatus(ticketId, { status: targetStatus, reason });
-      await refreshTicket();
-    } catch (err) {
-      setTransitionError(
-        err instanceof Error ? err.message : "Error al cambiar el estado del ticket.",
-      );
-    } finally {
-      setTransitioning(false);
-    }
+  const handleOpenUpdateStatusModal = () => {
+    const transitions = getAvailableTransitions(ticket?.status ?? "");
+    setUpdateTargetStatus(transitions[0]?.target ?? "");
+    setUpdateSolutionType("");
+    setUpdateComment("");
+    setTransitionError(null);
+    setShowUpdateStatusModal(true);
   };
 
-  const handleConfirmCancel = async (e: React.FormEvent) => {
+  const handleConfirmUpdateStatus = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cancelReason.trim()) {
+    if (!updateTargetStatus) {
+      setTransitionError("Selecciona la nueva situación del ticket.");
+      return;
+    }
+    if (updateTargetStatus === "Cancelado" && !updateComment.trim()) {
       setTransitionError("La cancelación exige un motivo escrito explicativo.");
       return;
     }
+    if (updateTargetStatus === "Solucionado") {
+      if (!updateSolutionType) {
+        setTransitionError("Selecciona el tipo de solución.");
+        return;
+      }
+      const hasOutbound = ticket?.messages.some((m) => m.direction === "Saliente");
+      if (!hasOutbound) {
+        setTransitionError(
+          "No se puede marcar como solucionado un ticket sin haber enviado al menos una respuesta al cliente.",
+        );
+        return;
+      }
+    }
+
+    const reason =
+      updateTargetStatus === "Solucionado"
+        ? `Tipo de solución: ${updateSolutionType}${
+            updateComment.trim() ? ` · Comentario: ${updateComment.trim()}` : ""
+          }`
+        : updateComment.trim() || undefined;
 
     try {
       setTransitioning(true);
       setTransitionError(null);
-      await ticketsApi.updateStatus(ticketId, {
-        status: "Cancelado",
-        reason: cancelReason.trim(),
-      });
-      setShowCancelModal(false);
-      setCancelReason("");
+      await ticketsApi.updateStatus(ticketId, { status: updateTargetStatus, reason });
+      setShowUpdateStatusModal(false);
+      setUpdateTargetStatus("");
+      setUpdateSolutionType("");
+      setUpdateComment("");
       await refreshTicket();
     } catch (err) {
       setTransitionError(
-        err instanceof Error ? err.message : "Error al cancelar el ticket.",
+        err instanceof Error ? err.message : "Error al actualizar el estado del ticket.",
       );
     } finally {
       setTransitioning(false);
@@ -351,7 +546,7 @@ export function TicketDetailPage() {
     }
   };
 
-  // Edit ticket details modal state (Fase 8, PUT /api/tickets/{id})
+  // Edit ticket details modal state (PUT /api/tickets/{id})
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSubject, setEditSubject] = useState("");
   const [editTopicId, setEditTopicId] = useState<number | null>(null);
@@ -443,6 +638,10 @@ export function TicketDetailPage() {
   }
 
   const sla = formatSlaRemaining(ticket.resolutionDueAt, Boolean(ticket.pausedAt));
+  const availableTransitions = getAvailableTransitions(ticket.status);
+  const editRequiresProductLine = Boolean(
+    editCatalogs?.topics.find((t) => t.id === editTopicId)?.requiresProductLine,
+  );
 
   // Consolidar mensajes y eventos en una línea de tiempo ordenada
   const timeline: TimelineItem[] = [
@@ -454,8 +653,201 @@ export function TicketDetailPage() {
     ),
   ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
+  // Hilo con el cliente (entrante + saliente, sin notas internas) y notas internas por separado,
+  // para las pestañas "Respuestas al cliente" y "Notas internas".
+  const sortedMessages = [...ticket.messages].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  const clientThread = sortedMessages.filter((m) => m.direction.toLowerCase() !== "interna");
+  const internalNotes = sortedMessages.filter((m) => m.direction.toLowerCase() === "interna");
+  const recipientEmail = ticket.contactEmail ?? ticket.requesterEmail ?? null;
+
+  function renderMessageCard(msg: TicketMessageResponse) {
+    const isInternal = msg.direction.toLowerCase() === "interna";
+    const isOutbound = msg.direction.toLowerCase() === "saliente";
+
+    return (
+      <div
+        key={`msg-${msg.id}`}
+        className={`rounded-xl transition-shadow ${
+          isInternal
+            ? "border-2 border-amber-300 bg-amber-50/75 p-5 shadow-xs"
+            : isOutbound
+            ? "border border-line-soft bg-white p-5 shadow-xs"
+            : "border border-slate-200 bg-slate-50/90 p-5 shadow-xs"
+        }`}
+      >
+        {/* Cabecera del mensaje */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 pb-3">
+          <div className="flex items-center gap-2.5">
+            {isInternal ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
+                <Lock className="h-3 w-3" /> Nota Interna
+              </span>
+            ) : isOutbound ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
+                <Mail className="h-3 w-3" /> Respuesta al cliente
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
+                <User className="h-3 w-3" /> Cliente
+              </span>
+            )}
+
+            <span className="text-xs font-semibold text-ink">
+              {msg.authorStaffName ??
+                msg.authorContactName ??
+                ticket.requesterName ??
+                "Remitente"}
+            </span>
+          </div>
+
+          <span className="text-[11.5px] text-subtle">{formatDateTime(msg.createdAt)}</span>
+        </div>
+
+        {/* Advertencia explícita en notas internas */}
+        {isInternal && (
+          <div className="mt-2.5 flex items-center gap-1.5 rounded-md bg-amber-100/90 px-2.5 py-1 text-[11px] font-medium text-amber-900">
+            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+            <span>
+              Solo visible para el personal de Plastifar. El cliente no puede ver este mensaje ni
+              recibe copia.
+            </span>
+          </div>
+        )}
+
+        {/* Cuerpo del mensaje */}
+        <div className="mt-3.5 text-sm leading-relaxed text-ink whitespace-pre-wrap">
+          {msg.bodyText ?? msg.bodyHtml?.replace(/<[^>]*>?/gm, "")}
+        </div>
+
+        {/* Adjuntos del mensaje */}
+        {msg.attachments && msg.attachments.length > 0 && (
+          <div className="mt-4 border-t border-black/5 pt-3">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+              Archivos adjuntos ({msg.attachments.length}):
+            </span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {msg.attachments.map((att) => (
+                <button
+                  key={att.id}
+                  type="button"
+                  onClick={() => void handleDownloadAttachment(att)}
+                  disabled={downloadingId === att.id}
+                  className="inline-flex items-center gap-2 rounded-lg border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
+                >
+                  <FileText className="h-3.5 w-3.5 text-subtle" />
+                  <span className="max-w-[180px] truncate">{att.fileName}</span>
+                  <span className="text-[10.5px] text-subtle">({formatBytes(att.sizeBytes)})</span>
+                  <Download className="h-3 w-3 text-subtle" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /** Punto del timeline lateral para un evento del sistema (más compacto que renderEvent,
+   * pensado para la columna angosta bajo la tarjeta SLA). */
+  function renderTimelineEvent(evt: TicketEventResponse, idx: number) {
+    const isBreach =
+      evt.eventType === "SlaBreached" ||
+      Boolean(evt.details?.toLowerCase().includes("incumplimiento de sla"));
+    return (
+      <div key={`tl-evt-${evt.id}-${idx}`} className="relative pb-5 pl-7 last:pb-0">
+        <span
+          className={`absolute left-0 top-0.5 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-white ${
+            isBreach ? "bg-red-600" : "bg-zinc-400"
+          }`}
+        >
+          {isBreach ? (
+            <AlertTriangle className="h-2.5 w-2.5 text-white" />
+          ) : (
+            <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+          )}
+        </span>
+        <div
+          className={`rounded-lg border px-3 py-2 text-[11px] ${
+            isBreach ? "border-red-200 bg-red-50" : "border-line-soft bg-canvas/50"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className={`font-medium ${isBreach ? "text-red-900" : "text-ink"}`}>
+              {evt.actorStaffName ?? "Sistema"}
+            </span>
+            <span className="shrink-0 text-[10px] text-subtle">{formatDateTime(evt.createdAt)}</span>
+          </div>
+          <p className={`mt-0.5 ${isBreach ? "font-medium text-red-700" : "text-subtle"}`}>
+            {evt.details ?? evt.eventType}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /** Punto del timeline lateral para un mensaje (versión compacta de renderMessageCard,
+   * pensada para la columna angosta bajo la tarjeta SLA). */
+  function renderTimelineMessage(msg: TicketMessageResponse) {
+    const isInternal = msg.direction.toLowerCase() === "interna";
+    const isOutbound = msg.direction.toLowerCase() === "saliente";
+    const dotColor = isInternal ? "bg-amber-500" : isOutbound ? "bg-sky-600" : "bg-slate-700";
+
+    return (
+      <div key={`tl-msg-${msg.id}`} className="relative pb-5 pl-7 last:pb-0">
+        <span
+          className={`absolute left-0 top-0.5 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-white ${dotColor}`}
+        >
+          {isInternal ? (
+            <Lock className="h-2.5 w-2.5 text-white" />
+          ) : isOutbound ? (
+            <Mail className="h-2.5 w-2.5 text-white" />
+          ) : (
+            <User className="h-2.5 w-2.5 text-white" />
+          )}
+        </span>
+        <div
+          className={`rounded-lg border p-3 text-xs ${
+            isInternal
+              ? "border-amber-200 bg-amber-50/60"
+              : isOutbound
+              ? "border-line-soft bg-white"
+              : "border-slate-200 bg-slate-50/80"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate font-semibold text-ink">
+              {msg.authorStaffName ?? msg.authorContactName ?? ticket.requesterName ?? "Remitente"}
+            </span>
+            <span className="shrink-0 text-[10px] text-subtle">{formatDateTime(msg.createdAt)}</span>
+          </div>
+          <span
+            className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ${dotColor}`}
+          >
+            {isInternal ? "Nota interna" : isOutbound ? "Respuesta" : "Cliente"}
+          </span>
+          <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink">
+            {msg.bodyText ?? msg.bodyHtml?.replace(/<[^>]*>?/gm, "")}
+          </p>
+          {msg.attachments && msg.attachments.length > 0 && (
+            <div className="mt-2 flex items-center gap-1 text-[10.5px] text-subtle">
+              <Paperclip className="h-3 w-3" />
+              {msg.attachments.length} adjunto{msg.attachments.length > 1 ? "s" : ""}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const detailTabs: { key: "respuestas" | "notas"; label: string; icon: typeof Mail; count?: number }[] = [
+    { key: "respuestas", label: "Respuestas al cliente", icon: Mail, count: clientThread.length },
+    { key: "notas", label: "Notas internas", icon: Lock, count: internalNotes.length },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-16">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50 pb-16">
       {/* Barra superior de navegación y cabecera */}
       <div className="sticky top-0 z-10 border-b border-line-soft bg-white/95 px-6 py-3.5 backdrop-blur-xs">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
@@ -507,13 +899,24 @@ export function TicketDetailPage() {
                 {sla.text}
               </span>
             )}
+
+            {availableTransitions.length > 0 ? (
+              <Button type="button" variant="primary" size="sm" onClick={handleOpenUpdateStatusModal}>
+                <RefreshCw className="h-3.5 w-3.5" />
+                Actualizar ticket
+              </Button>
+            ) : (
+              <span className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                Cancelado (cierre definitivo)
+              </span>
+            )}
           </div>
         </div>
       </div>
 
       {/* Contenedor principal de 2 columnas */}
       <div className="mx-auto max-w-7xl px-6 py-6">
-        {/* Título, metadatos rápidos y botones de acción rápida de estado (Sección 9.3) */}
+        {/* Título, metadatos rápidos y botones de acción rápida de estado */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl">
@@ -528,150 +931,36 @@ export function TicketDetailPage() {
             </p>
           </div>
 
-          {/* Barra de acciones de cambio de estado de la máquina de estados 9.3 */}
-          <div className="flex flex-wrap items-center gap-2">
-            {ticket.status === "Abierto" && (
-              <>
-                <Button
+          {/* Navegación por pestañas: antes vivían aquí los botones sueltos de
+              En espera / Reenvío / Solucionar / Cancelar, ahora consolidados en
+              el botón "Actualizar ticket" de la barra superior. */}
+          <div className="inline-flex flex-wrap gap-1 self-start rounded-edge border border-line-soft bg-canvas/60 p-1">
+            {detailTabs.map((tab) => {
+              const isActive = activeTab === tab.key;
+              const TabIcon = tab.icon;
+              return (
+                <button
+                  key={tab.key}
                   type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => handleUpdateStatus("En espera del cliente")}
-                  title="Pausa el SLA mientras se espera respuesta del cliente"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`inline-flex cursor-pointer items-center gap-1.5 rounded-edge px-3.5 py-1.5 text-[12.5px] font-semibold transition-all ${
+                    isActive ? "bg-white text-ink shadow-2xs" : "text-subtle hover:text-ink"
+                  }`}
                 >
-                  <Clock className="h-3.5 w-3.5" />
-                  En espera
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => handleUpdateStatus("Reenvío de producto")}
-                  title="Marca el caso para reenvío de producto"
-                >
-                  <Package className="h-3.5 w-3.5" />
-                  Reenvío
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => {
-                    const hasOutbound = ticket.messages.some((m) => m.direction === "Saliente");
-                    if (!hasOutbound) {
-                      setTransitionError(
-                        "No se puede marcar como solucionado un ticket sin haber enviado al menos una respuesta al cliente.",
-                      );
-                      return;
-                    }
-                    handleUpdateStatus("Solucionado");
-                  }}
-                  title="Marca como solucionado (requiere respuesta previa al cliente)"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Solucionar
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="danger"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => {
-                    setTransitionError(null);
-                    setShowCancelModal(true);
-                  }}
-                  title="Cancela el ticket definitivamente (exige motivo escrito)"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Cancelar
-                </Button>
-              </>
-            )}
-
-            {ticket.status === "En espera del cliente" && (
-              <>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => handleUpdateStatus("Abierto")}
-                  title="Reanuda la atención y el cómputo de SLA"
-                >
-                  Reanudar a Abierto
-                </Button>
-                <Button
-                  type="button"
-                  variant="danger"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => {
-                    setTransitionError(null);
-                    setShowCancelModal(true);
-                  }}
-                  title="Cancela el ticket definitivamente"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Cancelar
-                </Button>
-              </>
-            )}
-
-            {ticket.status === "Reenvío de producto" && (
-              <>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => handleUpdateStatus("Solucionado")}
-                  title="Marca el ticket como solucionado"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Marcar Solucionado
-                </Button>
-                <Button
-                  type="button"
-                  variant="danger"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => {
-                    setTransitionError(null);
-                    setShowCancelModal(true);
-                  }}
-                  title="Cancela el ticket definitivamente"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Cancelar
-                </Button>
-              </>
-            )}
-
-            {ticket.status === "Solucionado" && (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={transitioning}
-                onClick={() => handleUpdateStatus("Abierto")}
-                title="Reabre el ticket (incrementa el contador de reaperturas)"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reabrir ticket
-              </Button>
-            )}
-
-            {ticket.status === "Cancelado" && (
-              <span className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
-                Cancelado (Cerrado definitivo)
-              </span>
-            )}
+                  <TabIcon className="h-3.5 w-3.5" />
+                  {tab.label}
+                  {tab.count !== undefined && (
+                    <span
+                      className={`rounded-full px-1.5 py-px text-[10.5px] font-semibold ${
+                        isActive ? "bg-fill text-subtle" : "bg-white/70 text-subtle"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -693,541 +982,396 @@ export function TicketDetailPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* Columna Izquierda: Hilo de conversación y redactor (8 cols) */}
-          <div className="space-y-6 lg:col-span-8">
-            {/* Hilo de conversación */}
-            <div className="space-y-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-faint">
-                Historial de conversación y eventos
-              </h2>
-
-              {timeline.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
-                  No hay intervenciones ni eventos registrados aún en este ticket.
+        {/* Fila de KPIs: Cliente y Contacto | Atributos del Ticket | SLA y Métricas de Tiempo */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* KPI 1: Cliente & Contacto */}
+          <div className="rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+            <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+              <Building2 className="h-4 w-4 text-brand-red" />
+              Cliente y Contacto
+            </h3>
+            <div className="mt-3 space-y-2 text-xs">
+              <div>
+                <span className="text-subtle">Razón social:</span>
+                <p className="font-semibold text-ink">{ticket.clientName || "Sin cliente asignado"}</p>
+              </div>
+              {ticket.clientCode && (
+                <div>
+                  <span className="text-subtle">Código:</span>
+                  <p className="font-mono text-ink">{ticket.clientCode}</p>
                 </div>
-              ) : (
-                timeline.map((item, idx) => {
-                  if (item.kind === "event") {
-                    const evt = item.data;
-                    const isBreach =
-                      evt.eventType === "SlaBreached" ||
-                      Boolean(evt.details?.toLowerCase().includes("incumplimiento de sla"));
-                    return (
-                      <div
-                        key={`evt-${evt.id}-${idx}`}
-                        className="my-3 flex items-center justify-center gap-2 text-xs text-subtle"
-                      >
-                        <span className={`h-px flex-1 ${isBreach ? "bg-red-200" : "bg-line-soft"}`} />
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] shadow-2xs ${
-                            isBreach
-                              ? "border-red-300 bg-red-50 text-red-700 font-semibold"
-                              : "border-line-soft bg-white text-ink"
-                          }`}
-                        >
-                          {isBreach ? (
-                            <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
-                          ) : (
-                            <CheckCircle2 className="h-3 w-3 text-brand-red" />
-                          )}
-                          <span className={isBreach ? "text-red-900" : "font-medium text-ink"}>
-                            {evt.actorStaffName ?? "Sistema"}:
-                          </span>
-                          <span>{evt.details ?? evt.eventType}</span>
-                          <span className={isBreach ? "text-red-500 font-normal" : "text-subtle/70"}>
-                            ({formatDateTime(evt.createdAt)})
-                          </span>
-                        </span>
-                        <span className={`h-px flex-1 ${isBreach ? "bg-red-200" : "bg-line-soft"}`} />
-                      </div>
-                    );
-                  }
-
-                  const msg = item.data;
-                  const isInternal = msg.direction.toLowerCase() === "interna";
-                  const isOutbound = msg.direction.toLowerCase() === "saliente";
-
-                  return (
-                    <div
-                      key={`msg-${msg.id}`}
-                      className={`rounded-xl transition-shadow ${
-                        isInternal
-                          ? "border-2 border-amber-300 bg-amber-50/75 p-5 shadow-xs"
-                          : isOutbound
-                          ? "border border-line-soft bg-white p-5 shadow-xs"
-                          : "border border-slate-200 bg-slate-50/90 p-5 shadow-xs"
-                      }`}
-                    >
-                      {/* Cabecera del mensaje */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 pb-3">
-                        <div className="flex items-center gap-2.5">
-                          {isInternal ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
-                              <Lock className="h-3 w-3" /> Nota Interna
-                            </span>
-                          ) : isOutbound ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
-                              <Mail className="h-3 w-3" /> Respuesta al cliente
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
-                              <User className="h-3 w-3" /> Cliente
-                            </span>
-                          )}
-
-                          <span className="text-xs font-semibold text-ink">
-                            {msg.authorStaffName ??
-                              msg.authorContactName ??
-                              ticket.requesterName ??
-                              "Remitente"}
-                          </span>
-                        </div>
-
-                        <span className="text-[11.5px] text-subtle">
-                          {formatDateTime(msg.createdAt)}
-                        </span>
-                      </div>
-
-                      {/* Advertencia explícita en notas internas */}
-                      {isInternal && (
-                        <div className="mt-2.5 flex items-center gap-1.5 rounded-md bg-amber-100/90 px-2.5 py-1 text-[11px] font-medium text-amber-900">
-                          <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-700" />
-                          <span>
-                            Solo visible para el personal de Plastifar. El cliente no puede ver
-                            este mensaje ni recibe copia.
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Cuerpo del mensaje */}
-                      <div className="mt-3.5 text-sm leading-relaxed text-ink whitespace-pre-wrap">
-                        {msg.bodyText ?? msg.bodyHtml?.replace(/<[^>]*>?/gm, "")}
-                      </div>
-
-                      {/* Adjuntos del mensaje */}
-                      {msg.attachments && msg.attachments.length > 0 && (
-                        <div className="mt-4 border-t border-black/5 pt-3">
-                          <span className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
-                            Archivos adjuntos ({msg.attachments.length}):
-                          </span>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {msg.attachments.map((att) => (
-                              <button
-                                key={att.id}
-                                type="button"
-                                onClick={() => void handleDownloadAttachment(att)}
-                                disabled={downloadingId === att.id}
-                                className="inline-flex items-center gap-2 rounded-lg border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
-                              >
-                                <FileText className="h-3.5 w-3.5 text-subtle" />
-                                <span className="max-w-[180px] truncate">{att.fileName}</span>
-                                <span className="text-[10.5px] text-subtle">
-                                  ({formatBytes(att.sizeBytes)})
-                                </span>
-                                <Download className="h-3 w-3 text-subtle" />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
+              )}
+              {ticket.contactName && (
+                <div className="border-t border-line-soft pt-2">
+                  <span className="text-subtle">Contacto:</span>
+                  <p className="font-medium text-ink">{ticket.contactName}</p>
+                </div>
+              )}
+              {(ticket.contactEmail ?? ticket.requesterEmail) && (
+                <div className="flex items-center gap-1.5 text-subtle">
+                  <Mail className="h-3.5 w-3.5 shrink-0" />
+                  <a
+                    href={`mailto:${ticket.contactEmail ?? ticket.requesterEmail}`}
+                    className="truncate text-ink hover:underline"
+                  >
+                    {ticket.contactEmail ?? ticket.requesterEmail}
+                  </a>
+                </div>
+              )}
+              {ticket.contactPhone && (
+                <div className="flex items-center gap-1.5 text-subtle">
+                  <Phone className="h-3.5 w-3.5 shrink-0" />
+                  <span className="text-ink">{ticket.contactPhone}</span>
+                </div>
               )}
             </div>
+          </div>
 
-            {/* Redactor de Respuestas / Notas Internas */}
-            <div
-              className={`rounded-xl border transition-all ${
-                direction === "Interna"
-                  ? "border-amber-400 bg-amber-50/30 p-5 shadow-sm"
-                  : "border-line-soft bg-white p-5 shadow-xs"
-              }`}
-            >
-              {/* Selector de modo de intervención */}
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line-soft pb-3">
-                <div className="inline-flex rounded-lg border border-line-soft bg-slate-100 p-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDirection("Saliente");
-                      setSendError(null);
-                    }}
-                    className={`inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                      direction === "Saliente"
-                        ? "bg-white text-ink shadow-2xs"
-                        : "text-subtle hover:text-ink"
-                    }`}
-                  >
-                    <Send className="h-3.5 w-3.5 text-sky-600" />
-                    Responder al cliente
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDirection("Interna");
-                      setSendError(null);
-                    }}
-                    className={`inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                      direction === "Interna"
-                        ? "bg-amber-500 text-white shadow-2xs"
-                        : "text-subtle hover:text-ink"
-                    }`}
-                  >
-                    <Lock className="h-3.5 w-3.5" />
-                    Nota interna
-                  </button>
+          {/* KPI 2: Atributos del Ticket */}
+          <div className="rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+                <User className="h-4 w-4 text-brand-red" />
+                Atributos del Ticket
+              </h3>
+              {ticket.status !== "Cancelado" && ticket.status !== "Cerrado" && (
+                <button
+                  type="button"
+                  onClick={() => void handleOpenEditModal()}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-red transition-colors hover:underline cursor-pointer"
+                  title="Editar campos clave del ticket"
+                >
+                  <Pencil className="h-3 w-3" />
+                  Editar
+                </button>
+              )}
+            </div>
+            <div className="mt-3 space-y-2.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-subtle">Departamento:</span>
+                <span className="font-semibold text-ink">{ticket.departmentName || "Sin departamento"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-subtle">Tema / Motivo:</span>
+                <span className="font-medium text-ink">{ticket.topicName || "Sin motivo"}</span>
+              </div>
+              {ticket.productLineName && (
+                <div className="flex justify-between">
+                  <span className="text-subtle">Línea de producto:</span>
+                  <span className="font-medium text-ink">{ticket.productLineName}</span>
                 </div>
-
-                {/* Cambio de estado opcional */}
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-subtle font-medium">Cambiar estado a:</span>
-                  <select
-                    value={statusChange}
-                    onChange={(e) => setStatusChange(e.target.value)}
-                    className="h-8 rounded-lg border border-line-strong bg-white px-2.5 text-xs text-ink focus:border-brand-red focus:outline-none"
-                  >
-                    <option value="">(Mantener estado actual)</option>
-                    <option value="Abierto">Abierto</option>
-                    <option value="En espera del cliente">En espera del cliente</option>
-                    <option value="Reenvío de producto">Reenvío de producto</option>
-                    <option value="Solucionado">Solucionado</option>
-                  </select>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-subtle">Asignado a:</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-ink">
+                    {ticket.assignedStaffName ?? "Sin asignar"}
+                  </span>
+                  {ticket.status !== "Cancelado" && (
+                    <button
+                      type="button"
+                      onClick={() => void handleOpenAssignModal()}
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-brand-red transition-colors hover:bg-red-50 hover:underline"
+                      title="Asignar o reasignar ticket"
+                    >
+                      <UserCheck className="h-3 w-3" />
+                      {ticket.assignedStaffId ? "Cambiar" : "Asignar"}
+                    </button>
+                  )}
                 </div>
               </div>
+              <div className="flex justify-between">
+                <span className="text-subtle">Canal de origen:</span>
+                <span className="font-medium text-ink">{ticket.channel}</span>
+              </div>
+            </div>
+          </div>
 
-              {/* Banner de alto contraste si está en modo Nota Interna */}
-              {direction === "Interna" ? (
-                <div className="mb-3.5 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-100/90 p-3 text-xs text-amber-950">
-                  <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-                  <div>
-                    <span className="font-bold">MODO NOTA INTERNA ACTIVADO:</span> Esta nota es
-                    completamente privada y confidencial. Solo el personal del sistema podrá leerla.
-                    <span className="font-semibold text-amber-900">
-                      {" "}
-                      NUNCA se enviará ni notificará al cliente.
+          {/* KPI 3: SLA y Tiempos */}
+          <div className="rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+            <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+              <Clock className="h-4 w-4 text-brand-red" />
+              SLA y Métricas de Tiempo
+            </h3>
+            <div className="mt-3 space-y-2.5 text-xs">
+              <div>
+                <span className="text-subtle">Vencimiento de Resolución:</span>
+                <p className="font-medium text-ink">
+                  {ticket.resolutionDueAt
+                    ? formatDateTime(ticket.resolutionDueAt)
+                    : "No configurado"}
+                </p>
+              </div>
+
+              <div>
+                <span className="text-subtle">Primera respuesta:</span>
+                <p className="font-medium text-ink">
+                  {ticket.firstResponseAt ? (
+                    <span className="text-emerald-700">
+                      Lograda ({formatDateTime(ticket.firstResponseAt)})
                     </span>
+                  ) : ticket.firstResponseDueAt ? (
+                    <span>Límite: {formatDateTime(ticket.firstResponseDueAt)}</span>
+                  ) : (
+                    "Pendiente"
+                  )}
+                </p>
+              </div>
+
+              {Boolean(ticket.pausedAt) && (
+                <div className="rounded-lg bg-amber-50 p-2 text-amber-800">
+                  <div className="flex items-center gap-1 font-semibold">
+                    <AlertTriangle className="h-3.5 w-3.5" /> SLA Pausado
                   </div>
-                </div>
-              ) : (
-                <div className="mb-3.5 flex items-center gap-2 text-xs text-sky-800">
-                  <Mail className="h-3.5 w-3.5 text-sky-600" />
-                  <span>
-                    Esta respuesta será entregada al cliente (
-                    {ticket.contactEmail ?? ticket.requesterEmail ?? "contacto"}).
-                  </span>
+                  <p className="mt-0.5 text-[11px]">
+                    En espera del cliente desde {formatDateTime(ticket.pausedAt!)}.
+                  </p>
                 </div>
               )}
 
-              {sendError && (
-                <div className="mb-3">
-                  <Alert variant="error">{sendError}</Alert>
+              {ticket.pausedMinutes > 0 && (
+                <div className="flex justify-between text-subtle">
+                  <span>Tiempo total en pausa:</span>
+                  <span className="font-medium text-ink">{ticket.pausedMinutes} minutos</span>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <textarea
-                  rows={4}
-                  value={messageBody}
-                  onChange={(e) => setMessageBody(e.target.value)}
-                  placeholder={
-                    direction === "Interna"
-                      ? "Escribe aquí la nota interna confidencial para el equipo..."
-                      : "Escribe tu respuesta para el cliente..."
-                  }
-                  className={`w-full rounded-lg border p-3 text-sm text-ink placeholder:text-subtle focus:outline-none ${
-                    direction === "Interna"
-                      ? "border-amber-300 bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                      : "border-line-strong bg-white focus:border-brand-red focus:ring-1 focus:ring-brand-red"
-                  }`}
-                />
+              {ticket.reopenedCount > 0 && (
+                <div className="flex justify-between text-subtle">
+                  <span>Reaperturas:</span>
+                  <span className="font-semibold text-amber-700">{ticket.reopenedCount}</span>
+                </div>
+              )}
 
-                {/* Lista de adjuntos seleccionados */}
-                {attachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {attachments.map((f, i) => (
-                      <span
-                        key={`${f.name}-${i}`}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-line-soft bg-white px-2.5 py-1 text-xs text-ink"
-                      >
-                        <Paperclip className="h-3 w-3 text-subtle" />
-                        <span className="max-w-[160px] truncate">{f.name}</span>
-                        <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(i)}
-                          className="ml-1 text-subtle hover:text-rose-600"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
+              {ticket.resolvedAt && (
+                <div className="flex justify-between text-subtle">
+                  <span>Resuelto el:</span>
+                  <span className="font-medium text-ink">{formatDateTime(ticket.resolvedAt)}</span>
+                </div>
+              )}
+
+              {ticket.closedAt && (
+                <div className="flex justify-between text-subtle">
+                  <span>Cerrado el:</span>
+                  <span className="font-medium text-ink">{formatDateTime(ticket.closedAt)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Fila inferior: conversación con el cliente (bajo Cliente/Atributos) + timeline (bajo SLA) */}
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Columna principal: pestañas de conversación y compositor */}
+          <div className="space-y-4 lg:col-span-2">
+            {/* Pestaña: Respuestas al cliente, en modo correo (Para / Asunto fijos + cuerpo) */}
+            {activeTab === "respuestas" && (
+              <div className="space-y-4">
+                {clientThread.length === 0 ? (
+                  <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
+                    Aún no hay respuestas ni mensajes del cliente en este ticket.
                   </div>
+                ) : (
+                  clientThread.map((msg) => renderMessageCard(msg))
                 )}
 
-                {/* Barra de herramientas inferior */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      onChange={handleFileChange}
-                      className="hidden"
-                      id="ticket-attachment-input"
-                    />
-                    <label
-                      htmlFor="ticket-attachment-input"
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-white px-3 py-1.5 text-xs font-medium text-subtle transition-colors hover:bg-slate-50 hover:text-ink"
-                    >
-                      <Paperclip className="h-3.5 w-3.5" />
-                      Adjuntar archivos (máx 10 MB c/u)
-                    </label>
+                <div className="rounded-edge border border-line bg-white shadow-xs">
+                  <div className="space-y-1.5 border-b border-line-soft px-4 py-3">
+                    <div className="flex items-center gap-2 text-[12.5px]">
+                      <span className="w-12 shrink-0 font-medium text-subtle">Para:</span>
+                      {recipientEmail ? (
+                        <span className="truncate text-ink">{recipientEmail}</span>
+                      ) : (
+                        <span className="text-brand-red-dark">
+                          Este ticket no tiene un correo de contacto registrado.
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[12.5px]">
+                      <span className="w-12 shrink-0 font-medium text-subtle">Asunto:</span>
+                      <span className="truncate text-ink">Re: {ticket.subject}</span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    {direction === "Saliente" && ticket.status !== "Cancelado" && (
-                      <div className="flex items-center gap-1.5 text-xs text-subtle">
-                        <label htmlFor="composer-status" className="whitespace-nowrap font-medium text-ink">
-                          Estado:
-                        </label>
-                        <select
-                          id="composer-status"
-                          value={statusChange}
-                          onChange={(e) => setStatusChange(e.target.value)}
-                          className="h-8 rounded-lg border border-line-strong bg-white px-2 text-xs text-ink focus:border-brand-red focus:outline-none"
-                        >
-                          <option value="">(Sin cambio — {ticket.status})</option>
-                          {ticket.status === "Abierto" && (
-                            <>
-                              <option value="En espera del cliente">En espera del cliente</option>
-                              <option value="Reenvío de producto">Reenvío de producto</option>
-                              <option value="Solucionado">Solucionado</option>
-                            </>
-                          )}
-                          {ticket.status === "En espera del cliente" && (
-                            <option value="Abierto">Abierto</option>
-                          )}
-                          {ticket.status === "Reenvío de producto" && (
-                            <option value="Solucionado">Solucionado</option>
-                          )}
-                        </select>
+                  <form onSubmit={handleSendReply}>
+                    <textarea
+                      rows={6}
+                      value={replyBody}
+                      onChange={(e) => setReplyBody(e.target.value)}
+                      placeholder="Escribe tu respuesta para el cliente…"
+                      className="w-full resize-none border-0 px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-zinc-400 focus:outline-none"
+                    />
+
+                    {replyAttachments.length > 0 && (
+                      <div className="flex flex-wrap gap-2 border-t border-line-soft px-4 py-2.5">
+                        {replyAttachments.map((f, i) => (
+                          <span
+                            key={`${f.name}-${i}`}
+                            className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-canvas/60 px-2.5 py-1 text-[11.5px] text-ink"
+                          >
+                            <Paperclip className="h-3 w-3 text-subtle" />
+                            <span className="max-w-[160px] truncate">{f.name}</span>
+                            <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
+                            <button
+                              type="button"
+                              onClick={() => removeReplyFile(i)}
+                              className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
                       </div>
                     )}
 
-                    {direction === "Interna" ? (
+                    {replySendError && (
+                      <div className="border-t border-line-soft px-4 py-2.5">
+                        <Alert variant="error">{replySendError}</Alert>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft bg-canvas/40 px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={replyFileInputRef}
+                          type="file"
+                          multiple
+                          onChange={handleReplyFileChange}
+                          className="hidden"
+                          id="reply-attachment-input"
+                        />
+                        <label
+                          htmlFor="reply-attachment-input"
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
+                        >
+                          <Paperclip className="h-3.5 w-3.5" />
+                          Adjuntar
+                        </label>
+
+                        {ticket.status !== "Cancelado" && nextStatusOptions(ticket.status).length > 0 && (
+                          <select
+                            value={replyStatusChange}
+                            onChange={(e) => setReplyStatusChange(e.target.value)}
+                            className="h-8 rounded-edge border border-line-strong bg-white px-2 text-[11.5px] text-ink focus:border-brand-red focus:outline-none"
+                          >
+                            <option value="">Mantener estado ({ticket.status})</option>
+                            {nextStatusOptions(ticket.status).map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      <Button type="submit" variant="primary" isLoading={replySending} className="gap-2">
+                        <Send className="h-3.5 w-3.5" />
+                        Enviar respuesta
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Pestaña: Notas internas */}
+            {activeTab === "notas" && (
+              <div className="space-y-4">
+                {internalNotes.length === 0 ? (
+                  <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
+                    Aún no hay notas internas en este ticket.
+                  </div>
+                ) : (
+                  internalNotes.map((msg) => renderMessageCard(msg))
+                )}
+
+                <div className="rounded-edge border border-amber-300 bg-amber-50/40">
+                  <div className="flex items-start gap-2 border-b border-amber-200/70 px-4 py-2.5 text-[11.5px] text-amber-900">
+                    <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" />
+                    <span>
+                      Solo visible para el personal de Plastifar. El cliente no puede verla ni
+                      recibe copia.
+                    </span>
+                  </div>
+
+                  <form onSubmit={handleSaveNote}>
+                    <textarea
+                      rows={5}
+                      value={noteBody}
+                      onChange={(e) => setNoteBody(e.target.value)}
+                      placeholder="Escribe una nota interna confidencial para el equipo…"
+                      className="w-full resize-none border-0 bg-transparent px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-amber-700/50 focus:outline-none"
+                    />
+
+                    {noteAttachments.length > 0 && (
+                      <div className="flex flex-wrap gap-2 border-t border-amber-200/70 px-4 py-2.5">
+                        {noteAttachments.map((f, i) => (
+                          <span
+                            key={`${f.name}-${i}`}
+                            className="inline-flex items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1 text-[11.5px] text-ink"
+                          >
+                            <Paperclip className="h-3 w-3 text-subtle" />
+                            <span className="max-w-[160px] truncate">{f.name}</span>
+                            <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
+                            <button
+                              type="button"
+                              onClick={() => removeNoteFile(i)}
+                              className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {noteSendError && (
+                      <div className="border-t border-amber-200/70 px-4 py-2.5">
+                        <Alert variant="error">{noteSendError}</Alert>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-amber-200/70 px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={noteFileInputRef}
+                          type="file"
+                          multiple
+                          onChange={handleNoteFileChange}
+                          className="hidden"
+                          id="note-attachment-input"
+                        />
+                        <label
+                          htmlFor="note-attachment-input"
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-amber-800 transition-colors hover:bg-amber-100"
+                        >
+                          <Paperclip className="h-3.5 w-3.5" />
+                          Adjuntar
+                        </label>
+                      </div>
+
                       <button
                         type="submit"
-                        disabled={sending}
-                        className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-xs transition-colors hover:bg-amber-600 disabled:opacity-50"
+                        disabled={noteSending}
+                        className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-edge bg-amber-500 px-4 font-heading text-[11.5px] font-semibold uppercase tracking-[0.06em] text-white shadow-xs transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {sending ? (
-                          <Spinner size="sm" />
+                        {noteSending ? (
+                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                         ) : (
                           <Lock className="h-3.5 w-3.5" />
                         )}
                         Guardar nota interna
                       </button>
-                    ) : (
-                      <Button
-                        type="submit"
-                        variant="primary"
-                        isLoading={sending}
-                        className="gap-2"
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                        Enviar respuesta
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          {/* Columna Derecha: Tarjetas de contexto lateral (4 cols) */}
-          <div className="space-y-5 lg:col-span-4">
-            {/* Tarjeta 1: Cliente & Contacto */}
-            <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-faint">
-                <Building2 className="h-4 w-4 text-brand-red" />
-                Cliente y Contacto
-              </h3>
-              <div className="mt-3.5 space-y-2 text-xs">
-                <div>
-                  <span className="text-subtle">Razón social:</span>
-                  <p className="font-semibold text-ink">{ticket.clientName || "Sin cliente asignado"}</p>
-                </div>
-                {ticket.clientCode && (
-                  <div>
-                    <span className="text-subtle">Código:</span>
-                    <p className="font-mono text-ink">{ticket.clientCode}</p>
-                  </div>
-                )}
-                {ticket.contactName && (
-                  <div className="border-t border-line-soft pt-2">
-                    <span className="text-subtle">Contacto:</span>
-                    <p className="font-medium text-ink">{ticket.contactName}</p>
-                  </div>
-                )}
-                {(ticket.contactEmail ?? ticket.requesterEmail) && (
-                  <div className="flex items-center gap-1.5 text-subtle">
-                    <Mail className="h-3.5 w-3.5 shrink-0" />
-                    <a
-                      href={`mailto:${ticket.contactEmail ?? ticket.requesterEmail}`}
-                      className="truncate text-ink hover:underline"
-                    >
-                      {ticket.contactEmail ?? ticket.requesterEmail}
-                    </a>
-                  </div>
-                )}
-                {ticket.contactPhone && (
-                  <div className="flex items-center gap-1.5 text-subtle">
-                    <Phone className="h-3.5 w-3.5 shrink-0" />
-                    <span className="text-ink">{ticket.contactPhone}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Tarjeta 2: Atributos del Caso */}
-            <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-              <div className="flex items-center justify-between">
-                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-faint">
-                  <User className="h-4 w-4 text-brand-red" />
-                  Atributos del Ticket
-                </h3>
-                {ticket.status !== "Cancelado" && ticket.status !== "Cerrado" && (
-                  <button
-                    type="button"
-                    onClick={() => void handleOpenEditModal()}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-red transition-colors hover:underline cursor-pointer"
-                    title="Editar campos clave del ticket"
-                  >
-                    <Pencil className="h-3 w-3" />
-                    Editar
-                  </button>
-                )}
-              </div>
-              <div className="mt-3.5 space-y-2.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-subtle">Departamento:</span>
-                  <span className="font-semibold text-ink">{ticket.departmentName || "Sin departamento"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-subtle">Tema / Motivo:</span>
-                  <span className="font-medium text-ink">{ticket.topicName || "Sin motivo"}</span>
-                </div>
-                {ticket.productLineName && (
-                  <div className="flex justify-between">
-                    <span className="text-subtle">Línea de producto:</span>
-                    <span className="font-medium text-ink">{ticket.productLineName}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <span className="text-subtle">Asignado a:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-ink">
-                      {ticket.assignedStaffName ?? "Sin asignar"}
-                    </span>
-                    {ticket.status !== "Cancelado" && (
-                      <button
-                        type="button"
-                        onClick={() => void handleOpenAssignModal()}
-                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-brand-red transition-colors hover:bg-red-50 hover:underline"
-                        title="Asignar o reasignar ticket"
-                      >
-                        <UserCheck className="h-3 w-3" />
-                        {ticket.assignedStaffId ? "Cambiar" : "Asignar"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-subtle">Canal de origen:</span>
-                  <span className="font-medium text-ink">{ticket.channel}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tarjeta 3: SLA y Tiempos */}
-            <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-faint">
-                <Clock className="h-4 w-4 text-brand-red" />
-                SLA y Métricas de Tiempo
-              </h3>
-              <div className="mt-3.5 space-y-2.5 text-xs">
-                <div>
-                  <span className="text-subtle">Vencimiento de Resolución:</span>
-                  <p className="font-medium text-ink">
-                    {ticket.resolutionDueAt
-                      ? formatDateTime(ticket.resolutionDueAt)
-                      : "No configurado"}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-subtle">Primera respuesta:</span>
-                  <p className="font-medium text-ink">
-                    {ticket.firstResponseAt ? (
-                      <span className="text-emerald-700">
-                        Lograda ({formatDateTime(ticket.firstResponseAt)})
-                      </span>
-                    ) : ticket.firstResponseDueAt ? (
-                      <span>Límite: {formatDateTime(ticket.firstResponseDueAt)}</span>
-                    ) : (
-                      "Pendiente"
-                    )}
-                  </p>
-                </div>
-
-                {Boolean(ticket.pausedAt) && (
-                  <div className="rounded-lg bg-amber-50 p-2 text-amber-800">
-                    <div className="flex items-center gap-1 font-semibold">
-                      <AlertTriangle className="h-3.5 w-3.5" /> SLA Pausado
                     </div>
-                    <p className="mt-0.5 text-[11px]">
-                      En espera del cliente desde {formatDateTime(ticket.pausedAt!)}.
-                    </p>
-                  </div>
-                )}
-
-                {ticket.pausedMinutes > 0 && (
-                  <div className="flex justify-between text-subtle">
-                    <span>Tiempo total en pausa:</span>
-                    <span className="font-medium text-ink">{ticket.pausedMinutes} minutos</span>
-                  </div>
-                )}
-
-                {ticket.reopenedCount > 0 && (
-                  <div className="flex justify-between text-subtle">
-                    <span>Reaperturas:</span>
-                    <span className="font-semibold text-amber-700">{ticket.reopenedCount}</span>
-                  </div>
-                )}
-
-                {ticket.resolvedAt && (
-                  <div className="flex justify-between text-subtle">
-                    <span>Resuelto el:</span>
-                    <span className="font-medium text-ink">{formatDateTime(ticket.resolvedAt)}</span>
-                  </div>
-                )}
-
-                {ticket.closedAt && (
-                  <div className="flex justify-between text-subtle">
-                    <span>Cerrado el:</span>
-                    <span className="font-medium text-ink">{formatDateTime(ticket.closedAt)}</span>
-                  </div>
-                )}
+                  </form>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Tarjeta 4: Observadores */}
+            {/* Observadores del ticket */}
             {ticket.watchers && ticket.watchers.length > 0 && (
               <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-faint">
+                <h3 className="font-heading text-[12.5px] font-semibold text-ink">
                   Observadores ({ticket.watchers.length})
                 </h3>
                 <div className="mt-3 space-y-1.5 text-xs">
@@ -1241,10 +1385,10 @@ export function TicketDetailPage() {
               </div>
             )}
 
-            {/* Tarjeta 5: Todos los adjuntos del ticket */}
+            {/* Todos los adjuntos del ticket */}
             {ticket.attachments && ticket.attachments.length > 0 && (
               <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-faint">
+                <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
                   <Paperclip className="h-4 w-4 text-brand-red" />
                   Todos los Adjuntos ({ticket.attachments.length})
                 </h3>
@@ -1277,17 +1421,44 @@ export function TicketDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Columna del timeline: historial completo de mensajes y eventos, siempre visible */}
+          <div className="lg:col-span-1">
+            <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+              <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+                <History className="h-4 w-4 text-brand-red" />
+                Historial de conversación y eventos
+              </h3>
+
+              {timeline.length === 0 ? (
+                <div className="mt-4 rounded-edge border border-dashed border-line-strong bg-canvas/40 p-6 text-center text-xs text-subtle">
+                  No hay intervenciones ni eventos registrados aún en este ticket.
+                </div>
+              ) : (
+                <div className="relative mt-4">
+                  <div className="absolute bottom-1 left-[7px] top-1 w-px bg-line-soft" />
+                  {timeline.map((item, idx) =>
+                    item.kind === "event"
+                      ? renderTimelineEvent(item.data, idx)
+                      : renderTimelineMessage(item.data),
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Modal para Cancelar Ticket (Sección 9.3: exige motivo explicativo) */}
-      {showCancelModal && (
+      {/* Modal para Actualizar Ticket: una sola entrada para todas las transiciones de
+          estado válidas; Solucionado pide tipo de solución + comentario, Cancelado exige
+          un motivo explicativo, el resto acepta un comentario opcional. */}
+      {showUpdateStatusModal && (
         <Modal
           eyebrow={ticket.number}
-          title="Cancelar ticket"
-          description="La cancelación es definitiva y cerrará el caso de forma permanente. Debes indicar un motivo explicativo obligatorio."
+          title="Actualizar ticket"
+          description="Elige la nueva situación del ticket. Según la opción, se piden datos adicionales."
           onClose={() => {
-            if (!transitioning) setShowCancelModal(false);
+            if (!transitioning) setShowUpdateStatusModal(false);
           }}
           footer={
             <>
@@ -1295,42 +1466,111 @@ export function TicketDetailPage() {
                 type="button"
                 variant="secondary"
                 disabled={transitioning}
-                onClick={() => setShowCancelModal(false)}
+                onClick={() => setShowUpdateStatusModal(false)}
               >
                 Volver
               </Button>
               <Button
                 type="submit"
-                form="cancel-ticket-form"
-                variant="danger"
+                form="update-status-form"
+                variant={updateTargetStatus === "Cancelado" ? "danger" : "primary"}
                 isLoading={transitioning}
               >
-                Confirmar cancelación
+                Confirmar
               </Button>
             </>
           }
         >
-          <form id="cancel-ticket-form" onSubmit={handleConfirmCancel} className="space-y-4">
+          <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-4">
             {transitionError && <Alert variant="error">{transitionError}</Alert>}
+
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="cancel-reason" className="text-xs font-semibold text-ink">
-                Motivo de cancelación <span className="text-brand-red">*</span>
-              </label>
-              <textarea
-                id="cancel-reason"
-                rows={4}
-                required
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Explica detalladamente por qué se cancela este ticket..."
-                className="w-full rounded-lg border border-line-strong p-3 text-xs text-ink placeholder:text-subtle focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
-              />
+              <label className="text-xs font-semibold text-ink">Nueva situación</label>
+              <div className="space-y-2">
+                {availableTransitions.map((opt) => {
+                  const isSelected = updateTargetStatus === opt.target;
+                  const OptIcon = opt.icon;
+                  return (
+                    <button
+                      key={opt.target}
+                      type="button"
+                      onClick={() => setUpdateTargetStatus(opt.target)}
+                      className={`flex w-full cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-left transition-all ${
+                        isSelected
+                          ? opt.danger
+                            ? "border-brand-red bg-brand-red/5 ring-1 ring-brand-red/30"
+                            : "border-brand-red bg-brand-red/5 ring-1 ring-brand-red/30"
+                          : "border-line-strong hover:border-zinc-400 hover:bg-slate-50"
+                      }`}
+                    >
+                      <OptIcon
+                        className={`mt-0.5 h-4 w-4 shrink-0 ${
+                          opt.danger ? "text-brand-red" : "text-brand-gray"
+                        }`}
+                      />
+                      <span>
+                        <span className="block text-[13px] font-semibold text-ink">{opt.label}</span>
+                        <span className="block text-[11.5px] text-subtle">{opt.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {updateTargetStatus === "Solucionado" && (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="solution-type" className="text-xs font-semibold text-ink">
+                  Tipo de solución <span className="text-brand-red">*</span>
+                </label>
+                <select
+                  id="solution-type"
+                  required
+                  value={updateSolutionType}
+                  onChange={(e) => setUpdateSolutionType(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                >
+                  <option value="">— Selecciona un tipo —</option>
+                  {SOLUTION_TYPES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {updateTargetStatus && (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="update-comment" className="text-xs font-semibold text-ink">
+                  {updateTargetStatus === "Cancelado" ? (
+                    <>
+                      Motivo de cancelación <span className="text-brand-red">*</span>
+                    </>
+                  ) : (
+                    "Comentario (opcional)"
+                  )}
+                </label>
+                <textarea
+                  id="update-comment"
+                  rows={4}
+                  required={updateTargetStatus === "Cancelado"}
+                  value={updateComment}
+                  onChange={(e) => setUpdateComment(e.target.value)}
+                  placeholder={
+                    updateTargetStatus === "Cancelado"
+                      ? "Explica detalladamente por qué se cancela este ticket..."
+                      : "Agrega contexto adicional para el historial del ticket (opcional)..."
+                  }
+                  className="w-full rounded-lg border border-line-strong p-3 text-xs text-ink placeholder:text-subtle focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                />
+              </div>
+            )}
           </form>
         </Modal>
       )}
 
-      {/* Modal para Asignar Ticket (Sección 9.4) */}
+      {/* Modal para Asignar Ticket */}
       {showAssignModal && (
         <Modal
           eyebrow={ticket.number}
@@ -1370,45 +1610,36 @@ export function TicketDetailPage() {
               </div>
             ) : (
               <>
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="assign-staff-select" className="text-xs font-semibold text-ink">
-                    Colaborador asignado
-                  </label>
-                  <select
-                    id="assign-staff-select"
-                    value={selectedStaffId}
-                    onChange={(e) => setSelectedStaffId(e.target.value)}
-                    className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
-                  >
-                    <option value="">— Sin asignar (desasignar) —</option>
-                    {assignableStaff.map((s) => (
-                      <option key={s.id} value={String(s.id)}>
-                        {s.fullName} ({s.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SelectField
+                  id="assign-staff-select"
+                  label="Colaborador asignado"
+                  value={selectedStaffId}
+                  onChange={setSelectedStaffId}
+                  placeholder="Sin asignar (desasignar)"
+                  options={[
+                    { value: "", label: "Sin asignar (desasignar)" },
+                    ...assignableStaff.map((s) => ({
+                      value: String(s.id),
+                      label: `${s.fullName} (${s.email})`,
+                    })),
+                  ]}
+                />
 
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="assign-comment-input" className="text-xs font-semibold text-ink">
-                    Nota o comentario interno (opcional)
-                  </label>
-                  <input
-                    id="assign-comment-input"
-                    type="text"
-                    value={assignComment}
-                    onChange={(e) => setAssignComment(e.target.value)}
-                    placeholder="Ej: Reasignado para soporte especializado de producto..."
-                    className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink placeholder:text-subtle focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
-                  />
-                </div>
+                <TextField
+                  id="assign-comment-input"
+                  label="Nota o comentario interno"
+                  hint="Opcional: explica brevemente el motivo del cambio de responsable."
+                  value={assignComment}
+                  onChange={(e) => setAssignComment(e.target.value)}
+                  placeholder="Ej: Reasignado para soporte especializado de producto…"
+                />
               </>
             )}
           </form>
         </Modal>
       )}
 
-      {/* Modal para Editar Atributos del Ticket (RF-T10 / PUT /api/tickets/{id}) */}
+      {/* Modal para Editar Atributos del Ticket (PUT /api/tickets/{id}) */}
       {showEditModal && (
         <Modal
           eyebrow={ticket.number}
@@ -1448,31 +1679,28 @@ export function TicketDetailPage() {
               </div>
             ) : (
               <>
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="edit-subject" className="text-xs font-semibold text-ink">
-                    Asunto <span className="text-brand-red">*</span>
-                  </label>
-                  <input
-                    id="edit-subject"
-                    type="text"
-                    required
-                    maxLength={200}
-                    value={editSubject}
-                    onChange={(e) => setEditSubject(e.target.value)}
-                    className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
-                  />
-                </div>
+                <TextField
+                  id="edit-subject"
+                  label="Asunto"
+                  required
+                  maxLength={200}
+                  value={editSubject}
+                  onChange={(e) => setEditSubject(e.target.value)}
+                />
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="edit-topic" className="text-xs font-semibold text-ink">
-                      Motivo / Tema
-                    </label>
-                    <select
+                <div className="space-y-3.5 rounded-edge border border-line-soft bg-canvas/40 p-4">
+                  <h4 className="flex items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink">
+                    <Tag className="h-3.5 w-3.5 text-brand-red" />
+                    Clasificación y enrutamiento
+                  </h4>
+
+                  <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                    <SelectField
                       id="edit-topic"
-                      value={editTopicId ?? ""}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                      label="Motivo / Tema"
+                      size="sm"
+                      value={editTopicId !== null ? String(editTopicId) : ""}
+                      onChange={(val) => {
                         const newId = val ? Number(val) : null;
                         setEditTopicId(newId);
                         if (newId) {
@@ -1487,82 +1715,72 @@ export function TicketDetailPage() {
                           }
                         }
                       }}
-                      className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
-                    >
-                      <option value="">— Sin motivo —</option>
-                      {(editCatalogs?.topics ?? []).map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      placeholder="Sin motivo"
+                      options={[
+                        { value: "", label: "Sin motivo" },
+                        ...(editCatalogs?.topics ?? []).map((t) => ({
+                          value: String(t.id),
+                          label: t.name,
+                        })),
+                      ]}
+                    />
 
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="edit-priority" className="text-xs font-semibold text-ink">
-                      Prioridad <span className="text-brand-red">*</span>
-                    </label>
-                    <select
+                    <SelectField
                       id="edit-priority"
+                      label="Prioridad"
+                      required
+                      size="sm"
                       value={editPriority}
-                      onChange={(e) => setEditPriority(e.target.value)}
-                      className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
-                    >
-                      <option value="Emergencia">Emergencia</option>
-                      <option value="Alta">Alta</option>
-                      <option value="Normal">Normal</option>
-                      <option value="Baja">Baja</option>
-                    </select>
+                      onChange={setEditPriority}
+                      options={[
+                        { value: "Emergencia", label: "Emergencia" },
+                        { value: "Alta", label: "Alta" },
+                        { value: "Normal", label: "Normal" },
+                        { value: "Baja", label: "Baja" },
+                      ]}
+                    />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="edit-dept" className="text-xs font-semibold text-ink">
-                      Departamento
-                    </label>
-                    <select
+                  <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                    <SelectField
                       id="edit-dept"
-                      value={editDepartmentId ?? ""}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setEditDepartmentId(val ? Number(val) : null);
-                      }}
-                      className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
-                    >
-                      <option value="">— Sin departamento —</option>
-                      {(editCatalogs?.departments ?? []).map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      label="Departamento"
+                      size="sm"
+                      value={editDepartmentId !== null ? String(editDepartmentId) : ""}
+                      onChange={(val) => setEditDepartmentId(val ? Number(val) : null)}
+                      placeholder="Sin departamento"
+                      options={[
+                        { value: "", label: "Sin departamento" },
+                        ...(editCatalogs?.departments ?? []).map((d) => ({
+                          value: String(d.id),
+                          label: d.name,
+                        })),
+                      ]}
+                    />
 
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="edit-line" className="text-xs font-semibold text-ink">
-                      Línea de producto
-                    </label>
-                    <select
+                    <SelectField
                       id="edit-line"
-                      value={editProductLineId ?? ""}
-                      onChange={(e) =>
-                        setEditProductLineId(e.target.value ? Number(e.target.value) : null)
-                      }
-                      className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
-                    >
-                      <option value="">— Ninguna / No aplica —</option>
-                      {(editCatalogs?.productLines ?? []).map((pl) => (
-                        <option key={pl.id} value={pl.id}>
-                          {pl.name} ({pl.code})
-                        </option>
-                      ))}
-                    </select>
+                      label={editRequiresProductLine ? "Línea de producto *" : "Línea de producto"}
+                      size="sm"
+                      required={editRequiresProductLine}
+                      value={editProductLineId !== null ? String(editProductLineId) : ""}
+                      onChange={(val) => setEditProductLineId(val ? Number(val) : null)}
+                      placeholder="Ninguna / No aplica"
+                      options={[
+                        { value: "", label: "Ninguna / No aplica" },
+                        ...(editCatalogs?.productLines ?? []).map((pl) => ({
+                          value: String(pl.id),
+                          label: `${pl.name} (${pl.code})`,
+                        })),
+                      ]}
+                    />
                   </div>
                 </div>
 
-                <p className="text-[11.5px] text-subtle leading-relaxed">
-                  Nota: Si cambias el departamento y el colaborador actualmente asignado no pertenece al nuevo departamento, será desasignado automáticamente según la regla 9.4.8.
+                <p className="flex items-start gap-1.5 text-[11px] text-faint">
+                  <Info className="mt-px h-3 w-3 shrink-0" />
+                  Si cambias el departamento y el colaborador actualmente asignado no pertenece al
+                  nuevo departamento, será desasignado automáticamente.
                 </p>
               </>
             )}

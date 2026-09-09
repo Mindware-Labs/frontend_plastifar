@@ -310,7 +310,7 @@ export function TicketsPage() {
   const [pageSize, setPageSize] = useState(10);
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  // Fase 8: Selección múltiple, acciones en lote y alta manual
+  // Selección múltiple, acciones en lote y alta manual
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
@@ -494,7 +494,7 @@ export function TicketsPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {/* Barra de criterios: búsqueda, filtros estructurales y pastillas RF-T2 */}
+        {/* Barra de criterios: búsqueda, filtros estructurales y pastillas */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <SearchInput
             value={search}
@@ -715,7 +715,7 @@ export function TicketsPage() {
                           </span>
                         </Td>
 
-                        {/* SLA (RF-T6) */}
+                        {/* SLA */}
                         <Td className="whitespace-nowrap">
                           {sla.tone === "overdue" ? (
                             <Badge tone="red">
@@ -775,7 +775,7 @@ export function TicketsPage() {
         )}
       </div>
 
-      {/* Barra flotante de acciones en lote (RF-T11) */}
+      {/* Barra flotante de acciones en lote */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-[2px] border border-slate-700 bg-ink px-4 py-2.5 text-white shadow-2xl animate-plf-toast-in">
           <div className="flex items-center gap-2 text-[12.5px] font-medium text-slate-200">
@@ -813,7 +813,7 @@ export function TicketsPage() {
         </div>
       )}
 
-      {/* Modal alta manual de ticket (RF-T10) */}
+      {/* Modal alta manual de ticket */}
       {createModalOpen && (
         <CreateTicketModal
           onClose={() => setCreateModalOpen(false)}
@@ -829,7 +829,7 @@ export function TicketsPage() {
         />
       )}
 
-      {/* Modal asignación en lote (RF-T11) */}
+      {/* Modal asignación en lote */}
       {bulkAssignOpen && (
         <Modal
           eyebrow="Acciones en lote"
@@ -882,7 +882,7 @@ export function TicketsPage() {
         </Modal>
       )}
 
-      {/* Modal cambio de prioridad en lote (RF-T11) */}
+      {/* Modal cambio de prioridad en lote */}
       {bulkPriorityOpen && (
         <Modal
           eyebrow="Acciones en lote"

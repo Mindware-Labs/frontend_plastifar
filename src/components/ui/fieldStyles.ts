@@ -7,7 +7,7 @@ export type FieldState = "idle" | "error" | "valid";
 
 export const controlBase =
   "w-full rounded-edge border bg-white text-left text-ink outline-none transition-colors " +
-  "disabled:cursor-not-allowed disabled:bg-canvas disabled:text-muted";
+  "disabled:cursor-not-allowed disabled:bg-canvas disabled:text-faint";
 
 export const stateClasses: Record<FieldState, string> = {
   idle: "border-line-strong hover:border-zinc-400 focus:border-brand-red focus:ring-3 focus:ring-brand-red/10",

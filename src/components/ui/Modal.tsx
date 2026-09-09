@@ -90,7 +90,7 @@ export function Modal({
             type="button"
             onClick={requestClose}
             aria-label="Cerrar"
-            className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-muted
+            className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle
               transition-colors hover:bg-fill hover:text-ink"
           >
             <X className="h-4 w-4" />
