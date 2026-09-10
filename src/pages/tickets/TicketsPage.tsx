@@ -76,18 +76,18 @@ const secondaryFilters = filters.filter((f) => !PRIMARY_FILTER_KEYS.includes(f.k
 
 // Tabla de anchos fijos: el asunto absorbe lo que sobra y las columnas secundarias entran por escalones.
 const columns: { key: SortKey; label: string; className: string }[] = [
-  { key: "numero", label: "Número", className: "w-[108px]" },
+  { key: "numero", label: "Número", className: "w-[100px]" },
   { key: "asunto", label: "Asunto", className: "" },
-  { key: "cliente", label: "Cliente", className: "hidden w-[164px] lg:table-cell" },
-  { key: "departamento", label: "Departamento", className: "hidden w-[136px] 2xl:table-cell" },
-  { key: "prioridad", label: "Prioridad", className: "hidden w-[112px] md:table-cell" },
-  { key: "estado", label: "Estado", className: "w-[128px]" },
-  { key: "sla", label: "SLA", className: "w-[128px]" },
-  { key: "actividad", label: "Actividad", className: "hidden w-[160px] xl:table-cell" },
+  { key: "cliente", label: "Cliente", className: "hidden w-[160px] lg:table-cell" },
+  { key: "departamento", label: "Departamento", className: "hidden w-[125px] 2xl:table-cell" },
+  { key: "prioridad", label: "Prioridad", className: "hidden w-[96px] md:table-cell" },
+  { key: "estado", label: "Estado", className: "w-[115px]" },
+  { key: "sla", label: "SLA", className: "w-[110px]" },
+  { key: "actividad", label: "Actividad", className: "hidden w-[120px] xl:table-cell" },
 ];
 
-const SELECT_COLUMN = "w-11 px-2.5 text-center";
-const ASSIGNED_COLUMN = "hidden w-[160px] lg:table-cell";
+const SELECT_COLUMN = "w-10 px-2 text-center";
+const ASSIGNED_COLUMN = "hidden w-[145px] lg:table-cell";
 
 const clientColors = [
   "bg-sky-400",
@@ -651,11 +651,13 @@ export function TicketsPage() {
               <thead>
                 <HeadRow>
                   <Th className={SELECT_COLUMN}>
-                    <SelectBox
-                      checked={pageState}
-                      label={pageState === true ? "Quitar la selección de esta página" : "Seleccionar toda la página"}
-                      onToggle={togglePage}
-                    />
+                    <div className="flex items-center justify-center">
+                      <SelectBox
+                        checked={pageState}
+                        label={pageState === true ? "Quitar la selección de esta página" : "Seleccionar toda la página"}
+                        onToggle={togglePage}
+                      />
+                    </div>
                   </Th>
                   {columns.map(({ key, label, className }) => (
                     <Th
@@ -693,60 +695,60 @@ export function TicketsPage() {
                           open();
                         }
                       }}
-                      className="group cursor-pointer outline-none data-[checked=true]:bg-brand-red/[0.04] hover:data-[checked=true]:bg-brand-red/[0.07]
-                        focus-visible:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2
-                        focus-visible:outline-brand-red/50"
+                      className="group cursor-pointer outline-none focus-visible:bg-zinc-50"
                     >
                       <Td className={SELECT_COLUMN}>
-                        <SelectBox
-                          checked={checked}
-                          label={`Seleccionar ${t.number}`}
-                          onToggle={() => toggleSelect(t.id)}
-                        />
+                        <div className="flex items-center justify-center">
+                          <SelectBox
+                            checked={checked}
+                            label={`Seleccionar ${t.number}`}
+                            onToggle={() => toggleSelect(t.id)}
+                          />
+                        </div>
                       </Td>
 
                       <Td className={columns[0].className}>
-                        <span className="font-heading text-[11.5px] font-semibold tracking-[0.02em] tabular-nums text-brand-gray">
+                        <span className="font-heading text-[12px] font-semibold tracking-tight tabular-nums text-zinc-700">
                           {t.number}
                         </span>
                       </Td>
 
                       <Td className={columns[1].className}>
-                        <p className="truncate text-[13px] font-medium text-ink" title={t.subject}>
-                          {t.subject}
-                        </p>
-                        <p className="mt-0.5 truncate text-[11.5px] text-subtle">
-                          {t.topicName ?? "Sin motivo"}
-                          {department && <span className="2xl:hidden"> · {department}</span>}
-                          {t.productLineName && <> · {t.productLineName}</>}
-                        </p>
+                        <div className="min-w-0">
+                          <p className="truncate text-[12.5px] font-medium text-zinc-900 leading-snug" title={t.subject}>
+                            {t.subject}
+                          </p>
+                          <p className="truncate text-[11px] text-zinc-500 font-normal leading-tight mt-0.5">
+                            {t.topicName ?? "Sin motivo"}
+                            {department && <span className="text-zinc-400 2xl:hidden"> · {department}</span>}
+                            {t.productLineName && <span className="text-zinc-400"> · {t.productLineName}</span>}
+                          </p>
+                        </div>
                       </Td>
 
                       <Td className={columns[2].className}>
                         {client ? (
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0" title={`${client}${clientCode ? ` (${clientCode})` : ""}`}>
                             <span
                               aria-hidden
-                              className={`h-2.5 w-2.5 shrink-0 rounded-full ${getClientDotColor(client)}`}
+                              className={`h-2 w-2 shrink-0 rounded-full ${getClientDotColor(client)}`}
                             />
-                            <div className="min-w-0 flex-1 truncate">
-                              <p className="truncate text-[13px] font-medium text-zinc-800" title={client}>
-                                {client}
-                              </p>
-                              {(t.contactName ?? clientCode) && (
-                                <p className="truncate text-[11px] text-zinc-400">
-                                  {t.contactName ?? clientCode}
-                                </p>
-                              )}
-                            </div>
+                            <span className="truncate text-[12.5px] font-medium text-zinc-800">
+                              {client}
+                            </span>
+                            {clientCode && (
+                              <span className="shrink-0 text-[11px] font-normal text-zinc-400 tabular-nums">
+                                #{clientCode}
+                              </span>
+                            )}
                           </div>
                         ) : (
-                          <span className="text-[12.5px] text-zinc-400">Sin cliente</span>
+                          <span className="text-[12px] text-zinc-400">—</span>
                         )}
                       </Td>
 
-                      <Td className={`${columns[3].className} truncate text-[12.5px] text-brand-gray`}>
-                        {department ?? <span className="text-faint">—</span>}
+                      <Td className={`${columns[3].className} truncate text-[12px] text-zinc-600`}>
+                        {department ?? <span className="text-zinc-300">—</span>}
                       </Td>
 
                       <Td className={columns[4].className}>
@@ -761,7 +763,7 @@ export function TicketsPage() {
                         <SlaCell sla={sla} />
                       </Td>
 
-                      <Td className={`${columns[7].className} truncate whitespace-nowrap text-[12px] tabular-nums text-subtle`}>
+                      <Td className={`${columns[7].className} truncate whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500`}>
                         <span className="truncate" title={activity.full}>{activity.compact}</span>
                       </Td>
 
