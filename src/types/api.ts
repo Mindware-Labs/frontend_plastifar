@@ -422,6 +422,9 @@ export interface TicketMessageResponse {
   sentAt: string | null;
   createdAt: string;
   attachments: TicketAttachmentResponse[];
+  /** Como le fue al correo de esta respuesta; nulo en notas internas y mensajes del cliente. */
+  deliveryStatus?: string | null;
+  deliveryDetail?: string | null;
 }
 
 export interface TicketEventResponse {

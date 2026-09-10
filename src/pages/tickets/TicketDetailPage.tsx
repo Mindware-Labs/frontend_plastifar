@@ -45,6 +45,25 @@ import type {
   TicketStaffOptionResponse,
 } from "../../types/api";
 
+/** Como termino el correo de una respuesta. Solo lo ve el personal. */
+const deliveryLabels: Record<string, { label: string; className: string }> = {
+  Queued: { label: "En cola", className: "border-amber-200 bg-amber-50 text-amber-800" },
+  Sent: { label: "Enviado", className: "border-sky-200 bg-sky-50 text-sky-800" },
+  Delivered: { label: "Entregado", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+  Delayed: { label: "Demorado", className: "border-amber-200 bg-amber-50 text-amber-800" },
+  Bounced: { label: "No entregado", className: "border-red-200 bg-red-50 text-red-800" },
+  Complained: { label: "Marcado como spam", className: "border-red-200 bg-red-50 text-red-800" },
+  Failed: { label: "No se pudo enviar", className: "border-red-200 bg-red-50 text-red-800" },
+};
+
+/** Lo que una etiqueta pequena no basta para contar: alguien tiene que enterarse. */
+const deliveryWarnings: Record<string, string> = {
+  Queued: "El proveedor no respondió: la respuesta espera en la cola de salida y se reintenta sola.",
+  Bounced: "El correo del cliente rechazó la respuesta. Verifica la dirección de contacto.",
+  Complained: "El cliente marcó esta respuesta como spam.",
+  Failed: "Se agotaron los reintentos: esta respuesta nunca llegó al cliente.",
+};
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -659,6 +678,9 @@ export function TicketDetailPage() {
   function renderMessageCard(msg: TicketMessageResponse) {
     const isInternal = msg.direction.toLowerCase() === "interna";
     const isOutbound = msg.direction.toLowerCase() === "saliente";
+    const deliveryKey = isOutbound ? msg.deliveryStatus ?? undefined : undefined;
+    const delivery = deliveryKey ? deliveryLabels[deliveryKey] : undefined;
+    const deliveryWarning = deliveryKey ? deliveryWarnings[deliveryKey] : undefined;
 
     return (
       <div
@@ -696,8 +718,29 @@ export function TicketDetailPage() {
             </span>
           </div>
 
-          <span className="text-[11.5px] text-subtle">{formatDateTime(msg.createdAt)}</span>
+          <div className="flex items-center gap-2">
+            {delivery && (
+              <span
+                title={msg.deliveryDetail ?? undefined}
+                className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10.5px] font-semibold ${delivery.className}`}
+              >
+                {delivery.label}
+              </span>
+            )}
+            <span className="text-[11.5px] text-subtle">{formatDateTime(msg.createdAt)}</span>
+          </div>
         </div>
+
+        {/* Lo que salió mal con el correo, en las palabras del proveedor */}
+        {deliveryWarning && (
+          <div className="mt-2.5 flex items-start gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-ink">
+            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-warn" />
+            <span>
+              {deliveryWarning}
+              {msg.deliveryDetail && <span className="text-subtle"> ({msg.deliveryDetail})</span>}
+            </span>
+          </div>
+        )}
 
         {/* Advertencia explícita en notas internas */}
         {isInternal && (
@@ -1445,7 +1488,14 @@ export function TicketDetailPage() {
                     </label>
                   </div>
 
-                  <Button type="submit" variant="primary" isLoading={replySending} className="gap-2">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    isLoading={replySending}
+                    disabled={!recipientEmail}
+                    title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
+                    className="gap-2"
+                  >
                     <Send className="h-3.5 w-3.5" />
                     Enviar respuesta
                   </Button>
