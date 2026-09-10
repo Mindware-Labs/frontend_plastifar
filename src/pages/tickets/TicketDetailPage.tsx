@@ -236,6 +236,10 @@ export function TicketDetailPage() {
   // Navegación por pestañas: Información general, Responder al cliente, Notas internas
   const [activeTab, setActiveTab] = useState<"general" | "respuestas" | "notas">("general");
 
+  // Pestaña lateral (Drawer) para el Historial Completo del ticket
+  const [showTimelineDrawer, setShowTimelineDrawer] = useState(false);
+  const [timelineFilter, setTimelineFilter] = useState<"all" | "messages" | "events">("all");
+
   // Composer: Respuesta al cliente (modo correo)
   const [replyBody, setReplyBody] = useState("");
   const [replyStatusChange, setReplyStatusChange] = useState<string>("");
@@ -296,6 +300,23 @@ export function TicketDetailPage() {
       active = false;
     };
   }, [ticketId]);
+
+  // Manejador para cerrar la pestaña lateral de historial con tecla Escape y bloquear el scroll de fondo
+  useEffect(() => {
+    if (!showTimelineDrawer) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowTimelineDrawer(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showTimelineDrawer]);
 
   const { onTicketsChanged, onTicketStatusChanged, onTicketNewMessage } = useEmailCounts();
 
@@ -660,6 +681,13 @@ export function TicketDetailPage() {
     ),
   ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
+  // Elementos del timeline filtrados para el Drawer lateral
+  const filteredTimeline = timeline.filter((item) => {
+    if (timelineFilter === "messages") return item.kind === "message";
+    if (timelineFilter === "events") return item.kind === "event";
+    return true;
+  });
+
   // Hilo con el cliente (entrante + saliente, sin notas internas) y notas internas por separado,
   // para las pestañas "Respuestas al cliente" y "Notas internas".
   const sortedMessages = [...ticket.messages].sort(
@@ -834,13 +862,25 @@ export function TicketDetailPage() {
           >
             {isInternal ? "Nota interna" : isOutbound ? "Respuesta" : "Cliente"}
           </span>
-          <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink">
+          <p className="mt-2 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink">
             {msg.bodyText ?? msg.bodyHtml?.replace(/<[^>]*>?/gm, "")}
           </p>
           {msg.attachments && msg.attachments.length > 0 && (
-            <div className="mt-2 flex items-center gap-1 text-[10.5px] text-subtle">
-              <Paperclip className="h-3 w-3" />
-              {msg.attachments.length} adjunto{msg.attachments.length > 1 ? "s" : ""}
+            <div className="mt-2 flex flex-wrap gap-1.5 border-t border-line-soft/60 pt-2 text-[10.5px] text-subtle">
+              {msg.attachments.map((att) => (
+                <button
+                  key={att.id}
+                  type="button"
+                  onClick={() => void handleDownloadAttachment(att)}
+                  disabled={downloadingId === att.id}
+                  className="inline-flex items-center gap-1.5 rounded border border-line-soft bg-white px-2 py-0.5 text-ink transition-colors hover:bg-slate-50"
+                  title="Descargar adjunto"
+                >
+                  <Paperclip className="h-3 w-3 text-subtle" />
+                  <span className="max-w-[140px] truncate">{att.fileName}</span>
+                  <Download className="h-2.5 w-2.5 text-subtle" />
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -848,28 +888,121 @@ export function TicketDetailPage() {
     );
   }
 
-  function renderTimelineCard() {
-    return (
-      <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
-        <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-          <History className="h-4 w-4 text-brand-red" />
-          Historial de conversación y eventos
-        </h3>
+  function renderTimelineDrawer() {
+    if (!showTimelineDrawer || !ticket) return null;
 
-        {timeline.length === 0 ? (
-          <div className="mt-4 rounded-edge border border-dashed border-line-strong bg-canvas/40 p-6 text-center text-xs text-subtle">
-            No hay intervenciones ni eventos registrados aún en este ticket.
+    return (
+      <div
+        className="fixed inset-0 z-50 overflow-hidden"
+        aria-labelledby="timeline-drawer-title"
+        role="dialog"
+        aria-modal="true"
+      >
+        {/* Backdrop con desenfoque suave */}
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity duration-300 ease-out"
+          onClick={() => setShowTimelineDrawer(false)}
+        />
+
+        <div className="fixed inset-y-0 right-0 flex max-w-full pl-6 sm:pl-10 pointer-events-none">
+          <div className="pointer-events-auto flex w-screen max-w-lg flex-col border-l border-line-soft bg-white shadow-2xl transition-transform duration-300 ease-out">
+            {/* Cabecera del Drawer */}
+            <div className="flex items-center justify-between border-b border-line-soft bg-slate-50/70 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-brand-red">
+                  <History className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 id="timeline-drawer-title" className="font-heading text-sm font-bold text-ink">
+                    Historial de conversación y eventos
+                  </h2>
+                  <p className="text-[11.5px] text-subtle">
+                    {ticket.number} · {timeline.length} registro{timeline.length === 1 ? "" : "s"} cronológico{timeline.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowTimelineDrawer(false)}
+                className="cursor-pointer rounded-lg p-1.5 text-subtle transition-colors hover:bg-slate-200/60 hover:text-ink"
+                title="Cerrar pestaña de historial (Esc)"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Filtros rápidos: Todos | Mensajes | Eventos */}
+            <div className="flex items-center gap-1.5 border-b border-line-soft bg-canvas/30 px-6 py-2.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setTimelineFilter("all")}
+                className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all ${
+                  timelineFilter === "all"
+                    ? "border border-line-soft bg-white text-ink shadow-2xs"
+                    : "text-subtle hover:text-ink"
+                }`}
+              >
+                Todos ({timeline.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimelineFilter("messages")}
+                className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all ${
+                  timelineFilter === "messages"
+                    ? "border border-line-soft bg-white text-ink shadow-2xs"
+                    : "text-subtle hover:text-ink"
+                }`}
+              >
+                Mensajes ({sortedMessages.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimelineFilter("events")}
+                className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all ${
+                  timelineFilter === "events"
+                    ? "border border-line-soft bg-white text-ink shadow-2xs"
+                    : "text-subtle hover:text-ink"
+                }`}
+              >
+                Eventos ({ticket.events?.length ?? 0})
+              </button>
+            </div>
+
+            {/* Lista cronológica scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              {filteredTimeline.length === 0 ? (
+                <div className="rounded-edge border border-dashed border-line-strong bg-canvas/40 p-8 text-center text-xs text-subtle">
+                  No hay registros en esta categoría.
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="absolute bottom-1 left-[7px] top-1 w-px bg-line-soft" />
+                  {filteredTimeline.map((item, idx) =>
+                    item.kind === "event"
+                      ? renderTimelineEvent(item.data, idx)
+                      : renderTimelineMessage(item.data),
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Pie del Drawer con atajo Esc y botones */}
+            <div className="flex items-center justify-between border-t border-line-soft bg-slate-50/80 px-6 py-3">
+              <span className="text-[11px] text-subtle">
+                Presiona <kbd className="rounded border border-line-strong bg-white px-1.5 py-0.5 text-[10px] font-semibold text-ink">Esc</kbd> para cerrar
+              </span>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowTimelineDrawer(false)}
+              >
+                Cerrar
+              </Button>
+            </div>
           </div>
-        ) : (
-          <div className="relative mt-4">
-            <div className="absolute bottom-1 left-[7px] top-1 w-px bg-line-soft" />
-            {timeline.map((item, idx) =>
-              item.kind === "event"
-                ? renderTimelineEvent(item.data, idx)
-                : renderTimelineMessage(item.data),
-            )}
-          </div>
-        )}
+        </div>
       </div>
     );
   }
@@ -938,6 +1071,17 @@ export function TicketDetailPage() {
                 {sla.text}
               </span>
             )}
+
+            {/* Botón para desplegar la pestaña lateral con todo el timeline */}
+            <button
+              type="button"
+              onClick={() => setShowTimelineDrawer(true)}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-soft bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs transition-colors hover:border-line-strong hover:bg-canvas hover:text-brand-red"
+              title="Abrir historial de conversaciones y eventos"
+            >
+              <History className="h-3.5 w-3.5 text-brand-red" />
+              <span>Historial ({timeline.length})</span>
+            </button>
 
             {availableTransitions.length > 0 ? (
               <Button type="button" variant="primary" size="sm" onClick={handleOpenUpdateStatusModal}>
@@ -1277,91 +1421,137 @@ export function TicketDetailPage() {
               </div>
             </div>
 
-            {/* Fila inferior de Información General: Solicitud inicial + Observadores + Adjuntos | Timeline */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="space-y-4 lg:col-span-2">
-                {/* Solicitud / Descripción inicial del caso */}
-                <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft pb-3">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-brand-red" />
-                      <h3 className="font-heading text-[12.5px] font-semibold text-ink">
-                        Descripción inicial del caso
-                      </h3>
-                    </div>
-                    {clientThread.length > 0 && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-[11.5px] text-subtle">
-                          {formatDateTime(clientThread[0].createdAt)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab("respuestas")}
-                          className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-brand-red hover:underline"
-                        >
-                          <Mail className="h-3 w-3" />
-                          Responder al cliente
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {clientThread.length > 0 ? (
-                    <>
-                      <div className="mt-3.5 text-sm leading-relaxed text-ink whitespace-pre-wrap">
-                        {clientThread[0].bodyText ?? clientThread[0].bodyHtml?.replace(/<[^>]*>?/gm, "")}
-                      </div>
-
-                      {clientThread[0].attachments && clientThread[0].attachments.length > 0 && (
-                        <div className="mt-4 border-t border-line-soft pt-3">
-                          <span className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
-                            Archivos adjuntos ({clientThread[0].attachments.length}):
-                          </span>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {clientThread[0].attachments.map((att) => (
-                              <button
-                                key={att.id}
-                                type="button"
-                                onClick={() => void handleDownloadAttachment(att)}
-                                disabled={downloadingId === att.id}
-                                className="inline-flex items-center gap-2 rounded-lg border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
-                              >
-                                <FileText className="h-3.5 w-3.5 text-subtle" />
-                                <span className="max-w-[180px] truncate">{att.fileName}</span>
-                                <span className="text-[10.5px] text-subtle">({formatBytes(att.sizeBytes)})</span>
-                                <Download className="h-3 w-3 text-subtle" />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="mt-3 text-sm text-subtle">
-                      Este ticket no tiene un mensaje de descripción inicial registrado.
-                    </div>
-                  )}
+            {/* Solicitud / Descripción inicial del caso (ancho completo y equilibrado) */}
+            <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-brand-red" />
+                  <h3 className="font-heading text-[12.5px] font-semibold text-ink">
+                    Descripción inicial del caso
+                  </h3>
                 </div>
-
-                {/* Acceso rápido a las respuestas si hay más interacción en el hilo */}
-                {clientThread.length > 1 && (
-                  <div className="flex items-center justify-between rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-sky-600" />
-                      <span className="text-xs text-ink">
-                        Hay <strong className="font-semibold">{clientThread.length - 1}</strong> respuesta{clientThread.length - 1 > 1 ? "s" : ""} adicional{clientThread.length - 1 > 1 ? "es" : ""} en la conversación.
-                      </span>
-                    </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {clientThread.length > 0 && (
+                    <span className="text-[11.5px] text-subtle">
+                      {formatDateTime(clientThread[0].createdAt)}
+                    </span>
+                  )}
+                  {/* Botón para desplegar la pestaña lateral con todo el timeline */}
+                  <button
+                    type="button"
+                    onClick={() => setShowTimelineDrawer(true)}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-soft bg-slate-50 px-2.5 py-1 text-[11.5px] font-semibold text-ink shadow-2xs transition-colors hover:border-red-200 hover:bg-red-50 hover:text-brand-red"
+                    title="Ver línea de tiempo y auditoría del ticket"
+                  >
+                    <History className="h-3.5 w-3.5 text-brand-red" />
+                    <span>Ver historial ({timeline.length})</span>
+                  </button>
+                  {clientThread.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setActiveTab("respuestas")}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-line-strong bg-white px-2.5 py-1 text-xs font-semibold text-ink shadow-2xs hover:bg-slate-50"
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-edge border border-line-soft bg-white px-2.5 py-1 text-[11.5px] font-semibold text-brand-red shadow-2xs hover:bg-red-50"
                     >
-                      Ver respuestas ({clientThread.length})
+                      <Mail className="h-3 w-3" />
+                      Responder al cliente
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
+              </div>
 
+              {clientThread.length > 0 ? (
+                <>
+                  <div className="mt-3.5 text-sm leading-relaxed text-ink whitespace-pre-wrap">
+                    {clientThread[0].bodyText ?? clientThread[0].bodyHtml?.replace(/<[^>]*>?/gm, "")}
+                  </div>
+
+                  {clientThread[0].attachments && clientThread[0].attachments.length > 0 && (
+                    <div className="mt-4 border-t border-line-soft pt-3">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+                        Archivos adjuntos ({clientThread[0].attachments.length}):
+                      </span>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {clientThread[0].attachments.map((att) => (
+                          <button
+                            key={att.id}
+                            type="button"
+                            onClick={() => void handleDownloadAttachment(att)}
+                            disabled={downloadingId === att.id}
+                            className="inline-flex items-center gap-2 rounded-lg border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
+                          >
+                            <FileText className="h-3.5 w-3.5 text-subtle" />
+                            <span className="max-w-[180px] truncate">{att.fileName}</span>
+                            <span className="text-[10.5px] text-subtle">({formatBytes(att.sizeBytes)})</span>
+                            <Download className="h-3 w-3 text-subtle" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="mt-3 text-sm text-subtle">
+                  Este ticket no tiene un mensaje de descripción inicial registrado.
+                </div>
+              )}
+            </div>
+
+            {/* Banner destacado para abrir la pestaña lateral con todo el timeline */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-brand-red">
+                  <History className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-ink">Historial de conversación y eventos</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-subtle">
+                      {timeline.length} {timeline.length === 1 ? "registro" : "registros"}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11.5px] text-subtle">
+                    Consulta la cronología completa de cambios, intervenciones, mensajes y auditoría del ticket.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTimelineDrawer(true)}
+                className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-line-strong bg-white px-3.5 py-2 text-xs font-semibold text-ink shadow-2xs transition-all hover:border-brand-red hover:bg-red-50 hover:text-brand-red"
+              >
+                <History className="h-3.5 w-3.5 text-brand-red" />
+                <span>Desplegar historial</span>
+              </button>
+            </div>
+
+            {/* Acceso rápido a las respuestas si hay más interacción en el hilo */}
+            {clientThread.length > 1 && (
+              <div className="flex items-center justify-between rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-sky-600" />
+                  <span className="text-xs text-ink">
+                    Hay <strong className="font-semibold">{clientThread.length - 1}</strong> respuesta{clientThread.length - 1 > 1 ? "s" : ""} adicional{clientThread.length - 1 > 1 ? "es" : ""} en la conversación.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("respuestas")}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-line-strong bg-white px-2.5 py-1 text-xs font-semibold text-ink shadow-2xs hover:bg-slate-50"
+                >
+                  Ver respuestas ({clientThread.length})
+                </button>
+              </div>
+            )}
+
+            {/* Sub-grid simétrica para Observadores y Adjuntos */}
+            {((ticket.watchers && ticket.watchers.length > 0) || (ticket.attachments && ticket.attachments.length > 0)) && (
+              <div
+                className={`grid grid-cols-1 ${
+                  ticket.watchers && ticket.watchers.length > 0 && ticket.attachments && ticket.attachments.length > 0
+                    ? "lg:grid-cols-2"
+                    : ""
+                } gap-6`}
+              >
                 {/* Observadores del ticket */}
                 {ticket.watchers && ticket.watchers.length > 0 && (
                   <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
@@ -1415,29 +1605,24 @@ export function TicketDetailPage() {
                   </div>
                 )}
               </div>
-
-              {/* Columna del timeline en Información general */}
-              <div className="lg:col-span-1">
-                {renderTimelineCard()}
-              </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* Pestaña 2: Responder al cliente */}
         {activeTab === "respuestas" && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
-              {clientThread.length === 0 ? (
-                <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
-                  Aún no hay respuestas ni mensajes del cliente en este ticket.
-                </div>
-              ) : (
-                clientThread.map((msg) => renderMessageCard(msg))
-              )}
+          <div className="space-y-4">
+            {clientThread.length === 0 ? (
+              <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
+                Aún no hay respuestas ni mensajes del cliente en este ticket.
+              </div>
+            ) : (
+              clientThread.map((msg) => renderMessageCard(msg))
+            )}
 
-              <div className="rounded-edge border border-line bg-white shadow-xs">
-                <div className="space-y-1.5 border-b border-line-soft px-4 py-3">
+            <div className="rounded-edge border border-line bg-white shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft px-4 py-3">
+                <div className="space-y-1">
                   <div className="flex items-center gap-2 text-[12.5px]">
                     <span className="w-12 shrink-0 font-medium text-subtle">Para:</span>
                     {recipientEmail ? (
@@ -1454,190 +1639,199 @@ export function TicketDetailPage() {
                   </div>
                 </div>
 
-                <form onSubmit={handleSendReply}>
-                  <textarea
-                    rows={6}
-                    value={replyBody}
-                    onChange={(e) => setReplyBody(e.target.value)}
-                    placeholder="Escribe tu respuesta para el cliente…"
-                    className="w-full resize-none border-0 px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-zinc-400 focus:outline-none"
-                  />
-
-                  {replyAttachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 border-t border-line-soft px-4 py-2.5">
-                      {replyAttachments.map((f, i) => (
-                        <span
-                          key={`${f.name}-${i}`}
-                          className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-canvas/60 px-2.5 py-1 text-[11.5px] text-ink"
-                        >
-                          <Paperclip className="h-3 w-3 text-subtle" />
-                          <span className="max-w-[160px] truncate">{f.name}</span>
-                          <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
-                          <button
-                            type="button"
-                            onClick={() => removeReplyFile(i)}
-                            className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {replySendError && (
-                    <div className="border-t border-line-soft px-4 py-2.5">
-                      <Alert variant="error">{replySendError}</Alert>
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft bg-canvas/40 px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={replyFileInputRef}
-                        type="file"
-                        multiple
-                        onChange={handleReplyFileChange}
-                        className="hidden"
-                        id="reply-attachment-input"
-                      />
-                      <label
-                        htmlFor="reply-attachment-input"
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
-                      >
-                        <Paperclip className="h-3.5 w-3.5" />
-                        Adjuntar
-                      </label>
-
-                      {ticket.status !== "Cancelado" && nextStatusOptions(ticket.status).length > 0 && (
-                        <select
-                          value={replyStatusChange}
-                          onChange={(e) => setReplyStatusChange(e.target.value)}
-                          className="h-8 rounded-edge border border-line-strong bg-white px-2 text-[11.5px] text-ink focus:border-brand-red focus:outline-none"
-                        >
-                          <option value="">Mantener estado ({ticket.status})</option>
-                          {nextStatusOptions(ticket.status).map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-
-                    <Button type="submit" variant="primary" isLoading={replySending} className="gap-2">
-                      <Send className="h-3.5 w-3.5" />
-                      Enviar respuesta
-                    </Button>
-                  </div>
-                </form>
+                <button
+                  type="button"
+                  onClick={() => setShowTimelineDrawer(true)}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-soft bg-slate-50 px-2.5 py-1 text-[11.5px] font-semibold text-ink shadow-2xs transition-colors hover:border-red-200 hover:bg-red-50 hover:text-brand-red"
+                  title="Consultar historial completo del ticket"
+                >
+                  <History className="h-3.5 w-3.5 text-brand-red" />
+                  <span>Ver historial ({timeline.length})</span>
+                </button>
               </div>
-            </div>
 
-            {/* Columna del timeline en Responder al cliente */}
-            <div className="lg:col-span-1">
-              {renderTimelineCard()}
+              <form onSubmit={handleSendReply}>
+                <textarea
+                  rows={6}
+                  value={replyBody}
+                  onChange={(e) => setReplyBody(e.target.value)}
+                  placeholder="Escribe tu respuesta para el cliente…"
+                  className="w-full resize-none border-0 px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-zinc-400 focus:outline-none"
+                />
+
+                {replyAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 border-t border-line-soft px-4 py-2.5">
+                    {replyAttachments.map((f, i) => (
+                      <span
+                        key={`${f.name}-${i}`}
+                        className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-canvas/60 px-2.5 py-1 text-[11.5px] text-ink"
+                      >
+                        <Paperclip className="h-3 w-3 text-subtle" />
+                        <span className="max-w-[160px] truncate">{f.name}</span>
+                        <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
+                        <button
+                          type="button"
+                          onClick={() => removeReplyFile(i)}
+                          className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {replySendError && (
+                  <div className="border-t border-line-soft px-4 py-2.5">
+                    <Alert variant="error">{replySendError}</Alert>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft bg-canvas/40 px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={replyFileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleReplyFileChange}
+                      className="hidden"
+                      id="reply-attachment-input"
+                    />
+                    <label
+                      htmlFor="reply-attachment-input"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
+                    >
+                      <Paperclip className="h-3.5 w-3.5" />
+                      Adjuntar
+                    </label>
+
+                    {ticket.status !== "Cancelado" && nextStatusOptions(ticket.status).length > 0 && (
+                      <select
+                        value={replyStatusChange}
+                        onChange={(e) => setReplyStatusChange(e.target.value)}
+                        className="h-8 rounded-edge border border-line-strong bg-white px-2 text-[11.5px] text-ink focus:border-brand-red focus:outline-none"
+                      >
+                        <option value="">Mantener estado ({ticket.status})</option>
+                        {nextStatusOptions(ticket.status).map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <Button type="submit" variant="primary" isLoading={replySending} className="gap-2">
+                    <Send className="h-3.5 w-3.5" />
+                    Enviar respuesta
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
         )}
 
         {/* Pestaña 3: Notas internas */}
         {activeTab === "notas" && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
-              {internalNotes.length === 0 ? (
-                <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
-                  Aún no hay notas internas en este ticket.
-                </div>
-              ) : (
-                internalNotes.map((msg) => renderMessageCard(msg))
-              )}
+          <div className="space-y-4">
+            {internalNotes.length === 0 ? (
+              <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
+                Aún no hay notas internas en este ticket.
+              </div>
+            ) : (
+              internalNotes.map((msg) => renderMessageCard(msg))
+            )}
 
-              <div className="rounded-edge border border-amber-300 bg-amber-50/40">
-                <div className="flex items-start gap-2 border-b border-amber-200/70 px-4 py-2.5 text-[11.5px] text-amber-900">
+            <div className="rounded-edge border border-amber-300 bg-amber-50/40">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/70 px-4 py-2.5 text-[11.5px] text-amber-900">
+                <div className="flex items-start gap-2">
                   <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" />
                   <span>
                     Solo visible para el personal de Plastifar. El cliente no puede verla ni
                     recibe copia.
                   </span>
                 </div>
-
-                <form onSubmit={handleSaveNote}>
-                  <textarea
-                    rows={5}
-                    value={noteBody}
-                    onChange={(e) => setNoteBody(e.target.value)}
-                    placeholder="Escribe una nota interna confidencial para el equipo…"
-                    className="w-full resize-none border-0 bg-transparent px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-amber-700/50 focus:outline-none"
-                  />
-
-                  {noteAttachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 border-t border-amber-200/70 px-4 py-2.5">
-                      {noteAttachments.map((f, i) => (
-                        <span
-                          key={`${f.name}-${i}`}
-                          className="inline-flex items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1 text-[11.5px] text-ink"
-                        >
-                          <Paperclip className="h-3 w-3 text-subtle" />
-                          <span className="max-w-[160px] truncate">{f.name}</span>
-                          <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
-                          <button
-                            type="button"
-                            onClick={() => removeNoteFile(i)}
-                            className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {noteSendError && (
-                    <div className="border-t border-amber-200/70 px-4 py-2.5">
-                      <Alert variant="error">{noteSendError}</Alert>
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-amber-200/70 px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={noteFileInputRef}
-                        type="file"
-                        multiple
-                        onChange={handleNoteFileChange}
-                        className="hidden"
-                        id="note-attachment-input"
-                      />
-                      <label
-                        htmlFor="note-attachment-input"
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-amber-800 transition-colors hover:bg-amber-100"
-                      >
-                        <Paperclip className="h-3.5 w-3.5" />
-                        Adjuntar
-                      </label>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={noteSending}
-                      className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-edge bg-amber-500 px-4 font-heading text-[11.5px] font-semibold uppercase tracking-[0.06em] text-white shadow-xs transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {noteSending ? (
-                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      ) : (
-                        <Lock className="h-3.5 w-3.5" />
-                      )}
-                      Guardar nota interna
-                    </button>
-                  </div>
-                </form>
+                <button
+                  type="button"
+                  onClick={() => setShowTimelineDrawer(true)}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-amber-300/80 bg-white px-2.5 py-1 text-[11.5px] font-semibold text-amber-900 shadow-2xs transition-colors hover:bg-amber-100"
+                  title="Consultar historial completo del ticket"
+                >
+                  <History className="h-3.5 w-3.5 text-amber-800" />
+                  <span>Ver historial ({timeline.length})</span>
+                </button>
               </div>
-            </div>
 
-            {/* Columna del timeline en Notas internas */}
-            <div className="lg:col-span-1">
-              {renderTimelineCard()}
+              <form onSubmit={handleSaveNote}>
+                <textarea
+                  rows={5}
+                  value={noteBody}
+                  onChange={(e) => setNoteBody(e.target.value)}
+                  placeholder="Escribe una nota interna confidencial para el equipo…"
+                  className="w-full resize-none border-0 bg-transparent px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-amber-700/50 focus:outline-none"
+                />
+
+                {noteAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 border-t border-amber-200/70 px-4 py-2.5">
+                    {noteAttachments.map((f, i) => (
+                      <span
+                        key={`${f.name}-${i}`}
+                        className="inline-flex items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1 text-[11.5px] text-ink"
+                      >
+                        <Paperclip className="h-3 w-3 text-subtle" />
+                        <span className="max-w-[160px] truncate">{f.name}</span>
+                        <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
+                        <button
+                          type="button"
+                          onClick={() => removeNoteFile(i)}
+                          className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {noteSendError && (
+                  <div className="border-t border-amber-200/70 px-4 py-2.5">
+                    <Alert variant="error">{noteSendError}</Alert>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-amber-200/70 px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={noteFileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleNoteFileChange}
+                      className="hidden"
+                      id="note-attachment-input"
+                    />
+                    <label
+                      htmlFor="note-attachment-input"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-amber-800 transition-colors hover:bg-amber-100"
+                    >
+                      <Paperclip className="h-3.5 w-3.5" />
+                      Adjuntar
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={noteSending}
+                    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-edge bg-amber-500 px-4 font-heading text-[11.5px] font-semibold uppercase tracking-[0.06em] text-white shadow-xs transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {noteSending ? (
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <Lock className="h-3.5 w-3.5" />
+                    )}
+                    Guardar nota interna
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -1981,6 +2175,9 @@ export function TicketDetailPage() {
           </form>
         </Modal>
       )}
+
+      {/* Pestaña lateral desplegable con todo el historial del ticket */}
+      {renderTimelineDrawer()}
     </div>
   );
 }
