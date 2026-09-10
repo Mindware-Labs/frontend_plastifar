@@ -1,6 +1,7 @@
 import {
   Archive,
   ArchiveRestore,
+  ArrowUpRight,
   CornerUpLeft,
   Download,
   Forward,
@@ -30,6 +31,7 @@ import { Badge } from "../../components/shadcn/badge";
 import { Button } from "../../components/shadcn/button";
 import { Separator } from "../../components/shadcn/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/shadcn/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "../../components/shadcn/popover";
 import {
   formatBytes,
   formatDateTime,
@@ -139,6 +141,75 @@ function ticketsNote(message: { direction: string; origin?: string }): string | 
   return message.direction === "Outbound"
     ? "Esta respuesta se envió desde el módulo de tickets."
     : "El cliente responde a un correo que se envió desde el módulo de tickets.";
+}
+
+interface TicketsOriginPopoverProps {
+  note: string;
+  ticketId: number | null;
+}
+
+/**
+ * Alerta incrustada en la barra de herramientas al lado de la papelera:
+ * no ocupa espacio en el cuerpo del correo y despliega una mini modal (popover)
+ * flotante con la información contextual y el acceso directo al ticket.
+ */
+function TicketsOriginPopover({ note, ticketId }: TicketsOriginPopoverProps) {
+  return (
+    <Popover>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Ver información de origen del ticket"
+              className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-edge border border-brand-red/30 bg-brand-red/8 px-2 text-[11px] font-semibold text-brand-red-dark shadow-2xs transition-all hover:border-brand-red/50 hover:bg-brand-red/15 focus-visible:ring-3 focus-visible:ring-brand-red/20 data-[state=open]:border-brand-red/60 data-[state=open]:bg-brand-red/15"
+            >
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-red text-white shadow-2xs">
+                <TicketIcon className="h-2.5 w-2.5" />
+              </span>
+              <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em]">
+                Tickets
+              </span>
+            </button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Información de origen en Tickets</TooltipContent>
+      </Tooltip>
+
+      <PopoverContent align="start" sideOffset={6} className="w-80 p-3.5">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2.5 border-b border-line-soft pb-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-brand-red/20 bg-brand-red/8 text-brand-red shadow-2xs">
+              <TicketIcon className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-brand-red-dark">
+                Módulo de Tickets
+              </h4>
+              <p className="text-[11px] text-subtle">Origen del correo</p>
+            </div>
+          </div>
+
+          <p className="text-[12px] leading-relaxed text-ink">
+            {note}
+          </p>
+
+          {ticketId && (
+            <div className="border-t border-line-soft pt-2.5">
+              <Link
+                to={`/tickets/${ticketId}`}
+                className="group flex w-full items-center justify-between rounded-edge border border-brand-red/25 bg-brand-red/[0.04] px-3 py-1.5 text-xs font-semibold text-brand-red-dark shadow-2xs transition-all hover:border-brand-red hover:bg-brand-red hover:text-white cursor-pointer"
+                title="Abrir este ticket en el módulo de Tickets"
+              >
+                <span>Ver ticket {formatTicketCode(ticketId)}</span>
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </Link>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 
@@ -721,6 +792,13 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               )}
             </>
           )}
+
+          {ticketsNote(email) && (
+            <TicketsOriginPopover
+              note={ticketsNote(email)!}
+              ticketId={email.ticketId}
+            />
+          )}
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
@@ -822,7 +900,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       <Separator className="bg-line" />
 
-      <div className="relative min-h-0 flex-1">
+      {/* Columna: los avisos ocupan lo suyo y el cuerpo se queda con el resto, sin desbordar sobre el pie. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {replyOpen && (
           <div
             ref={replyContainerRef}
@@ -1087,6 +1166,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   {(openReply.bccEmails ?? []).length > 0 && ` · CCO: ${openReply.bccEmails.join(", ")}`}
                 </p>
               </div>
+              {ticketsNote(openReply) && (
+                <TicketsOriginPopover
+                  note={ticketsNote(openReply)!}
+                  ticketId={email.ticketId}
+                />
+              )}
               <span className="shrink-0 whitespace-nowrap text-[11px] font-medium text-faint">
                 {formatDateTime(openReply.createdAt)}
               </span>
@@ -1127,12 +1212,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                     )}
                   </span>
                 </Alert>
-              </div>
-            )}
-
-            {ticketsNote(openReply) && (
-              <div className="shrink-0 border-b border-line px-4 py-2">
-                <Alert variant="info">{ticketsNote(openReply)}</Alert>
               </div>
             )}
 
@@ -1188,12 +1267,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           </div>
         )}
 
-        {ticketsNote(email) && (
-          <div className="shrink-0 px-4 pb-2 pt-2">
-            <Alert variant="info">{ticketsNote(email)}</Alert>
-          </div>
-        )}
-
         {email.direction === "Inbound" && email.authFailed && (
           <div className="shrink-0 px-4 pb-2 pt-2" title={email.authResult ?? undefined}>
             <Alert variant="error">
@@ -1208,14 +1281,14 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             sandbox=""
             srcDoc={email.bodyHtml}
             title="Cuerpo del correo"
-            className="h-full w-full border-0 bg-white"
+            className="min-h-0 w-full flex-1 border-0 bg-white"
           />
         ) : email.bodyText ? (
-          <pre className="h-full overflow-y-auto whitespace-pre-wrap p-4 text-[13px] leading-relaxed text-ink">
+          <pre className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap p-4 text-[13px] leading-relaxed text-ink">
             {email.bodyText}
           </pre>
         ) : (
-          <p className="p-4 text-[13px] text-subtle">Este correo no tiene contenido.</p>
+          <p className="min-h-0 flex-1 p-4 text-[13px] text-subtle">Este correo no tiene contenido.</p>
         )}
       </div>
 
@@ -1273,7 +1346,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       <div className="shrink-0 px-4 py-2.5">
         {others.length > 0 && (
-          <div className="mb-2 max-h-24 overflow-y-auto pr-0.5">
+          <div className="mb-2 max-h-40 overflow-y-auto pr-0.5">
             {others.map((reply) => {
               const badge = getThreadMessageBadge(reply);
               const contactName =
@@ -1312,7 +1385,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                       Tickets
                     </span>
                   )}
-                  <span className="shrink-0 text-[11.5px] font-semibold text-ink">
+                  {/* Cede antes que la fila: una direccion larga no puede empujar la hora fuera de vista. */}
+                  <span className="max-w-[45%] truncate text-[11.5px] font-semibold text-ink">
                     {contactName}
                   </span>
                   {authorNote && (
