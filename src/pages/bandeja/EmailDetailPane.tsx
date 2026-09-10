@@ -132,6 +132,15 @@ const deliveryLabels: Record<string, { label: string; className: string }> = {
 /** Estados que merecen un aviso al abrir el correo, no solo una etiqueta en la tira. */
 const alertingStatuses = new Set(["Queued", "Bounced", "Complained", "Failed"]);
 
+/** La acotacion cuando el correo no se escribio desde aca. Null si salio de la bandeja. */
+function ticketsNote(message: { direction: string; origin?: string }): string | null {
+  if (message.origin !== "Tickets") return null;
+
+  return message.direction === "Outbound"
+    ? "Esta respuesta se envió desde el módulo de tickets."
+    : "El cliente responde a un correo que se envió desde el módulo de tickets.";
+}
+
 
 function getThreadMessageBadge(message: { direction: string; subject?: string }) {
   if (message.direction !== "Outbound") {
@@ -1121,6 +1130,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               </div>
             )}
 
+            {ticketsNote(openReply) && (
+              <div className="shrink-0 border-b border-line px-4 py-2">
+                <Alert variant="info">{ticketsNote(openReply)}</Alert>
+              </div>
+            )}
+
             {openReply.direction === "Inbound" && openReply.authFailed && (
               <div className="shrink-0 border-b border-line px-4 py-2" title={openReply.authResult ?? undefined}>
                 <Alert variant="error">
@@ -1170,6 +1185,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {ticketsNote(email) && (
+          <div className="shrink-0 px-4 pb-2 pt-2">
+            <Alert variant="info">{ticketsNote(email)}</Alert>
           </div>
         )}
 
@@ -1281,6 +1302,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   >
                     {badge.label}
                   </span>
+                  {reply.origin === "Tickets" && (
+                    <span
+                      title={ticketsNote(reply) ?? undefined}
+                      className="inline-flex shrink-0 items-center rounded-full border border-brand-red/20
+                        bg-brand-red/8 px-1.5 py-0.5 font-heading text-[9px] font-bold uppercase
+                        tracking-[0.05em] text-brand-red-dark"
+                    >
+                      Tickets
+                    </span>
+                  )}
                   <span className="shrink-0 text-[11.5px] font-semibold text-ink">
                     {contactName}
                   </span>

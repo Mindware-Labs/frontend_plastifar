@@ -188,6 +188,8 @@ export interface EmailDetailResponse {
   authResult: string | null;
   /** true si spf, dkim o dmarc marcaron fail: el remitente podría estar suplantado. */
   authFailed: boolean;
+  /** Bandeja | Tickets. En un entrante, el modulo del envio que el cliente contesto. */
+  origin: string;
 }
 
 /** Un correo de la conversacion, venga del cliente o de nosotros. */
@@ -212,6 +214,8 @@ export interface EmailThreadMessageResponse {
   attachments: EmailAttachmentResponse[];
   authResult: string | null;
   authFailed: boolean;
+  /** Bandeja | Tickets. En un entrante, el modulo del envio que el cliente contesto. */
+  origin: string;
 }
 
 /** Respuesta paginada de la bandeja (GET /api/emails). */
