@@ -233,9 +233,8 @@ export function TicketDetailPage() {
     ticketId ? null : "Identificador de ticket no válido.",
   );
 
-  // Navegación por pestañas: respuestas al cliente, notas internas
-  // (el timeline ya no es una pestaña: vive fijo en la columna derecha)
-  const [activeTab, setActiveTab] = useState<"respuestas" | "notas">("respuestas");
+  // Navegación por pestañas: Información general, Responder al cliente, Notas internas
+  const [activeTab, setActiveTab] = useState<"general" | "respuestas" | "notas">("general");
 
   // Composer: Respuesta al cliente (modo correo)
   const [replyBody, setReplyBody] = useState("");
@@ -849,8 +848,40 @@ export function TicketDetailPage() {
     );
   }
 
-  const detailTabs: { key: "respuestas" | "notas"; label: string; icon: typeof Mail; count?: number }[] = [
-    { key: "respuestas", label: "Respuestas al cliente", icon: Mail, count: clientThread.length },
+  function renderTimelineCard() {
+    return (
+      <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+        <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+          <History className="h-4 w-4 text-brand-red" />
+          Historial de conversación y eventos
+        </h3>
+
+        {timeline.length === 0 ? (
+          <div className="mt-4 rounded-edge border border-dashed border-line-strong bg-canvas/40 p-6 text-center text-xs text-subtle">
+            No hay intervenciones ni eventos registrados aún en este ticket.
+          </div>
+        ) : (
+          <div className="relative mt-4">
+            <div className="absolute bottom-1 left-[7px] top-1 w-px bg-line-soft" />
+            {timeline.map((item, idx) =>
+              item.kind === "event"
+                ? renderTimelineEvent(item.data, idx)
+                : renderTimelineMessage(item.data),
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const detailTabs: {
+    key: "general" | "respuestas" | "notas";
+    label: string;
+    icon: typeof Info;
+    count?: number;
+  }[] = [
+    { key: "general", label: "Información general", icon: Info },
+    { key: "respuestas", label: "Responder al cliente", icon: Mail, count: clientThread.length },
     { key: "notas", label: "Notas internas", icon: Lock, count: internalNotes.length },
   ];
 
@@ -990,144 +1021,147 @@ export function TicketDetailPage() {
           </div>
         )}
 
-        {/* Fila de KPIs: Cliente y Contacto | Atributos del Ticket | SLA y Métricas de Tiempo */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* KPI 1: Cliente & Contacto */}
-          <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-                <Building2 className="h-4 w-4 text-brand-red" />
-                Cliente y Contacto
-              </h3>
-              {ticket.clientCode && (
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-subtle">
-                  {ticket.clientCode}
-                </span>
-              )}
-            </div>
-            <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
-              <div className="space-y-2">
-                <div>
-                  <span className="block text-[11px] text-subtle">Razón social:</span>
-                  <p className="truncate font-semibold text-ink" title={ticket.clientName || undefined}>
-                    {ticket.clientName || "Sin cliente asignado"}
-                  </p>
+        {/* Pestaña 1: Información general */}
+        {activeTab === "general" && (
+          <div className="space-y-6">
+            {/* Fila de KPIs: Cliente y Contacto | Atributos del Ticket | SLA y Métricas de Tiempo */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              {/* KPI 1: Cliente & Contacto */}
+              <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+                    <Building2 className="h-4 w-4 text-brand-red" />
+                    Cliente y Contacto
+                  </h3>
+                  {ticket.clientCode && (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-subtle">
+                      {ticket.clientCode}
+                    </span>
+                  )}
                 </div>
-                <div>
-                  <span className="block text-[11px] text-subtle">Contacto:</span>
-                  <p className="truncate font-medium text-ink" title={ticket.contactName || undefined}>
-                    {ticket.contactName || "Sin contacto registrado"}
-                  </p>
+                <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
+                  <div className="space-y-2">
+                    <div>
+                      <span className="block text-[11px] text-subtle">Razón social:</span>
+                      <p className="truncate font-semibold text-ink" title={ticket.clientName || undefined}>
+                        {ticket.clientName || "Sin cliente asignado"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="block text-[11px] text-subtle">Contacto:</span>
+                      <p className="truncate font-medium text-ink" title={ticket.contactName || undefined}>
+                        {ticket.contactName || "Sin contacto registrado"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {((ticket.contactEmail ?? ticket.requesterEmail) || ticket.contactPhone) && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
+                      {(ticket.contactEmail ?? ticket.requesterEmail) && (
+                        <div className="flex min-w-0 max-w-full items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5 shrink-0 text-subtle" />
+                          <a
+                            href={`mailto:${ticket.contactEmail ?? ticket.requesterEmail}`}
+                            className="truncate text-ink hover:underline"
+                            title={ticket.contactEmail ?? ticket.requesterEmail ?? undefined}
+                          >
+                            {ticket.contactEmail ?? ticket.requesterEmail}
+                          </a>
+                        </div>
+                      )}
+                      {ticket.contactPhone && (
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5 shrink-0 text-subtle" />
+                          <span className="text-ink">{ticket.contactPhone}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {((ticket.contactEmail ?? ticket.requesterEmail) || ticket.contactPhone) && (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
-                  {(ticket.contactEmail ?? ticket.requesterEmail) && (
-                    <div className="flex min-w-0 max-w-full items-center gap-1.5">
-                      <Mail className="h-3.5 w-3.5 shrink-0 text-subtle" />
-                      <a
-                        href={`mailto:${ticket.contactEmail ?? ticket.requesterEmail}`}
-                        className="truncate text-ink hover:underline"
-                        title={ticket.contactEmail ?? ticket.requesterEmail ?? undefined}
-                      >
-                        {ticket.contactEmail ?? ticket.requesterEmail}
-                      </a>
-                    </div>
-                  )}
-                  {ticket.contactPhone && (
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <Phone className="h-3.5 w-3.5 shrink-0 text-subtle" />
-                      <span className="text-ink">{ticket.contactPhone}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* KPI 2: Atributos del Ticket */}
-          <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-                <User className="h-4 w-4 text-brand-red" />
-                Atributos del Ticket
-              </h3>
-              {ticket.status !== "Cancelado" && ticket.status !== "Cerrado" && (
-                <button
-                  type="button"
-                  onClick={() => void handleOpenEditModal()}
-                  className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-brand-red transition-colors hover:underline"
-                  title="Editar campos clave del ticket"
-                >
-                  <Pencil className="h-3 w-3" />
-                  Editar
-                </button>
-              )}
-            </div>
-            <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
-              <div className="space-y-2.5">
-                {/* Clasificación: Departamento y Tema / Motivo con simetría exacta */}
-                <div className="grid grid-cols-2 divide-x divide-line-soft/60">
-                  <div className="min-w-0 pr-3">
-                    <span className="block text-[11px] text-subtle">Departamento:</span>
-                    <span className="block truncate font-semibold text-ink" title={ticket.departmentName || undefined}>
-                      {ticket.departmentName || "Sin departamento"}
-                    </span>
-                  </div>
-
-                  <div className="min-w-0 pl-3">
-                    <span className="block text-[11px] text-subtle">Tema / Motivo:</span>
-                    <span className="block truncate font-semibold text-ink" title={ticket.topicName || undefined}>
-                      {ticket.topicName || "Sin motivo"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Asignado a: bloque integrado con avatar e interacción limpia */}
-                <div className="flex items-center justify-between rounded-lg border border-line-soft bg-slate-50/80 px-2.5 py-1.5">
-                  <div className="flex min-w-0 items-center gap-2">
-                    {ticket.assignedStaffName ? (
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-100 text-[10.5px] font-bold text-brand-red">
-                        {getInitials(ticket.assignedStaffName)}
-                      </div>
-                    ) : (
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200/70 text-subtle">
-                        <User className="h-3.5 w-3.5" />
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <span className="block text-[10px] leading-tight text-subtle">Asignado a:</span>
-                      <span
-                        className="block truncate text-xs font-semibold text-ink"
-                        title={ticket.assignedStaffName || undefined}
-                      >
-                        {ticket.assignedStaffName ?? "Sin asignar"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {ticket.status !== "Cancelado" && (
+              {/* KPI 2: Atributos del Ticket */}
+              <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+                    <User className="h-4 w-4 text-brand-red" />
+                    Atributos del Ticket
+                  </h3>
+                  {ticket.status !== "Cancelado" && ticket.status !== "Cerrado" && (
                     <button
                       type="button"
-                      onClick={() => void handleOpenAssignModal()}
-                      className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-line-soft bg-white px-2 py-1 text-[11px] font-semibold text-brand-red shadow-2xs transition-colors hover:border-red-200 hover:bg-red-50"
-                      title="Asignar o reasignar ticket"
+                      onClick={() => void handleOpenEditModal()}
+                      className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-brand-red transition-colors hover:underline"
+                      title="Editar campos clave del ticket"
                     >
-                      <UserCheck className="h-3 w-3" />
-                      {ticket.assignedStaffId ? "Cambiar" : "Asignar"}
+                      <Pencil className="h-3 w-3" />
+                      Editar
                     </button>
                   )}
                 </div>
-              </div>
+                <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
+                  <div className="space-y-2.5">
+                    {/* Clasificación: Departamento y Tema / Motivo con simetría exacta */}
+                    <div className="grid grid-cols-2 divide-x divide-line-soft/60">
+                      <div className="min-w-0 pr-3">
+                        <span className="block text-[11px] text-subtle">Departamento:</span>
+                        <span className="block truncate font-semibold text-ink" title={ticket.departmentName || undefined}>
+                          {ticket.departmentName || "Sin departamento"}
+                        </span>
+                      </div>
 
-              {/* Pie: Canal de origen y Línea de producto */}
-              <div className="flex items-center justify-between border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <span>Canal:</span>
-                  <span className="truncate font-medium text-ink">{ticket.channel}</span>
-                </div>
-                {ticket.productLineName && (
+                      <div className="min-w-0 pl-3">
+                        <span className="block text-[11px] text-subtle">Tema / Motivo:</span>
+                        <span className="block truncate font-semibold text-ink" title={ticket.topicName || undefined}>
+                          {ticket.topicName || "Sin motivo"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Asignado a: bloque integrado con avatar e interacción limpia */}
+                    <div className="flex items-center justify-between rounded-lg border border-line-soft bg-slate-50/80 px-2.5 py-1.5">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {ticket.assignedStaffName ? (
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-100 text-[10.5px] font-bold text-brand-red">
+                            {getInitials(ticket.assignedStaffName)}
+                          </div>
+                        ) : (
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200/70 text-subtle">
+                            <User className="h-3.5 w-3.5" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <span className="block text-[10px] leading-tight text-subtle">Asignado a:</span>
+                          <span
+                            className="block truncate text-xs font-semibold text-ink"
+                            title={ticket.assignedStaffName || undefined}
+                          >
+                            {ticket.assignedStaffName ?? "Sin asignar"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {ticket.status !== "Cancelado" && (
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenAssignModal()}
+                          className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-line-soft bg-white px-2 py-1 text-[11px] font-semibold text-brand-red shadow-2xs transition-colors hover:border-red-200 hover:bg-red-50"
+                          title="Asignar o reasignar ticket"
+                        >
+                          <UserCheck className="h-3 w-3" />
+                          {ticket.assignedStaffId ? "Cambiar" : "Asignar"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pie: Canal de origen y Línea de producto */}
+                  <div className="flex items-center justify-between border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span>Canal:</span>
+                      <span className="truncate font-medium text-ink">{ticket.channel}</span>
+                    </div>
+                    {ticket.productLineName && (
                   <div className="flex shrink-0 items-center gap-1.5">
                     <span>Línea:</span>
                     <span className="truncate font-medium text-ink" title={ticket.productLineName}>
@@ -1135,401 +1169,478 @@ export function TicketDetailPage() {
                     </span>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* KPI 3: SLA y Tiempos */}
-          <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-                <Clock className="h-4 w-4 text-brand-red" />
-                SLA y Métricas de Tiempo
-              </h3>
-              {sla.tone === "ok" ? (
-                <Badge tone="green">
-                  <Clock className="mr-1 inline h-3 w-3" />
-                  {sla.text}
-                </Badge>
-              ) : sla.tone === "overdue" ? (
-                <Badge tone="red">
-                  <Clock className="mr-1 inline h-3 w-3" />
-                  {sla.text}
-                </Badge>
-              ) : sla.tone === "warning" ? (
-                <span className="inline-flex h-5 items-center rounded-full bg-amber-100 px-2 text-[10.5px] font-semibold text-amber-800">
-                  <Clock className="mr-1 inline h-3 w-3" />
-                  {sla.text}
-                </span>
-              ) : (
-                <span className="inline-flex h-5 items-center rounded-full bg-slate-100 px-2 text-[10.5px] font-medium text-slate-600">
-                  {sla.text}
-                </span>
-              )}
-            </div>
-            <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
-              <div className="space-y-2">
-                <div>
-                  <span className="block text-[11px] text-subtle">Vencimiento de Resolución:</span>
-                  <p className="font-medium text-ink">
-                    {ticket.resolutionDueAt
-                      ? formatDateTime(ticket.resolutionDueAt)
-                      : "No configurado"}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="block text-[11px] text-subtle">Primera respuesta:</span>
-                  <p className="font-medium text-ink">
-                    {ticket.firstResponseAt ? (
-                      <span className="text-emerald-700">
-                        Lograda ({formatDateTime(ticket.firstResponseAt)})
-                      </span>
-                    ) : ticket.firstResponseDueAt ? (
-                      <span>Límite: {formatDateTime(ticket.firstResponseDueAt)}</span>
-                    ) : (
-                      "Pendiente"
-                    )}
-                  </p>
-                </div>
-
-                {Boolean(ticket.pausedAt) && (
-                  <div className="rounded-lg bg-amber-50 p-2 text-amber-800">
-                    <div className="flex items-center gap-1 font-semibold">
-                      <AlertTriangle className="h-3.5 w-3.5" /> SLA Pausado
-                    </div>
-                    <p className="mt-0.5 text-[11px]">
-                      En espera del cliente desde {formatDateTime(ticket.pausedAt!)}.
-                    </p>
                   </div>
-                )}
-
-                {ticket.pausedMinutes > 0 && (
-                  <div className="flex justify-between text-subtle">
-                    <span>Tiempo total en pausa:</span>
-                    <span className="font-medium text-ink">{ticket.pausedMinutes} minutos</span>
-                  </div>
-                )}
-
-                {ticket.reopenedCount > 0 && (
-                  <div className="flex justify-between text-subtle">
-                    <span>Reaperturas:</span>
-                    <span className="font-semibold text-amber-700">{ticket.reopenedCount}</span>
-                  </div>
-                )}
-
-                {ticket.resolvedAt && (
-                  <div className="flex justify-between text-subtle">
-                    <span>Resuelto el:</span>
-                    <span className="font-medium text-ink">{formatDateTime(ticket.resolvedAt)}</span>
-                  </div>
-                )}
-
-                {ticket.closedAt && (
-                  <div className="flex justify-between text-subtle">
-                    <span>Cerrado el:</span>
-                    <span className="font-medium text-ink">{formatDateTime(ticket.closedAt)}</span>
-                  </div>
-                )}
-              </div>
-
-              {!ticket.pausedAt && ticket.pausedMinutes === 0 && ticket.reopenedCount === 0 && !ticket.resolvedAt && (
-                <div className="flex items-center justify-between border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
-                  <span>Última actividad:</span>
-                  <span className="font-medium text-ink">{formatDateTime(ticket.lastActivityAt)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Fila inferior: conversación con el cliente (bajo Cliente/Atributos) + timeline (bajo SLA) */}
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Columna principal: pestañas de conversación y compositor */}
-          <div className="space-y-4 lg:col-span-2">
-            {/* Pestaña: Respuestas al cliente, en modo correo (Para / Asunto fijos + cuerpo) */}
-            {activeTab === "respuestas" && (
-              <div className="space-y-4">
-                {clientThread.length === 0 ? (
-                  <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
-                    Aún no hay respuestas ni mensajes del cliente en este ticket.
-                  </div>
-                ) : (
-                  clientThread.map((msg) => renderMessageCard(msg))
-                )}
-
-                <div className="rounded-edge border border-line bg-white shadow-xs">
-                  <div className="space-y-1.5 border-b border-line-soft px-4 py-3">
-                    <div className="flex items-center gap-2 text-[12.5px]">
-                      <span className="w-12 shrink-0 font-medium text-subtle">Para:</span>
-                      {recipientEmail ? (
-                        <span className="truncate text-ink">{recipientEmail}</span>
-                      ) : (
-                        <span className="text-brand-red-dark">
-                          Este ticket no tiene un correo de contacto registrado.
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-[12.5px]">
-                      <span className="w-12 shrink-0 font-medium text-subtle">Asunto:</span>
-                      <span className="truncate text-ink">Re: {ticket.subject}</span>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleSendReply}>
-                    <textarea
-                      rows={6}
-                      value={replyBody}
-                      onChange={(e) => setReplyBody(e.target.value)}
-                      placeholder="Escribe tu respuesta para el cliente…"
-                      className="w-full resize-none border-0 px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-zinc-400 focus:outline-none"
-                    />
-
-                    {replyAttachments.length > 0 && (
-                      <div className="flex flex-wrap gap-2 border-t border-line-soft px-4 py-2.5">
-                        {replyAttachments.map((f, i) => (
-                          <span
-                            key={`${f.name}-${i}`}
-                            className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-canvas/60 px-2.5 py-1 text-[11.5px] text-ink"
-                          >
-                            <Paperclip className="h-3 w-3 text-subtle" />
-                            <span className="max-w-[160px] truncate">{f.name}</span>
-                            <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
-                            <button
-                              type="button"
-                              onClick={() => removeReplyFile(i)}
-                              className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {replySendError && (
-                      <div className="border-t border-line-soft px-4 py-2.5">
-                        <Alert variant="error">{replySendError}</Alert>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft bg-canvas/40 px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <input
-                          ref={replyFileInputRef}
-                          type="file"
-                          multiple
-                          onChange={handleReplyFileChange}
-                          className="hidden"
-                          id="reply-attachment-input"
-                        />
-                        <label
-                          htmlFor="reply-attachment-input"
-                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
-                        >
-                          <Paperclip className="h-3.5 w-3.5" />
-                          Adjuntar
-                        </label>
-
-                        {ticket.status !== "Cancelado" && nextStatusOptions(ticket.status).length > 0 && (
-                          <select
-                            value={replyStatusChange}
-                            onChange={(e) => setReplyStatusChange(e.target.value)}
-                            className="h-8 rounded-edge border border-line-strong bg-white px-2 text-[11.5px] text-ink focus:border-brand-red focus:outline-none"
-                          >
-                            <option value="">Mantener estado ({ticket.status})</option>
-                            {nextStatusOptions(ticket.status).map((s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-
-                      <Button type="submit" variant="primary" isLoading={replySending} className="gap-2">
-                        <Send className="h-3.5 w-3.5" />
-                        Enviar respuesta
-                      </Button>
-                    </div>
-                  </form>
                 </div>
               </div>
-            )}
 
-            {/* Pestaña: Notas internas */}
-            {activeTab === "notas" && (
-              <div className="space-y-4">
-                {internalNotes.length === 0 ? (
-                  <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
-                    Aún no hay notas internas en este ticket.
-                  </div>
-                ) : (
-                  internalNotes.map((msg) => renderMessageCard(msg))
-                )}
-
-                <div className="rounded-edge border border-amber-300 bg-amber-50/40">
-                  <div className="flex items-start gap-2 border-b border-amber-200/70 px-4 py-2.5 text-[11.5px] text-amber-900">
-                    <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" />
-                    <span>
-                      Solo visible para el personal de Plastifar. El cliente no puede verla ni
-                      recibe copia.
+              {/* KPI 3: SLA y Tiempos */}
+              <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+                    <Clock className="h-4 w-4 text-brand-red" />
+                    SLA y Métricas de Tiempo
+                  </h3>
+                  {sla.tone === "ok" ? (
+                    <Badge tone="green">
+                      <Clock className="mr-1 inline h-3 w-3" />
+                      {sla.text}
+                    </Badge>
+                  ) : sla.tone === "overdue" ? (
+                    <Badge tone="red">
+                      <Clock className="mr-1 inline h-3 w-3" />
+                      {sla.text}
+                    </Badge>
+                  ) : sla.tone === "warning" ? (
+                    <span className="inline-flex h-5 items-center rounded-full bg-amber-100 px-2 text-[10.5px] font-semibold text-amber-800">
+                      <Clock className="mr-1 inline h-3 w-3" />
+                      {sla.text}
                     </span>
-                  </div>
-
-                  <form onSubmit={handleSaveNote}>
-                    <textarea
-                      rows={5}
-                      value={noteBody}
-                      onChange={(e) => setNoteBody(e.target.value)}
-                      placeholder="Escribe una nota interna confidencial para el equipo…"
-                      className="w-full resize-none border-0 bg-transparent px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-amber-700/50 focus:outline-none"
-                    />
-
-                    {noteAttachments.length > 0 && (
-                      <div className="flex flex-wrap gap-2 border-t border-amber-200/70 px-4 py-2.5">
-                        {noteAttachments.map((f, i) => (
-                          <span
-                            key={`${f.name}-${i}`}
-                            className="inline-flex items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1 text-[11.5px] text-ink"
-                          >
-                            <Paperclip className="h-3 w-3 text-subtle" />
-                            <span className="max-w-[160px] truncate">{f.name}</span>
-                            <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
-                            <button
-                              type="button"
-                              onClick={() => removeNoteFile(i)}
-                              className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {noteSendError && (
-                      <div className="border-t border-amber-200/70 px-4 py-2.5">
-                        <Alert variant="error">{noteSendError}</Alert>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-amber-200/70 px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <input
-                          ref={noteFileInputRef}
-                          type="file"
-                          multiple
-                          onChange={handleNoteFileChange}
-                          className="hidden"
-                          id="note-attachment-input"
-                        />
-                        <label
-                          htmlFor="note-attachment-input"
-                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-amber-800 transition-colors hover:bg-amber-100"
-                        >
-                          <Paperclip className="h-3.5 w-3.5" />
-                          Adjuntar
-                        </label>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={noteSending}
-                        className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-edge bg-amber-500 px-4 font-heading text-[11.5px] font-semibold uppercase tracking-[0.06em] text-white shadow-xs transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {noteSending ? (
-                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                        ) : (
-                          <Lock className="h-3.5 w-3.5" />
-                        )}
-                        Guardar nota interna
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
-
-            {/* Observadores del ticket */}
-            {ticket.watchers && ticket.watchers.length > 0 && (
-              <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-                <h3 className="font-heading text-[12.5px] font-semibold text-ink">
-                  Observadores ({ticket.watchers.length})
-                </h3>
-                <div className="mt-3 space-y-1.5 text-xs">
-                  {ticket.watchers.map((w) => (
-                    <div key={w.id} className="flex items-center justify-between text-ink">
-                      <span className="font-medium">{w.staffName}</span>
-                      <span className="text-[11px] text-subtle">{w.staffEmail}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Todos los adjuntos del ticket */}
-            {ticket.attachments && ticket.attachments.length > 0 && (
-              <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-                <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-                  <Paperclip className="h-4 w-4 text-brand-red" />
-                  Todos los Adjuntos ({ticket.attachments.length})
-                </h3>
-                <div className="mt-3 space-y-2 text-xs">
-                  {ticket.attachments.map((att) => (
-                    <div
-                      key={att.id}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-line-soft p-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-ink" title={att.fileName}>
-                          {att.fileName}
-                        </p>
-                        <span className="text-[10px] text-subtle">
-                          {formatBytes(att.sizeBytes)} · {formatDateTime(att.createdAt)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleDownloadAttachment(att)}
-                        disabled={downloadingId === att.id}
-                        className="rounded-md border border-line-soft p-1.5 text-subtle transition-colors hover:bg-slate-100 hover:text-ink"
-                        title="Descargar"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Columna del timeline: historial completo de mensajes y eventos, siempre visible */}
-          <div className="lg:col-span-1">
-            <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
-              <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-                <History className="h-4 w-4 text-brand-red" />
-                Historial de conversación y eventos
-              </h3>
-
-              {timeline.length === 0 ? (
-                <div className="mt-4 rounded-edge border border-dashed border-line-strong bg-canvas/40 p-6 text-center text-xs text-subtle">
-                  No hay intervenciones ni eventos registrados aún en este ticket.
-                </div>
-              ) : (
-                <div className="relative mt-4">
-                  <div className="absolute bottom-1 left-[7px] top-1 w-px bg-line-soft" />
-                  {timeline.map((item, idx) =>
-                    item.kind === "event"
-                      ? renderTimelineEvent(item.data, idx)
-                      : renderTimelineMessage(item.data),
+                  ) : (
+                    <span className="inline-flex h-5 items-center rounded-full bg-slate-100 px-2 text-[10.5px] font-medium text-slate-600">
+                      {sla.text}
+                    </span>
                   )}
                 </div>
-              )}
+                <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
+                  <div className="space-y-2">
+                    <div>
+                      <span className="block text-[11px] text-subtle">Vencimiento de Resolución:</span>
+                      <p className="font-medium text-ink">
+                        {ticket.resolutionDueAt
+                          ? formatDateTime(ticket.resolutionDueAt)
+                          : "No configurado"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="block text-[11px] text-subtle">Primera respuesta:</span>
+                      <p className="font-medium text-ink">
+                        {ticket.firstResponseAt ? (
+                          <span className="text-emerald-700">
+                            Lograda ({formatDateTime(ticket.firstResponseAt)})
+                          </span>
+                        ) : ticket.firstResponseDueAt ? (
+                          <span>Límite: {formatDateTime(ticket.firstResponseDueAt)}</span>
+                        ) : (
+                          "Pendiente"
+                        )}
+                      </p>
+                    </div>
+
+                    {Boolean(ticket.pausedAt) && (
+                      <div className="rounded-lg bg-amber-50 p-2 text-amber-800">
+                        <div className="flex items-center gap-1 font-semibold">
+                          <AlertTriangle className="h-3.5 w-3.5" /> SLA Pausado
+                        </div>
+                        <p className="mt-0.5 text-[11px]">
+                          En espera del cliente desde {formatDateTime(ticket.pausedAt!)}.
+                        </p>
+                      </div>
+                    )}
+
+                    {ticket.pausedMinutes > 0 && (
+                      <div className="flex justify-between text-subtle">
+                        <span>Tiempo total en pausa:</span>
+                        <span className="font-medium text-ink">{ticket.pausedMinutes} minutos</span>
+                      </div>
+                    )}
+
+                    {ticket.reopenedCount > 0 && (
+                      <div className="flex justify-between text-subtle">
+                        <span>Reaperturas:</span>
+                        <span className="font-semibold text-amber-700">{ticket.reopenedCount}</span>
+                      </div>
+                    )}
+
+                    {ticket.resolvedAt && (
+                      <div className="flex justify-between text-subtle">
+                        <span>Resuelto el:</span>
+                        <span className="font-medium text-ink">{formatDateTime(ticket.resolvedAt)}</span>
+                      </div>
+                    )}
+
+                    {ticket.closedAt && (
+                      <div className="flex justify-between text-subtle">
+                        <span>Cerrado el:</span>
+                        <span className="font-medium text-ink">{formatDateTime(ticket.closedAt)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {!ticket.pausedAt && ticket.pausedMinutes === 0 && ticket.reopenedCount === 0 && !ticket.resolvedAt && (
+                    <div className="flex items-center justify-between border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
+                      <span>Última actividad:</span>
+                      <span className="font-medium text-ink">{formatDateTime(ticket.lastActivityAt)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Fila inferior de Información General: Solicitud inicial + Observadores + Adjuntos | Timeline */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="space-y-4 lg:col-span-2">
+                {/* Solicitud / Descripción inicial del caso */}
+                <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft pb-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-brand-red" />
+                      <h3 className="font-heading text-[12.5px] font-semibold text-ink">
+                        Descripción inicial del caso
+                      </h3>
+                    </div>
+                    {clientThread.length > 0 && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11.5px] text-subtle">
+                          {formatDateTime(clientThread[0].createdAt)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("respuestas")}
+                          className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-brand-red hover:underline"
+                        >
+                          <Mail className="h-3 w-3" />
+                          Responder al cliente
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {clientThread.length > 0 ? (
+                    <>
+                      <div className="mt-3.5 text-sm leading-relaxed text-ink whitespace-pre-wrap">
+                        {clientThread[0].bodyText ?? clientThread[0].bodyHtml?.replace(/<[^>]*>?/gm, "")}
+                      </div>
+
+                      {clientThread[0].attachments && clientThread[0].attachments.length > 0 && (
+                        <div className="mt-4 border-t border-line-soft pt-3">
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
+                            Archivos adjuntos ({clientThread[0].attachments.length}):
+                          </span>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {clientThread[0].attachments.map((att) => (
+                              <button
+                                key={att.id}
+                                type="button"
+                                onClick={() => void handleDownloadAttachment(att)}
+                                disabled={downloadingId === att.id}
+                                className="inline-flex items-center gap-2 rounded-lg border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
+                              >
+                                <FileText className="h-3.5 w-3.5 text-subtle" />
+                                <span className="max-w-[180px] truncate">{att.fileName}</span>
+                                <span className="text-[10.5px] text-subtle">({formatBytes(att.sizeBytes)})</span>
+                                <Download className="h-3 w-3 text-subtle" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="mt-3 text-sm text-subtle">
+                      Este ticket no tiene un mensaje de descripción inicial registrado.
+                    </div>
+                  )}
+                </div>
+
+                {/* Acceso rápido a las respuestas si hay más interacción en el hilo */}
+                {clientThread.length > 1 && (
+                  <div className="flex items-center justify-between rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-sky-600" />
+                      <span className="text-xs text-ink">
+                        Hay <strong className="font-semibold">{clientThread.length - 1}</strong> respuesta{clientThread.length - 1 > 1 ? "s" : ""} adicional{clientThread.length - 1 > 1 ? "es" : ""} en la conversación.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("respuestas")}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-line-strong bg-white px-2.5 py-1 text-xs font-semibold text-ink shadow-2xs hover:bg-slate-50"
+                    >
+                      Ver respuestas ({clientThread.length})
+                    </button>
+                  </div>
+                )}
+
+                {/* Observadores del ticket */}
+                {ticket.watchers && ticket.watchers.length > 0 && (
+                  <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
+                    <h3 className="font-heading text-[12.5px] font-semibold text-ink">
+                      Observadores ({ticket.watchers.length})
+                    </h3>
+                    <div className="mt-3 space-y-1.5 text-xs">
+                      {ticket.watchers.map((w) => (
+                        <div key={w.id} className="flex items-center justify-between text-ink">
+                          <span className="font-medium">{w.staffName}</span>
+                          <span className="text-[11px] text-subtle">{w.staffEmail}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Todos los adjuntos del ticket */}
+                {ticket.attachments && ticket.attachments.length > 0 && (
+                  <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
+                    <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+                      <Paperclip className="h-4 w-4 text-brand-red" />
+                      Todos los Adjuntos ({ticket.attachments.length})
+                    </h3>
+                    <div className="mt-3 space-y-2 text-xs">
+                      {ticket.attachments.map((att) => (
+                        <div
+                          key={att.id}
+                          className="flex items-center justify-between gap-2 rounded-lg border border-line-soft p-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-ink" title={att.fileName}>
+                              {att.fileName}
+                            </p>
+                            <span className="text-[10px] text-subtle">
+                              {formatBytes(att.sizeBytes)} · {formatDateTime(att.createdAt)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleDownloadAttachment(att)}
+                            disabled={downloadingId === att.id}
+                            className="rounded-md border border-line-soft p-1.5 text-subtle transition-colors hover:bg-slate-100 hover:text-ink"
+                            title="Descargar"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Columna del timeline en Información general */}
+              <div className="lg:col-span-1">
+                {renderTimelineCard()}
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Pestaña 2: Responder al cliente */}
+        {activeTab === "respuestas" && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              {clientThread.length === 0 ? (
+                <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
+                  Aún no hay respuestas ni mensajes del cliente en este ticket.
+                </div>
+              ) : (
+                clientThread.map((msg) => renderMessageCard(msg))
+              )}
+
+              <div className="rounded-edge border border-line bg-white shadow-xs">
+                <div className="space-y-1.5 border-b border-line-soft px-4 py-3">
+                  <div className="flex items-center gap-2 text-[12.5px]">
+                    <span className="w-12 shrink-0 font-medium text-subtle">Para:</span>
+                    {recipientEmail ? (
+                      <span className="truncate text-ink">{recipientEmail}</span>
+                    ) : (
+                      <span className="text-brand-red-dark">
+                        Este ticket no tiene un correo de contacto registrado.
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-[12.5px]">
+                    <span className="w-12 shrink-0 font-medium text-subtle">Asunto:</span>
+                    <span className="truncate text-ink">Re: {ticket.subject}</span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSendReply}>
+                  <textarea
+                    rows={6}
+                    value={replyBody}
+                    onChange={(e) => setReplyBody(e.target.value)}
+                    placeholder="Escribe tu respuesta para el cliente…"
+                    className="w-full resize-none border-0 px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-zinc-400 focus:outline-none"
+                  />
+
+                  {replyAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 border-t border-line-soft px-4 py-2.5">
+                      {replyAttachments.map((f, i) => (
+                        <span
+                          key={`${f.name}-${i}`}
+                          className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-canvas/60 px-2.5 py-1 text-[11.5px] text-ink"
+                        >
+                          <Paperclip className="h-3 w-3 text-subtle" />
+                          <span className="max-w-[160px] truncate">{f.name}</span>
+                          <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
+                          <button
+                            type="button"
+                            onClick={() => removeReplyFile(i)}
+                            className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {replySendError && (
+                    <div className="border-t border-line-soft px-4 py-2.5">
+                      <Alert variant="error">{replySendError}</Alert>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft bg-canvas/40 px-4 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={replyFileInputRef}
+                        type="file"
+                        multiple
+                        onChange={handleReplyFileChange}
+                        className="hidden"
+                        id="reply-attachment-input"
+                      />
+                      <label
+                        htmlFor="reply-attachment-input"
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
+                      >
+                        <Paperclip className="h-3.5 w-3.5" />
+                        Adjuntar
+                      </label>
+
+                      {ticket.status !== "Cancelado" && nextStatusOptions(ticket.status).length > 0 && (
+                        <select
+                          value={replyStatusChange}
+                          onChange={(e) => setReplyStatusChange(e.target.value)}
+                          className="h-8 rounded-edge border border-line-strong bg-white px-2 text-[11.5px] text-ink focus:border-brand-red focus:outline-none"
+                        >
+                          <option value="">Mantener estado ({ticket.status})</option>
+                          {nextStatusOptions(ticket.status).map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    <Button type="submit" variant="primary" isLoading={replySending} className="gap-2">
+                      <Send className="h-3.5 w-3.5" />
+                      Enviar respuesta
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            {/* Columna del timeline en Responder al cliente */}
+            <div className="lg:col-span-1">
+              {renderTimelineCard()}
+            </div>
+          </div>
+        )}
+
+        {/* Pestaña 3: Notas internas */}
+        {activeTab === "notas" && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              {internalNotes.length === 0 ? (
+                <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
+                  Aún no hay notas internas en este ticket.
+                </div>
+              ) : (
+                internalNotes.map((msg) => renderMessageCard(msg))
+              )}
+
+              <div className="rounded-edge border border-amber-300 bg-amber-50/40">
+                <div className="flex items-start gap-2 border-b border-amber-200/70 px-4 py-2.5 text-[11.5px] text-amber-900">
+                  <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" />
+                  <span>
+                    Solo visible para el personal de Plastifar. El cliente no puede verla ni
+                    recibe copia.
+                  </span>
+                </div>
+
+                <form onSubmit={handleSaveNote}>
+                  <textarea
+                    rows={5}
+                    value={noteBody}
+                    onChange={(e) => setNoteBody(e.target.value)}
+                    placeholder="Escribe una nota interna confidencial para el equipo…"
+                    className="w-full resize-none border-0 bg-transparent px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-amber-700/50 focus:outline-none"
+                  />
+
+                  {noteAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 border-t border-amber-200/70 px-4 py-2.5">
+                      {noteAttachments.map((f, i) => (
+                        <span
+                          key={`${f.name}-${i}`}
+                          className="inline-flex items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1 text-[11.5px] text-ink"
+                        >
+                          <Paperclip className="h-3 w-3 text-subtle" />
+                          <span className="max-w-[160px] truncate">{f.name}</span>
+                          <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
+                          <button
+                            type="button"
+                            onClick={() => removeNoteFile(i)}
+                            className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {noteSendError && (
+                    <div className="border-t border-amber-200/70 px-4 py-2.5">
+                      <Alert variant="error">{noteSendError}</Alert>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-amber-200/70 px-4 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={noteFileInputRef}
+                        type="file"
+                        multiple
+                        onChange={handleNoteFileChange}
+                        className="hidden"
+                        id="note-attachment-input"
+                      />
+                      <label
+                        htmlFor="note-attachment-input"
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-amber-800 transition-colors hover:bg-amber-100"
+                      >
+                        <Paperclip className="h-3.5 w-3.5" />
+                        Adjuntar
+                      </label>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={noteSending}
+                      className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-edge bg-amber-500 px-4 font-heading text-[11.5px] font-semibold uppercase tracking-[0.06em] text-white shadow-xs transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {noteSending ? (
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <Lock className="h-3.5 w-3.5" />
+                      )}
+                      Guardar nota interna
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            {/* Columna del timeline en Notas internas */}
+            <div className="lg:col-span-1">
+              {renderTimelineCard()}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal para Actualizar Ticket: una sola entrada para todas las transiciones de
