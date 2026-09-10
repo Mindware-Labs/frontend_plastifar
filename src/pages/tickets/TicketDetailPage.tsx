@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   Building2,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Download,
   FileText,
@@ -246,6 +248,11 @@ export function TicketDetailPage() {
 
   // Pestaña lateral (Drawer) para el Historial Completo del ticket
   const [showTimelineDrawer, setShowTimelineDrawer] = useState(false);
+  const [timelineFilter, setTimelineFilter] = useState<"all" | "messages" | "events">("all");
+
+  // Control de despliegue de mensajes/notas anteriores inline
+  const [showEarlierReplies, setShowEarlierReplies] = useState(false);
+  const [showEarlierNotes, setShowEarlierNotes] = useState(false);
 
   // Composer: Respuesta al cliente (modo correo)
   const [replyBody, setReplyBody] = useState("");
@@ -675,7 +682,7 @@ export function TicketDetailPage() {
   const internalNotes = sortedMessages.filter((m) => m.direction.toLowerCase() === "interna");
   const recipientEmail = ticket.contactEmail ?? ticket.requesterEmail ?? null;
 
-  function renderMessageCard(msg: TicketMessageResponse) {
+  function renderMessageCard(msg: TicketMessageResponse, isLatest = false) {
     const isInternal = msg.direction.toLowerCase() === "interna";
     const isOutbound = msg.direction.toLowerCase() === "saliente";
     const deliveryKey = isOutbound ? msg.deliveryStatus ?? undefined : undefined;
@@ -695,7 +702,7 @@ export function TicketDetailPage() {
       >
         {/* Cabecera del mensaje */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 pb-3">
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             {isInternal ? (
               <span className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
                 <Lock className="h-3 w-3" /> Nota Interna
@@ -716,6 +723,17 @@ export function TicketDetailPage() {
                 ticket?.requesterName ??
                 "Remitente"}
             </span>
+
+            {isLatest && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-800">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                {isOutbound
+                  ? "Última respuesta enviada"
+                  : isInternal
+                  ? "Última nota registrada"
+                  : "Último mensaje recibido"}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -1298,7 +1316,10 @@ export function TicketDetailPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowTimelineDrawer(true)}
+                onClick={() => {
+                  setTimelineFilter("all");
+                  setShowTimelineDrawer(true);
+                }}
                 className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-line-strong bg-white px-3.5 py-2 text-xs font-semibold text-ink shadow-2xs transition-all hover:border-brand-red hover:bg-red-50 hover:text-brand-red"
               >
                 <History className="h-3.5 w-3.5 text-brand-red" />
@@ -1395,11 +1416,85 @@ export function TicketDetailPage() {
         {activeTab === "respuestas" && (
           <div className="space-y-4">
             {clientThread.length === 0 ? (
-              <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
+              <div className="rounded-xl border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
                 Aún no hay respuestas ni mensajes del cliente en este ticket.
               </div>
+            ) : clientThread.length === 1 ? (
+              renderMessageCard(clientThread[0], true)
             ) : (
-              clientThread.map((msg) => renderMessageCard(msg))
+              <>
+                {/* Banner destacado para consultar o desplegar el historial de respuestas anteriores */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-brand-red">
+                      <History className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-ink">Historial de la conversación</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-subtle">
+                          {clientThread.length - 1} {clientThread.length - 1 === 1 ? "mensaje previo" : "mensajes previos"}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[11.5px] text-subtle">
+                        Consulta los intercambios anteriores con el cliente en la pestaña lateral o despliégalos aquí.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowEarlierReplies((prev) => !prev)}
+                      className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line-soft bg-slate-50 px-3 py-2 text-xs font-semibold text-ink shadow-2xs transition-all hover:bg-slate-100"
+                    >
+                      {showEarlierReplies ? (
+                        <>
+                          <ChevronUp className="h-3.5 w-3.5 text-subtle" />
+                          <span>Ocultar anteriores</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3.5 w-3.5 text-subtle" />
+                          <span>Ver anteriores ({clientThread.length - 1})</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTimelineFilter("messages");
+                        setShowTimelineDrawer(true);
+                      }}
+                      className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-line-strong bg-white px-3.5 py-2 text-xs font-semibold text-ink shadow-2xs transition-all hover:border-brand-red hover:bg-red-50 hover:text-brand-red"
+                    >
+                      <History className="h-3.5 w-3.5 text-brand-red" />
+                      <span>Desplegar historial</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mensajes anteriores colapsables inline si el usuario desea verlos aquí */}
+                {showEarlierReplies && (
+                  <div className="space-y-3 rounded-xl border border-line-soft bg-slate-50/50 p-3 sm:p-4">
+                    <div className="flex items-center justify-between px-1 pb-1 text-xs font-semibold text-subtle">
+                      <span>Intercambios anteriores ({clientThread.length - 1})</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowEarlierReplies(false)}
+                        className="cursor-pointer text-[11px] font-medium text-subtle hover:text-ink"
+                      >
+                        Ocultar
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {clientThread.slice(0, -1).map((msg) => renderMessageCard(msg))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Último mensaje recibido o enviado: la referencia activa para la respuesta */}
+                {renderMessageCard(clientThread[clientThread.length - 1], true)}
+              </>
             )}
 
             <div className="rounded-edge border border-line bg-white shadow-xs">
@@ -1423,7 +1518,10 @@ export function TicketDetailPage() {
 
                 <button
                   type="button"
-                  onClick={() => setShowTimelineDrawer(true)}
+                  onClick={() => {
+                    setTimelineFilter("messages");
+                    setShowTimelineDrawer(true);
+                  }}
                   className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-soft bg-slate-50 px-2.5 py-1 text-[11.5px] font-semibold text-ink shadow-2xs transition-colors hover:border-red-200 hover:bg-red-50 hover:text-brand-red"
                   title="Consultar historial completo del ticket"
                 >
@@ -1509,11 +1607,85 @@ export function TicketDetailPage() {
         {activeTab === "notas" && (
           <div className="space-y-4">
             {internalNotes.length === 0 ? (
-              <div className="rounded-edge border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
+              <div className="rounded-xl border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
                 Aún no hay notas internas en este ticket.
               </div>
+            ) : internalNotes.length === 1 ? (
+              renderMessageCard(internalNotes[0], true)
             ) : (
-              internalNotes.map((msg) => renderMessageCard(msg))
+              <>
+                {/* Banner destacado para notas internas anteriores */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-amber-200/70 bg-amber-50/40 p-4 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-ink">Historial de notas internas</span>
+                        <span className="rounded-full bg-amber-100/80 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                          {internalNotes.length - 1} {internalNotes.length - 1 === 1 ? "nota previa" : "notas previas"}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[11.5px] text-subtle">
+                        Consulta las notas internas anteriores en la pestaña lateral o despliégalas aquí.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowEarlierNotes((prev) => !prev)}
+                      className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-ink shadow-2xs transition-all hover:bg-amber-50"
+                    >
+                      {showEarlierNotes ? (
+                        <>
+                          <ChevronUp className="h-3.5 w-3.5 text-subtle" />
+                          <span>Ocultar anteriores</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3.5 w-3.5 text-subtle" />
+                          <span>Ver anteriores ({internalNotes.length - 1})</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTimelineFilter("messages");
+                        setShowTimelineDrawer(true);
+                      }}
+                      className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3.5 py-2 text-xs font-semibold text-amber-900 shadow-2xs transition-all hover:bg-amber-100"
+                    >
+                      <History className="h-3.5 w-3.5 text-amber-700" />
+                      <span>Desplegar historial</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Notas anteriores colapsables inline */}
+                {showEarlierNotes && (
+                  <div className="space-y-3 rounded-xl border border-amber-200/60 bg-amber-50/30 p-3 sm:p-4">
+                    <div className="flex items-center justify-between px-1 pb-1 text-xs font-semibold text-amber-900">
+                      <span>Notas anteriores ({internalNotes.length - 1})</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowEarlierNotes(false)}
+                        className="cursor-pointer text-[11px] font-medium text-amber-800 hover:text-ink"
+                      >
+                        Ocultar
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {internalNotes.slice(0, -1).map((msg) => renderMessageCard(msg))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Última nota interna */}
+                {renderMessageCard(internalNotes[internalNotes.length - 1], true)}
+              </>
             )}
 
             <div className="rounded-edge border border-amber-300 bg-amber-50/40">
@@ -1527,7 +1699,10 @@ export function TicketDetailPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowTimelineDrawer(true)}
+                  onClick={() => {
+                    setTimelineFilter("messages");
+                    setShowTimelineDrawer(true);
+                  }}
                   className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-amber-300/80 bg-white px-2.5 py-1 text-[11.5px] font-semibold text-amber-900 shadow-2xs transition-colors hover:bg-amber-100"
                   title="Consultar historial completo del ticket"
                 >
@@ -1960,6 +2135,7 @@ export function TicketDetailPage() {
           onDownloadAttachment={handleDownloadAttachment}
           onClose={() => setShowTimelineDrawer(false)}
           onSelectTab={setActiveTab}
+          initialFilter={timelineFilter}
         />
       )}
     </div>

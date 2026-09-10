@@ -34,6 +34,7 @@ export interface TicketTimelineSheetProps {
   onDownloadAttachment: (att: TicketAttachmentResponse) => void;
   onClose: () => void;
   onSelectTab?: (tab: "general" | "respuestas" | "notas") => void;
+  initialFilter?: "all" | "messages" | "events";
 }
 
 export function TicketTimelineSheet({
@@ -44,12 +45,13 @@ export function TicketTimelineSheet({
   onDownloadAttachment,
   onClose,
   onSelectTab,
+  initialFilter = "all",
 }: TicketTimelineSheetProps) {
   // Coordinar animación suave de entrada y salida sincronizada con index.css (220ms)
   const { isExiting, requestClose } = useModalAnimation(onClose, 220);
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const [filter, setFilter] = useState<"all" | "messages" | "events">("all");
+  const [filter, setFilter] = useState<"all" | "messages" | "events">(initialFilter);
 
   // Bloqueo de scroll de fondo y atajo de teclado Escape
   useEffect(() => {
