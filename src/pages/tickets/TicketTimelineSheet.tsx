@@ -1,67 +1,58 @@
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Eye,
-  History,
-  Info,
-  Lock,
-  Mail,
-  Paperclip,
-  User,
-  X,
-} from "lucide-react";
+import { AlertTriangle, Check, Lock, Mail, User, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { FilterChip } from "../../components/ui/FilterChip";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatDateTime } from "../../lib/format";
-import { FormattedTicketBody } from "./FormattedTicketBody";
-import { isEmailChannel, originLabel } from "./ticketOrigin";
 import type {
   TicketAttachmentResponse,
   TicketDetailResponse,
   TicketEventResponse,
   TicketMessageResponse,
 } from "../../types/api";
+import { FormattedTicketBody } from "./FormattedTicketBody";
+import { AttachmentChip } from "./TicketMessageCard";
+import { originLabel } from "./ticketOrigin";
 
 export type TimelineItem =
   | { kind: "message"; data: TicketMessageResponse; createdAt: string }
   | { kind: "event"; data: TicketEventResponse; createdAt: string };
 
+export type TicketDetailTab = "conversacion" | "notas";
+
+type TimelineFilter = "all" | "messages" | "events";
+
 export interface TicketTimelineSheetProps {
   ticket: TicketDetailResponse;
   timeline: TimelineItem[];
-  sortedMessages: TicketMessageResponse[];
-  /** Abre el visor; desde ahí se decide si además se descarga. */
+  /** Abre el visor; desde ahi se decide si ademas se descarga. */
   onOpenAttachment: (attachments: TicketAttachmentResponse[], attachmentId: number) => void;
   onClose: () => void;
-  onSelectTab?: (tab: "general" | "respuestas" | "notas") => void;
-  initialFilter?: "all" | "messages" | "events";
+  onSelectTab?: (tab: TicketDetailTab) => void;
+  initialFilter?: TimelineFilter;
 }
 
+/** Cronologia completa del ticket, mensajes y eventos entrelazados, en un cajon lateral. */
 export function TicketTimelineSheet({
   ticket,
   timeline,
-  sortedMessages,
   onOpenAttachment,
   onClose,
   onSelectTab,
   initialFilter = "all",
 }: TicketTimelineSheetProps) {
-  // Coordinar animación suave de entrada y salida sincronizada con index.css (220ms)
   const { isExiting, requestClose } = useModalAnimation(onClose, 220);
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const [filter, setFilter] = useState<"all" | "messages" | "events">(initialFilter);
+  const [filter, setFilter] = useState<TimelineFilter>(initialFilter);
 
-  // Bloqueo de scroll de fondo y atajo de teclado Escape
   useEffect(() => {
     closeButtonRef.current?.focus();
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isExiting) {
-        requestClose();
-      }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isExiting) requestClose();
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -74,252 +65,182 @@ export function TicketTimelineSheet({
     };
   }, [isExiting, requestClose]);
 
-  const filteredTimeline = timeline.filter((item) => {
-    if (filter === "messages") return item.kind === "message";
-    if (filter === "events") return item.kind === "event";
-    return true;
-  });
+  const messageCount = timeline.filter((item) => item.kind === "message").length;
+  const eventCount = timeline.length - messageCount;
+  const filtered = timeline.filter((item) =>
+    filter === "messages" ? item.kind === "message" : filter === "events" ? item.kind === "event" : true,
+  );
+  const origin = originLabel(ticket.channel);
 
-  function renderTimelineEvent(evt: TicketEventResponse, idx: number) {
+  function renderEvent(event: TicketEventResponse, index: number) {
     const isBreach =
-      evt.eventType === "SlaBreached" ||
-      Boolean(evt.details?.toLowerCase().includes("incumplimiento de sla"));
+      event.eventType === "SlaBreached" || Boolean(event.details?.toLowerCase().includes("incumplimiento de sla"));
+
     return (
-      <div key={`tl-evt-${evt.id}-${idx}`} className="relative pb-5 pl-7 last:pb-0">
+      <li key={`evt-${event.id}-${index}`} className="relative pb-5 pl-8 last:pb-0">
         <span
-          className={`absolute left-0 top-0.5 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-white ${
-            isBreach ? "bg-red-600" : "bg-zinc-400"
+          aria-hidden
+          className={`absolute left-0 top-0 flex h-[18px] w-[18px] items-center justify-center rounded-full ring-4 ring-white ${
+            isBreach ? "bg-brand-red text-white" : "bg-line-strong text-brand-gray"
           }`}
         >
-          {isBreach ? (
-            <AlertTriangle className="h-2.5 w-2.5 text-white" />
-          ) : (
-            <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-          )}
+          {isBreach ? <AlertTriangle className="h-2.5 w-2.5" /> : <Check className="h-2.5 w-2.5" strokeWidth={3} />}
         </span>
-        <div
-          className={`rounded-lg border px-3 py-2 text-[11px] ${
-            isBreach ? "border-red-200 bg-red-50" : "border-line-soft bg-canvas/50"
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className={`font-medium ${isBreach ? "text-red-900" : "text-ink"}`}>
-              {evt.actorStaffName ?? "Sistema"}
-            </span>
-            <span className="shrink-0 text-[10px] text-subtle">{formatDateTime(evt.createdAt)}</span>
-          </div>
-          <p className={`mt-0.5 ${isBreach ? "font-medium text-red-700" : "text-subtle"}`}>
-            {evt.details ?? evt.eventType}
-          </p>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[12.5px] font-medium text-ink">{event.actorStaffName ?? "Sistema"}</span>
+          <time dateTime={event.createdAt} className="shrink-0 text-[11px] tabular-nums text-subtle">
+            {formatDateTime(event.createdAt)}
+          </time>
         </div>
-      </div>
+        <p className={`mt-0.5 text-[12px] ${isBreach ? "font-medium text-brand-red-dark" : "text-subtle"}`}>
+          {event.details ?? event.eventType}
+        </p>
+      </li>
     );
   }
 
-  const isCorreo = isEmailChannel(ticket.channel);
-  const origin = originLabel(ticket.channel);
-
-  function renderTimelineMessage(msg: TicketMessageResponse) {
-    const isInternal = msg.direction.toLowerCase() === "interna";
-    const isOutbound = msg.direction.toLowerCase() === "saliente";
-    const dotColor = isInternal ? "bg-amber-500" : isOutbound ? "bg-sky-600" : "bg-slate-700";
+  function renderMessage(message: TicketMessageResponse) {
+    const direction = message.direction.toLowerCase();
+    const isInternal = direction === "interna";
+    const isOutbound = direction === "saliente";
+    const author = message.authorStaffName ?? message.authorContactName ?? ticket.requesterName ?? "Remitente";
+    const role = isInternal ? "Nota interna" : isOutbound ? "Respuesta" : "Cliente";
+    const Icon = isInternal ? Lock : isOutbound ? Mail : User;
+    const dotClass = isInternal ? "bg-warn" : isOutbound ? "bg-ink" : "bg-brand-gray";
 
     return (
-      <div key={`tl-msg-${msg.id}`} className="relative pb-5 pl-7 last:pb-0">
+      <li key={`msg-${message.id}`} className="relative pb-5 pl-8 last:pb-0">
         <span
-          className={`absolute left-0 top-0.5 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-white ${dotColor}`}
+          aria-hidden
+          className={`absolute left-0 top-0 flex h-[18px] w-[18px] items-center justify-center rounded-full text-white ring-4 ring-white ${dotClass}`}
         >
-          {isInternal ? (
-            <Lock className="h-2.5 w-2.5 text-white" />
-          ) : isOutbound ? (
-            <Mail className="h-2.5 w-2.5 text-white" />
-          ) : (
-            <User className="h-2.5 w-2.5 text-white" />
-          )}
+          <Icon className="h-2.5 w-2.5" />
         </span>
         <div
-          className={`rounded-lg border p-3 text-xs ${
-            isInternal
-              ? "border-amber-200 bg-amber-50/60"
-              : isOutbound
-              ? "border-line-soft bg-white"
-              : "border-slate-200 bg-slate-50/80"
+          className={`rounded-edge border p-3 ${
+            isInternal ? "border-warn/30 bg-warn/[0.045]" : isOutbound ? "border-line bg-white" : "border-line bg-canvas/60"
           }`}
         >
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate font-semibold text-ink">
-              {msg.authorStaffName ?? msg.authorContactName ?? ticket.requesterName ?? "Remitente"}
-            </span>
-            <span className="shrink-0 text-[10px] text-subtle">{formatDateTime(msg.createdAt)}</span>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="truncate text-[12.5px] font-semibold text-ink">{author}</span>
+            <time dateTime={message.createdAt} className="shrink-0 text-[11px] tabular-nums text-subtle">
+              {formatDateTime(message.createdAt)}
+            </time>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <span
-              className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ${dotColor}`}
-            >
-              {isInternal ? "Nota interna" : isOutbound ? "Respuesta" : "Cliente"}
-            </span>
-
-            {/* En una lista cronológica, el primero se confunde con uno más: aquí se nombra. */}
-            {msg.isOrigin && (
-              <span
-                title={`${origin.hint} ${formatDateTime(msg.createdAt)}`}
-                className="inline-flex items-center gap-1 rounded border border-line-strong bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-ink"
-              >
-                {isCorreo ? <Mail className="h-2.5 w-2.5 text-subtle" /> : <Info className="h-2.5 w-2.5 text-subtle" />}
-                {origin.label}
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11.5px] text-subtle">
+            {role}
+            {/* En una lista cronologica el primero se confunde con uno mas: aqui se nombra. */}
+            {message.isOrigin && (
+              <span title={`${origin.hint} ${formatDateTime(message.createdAt)}`}>
+                <Badge>{origin.label}</Badge>
               </span>
             )}
           </div>
-          <div className="mt-2 w-full text-[11.5px] leading-relaxed text-ink">
-            <FormattedTicketBody text={msg.bodyText} html={msg.bodyHtml} />
+          <div className="mt-2 text-[12.5px] leading-relaxed text-ink">
+            <FormattedTicketBody text={message.bodyText} html={message.bodyHtml} />
           </div>
-          {msg.attachments && msg.attachments.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5 border-t border-line-soft/60 pt-2 text-[10.5px] text-subtle">
-              {msg.attachments.map((att) => (
-                <button
-                  key={att.id}
-                  type="button"
-                  onClick={() => onOpenAttachment(msg.attachments, att.id)}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-line-soft bg-white px-2 py-0.5 text-ink transition-colors hover:bg-slate-50"
-                  title={`Abrir ${att.fileName}`}
-                >
-                  <Paperclip className="h-3 w-3 text-subtle" />
-                  <span className="max-w-[140px] truncate">{att.fileName}</span>
-                  <Eye className="h-2.5 w-2.5 text-subtle" />
-                </button>
+          {message.attachments.length > 0 && (
+            <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-line/70 pt-2.5">
+              {message.attachments.map((attachment) => (
+                <AttachmentChip
+                  key={attachment.id}
+                  attachment={attachment}
+                  onOpen={() => onOpenAttachment(message.attachments, attachment.id)}
+                />
               ))}
             </div>
           )}
         </div>
-      </div>
+      </li>
     );
   }
 
   return createPortal(
     <div
       inert={isExiting ? true : undefined}
-      className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] transition-opacity ${
+      className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] ${
         isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
       }`}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !isExiting) requestClose();
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isExiting) requestClose();
       }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[540px] md:w-[600px] ${
+        className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[560px] ${
           isExiting ? "animate-plf-drawer-out pointer-events-none" : "animate-plf-drawer-in"
         }`}
       >
-        {/* Cabecera del Drawer */}
-        <div className="flex shrink-0 items-center justify-between border-b border-line bg-slate-50/70 px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red">
-              <History className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 id={titleId} className="font-heading text-sm font-bold text-ink">
-                Historial de conversación y eventos
-              </h2>
-              <p className="text-[11.5px] text-subtle">
-                {ticket.number} · {timeline.length} registro{timeline.length === 1 ? "" : "s"} cronológico{timeline.length === 1 ? "" : "s"}
-              </p>
-            </div>
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
+          <div className="min-w-0">
+            <h2 id={titleId} className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+              Historial
+            </h2>
+            <p className="mt-0.5 text-[12px] tabular-nums text-subtle">
+              {ticket.number} · {timeline.length} {timeline.length === 1 ? "registro" : "registros"}
+            </p>
           </div>
-
           <button
             ref={closeButtonRef}
             type="button"
             onClick={requestClose}
-            className="cursor-pointer rounded-lg p-1.5 text-subtle transition-colors hover:bg-slate-200/60 hover:text-ink"
-            title="Cerrar pestaña de historial (Esc)"
+            aria-label="Cerrar el historial (Esc)"
+            title="Cerrar (Esc)"
+            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle outline-none
+              transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Filtros rápidos: Todos | Mensajes | Eventos */}
-        <div className="flex shrink-0 items-center gap-1.5 border-b border-line bg-canvas/40 px-6 py-2.5 text-xs">
-          <button
-            type="button"
-            onClick={() => setFilter("all")}
-            className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all ${
-              filter === "all"
-                ? "border border-line-soft bg-white text-ink shadow-2xs"
-                : "text-subtle hover:text-ink"
-            }`}
-          >
-            Todos ({timeline.length})
-          </button>
-          <button
-            type="button"
+        <div className="flex shrink-0 flex-wrap gap-1.5 border-b border-line px-6 py-2.5">
+          <FilterChip label="Todos" count={timeline.length} active={filter === "all"} onClick={() => setFilter("all")} />
+          <FilterChip
+            label="Mensajes"
+            count={messageCount}
+            active={filter === "messages"}
             onClick={() => setFilter("messages")}
-            className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all ${
-              filter === "messages"
-                ? "border border-line-soft bg-white text-ink shadow-2xs"
-                : "text-subtle hover:text-ink"
-            }`}
-          >
-            Mensajes ({sortedMessages.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilter("events")}
-            className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all ${
-              filter === "events"
-                ? "border border-line-soft bg-white text-ink shadow-2xs"
-                : "text-subtle hover:text-ink"
-            }`}
-          >
-            Eventos ({ticket.events?.length ?? 0})
-          </button>
+          />
+          <FilterChip label="Eventos" count={eventCount} active={filter === "events"} onClick={() => setFilter("events")} />
         </div>
 
-        {/* Lista cronológica scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          {filteredTimeline.length === 0 ? (
-            <div className="rounded-edge border border-dashed border-line-strong bg-canvas/40 p-8 text-center text-xs text-subtle">
-              No hay registros en esta categoría.
-            </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          {filtered.length === 0 ? (
+            <p className="py-10 text-center text-[12.5px] text-faint">No hay registros de este tipo.</p>
           ) : (
-            <div className="relative">
-              <div className="absolute bottom-1 left-[7px] top-1 w-px bg-line-soft" />
-              {filteredTimeline.map((item, idx) =>
-                item.kind === "event"
-                  ? renderTimelineEvent(item.data, idx)
-                  : renderTimelineMessage(item.data),
+            <ol className="relative">
+              <span aria-hidden className="absolute bottom-2 left-[8.5px] top-2 w-px bg-line" />
+              {filtered.map((item, index) =>
+                item.kind === "event" ? renderEvent(item.data, index) : renderMessage(item.data),
               )}
-            </div>
+            </ol>
           )}
         </div>
 
-        {/* Pie del Drawer con atajo Esc y botones */}
-        <div className="flex shrink-0 items-center justify-between border-t border-line bg-slate-50/80 px-6 py-3">
-          <span className="text-[11px] text-subtle">
-            Presiona <kbd className="rounded border border-line-strong bg-white px-1.5 py-0.5 text-[10px] font-semibold text-ink">Esc</kbd> para salir
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line px-6 py-3">
+          <span className="text-[11.5px] text-subtle">
+            <kbd className="rounded-edge border border-line-strong bg-white px-1.5 py-0.5 font-heading text-[10px] font-semibold text-ink">
+              Esc
+            </kbd>{" "}
+            para cerrar
           </span>
           <div className="flex items-center gap-2">
             {onSelectTab && (
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => {
                   requestClose();
-                  onSelectTab("respuestas");
+                  onSelectTab("conversacion");
                 }}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-line-soft bg-white px-3 py-1.5 text-xs font-semibold text-brand-red shadow-2xs hover:bg-red-50"
               >
-                <Mail className="h-3.5 w-3.5" />
-                Responder al cliente
-              </button>
+                Ir a la conversación
+              </Button>
             )}
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={requestClose}
-            >
+            <Button type="button" size="sm" onClick={requestClose}>
               Cerrar
             </Button>
           </div>

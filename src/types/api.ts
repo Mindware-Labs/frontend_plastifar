@@ -684,6 +684,23 @@ export interface TicketTopicResponse {
   updatedAt: string;
 }
 
+/** Contadores de las pastillas: los calcula la busqueda, no la pagina que se ve. */
+export interface TicketTopicCounts {
+  all: number;
+  active: number;
+  inactive: number;
+}
+
+/** Respuesta paginada del catalogo de motivos (GET /api/ticket-topics). */
+export interface TicketTopicListResponse {
+  items: TicketTopicResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: TicketTopicCounts;
+}
+
 export interface SaveTicketTopicRequest {
   name: string;
   defaultDepartmentId: number;

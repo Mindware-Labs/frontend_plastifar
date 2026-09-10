@@ -1,131 +1,48 @@
 import {
-  AlertTriangle,
   ArrowLeft,
-  Building2,
   CheckCircle2,
   Clock,
   CornerUpLeft,
-  Eye,
-  FileText,
   History,
-  Info,
   Lock,
   Mail,
   Package,
   Paperclip,
-  Pencil,
-  Phone,
   Plus,
   RefreshCw,
   RotateCcw,
   Send,
-  Tag,
-  User,
-  UserCheck,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ticketsApi } from "../../api/tickets";
-import { TicketTimelineSheet } from "./TicketTimelineSheet";
-import { FormattedTicketBody } from "./FormattedTicketBody";
-import { AttachmentPreviewModal } from "../bandeja/AttachmentPreviewModal";
-import { isEmailChannel, originLabel } from "./ticketOrigin";
-import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
-import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
-import { useEmailCounts } from "../../context/useEmailCounts";
+import { Tabs, TabsList, TabsTrigger } from "../../components/shadcn/tabs";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { SelectField, TextField } from "../../components/ui/Field";
+import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
-import { formatDateTime, formatSlaRemaining } from "../../lib/format";
+import { useEmailCounts } from "../../context/useEmailCounts";
+import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
+import { formatBytes, formatDateTime, formatSlaRemaining } from "../../lib/format";
 import type {
   TicketAttachmentResponse,
   TicketCreateOptionsResponse,
   TicketDetailResponse,
-  TicketEventResponse,
-  TicketMessageResponse,
   TicketStaffOptionResponse,
 } from "../../types/api";
+import { AttachmentPreviewModal } from "../bandeja/AttachmentPreviewModal";
+import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
+import { TicketMessageCard } from "./TicketMessageCard";
+import { TicketPropertiesAside } from "./TicketPropertiesAside";
+import { TicketTimelineSheet, type TicketDetailTab, type TimelineItem } from "./TicketTimelineSheet";
 
 /** El atajo se nombra con la tecla que la persona tiene delante, no con las dos. */
 const SAVE_SHORTCUT =
-  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent)
-    ? "⌘ + Enter"
-    : "Ctrl + Enter";
-
-/** Como termino el correo de una respuesta. Solo lo ve el personal. */
-const deliveryLabels: Record<string, { label: string; className: string }> = {
-  Queued: { label: "En cola", className: "border-amber-200 bg-amber-50 text-amber-800" },
-  Sent: { label: "Enviado", className: "border-sky-200 bg-sky-50 text-sky-800" },
-  Delivered: { label: "Entregado", className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
-  Delayed: { label: "Demorado", className: "border-amber-200 bg-amber-50 text-amber-800" },
-  Bounced: { label: "No entregado", className: "border-red-200 bg-red-50 text-red-800" },
-  Complained: { label: "Marcado como spam", className: "border-red-200 bg-red-50 text-red-800" },
-  Failed: { label: "No se pudo enviar", className: "border-red-200 bg-red-50 text-red-800" },
-};
-
-/** Lo que una etiqueta pequena no basta para contar: alguien tiene que enterarse. */
-const deliveryWarnings: Record<string, string> = {
-  Queued: "El proveedor no respondió: la respuesta espera en la cola de salida y se reintenta sola.",
-  Bounced: "El correo del cliente rechazó la respuesta. Verifica la dirección de contacto.",
-  Complained: "El cliente marcó esta respuesta como spam.",
-  Failed: "Se agotaron los reintentos: esta respuesta nunca llegó al cliente.",
-};
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function getInitials(name?: string | null): string {
-  if (!name) return "";
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
-}
-
-function priorityClasses(priority: string): string {
-  switch (priority.toLowerCase()) {
-    case "emergencia":
-      return "bg-red-50 text-red-700 border-red-200 font-semibold";
-    case "alta":
-      return "bg-amber-50 text-amber-800 border-amber-200";
-    case "normal":
-      return "bg-slate-50 text-slate-700 border-slate-200";
-    case "baja":
-      return "bg-gray-50 text-gray-600 border-gray-200";
-    default:
-      return "bg-slate-50 text-slate-700 border-slate-200";
-  }
-}
-
-function statusDotColor(status: string): string {
-  switch (status.toLowerCase()) {
-    case "abierto":
-      return "bg-emerald-500";
-    case "en espera del cliente":
-    case "en-espera":
-      return "bg-amber-500";
-    case "reenvío de producto":
-    case "reenvio de producto":
-      return "bg-indigo-500";
-    case "solucionado":
-      return "bg-blue-500";
-    case "cancelado":
-      return "bg-rose-500";
-    default:
-      return "bg-slate-400";
-  }
-}
-
-type TimelineItem =
-  | { kind: "message"; data: TicketMessageResponse; createdAt: string }
-  | { kind: "event"; data: TicketEventResponse; createdAt: string };
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘ + Enter" : "Ctrl + Enter";
 
 const MAX_SINGLE_ATTACHMENT = 10 * 1024 * 1024;
 const MAX_TOTAL_ATTACHMENTS = 25 * 1024 * 1024;
@@ -143,9 +60,7 @@ function validateAttachments(chosen: File[], existing: File[]): string | null {
   return null;
 }
 
-
-/** Categorías de cierre para un ticket solucionado (sin catálogo propio en el backend
- * aún: se envían como parte del texto de motivo, visible en el historial del ticket). */
+/** Categorias de cierre de un ticket solucionado; viajan dentro del motivo, visibles en el historial. */
 const SOLUTION_TYPES = [
   "Consulta resuelta",
   "Reemplazo de producto",
@@ -155,6 +70,8 @@ const SOLUTION_TYPES = [
   "Otro",
 ];
 
+const PRIORITY_OPTIONS = ["Emergencia", "Alta", "Normal", "Baja"].map((value) => ({ value, label: value }));
+
 interface StatusTransitionOption {
   target: string;
   label: string;
@@ -163,8 +80,15 @@ interface StatusTransitionOption {
   danger?: boolean;
 }
 
-/** Transiciones válidas desde el estado actual, para el modal "Actualizar ticket"
- * (sustituye a los botones sueltos de En espera / Reenvío / Solucionar / Cancelar). */
+const CANCEL_TRANSITION: StatusTransitionOption = {
+  target: "Cancelado",
+  label: "Cancelar ticket",
+  description: "Cierre definitivo; exige un motivo explicativo.",
+  icon: X,
+  danger: true,
+};
+
+/** Transiciones validas desde el estado actual, para el dialogo "Actualizar ticket". */
 function getAvailableTransitions(status: string): StatusTransitionOption[] {
   switch (status) {
     case "Abierto":
@@ -187,13 +111,7 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
           description: "Requiere haber enviado antes al menos una respuesta al cliente.",
           icon: CheckCircle2,
         },
-        {
-          target: "Cancelado",
-          label: "Cancelar ticket",
-          description: "Cierre definitivo; exige un motivo explicativo.",
-          icon: X,
-          danger: true,
-        },
+        CANCEL_TRANSITION,
       ];
     case "En espera del cliente":
       return [
@@ -203,13 +121,7 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
           description: "Reanuda la atención y el cómputo de SLA.",
           icon: RotateCcw,
         },
-        {
-          target: "Cancelado",
-          label: "Cancelar ticket",
-          description: "Cierre definitivo; exige un motivo explicativo.",
-          icon: X,
-          danger: true,
-        },
+        CANCEL_TRANSITION,
       ];
     case "Reenvío de producto":
       return [
@@ -219,13 +131,7 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
           description: "Cierra el caso como resuelto.",
           icon: CheckCircle2,
         },
-        {
-          target: "Cancelado",
-          label: "Cancelar ticket",
-          description: "Cierre definitivo; exige un motivo explicativo.",
-          icon: X,
-          danger: true,
-        },
+        CANCEL_TRANSITION,
       ];
     case "Solucionado":
       return [
@@ -241,6 +147,40 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
   }
 }
 
+const labelClass = "font-heading text-[11.5px] font-semibold text-faint";
+
+const textareaClass =
+  "w-full resize-none rounded-edge border border-line-strong bg-white px-3 py-2.5 text-[13px] leading-relaxed " +
+  "text-ink outline-none transition-colors placeholder:text-faint hover:border-zinc-400 " +
+  "focus:border-brand-red focus:ring-3 focus:ring-brand-red/10";
+
+const attachLabelClass =
+  "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 " +
+  "text-[11.5px] font-medium text-subtle transition-colors hover:border-zinc-400 hover:bg-canvas hover:text-ink";
+
+const tabTriggerClass =
+  "gap-1.5 px-3 text-[11.5px] font-medium text-subtle transition-colors hover:text-ink " +
+  "data-active:bg-white data-active:font-semibold data-active:text-brand-red-dark";
+
+/** Archivo elegido y aun no enviado: nombre, peso y la cruz para quitarlo. */
+function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
+  return (
+    <span className="inline-flex h-7 items-center gap-1.5 rounded-edge border border-line bg-white pl-2.5 pr-1 text-[11.5px] text-ink">
+      <Paperclip aria-hidden className="h-3 w-3 text-subtle" />
+      <span className="max-w-[180px] truncate">{file.name}</span>
+      <span className="text-[10.5px] tabular-nums text-subtle">{formatBytes(file.size)}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Quitar ${file.name}`}
+        className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-edge text-subtle transition-colors hover:bg-fill hover:text-brand-red"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -248,19 +188,12 @@ export function TicketDetailPage() {
 
   const [ticket, setTicket] = useState<TicketDetailResponse | null>(null);
   const [loading, setLoading] = useState(Boolean(ticketId));
-  const [error, setError] = useState<string | null>(
-    ticketId ? null : "Identificador de ticket no válido.",
-  );
+  const [error, setError] = useState<string | null>(ticketId ? null : "Identificador de ticket no válido.");
 
-  // Navegación por pestañas: Información general, Responder al cliente, Notas internas
-  const [activeTab, setActiveTab] = useState<"general" | "respuestas" | "notas">("general");
+  const [activeTab, setActiveTab] = useState<TicketDetailTab>("conversacion");
+  const [showTimeline, setShowTimeline] = useState(false);
 
-  // Pestaña lateral (Drawer) para el Historial Completo del ticket
-  const [showTimelineDrawer, setShowTimelineDrawer] = useState(false);
-  const [timelineFilter, setTimelineFilter] = useState<"all" | "messages" | "events">("all");
-
-  // Composer: Respuesta al cliente (modo correo)
-  // El mismo editor que la bandeja: lo que sale de aquí también es un correo.
+  // Respuesta al cliente: el mismo editor que la bandeja, porque lo que sale de aqui tambien es un correo.
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyBlocks, setReplyBlocks] = useState<unknown>(null);
   // Remontar el editor es la forma de vaciarlo: su contenido inicial no es controlado.
@@ -270,7 +203,6 @@ export function TicketDetailPage() {
   const [replySendError, setReplySendError] = useState<string | null>(null);
   const replyFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Composer: Nota interna
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteBody, setNoteBody] = useState("");
   const [noteAttachments, setNoteAttachments] = useState<File[]>([]);
@@ -278,17 +210,13 @@ export function TicketDetailPage() {
   const [noteSendError, setNoteSendError] = useState<string | null>(null);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Qué adjunto se está mirando y con qué vecinos, para poder saltar entre ellos.
-  const [preview, setPreview] = useState<{
-    attachments: TicketAttachmentResponse[];
-    index: number;
-  } | null>(null);
+  // Que adjunto se esta mirando y con que vecinos, para poder saltar entre ellos.
+  const [preview, setPreview] = useState<{ attachments: TicketAttachmentResponse[]; index: number } | null>(null);
 
   const refreshTicket = useCallback(async () => {
     if (!ticketId) return;
     try {
-      const data = await ticketsApi.getById(ticketId);
-      setTicket(data);
+      setTicket(await ticketsApi.getById(ticketId));
     } catch (err) {
       setError(
         err instanceof Error
@@ -299,25 +227,23 @@ export function TicketDetailPage() {
   }, [ticketId]);
 
   useEffect(() => {
-    let active = true;
     if (!ticketId) return;
+    let active = true;
 
     ticketsApi
       .getById(ticketId)
       .then((data) => {
-        if (active) {
-          setTicket(data);
-          setError(null);
-        }
+        if (!active) return;
+        setTicket(data);
+        setError(null);
       })
       .catch((err: unknown) => {
-        if (active) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "No se pudo cargar el detalle del ticket o no tienes permiso para acceder a su departamento.",
-          );
-        }
+        if (!active) return;
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo cargar el detalle del ticket o no tienes permiso para acceder a su departamento.",
+        );
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -332,75 +258,46 @@ export function TicketDetailPage() {
 
   useEffect(() => {
     if (!ticketId) return;
-
     const unsubs = [
-      onTicketsChanged(() => {
-        void refreshTicket();
-      }),
+      onTicketsChanged(() => void refreshTicket()),
       onTicketStatusChanged((notice) => {
-        if (notice.ticketId === ticketId) {
-          void refreshTicket();
-        }
+        if (notice.ticketId === ticketId) void refreshTicket();
       }),
       onTicketNewMessage((notice) => {
-        if (notice.ticketId === ticketId) {
-          void refreshTicket();
-        }
+        if (notice.ticketId === ticketId) void refreshTicket();
       }),
     ];
-
-    return () => {
-      unsubs.forEach((unsub) => unsub());
-    };
+    return () => unsubs.forEach((unsub) => unsub());
   }, [ticketId, onTicketsChanged, onTicketStatusChanged, onTicketNewMessage, refreshTicket]);
 
-  // El editor tapa la página entera: Escape tiene que devolverte a donde estabas.
+  // El editor tapa la pagina entera: Escape tiene que devolverte a donde estabas.
   useEffect(() => {
     if (!replyOpen) return;
-
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") setReplyOpen(false);
     }
-
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
   }, [replyOpen]);
 
-  const handleReplyFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const chosen = Array.from(e.target.files);
-    const err = validateAttachments(chosen, replyAttachments);
-    if (err) {
-      setReplySendError(err);
+  function pickFiles(
+    input: HTMLInputElement,
+    existing: File[],
+    setFiles: (update: (prev: File[]) => File[]) => void,
+    setFileError: (message: string | null) => void,
+  ) {
+    if (!input.files) return;
+    const chosen = Array.from(input.files);
+    const problem = validateAttachments(chosen, existing);
+    if (problem) {
+      setFileError(problem);
       return;
     }
-    setReplySendError(null);
-    setReplyAttachments((prev) => [...prev, ...chosen]);
-    if (replyFileInputRef.current) replyFileInputRef.current.value = "";
-  };
+    setFileError(null);
+    setFiles((prev) => [...prev, ...chosen]);
+    input.value = "";
+  }
 
-  const removeReplyFile = (index: number) => {
-    setReplyAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleNoteFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const chosen = Array.from(e.target.files);
-    const err = validateAttachments(chosen, noteAttachments);
-    if (err) {
-      setNoteSendError(err);
-      return;
-    }
-    setNoteSendError(null);
-    setNoteAttachments((prev) => [...prev, ...chosen]);
-    if (noteFileInputRef.current) noteFileInputRef.current.value = "";
-  };
-
-  const removeNoteFile = (index: number) => {
-    setNoteAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // Abrir el archivo, no bajarlo a ciegas: el visor decide si se ve dentro y ofrece descargarlo.
   const openAttachment = (attachments: TicketAttachmentResponse[], attachmentId: number) => {
     const index = attachments.findIndex((a) => a.id === attachmentId);
     if (index >= 0) setPreview({ attachments, index });
@@ -408,7 +305,6 @@ export function TicketDetailPage() {
 
   const sendReply = async () => {
     if (!replyReady || replySending) return;
-
     try {
       setReplySending(true);
       setReplySendError(null);
@@ -418,9 +314,7 @@ export function TicketDetailPage() {
       formData.append("BodyText", replyText.trim());
       // El formato lo lleva el HTML; el texto plano viaja como alternativa del correo.
       formData.append("BodyHtml", blocksToEmailHtml(replyBlocks));
-      replyAttachments.forEach((file) => {
-        formData.append("Attachments", file);
-      });
+      replyAttachments.forEach((file) => formData.append("Attachments", file));
 
       await ticketsApi.createMessage(ticketId, formData);
 
@@ -430,9 +324,7 @@ export function TicketDetailPage() {
       setReplyOpen(false);
       await refreshTicket();
     } catch (err) {
-      setReplySendError(
-        err instanceof Error ? err.message : "Ocurrió un error al enviar la respuesta.",
-      );
+      setReplySendError(err instanceof Error ? err.message : "Ocurrió un error al enviar la respuesta.");
     } finally {
       setReplySending(false);
     }
@@ -440,7 +332,6 @@ export function TicketDetailPage() {
 
   const saveNote = async () => {
     if (!noteBody.trim() || noteSending) return;
-
     try {
       setNoteSending(true);
       setNoteSendError(null);
@@ -448,9 +339,7 @@ export function TicketDetailPage() {
       const formData = new FormData();
       formData.append("Direction", "Interna");
       formData.append("BodyText", noteBody.trim());
-      noteAttachments.forEach((file) => {
-        formData.append("Attachments", file);
-      });
+      noteAttachments.forEach((file) => formData.append("Attachments", file));
 
       await ticketsApi.createMessage(ticketId, formData);
 
@@ -459,36 +348,24 @@ export function TicketDetailPage() {
       setShowNoteModal(false);
       await refreshTicket();
     } catch (err) {
-      setNoteSendError(
-        err instanceof Error ? err.message : "Ocurrió un error al guardar la nota.",
-      );
+      setNoteSendError(err instanceof Error ? err.message : "Ocurrió un error al guardar la nota.");
     } finally {
       setNoteSending(false);
     }
   };
 
-  // Escribir y guardar sin soltar el teclado: es el gesto de cualquier campo de notas.
-  const handleNoteKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      e.preventDefault();
-      void saveNote();
-    }
-  };
-
-  // Actualización de estado: un único modal reemplaza los botones sueltos de
-  // En espera / Reenvío / Solucionar / Cancelar.
+  // Cambio de estado: un solo dialogo para todas las transiciones validas.
   const [transitioning, setTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
-  const [updateTargetStatus, setUpdateTargetStatus] = useState<string>("");
-  const [updateSolutionType, setUpdateSolutionType] = useState<string>("");
+  const [updateTargetStatus, setUpdateTargetStatus] = useState("");
+  const [updateSolutionType, setUpdateSolutionType] = useState("");
   const [updateComment, setUpdateComment] = useState("");
 
-  // Assign modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignableStaff, setAssignableStaff] = useState<TicketStaffOptionResponse[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
-  const [selectedStaffId, setSelectedStaffId] = useState<string>("");
+  const [selectedStaffId, setSelectedStaffId] = useState("");
   const [assignComment, setAssignComment] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
@@ -502,14 +379,14 @@ export function TicketDetailPage() {
     setShowUpdateStatusModal(true);
   };
 
-  const handleConfirmUpdateStatus = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirmUpdateStatus = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!updateTargetStatus) {
       setTransitionError("Selecciona la nueva situación del ticket.");
       return;
     }
     if (updateTargetStatus === "Cancelado" && !updateComment.trim()) {
-      setTransitionError("La cancelación exige un motivo escrito explicativo.");
+      setTransitionError("La cancelación exige un motivo escrito.");
       return;
     }
     if (updateTargetStatus === "Solucionado") {
@@ -517,20 +394,15 @@ export function TicketDetailPage() {
         setTransitionError("Selecciona el tipo de solución.");
         return;
       }
-      const hasOutbound = ticket?.messages.some((m) => m.direction === "Saliente");
-      if (!hasOutbound) {
-        setTransitionError(
-          "No se puede marcar como solucionado un ticket sin haber enviado al menos una respuesta al cliente.",
-        );
+      if (!ticket?.messages.some((m) => m.direction === "Saliente")) {
+        setTransitionError("No se puede marcar como solucionado sin haber enviado al menos una respuesta al cliente.");
         return;
       }
     }
 
     const reason =
       updateTargetStatus === "Solucionado"
-        ? `Tipo de solución: ${updateSolutionType}${
-            updateComment.trim() ? ` · Comentario: ${updateComment.trim()}` : ""
-          }`
+        ? `Tipo de solución: ${updateSolutionType}${updateComment.trim() ? ` · Comentario: ${updateComment.trim()}` : ""}`
         : updateComment.trim() || undefined;
 
     try {
@@ -538,14 +410,9 @@ export function TicketDetailPage() {
       setTransitionError(null);
       await ticketsApi.updateStatus(ticketId, { status: updateTargetStatus, reason });
       setShowUpdateStatusModal(false);
-      setUpdateTargetStatus("");
-      setUpdateSolutionType("");
-      setUpdateComment("");
       await refreshTicket();
     } catch (err) {
-      setTransitionError(
-        err instanceof Error ? err.message : "Error al actualizar el estado del ticket.",
-      );
+      setTransitionError(err instanceof Error ? err.message : "Error al actualizar el estado del ticket.");
     } finally {
       setTransitioning(false);
     }
@@ -559,43 +426,37 @@ export function TicketDetailPage() {
     setShowAssignModal(true);
     try {
       setLoadingStaff(true);
-      const staffList = await ticketsApi.getAssignableStaff(ticketId);
-      setAssignableStaff(staffList);
+      setAssignableStaff(await ticketsApi.getAssignableStaff(ticketId));
     } catch (err) {
-      setAssignError(
-        err instanceof Error ? err.message : "No se pudo cargar el personal asignable.",
-      );
+      setAssignError(err instanceof Error ? err.message : "No se pudo cargar el personal asignable.");
     } finally {
       setLoadingStaff(false);
     }
   };
 
-  const handleConfirmAssign = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirmAssign = async (event: React.FormEvent) => {
+    event.preventDefault();
     try {
       setAssigning(true);
       setAssignError(null);
-      const staffId = selectedStaffId ? parseInt(selectedStaffId, 10) : null;
       await ticketsApi.assign(ticketId, {
-        staffId,
+        staffId: selectedStaffId ? parseInt(selectedStaffId, 10) : null,
         comment: assignComment.trim() || undefined,
       });
       setShowAssignModal(false);
       await refreshTicket();
     } catch (err) {
-      setAssignError(
-        err instanceof Error ? err.message : "Error al asignar el ticket.",
-      );
+      setAssignError(err instanceof Error ? err.message : "Error al asignar el ticket.");
     } finally {
       setAssigning(false);
     }
   };
 
-  // Edit ticket details modal state (PUT /api/tickets/{id})
+  // Edicion de atributos (PUT /api/tickets/{id}).
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSubject, setEditSubject] = useState("");
   const [editTopicId, setEditTopicId] = useState<number | null>(null);
-  const [editPriority, setEditPriority] = useState<string>("Normal");
+  const [editPriority, setEditPriority] = useState("Normal");
   const [editDepartmentId, setEditDepartmentId] = useState<number | null>(null);
   const [editProductLineId, setEditProductLineId] = useState<number | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
@@ -616,26 +477,24 @@ export function TicketDetailPage() {
     if (!editCatalogs) {
       try {
         setLoadingEditCatalogs(true);
-        const cats = await ticketsApi.createOptions();
-        setEditCatalogs(cats);
+        setEditCatalogs(await ticketsApi.createOptions());
       } catch {
-        // Ignorar
+        // Sin catalogos el formulario sigue abierto con los valores actuales.
       } finally {
         setLoadingEditCatalogs(false);
       }
     }
   };
 
-  const handleConfirmEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirmEdit = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!editSubject.trim()) {
       setEditError("El asunto no puede estar vacío.");
       return;
     }
-
     const currentTopic = editCatalogs?.topics.find((t) => t.id === editTopicId);
     if (currentTopic?.requiresProductLine && !editProductLineId) {
-      setEditError(`El motivo '${currentTopic.name}' exige indicar una línea de producto.`);
+      setEditError(`El motivo «${currentTopic.name}» exige indicar una línea de producto.`);
       return;
     }
 
@@ -652,9 +511,7 @@ export function TicketDetailPage() {
       setShowEditModal(false);
       await refreshTicket();
     } catch (err) {
-      setEditError(
-        err instanceof Error ? err.message : "Error al actualizar los detalles del ticket.",
-      );
+      setEditError(err instanceof Error ? err.message : "Error al actualizar los detalles del ticket.");
     } finally {
       setSavingEdit(false);
     }
@@ -662,20 +519,20 @@ export function TicketDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex h-96 items-center justify-center">
-        <Spinner size="lg" />
+      <div className="flex flex-1 items-center justify-center py-16">
+        <Spinner />
       </div>
     );
   }
 
   if (error || !ticket) {
     return (
-      <div className="mx-auto max-w-4xl p-6">
+      <div className="mx-auto w-full max-w-2xl py-6">
         <Button variant="secondary" size="sm" onClick={() => navigate("/tickets")} className="mb-4">
-          <ArrowLeft className="h-4 w-4" /> Volver a tickets
+          <ArrowLeft className="h-4 w-4" />
+          Volver a tickets
         </Button>
         <Alert variant="error">
-          <strong className="font-semibold">Error al abrir ticket:</strong>{" "}
           {error ?? "El ticket solicitado no existe o no tienes acceso a su departamento."}
         </Alert>
       </div>
@@ -684,908 +541,218 @@ export function TicketDetailPage() {
 
   const sla = formatSlaRemaining(ticket.resolutionDueAt, Boolean(ticket.pausedAt), ticket.status, ticket.closedAt);
   const availableTransitions = getAvailableTransitions(ticket.status);
-  const editRequiresProductLine = Boolean(
-    editCatalogs?.topics.find((t) => t.id === editTopicId)?.requiresProductLine,
-  );
+  const isClosed = ticket.status === "Cancelado" || ticket.status === "Cerrado";
+  const editRequiresProductLine = Boolean(editCatalogs?.topics.find((t) => t.id === editTopicId)?.requiresProductLine);
 
-  // Consolidar mensajes y eventos en una línea de tiempo ordenada
+  const byDate = (a: { createdAt: string }, b: { createdAt: string }) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+
   const timeline: TimelineItem[] = [
-    ...ticket.messages.map(
-      (m): TimelineItem => ({ kind: "message", data: m, createdAt: m.createdAt }),
-    ),
-    ...ticket.events.map(
-      (e): TimelineItem => ({ kind: "event", data: e, createdAt: e.createdAt }),
-    ),
-  ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    ...ticket.messages.map((m): TimelineItem => ({ kind: "message", data: m, createdAt: m.createdAt })),
+    ...ticket.events.map((e): TimelineItem => ({ kind: "event", data: e, createdAt: e.createdAt })),
+  ].sort(byDate);
 
-  // Hilo con el cliente (entrante + saliente, sin notas internas) y notas internas por separado,
-  // para las pestañas "Respuestas al cliente" y "Notas internas".
-  const sortedMessages = [...ticket.messages].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
+  const sortedMessages = [...ticket.messages].sort(byDate);
   const clientThread = sortedMessages.filter((m) => m.direction.toLowerCase() !== "interna");
   const internalNotes = sortedMessages.filter((m) => m.direction.toLowerCase() === "interna");
   const recipientEmail = ticket.contactEmail ?? ticket.requesterEmail ?? null;
 
-  // Se declaran aquí, con el destinatario: sendReply las lee al ejecutarse, no al definirse.
+  // Se declaran aqui, con el destinatario: sendReply las lee al ejecutarse, no al definirse.
   const replyText = blocksToText(replyBlocks);
   const replyReady = Boolean(recipientEmail) && replyText.trim().length > 0;
 
-  const isCorreo = isEmailChannel(ticket.channel);
-  const origin = originLabel(ticket.channel);
-
-  function renderMessageCard(msg: TicketMessageResponse, isLatest = false) {
-    const isInternal = msg.direction.toLowerCase() === "interna";
-    const isOutbound = msg.direction.toLowerCase() === "saliente";
-    const deliveryKey = isOutbound ? msg.deliveryStatus ?? undefined : undefined;
-    const delivery = deliveryKey ? deliveryLabels[deliveryKey] : undefined;
-    const deliveryWarning = deliveryKey ? deliveryWarnings[deliveryKey] : undefined;
-
-    return (
-      <div
-        key={`msg-${msg.id}`}
-        className={`rounded-edge transition-shadow ${
-          isInternal
-            ? "border border-warn/30 bg-warn/[0.045] p-5 shadow-xs"
-            : isOutbound
-            ? "border border-line-soft bg-white p-5 shadow-xs"
-            : "border border-slate-200 bg-slate-50/90 p-5 shadow-xs"
-        }`}
-      >
-        {/* Cabecera del mensaje */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 pb-3">
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Los tonos medios no llegaban a 4.5:1 con texto blanco encima. */}
-            {isInternal ? (
-              <span className="inline-flex items-center gap-1 rounded-edge bg-amber-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
-                <Lock className="h-3 w-3" /> Nota Interna
-              </span>
-            ) : isOutbound ? (
-              <span className="inline-flex items-center gap-1 rounded-edge bg-sky-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
-                <Mail className="h-3 w-3" /> Respuesta al cliente
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-edge bg-slate-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
-                <User className="h-3 w-3" /> Cliente
-              </span>
-            )}
-
-            <span className="text-xs font-semibold text-ink">
-              {msg.authorStaffName ??
-                msg.authorContactName ??
-                ticket?.requesterName ??
-                "Remitente"}
-            </span>
-
-            {/* Sin esto se lee como un mensaje más del hilo, y es la solicitud que abrió el caso. */}
-            {msg.isOrigin && (
-              <span className="inline-flex items-center gap-1 rounded-edge border border-line-strong bg-canvas px-2 py-0.5 text-[10.5px] font-semibold text-ink">
-                {isCorreo ? <Mail className="h-3 w-3 text-subtle" /> : <Info className="h-3 w-3 text-subtle" />}
-                {origin.label}
-              </span>
-            )}
-
-            {isLatest && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-800">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {isOutbound
-                  ? "Última respuesta enviada"
-                  : isInternal
-                  ? "Última nota registrada"
-                  : "Último mensaje recibido"}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {delivery && (
-              <span
-                title={msg.deliveryDetail ?? undefined}
-                className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10.5px] font-semibold ${delivery.className}`}
-              >
-                {delivery.label}
-              </span>
-            )}
-            <span className="text-[11.5px] text-subtle">{formatDateTime(msg.createdAt)}</span>
-          </div>
-        </div>
-
-        {/* Lo que salió mal con el correo, en las palabras del proveedor */}
-        {deliveryWarning && (
-          <div className="mt-2.5 flex items-start gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-ink">
-            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-warn" />
-            <span>
-              {deliveryWarning}
-              {msg.deliveryDetail && <span className="text-subtle"> ({msg.deliveryDetail})</span>}
-            </span>
-          </div>
-        )}
-
-        {/* La confidencialidad se dice una vez, al escribir: repetirla en cada tarjeta es ruido. */}
-
-        {msg.isOrigin && (
-          <p className="mt-2.5 text-[11.5px] text-subtle">
-            {origin.hint} {formatDateTime(msg.createdAt)}
-          </p>
-        )}
-
-        {/* Cuerpo del mensaje */}
-        <div className="mt-3.5 w-full text-sm leading-relaxed text-ink">
-          <FormattedTicketBody text={msg.bodyText} html={msg.bodyHtml} />
-        </div>
-
-        {/* Adjuntos del mensaje */}
-        {msg.attachments && msg.attachments.length > 0 && (
-          <div className="mt-4 border-t border-black/5 pt-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
-              Archivos adjuntos ({msg.attachments.length}):
-            </span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {msg.attachments.map((att) => (
-                <button
-                  key={att.id}
-                  type="button"
-                  onClick={() => openAttachment(msg.attachments, att.id)}
-                  title={`Abrir ${att.fileName}`}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
-                >
-                  <FileText className="h-3.5 w-3.5 text-subtle" />
-                  <span className="max-w-[180px] truncate">{att.fileName}</span>
-                  <span className="text-[10.5px] text-subtle">({formatBytes(att.sizeBytes)})</span>
-                  <Eye className="h-3 w-3 text-subtle" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  const detailTabs: {
-    key: "general" | "respuestas" | "notas";
-    label: string;
-    icon: typeof Info;
-    count?: number;
-  }[] = [
-    { key: "general", label: "Información general", icon: Info },
-    { key: "notas", label: "Notas internas", icon: Lock, count: internalNotes.length },
-    { key: "respuestas", label: "Responder al cliente", icon: Mail, count: clientThread.length },
-  ];
+  const renderThread = (messages: typeof clientThread) =>
+    messages.map((message, index) => (
+      <TicketMessageCard
+        key={message.id}
+        message={message}
+        channel={ticket.channel}
+        requesterName={ticket.requesterName}
+        isLatest={messages.length > 1 && index === messages.length - 1}
+        onOpenAttachment={openAttachment}
+      />
+    ));
 
   return (
-    // -mt-6 anula el pt-6 del layout: la barra fija se pega arriba y su contenido
-    // queda con el mismo aire por encima que por debajo. Ese margen pasa al cuerpo.
-    <div className="-mt-6 min-h-0 flex-1 overflow-y-auto bg-slate-50/50 pb-16">
-      {/* Barra superior de navegación y cabecera */}
-      <div className="sticky top-0 z-10 border-b border-line-soft bg-white/95 px-6 py-3.5 backdrop-blur-xs">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+    // -mx-8 -mt-6 anulan el aire del layout: la barra fija corre de borde a borde y el scroll queda en el canto.
+    <div className="-mx-8 -mt-6 min-h-0 flex-1 overflow-y-auto pb-12">
+      <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-8 py-2.5 backdrop-blur-xs">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
             <button
               type="button"
               onClick={() => navigate("/tickets")}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-line-soft bg-white text-subtle transition-colors hover:bg-slate-100 hover:text-ink"
-              title="Volver a la bandeja"
+              aria-label="Volver a tickets"
+              title="Volver a tickets"
+              className="-ml-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-brand-gray outline-none
+                transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <span className="font-mono text-xs font-semibold text-subtle">
+            <span className="font-heading text-[12px] font-semibold tracking-[0.02em] tabular-nums text-ink">
               {ticket.number}
             </span>
-            <span className="h-3.5 w-px bg-line-soft" />
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink">
-              <span className={`h-2 w-2 rounded-full ${statusDotColor(ticket.status)}`} />
-              {ticket.status}
-            </span>
-            <span
-              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${priorityClasses(
-                ticket.priority,
-              )}`}
-            >
-              {ticket.priority}
-            </span>
+            <span aria-hidden className="h-4 w-px bg-line" />
+            <StatusCell status={ticket.status} />
+            <PriorityCell priority={ticket.priority} />
+            <SlaCell sla={sla} />
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* SLA Badge */}
-            {sla.tone === "ok" || sla.tone === "completed" ? (
-              <Badge tone={sla.tone === "completed" ? "completed" : "green"}>
-                <CheckCircle2 className="mr-1 inline h-3 w-3" />
-                {sla.text}
-              </Badge>
-            ) : sla.tone === "overdue" ? (
-              <Badge tone="red">
-                <Clock className="mr-1 h-3 w-3 inline" />
-                {sla.text}
-              </Badge>
-            ) : sla.tone === "warning" ? (
-              <span className="inline-flex h-6 items-center rounded-full bg-amber-100 px-2.5 text-xs font-semibold text-amber-800">
-                <Clock className="mr-1 h-3 w-3" />
-                {sla.text}
-              </span>
-            ) : (
-              <span className="inline-flex h-6 items-center rounded-full bg-slate-100 px-2.5 text-xs font-medium text-slate-600">
-                {sla.text}
-              </span>
-            )}
-
-            {/* Botón para desplegar la pestaña lateral con todo el timeline */}
-            <button
-              type="button"
-              onClick={() => setShowTimelineDrawer(true)}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-soft bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs transition-colors hover:border-line-strong hover:bg-canvas hover:text-brand-red"
-              title="Abrir historial de conversaciones y eventos"
-            >
-              <History className="h-3.5 w-3.5 text-brand-red" />
-              <span>Historial ({timeline.length})</span>
-            </button>
-
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowTimeline(true)}>
+              <History className="h-[15px] w-[15px]" />
+              Historial
+              <span className="tabular-nums text-subtle">{timeline.length}</span>
+            </Button>
             {availableTransitions.length > 0 ? (
-              <Button type="button" variant="primary" size="sm" onClick={handleOpenUpdateStatusModal}>
-                <RefreshCw className="h-3.5 w-3.5" />
+              <Button type="button" size="sm" onClick={handleOpenUpdateStatusModal}>
+                <RefreshCw className="h-[15px] w-[15px]" />
                 Actualizar ticket
               </Button>
             ) : (
-              <span className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
-                Cancelado (cierre definitivo)
-              </span>
+              <span className="text-[12px] text-subtle">Cierre definitivo</span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Contenedor principal de 2 columnas */}
-      {/* pt-3.5 = el mismo aire que la barra da a sus elementos: el asunto arranca igual de arriba. */}
-      <div className="mx-auto max-w-7xl px-6 pb-6 pt-3.5">
-        {/* Título, metadatos rápidos y botones de acción rápida de estado */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-ink md:text-2xl">
-              {ticket.subject}
-            </h1>
-            <p className="mt-1 text-xs text-subtle">
-              Creado el {formatDateTime(ticket.createdAt)} por{" "}
-              <span className="font-medium text-ink">
-                {ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}
-              </span>{" "}
-              · Canal: <span className="font-medium text-ink">{ticket.channel}</span>
-            </p>
-          </div>
+      <div className="mx-auto max-w-6xl px-8 pt-5">
+        <h1 className="text-balance font-heading text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink">
+          {ticket.subject}
+        </h1>
+        <p className="mt-1 text-[12.5px] text-subtle">
+          Creado el {formatDateTime(ticket.createdAt)} por{" "}
+          <span className="text-ink">{ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}</span>
+          <span aria-hidden className="mx-1.5 text-line-strong">·</span>
+          {ticket.channel}
+        </p>
 
-          {/* Navegación por pestañas: antes vivían aquí los botones sueltos de
-              En espera / Reenvío / Solucionar / Cancelar, ahora consolidados en
-              el botón "Actualizar ticket" de la barra superior. */}
-          <div className="inline-flex flex-wrap gap-1 self-start rounded-edge border border-line-soft bg-canvas/60 p-1">
-            {detailTabs.map((tab) => {
-              const isActive = activeTab === tab.key;
-              const TabIcon = tab.icon;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`inline-flex cursor-pointer items-center gap-1.5 rounded-edge px-3.5 py-1.5 text-[12.5px] font-semibold transition-all ${
-                    isActive ? "bg-white text-ink shadow-2xs" : "text-subtle hover:text-ink"
-                  }`}
-                >
-                  <TabIcon className="h-3.5 w-3.5" />
-                  {tab.label}
-                  {tab.count !== undefined && (
-                    <span
-                      className={`rounded-full px-1.5 py-px text-[10.5px] font-semibold ${
-                        isActive ? "bg-fill text-subtle" : "bg-white/70 text-subtle"
-                      }`}
-                    >
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TicketDetailTab)}>
+              <TabsList className="h-9 border border-line bg-canvas">
+                <TabsTrigger value="conversacion" className={tabTriggerClass}>
+                  <Mail aria-hidden className="size-3.5" />
+                  Conversación
+                  <span className="tabular-nums opacity-70">{clientThread.length}</span>
+                </TabsTrigger>
+                <TabsTrigger value="notas" className={tabTriggerClass}>
+                  <Lock aria-hidden className="size-3.5" />
+                  Notas internas
+                  <span className="tabular-nums opacity-70">{internalNotes.length}</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-        {/* Alerta visible para conflictos 409 o errores de transición */}
-        {transitionError && (
-          <div className="mb-6">
-            <Alert variant="error">
-              <div className="flex items-center justify-between">
-                <span>{transitionError}</span>
-                <button
-                  type="button"
-                  onClick={() => setTransitionError(null)}
-                  className="ml-3 text-xs font-semibold underline hover:opacity-80"
-                >
-                  Entendido
-                </button>
-              </div>
-            </Alert>
-          </div>
-        )}
-
-        {/* Pestaña 1: Información general */}
-        {activeTab === "general" && (
-          <div className="space-y-6">
-            {/* Fila de KPIs: Cliente y Contacto | Atributos del Ticket | SLA y Métricas de Tiempo */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              {/* KPI 1: Cliente & Contacto */}
-              <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-                    <Building2 className="h-4 w-4 text-brand-red" />
-                    Cliente y Contacto
-                  </h3>
-                  {ticket.clientCode && (
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-subtle">
-                      {ticket.clientCode}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
-                  <div className="space-y-2">
-                    <div>
-                      <span className="block text-[11px] text-subtle">Razón social:</span>
-                      <p className="truncate font-semibold text-ink" title={ticket.clientName || undefined}>
-                        {ticket.clientName || "Sin cliente asignado"}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="block text-[11px] text-subtle">Contacto:</span>
-                      <p className="truncate font-medium text-ink" title={ticket.contactName || undefined}>
-                        {ticket.contactName || "Sin contacto registrado"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {((ticket.contactEmail ?? ticket.requesterEmail) || ticket.contactPhone) && (
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
-                      {(ticket.contactEmail ?? ticket.requesterEmail) && (
-                        <div className="flex min-w-0 max-w-full items-center gap-1.5">
-                          <Mail className="h-3.5 w-3.5 shrink-0 text-subtle" />
-                          <a
-                            href={`mailto:${ticket.contactEmail ?? ticket.requesterEmail}`}
-                            className="truncate text-ink hover:underline"
-                            title={ticket.contactEmail ?? ticket.requesterEmail ?? undefined}
-                          >
-                            {ticket.contactEmail ?? ticket.requesterEmail}
-                          </a>
-                        </div>
-                      )}
-                      {ticket.contactPhone && (
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <Phone className="h-3.5 w-3.5 shrink-0 text-subtle" />
-                          <span className="text-ink">{ticket.contactPhone}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* KPI 2: Atributos del Ticket */}
-              <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-                    <User className="h-4 w-4 text-brand-red" />
-                    Atributos del Ticket
-                  </h3>
-                  {ticket.status !== "Cancelado" && ticket.status !== "Cerrado" && (
-                    <button
-                      type="button"
-                      onClick={() => void handleOpenEditModal()}
-                      className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-brand-red transition-colors hover:underline"
-                      title="Editar campos clave del ticket"
-                    >
-                      <Pencil className="h-3 w-3" />
-                      Editar
-                    </button>
-                  )}
-                </div>
-                <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
-                  <div className="space-y-2.5">
-                    {/* Clasificación: Departamento y Tema / Motivo con simetría exacta */}
-                    <div className="grid grid-cols-2 divide-x divide-line-soft/60">
-                      <div className="min-w-0 pr-3">
-                        <span className="block text-[11px] text-subtle">Departamento:</span>
-                        <span className="block truncate font-semibold text-ink" title={ticket.departmentName || undefined}>
-                          {ticket.departmentName || "Sin departamento"}
-                        </span>
-                      </div>
-
-                      <div className="min-w-0 pl-3">
-                        <span className="block text-[11px] text-subtle">Tema / Motivo:</span>
-                        <span className="block truncate font-semibold text-ink" title={ticket.topicName || undefined}>
-                          {ticket.topicName || "Sin motivo"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Asignado a: bloque integrado con avatar e interacción limpia */}
-                    <div className="flex items-center justify-between rounded-lg border border-line-soft bg-slate-50/80 px-2.5 py-1.5">
-                      <div className="flex min-w-0 items-center gap-2">
-                        {ticket.assignedStaffName ? (
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-100 text-[10.5px] font-bold text-brand-red">
-                            {getInitials(ticket.assignedStaffName)}
-                          </div>
-                        ) : (
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200/70 text-subtle">
-                            <User className="h-3.5 w-3.5" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <span className="block text-[10px] leading-tight text-subtle">Asignado a:</span>
-                          <span
-                            className="block truncate text-xs font-semibold text-ink"
-                            title={ticket.assignedStaffName || undefined}
-                          >
-                            {ticket.assignedStaffName ?? "Sin asignar"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {ticket.status !== "Cancelado" && (
-                        <button
-                          type="button"
-                          onClick={() => void handleOpenAssignModal()}
-                          className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-line-soft bg-white px-2 py-1 text-[11px] font-semibold text-brand-red shadow-2xs transition-colors hover:border-red-200 hover:bg-red-50"
-                          title="Asignar o reasignar ticket"
-                        >
-                          <UserCheck className="h-3 w-3" />
-                          {ticket.assignedStaffId ? "Cambiar" : "Asignar"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Pie: Canal de origen y Línea de producto */}
-                  <div className="flex items-center justify-between border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <span>Canal:</span>
-                      <span className="truncate font-medium text-ink">{ticket.channel}</span>
-                    </div>
-                    {ticket.productLineName && (
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <span>Línea:</span>
-                    <span className="truncate font-medium text-ink" title={ticket.productLineName}>
-                      {ticket.productLineName}
-                    </span>
-                  </div>
-                )}
-                  </div>
-                </div>
-              </div>
-
-              {/* KPI 3: SLA y Tiempos */}
-              <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-                    <Clock className="h-4 w-4 text-brand-red" />
-                    SLA y Métricas de Tiempo
-                  </h3>
-                  {sla.tone === "ok" || sla.tone === "completed" ? (
-                    <Badge tone={sla.tone === "completed" ? "completed" : "green"}>
-                      <CheckCircle2 className="mr-1 inline h-3 w-3" />
-                      {sla.text}
-                    </Badge>
-                  ) : sla.tone === "overdue" ? (
-                    <Badge tone="red">
-                      <Clock className="mr-1 inline h-3 w-3" />
-                      {sla.text}
-                    </Badge>
-                  ) : sla.tone === "warning" ? (
-                    <span className="inline-flex h-5 items-center rounded-full bg-amber-100 px-2 text-[10.5px] font-semibold text-amber-800">
-                      <Clock className="mr-1 inline h-3 w-3" />
-                      {sla.text}
-                    </span>
-                  ) : (
-                    <span className="inline-flex h-5 items-center rounded-full bg-slate-100 px-2 text-[10.5px] font-medium text-slate-600">
-                      {sla.text}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
-                  <div className="space-y-2">
-                    <div>
-                      <span className="block text-[11px] text-subtle">Vencimiento de Resolución:</span>
-                      <p className="font-medium text-ink">
-                        {ticket.resolutionDueAt
-                          ? formatDateTime(ticket.resolutionDueAt)
-                          : "No configurado"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="block text-[11px] text-subtle">Primera respuesta:</span>
-                      <p className="font-medium text-ink">
-                        {ticket.firstResponseAt ? (
-                          <span className="text-emerald-700">
-                            Lograda ({formatDateTime(ticket.firstResponseAt)})
-                          </span>
-                        ) : ticket.firstResponseDueAt ? (
-                          <span>Límite: {formatDateTime(ticket.firstResponseDueAt)}</span>
-                        ) : (
-                          "Pendiente"
-                        )}
-                      </p>
-                    </div>
-
-                    {Boolean(ticket.pausedAt) && (
-                      <div className="rounded-lg bg-amber-50 p-2 text-amber-800">
-                        <div className="flex items-center gap-1 font-semibold">
-                          <AlertTriangle className="h-3.5 w-3.5" /> SLA Pausado
-                        </div>
-                        <p className="mt-0.5 text-[11px]">
-                          En espera del cliente desde {formatDateTime(ticket.pausedAt!)}.
-                        </p>
-                      </div>
-                    )}
-
-                    {ticket.pausedMinutes > 0 && (
-                      <div className="flex justify-between text-subtle">
-                        <span>Tiempo total en pausa:</span>
-                        <span className="font-medium text-ink">{ticket.pausedMinutes} minutos</span>
-                      </div>
-                    )}
-
-                    {ticket.reopenedCount > 0 && (
-                      <div className="flex justify-between text-subtle">
-                        <span>Reaperturas:</span>
-                        <span className="font-semibold text-amber-700">{ticket.reopenedCount}</span>
-                      </div>
-                    )}
-
-                    {ticket.resolvedAt && (
-                      <div className="flex justify-between text-subtle">
-                        <span>Resuelto el:</span>
-                        <span className="font-medium text-ink">{formatDateTime(ticket.resolvedAt)}</span>
-                      </div>
-                    )}
-
-                    {ticket.closedAt && (
-                      <div className="flex justify-between text-subtle">
-                        <span>Cerrado el:</span>
-                        <span className="font-medium text-ink">{formatDateTime(ticket.closedAt)}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {!ticket.pausedAt && ticket.pausedMinutes === 0 && ticket.reopenedCount === 0 && !ticket.resolvedAt && (
-                    <div className="flex items-center justify-between border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
-                      <span>Última actividad:</span>
-                      <span className="font-medium text-ink">{formatDateTime(ticket.lastActivityAt)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Solicitud / Descripción inicial del caso (ancho completo y equilibrado) */}
-            <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft pb-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-brand-red" />
-                  <h3 className="font-heading text-[12.5px] font-semibold text-ink">
-                    Descripción inicial del caso
-                  </h3>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {clientThread.length > 0 && (
-                    <span className="text-[11.5px] text-subtle">
-                      {formatDateTime(clientThread[0].createdAt)}
-                    </span>
-                  )}
-                  {/* Botón para desplegar la pestaña lateral con todo el timeline */}
-                  <button
-                    type="button"
-                    onClick={() => setShowTimelineDrawer(true)}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-soft bg-slate-50 px-2.5 py-1 text-[11.5px] font-semibold text-ink shadow-2xs transition-colors hover:border-red-200 hover:bg-red-50 hover:text-brand-red"
-                    title="Ver línea de tiempo y auditoría del ticket"
-                  >
-                    <History className="h-3.5 w-3.5 text-brand-red" />
-                    <span>Ver historial ({timeline.length})</span>
-                  </button>
-                  {clientThread.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("respuestas")}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-edge border border-line-soft bg-white px-2.5 py-1 text-[11.5px] font-semibold text-brand-red shadow-2xs hover:bg-red-50"
-                    >
-                      <Mail className="h-3 w-3" />
-                      Responder al cliente
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {clientThread.length > 0 ? (
-                <>
-                  <div className="mt-3.5 w-full text-sm leading-relaxed text-ink">
-                    <FormattedTicketBody
-                      text={clientThread[0].bodyText}
-                      html={clientThread[0].bodyHtml}
-                    />
-                  </div>
-
-                  {clientThread[0].attachments && clientThread[0].attachments.length > 0 && (
-                    <div className="mt-4 border-t border-line-soft pt-3">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-subtle">
-                        Archivos adjuntos ({clientThread[0].attachments.length}):
-                      </span>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {clientThread[0].attachments.map((att) => (
-                          <button
-                            key={att.id}
-                            type="button"
-                            onClick={() => openAttachment(clientThread[0].attachments, att.id)}
-                            title={`Abrir ${att.fileName}`}
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
-                          >
-                            <FileText className="h-3.5 w-3.5 text-subtle" />
-                            <span className="max-w-[180px] truncate">{att.fileName}</span>
-                            <span className="text-[10.5px] text-subtle">({formatBytes(att.sizeBytes)})</span>
-                            <Eye className="h-3 w-3 text-subtle" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="mt-3 text-sm text-subtle">
-                  Este ticket no tiene un mensaje de descripción inicial registrado.
-                </div>
-              )}
-            </div>
-
-            {/* Banner destacado para abrir la pestaña lateral con todo el timeline */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-brand-red">
-                  <History className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-ink">Historial de conversación y eventos</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-subtle">
-                      {timeline.length} {timeline.length === 1 ? "registro" : "registros"}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-[11.5px] text-subtle">
-                    Consulta la cronología completa de cambios, intervenciones, mensajes y auditoría del ticket.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setTimelineFilter("all");
-                  setShowTimelineDrawer(true);
-                }}
-                className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-line-strong bg-white px-3.5 py-2 text-xs font-semibold text-ink shadow-2xs transition-all hover:border-brand-red hover:bg-red-50 hover:text-brand-red"
-              >
-                <History className="h-3.5 w-3.5 text-brand-red" />
-                <span>Desplegar historial</span>
-              </button>
-            </div>
-
-            {/* Acceso rápido a las respuestas si hay más interacción en el hilo */}
-            {clientThread.length > 1 && (
-              <div className="flex items-center justify-between rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-sky-600" />
-                  <span className="text-xs text-ink">
-                    Hay <strong className="font-semibold">{clientThread.length - 1}</strong> respuesta{clientThread.length - 1 > 1 ? "s" : ""} adicional{clientThread.length - 1 > 1 ? "es" : ""} en la conversación.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("respuestas")}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-line-strong bg-white px-2.5 py-1 text-xs font-semibold text-ink shadow-2xs hover:bg-slate-50"
-                >
-                  Ver respuestas ({clientThread.length})
-                </button>
-              </div>
-            )}
-
-            {/* Sub-grid simétrica para Observadores y Adjuntos */}
-            {((ticket.watchers && ticket.watchers.length > 0) || (ticket.attachments && ticket.attachments.length > 0)) && (
-              <div
-                className={`grid grid-cols-1 ${
-                  ticket.watchers && ticket.watchers.length > 0 && ticket.attachments && ticket.attachments.length > 0
-                    ? "lg:grid-cols-2"
-                    : ""
-                } gap-6`}
-              >
-                {/* Observadores del ticket */}
-                {ticket.watchers && ticket.watchers.length > 0 && (
-                  <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-                    <h3 className="font-heading text-[12.5px] font-semibold text-ink">
-                      Observadores ({ticket.watchers.length})
-                    </h3>
-                    <div className="mt-3 space-y-1.5 text-xs">
-                      {ticket.watchers.map((w) => (
-                        <div key={w.id} className="flex items-center justify-between text-ink">
-                          <span className="font-medium">{w.staffName}</span>
-                          <span className="text-[11px] text-subtle">{w.staffEmail}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Todos los adjuntos del ticket */}
-                {ticket.attachments && ticket.attachments.length > 0 && (
-                  <div className="rounded-xl border border-line-soft bg-white p-5 shadow-xs">
-                    <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-                      <Paperclip className="h-4 w-4 text-brand-red" />
-                      Todos los Adjuntos ({ticket.attachments.length})
-                    </h3>
-                    <div className="mt-3 space-y-2 text-xs">
-                      {/* La fila entera es el control: el ojo solo señala qué hace. */}
-                      {ticket.attachments.map((att) => (
-                        <button
-                          key={att.id}
-                          type="button"
-                          onClick={() => openAttachment(ticket.attachments, att.id)}
-                          title={`Abrir ${att.fileName}`}
-                          className="group flex w-full cursor-pointer items-center justify-between gap-2 rounded-edge
-                            border border-line-soft p-2 text-left outline-none transition-colors
-                            hover:border-line-strong hover:bg-canvas
-                            focus-visible:ring-3 focus-visible:ring-brand-red/12"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-ink">{att.fileName}</p>
-                            <span className="text-[10px] text-subtle">
-                              {formatBytes(att.sizeBytes)} · {formatDateTime(att.createdAt)}
-                            </span>
-                          </div>
-                          <Eye
-                            aria-hidden
-                            className="h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-ink"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Pestaña 2: Responder al cliente */}
-        {activeTab === "respuestas" && (
-          <div className="space-y-4">
-            {/* La acción encabeza el hilo; el editor se pide, no está siempre puesto. */}
-            <div className="flex items-center gap-3">
-              <span className="shrink-0 text-[11.5px] font-semibold text-subtle">
-                {clientThread.length} {clientThread.length === 1 ? "mensaje" : "mensajes"}
-              </span>
-
-              <span aria-hidden className="h-px flex-1 bg-line" />
-
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                onClick={() => setReplyOpen(true)}
-                disabled={!recipientEmail}
-                title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
-                className="shrink-0 gap-2"
-              >
-                <CornerUpLeft className="h-3.5 w-3.5" />
-                Responder
-              </Button>
-            </div>
-
-            {clientThread.length === 0 ? (
-              <div className="px-6 pb-4 pt-8 text-center">
-                <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-edge border border-line-strong bg-canvas text-subtle">
-                  <Mail className="h-5 w-5" />
-                </span>
-                <p className="mt-4 font-heading text-[15px] font-semibold tracking-[-0.01em] text-ink">
-                  Todavía no hay conversación
-                </p>
-                <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-subtle">
-                  Ni el cliente ha escrito ni se le ha respondido. Lo que envíes desde aquí le
-                  llegará por correo y quedará registrado en este hilo.
-                </p>
-              </div>
-            ) : (
-              /* Todo el hilo a la vista, en orden; la última es la referencia activa. */
-              <div className="space-y-3">
-                {clientThread.map((msg, index) =>
-                  renderMessageCard(msg, index === clientThread.length - 1),
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Pestaña 3: Notas internas */}
-        {activeTab === "notas" && (
-          <div className="space-y-4">
-            {internalNotes.length === 0 ? (
-              // Sin notas, el vacío es la única pieza: explica para qué sirven y ofrece escribir la primera.
-              <div className="px-6 pb-4 pt-8 text-center">
-                <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-edge border border-warn/30 bg-warn/[0.07] text-warn">
-                  <Lock className="h-5 w-5" />
-                </span>
-                <p className="mt-4 font-heading text-[15px] font-semibold tracking-[-0.01em] text-ink">
-                  Nada anotado todavía
-                </p>
-                <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-subtle">
-                  Aquí queda lo que el equipo necesita saber y el cliente no: cómo fue la llamada,
-                  qué se intentó ya, con quién quedó pendiente. Nunca sale por correo.
-                </p>
-
-                <Button
-                  type="button"
-                  variant="primary"
-                  onClick={() => setShowNoteModal(true)}
-                  className="mt-5 gap-2"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Añadir nota
-                </Button>
-              </div>
-            ) : (
-              <>
-                {/* La acción encabeza la lista: es su cabecera, no una barra suelta. */}
+            {activeTab === "conversacion" && (
+              <div className="mt-4 space-y-3">
+                {/* La accion encabeza el hilo; el editor se pide, no esta siempre puesto. */}
                 <div className="flex items-center gap-3">
-                  <span className="shrink-0 text-[11.5px] font-semibold text-subtle">
-                    {internalNotes.length} {internalNotes.length === 1 ? "nota" : "notas"}
+                  <span className="shrink-0 text-[11.5px] font-semibold tabular-nums text-subtle">
+                    {clientThread.length} {clientThread.length === 1 ? "mensaje" : "mensajes"}
                   </span>
-
                   <span aria-hidden className="h-px flex-1 bg-line" />
-
                   <Button
                     type="button"
-                    variant="primary"
                     size="sm"
-                    onClick={() => setShowNoteModal(true)}
-                    className="shrink-0 gap-2"
+                    onClick={() => setReplyOpen(true)}
+                    disabled={!recipientEmail}
+                    title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    Añadir nota
+                    <CornerUpLeft className="h-[15px] w-[15px]" />
+                    Responder
                   </Button>
                 </div>
 
-                {/* Todas a la vista: son pocas y se leen de corrido, la última al final. */}
-                <div className="space-y-3">
-                  {internalNotes.map((msg, index) =>
-                    renderMessageCard(msg, index === internalNotes.length - 1),
-                  )}
-                </div>
-              </>
+                {clientThread.length === 0 ? (
+                  <div className="px-6 pb-4 pt-10 text-center">
+                    <Mail className="mx-auto h-6 w-6 text-faint" />
+                    <p className="mt-3 font-heading text-[15px] font-semibold tracking-[-0.01em] text-ink">
+                      Todavía no hay conversación
+                    </p>
+                    <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-subtle">
+                      Ni el cliente ha escrito ni se le ha respondido. Lo que envíes desde aquí le llegará por correo y
+                      quedará registrado en este hilo.
+                    </p>
+                  </div>
+                ) : (
+                  renderThread(clientThread)
+                )}
+              </div>
+            )}
+
+            {activeTab === "notas" && (
+              <div className="mt-4 space-y-3">
+                {internalNotes.length === 0 ? (
+                  // Sin notas, el vacio es la unica pieza: explica para que sirven y ofrece escribir la primera.
+                  <div className="px-6 pb-4 pt-10 text-center">
+                    <Lock className="mx-auto h-6 w-6 text-warn" />
+                    <p className="mt-3 font-heading text-[15px] font-semibold tracking-[-0.01em] text-ink">
+                      Nada anotado todavía
+                    </p>
+                    <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-subtle">
+                      Aquí queda lo que el equipo necesita saber y el cliente no: cómo fue la llamada, qué se intentó
+                      ya, con quién quedó pendiente. Nunca sale por correo.
+                    </p>
+                    <Button type="button" size="sm" onClick={() => setShowNoteModal(true)} className="mt-5">
+                      <Plus className="h-[15px] w-[15px]" />
+                      Añadir nota
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <span className="shrink-0 text-[11.5px] font-semibold tabular-nums text-subtle">
+                        {internalNotes.length} {internalNotes.length === 1 ? "nota" : "notas"}
+                      </span>
+                      <span aria-hidden className="h-px flex-1 bg-line" />
+                      <Button type="button" size="sm" onClick={() => setShowNoteModal(true)}>
+                        <Plus className="h-[15px] w-[15px]" />
+                        Añadir nota
+                      </Button>
+                    </div>
+                    {renderThread(internalNotes)}
+                  </>
+                )}
+              </div>
             )}
           </div>
-        )}
+
+          <TicketPropertiesAside
+            ticket={ticket}
+            sla={sla}
+            canEdit={!isClosed}
+            canAssign={ticket.status !== "Cancelado"}
+            onEdit={() => void handleOpenEditModal()}
+            onAssign={() => void handleOpenAssignModal()}
+            onOpenAttachment={openAttachment}
+            className="w-full shrink-0 border-t border-line pt-6 lg:w-[300px] lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0"
+          />
+        </div>
       </div>
 
-      {/* Responder es la tarea entera, no un apéndice del hilo: ocupa la pantalla.
-          Cerrar sin enviar conserva el borrador; solo se vacía al salir el correo. */}
+      {/* Responder es la tarea entera, no un apendice del hilo: ocupa la pantalla.
+          Cerrar sin enviar conserva el borrador; solo se vacia al salir el correo. */}
       {replyOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white">
           <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-3.5">
             <div className="min-w-0">
-              <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
+              <p className="font-heading text-[11px] font-semibold tracking-[0.02em] tabular-nums text-subtle">
                 {ticket.number}
               </p>
-              <h2 className="mt-1 truncate font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+              <h2 className="mt-0.5 truncate font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
                 Re: {ticket.subject}
               </h2>
               <p className="mt-0.5 truncate text-[12px] text-subtle">
                 Para <span className="font-medium text-ink">{recipientEmail}</span>
               </p>
             </div>
-
             <button
               type="button"
               onClick={() => !replySending && setReplyOpen(false)}
-              aria-label="Cerrar el editor"
-              className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle
-                transition-colors hover:bg-fill hover:text-ink"
+              aria-label="Cerrar el editor (Esc)"
+              className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle outline-none
+                transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20"
             >
               <X className="h-4 w-4" />
             </button>
@@ -1613,22 +780,12 @@ export function TicketDetailPage() {
           <div className="shrink-0 space-y-2.5 border-t border-line bg-canvas/40 px-6 py-3">
             {replyAttachments.length > 0 && (
               <div className="mx-auto flex max-w-4xl flex-wrap gap-2">
-                {replyAttachments.map((f, i) => (
-                  <span
-                    key={`${f.name}-${i}`}
-                    className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-white px-2.5 py-1 text-[11.5px] text-ink"
-                  >
-                    <Paperclip className="h-3 w-3 text-subtle" />
-                    <span className="max-w-[160px] truncate">{f.name}</span>
-                    <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
-                    <button
-                      type="button"
-                      onClick={() => removeReplyFile(i)}
-                      className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
+                {replyAttachments.map((file, index) => (
+                  <PendingFile
+                    key={`${file.name}-${index}`}
+                    file={file}
+                    onRemove={() => setReplyAttachments((prev) => prev.filter((_, i) => i !== index))}
+                  />
                 ))}
               </div>
             )}
@@ -1643,42 +800,32 @@ export function TicketDetailPage() {
               <div className="flex items-center gap-3">
                 <input
                   ref={replyFileInputRef}
+                  id="reply-attachment-input"
                   type="file"
                   multiple
-                  onChange={handleReplyFileChange}
                   className="hidden"
-                  id="reply-attachment-input"
+                  onChange={(event) =>
+                    pickFiles(event.target, replyAttachments, setReplyAttachments, setReplySendError)
+                  }
                 />
-                <label
-                  htmlFor="reply-attachment-input"
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
-                >
+                <label htmlFor="reply-attachment-input" className={attachLabelClass}>
                   <Paperclip className="h-3.5 w-3.5" />
                   Adjuntar
                 </label>
-                <span className="hidden text-[11px] text-faint sm:inline">
-                  {SAVE_SHORTCUT} para enviar
-                </span>
+                <span className="hidden text-[11px] text-faint sm:inline">{SAVE_SHORTCUT} para enviar</span>
               </div>
 
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={replySending}
-                  onClick={() => setReplyOpen(false)}
-                >
+                <Button type="button" variant="secondary" disabled={replySending} onClick={() => setReplyOpen(false)}>
                   Cancelar
                 </Button>
                 <Button
                   type="button"
-                  variant="primary"
                   isLoading={replySending}
                   disabled={!replyReady}
                   onClick={() => void sendReply()}
-                  className="gap-2"
                 >
-                  <Send className="h-3.5 w-3.5" />
+                  <Send className="h-[15px] w-[15px]" />
                   Enviar respuesta
                 </Button>
               </div>
@@ -1687,21 +834,18 @@ export function TicketDetailPage() {
         </div>
       )}
 
-      {/* Escribir una nota es un acto aparte, no algo que viva bajo el hilo: se pide,
-          se escribe y se cierra. El borrador sobrevive si se cierra sin guardar. */}
+      {/* Escribir una nota es un acto aparte: se pide, se escribe y se cierra. El borrador sobrevive si se cierra sin guardar. */}
       {showNoteModal && (
         <Modal
           eyebrow={ticket.number}
           title="Añadir nota interna"
           description={
             <span className="inline-flex flex-wrap items-center gap-2">
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-edge bg-amber-700 px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-white">
-                <Lock className="h-2.5 w-2.5" />
+              <Badge tone="amber">
+                <Lock aria-hidden className="mr-1 h-3 w-3" />
                 Privada
-              </span>
-              <span className="text-ink">
-                Solo la ve el personal de Plastifar. El cliente no recibe copia.
-              </span>
+              </Badge>
+              <span>Solo la ve el personal de Plastifar. El cliente no recibe copia.</span>
             </span>
           }
           onClose={() => {
@@ -1709,23 +853,15 @@ export function TicketDetailPage() {
           }}
           footer={
             <>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={noteSending}
-                onClick={() => setShowNoteModal(false)}
-              >
+              <Button type="button" variant="secondary" disabled={noteSending} onClick={() => setShowNoteModal(false)}>
                 Cancelar
               </Button>
               <Button
                 type="button"
-                variant="primary"
                 isLoading={noteSending}
                 disabled={!noteBody.trim()}
                 onClick={() => void saveNote()}
-                className="gap-2"
               >
-                <Lock className="h-3.5 w-3.5" />
                 Guardar nota
               </Button>
             </>
@@ -1736,27 +872,28 @@ export function TicketDetailPage() {
               autoFocus
               rows={7}
               value={noteBody}
-              onChange={(e) => setNoteBody(e.target.value)}
-              onKeyDown={handleNoteKeyDown}
+              onChange={(event) => setNoteBody(event.target.value)}
+              onKeyDown={(event) => {
+                // Escribir y guardar sin soltar el teclado: es el gesto de cualquier campo de notas.
+                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  void saveNote();
+                }
+              }}
               placeholder="Lo que el equipo debe saber sobre este caso…"
-              className="w-full resize-none rounded-edge border border-line-strong bg-white px-3 py-2.5
-                text-[13px] leading-relaxed text-ink outline-none transition-colors
-                placeholder:text-faint focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
+              className={textareaClass}
             />
 
             <div className="flex flex-wrap items-center gap-3">
               <input
                 ref={noteFileInputRef}
+                id="note-attachment-input"
                 type="file"
                 multiple
-                onChange={handleNoteFileChange}
                 className="hidden"
-                id="note-attachment-input"
+                onChange={(event) => pickFiles(event.target, noteAttachments, setNoteAttachments, setNoteSendError)}
               />
-              <label
-                htmlFor="note-attachment-input"
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
-              >
+              <label htmlFor="note-attachment-input" className={attachLabelClass}>
                 <Paperclip className="h-3.5 w-3.5" />
                 Adjuntar
               </label>
@@ -1765,22 +902,12 @@ export function TicketDetailPage() {
 
             {noteAttachments.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {noteAttachments.map((f, i) => (
-                  <span
-                    key={`${f.name}-${i}`}
-                    className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-canvas/60 px-2.5 py-1 text-[11.5px] text-ink"
-                  >
-                    <Paperclip className="h-3 w-3 text-subtle" />
-                    <span className="max-w-[160px] truncate">{f.name}</span>
-                    <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
-                    <button
-                      type="button"
-                      onClick={() => removeNoteFile(i)}
-                      className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
+                {noteAttachments.map((file, index) => (
+                  <PendingFile
+                    key={`${file.name}-${index}`}
+                    file={file}
+                    onRemove={() => setNoteAttachments((prev) => prev.filter((_, i) => i !== index))}
+                  />
                 ))}
               </div>
             )}
@@ -1790,9 +917,8 @@ export function TicketDetailPage() {
         </Modal>
       )}
 
-      {/* Modal para Actualizar Ticket: una sola entrada para todas las transiciones de
-          estado válidas; Solucionado pide tipo de solución + comentario, Cancelado exige
-          un motivo explicativo, el resto acepta un comentario opcional. */}
+      {/* Una sola entrada para todas las transiciones: Solucionado pide tipo de solucion,
+          Cancelado exige motivo, el resto acepta un comentario opcional. */}
       {showUpdateStatusModal && (
         <Modal
           eyebrow={ticket.number}
@@ -1817,7 +943,7 @@ export function TicketDetailPage() {
                 variant={updateTargetStatus === "Cancelado" ? "danger" : "primary"}
                 isLoading={transitioning}
               >
-                Confirmar
+                {updateTargetStatus === "Cancelado" ? "Cancelar ticket" : "Confirmar"}
               </Button>
             </>
           }
@@ -1825,71 +951,57 @@ export function TicketDetailPage() {
           <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-4">
             {transitionError && <Alert variant="error">{transitionError}</Alert>}
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-ink">Nueva situación</label>
-              <div className="space-y-2">
-                {availableTransitions.map((opt) => {
-                  const isSelected = updateTargetStatus === opt.target;
-                  const OptIcon = opt.icon;
-                  return (
-                    <button
-                      key={opt.target}
-                      type="button"
-                      onClick={() => setUpdateTargetStatus(opt.target)}
-                      className={`flex w-full cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-left transition-all ${
+            <div role="radiogroup" aria-label="Nueva situación" className="space-y-2">
+              {availableTransitions.map((option) => {
+                const isSelected = updateTargetStatus === option.target;
+                const OptionIcon = option.icon;
+                return (
+                  <button
+                    key={option.target}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => setUpdateTargetStatus(option.target)}
+                    className={`flex w-full items-start gap-3 rounded-edge border p-3 text-left outline-none transition-colors
+                      focus-visible:ring-3 focus-visible:ring-brand-red/15 ${
                         isSelected
-                          ? opt.danger
-                            ? "border-brand-red bg-brand-red/5 ring-1 ring-brand-red/30"
-                            : "border-brand-red bg-brand-red/5 ring-1 ring-brand-red/30"
-                          : "border-line-strong hover:border-zinc-400 hover:bg-slate-50"
+                          ? "border-brand-red bg-brand-red/[0.04]"
+                          : "border-line-strong hover:border-zinc-400 hover:bg-canvas"
                       }`}
-                    >
-                      <OptIcon
-                        className={`mt-0.5 h-4 w-4 shrink-0 ${
-                          opt.danger ? "text-brand-red" : "text-brand-gray"
-                        }`}
-                      />
-                      <span>
-                        <span className="block text-[13px] font-semibold text-ink">{opt.label}</span>
-                        <span className="block text-[11.5px] text-subtle">{opt.description}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                  >
+                    <OptionIcon
+                      aria-hidden
+                      className={`mt-0.5 h-4 w-4 shrink-0 ${option.danger ? "text-brand-red" : "text-brand-gray"}`}
+                    />
+                    <span>
+                      <span className="block text-[13px] font-semibold text-ink">{option.label}</span>
+                      <span className="block text-[11.5px] text-subtle">{option.description}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {updateTargetStatus === "Solucionado" && (
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="solution-type" className="text-xs font-semibold text-ink">
-                  Tipo de solución <span className="text-brand-red">*</span>
-                </label>
-                <select
-                  id="solution-type"
-                  required
-                  value={updateSolutionType}
-                  onChange={(e) => setUpdateSolutionType(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-line-strong bg-white px-3 text-xs text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
-                >
-                  <option value="">— Selecciona un tipo —</option>
-                  {SOLUTION_TYPES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SelectField
+                id="solution-type"
+                label="Tipo de solución"
+                required
+                placeholder="Selecciona un tipo"
+                value={updateSolutionType}
+                onChange={setUpdateSolutionType}
+                options={SOLUTION_TYPES.map((value) => ({ value, label: value }))}
+              />
             )}
 
             {updateTargetStatus && (
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="update-comment" className="text-xs font-semibold text-ink">
+                <label htmlFor="update-comment" className={labelClass}>
+                  {updateTargetStatus === "Cancelado" ? "Motivo de cancelación" : "Comentario"}
                   {updateTargetStatus === "Cancelado" ? (
-                    <>
-                      Motivo de cancelación <span className="text-brand-red">*</span>
-                    </>
+                    <span className="ml-1 text-brand-red">*</span>
                   ) : (
-                    "Comentario (opcional)"
+                    <span className="ml-1 font-normal">(opcional)</span>
                   )}
                 </label>
                 <textarea
@@ -1897,13 +1009,13 @@ export function TicketDetailPage() {
                   rows={4}
                   required={updateTargetStatus === "Cancelado"}
                   value={updateComment}
-                  onChange={(e) => setUpdateComment(e.target.value)}
+                  onChange={(event) => setUpdateComment(event.target.value)}
                   placeholder={
                     updateTargetStatus === "Cancelado"
-                      ? "Explica detalladamente por qué se cancela este ticket..."
-                      : "Agrega contexto adicional para el historial del ticket (opcional)..."
+                      ? "Explica por qué se cancela este ticket…"
+                      : "Contexto adicional para el historial del ticket…"
                   }
-                  className="w-full rounded-lg border border-line-strong p-3 text-xs text-ink placeholder:text-subtle focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                  className={textareaClass}
                 />
               </div>
             )}
@@ -1911,31 +1023,20 @@ export function TicketDetailPage() {
         </Modal>
       )}
 
-      {/* Modal para Asignar Ticket */}
       {showAssignModal && (
         <Modal
           eyebrow={ticket.number}
           title="Asignar ticket"
-          description="Selecciona el agente del personal para atender este caso. Solo se muestran colaboradores activos con acceso al departamento."
+          description="Solo aparecen colaboradores activos con acceso al departamento del ticket."
           onClose={() => {
             if (!assigning) setShowAssignModal(false);
           }}
           footer={
             <>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={assigning}
-                onClick={() => setShowAssignModal(false)}
-              >
+              <Button type="button" variant="secondary" disabled={assigning} onClick={() => setShowAssignModal(false)}>
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                form="assign-ticket-form"
-                variant="primary"
-                isLoading={assigning}
-              >
+              <Button type="submit" form="assign-ticket-form" isLoading={assigning}>
                 Guardar asignación
               </Button>
             </>
@@ -1945,34 +1046,28 @@ export function TicketDetailPage() {
             {assignError && <Alert variant="error">{assignError}</Alert>}
 
             {loadingStaff ? (
-              <div className="flex items-center justify-center py-8">
-                <Spinner size="md" />
-                <span className="ml-2 text-xs text-subtle">Cargando personal disponible...</span>
+              <div className="flex justify-center py-8">
+                <Spinner size="sm" label="Cargando colaboradores…" />
               </div>
             ) : (
               <>
                 <SelectField
                   id="assign-staff-select"
-                  label="Colaborador asignado"
+                  label="Colaborador"
                   value={selectedStaffId}
                   onChange={setSelectedStaffId}
-                  placeholder="Sin asignar (desasignar)"
                   options={[
-                    { value: "", label: "Sin asignar (desasignar)" },
-                    ...assignableStaff.map((s) => ({
-                      value: String(s.id),
-                      label: `${s.fullName} (${s.email})`,
-                    })),
+                    { value: "", label: "Sin asignar" },
+                    ...assignableStaff.map((s) => ({ value: String(s.id), label: s.fullName })),
                   ]}
                 />
-
                 <TextField
                   id="assign-comment-input"
-                  label="Nota o comentario interno"
-                  hint="Opcional: explica brevemente el motivo del cambio de responsable."
+                  label="Comentario"
+                  hint="Opcional: por qué cambia la persona responsable. Queda en el historial."
                   value={assignComment}
-                  onChange={(e) => setAssignComment(e.target.value)}
-                  placeholder="Ej: Reasignado para soporte especializado de producto…"
+                  onChange={(event) => setAssignComment(event.target.value)}
+                  placeholder="Ej.: reasignado para soporte especializado de producto"
                 />
               </>
             )}
@@ -1980,31 +1075,20 @@ export function TicketDetailPage() {
         </Modal>
       )}
 
-      {/* Modal para Editar Atributos del Ticket (PUT /api/tickets/{id}) */}
       {showEditModal && (
         <Modal
           eyebrow={ticket.number}
-          title="Editar detalles del ticket"
-          description="Modifica el asunto, motivo, prioridad, departamento o línea de producto. La fecha límite de SLA se recalculará automáticamente."
+          title="Editar ticket"
+          description="Asunto, motivo, prioridad, departamento y línea de producto. El SLA se recalcula solo."
           onClose={() => {
             if (!savingEdit) setShowEditModal(false);
           }}
           footer={
             <>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={savingEdit}
-                onClick={() => setShowEditModal(false)}
-              >
+              <Button type="button" variant="secondary" disabled={savingEdit} onClick={() => setShowEditModal(false)}>
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                form="edit-ticket-form"
-                variant="primary"
-                isLoading={savingEdit}
-              >
+              <Button type="submit" form="edit-ticket-form" isLoading={savingEdit}>
                 Guardar cambios
               </Button>
             </>
@@ -2014,9 +1098,8 @@ export function TicketDetailPage() {
             {editError && <Alert variant="error">{editError}</Alert>}
 
             {loadingEditCatalogs ? (
-              <div className="flex items-center justify-center py-8">
-                <Spinner size="md" />
-                <span className="ml-2 text-xs text-subtle">Cargando catálogos...</span>
+              <div className="flex justify-center py-8">
+                <Spinner size="sm" label="Cargando catálogos…" />
               </div>
             ) : (
               <>
@@ -2026,102 +1109,70 @@ export function TicketDetailPage() {
                   required
                   maxLength={200}
                   value={editSubject}
-                  onChange={(e) => setEditSubject(e.target.value)}
+                  onChange={(event) => setEditSubject(event.target.value)}
                 />
 
-                <div className="space-y-3.5 rounded-edge border border-line-soft bg-canvas/40 p-4">
-                  <h4 className="flex items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink">
-                    <Tag className="h-3.5 w-3.5 text-brand-red" />
-                    Clasificación y enrutamiento
-                  </h4>
-
-                  <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                    <SelectField
-                      id="edit-topic"
-                      label="Motivo / Tema"
-                      size="sm"
-                      value={editTopicId !== null ? String(editTopicId) : ""}
-                      onChange={(val) => {
-                        const newId = val ? Number(val) : null;
-                        setEditTopicId(newId);
-                        if (newId) {
-                          const foundTopic = editCatalogs?.topics.find((t) => t.id === newId);
-                          if (foundTopic) {
-                            if (foundTopic.defaultDepartmentId) {
-                              setEditDepartmentId(foundTopic.defaultDepartmentId);
-                            }
-                            if (foundTopic.defaultPriority) {
-                              setEditPriority(foundTopic.defaultPriority);
-                            }
-                          }
-                        }
-                      }}
-                      placeholder="Sin motivo"
-                      options={[
-                        { value: "", label: "Sin motivo" },
-                        ...(editCatalogs?.topics ?? []).map((t) => ({
-                          value: String(t.id),
-                          label: t.name,
-                        })),
-                      ]}
-                    />
-
-                    <SelectField
-                      id="edit-priority"
-                      label="Prioridad"
-                      required
-                      size="sm"
-                      value={editPriority}
-                      onChange={setEditPriority}
-                      options={[
-                        { value: "Emergencia", label: "Emergencia" },
-                        { value: "Alta", label: "Alta" },
-                        { value: "Normal", label: "Normal" },
-                        { value: "Baja", label: "Baja" },
-                      ]}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                    <SelectField
-                      id="edit-dept"
-                      label="Departamento"
-                      size="sm"
-                      value={editDepartmentId !== null ? String(editDepartmentId) : ""}
-                      onChange={(val) => setEditDepartmentId(val ? Number(val) : null)}
-                      placeholder="Sin departamento"
-                      options={[
-                        { value: "", label: "Sin departamento" },
-                        ...(editCatalogs?.departments ?? []).map((d) => ({
-                          value: String(d.id),
-                          label: d.name,
-                        })),
-                      ]}
-                    />
-
-                    <SelectField
-                      id="edit-line"
-                      label={editRequiresProductLine ? "Línea de producto *" : "Línea de producto"}
-                      size="sm"
-                      required={editRequiresProductLine}
-                      value={editProductLineId !== null ? String(editProductLineId) : ""}
-                      onChange={(val) => setEditProductLineId(val ? Number(val) : null)}
-                      placeholder="Ninguna / No aplica"
-                      options={[
-                        { value: "", label: "Ninguna / No aplica" },
-                        ...(editCatalogs?.productLines ?? []).map((pl) => ({
-                          value: String(pl.id),
-                          label: `${pl.name} (${pl.code})`,
-                        })),
-                      ]}
-                    />
-                  </div>
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                  <SelectField
+                    id="edit-topic"
+                    label="Motivo"
+                    size="sm"
+                    value={editTopicId !== null ? String(editTopicId) : ""}
+                    onChange={(value) => {
+                      const nextId = value ? Number(value) : null;
+                      setEditTopicId(nextId);
+                      // El motivo trae su departamento y prioridad por defecto; se pueden corregir despues.
+                      const topic = nextId ? editCatalogs?.topics.find((t) => t.id === nextId) : undefined;
+                      if (topic?.defaultDepartmentId) setEditDepartmentId(topic.defaultDepartmentId);
+                      if (topic?.defaultPriority) setEditPriority(topic.defaultPriority);
+                    }}
+                    placeholder="Sin motivo"
+                    options={[
+                      { value: "", label: "Sin motivo" },
+                      ...(editCatalogs?.topics ?? []).map((t) => ({ value: String(t.id), label: t.name })),
+                    ]}
+                  />
+                  <SelectField
+                    id="edit-priority"
+                    label="Prioridad"
+                    required
+                    size="sm"
+                    value={editPriority}
+                    onChange={setEditPriority}
+                    options={PRIORITY_OPTIONS}
+                  />
+                  <SelectField
+                    id="edit-dept"
+                    label="Departamento"
+                    size="sm"
+                    value={editDepartmentId !== null ? String(editDepartmentId) : ""}
+                    onChange={(value) => setEditDepartmentId(value ? Number(value) : null)}
+                    placeholder="Sin departamento"
+                    options={[
+                      { value: "", label: "Sin departamento" },
+                      ...(editCatalogs?.departments ?? []).map((d) => ({ value: String(d.id), label: d.name })),
+                    ]}
+                  />
+                  <SelectField
+                    id="edit-line"
+                    label="Línea de producto"
+                    size="sm"
+                    required={editRequiresProductLine}
+                    value={editProductLineId !== null ? String(editProductLineId) : ""}
+                    onChange={(value) => setEditProductLineId(value ? Number(value) : null)}
+                    placeholder="No aplica"
+                    options={[
+                      { value: "", label: "No aplica" },
+                      ...(editCatalogs?.productLines ?? []).map((line) => ({
+                        value: String(line.id),
+                        label: `${line.name} (${line.code})`,
+                      })),
+                    ]}
+                  />
                 </div>
 
-                <p className="flex items-start gap-1.5 text-[11px] text-faint">
-                  <Info className="mt-px h-3 w-3 shrink-0" />
-                  Si cambias el departamento y el colaborador actualmente asignado no pertenece al
-                  nuevo departamento, será desasignado automáticamente.
+                <p className="text-[11.5px] leading-relaxed text-faint">
+                  Si cambias el departamento y la persona asignada no pertenece al nuevo, queda sin asignar.
                 </p>
               </>
             )}
@@ -2129,13 +1180,11 @@ export function TicketDetailPage() {
         </Modal>
       )}
 
-      {/* El mismo visor de la bandeja: se ve dentro y, si hace falta, se descarga desde ahí. */}
+      {/* El mismo visor de la bandeja: se ve dentro y, si hace falta, se descarga desde ahi. */}
       {preview && (
         <AttachmentPreviewModal
           sourceId={ticketId}
-          loadLink={(attachmentId, download) =>
-            ticketsApi.attachmentLink(ticketId, attachmentId, download)
-          }
+          loadLink={(attachmentId, download) => ticketsApi.attachmentLink(ticketId, attachmentId, download)}
           attachments={preview.attachments}
           index={preview.index}
           onIndexChange={(index) => setPreview({ ...preview, index })}
@@ -2143,16 +1192,13 @@ export function TicketDetailPage() {
         />
       )}
 
-      {/* Pestaña lateral desplegable (Sheet) con animación fluida de entrada y salida */}
-      {showTimelineDrawer && ticket && (
+      {showTimeline && (
         <TicketTimelineSheet
           ticket={ticket}
           timeline={timeline}
-          sortedMessages={sortedMessages}
           onOpenAttachment={openAttachment}
-          onClose={() => setShowTimelineDrawer(false)}
+          onClose={() => setShowTimeline(false)}
           onSelectTab={setActiveTab}
-          initialFilter={timelineFilter}
         />
       )}
     </div>

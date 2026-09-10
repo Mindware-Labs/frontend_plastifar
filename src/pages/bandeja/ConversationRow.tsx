@@ -4,7 +4,7 @@ import { Badge } from "../../components/shadcn/badge";
 import { formatEmailListDate, formatTicketCode } from "../../lib/format";
 import type { EmailSummaryResponse } from "../../types/api";
 import { ticketBadgeClass } from "./badgeStyles";
-import { SelectBox } from "./SelectionBar";
+import { SelectBox } from "../../components/ui/SelectBox";
 
 interface ConversationRowProps {
   email: EmailSummaryResponse;

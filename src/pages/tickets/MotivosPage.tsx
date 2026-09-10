@@ -1,29 +1,39 @@
 import { Ban, CheckCircle2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
-import { ticketTopicsApi } from "../../api/ticketTopics";
+import { ticketTopicsApi, type TicketTopicQuery } from "../../api/ticketTopics";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePagedList } from "../../hooks/usePagedList";
 import { formatDateTime } from "../../lib/format";
-import type { DepartmentResponse, TicketTopicResponse } from "../../types/api";
+import type {
+  DepartmentResponse,
+  TicketTopicListResponse,
+  TicketTopicResponse,
+} from "../../types/api";
 import { MotivoModal } from "./MotivoModal";
 
 type StatusFilter = "todos" | "activos" | "inactivos";
 
-const statusFilters: { key: StatusFilter; label: string }[] = [
-  { key: "todos", label: "Todos" },
-  { key: "activos", label: "Activos" },
-  { key: "inactivos", label: "Inactivos" },
+const statusFilters: {
+  key: StatusFilter;
+  label: string;
+  countKey: keyof TicketTopicListResponse["counts"];
+}[] = [
+  { key: "todos", label: "Todos", countKey: "all" },
+  { key: "activos", label: "Activos", countKey: "active" },
+  { key: "inactivos", label: "Inactivos", countKey: "inactive" },
 ];
 
 /** El tono no decora: dice cuánta prisa mete cada motivo en el SLA del ticket. */
@@ -42,53 +52,42 @@ export function MotivosPage() {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
 
-  const [items, setItems] = useState<TicketTopicResponse[] | null>(null);
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("todos");
+  const [pageSize, setPageSize] = useState(10);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [modal, setModal] = useState<"nuevo" | TicketTopicResponse | null>(null);
 
-  const debouncedSearch = useDebouncedValue(search, 300);
+  const debouncedSearch = useDebouncedValue(search, 300).trim();
 
-  // El estado se filtra en memoria: el catálogo es corto y así las pastillas
-  // pueden mostrar cuántos hay en cada bucket sin pedir tres listados.
-  const load = useCallback(() => {
-    ticketTopicsApi
-      .list({ search: debouncedSearch || undefined })
-      .then(setItems)
-      .catch((err) =>
-        setError(err instanceof ApiError ? err.message : "No se pudieron cargar los motivos"),
-      );
-  }, [debouncedSearch]);
-
-  useEffect(load, [load]);
+  const { data, isStale, error, setPage, refresh } = usePagedList<
+    TicketTopicQuery,
+    TicketTopicListResponse
+  >({
+    fetch: ticketTopicsApi.list,
+    criteria: { pageSize, search: debouncedSearch || undefined, status },
+    fallbackError: "No se pudieron cargar los motivos",
+  });
 
   useEffect(() => {
     departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
   }, []);
 
-  const all = items ?? [];
-  const counts: Record<StatusFilter, number> = {
-    todos: all.length,
-    activos: all.filter((t) => t.isActive).length,
-    inactivos: all.filter((t) => !t.isActive).length,
-  };
-
-  const rows = all.filter((topic) =>
-    status === "todos" ? true : status === "activos" ? topic.isActive : !topic.isActive,
-  );
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
 
   async function run(id: number, action: () => Promise<unknown>) {
     setBusyId(id);
-    setError(null);
+    setActionError(null);
     try {
       await action();
-      load();
+      // Relee la página: totales y contadores los manda el servidor, no se adivinan aquí.
+      refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo completar la acción");
+      setActionError(err instanceof ApiError ? err.message : "No se pudo completar la acción");
     } finally {
       setBusyId(null);
     }
@@ -138,8 +137,8 @@ export function MotivosPage() {
       <ModuleHeader
         title="Motivos"
         summary={
-          items
-            ? `${items.length} ${items.length === 1 ? "motivo" : "motivos"} · cada uno decide a qué departamento se encola el ticket`
+          data
+            ? `${data.total} ${data.total === 1 ? "motivo" : "motivos"} · cada uno decide a qué departamento se encola el ticket`
             : "Cargando los motivos…"
         }
         action={
@@ -166,7 +165,7 @@ export function MotivosPage() {
               <FilterChip
                 key={filter.key}
                 label={filter.label}
-                count={counts[filter.key]}
+                count={counts?.[filter.countKey] ?? 0}
                 active={status === filter.key}
                 onClick={() => setStatus(filter.key)}
               />
@@ -174,18 +173,19 @@ export function MotivosPage() {
           </div>
         </div>
 
-        {error && (
+        {(error || actionError) && (
           <div className="mb-3">
-            <Alert variant="error">{error}</Alert>
+            <Alert variant="error">{error ?? actionError}</Alert>
           </div>
         )}
 
-        {items === null ? (
+        {!data ? (
           <div className="flex justify-center py-16">
             <Spinner />
           </div>
         ) : (
-          <>
+          // Atenuada mientras llega la página nueva: la anterior se queda para no dar un salto en blanco.
+          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
             <DataTable>
               <thead>
                 <HeadRow>
@@ -268,13 +268,23 @@ export function MotivosPage() {
               <div className="flex flex-col items-center gap-2 py-14 text-center">
                 <Tag className="h-6 w-6 text-faint" />
                 <p className="text-[13.5px] text-faint">
-                  {search.trim() || status !== "todos"
+                  {debouncedSearch || status !== "todos"
                     ? "Ningún motivo coincide con el filtro."
                     : "Todavía no hay motivos en el catálogo."}
                 </p>
               </div>
             )}
-          </>
+
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="motivos"
+            />
+          </div>
         )}
       </div>
 
@@ -285,7 +295,7 @@ export function MotivosPage() {
           topic={modal === "nuevo" ? undefined : modal}
           departments={departments}
           onClose={() => setModal(null)}
-          onSaved={load}
+          onSaved={refresh}
         />
       )}
     </div>
