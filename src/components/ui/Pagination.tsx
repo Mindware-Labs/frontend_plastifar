@@ -35,24 +35,24 @@ export function Pagination({
   const from = (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
 
-  const stepClass = `flex h-7 w-7 items-center justify-center rounded-edge border border-line-strong
-    text-subtle transition-colors hover:bg-fill hover:text-ink
-    disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`;
+  const stepClass = `flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white
+    text-zinc-600 shadow-2xs transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900
+    active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-200 disabled:hover:bg-white`;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 py-3 text-[12.5px] text-subtle">
+    <div className="flex flex-wrap items-center justify-between gap-3 py-3.5 text-[12.5px] text-zinc-500">
       <p>
-        Mostrando <span className="font-medium text-ink">{from}</span>–
-        <span className="font-medium text-ink">{to}</span> de{" "}
-        <span className="font-medium text-ink">{total}</span> {noun}
+        Mostrando <span className="font-medium text-zinc-800">{from}</span>–
+        <span className="font-medium text-zinc-800">{to}</span> de{" "}
+        <span className="font-medium text-zinc-800">{total}</span> {noun}
       </p>
 
       <div className="flex items-center gap-3">
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1.5 text-zinc-600">
           Por página
           <Select
             size="sm"
-            className="w-[60px]"
+            className="w-[66px]"
             aria-label="Filas por página"
             value={String(pageSize)}
             onChange={(next) => onPageSizeChange(Number(next))}
@@ -77,10 +77,10 @@ export function Pagination({
               type="button"
               onClick={() => onPageChange(number)}
               aria-current={number === page ? "page" : undefined}
-              className={`h-7 min-w-7 rounded-edge px-2 text-[12.5px] font-medium transition-colors ${
+              className={`h-8 min-w-8 rounded-lg px-2 text-[12.5px] font-medium transition-all active:scale-[0.97] ${
                 number === page
-                  ? "bg-brand-red text-white"
-                  : "border border-line-strong text-brand-gray hover:bg-fill hover:text-ink"
+                  ? "bg-brand-red text-white shadow-2xs font-semibold"
+                  : "border border-zinc-200 bg-white text-zinc-700 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
               }`}
             >
               {number}

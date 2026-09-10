@@ -1,14 +1,33 @@
-import { Plus, SlidersHorizontal, Ticket as TicketIcon } from "lucide-react";
+import {
+  AlertOctagon,
+  AlertTriangle,
+  Boxes,
+  Briefcase,
+  Building2,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Factory,
+  Flag,
+  LayoutGrid,
+  Plus,
+  ShieldCheck,
+  SlidersHorizontal,
+  Ticket as TicketIcon,
+  TrendingUp,
+  Wrench,
+  X,
+} from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
 import { Modal } from "../../components/ui/Modal";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -50,8 +69,8 @@ const filters: TicketFilter[] = [
   { key: "cerrados", label: "Cerrados", countKey: "closed" },
 ];
 
-// A la vista van las que marcan el trabajo del dia (SLA); el resto queda en el menu.
-const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos", "por-vencer", "vencidos"];
+// Solo dos tags visibles en la barra principal; el resto queda en el menú Más.
+const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos"];
 const primaryFilters = filters.filter((f) => PRIMARY_FILTER_KEYS.includes(f.key));
 const secondaryFilters = filters.filter((f) => !PRIMARY_FILTER_KEYS.includes(f.key));
 
@@ -64,11 +83,30 @@ const columns: { key: SortKey; label: string; className: string }[] = [
   { key: "prioridad", label: "Prioridad", className: "hidden w-[112px] md:table-cell" },
   { key: "estado", label: "Estado", className: "w-[128px]" },
   { key: "sla", label: "SLA", className: "w-[128px]" },
-  { key: "actividad", label: "Actividad", className: "hidden w-[124px] xl:table-cell" },
+  { key: "actividad", label: "Actividad", className: "hidden w-[160px] xl:table-cell" },
 ];
 
-const SELECT_COLUMN = "w-11 pl-[11px]! pr-2!";
+const SELECT_COLUMN = "w-11 px-2.5 text-center";
 const ASSIGNED_COLUMN = "hidden w-[160px] lg:table-cell";
+
+const clientColors = [
+  "bg-sky-400",
+  "bg-teal-400",
+  "bg-indigo-500",
+  "bg-purple-500",
+  "bg-emerald-500",
+  "bg-pink-400",
+  "bg-amber-500",
+  "bg-blue-500",
+];
+
+function getClientDotColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return clientColors[Math.abs(hash) % clientColors.length];
+}
 
 const priorityOptions = [
   { value: "Emergencia", label: "Emergencia" },
@@ -93,7 +131,6 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
-  const active = options.find((option) => option.key === activeKey);
 
   useEffect(() => {
     if (!open) return;
@@ -136,6 +173,10 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
     setOpen(true);
   }
 
+  const active = options.find((option) => option.key === activeKey);
+  const activeCount = active && counts ? counts[active.countKey] : 0;
+  const hasOverdueSecondary = (counts?.overdue ?? 0) > 0;
+
   return (
     <div className="relative shrink-0">
       <button
@@ -147,14 +188,32 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
         aria-controls={open ? panelId : undefined}
         aria-label={active ? `Más vistas (activa: ${active.label})` : "Más vistas"}
         title={active ? `Vista activa: ${active.label}` : "Más vistas"}
-        data-active={Boolean(active)}
-        className="relative flex h-8 w-8 items-center justify-center rounded-edge border border-line-strong
-          bg-white text-brand-gray outline-none transition-colors hover:border-zinc-400 hover:text-ink
-          focus-visible:border-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/10
-          data-[active=true]:border-brand-red data-[active=true]:bg-brand-red data-[active=true]:text-white
-          data-[active=true]:hover:border-brand-red-dark data-[active=true]:hover:bg-brand-red-dark"
+        className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
+          active
+            ? "border border-zinc-300 bg-zinc-100 font-semibold text-zinc-900"
+            : "border border-zinc-200 bg-white font-medium text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+        }`}
       >
-        <SlidersHorizontal className="h-4 w-4" />
+        <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
+        <span>{active ? active.label : "Más"}</span>
+        {active ? (
+          <span
+            className={`rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums ${
+              active.key === "vencidos" && activeCount > 0
+                ? "bg-red-100 text-brand-red"
+                : "bg-zinc-200 text-zinc-800"
+            }`}
+          >
+            {activeCount}
+          </span>
+        ) : (
+          hasOverdueSecondary && (
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-red" title="Hay tickets vencidos" />
+          )
+        )}
+        <ChevronDown
+          className={`h-3 w-3 text-zinc-400 transition-transform duration-150 ${open ? "rotate-180 text-zinc-700" : ""}`}
+        />
       </button>
 
       {open &&
@@ -166,11 +225,16 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
             role="menu"
             aria-label="Más vistas de estado"
             style={{ position: "fixed", top: anchor.top, left: anchor.left, width: STATUS_MENU_WIDTH }}
-            className="animate-plf-popover-in z-[60] flex flex-col gap-0.5 rounded-edge border border-line
-              bg-white p-1.5 shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
+            className="animate-plf-popover-in z-[60] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
+              bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
           >
+            <div className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
+              Vistas de estado
+            </div>
             {options.map(({ key, label, countKey }) => {
               const isActive = key === activeKey;
+              const count = counts?.[countKey] ?? 0;
+              const isOverdue = key === "vencidos" && count > 0;
               return (
                 <button
                   key={key}
@@ -181,18 +245,24 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
                     onSelect(key);
                     setOpen(false);
                   }}
-                  className={`flex items-center justify-between gap-2 rounded-edge px-2.5 py-1.5 text-left
-                    text-[12.5px] font-medium transition-colors ${
-                      isActive ? "bg-brand-red/[0.06] text-brand-red-dark" : "text-ink hover:bg-fill"
+                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left
+                    text-[12.5px] transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-zinc-100 font-semibold text-zinc-900"
+                        : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-zinc-900"
                     }`}
                 >
-                  <span>{label}</span>
+                  <span className={isOverdue ? "font-semibold text-brand-red" : ""}>{label}</span>
                   <span
-                    className={`rounded-full px-1.5 py-px text-[11px] font-semibold tabular-nums ${
-                      isActive ? "bg-brand-red/15 text-brand-red-dark" : "bg-fill text-subtle"
+                    className={`rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums ${
+                      isOverdue
+                        ? "bg-red-50 text-brand-red font-bold"
+                        : isActive
+                        ? "bg-zinc-200 text-zinc-900"
+                        : "bg-zinc-100 text-zinc-500"
                     }`}
                   >
-                    {counts?.[countKey] ?? 0}
+                    {count}
                   </span>
                 </button>
               );
@@ -369,6 +439,64 @@ export function TicketsPage() {
 
   const bulkIds = () => Array.from(selectedIds);
 
+  const departmentOptions: TicketFilterOption[] = [
+    {
+      value: "todos",
+      label: "Todos los departamentos",
+      icon: <LayoutGrid className="h-4 w-4 text-zinc-500" />,
+    },
+    ...departments.map((d) => {
+      const name = d.name.toLowerCase();
+      let icon = <Building2 className="h-4 w-4 text-zinc-500" />;
+      if (name.includes("almac")) {
+        icon = <Boxes className="h-4 w-4 text-amber-600" />;
+      } else if (name.includes("admin")) {
+        icon = <Briefcase className="h-4 w-4 text-blue-600" />;
+      } else if (name.includes("calidad")) {
+        icon = <ShieldCheck className="h-4 w-4 text-emerald-600" />;
+      } else if (name.includes("producc")) {
+        icon = <Factory className="h-4 w-4 text-purple-600" />;
+      } else if (name.includes("manten")) {
+        icon = <Wrench className="h-4 w-4 text-orange-600" />;
+      } else if (name.includes("ventas") || name.includes("comercial")) {
+        icon = <TrendingUp className="h-4 w-4 text-cyan-600" />;
+      }
+      return {
+        value: String(d.id),
+        label: d.name,
+        icon,
+      };
+    }),
+  ];
+
+  const priorityFilterOptions: TicketFilterOption[] = [
+    {
+      value: "todas",
+      label: "Todas las prioridades",
+      icon: <Flag className="h-4 w-4 text-zinc-500" />,
+    },
+    {
+      value: "Emergencia",
+      label: "Emergencia",
+      icon: <AlertOctagon className="h-4 w-4 text-rose-600" />,
+    },
+    {
+      value: "Alta",
+      label: "Alta",
+      icon: <AlertTriangle className="h-4 w-4 text-amber-500" />,
+    },
+    {
+      value: "Normal",
+      label: "Normal",
+      icon: <CheckCircle2 className="h-4 w-4 text-blue-500" />,
+    },
+    {
+      value: "Baja",
+      label: "Baja",
+      icon: <Clock className="h-4 w-4 text-zinc-400" />,
+    },
+  ];
+
   return (
     <div className="flex h-full flex-col">
       <ModuleHeader
@@ -394,13 +522,14 @@ export function TicketsPage() {
         }
         action={
           <Button size="sm" onClick={() => setCreateModalOpen(true)}>
-            <Plus className="h-[15px] w-[15px]" />
+            <Plus className="h-3.5 w-3.5" />
             Nuevo ticket
           </Button>
         }
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        {/* Barra de herramientas en una sola línea: búsqueda y filtros a la izquierda, vistas de estado a la derecha */}
         <div className="mb-3 grid min-h-8">
           {showCriteria && (
             <div
@@ -414,39 +543,71 @@ export function TicketsPage() {
                   value={search}
                   onChange={setSearch}
                   placeholder="Buscar por número, asunto o cliente…"
-                  className="w-[260px]"
+                  className="w-[280px] sm:w-[300px]"
                 />
-                <Select
-                  size="sm"
-                  className="w-[168px]"
-                  aria-label="Filtrar por departamento"
+                <TicketFilterDropdown
+                  title="Seleccionar departamento"
                   value={String(departmentId)}
                   onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
-                  options={[
-                    { value: "todos", label: "Todos los departamentos" },
-                    ...departments.map((d) => ({ value: String(d.id), label: d.name })),
-                  ]}
+                  options={departmentOptions}
+                  defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
+                  aria-label="Filtrar por departamento"
                 />
-                <Select
-                  size="sm"
-                  className="w-[156px]"
-                  aria-label="Filtrar por prioridad"
+                <TicketFilterDropdown
+                  title="Seleccionar prioridad"
                   value={priority}
                   onChange={setPriority}
-                  options={[{ value: "todas", label: "Todas las prioridades" }, ...priorityOptions]}
+                  options={priorityFilterOptions}
+                  defaultIcon={<Flag className="h-4 w-4 text-zinc-500" />}
+                  aria-label="Filtrar por prioridad"
                 />
+
+                {(search || departmentId !== "todos" || priority !== "todas") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setDepartmentId("todos");
+                      setPriority("todas");
+                    }}
+                    title="Limpiar filtros"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
+                  >
+                    <X className="h-3.5 w-3.5 text-zinc-400" />
+                    <span>Limpiar</span>
+                  </button>
+                )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
-                {primaryFilters.map(({ key, label, countKey }) => (
-                  <FilterChip
-                    key={key}
-                    label={label}
-                    count={counts?.[countKey] ?? 0}
-                    active={filter === key}
-                    onClick={() => setFilter(key)}
-                  />
-                ))}
+              {/* Solo 2 tags visibles: Todos y Abiertos + Más */}
+              <div className="inline-flex items-center gap-1.5">
+                {primaryFilters.map(({ key, label, countKey }) => {
+                  const isActive = filter === key;
+                  const count = counts?.[countKey] ?? 0;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setFilter(key)}
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
+                        isActive
+                          ? "border border-zinc-300 bg-zinc-100 font-semibold text-zinc-900"
+                          : "border border-zinc-200 bg-white font-medium text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                      }`}
+                    >
+                      <span>{label}</span>
+                      <span
+                        className={`rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums transition-colors ${
+                          isActive
+                            ? "bg-zinc-200 text-zinc-800"
+                            : "bg-zinc-100 text-zinc-500"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
                 <TicketStatusMenu
                   options={secondaryFilters}
                   activeKey={filter}
@@ -532,7 +693,7 @@ export function TicketsPage() {
                           open();
                         }
                       }}
-                      className="group cursor-pointer outline-none data-[checked=true]:bg-fill/70
+                      className="group cursor-pointer outline-none data-[checked=true]:bg-brand-red/[0.04] hover:data-[checked=true]:bg-brand-red/[0.07]
                         focus-visible:bg-canvas focus-visible:outline-2 focus-visible:-outline-offset-2
                         focus-visible:outline-brand-red/50"
                     >
@@ -541,11 +702,6 @@ export function TicketsPage() {
                           checked={checked}
                           label={`Seleccionar ${t.number}`}
                           onToggle={() => toggleSelect(t.id)}
-                          className={
-                            checked || isSelecting
-                              ? ""
-                              : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
-                          }
                         />
                       </Td>
 
@@ -568,18 +724,24 @@ export function TicketsPage() {
 
                       <Td className={columns[2].className}>
                         {client ? (
-                          <>
-                            <p className="truncate text-[12.5px] font-medium text-ink" title={client}>
-                              {client}
-                            </p>
-                            {(t.contactName ?? clientCode) && (
-                              <p className="mt-0.5 truncate text-[11.5px] text-subtle">
-                                {t.contactName ?? clientCode}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              aria-hidden
+                              className={`h-2.5 w-2.5 shrink-0 rounded-full ${getClientDotColor(client)}`}
+                            />
+                            <div className="min-w-0 flex-1 truncate">
+                              <p className="truncate text-[13px] font-medium text-zinc-800" title={client}>
+                                {client}
                               </p>
-                            )}
-                          </>
+                              {(t.contactName ?? clientCode) && (
+                                <p className="truncate text-[11px] text-zinc-400">
+                                  {t.contactName ?? clientCode}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         ) : (
-                          <span className="text-[12.5px] text-faint">Sin cliente</span>
+                          <span className="text-[12.5px] text-zinc-400">Sin cliente</span>
                         )}
                       </Td>
 
@@ -599,8 +761,8 @@ export function TicketsPage() {
                         <SlaCell sla={sla} />
                       </Td>
 
-                      <Td className={`${columns[7].className} whitespace-nowrap text-[12px] tabular-nums text-subtle`}>
-                        <span title={activity.full}>{activity.compact}</span>
+                      <Td className={`${columns[7].className} truncate whitespace-nowrap text-[12px] tabular-nums text-subtle`}>
+                        <span className="truncate" title={activity.full}>{activity.compact}</span>
                       </Td>
 
                       <Td className={ASSIGNED_COLUMN}>

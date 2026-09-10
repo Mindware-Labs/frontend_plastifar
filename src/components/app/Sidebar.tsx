@@ -5,7 +5,8 @@ import {
   Inbox,
   KeyRound,
   LogOut,
-  PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   PenLine,
   MessageSquareText,
   Send,
@@ -101,8 +102,10 @@ function FolderBadge({
 
   return (
     <span
-      className={`ml-auto shrink-0 font-heading text-[12px] font-bold tabular-nums transition-colors ${
-        isActive ? "text-brand-red-dark" : "text-zinc-900 group-hover:text-black"
+      className={`ml-auto shrink-0 rounded-md px-1.5 py-0.2 font-heading text-[10.5px] font-bold tabular-nums transition-colors ${
+        isActive
+          ? "bg-brand-red/10 text-brand-red"
+          : "bg-zinc-100 text-zinc-600 group-hover:bg-zinc-200/70 group-hover:text-zinc-900"
       }`}
     >
       {count.unread > 99 ? "99+" : count.unread}
@@ -271,28 +274,28 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`flex h-screen shrink-0 flex-col border-r border-line/80 bg-white select-none
+      className={`flex h-screen shrink-0 flex-col border-r border-zinc-200/80 bg-white select-none
         transition-[width] duration-200 ease-out ${collapsed ? "w-[68px]" : "w-60"}`}
     >
       {/* 1. Cabecera superior: Logotipo y control de contracción */}
       <div
-        className={`flex shrink-0 items-center border-b border-line-soft transition-all duration-200 ${
+        className={`flex shrink-0 items-center border-b border-zinc-200/80 transition-all duration-200 ${
           collapsed
-            ? "h-[88px] flex-col pt-4 gap-3 px-2"
-            : "h-16 justify-between px-4"
+            ? "h-[84px] flex-col items-center justify-center gap-2.5 px-2"
+            : "h-14 justify-between px-3"
         }`}
       >
         {!collapsed ? (
           <>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 pl-0.5">
               <Link
                 to="/bandeja"
-                className="transition-opacity hover:opacity-85 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 rounded-edge"
+                className="transition-opacity hover:opacity-85 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 rounded-md"
                 title="Plastifar · Ir a Bandeja"
               >
-                <Logo variant="color" height={23} />
+                <Logo variant="color" height={22} />
               </Link>
-              <span className="rounded border border-line-soft bg-canvas px-1.5 py-0.5 font-heading text-[9px] font-bold tracking-[0.08em] text-subtle">
+              <span className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-heading text-[9.5px] font-semibold tracking-wider text-zinc-500">
                 OPS
               </span>
             </div>
@@ -301,28 +304,28 @@ export function Sidebar() {
               onClick={toggleCollapsed}
               aria-label="Contraer la barra lateral"
               title="Contraer barra lateral"
-              className="flex h-7 w-7 items-center justify-center rounded-edge text-subtle transition-all duration-150 hover:bg-canvas hover:text-ink active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 outline-none"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-all duration-150 hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 outline-none"
             >
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeftClose className="h-4 w-4" />
             </button>
           </>
         ) : (
           <>
             <Link
               to="/bandeja"
-              className="flex items-center justify-center rounded-edge transition-opacity hover:opacity-85 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+              className="flex items-center justify-center rounded-md transition-opacity hover:opacity-85 active:scale-95 outline-none"
               title="Plastifar · Ir a Bandeja"
             >
-              <Logo variant="isotipo" height={24} />
+              <Logo variant="isotipo" height={22} />
             </Link>
             <button
               type="button"
               onClick={toggleCollapsed}
               aria-label="Expandir la barra lateral"
               title="Expandir barra lateral"
-              className="flex h-6 w-6 items-center justify-center rounded-edge text-faint transition-all hover:bg-canvas hover:text-ink active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-400 transition-all hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 outline-none"
             >
-              <PanelLeft className="h-4 w-4 rotate-180" />
+              <PanelLeftOpen className="h-4 w-4" />
             </button>
           </>
         )}
@@ -330,8 +333,8 @@ export function Sidebar() {
 
       {/* 2. Árbol de Navegación Principal */}
       <nav
-        className={`flex-1 overflow-y-auto overflow-x-hidden py-2.5 ${
-          collapsed ? "flex flex-col items-center gap-2 px-2" : "pl-0 pr-3 space-y-3"
+        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${
+          collapsed ? "flex flex-col items-center gap-2 px-2" : "px-2 space-y-3"
         }`}
       >
         {groups.map((group) =>
@@ -345,10 +348,10 @@ export function Sidebar() {
                 onMouseLeave={scheduleClose}
                 onFocus={(event) => openFlyout(group, event.currentTarget)}
                 onBlur={scheduleClose}
-                className={`group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-edge transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-line-strong ${
+                className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 ${
                   isGroupActive(group)
-                    ? "bg-canvas border border-line-strong/70 text-ink shadow-2xs font-semibold"
-                    : "text-subtle hover:bg-canvas/75 hover:text-ink border border-transparent active:scale-95"
+                    ? "bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
+                    : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 active:scale-95"
                 }`}
               >
                 <group.icon className="h-4.5 w-4.5 transition-transform duration-150 group-hover:scale-105" />
@@ -364,16 +367,15 @@ export function Sidebar() {
           ) : (
             /* Modo Extendido (Expandido) */
             <div key={group.label} className="flex flex-col">
-              {/* Cabecera interactiva colapsable tipo select / acordeón */}
+              {/* Cabecera interactiva colapsable estilo moderno y discreto */}
               <button
                 type="button"
                 onClick={() => toggleGroup(group.label)}
                 aria-expanded={isGroupExpanded(group.label)}
-                className="group/header flex w-full items-center justify-between pl-5 pr-3 py-1 text-left transition-colors duration-150 rounded-r-full hover:bg-zinc-100/70 outline-none focus-visible:ring-1 focus-visible:ring-brand-red/30 cursor-pointer select-none"
+                className="group/header flex w-full items-center justify-between px-2.5 py-1 text-left transition-colors duration-150 rounded-md hover:bg-zinc-100/60 outline-none select-none cursor-pointer"
                 title={isGroupExpanded(group.label) ? `Ocultar ${group.label}` : `Mostrar ${group.label}`}
               >
-                <span className="flex items-center gap-2 font-heading text-[10.5px] font-bold tracking-[0.08em] uppercase text-zinc-500 group-hover/header:text-zinc-800 transition-colors">
-                  <group.icon className="h-3.5 w-3.5 text-zinc-400 group-hover/header:text-zinc-600 transition-colors" />
+                <span className="font-heading text-[11.5px] font-medium text-zinc-400 group-hover/header:text-zinc-700 transition-colors">
                   {group.label}
                 </span>
                 <div className="flex items-center gap-1.5">
@@ -383,14 +385,14 @@ export function Sidebar() {
                     </span>
                   )}
                   <ChevronDown
-                    className={`h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 ease-out group-hover/header:text-zinc-700 ${
+                    className={`h-3 w-3 text-zinc-400 transition-transform duration-200 ease-out group-hover/header:text-zinc-600 ${
                       isGroupExpanded(group.label) ? "rotate-0" : "-rotate-90"
                     }`}
                   />
                 </div>
               </button>
 
-              {/* Opciones con animación suave de colapso y estilo Gmail */}
+              {/* Opciones con animación suave de colapso */}
               <div
                 className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
                   isGroupExpanded(group.label)
@@ -407,12 +409,12 @@ export function Sidebar() {
                         to={child.to}
                         end={child.end}
                         className={({ isActive }) =>
-                          `group relative flex h-[34px] items-center gap-3.5 rounded-r-full pl-5 pr-3 text-[13px] transition-colors duration-150 outline-none select-none ${
+                          `group relative flex h-[34px] items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors duration-150 outline-none select-none ${
                             isActive
-                              ? "bg-brand-red/[0.08] text-brand-red-dark font-bold"
+                              ? "bg-zinc-100 text-zinc-900 font-semibold shadow-2xs"
                               : hasUnread
-                              ? "text-zinc-900 font-bold hover:bg-zinc-100/80"
-                              : "text-zinc-700 font-medium hover:bg-zinc-100/80 hover:text-zinc-900"
+                              ? "text-zinc-900 font-semibold hover:bg-zinc-100/70"
+                              : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
                           }`
                         }
                       >
@@ -421,10 +423,10 @@ export function Sidebar() {
                             <child.icon
                               className={`h-4 w-4 shrink-0 transition-colors ${
                                 isActive
-                                  ? "text-brand-red"
+                                  ? "text-zinc-900"
                                   : hasUnread
                                   ? "text-zinc-800"
-                                  : "text-zinc-500 group-hover:text-zinc-800"
+                                  : "text-zinc-400 group-hover:text-zinc-700"
                               }`}
                             />
 
@@ -453,15 +455,15 @@ export function Sidebar() {
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
           style={{ top: flyout.top, left: flyout.left }}
-          className="animate-plf-toast-in fixed z-40 w-[210px] rounded-lg border border-line bg-white p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.14),0_2px_6px_rgba(27,27,29,0.04)]"
+          className="animate-plf-toast-in fixed z-40 w-[200px] rounded-xl border border-zinc-200/90 bg-white p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.12),0_2px_6px_rgba(27,27,29,0.04)]"
         >
-          <div className="flex items-center justify-between border-b border-line-soft px-2.5 pb-2 pt-1.5">
-            <span className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-subtle">
-              <flyout.group.icon className="h-3.5 w-3.5 text-brand-gray" />
+          <div className="flex items-center justify-between border-b border-zinc-100 px-2.5 pb-2 pt-1">
+            <span className="flex items-center gap-2 font-heading text-[11.5px] font-medium text-zinc-400">
+              <flyout.group.icon className="h-3.5 w-3.5 text-zinc-400" />
               {flyout.group.label}
             </span>
             {flyout.group.label === "Correo" && pendingMail > 0 && (
-              <span className="rounded-full bg-brand-red/10 px-1.5 py-0.2 font-heading text-[10px] font-bold text-brand-red">
+              <span className="rounded-full bg-zinc-100 px-1.5 py-0.2 font-heading text-[10px] font-bold text-zinc-700">
                 {pendingMail}
               </span>
             )}
@@ -476,12 +478,12 @@ export function Sidebar() {
                   end={child.end}
                   onClick={() => setFlyout(null)}
                   className={({ isActive }) =>
-                    `group flex h-[32px] items-center gap-3 rounded-md px-2.5 text-[12.5px] transition-colors ${
+                    `group flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-colors ${
                       isActive
-                        ? "bg-brand-red/[0.08] text-brand-red-dark font-bold"
+                        ? "bg-zinc-100 text-zinc-900 font-semibold shadow-2xs"
                         : hasUnread
-                        ? "text-zinc-900 font-bold hover:bg-zinc-100/80"
-                        : "text-zinc-700 font-medium hover:bg-zinc-100/80 hover:text-zinc-900"
+                        ? "text-zinc-900 font-semibold hover:bg-zinc-100/70"
+                        : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
                     }`
                   }
                 >
@@ -490,10 +492,10 @@ export function Sidebar() {
                       <child.icon
                         className={`h-4 w-4 shrink-0 transition-colors ${
                           isActive
-                            ? "text-brand-red"
+                            ? "text-zinc-900"
                             : hasUnread
                             ? "text-zinc-800"
-                            : "text-zinc-500 group-hover:text-zinc-800"
+                            : "text-zinc-400 group-hover:text-zinc-700"
                         }`}
                       />
                       <span className="truncate flex-1">{child.label}</span>
@@ -509,30 +511,32 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* 5. Pie de Tarjeta de Usuario y Menú Desplegable */}
-      <div className="shrink-0 border-t border-line p-2.5" ref={menuRef}>
+      {/* 4. Pie de Tarjeta de Usuario y Menú Desplegable */}
+      <div className="shrink-0 border-t border-zinc-200/80 p-2" ref={menuRef}>
         <div className="relative">
           {/* Menú flotante de perfil */}
           {menuOpen && (
             <div
               role="menu"
-              className="animate-plf-toast-in absolute bottom-[calc(100%+8px)] left-0 z-30 w-full min-w-[240px] rounded-edge border border-line bg-white p-1.5 shadow-[0_12px_32px_-6px_rgba(27,27,29,0.16),0_2px_8px_rgba(27,27,29,0.06)]"
+              className={`animate-plf-toast-in absolute bottom-[calc(100%+8px)] z-30 min-w-[240px] rounded-xl border border-zinc-200/90 bg-white p-1.5 shadow-[0_12px_32px_-6px_rgba(27,27,29,0.14),0_2px_8px_rgba(27,27,29,0.04)] ${
+                collapsed ? "left-2" : "left-0 w-full"
+              }`}
             >
               {/* Encabezado del usuario */}
-              <div className="mb-1.5 flex items-center gap-2.5 border-b border-line-soft p-2">
-                <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink font-heading text-[12px] font-bold text-white shadow-xs">
+              <div className="mb-1 flex items-center gap-2.5 border-b border-zinc-100 p-2">
+                <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 font-heading text-[11.5px] font-bold text-white shadow-xs">
                   {initials}
                   <span
                     aria-hidden
-                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-brand-green"
+                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500"
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-heading text-[13px] font-bold text-ink leading-tight">
+                  <p className="truncate font-heading text-[12.5px] font-semibold text-zinc-900 leading-tight">
                     {displayName}
                   </p>
-                  <p className="truncate text-[11px] text-faint leading-tight mt-0.5">{user?.email}</p>
-                  <span className="mt-1 inline-flex items-center rounded-full bg-brand-red/[0.08] px-2 py-0.2 font-heading text-[9.5px] font-bold text-brand-red tracking-wide">
+                  <p className="truncate text-[11px] text-zinc-400 leading-tight mt-0.5">{user?.email}</p>
+                  <span className="mt-1 inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 font-heading text-[9.5px] font-semibold text-zinc-600 tracking-wide">
                     {user?.isAdmin ? "ADMINISTRADOR" : "COLABORADOR"}
                   </span>
                 </div>
@@ -547,9 +551,9 @@ export function Sidebar() {
                     setMenuOpen(false);
                     setEditingSignature(true);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] text-[#3e3e44] transition-colors hover:bg-canvas hover:text-ink"
+                  className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
                 >
-                  <PenLine className="h-3.5 w-3.5 text-subtle" />
+                  <PenLine className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
                   <span>Tu firma de correo</span>
                 </button>
                 <button
@@ -559,9 +563,9 @@ export function Sidebar() {
                     setMenuOpen(false);
                     setEditingAlerts(true);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] text-[#3e3e44] transition-colors hover:bg-canvas hover:text-ink"
+                  className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
                 >
-                  <Bell className="h-3.5 w-3.5 text-subtle" />
+                  <Bell className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
                   <span>Avisos y notificaciones</span>
                 </button>
                 <button
@@ -571,21 +575,21 @@ export function Sidebar() {
                     setMenuOpen(false);
                     setChangingPassword(true);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] text-[#3e3e44] transition-colors hover:bg-canvas hover:text-ink"
+                  className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
                 >
-                  <KeyRound className="h-3.5 w-3.5 text-subtle" />
+                  <KeyRound className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
                   <span>Cambiar contraseña</span>
                 </button>
 
-                <div className="my-1 border-t border-line-soft" />
+                <div className="my-1 border-t border-zinc-100" />
 
                 <button
                   type="button"
                   role="menuitem"
                   onClick={() => logout()}
-                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] font-medium text-brand-red-dark transition-colors hover:bg-red-50/80"
+                  className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
                 >
-                  <LogOut className="h-3.5 w-3.5 text-brand-red" />
+                  <LogOut className="h-3.5 w-3.5 text-red-500 group-hover:text-red-600 transition-colors" />
                   <span>Cerrar sesión</span>
                 </button>
               </div>
@@ -599,34 +603,34 @@ export function Sidebar() {
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             title={collapsed ? `${displayName} · ${user?.email}` : undefined}
-            className={`group flex w-full items-center rounded-edge border transition-all duration-150 outline-none ${
+            className={`group flex w-full items-center rounded-lg transition-colors duration-150 outline-none ${
               menuOpen
-                ? "border-line-strong bg-fill shadow-xs ring-1 ring-line-strong"
-                : "border-transparent hover:border-line-soft hover:bg-canvas"
-            } ${collapsed ? "justify-center p-1.5" : "gap-2.5 p-1.5"}`}
+                ? "bg-zinc-100 text-zinc-900"
+                : "hover:bg-zinc-100/80 text-zinc-700"
+            } ${collapsed ? "justify-center p-2" : "gap-2.5 p-2"}`}
           >
             {/* Avatar circular con aro y presencia en línea */}
-            <div className="relative flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-ink font-heading text-[11.5px] font-bold text-white shadow-xs transition-transform group-hover:scale-105">
+            <div className="relative flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-zinc-900 font-heading text-[11px] font-bold text-white shadow-xs transition-transform group-hover:scale-105">
               {initials}
               <span
                 aria-hidden
-                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-brand-green"
+                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500"
               />
             </div>
 
             {!collapsed && (
               <>
                 <div className="min-w-0 flex-1 text-left">
-                  <span className="block truncate font-heading text-[12.5px] font-bold leading-tight text-ink">
+                  <span className="block truncate font-heading text-[12.5px] font-semibold leading-tight text-zinc-800">
                     {displayName}
                   </span>
-                  <span className="block truncate text-[10.5px] leading-tight text-faint mt-0.5">
+                  <span className="block truncate text-[11px] leading-tight text-zinc-400 mt-0.5 font-normal">
                     {user?.isAdmin ? "Administrador" : "Staff"}
                   </span>
                 </div>
                 <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-faint transition-transform duration-200 ${
-                    menuOpen ? "rotate-180 text-ink" : "group-hover:text-subtle"
+                  className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-200 ${
+                    menuOpen ? "rotate-180 text-zinc-800" : "group-hover:text-zinc-600"
                   }`}
                 />
               </>

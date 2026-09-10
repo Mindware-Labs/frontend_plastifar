@@ -1,28 +1,42 @@
-import { Eye, Mail, Pencil, Phone, UserCheck } from "lucide-react";
+import {
+  Building2,
+  Clock,
+  Eye,
+  FileText,
+  Mail,
+  Pencil,
+  Phone,
+  Tag,
+  Users,
+} from "lucide-react";
 import type { ReactNode } from "react";
+import { Avatar } from "../../components/ui/Avatar";
 import { formatBytes, formatDateTime, type formatSlaRemaining } from "../../lib/format";
 import type { TicketAttachmentResponse, TicketDetailResponse } from "../../types/api";
-import { AssigneeCell, PriorityCell, SlaCell } from "./ticketCells";
+import { PriorityCell, SlaCell } from "./ticketCells";
 
-interface SectionProps {
+function SectionHeader({
+  title,
+  icon: Icon,
+  action,
+}: {
   title: string;
+  icon?: React.ComponentType<{ className?: string }>;
   action?: ReactNode;
-  children: ReactNode;
-}
-
-function Section({ title, action, children }: SectionProps) {
+}) {
   return (
-    <section className="border-b border-line py-4 first:pt-0 last:border-0 last:pb-0">
-      <div className="mb-2.5 flex h-6 items-center justify-between gap-2">
-        <h2 className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-faint">{title}</h2>
-        {action}
+    <div className="flex items-center justify-between gap-2 border-b border-zinc-100 bg-zinc-50/60 px-3.5 py-1.5">
+      <div className="flex items-center gap-1.5">
+        {Icon && <Icon className="h-3.5 w-3.5 text-zinc-400" />}
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+          {title}
+        </span>
       </div>
-      {children}
-    </section>
+      {action}
+    </div>
   );
 }
 
-/** Accion de seccion: texto corto en rojo, sin peso de boton, porque la seccion es lo que manda. */
 function SectionAction({
   label,
   icon: Icon,
@@ -36,30 +50,42 @@ function SectionAction({
     <button
       type="button"
       onClick={onClick}
-      className="-mr-1.5 inline-flex h-6 items-center gap-1 rounded-edge px-1.5 font-heading text-[10.5px] font-semibold
-        uppercase tracking-[0.06em] text-brand-red-dark outline-none transition-colors hover:bg-brand-red/[0.06]
-        focus-visible:ring-3 focus-visible:ring-brand-red/20"
+      className="inline-flex h-5 items-center gap-1 rounded border border-zinc-200/80 bg-white px-1.5 text-[11px] font-medium text-zinc-600 shadow-2xs transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-brand-red/30"
     >
-      <Icon aria-hidden className="h-3 w-3" />
-      {label}
+      <Icon aria-hidden className="h-2.5 w-2.5 text-zinc-400" />
+      <span>{label}</span>
     </button>
   );
 }
 
-function Field({ label, children, title }: { label: string; children: ReactNode; title?: string }) {
+function PropertyRow({
+  label,
+  children,
+  isLast = false,
+  truncateValue = true,
+}: {
+  label: string;
+  children: ReactNode;
+  isLast?: boolean;
+  truncateValue?: boolean;
+}) {
   return (
-    <>
-      <dt className="text-[12px] text-subtle">{label}</dt>
-      <dd className="min-w-0 truncate text-[12.5px] text-ink" title={title}>
+    <div
+      className={`flex min-h-[25px] items-center justify-between gap-2.5 py-1 text-[12px] ${
+        isLast ? "" : "border-b border-zinc-100/70"
+      }`}
+    >
+      <span className="shrink-0 text-[11.5px] font-normal text-zinc-500">{label}</span>
+      <div
+        className={`min-w-0 text-right font-medium text-zinc-900 ${
+          truncateValue ? "max-w-[195px] truncate" : "flex-1"
+        }`}
+      >
         {children}
-      </dd>
-    </>
+      </div>
+    </div>
   );
 }
-
-const Empty = ({ children }: { children: ReactNode }) => <span className="text-faint">{children}</span>;
-
-const listClass = "grid grid-cols-[96px_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1.5";
 
 interface TicketPropertiesAsideProps {
   ticket: TicketDetailResponse;
@@ -72,7 +98,7 @@ interface TicketPropertiesAsideProps {
   className?: string;
 }
 
-/** Ficha del ticket: todo lo que no es conversacion, siempre a la vista junto al hilo. */
+/** Ficha compacta del ticket: panel unificado de propiedades alineado con el nuevo diseño SaaS. */
 export function TicketPropertiesAside({
   ticket,
   sla,
@@ -88,162 +114,249 @@ export function TicketPropertiesAside({
 
   return (
     <aside aria-label="Datos del ticket" className={className}>
-      <Section title="Cliente">
-        <dl className={listClass}>
-          <Field label="Razón social" title={ticket.clientName ?? undefined}>
+      <div className="rounded-xl border border-zinc-200/80 bg-white shadow-2xs divide-y divide-zinc-100 overflow-hidden">
+        {/* SECCIÓN 1: CLIENTE */}
+        <div>
+          <SectionHeader title="Cliente" icon={Building2} />
+          <div className="px-3.5 py-1">
             {ticket.clientName ? (
-              <span className="font-medium">{ticket.clientName}</span>
+              <div className="flex items-center gap-2 py-1">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 font-heading text-[10px] font-bold text-zinc-700 shadow-2xs">
+                  {ticket.clientName.slice(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[12.5px] font-semibold text-zinc-900 leading-tight" title={ticket.clientName}>
+                      {ticket.clientName}
+                    </span>
+                    {ticket.clientCode && (
+                      <span className="shrink-0 rounded bg-zinc-100 px-1 py-0.2 font-mono text-[10px] text-zinc-500">
+                        #{ticket.clientCode}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             ) : (
-              <Empty>Sin cliente</Empty>
+              <div className="py-1 text-[12px] text-zinc-400 italic">Sin cliente asignado</div>
             )}
-          </Field>
-          {ticket.clientCode && (
-            <Field label="Código">
-              <span className="tabular-nums">{ticket.clientCode}</span>
-            </Field>
-          )}
-          <Field label="Contacto" title={ticket.contactName ?? undefined}>
-            {ticket.contactName ?? <Empty>Sin contacto</Empty>}
-          </Field>
-          {email && (
-            <Field label="Correo" title={email}>
-              <a
-                href={`mailto:${email}`}
-                className="inline-flex max-w-full items-center gap-1.5 rounded-edge outline-none hover:underline
-                  focus-visible:ring-3 focus-visible:ring-brand-red/20"
-              >
-                <Mail aria-hidden className="h-3.5 w-3.5 shrink-0 text-faint" />
-                <span className="truncate">{email}</span>
-              </a>
-            </Field>
-          )}
-          {ticket.contactPhone && (
-            <Field label="Teléfono">
-              <span className="inline-flex items-center gap-1.5 tabular-nums">
-                <Phone aria-hidden className="h-3.5 w-3.5 shrink-0 text-faint" />
-                {ticket.contactPhone}
+
+            <PropertyRow label="Contacto">
+              {ticket.contactName ?? <span className="text-zinc-400 font-normal">Sin contacto</span>}
+            </PropertyRow>
+
+            {email && (
+              <PropertyRow label="Correo">
+                <a
+                  href={`mailto:${email}`}
+                  title={email}
+                  className="inline-flex items-center gap-1 text-zinc-800 hover:text-brand-red hover:underline transition-colors"
+                >
+                  <Mail className="h-3 w-3 shrink-0 text-zinc-400" />
+                  <span className="truncate">{email}</span>
+                </a>
+              </PropertyRow>
+            )}
+
+            {ticket.contactPhone && (
+              <PropertyRow label="Teléfono" isLast>
+                <a
+                  href={`tel:${ticket.contactPhone}`}
+                  className="inline-flex items-center gap-1 tabular-nums text-zinc-800 hover:text-brand-red hover:underline transition-colors"
+                >
+                  <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
+                  <span>{ticket.contactPhone}</span>
+                </a>
+              </PropertyRow>
+            )}
+          </div>
+        </div>
+
+        {/* SECCIÓN 2: CLASIFICACIÓN Y ASIGNACIÓN */}
+        <div>
+          <SectionHeader
+            title="Clasificación"
+            icon={Tag}
+            action={canEdit && <SectionAction label="Editar" icon={Pencil} onClick={onEdit} />}
+          />
+          <div className="px-3.5 py-1">
+            <PropertyRow label="Responsable" truncateValue={false}>
+              <div className="flex items-center justify-end gap-1.5 min-w-0">
+                {ticket.assignedStaffName && ticket.assignedStaffId !== null ? (
+                  <div className="flex items-center justify-end gap-1.5 min-w-0" title={ticket.assignedStaffName}>
+                    <Avatar name={ticket.assignedStaffName} seed={ticket.assignedStaffId} size={18} />
+                    <span className="text-zinc-900 font-medium text-[12px] leading-tight text-right">
+                      {ticket.assignedStaffName}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-zinc-400 font-normal italic">Sin asignar</span>
+                )}
+                {canAssign && (
+                  <button
+                    type="button"
+                    onClick={onAssign}
+                    title={ticket.assignedStaffId ? "Cambiar responsable" : "Asignar responsable"}
+                    className="ml-0.5 shrink-0 inline-flex h-5 w-5 items-center justify-center rounded border border-zinc-200/80 bg-white text-zinc-500 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer transition-all"
+                  >
+                    <Pencil className="h-2.5 w-2.5" />
+                  </button>
+                )}
+              </div>
+            </PropertyRow>
+
+            <PropertyRow label="Departamento">
+              <span title={ticket.departmentName ?? undefined}>
+                {ticket.departmentName ?? <span className="text-zinc-400 font-normal">—</span>}
               </span>
-            </Field>
-          )}
-        </dl>
-      </Section>
+            </PropertyRow>
 
-      <Section
-        title="Clasificación"
-        action={canEdit && <SectionAction label="Editar" icon={Pencil} onClick={onEdit} />}
-      >
-        <dl className={listClass}>
-          <Field label="Departamento" title={ticket.departmentName ?? undefined}>
-            {ticket.departmentName ?? <Empty>Sin departamento</Empty>}
-          </Field>
-          <Field label="Motivo" title={ticket.topicName ?? undefined}>
-            {ticket.topicName ?? <Empty>Sin motivo</Empty>}
-          </Field>
-          <Field label="Línea" title={ticket.productLineName ?? undefined}>
-            {ticket.productLineName ?? <Empty>No aplica</Empty>}
-          </Field>
-          <Field label="Prioridad">
-            <PriorityCell priority={ticket.priority} />
-          </Field>
-          <Field label="Canal">{ticket.channel}</Field>
-        </dl>
-      </Section>
-
-      <Section
-        title="Asignación"
-        action={
-          canAssign && (
-            <SectionAction
-              label={ticket.assignedStaffId ? "Cambiar" : "Asignar"}
-              icon={UserCheck}
-              onClick={onAssign}
-            />
-          )
-        }
-      >
-        <AssigneeCell id={ticket.assignedStaffId} name={ticket.assignedStaffName} />
-      </Section>
-
-      <Section title="SLA" action={<SlaCell sla={sla} />}>
-        <dl className={listClass}>
-          <Field label="Resolución">
-            {ticket.resolutionDueAt ? (
-              <span className={sla.tone === "overdue" ? "font-medium text-brand-red-dark" : ""}>
-                {formatDateTime(ticket.resolutionDueAt)}
+            <PropertyRow label="Motivo">
+              <span title={ticket.topicName ?? undefined}>
+                {ticket.topicName ?? <span className="text-zinc-400 font-normal">—</span>}
               </span>
-            ) : (
-              <Empty>Sin compromiso</Empty>
-            )}
-          </Field>
-          <Field label="1.ª respuesta">
-            {ticket.firstResponseAt ? (
-              <span className="text-brand-green">Lograda · {formatDateTime(ticket.firstResponseAt)}</span>
-            ) : ticket.firstResponseDueAt ? (
-              <span>Límite · {formatDateTime(ticket.firstResponseDueAt)}</span>
-            ) : (
-              <Empty>Pendiente</Empty>
-            )}
-          </Field>
-          {isPaused && (
-            <Field label="En pausa">
-              <span className="text-warn">Desde {formatDateTime(ticket.pausedAt!)}</span>
-            </Field>
-          )}
-          {ticket.pausedMinutes > 0 && (
-            <Field label="Tiempo en pausa">
-              <span className="tabular-nums">{ticket.pausedMinutes} min</span>
-            </Field>
-          )}
-          {ticket.reopenedCount > 0 && (
-            <Field label="Reaperturas">
-              <span className="font-medium tabular-nums text-warn">{ticket.reopenedCount}</span>
-            </Field>
-          )}
-          {ticket.resolvedAt && <Field label="Resuelto">{formatDateTime(ticket.resolvedAt)}</Field>}
-          {ticket.closedAt && <Field label="Cerrado">{formatDateTime(ticket.closedAt)}</Field>}
-          <Field label="Actividad">{formatDateTime(ticket.lastActivityAt)}</Field>
-        </dl>
-      </Section>
+            </PropertyRow>
 
-      {ticket.watchers.length > 0 && (
-        <Section title={`Observadores · ${ticket.watchers.length}`}>
-          <ul className="space-y-1.5">
-            {ticket.watchers.map((watcher) => (
-              <li key={watcher.id} className="min-w-0 text-[12.5px]" title={watcher.staffEmail}>
-                <span className="text-ink">{watcher.staffName}</span>
-                <span className="block truncate text-[11.5px] text-subtle">{watcher.staffEmail}</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
+            <PropertyRow label="Línea">
+              <span title={ticket.productLineName ?? undefined}>
+                {ticket.productLineName ?? <span className="text-zinc-400 font-normal">No aplica</span>}
+              </span>
+            </PropertyRow>
 
-      {ticket.attachments.length > 0 && (
-        <Section title={`Adjuntos · ${ticket.attachments.length}`}>
-          {/* La fila entera es el control: el ojo solo senala que hace. */}
-          <ul className="-mx-2 space-y-0.5">
-            {ticket.attachments.map((attachment) => (
-              <li key={attachment.id}>
+            <PropertyRow label="Prioridad">
+              <PriorityCell priority={ticket.priority} />
+            </PropertyRow>
+
+            <PropertyRow label="Canal" isLast>
+              <span className="capitalize text-zinc-800">{ticket.channel}</span>
+            </PropertyRow>
+          </div>
+        </div>
+
+        {/* SECCIÓN 3: SLA Y TIEMPOS */}
+        <div>
+          <SectionHeader
+            title="SLA y tiempos"
+            icon={Clock}
+            action={<SlaCell sla={sla} />}
+          />
+          <div className="px-3.5 py-1">
+            <PropertyRow label="Resolución">
+              {ticket.resolutionDueAt ? (
+                <span
+                  className={`tabular-nums ${
+                    sla.tone === "overdue" ? "font-semibold text-brand-red" : "text-zinc-800"
+                  }`}
+                >
+                  {formatDateTime(ticket.resolutionDueAt)}
+                </span>
+              ) : (
+                <span className="text-zinc-400 font-normal">Sin compromiso</span>
+              )}
+            </PropertyRow>
+
+            <PropertyRow label="1.ª respuesta">
+              {ticket.firstResponseAt ? (
+                <span className="text-emerald-700 font-medium tabular-nums" title={`Lograda el ${formatDateTime(ticket.firstResponseAt)}`}>
+                  Lograda · {formatDateTime(ticket.firstResponseAt)}
+                </span>
+              ) : ticket.firstResponseDueAt ? (
+                <span className="tabular-nums text-zinc-800">
+                  Límite · {formatDateTime(ticket.firstResponseDueAt)}
+                </span>
+              ) : (
+                <span className="text-zinc-400 font-normal">Pendiente</span>
+              )}
+            </PropertyRow>
+
+            {isPaused && (
+              <PropertyRow label="En pausa">
+                <span className="font-medium text-amber-700 tabular-nums">
+                  Desde {formatDateTime(ticket.pausedAt!)}
+                </span>
+              </PropertyRow>
+            )}
+
+            {ticket.pausedMinutes > 0 && (
+              <PropertyRow label="Tiempo pausa">
+                <span className="tabular-nums text-zinc-800">{ticket.pausedMinutes} min</span>
+              </PropertyRow>
+            )}
+
+            {ticket.reopenedCount > 0 && (
+              <PropertyRow label="Reaperturas">
+                <span className="font-bold tabular-nums text-amber-700">{ticket.reopenedCount}</span>
+              </PropertyRow>
+            )}
+
+            {ticket.resolvedAt && (
+              <PropertyRow label="Resuelto">
+                <span className="tabular-nums text-zinc-800">{formatDateTime(ticket.resolvedAt)}</span>
+              </PropertyRow>
+            )}
+
+            {ticket.closedAt && (
+              <PropertyRow label="Cerrado">
+                <span className="tabular-nums text-zinc-800">{formatDateTime(ticket.closedAt)}</span>
+              </PropertyRow>
+            )}
+
+            <PropertyRow label="Actividad" isLast>
+              <span className="tabular-nums text-zinc-600">{formatDateTime(ticket.lastActivityAt)}</span>
+            </PropertyRow>
+          </div>
+        </div>
+
+        {/* SECCIÓN 4: OBSERVADORES (SI EXISTEN) */}
+        {ticket.watchers.length > 0 && (
+          <div>
+            <SectionHeader title={`Observadores (${ticket.watchers.length})`} icon={Users} />
+            <div className="px-3.5 py-2">
+              <div className="flex flex-wrap gap-1.5">
+                {ticket.watchers.map((watcher) => (
+                  <div
+                    key={watcher.id}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200/80 bg-zinc-50/70 px-2 py-0.5 text-[11px] text-zinc-800 shadow-2xs"
+                    title={`${watcher.staffName} (${watcher.staffEmail})`}
+                  >
+                    <Avatar name={watcher.staffName} seed={watcher.id} size={16} />
+                    <span className="max-w-[120px] truncate font-medium">{watcher.staffName}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECCIÓN 5: ADJUNTOS (SI EXISTEN) */}
+        {ticket.attachments.length > 0 && (
+          <div>
+            <SectionHeader title={`Adjuntos (${ticket.attachments.length})`} icon={FileText} />
+            <div className="divide-y divide-zinc-100/80 px-3.5 py-1">
+              {ticket.attachments.map((attachment) => (
                 <button
+                  key={attachment.id}
                   type="button"
                   onClick={() => onOpenAttachment(ticket.attachments, attachment.id)}
                   title={`Abrir ${attachment.fileName}`}
-                  className="group flex w-full items-center justify-between gap-2 rounded-edge px-2 py-1.5 text-left
-                    outline-none transition-colors hover:bg-fill focus-visible:ring-3 focus-visible:ring-brand-red/12"
+                  className="group flex w-full items-center justify-between gap-2 py-1.5 text-left transition-colors hover:text-brand-red cursor-pointer"
                 >
-                  <span className="min-w-0">
-                    <span className="block truncate text-[12.5px] text-ink">{attachment.fileName}</span>
-                    <span className="block text-[11px] tabular-nums text-subtle">
-                      {formatBytes(attachment.sizeBytes)} · {formatDateTime(attachment.createdAt)}
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-zinc-400 group-hover:text-brand-red transition-colors" />
+                    <span className="truncate text-[12px] font-medium text-zinc-700 group-hover:text-zinc-900">
+                      {attachment.fileName}
                     </span>
-                  </span>
-                  <Eye aria-hidden className="h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-ink" />
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5 text-[11px] tabular-nums text-zinc-400">
+                    <span>{formatBytes(attachment.sizeBytes)}</span>
+                    <Eye className="h-3 w-3 text-zinc-400 group-hover:text-zinc-700" />
+                  </div>
                 </button>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </aside>
   );
 }

@@ -1,6 +1,5 @@
 import { Search, X } from "lucide-react";
 import { useId } from "react";
-import { controlBase, controlSizes, stateClasses } from "./fieldStyles";
 
 interface SearchInputProps {
   value: string;
@@ -21,7 +20,7 @@ export function SearchInput({ value, onChange, placeholder, className = "" }: Se
     <div className={`relative ${className}`}>
       <Search
         aria-hidden
-        className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
+        className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"
       />
       <input
         id={id}
@@ -30,9 +29,9 @@ export function SearchInput({ value, onChange, placeholder, className = "" }: Se
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className={`${controlBase} ${stateClasses.idle} ${controlSizes.sm}
-          pl-8 pr-8 font-medium placeholder:font-normal placeholder:text-zinc-400
-          [&::-webkit-search-cancel-button]:hidden`}
+        className="w-full h-8 rounded-lg border border-zinc-200 bg-white pl-8 pr-7 text-[12.5px] text-zinc-800
+          placeholder:text-zinc-400 placeholder:font-normal shadow-2xs outline-none transition-colors hover:border-zinc-300
+          focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20 [&::-webkit-search-cancel-button]:hidden"
       />
       {value && (
         <button

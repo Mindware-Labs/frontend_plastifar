@@ -25,10 +25,10 @@ interface ShellProps {
 
 function FieldShell({ id, label, error, hint, required, children }: ShellProps) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       <label
         htmlFor={id}
-        className="font-heading text-[11.5px] font-semibold text-faint"
+        className="font-heading text-[11px] font-semibold text-zinc-500"
       >
         {label}
         {required && <span className="ml-1 text-brand-red">*</span>}
@@ -39,13 +39,13 @@ function FieldShell({ id, label, error, hint, required, children }: ShellProps) 
       {error ? (
         <p
           id={`${id}-error`}
-          className="animate-plf-shake flex items-start gap-1.5 text-[11.5px] font-medium text-brand-red-dark"
+          className="animate-plf-shake flex items-start gap-1 text-[11px] font-medium text-brand-red-dark"
         >
           <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-hint`} className="text-[11.5px] leading-relaxed text-faint">
+        <p id={`${id}-hint`} className="text-[11px] leading-relaxed text-zinc-400">
           {hint}
         </p>
       ) : null}
@@ -58,15 +58,16 @@ function describedBy(id: string, error?: string, hint?: ReactNode) {
   return hint ? `${id}-hint` : undefined;
 }
 
-interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
+interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   label: string;
   error?: string;
   hint?: ReactNode;
   state?: FieldState;
+  size?: ControlSize;
 }
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
-  { label, error, hint, state = "idle", id, className = "", required, ...props },
+  { label, error, hint, state = "idle", size = "md", id, className = "", required, ...props },
   ref,
 ) {
   const generated = useId();
@@ -81,7 +82,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
           id={fieldId}
           aria-invalid={resolved === "error"}
           aria-describedby={describedBy(fieldId, error, hint)}
-          className={`${controlBase} ${stateClasses[resolved]} ${controlSizes.md} px-3
+          className={`${controlBase} ${stateClasses[resolved]} ${controlSizes[size]} px-3
             placeholder:text-zinc-400 ${resolved === "valid" ? "pr-9" : ""} ${className}`}
           {...props}
         />

@@ -6,7 +6,7 @@ import { useModalAnimation } from "../../hooks/useModalAnimation";
 
 export interface ModalProps {
   title: string;
-  /** Linea corta sobre el titulo: situa la accion dentro del modulo. */
+  /** Línea corta sobre el título: sitúa la acción dentro del módulo. */
   eyebrow?: string;
   description?: ReactNode;
   onClose: () => void;
@@ -20,10 +20,8 @@ export interface ModalProps {
 }
 
 /**
- * Dialogo modal del panel. Se monta en un portal sobre document.body para que
- * ningun ancestro con transform o overflow lo recorte ni lo desplace.
- * Cuenta con animación fluida de entrada (.animate-plf-modal-in) y de salida
- * (.animate-plf-modal-out) tanto en el panel como en el telón de fondo.
+ * Diálogo modal del panel con diseño SaaS moderno y compacto:
+ * Bordes suaves rounded-xl, cabecera y pie estructurados y espaciado optimizado.
  */
 export function Modal({
   title,
@@ -49,7 +47,7 @@ export function Modal({
   return createPortal(
     <div
       inert={isExiting ? true : undefined}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-ink/45 px-4 py-8 ${
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8 backdrop-blur-[2px] ${
         isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
       }`}
       onMouseDown={(event) => {
@@ -64,23 +62,24 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         className={`${
           isExiting ? "animate-plf-modal-out pointer-events-none" : "animate-plf-modal-in"
-        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-edge border border-line bg-white shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]`}
+        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-xl`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-6 pb-4 pt-5">
-          <div>
+        {/* Cabecera compacta */}
+        <div className="flex items-start justify-between gap-3 border-b border-zinc-100 bg-zinc-50/60 px-5 py-3">
+          <div className="min-w-0 flex-1">
             {eyebrow && (
-              <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
+              <p className="font-heading text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">
                 {eyebrow}
               </p>
             )}
             <h2
               id={titleId}
-              className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink"
+              className="font-heading text-[15px] font-bold tracking-tight text-zinc-900 leading-snug"
             >
               {title}
             </h2>
             {description && (
-              <p id={descriptionId} className="mt-1.5 text-[12.5px] leading-relaxed text-subtle">
+              <p id={descriptionId} className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">
                 {description}
               </p>
             )}
@@ -90,17 +89,18 @@ export function Modal({
             type="button"
             onClick={requestClose}
             aria-label="Cerrar"
-            className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle
-              transition-colors hover:bg-fill hover:text-ink"
+            className="-mr-1 flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-zinc-200/70 hover:text-zinc-800 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="overflow-y-auto px-6 py-5">{children}</div>
+        {/* Cuerpo del modal */}
+        <div className="overflow-y-auto px-5 py-4">{children}</div>
 
+        {/* Pie de acción */}
         {footer && (
-          <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-canvas px-6 py-3.5">
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50/60 px-5 py-2.5">
             {typeof footer === "function" ? footer({ requestClose, close: requestClose }) : footer}
           </div>
         )}

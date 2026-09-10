@@ -117,8 +117,8 @@ export function TicketTimelineSheet({
           <Icon className="h-2.5 w-2.5" />
         </span>
         <div
-          className={`rounded-edge border p-3 ${
-            isInternal ? "border-warn/30 bg-warn/[0.045]" : isOutbound ? "border-line bg-white" : "border-line bg-canvas/60"
+          className={`rounded-xl border p-3 shadow-2xs ${
+            isInternal ? "border-amber-200/80 bg-amber-50/25" : isOutbound ? "border-zinc-200/80 bg-white" : "border-zinc-200/80 bg-zinc-50/50"
           }`}
         >
           <div className="flex items-baseline justify-between gap-3">

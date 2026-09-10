@@ -147,33 +147,33 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
   }
 }
 
-const labelClass = "font-heading text-[11.5px] font-semibold text-faint";
+const labelClass = "font-heading text-[11.5px] font-semibold text-zinc-500";
 
 const textareaClass =
-  "w-full resize-none rounded-edge border border-line-strong bg-white px-3 py-2.5 text-[13px] leading-relaxed " +
-  "text-ink outline-none transition-colors placeholder:text-faint hover:border-zinc-400 " +
-  "focus:border-brand-red focus:ring-3 focus:ring-brand-red/10";
+  "w-full resize-none rounded-lg border border-zinc-200/80 bg-white px-3 py-2 text-[12.5px] leading-relaxed " +
+  "text-zinc-900 outline-none transition-all placeholder:text-zinc-400 hover:border-zinc-300 " +
+  "focus:border-brand-red focus:ring-2 focus:ring-brand-red/15";
 
 const attachLabelClass =
-  "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 " +
-  "text-[11.5px] font-medium text-subtle transition-colors hover:border-zinc-400 hover:bg-canvas hover:text-ink";
+  "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 " +
+  "text-[11.5px] font-medium text-zinc-600 shadow-2xs transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95";
 
 const tabTriggerClass =
-  "gap-1.5 px-3 text-[11.5px] font-medium text-subtle transition-colors hover:text-ink " +
-  "data-active:bg-white data-active:font-semibold data-active:text-brand-red-dark";
+  "gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium text-zinc-600 transition-all hover:text-zinc-900 " +
+  "data-active:bg-white data-active:font-semibold data-active:text-zinc-900 data-active:shadow-2xs";
 
 /** Archivo elegido y aun no enviado: nombre, peso y la cruz para quitarlo. */
 function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
-    <span className="inline-flex h-7 items-center gap-1.5 rounded-edge border border-line bg-white pl-2.5 pr-1 text-[11.5px] text-ink">
-      <Paperclip aria-hidden className="h-3 w-3 text-subtle" />
+    <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-zinc-50/70 px-2.5 text-[11.5px] font-medium text-zinc-800 shadow-2xs">
+      <Paperclip aria-hidden className="h-3 w-3 text-zinc-400" />
       <span className="max-w-[180px] truncate">{file.name}</span>
-      <span className="text-[10.5px] tabular-nums text-subtle">{formatBytes(file.size)}</span>
+      <span className="text-[10.5px] tabular-nums text-zinc-400">{formatBytes(file.size)}</span>
       <button
         type="button"
         onClick={onRemove}
         aria-label={`Quitar ${file.name}`}
-        className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-edge text-subtle transition-colors hover:bg-fill hover:text-brand-red"
+        className="ml-0.5 flex h-4.5 w-4.5 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-brand-red cursor-pointer"
       >
         <X className="h-3 w-3" />
       </button>
@@ -630,28 +630,28 @@ export function TicketDetailPage() {
         <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-start">
           <div className="min-w-0 flex-1">
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TicketDetailTab)}>
-              <TabsList className="h-9 border border-line bg-canvas">
+              <TabsList className="h-8 rounded-lg border border-zinc-200/80 bg-zinc-100/70 p-0.5">
                 <TabsTrigger value="conversacion" className={tabTriggerClass}>
                   <Mail aria-hidden className="size-3.5" />
                   Conversación
-                  <span className="tabular-nums opacity-70">{clientThread.length}</span>
+                  <span className="tabular-nums opacity-70 font-mono text-[11px]">{clientThread.length}</span>
                 </TabsTrigger>
                 <TabsTrigger value="notas" className={tabTriggerClass}>
                   <Lock aria-hidden className="size-3.5" />
                   Notas internas
-                  <span className="tabular-nums opacity-70">{internalNotes.length}</span>
+                  <span className="tabular-nums opacity-70 font-mono text-[11px]">{internalNotes.length}</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
 
             {activeTab === "conversacion" && (
-              <div className="mt-4 space-y-3">
+              <div className="mt-3.5 space-y-2.5">
                 {/* La accion encabeza el hilo; el editor se pide, no esta siempre puesto. */}
                 <div className="flex items-center gap-3">
-                  <span className="shrink-0 text-[11.5px] font-semibold tabular-nums text-subtle">
+                  <span className="shrink-0 text-[11.5px] font-medium tabular-nums text-zinc-500">
                     {clientThread.length} {clientThread.length === 1 ? "mensaje" : "mensajes"}
                   </span>
-                  <span aria-hidden className="h-px flex-1 bg-line" />
+                  <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
                   <Button
                     type="button"
                     size="sm"
@@ -659,18 +659,20 @@ export function TicketDetailPage() {
                     disabled={!recipientEmail}
                     title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
                   >
-                    <CornerUpLeft className="h-[15px] w-[15px]" />
+                    <CornerUpLeft className="h-[14px] w-[14px]" />
                     Responder
                   </Button>
                 </div>
 
                 {clientThread.length === 0 ? (
-                  <div className="px-6 pb-4 pt-10 text-center">
-                    <Mail className="mx-auto h-6 w-6 text-faint" />
-                    <p className="mt-3 font-heading text-[15px] font-semibold tracking-[-0.01em] text-ink">
+                  <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-8 text-center">
+                    <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-400 shadow-2xs">
+                      <Mail className="h-4.5 w-4.5" />
+                    </div>
+                    <p className="mt-2.5 font-heading text-[14px] font-semibold text-zinc-800">
                       Todavía no hay conversación
                     </p>
-                    <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-subtle">
+                    <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
                       Ni el cliente ha escrito ni se le ha respondido. Lo que envíes desde aquí le llegará por correo y
                       quedará registrado en este hilo.
                     </p>
@@ -682,32 +684,34 @@ export function TicketDetailPage() {
             )}
 
             {activeTab === "notas" && (
-              <div className="mt-4 space-y-3">
+              <div className="mt-3.5 space-y-2.5">
                 {internalNotes.length === 0 ? (
-                  // Sin notas, el vacio es la unica pieza: explica para que sirven y ofrece escribir la primera.
-                  <div className="px-6 pb-4 pt-10 text-center">
-                    <Lock className="mx-auto h-6 w-6 text-warn" />
-                    <p className="mt-3 font-heading text-[15px] font-semibold tracking-[-0.01em] text-ink">
+                  <div className="rounded-xl border border-dashed border-amber-200/80 bg-amber-50/20 px-6 py-8 text-center">
+                    <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200/80 bg-white text-amber-600 shadow-2xs">
+                      <Lock className="h-4.5 w-4.5" />
+                    </div>
+                    <p className="mt-2.5 font-heading text-[14px] font-semibold text-zinc-800">
                       Nada anotado todavía
                     </p>
-                    <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-subtle">
+                    <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
                       Aquí queda lo que el equipo necesita saber y el cliente no: cómo fue la llamada, qué se intentó
                       ya, con quién quedó pendiente. Nunca sale por correo.
                     </p>
-                    <Button type="button" size="sm" onClick={() => setShowNoteModal(true)} className="mt-5">
-                      <Plus className="h-[15px] w-[15px]" />
+                    <Button type="button" size="sm" onClick={() => setShowNoteModal(true)} className="mt-4">
+                      <Plus className="h-[14px] w-[14px]" />
                       Añadir nota
                     </Button>
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center gap-3">
-                      <span className="shrink-0 text-[11.5px] font-semibold tabular-nums text-subtle">
-                        {internalNotes.length} {internalNotes.length === 1 ? "nota" : "notas"}
-                      </span>
-                      <span aria-hidden className="h-px flex-1 bg-line" />
+                      <div className="flex items-center gap-1.5 text-[11.5px] font-medium tabular-nums text-zinc-500">
+                        <Lock className="h-3 w-3 text-amber-600" />
+                        <span>{internalNotes.length} {internalNotes.length === 1 ? "nota interna" : "notas internas"}</span>
+                      </div>
+                      <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
                       <Button type="button" size="sm" onClick={() => setShowNoteModal(true)}>
-                        <Plus className="h-[15px] w-[15px]" />
+                        <Plus className="h-[14px] w-[14px]" />
                         Añadir nota
                       </Button>
                     </div>
@@ -726,7 +730,7 @@ export function TicketDetailPage() {
             onEdit={() => void handleOpenEditModal()}
             onAssign={() => void handleOpenAssignModal()}
             onOpenAttachment={openAttachment}
-            className="w-full shrink-0 border-t border-line pt-6 lg:w-[300px] lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0"
+            className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[330px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-16 self-start"
           />
         </div>
       </div>
@@ -923,23 +927,20 @@ export function TicketDetailPage() {
         <Modal
           eyebrow={ticket.number}
           title="Actualizar ticket"
-          description="Elige la nueva situación del ticket. Según la opción, se piden datos adicionales."
+          description="Avanzar, pausar o cerrar el ciclo de vida del ticket."
+          maxWidth="max-w-md"
           onClose={() => {
             if (!transitioning) setShowUpdateStatusModal(false);
           }}
           footer={
             <>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={transitioning}
-                onClick={() => setShowUpdateStatusModal(false)}
-              >
-                Volver
+              <Button type="button" variant="secondary" size="sm" disabled={transitioning} onClick={() => setShowUpdateStatusModal(false)}>
+                Cancelar
               </Button>
               <Button
                 type="submit"
                 form="update-status-form"
+                size="sm"
                 variant={updateTargetStatus === "Cancelado" ? "danger" : "primary"}
                 isLoading={transitioning}
               >
@@ -948,10 +949,10 @@ export function TicketDetailPage() {
             </>
           }
         >
-          <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-4">
+          <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-3">
             {transitionError && <Alert variant="error">{transitionError}</Alert>}
 
-            <div role="radiogroup" aria-label="Nueva situación" className="space-y-2">
+            <div role="radiogroup" aria-label="Nueva situación" className="space-y-1.5">
               {availableTransitions.map((option) => {
                 const isSelected = updateTargetStatus === option.target;
                 const OptionIcon = option.icon;
@@ -962,20 +963,20 @@ export function TicketDetailPage() {
                     role="radio"
                     aria-checked={isSelected}
                     onClick={() => setUpdateTargetStatus(option.target)}
-                    className={`flex w-full items-start gap-3 rounded-edge border p-3 text-left outline-none transition-colors
-                      focus-visible:ring-3 focus-visible:ring-brand-red/15 ${
+                    className={`flex w-full items-start gap-2.5 rounded-lg border p-2.5 text-left outline-none transition-all cursor-pointer
+                      focus-visible:ring-2 focus-visible:ring-brand-red/20 ${
                         isSelected
-                          ? "border-brand-red bg-brand-red/[0.04]"
-                          : "border-line-strong hover:border-zinc-400 hover:bg-canvas"
+                          ? "border-brand-red bg-brand-red/[0.04] shadow-2xs"
+                          : "border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50"
                       }`}
                   >
                     <OptionIcon
                       aria-hidden
-                      className={`mt-0.5 h-4 w-4 shrink-0 ${option.danger ? "text-brand-red" : "text-brand-gray"}`}
+                      className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${option.danger ? "text-brand-red" : "text-zinc-500"}`}
                     />
                     <span>
-                      <span className="block text-[13px] font-semibold text-ink">{option.label}</span>
-                      <span className="block text-[11.5px] text-subtle">{option.description}</span>
+                      <span className="block text-[12.5px] font-semibold text-zinc-900">{option.label}</span>
+                      <span className="block text-[11px] text-zinc-500 leading-tight mt-0.5">{option.description}</span>
                     </span>
                   </button>
                 );
@@ -986,6 +987,7 @@ export function TicketDetailPage() {
               <SelectField
                 id="solution-type"
                 label="Tipo de solución"
+                size="sm"
                 required
                 placeholder="Selecciona un tipo"
                 value={updateSolutionType}
@@ -995,18 +997,18 @@ export function TicketDetailPage() {
             )}
 
             {updateTargetStatus && (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1">
                 <label htmlFor="update-comment" className={labelClass}>
                   {updateTargetStatus === "Cancelado" ? "Motivo de cancelación" : "Comentario"}
                   {updateTargetStatus === "Cancelado" ? (
                     <span className="ml-1 text-brand-red">*</span>
                   ) : (
-                    <span className="ml-1 font-normal">(opcional)</span>
+                    <span className="ml-1 font-normal text-zinc-400">(opcional)</span>
                   )}
                 </label>
                 <textarea
                   id="update-comment"
-                  rows={4}
+                  rows={3}
                   required={updateTargetStatus === "Cancelado"}
                   value={updateComment}
                   onChange={(event) => setUpdateComment(event.target.value)}
@@ -1028,25 +1030,26 @@ export function TicketDetailPage() {
           eyebrow={ticket.number}
           title="Asignar ticket"
           description="Solo aparecen colaboradores activos con acceso al departamento del ticket."
+          maxWidth="max-w-md"
           onClose={() => {
             if (!assigning) setShowAssignModal(false);
           }}
           footer={
             <>
-              <Button type="button" variant="secondary" disabled={assigning} onClick={() => setShowAssignModal(false)}>
+              <Button type="button" variant="secondary" size="sm" disabled={assigning} onClick={() => setShowAssignModal(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" form="assign-ticket-form" isLoading={assigning}>
+              <Button type="submit" form="assign-ticket-form" size="sm" isLoading={assigning}>
                 Guardar asignación
               </Button>
             </>
           }
         >
-          <form id="assign-ticket-form" onSubmit={handleConfirmAssign} className="space-y-4">
+          <form id="assign-ticket-form" onSubmit={handleConfirmAssign} className="space-y-3">
             {assignError && <Alert variant="error">{assignError}</Alert>}
 
             {loadingStaff ? (
-              <div className="flex justify-center py-8">
+              <div className="flex justify-center py-6">
                 <Spinner size="sm" label="Cargando colaboradores…" />
               </div>
             ) : (
@@ -1054,6 +1057,7 @@ export function TicketDetailPage() {
                 <SelectField
                   id="assign-staff-select"
                   label="Colaborador"
+                  size="sm"
                   value={selectedStaffId}
                   onChange={setSelectedStaffId}
                   options={[
@@ -1064,10 +1068,11 @@ export function TicketDetailPage() {
                 <TextField
                   id="assign-comment-input"
                   label="Comentario"
-                  hint="Opcional: por qué cambia la persona responsable. Queda en el historial."
+                  size="sm"
+                  hint="Opcional: por qué cambia la persona responsable."
                   value={assignComment}
                   onChange={(event) => setAssignComment(event.target.value)}
-                  placeholder="Ej.: reasignado para soporte especializado de producto"
+                  placeholder="Ej.: reasignado para soporte de producto"
                 />
               </>
             )}
@@ -1078,27 +1083,28 @@ export function TicketDetailPage() {
       {showEditModal && (
         <Modal
           eyebrow={ticket.number}
-          title="Editar ticket"
-          description="Asunto, motivo, prioridad, departamento y línea de producto. El SLA se recalcula solo."
+          title="Editar clasificación y detalles"
+          description="Ajusta el asunto y la clasificación. El SLA se recalcula automáticamente."
+          maxWidth="max-w-md"
           onClose={() => {
             if (!savingEdit) setShowEditModal(false);
           }}
           footer={
             <>
-              <Button type="button" variant="secondary" disabled={savingEdit} onClick={() => setShowEditModal(false)}>
+              <Button type="button" variant="secondary" size="sm" disabled={savingEdit} onClick={() => setShowEditModal(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" form="edit-ticket-form" isLoading={savingEdit}>
+              <Button type="submit" form="edit-ticket-form" size="sm" isLoading={savingEdit}>
                 Guardar cambios
               </Button>
             </>
           }
         >
-          <form id="edit-ticket-form" onSubmit={handleConfirmEdit} className="space-y-4">
+          <form id="edit-ticket-form" onSubmit={handleConfirmEdit} className="space-y-3">
             {editError && <Alert variant="error">{editError}</Alert>}
 
             {loadingEditCatalogs ? (
-              <div className="flex justify-center py-8">
+              <div className="flex justify-center py-6">
                 <Spinner size="sm" label="Cargando catálogos…" />
               </div>
             ) : (
@@ -1106,13 +1112,15 @@ export function TicketDetailPage() {
                 <TextField
                   id="edit-subject"
                   label="Asunto"
+                  size="sm"
                   required
                   maxLength={200}
                   value={editSubject}
                   onChange={(event) => setEditSubject(event.target.value)}
+                  placeholder="Describe brevemente el caso…"
                 />
 
-                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   <SelectField
                     id="edit-topic"
                     label="Motivo"
@@ -1171,8 +1179,8 @@ export function TicketDetailPage() {
                   />
                 </div>
 
-                <p className="text-[11.5px] leading-relaxed text-faint">
-                  Si cambias el departamento y la persona asignada no pertenece al nuevo, queda sin asignar.
+                <p className="text-[11px] leading-normal text-zinc-400">
+                  Si cambias el departamento y la persona asignada no pertenece al nuevo, quedará sin asignar.
                 </p>
               </>
             )}

@@ -11,7 +11,7 @@ import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } fr
  */
 export function DataTable({ fixed = false, children }: { fixed?: boolean; children: ReactNode }) {
   return (
-    <div className={fixed ? "" : "overflow-x-auto"}>
+    <div className={`rounded-xl border border-zinc-200/80 bg-white shadow-2xs overflow-hidden ${fixed ? "" : "overflow-x-auto"}`}>
       <table className={`w-full border-collapse text-left ${fixed ? "table-fixed" : ""}`}>
         {children}
       </table>
@@ -21,7 +21,7 @@ export function DataTable({ fixed = false, children }: { fixed?: boolean; childr
 
 export function HeadRow({ children }: { children: ReactNode }) {
   return (
-    <tr className="border-b border-line [&>th:first-child]:pl-0 [&>th:last-child]:pr-0">
+    <tr className="border-b border-zinc-200/80 bg-zinc-50/40">
       {children}
     </tr>
   );
@@ -39,23 +39,22 @@ export function Th({ sort, className = "", children, ...props }: ThProps) {
   return (
     <th
       aria-sort={sort?.dir === "asc" ? "ascending" : sort?.dir === "desc" ? "descending" : undefined}
-      className={`px-3.5 py-2.5 font-heading text-[10px] font-semibold uppercase tracking-[0.08em]
-        text-faint ${className}`}
+      className={`px-3 py-2 text-[12.5px] font-medium text-zinc-500 border-r border-zinc-100 last:border-r-0 ${className}`}
       {...props}
     >
       {sort ? (
         <button
           type="button"
           onClick={sort.onToggle}
-          className="group inline-flex items-center gap-1.5 transition-colors hover:text-ink"
+          className="group inline-flex items-center gap-1.5 transition-colors hover:text-zinc-900 cursor-pointer"
         >
           {children}
           {sort.dir === null ? (
-            <ChevronsUpDown className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+            <ChevronsUpDown className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 text-zinc-400" />
           ) : sort.dir === "asc" ? (
-            <ChevronUp className="h-3 w-3 text-brand-red" />
+            <ChevronUp className="h-3 w-3 text-zinc-900" />
           ) : (
-            <ChevronDown className="h-3 w-3 text-brand-red" />
+            <ChevronDown className="h-3 w-3 text-zinc-900" />
           )}
         </button>
       ) : (
@@ -74,8 +73,8 @@ interface RowProps extends HTMLAttributes<HTMLTableRowElement> {
 export function Row({ busy = false, className = "", children, ...props }: RowProps) {
   return (
     <tr
-      className={`border-b border-line-soft transition-colors last:border-0 hover:bg-canvas
-        [&>td:first-child]:pl-0 [&>td:last-child]:pr-0 ${busy ? "opacity-50" : ""} ${className}`}
+      className={`border-b border-zinc-100 transition-colors last:border-0 hover:bg-zinc-50/50
+        data-[checked=true]:bg-brand-red/[0.04] hover:data-[checked=true]:bg-brand-red/[0.07] ${busy ? "opacity-50" : ""} ${className}`}
       {...props}
     >
       {children}
@@ -84,5 +83,5 @@ export function Row({ busy = false, className = "", children, ...props }: RowPro
 }
 
 export function Td({ className = "", ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={`px-3.5 py-2.5 ${className}`} {...props} />;
+  return <td className={`px-3 py-2 text-[13px] border-r border-zinc-100/80 last:border-r-0 ${className}`} {...props} />;
 }

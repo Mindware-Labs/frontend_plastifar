@@ -373,14 +373,13 @@ input:-webkit-autofill:focus {
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  /* La escala de shadcn se aplana sobre --radius-edge: un solo canto en toda la app. */
-  --radius-sm: var(--radius-edge);
-  --radius-md: var(--radius-edge);
-  --radius-lg: var(--radius-edge);
-  --radius-xl: var(--radius-edge);
-  --radius-2xl: var(--radius-edge);
-  --radius-3xl: var(--radius-edge);
-  --radius-4xl: var(--radius-edge);
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
 }
 
 :root {
@@ -407,7 +406,7 @@ input:-webkit-autofill:focus {
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: var(--radius-edge);
+  --radius: 0.5rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);

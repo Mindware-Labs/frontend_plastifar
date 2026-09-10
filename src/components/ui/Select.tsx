@@ -349,12 +349,12 @@ export function Select({
                 width: anchor.width,
                 maxHeight: PANEL_MAX_HEIGHT,
               }}
-              className="animate-plf-toast-in z-[80] flex flex-col overflow-hidden rounded-edge border border-line
-                bg-white shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
+              className="animate-plf-toast-in z-[80] flex flex-col overflow-hidden rounded-lg border border-zinc-200
+                bg-white shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
             >
               {showSearch && (
-                <div className="relative shrink-0 border-b border-line p-1.5">
-                  <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+                <div className="relative shrink-0 border-b border-zinc-100 p-1.5">
+                  <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -364,9 +364,9 @@ export function Select({
                     placeholder="Buscar…"
                     aria-label="Buscar opciones"
                     aria-controls={listId}
-                    className="w-full rounded-edge border border-line bg-canvas/60 py-1.5 pl-8 pr-2 text-[12px]
-                      text-ink outline-none transition-colors placeholder:text-faint focus:border-brand-red/40
-                      focus:bg-white focus:ring-2 focus:ring-brand-red/10"
+                    className="w-full rounded-md border border-zinc-200 bg-zinc-50/60 py-1.5 pl-8 pr-2 text-[12px]
+                      text-zinc-800 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-400
+                      focus:bg-white focus:ring-2 focus:ring-zinc-400/20"
                   />
                 </div>
               )}
@@ -395,7 +395,7 @@ export function Select({
                       aria-disabled={option.disabled}
                       onMouseEnter={() => !option.disabled && setActiveIndex(index)}
                       onClick={() => commit(index)}
-                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge transition-colors ${
+                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-md transition-colors ${
                         size === "xs"
                           ? "px-2 py-1.5 text-[11.5px]"
                           : size === "sm"
@@ -405,9 +405,9 @@ export function Select({
                         option.disabled
                           ? "cursor-not-allowed text-zinc-300"
                           : isActive
-                            ? "bg-fill text-ink"
-                            : "text-brand-gray"
-                      } ${isSelected ? "font-semibold text-ink" : ""}`}
+                            ? "bg-zinc-100 text-zinc-900 font-medium"
+                            : "text-zinc-700 hover:bg-zinc-100/70"
+                      } ${isSelected ? "font-semibold text-zinc-900" : ""}`}
                     >
                       <span className="truncate">{option.label}</span>
                       {isSelected && (

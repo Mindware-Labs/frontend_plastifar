@@ -79,7 +79,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
   const isKeyValueLine = (line: string) => /^[A-Za-zÁ-ÿ0-9\s#_-]{2,30}:\s*.+$/.test(line);
 
   return (
-    <div className={`w-full space-y-3 break-words leading-relaxed text-ink ${className}`}>
+    <div className={`w-full space-y-2 break-words leading-relaxed text-zinc-800 ${className}`}>
       {blocks.map((block, bIndex) => {
         const lines = block
           .split("\n")
@@ -91,7 +91,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
         // Caso A: Todas las líneas son viñetas
         if (lines.every(isBulletLine)) {
           return (
-            <ul key={bIndex} className="my-2 list-disc space-y-1 pl-5">
+            <ul key={bIndex} className="my-1.5 list-disc space-y-0.5 pl-5">
               {lines.map((l, lIndex) => (
                 <li key={lIndex} className="pl-1">
                   {renderInline(l.replace(/^[-*•–]\s+/, ""))}
@@ -120,7 +120,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
         // Caso C: Todas las líneas son numeradas
         if (lines.every(isNumberedLine)) {
           return (
-            <ol key={bIndex} className="my-2 list-decimal space-y-1 pl-5">
+            <ol key={bIndex} className="my-1.5 list-decimal space-y-0.5 pl-5">
               {lines.map((l, lIndex) => (
                 <li key={lIndex} className="pl-1">
                   {renderInline(l.replace(/^\d+[\.\)]\s+/, ""))}
