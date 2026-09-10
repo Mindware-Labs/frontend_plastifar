@@ -49,6 +49,14 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getInitials(name?: string | null): string {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
 function priorityClasses(priority: string): string {
   switch (priority.toLowerCase()) {
     case "emergencia":
@@ -697,7 +705,7 @@ export function TicketDetailPage() {
             <span className="text-xs font-semibold text-ink">
               {msg.authorStaffName ??
                 msg.authorContactName ??
-                ticket.requesterName ??
+                ticket?.requesterName ??
                 "Remitente"}
             </span>
           </div>
@@ -818,7 +826,7 @@ export function TicketDetailPage() {
         >
           <div className="flex items-center justify-between gap-2">
             <span className="truncate font-semibold text-ink">
-              {msg.authorStaffName ?? msg.authorContactName ?? ticket.requesterName ?? "Remitente"}
+              {msg.authorStaffName ?? msg.authorContactName ?? ticket?.requesterName ?? "Remitente"}
             </span>
             <span className="shrink-0 text-[10px] text-subtle">{formatDateTime(msg.createdAt)}</span>
           </div>
@@ -983,52 +991,63 @@ export function TicketDetailPage() {
         )}
 
         {/* Fila de KPIs: Cliente y Contacto | Atributos del Ticket | SLA y Métricas de Tiempo */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* KPI 1: Cliente & Contacto */}
-          <div className="rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-            <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-              <Building2 className="h-4 w-4 text-brand-red" />
-              Cliente y Contacto
-            </h3>
-            <div className="mt-3 space-y-2 text-xs">
-              <div>
-                <span className="text-subtle">Razón social:</span>
-                <p className="font-semibold text-ink">{ticket.clientName || "Sin cliente asignado"}</p>
-              </div>
+          <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+                <Building2 className="h-4 w-4 text-brand-red" />
+                Cliente y Contacto
+              </h3>
               {ticket.clientCode && (
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-subtle">
+                  {ticket.clientCode}
+                </span>
+              )}
+            </div>
+            <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
+              <div className="space-y-2">
                 <div>
-                  <span className="text-subtle">Código:</span>
-                  <p className="font-mono text-ink">{ticket.clientCode}</p>
+                  <span className="block text-[11px] text-subtle">Razón social:</span>
+                  <p className="truncate font-semibold text-ink" title={ticket.clientName || undefined}>
+                    {ticket.clientName || "Sin cliente asignado"}
+                  </p>
                 </div>
-              )}
-              {ticket.contactName && (
-                <div className="border-t border-line-soft pt-2">
-                  <span className="text-subtle">Contacto:</span>
-                  <p className="font-medium text-ink">{ticket.contactName}</p>
+                <div>
+                  <span className="block text-[11px] text-subtle">Contacto:</span>
+                  <p className="truncate font-medium text-ink" title={ticket.contactName || undefined}>
+                    {ticket.contactName || "Sin contacto registrado"}
+                  </p>
                 </div>
-              )}
-              {(ticket.contactEmail ?? ticket.requesterEmail) && (
-                <div className="flex items-center gap-1.5 text-subtle">
-                  <Mail className="h-3.5 w-3.5 shrink-0" />
-                  <a
-                    href={`mailto:${ticket.contactEmail ?? ticket.requesterEmail}`}
-                    className="truncate text-ink hover:underline"
-                  >
-                    {ticket.contactEmail ?? ticket.requesterEmail}
-                  </a>
-                </div>
-              )}
-              {ticket.contactPhone && (
-                <div className="flex items-center gap-1.5 text-subtle">
-                  <Phone className="h-3.5 w-3.5 shrink-0" />
-                  <span className="text-ink">{ticket.contactPhone}</span>
+              </div>
+
+              {((ticket.contactEmail ?? ticket.requesterEmail) || ticket.contactPhone) && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
+                  {(ticket.contactEmail ?? ticket.requesterEmail) && (
+                    <div className="flex min-w-0 max-w-full items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5 shrink-0 text-subtle" />
+                      <a
+                        href={`mailto:${ticket.contactEmail ?? ticket.requesterEmail}`}
+                        className="truncate text-ink hover:underline"
+                        title={ticket.contactEmail ?? ticket.requesterEmail ?? undefined}
+                      >
+                        {ticket.contactEmail ?? ticket.requesterEmail}
+                      </a>
+                    </div>
+                  )}
+                  {ticket.contactPhone && (
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-subtle" />
+                      <span className="text-ink">{ticket.contactPhone}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
           {/* KPI 2: Atributos del Ticket */}
-          <div className="rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+          <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
             <div className="flex items-center justify-between">
               <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
                 <User className="h-4 w-4 text-brand-red" />
@@ -1038,7 +1057,7 @@ export function TicketDetailPage() {
                 <button
                   type="button"
                   onClick={() => void handleOpenEditModal()}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-red transition-colors hover:underline cursor-pointer"
+                  className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-brand-red transition-colors hover:underline"
                   title="Editar campos clave del ticket"
                 >
                   <Pencil className="h-3 w-3" />
@@ -1046,32 +1065,53 @@ export function TicketDetailPage() {
                 </button>
               )}
             </div>
-            <div className="mt-3 space-y-2.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-subtle">Departamento:</span>
-                <span className="font-semibold text-ink">{ticket.departmentName || "Sin departamento"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-subtle">Tema / Motivo:</span>
-                <span className="font-medium text-ink">{ticket.topicName || "Sin motivo"}</span>
-              </div>
-              {ticket.productLineName && (
-                <div className="flex justify-between">
-                  <span className="text-subtle">Línea de producto:</span>
-                  <span className="font-medium text-ink">{ticket.productLineName}</span>
+            <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
+              <div className="space-y-2.5">
+                {/* Clasificación: Departamento y Tema / Motivo en 2 columnas */}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                  <div>
+                    <span className="block text-[11px] text-subtle">Departamento:</span>
+                    <span className="block truncate font-semibold text-ink" title={ticket.departmentName || undefined}>
+                      {ticket.departmentName || "Sin departamento"}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="block text-[11px] text-subtle">Tema / Motivo:</span>
+                    <span className="block truncate font-medium text-ink" title={ticket.topicName || undefined}>
+                      {ticket.topicName || "Sin motivo"}
+                    </span>
+                  </div>
                 </div>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-subtle">Asignado a:</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-ink">
-                    {ticket.assignedStaffName ?? "Sin asignar"}
-                  </span>
+
+                {/* Asignado a: bloque integrado con avatar e interacción limpia */}
+                <div className="flex items-center justify-between rounded-lg border border-line-soft bg-slate-50/80 px-2.5 py-1.5">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {ticket.assignedStaffName ? (
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-100 text-[10.5px] font-bold text-brand-red">
+                        {getInitials(ticket.assignedStaffName)}
+                      </div>
+                    ) : (
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200/70 text-subtle">
+                        <User className="h-3.5 w-3.5" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <span className="block text-[10px] leading-tight text-subtle">Asignado a:</span>
+                      <span
+                        className="block truncate text-xs font-semibold text-ink"
+                        title={ticket.assignedStaffName || undefined}
+                      >
+                        {ticket.assignedStaffName ?? "Sin asignar"}
+                      </span>
+                    </div>
+                  </div>
+
                   {ticket.status !== "Cancelado" && (
                     <button
                       type="button"
                       onClick={() => void handleOpenAssignModal()}
-                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-brand-red transition-colors hover:bg-red-50 hover:underline"
+                      className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-line-soft bg-white px-2 py-1 text-[11px] font-semibold text-brand-red shadow-2xs transition-colors hover:border-red-200 hover:bg-red-50"
                       title="Asignar o reasignar ticket"
                     >
                       <UserCheck className="h-3 w-3" />
@@ -1080,80 +1120,123 @@ export function TicketDetailPage() {
                   )}
                 </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-subtle">Canal de origen:</span>
-                <span className="font-medium text-ink">{ticket.channel}</span>
+
+              {/* Pie: Canal de origen y Línea de producto */}
+              <div className="flex items-center justify-between border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span>Canal:</span>
+                  <span className="truncate font-medium text-ink">{ticket.channel}</span>
+                </div>
+                {ticket.productLineName && (
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span>Línea:</span>
+                    <span className="truncate font-medium text-ink" title={ticket.productLineName}>
+                      {ticket.productLineName}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* KPI 3: SLA y Tiempos */}
-          <div className="rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-            <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
-              <Clock className="h-4 w-4 text-brand-red" />
-              SLA y Métricas de Tiempo
-            </h3>
-            <div className="mt-3 space-y-2.5 text-xs">
-              <div>
-                <span className="text-subtle">Vencimiento de Resolución:</span>
-                <p className="font-medium text-ink">
-                  {ticket.resolutionDueAt
-                    ? formatDateTime(ticket.resolutionDueAt)
-                    : "No configurado"}
-                </p>
-              </div>
-
-              <div>
-                <span className="text-subtle">Primera respuesta:</span>
-                <p className="font-medium text-ink">
-                  {ticket.firstResponseAt ? (
-                    <span className="text-emerald-700">
-                      Lograda ({formatDateTime(ticket.firstResponseAt)})
-                    </span>
-                  ) : ticket.firstResponseDueAt ? (
-                    <span>Límite: {formatDateTime(ticket.firstResponseDueAt)}</span>
-                  ) : (
-                    "Pendiente"
-                  )}
-                </p>
-              </div>
-
-              {Boolean(ticket.pausedAt) && (
-                <div className="rounded-lg bg-amber-50 p-2 text-amber-800">
-                  <div className="flex items-center gap-1 font-semibold">
-                    <AlertTriangle className="h-3.5 w-3.5" /> SLA Pausado
-                  </div>
-                  <p className="mt-0.5 text-[11px]">
-                    En espera del cliente desde {formatDateTime(ticket.pausedAt!)}.
+          <div className="flex flex-col rounded-xl border border-line-soft bg-white p-4 shadow-xs">
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-2 font-heading text-[12.5px] font-semibold text-ink">
+                <Clock className="h-4 w-4 text-brand-red" />
+                SLA y Métricas de Tiempo
+              </h3>
+              {sla.tone === "ok" ? (
+                <Badge tone="green">
+                  <Clock className="mr-1 inline h-3 w-3" />
+                  {sla.text}
+                </Badge>
+              ) : sla.tone === "overdue" ? (
+                <Badge tone="red">
+                  <Clock className="mr-1 inline h-3 w-3" />
+                  {sla.text}
+                </Badge>
+              ) : sla.tone === "warning" ? (
+                <span className="inline-flex h-5 items-center rounded-full bg-amber-100 px-2 text-[10.5px] font-semibold text-amber-800">
+                  <Clock className="mr-1 inline h-3 w-3" />
+                  {sla.text}
+                </span>
+              ) : (
+                <span className="inline-flex h-5 items-center rounded-full bg-slate-100 px-2 text-[10.5px] font-medium text-slate-600">
+                  {sla.text}
+                </span>
+              )}
+            </div>
+            <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
+              <div className="space-y-2">
+                <div>
+                  <span className="block text-[11px] text-subtle">Vencimiento de Resolución:</span>
+                  <p className="font-medium text-ink">
+                    {ticket.resolutionDueAt
+                      ? formatDateTime(ticket.resolutionDueAt)
+                      : "No configurado"}
                   </p>
                 </div>
-              )}
 
-              {ticket.pausedMinutes > 0 && (
-                <div className="flex justify-between text-subtle">
-                  <span>Tiempo total en pausa:</span>
-                  <span className="font-medium text-ink">{ticket.pausedMinutes} minutos</span>
+                <div>
+                  <span className="block text-[11px] text-subtle">Primera respuesta:</span>
+                  <p className="font-medium text-ink">
+                    {ticket.firstResponseAt ? (
+                      <span className="text-emerald-700">
+                        Lograda ({formatDateTime(ticket.firstResponseAt)})
+                      </span>
+                    ) : ticket.firstResponseDueAt ? (
+                      <span>Límite: {formatDateTime(ticket.firstResponseDueAt)}</span>
+                    ) : (
+                      "Pendiente"
+                    )}
+                  </p>
                 </div>
-              )}
 
-              {ticket.reopenedCount > 0 && (
-                <div className="flex justify-between text-subtle">
-                  <span>Reaperturas:</span>
-                  <span className="font-semibold text-amber-700">{ticket.reopenedCount}</span>
-                </div>
-              )}
+                {Boolean(ticket.pausedAt) && (
+                  <div className="rounded-lg bg-amber-50 p-2 text-amber-800">
+                    <div className="flex items-center gap-1 font-semibold">
+                      <AlertTriangle className="h-3.5 w-3.5" /> SLA Pausado
+                    </div>
+                    <p className="mt-0.5 text-[11px]">
+                      En espera del cliente desde {formatDateTime(ticket.pausedAt!)}.
+                    </p>
+                  </div>
+                )}
 
-              {ticket.resolvedAt && (
-                <div className="flex justify-between text-subtle">
-                  <span>Resuelto el:</span>
-                  <span className="font-medium text-ink">{formatDateTime(ticket.resolvedAt)}</span>
-                </div>
-              )}
+                {ticket.pausedMinutes > 0 && (
+                  <div className="flex justify-between text-subtle">
+                    <span>Tiempo total en pausa:</span>
+                    <span className="font-medium text-ink">{ticket.pausedMinutes} minutos</span>
+                  </div>
+                )}
 
-              {ticket.closedAt && (
-                <div className="flex justify-between text-subtle">
-                  <span>Cerrado el:</span>
-                  <span className="font-medium text-ink">{formatDateTime(ticket.closedAt)}</span>
+                {ticket.reopenedCount > 0 && (
+                  <div className="flex justify-between text-subtle">
+                    <span>Reaperturas:</span>
+                    <span className="font-semibold text-amber-700">{ticket.reopenedCount}</span>
+                  </div>
+                )}
+
+                {ticket.resolvedAt && (
+                  <div className="flex justify-between text-subtle">
+                    <span>Resuelto el:</span>
+                    <span className="font-medium text-ink">{formatDateTime(ticket.resolvedAt)}</span>
+                  </div>
+                )}
+
+                {ticket.closedAt && (
+                  <div className="flex justify-between text-subtle">
+                    <span>Cerrado el:</span>
+                    <span className="font-medium text-ink">{formatDateTime(ticket.closedAt)}</span>
+                  </div>
+                )}
+              </div>
+
+              {!ticket.pausedAt && ticket.pausedMinutes === 0 && ticket.reopenedCount === 0 && !ticket.resolvedAt && (
+                <div className="flex items-center justify-between border-t border-line-soft/60 pt-2 text-[11.5px] text-subtle">
+                  <span>Última actividad:</span>
+                  <span className="font-medium text-ink">{formatDateTime(ticket.lastActivityAt)}</span>
                 </div>
               )}
             </div>
