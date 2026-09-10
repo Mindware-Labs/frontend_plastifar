@@ -26,6 +26,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ticketsApi } from "../../api/tickets";
+import { TicketTimelineSheet } from "./TicketTimelineSheet";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
@@ -111,19 +112,6 @@ function validateAttachments(chosen: File[], existing: File[]): string | null {
   return null;
 }
 
-/** Estados alcanzables desde el estado actual, para el selector del redactor de respuestas. */
-function nextStatusOptions(status: string): string[] {
-  switch (status) {
-    case "Abierto":
-      return ["En espera del cliente", "Reenvío de producto", "Solucionado"];
-    case "En espera del cliente":
-      return ["Abierto"];
-    case "Reenvío de producto":
-      return ["Solucionado"];
-    default:
-      return [];
-  }
-}
 
 /** Categorías de cierre para un ticket solucionado (sin catálogo propio en el backend
  * aún: se envían como parte del texto de motivo, visible en el historial del ticket). */
@@ -238,11 +226,9 @@ export function TicketDetailPage() {
 
   // Pestaña lateral (Drawer) para el Historial Completo del ticket
   const [showTimelineDrawer, setShowTimelineDrawer] = useState(false);
-  const [timelineFilter, setTimelineFilter] = useState<"all" | "messages" | "events">("all");
 
   // Composer: Respuesta al cliente (modo correo)
   const [replyBody, setReplyBody] = useState("");
-  const [replyStatusChange, setReplyStatusChange] = useState<string>("");
   const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
   const [replySending, setReplySending] = useState(false);
   const [replySendError, setReplySendError] = useState<string | null>(null);
@@ -300,23 +286,6 @@ export function TicketDetailPage() {
       active = false;
     };
   }, [ticketId]);
-
-  // Manejador para cerrar la pestaña lateral de historial con tecla Escape y bloquear el scroll de fondo
-  useEffect(() => {
-    if (!showTimelineDrawer) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setShowTimelineDrawer(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [showTimelineDrawer]);
 
   const { onTicketsChanged, onTicketStatusChanged, onTicketNewMessage } = useEmailCounts();
 
@@ -404,9 +373,6 @@ export function TicketDetailPage() {
       const formData = new FormData();
       formData.append("Direction", "Saliente");
       formData.append("BodyText", replyBody.trim());
-      if (replyStatusChange) {
-        formData.append("Status", replyStatusChange);
-      }
       replyAttachments.forEach((file) => {
         formData.append("Attachments", file);
       });
@@ -415,7 +381,6 @@ export function TicketDetailPage() {
 
       setReplyBody("");
       setReplyAttachments([]);
-      setReplyStatusChange("");
       await refreshTicket();
     } catch (err) {
       setReplySendError(
@@ -681,13 +646,6 @@ export function TicketDetailPage() {
     ),
   ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-  // Elementos del timeline filtrados para el Drawer lateral
-  const filteredTimeline = timeline.filter((item) => {
-    if (timelineFilter === "messages") return item.kind === "message";
-    if (timelineFilter === "events") return item.kind === "event";
-    return true;
-  });
-
   // Hilo con el cliente (entrante + saliente, sin notas internas) y notas internas por separado,
   // para las pestañas "Respuestas al cliente" y "Notas internas".
   const sortedMessages = [...ticket.messages].sort(
@@ -780,229 +738,6 @@ export function TicketDetailPage() {
             </div>
           </div>
         )}
-      </div>
-    );
-  }
-
-  /** Punto del timeline lateral para un evento del sistema (más compacto que renderEvent,
-   * pensado para la columna angosta bajo la tarjeta SLA). */
-  function renderTimelineEvent(evt: TicketEventResponse, idx: number) {
-    const isBreach =
-      evt.eventType === "SlaBreached" ||
-      Boolean(evt.details?.toLowerCase().includes("incumplimiento de sla"));
-    return (
-      <div key={`tl-evt-${evt.id}-${idx}`} className="relative pb-5 pl-7 last:pb-0">
-        <span
-          className={`absolute left-0 top-0.5 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-white ${
-            isBreach ? "bg-red-600" : "bg-zinc-400"
-          }`}
-        >
-          {isBreach ? (
-            <AlertTriangle className="h-2.5 w-2.5 text-white" />
-          ) : (
-            <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-          )}
-        </span>
-        <div
-          className={`rounded-lg border px-3 py-2 text-[11px] ${
-            isBreach ? "border-red-200 bg-red-50" : "border-line-soft bg-canvas/50"
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className={`font-medium ${isBreach ? "text-red-900" : "text-ink"}`}>
-              {evt.actorStaffName ?? "Sistema"}
-            </span>
-            <span className="shrink-0 text-[10px] text-subtle">{formatDateTime(evt.createdAt)}</span>
-          </div>
-          <p className={`mt-0.5 ${isBreach ? "font-medium text-red-700" : "text-subtle"}`}>
-            {evt.details ?? evt.eventType}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  /** Punto del timeline lateral para un mensaje (versión compacta de renderMessageCard,
-   * pensada para la columna angosta bajo la tarjeta SLA). */
-  function renderTimelineMessage(msg: TicketMessageResponse) {
-    const isInternal = msg.direction.toLowerCase() === "interna";
-    const isOutbound = msg.direction.toLowerCase() === "saliente";
-    const dotColor = isInternal ? "bg-amber-500" : isOutbound ? "bg-sky-600" : "bg-slate-700";
-
-    return (
-      <div key={`tl-msg-${msg.id}`} className="relative pb-5 pl-7 last:pb-0">
-        <span
-          className={`absolute left-0 top-0.5 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-white ${dotColor}`}
-        >
-          {isInternal ? (
-            <Lock className="h-2.5 w-2.5 text-white" />
-          ) : isOutbound ? (
-            <Mail className="h-2.5 w-2.5 text-white" />
-          ) : (
-            <User className="h-2.5 w-2.5 text-white" />
-          )}
-        </span>
-        <div
-          className={`rounded-lg border p-3 text-xs ${
-            isInternal
-              ? "border-amber-200 bg-amber-50/60"
-              : isOutbound
-              ? "border-line-soft bg-white"
-              : "border-slate-200 bg-slate-50/80"
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate font-semibold text-ink">
-              {msg.authorStaffName ?? msg.authorContactName ?? ticket?.requesterName ?? "Remitente"}
-            </span>
-            <span className="shrink-0 text-[10px] text-subtle">{formatDateTime(msg.createdAt)}</span>
-          </div>
-          <span
-            className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ${dotColor}`}
-          >
-            {isInternal ? "Nota interna" : isOutbound ? "Respuesta" : "Cliente"}
-          </span>
-          <p className="mt-2 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink">
-            {msg.bodyText ?? msg.bodyHtml?.replace(/<[^>]*>?/gm, "")}
-          </p>
-          {msg.attachments && msg.attachments.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5 border-t border-line-soft/60 pt-2 text-[10.5px] text-subtle">
-              {msg.attachments.map((att) => (
-                <button
-                  key={att.id}
-                  type="button"
-                  onClick={() => void handleDownloadAttachment(att)}
-                  disabled={downloadingId === att.id}
-                  className="inline-flex items-center gap-1.5 rounded border border-line-soft bg-white px-2 py-0.5 text-ink transition-colors hover:bg-slate-50"
-                  title="Descargar adjunto"
-                >
-                  <Paperclip className="h-3 w-3 text-subtle" />
-                  <span className="max-w-[140px] truncate">{att.fileName}</span>
-                  <Download className="h-2.5 w-2.5 text-subtle" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function renderTimelineDrawer() {
-    if (!showTimelineDrawer || !ticket) return null;
-
-    return (
-      <div
-        className="fixed inset-0 z-50 overflow-hidden"
-        aria-labelledby="timeline-drawer-title"
-        role="dialog"
-        aria-modal="true"
-      >
-        {/* Backdrop con desenfoque suave */}
-        <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity duration-300 ease-out"
-          onClick={() => setShowTimelineDrawer(false)}
-        />
-
-        <div className="fixed inset-y-0 right-0 flex max-w-full pl-6 sm:pl-10 pointer-events-none">
-          <div className="pointer-events-auto flex w-screen max-w-lg flex-col border-l border-line-soft bg-white shadow-2xl transition-transform duration-300 ease-out">
-            {/* Cabecera del Drawer */}
-            <div className="flex items-center justify-between border-b border-line-soft bg-slate-50/70 px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-brand-red">
-                  <History className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 id="timeline-drawer-title" className="font-heading text-sm font-bold text-ink">
-                    Historial de conversación y eventos
-                  </h2>
-                  <p className="text-[11.5px] text-subtle">
-                    {ticket.number} · {timeline.length} registro{timeline.length === 1 ? "" : "s"} cronológico{timeline.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowTimelineDrawer(false)}
-                className="cursor-pointer rounded-lg p-1.5 text-subtle transition-colors hover:bg-slate-200/60 hover:text-ink"
-                title="Cerrar pestaña de historial (Esc)"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Filtros rápidos: Todos | Mensajes | Eventos */}
-            <div className="flex items-center gap-1.5 border-b border-line-soft bg-canvas/30 px-6 py-2.5 text-xs">
-              <button
-                type="button"
-                onClick={() => setTimelineFilter("all")}
-                className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all ${
-                  timelineFilter === "all"
-                    ? "border border-line-soft bg-white text-ink shadow-2xs"
-                    : "text-subtle hover:text-ink"
-                }`}
-              >
-                Todos ({timeline.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimelineFilter("messages")}
-                className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all ${
-                  timelineFilter === "messages"
-                    ? "border border-line-soft bg-white text-ink shadow-2xs"
-                    : "text-subtle hover:text-ink"
-                }`}
-              >
-                Mensajes ({sortedMessages.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimelineFilter("events")}
-                className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all ${
-                  timelineFilter === "events"
-                    ? "border border-line-soft bg-white text-ink shadow-2xs"
-                    : "text-subtle hover:text-ink"
-                }`}
-              >
-                Eventos ({ticket.events?.length ?? 0})
-              </button>
-            </div>
-
-            {/* Lista cronológica scrollable */}
-            <div className="flex-1 overflow-y-auto px-6 py-5">
-              {filteredTimeline.length === 0 ? (
-                <div className="rounded-edge border border-dashed border-line-strong bg-canvas/40 p-8 text-center text-xs text-subtle">
-                  No hay registros en esta categoría.
-                </div>
-              ) : (
-                <div className="relative">
-                  <div className="absolute bottom-1 left-[7px] top-1 w-px bg-line-soft" />
-                  {filteredTimeline.map((item, idx) =>
-                    item.kind === "event"
-                      ? renderTimelineEvent(item.data, idx)
-                      : renderTimelineMessage(item.data),
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Pie del Drawer con atajo Esc y botones */}
-            <div className="flex items-center justify-between border-t border-line-soft bg-slate-50/80 px-6 py-3">
-              <span className="text-[11px] text-subtle">
-                Presiona <kbd className="rounded border border-line-strong bg-white px-1.5 py-0.5 text-[10px] font-semibold text-ink">Esc</kbd> para cerrar
-              </span>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowTimelineDrawer(false)}
-              >
-                Cerrar
-              </Button>
-            </div>
-          </div>
-        </div>
       </div>
     );
   }
@@ -1704,21 +1439,6 @@ export function TicketDetailPage() {
                       <Paperclip className="h-3.5 w-3.5" />
                       Adjuntar
                     </label>
-
-                    {ticket.status !== "Cancelado" && nextStatusOptions(ticket.status).length > 0 && (
-                      <select
-                        value={replyStatusChange}
-                        onChange={(e) => setReplyStatusChange(e.target.value)}
-                        className="h-8 rounded-edge border border-line-strong bg-white px-2 text-[11.5px] text-ink focus:border-brand-red focus:outline-none"
-                      >
-                        <option value="">Mantener estado ({ticket.status})</option>
-                        {nextStatusOptions(ticket.status).map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                    )}
                   </div>
 
                   <Button type="submit" variant="primary" isLoading={replySending} className="gap-2">
@@ -2176,8 +1896,18 @@ export function TicketDetailPage() {
         </Modal>
       )}
 
-      {/* Pestaña lateral desplegable con todo el historial del ticket */}
-      {renderTimelineDrawer()}
+      {/* Pestaña lateral desplegable (Sheet) con animación fluida de entrada y salida */}
+      {showTimelineDrawer && ticket && (
+        <TicketTimelineSheet
+          ticket={ticket}
+          timeline={timeline}
+          sortedMessages={sortedMessages}
+          downloadingId={downloadingId}
+          onDownloadAttachment={handleDownloadAttachment}
+          onClose={() => setShowTimelineDrawer(false)}
+          onSelectTab={setActiveTab}
+        />
+      )}
     </div>
   );
 }
