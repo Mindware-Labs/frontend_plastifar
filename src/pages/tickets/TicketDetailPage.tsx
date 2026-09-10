@@ -682,7 +682,7 @@ export function TicketDetailPage() {
     );
   }
 
-  const sla = formatSlaRemaining(ticket.resolutionDueAt, Boolean(ticket.pausedAt));
+  const sla = formatSlaRemaining(ticket.resolutionDueAt, Boolean(ticket.pausedAt), ticket.status, ticket.closedAt);
   const availableTransitions = getAvailableTransitions(ticket.status);
   const editRequiresProductLine = Boolean(
     editCatalogs?.topics.find((t) => t.id === editTopicId)?.requiresProductLine,
@@ -888,9 +888,9 @@ export function TicketDetailPage() {
 
           <div className="flex items-center gap-3">
             {/* SLA Badge */}
-            {sla.tone === "ok" ? (
-              <Badge tone="green">
-                <Clock className="mr-1 h-3 w-3 inline" />
+            {sla.tone === "ok" || sla.tone === "completed" ? (
+              <Badge tone={sla.tone === "completed" ? "completed" : "green"}>
+                <CheckCircle2 className="mr-1 inline h-3 w-3" />
                 {sla.text}
               </Badge>
             ) : sla.tone === "overdue" ? (
@@ -1162,9 +1162,9 @@ export function TicketDetailPage() {
                     <Clock className="h-4 w-4 text-brand-red" />
                     SLA y Métricas de Tiempo
                   </h3>
-                  {sla.tone === "ok" ? (
-                    <Badge tone="green">
-                      <Clock className="mr-1 inline h-3 w-3" />
+                  {sla.tone === "ok" || sla.tone === "completed" ? (
+                    <Badge tone={sla.tone === "completed" ? "completed" : "green"}>
+                      <CheckCircle2 className="mr-1 inline h-3 w-3" />
                       {sla.text}
                     </Badge>
                   ) : sla.tone === "overdue" ? (

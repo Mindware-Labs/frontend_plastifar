@@ -125,11 +125,33 @@ export function formatInitials(
   return "PF";
 }
 
-/** Calcula el tiempo restante o vencido de un compromiso de SLA para la bandeja. */
+/** Calcula el tiempo restante o vencido de un compromiso de SLA para la bandeja o detalle. */
 export function formatSlaRemaining(
   dueAtIso: string | null,
   isPaused: boolean,
-): { text: string; tone: "overdue" | "warning" | "ok" | "paused" } {
+  status?: string | null,
+  closedAtIso?: string | null,
+): { text: string; tone: "overdue" | "warning" | "ok" | "paused" | "completed" } {
+  const normStatus = (status ?? "").toLowerCase().trim();
+  const isFinalized = ["solucionado", "solucionada", "cancelado", "cerrado"].includes(normStatus);
+
+  if (isFinalized) {
+    if (normStatus === "cancelado") {
+      return { text: "Cancelado", tone: "paused" };
+    }
+    // Si tiene compromiso de resolución y fecha de cierre, verificamos si cumplió en plazo
+    if (dueAtIso && closedAtIso) {
+      const due = new Date(dueAtIso).getTime();
+      const closed = new Date(closedAtIso).getTime();
+      if (closed <= due) {
+        return { text: "Cumplido", tone: "completed" };
+      } else {
+        return { text: "Fuera de SLA", tone: "warning" };
+      }
+    }
+    return { text: "Cumplido", tone: "completed" };
+  }
+
   if (isPaused) {
     return { text: "Pausado", tone: "paused" };
   }
@@ -155,4 +177,46 @@ export function formatSlaRemaining(
   if (diffHours < 24) return { text: `${diffHours}h restantes`, tone: diffHours <= 4 ? "warning" : "ok" };
   const diffDays = Math.floor(diffHours / 24);
   return { text: `${diffDays}d restantes`, tone: "ok" };
+}
+
+/**
+ * Formatea fecha y hora de actividad de manera compacta para evitar truncamiento en tablas.
+ */
+export function formatActivityDate(iso: string | null | undefined): { compact: string; full: string } {
+  if (!iso) return { compact: "—", full: "Sin actividad" };
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return { compact: "—", full: "Fecha inválida" };
+
+  const now = new Date();
+  const full = formatDateTime(iso);
+
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  const timeStr = date.toLocaleTimeString("es-419", { hour: "2-digit", minute: "2-digit" });
+
+  if (isToday) {
+    return { compact: `Hoy, ${timeStr}`, full };
+  }
+  if (isYesterday) {
+    return { compact: `Ayer, ${timeStr}`, full };
+  }
+
+  const isSameYear = date.getFullYear() === now.getFullYear();
+  const dateStr = date.toLocaleDateString("es-419", {
+    day: "2-digit",
+    month: "short",
+    ...(isSameYear ? {} : { year: "numeric" }),
+  });
+
+  return { compact: `${dateStr}, ${timeStr}`, full };
 }

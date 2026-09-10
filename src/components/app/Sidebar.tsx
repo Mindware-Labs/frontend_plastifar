@@ -11,6 +11,7 @@ import {
   Send,
   ShieldCheck,
   Star,
+  Tag,
   Trash2,
   Users,
   Ticket as TicketIcon,
@@ -52,6 +53,7 @@ const groups: NavGroup[] = [
     icon: TicketIcon,
     children: [
       { label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon },
+      { label: "Motivos", to: "/tickets/motivos", icon: Tag },
     ],
   },
   {

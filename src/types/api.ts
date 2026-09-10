@@ -668,3 +668,26 @@ export interface BulkActionResult {
 
 
 
+
+/** Motivo del catálogo de tickets, tal como lo lista su pantalla de administración. */
+export interface TicketTopicResponse {
+  id: number;
+  name: string;
+  defaultDepartmentId: number;
+  defaultDepartmentName: string;
+  /** Emergencia | Alta | Normal | Baja. */
+  defaultPriority: string;
+  requiresProductLine: boolean;
+  isActive: boolean;
+  /** Cuántos tickets lo usan: con uno solo ya no se puede borrar, solo desactivar. */
+  ticketCount: number;
+  updatedAt: string;
+}
+
+export interface SaveTicketTopicRequest {
+  name: string;
+  defaultDepartmentId: number;
+  defaultPriority?: string;
+  requiresProductLine: boolean;
+  isActive?: boolean;
+}

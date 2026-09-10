@@ -1,4 +1,19 @@
-import { Clock, Flag, Info, MousePointerClick, Plus, SlidersHorizontal, Ticket as TicketIcon, UserCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Flag,
+  Info,
+  MousePointerClick,
+  Pause,
+  Plus,
+  SlidersHorizontal,
+  Ticket as TicketIcon,
+  User,
+  UserCheck,
+  UserX,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -6,9 +21,8 @@ import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
-import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { DataTable, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Modal } from "../../components/ui/Modal";
 import { Pagination } from "../../components/ui/Pagination";
@@ -19,7 +33,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
-import { formatDateTime, formatSlaRemaining } from "../../lib/format";
+import { formatActivityDate, formatInitials, formatSlaRemaining } from "../../lib/format";
 import type {
   DepartmentResponse,
   TicketCounts,
@@ -42,42 +56,188 @@ const filters: { key: TicketFilterKey; label: string; countKey: keyof TicketCoun
   { key: "cerrados", label: "Cerrados", countKey: "closed" },
 ];
 
-// Las pastillas nunca deben partirse a una segunda línea: solo se muestran fijas
-// las 3 vistas más usadas en la operación diaria; el resto vive detrás del botón
-// de filtros (mismo patrón que el ícono de filtros de la bandeja de correo).
 const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos", "vencidos"];
 const primaryFilters = filters.filter((f) => PRIMARY_FILTER_KEYS.includes(f.key));
 const secondaryFilters = filters.filter((f) => !PRIMARY_FILTER_KEYS.includes(f.key));
 
-// El ancho es un reparto, no una suma: la tabla nunca desborda y las columnas menos
-// decisivas para triar se retiran por tramos antes de que las demás queden ilegibles.
+// Distribución de anchos equilibrada para evitar truncamientos y optimizar jerarquía
 const columns: { key: SortKey; label: string; className: string }[] = [
-  { key: "numero", label: "Número", className: "w-[8%]" },
-  { key: "asunto", label: "Asunto / Motivo", className: "w-[20%]" },
-  { key: "cliente", label: "Cliente", className: "hidden w-[13%] lg:table-cell" },
-  // El departamento cae primero: es el único que además tiene su propio filtro arriba.
-  { key: "departamento", label: "Departamento", className: "hidden w-[10%] 2xl:table-cell" },
-  { key: "prioridad", label: "Prioridad", className: "hidden w-[7%] md:table-cell" },
-  { key: "estado", label: "Estado", className: "w-[10%]" },
-  { key: "sla", label: "SLA", className: "w-[10%]" },
-  { key: "actividad", label: "Última actividad", className: "hidden w-[10%] xl:table-cell" },
+  { key: "numero", label: "Número", className: "w-[110px]" },
+  { key: "asunto", label: "Asunto / Motivo", className: "min-w-[200px]" },
+  { key: "cliente", label: "Cliente", className: "hidden w-[145px] lg:table-cell" },
+  { key: "departamento", label: "Departamento", className: "hidden w-[125px] 2xl:table-cell" },
+  { key: "prioridad", label: "Prioridad", className: "hidden w-[110px] md:table-cell" },
+  { key: "estado", label: "Estado", className: "w-[125px]" },
+  { key: "sla", label: "SLA", className: "w-[135px]" },
+  { key: "actividad", label: "Última actividad", className: "hidden w-[125px] xl:table-cell" },
 ];
 
-const ASSIGNED_COLUMN = "hidden w-[10%] lg:table-cell";
+const ASSIGNED_COLUMN = "hidden w-[155px] lg:table-cell";
 
-function priorityBadgeClass(priority: string) {
-  switch (priority.toLowerCase()) {
+function renderPriorityBadge(priority: string) {
+  const norm = (priority ?? "").toLowerCase().trim();
+  switch (norm) {
     case "emergencia":
-      return "bg-red-50 text-red-700 border-red-200 font-semibold";
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-red-500/10 text-brand-red border border-red-500/25 shadow-2xs">
+          <span className="h-1.5 w-1.5 rounded-full bg-brand-red animate-pulse" />
+          Emergencia
+        </span>
+      );
     case "alta":
-      return "bg-amber-50 text-amber-800 border-amber-200";
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-amber-500/10 text-amber-800 border border-amber-500/25">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          Alta
+        </span>
+      );
     case "normal":
-      return "bg-slate-50 text-slate-700 border-slate-200";
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-blue-500/10 text-blue-700 border border-blue-500/20">
+          <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+          Normal
+        </span>
+      );
     case "baja":
-      return "bg-gray-50 text-gray-600 border-gray-200";
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-slate-500/10 text-slate-600 border border-slate-500/20">
+          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+          Baja
+        </span>
+      );
     default:
-      return "bg-slate-50 text-slate-700 border-slate-200";
+      return (
+        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-slate-500/10 text-slate-700 border border-slate-500/20">
+          {priority}
+        </span>
+      );
   }
+}
+
+function renderStatusBadge(status: string) {
+  const norm = (status ?? "").toLowerCase().trim();
+  switch (norm) {
+    case "abierto":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-500/10 text-emerald-800 border border-emerald-500/20">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Abierto
+        </span>
+      );
+    case "en espera del cliente":
+    case "en espera":
+    case "espera":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-amber-500/10 text-amber-800 border border-amber-500/25">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          En espera
+        </span>
+      );
+    case "reenvío de producto":
+    case "reenvio de producto":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-purple-500/10 text-purple-800 border border-purple-500/20">
+          <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+          Reenvío
+        </span>
+      );
+    case "solucionado":
+    case "solucionada":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-teal-500/10 text-teal-800 border border-teal-500/20">
+          <CheckCircle2 className="h-3 w-3 text-teal-600" />
+          Solucionado
+        </span>
+      );
+    case "cancelado":
+    case "cerrado":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-slate-500/10 text-slate-600 border border-slate-500/20">
+          <XCircle className="h-3 w-3 text-slate-400" />
+          {norm === "cerrado" ? "Cerrado" : "Cancelado"}
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-slate-500/10 text-slate-700 border border-slate-500/20">
+          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+          {status}
+        </span>
+      );
+  }
+}
+
+function renderDepartmentBadge(deptName?: string | null) {
+  if (!deptName || deptName === "Sin departamento") {
+    return <span className="text-[11.5px] text-faint italic font-normal">Sin depto.</span>;
+  }
+  const norm = deptName.toLowerCase();
+  let colorClass = "bg-slate-500/10 text-slate-700 border-slate-500/20";
+
+  if (norm.includes("almacén") || norm.includes("almacen")) {
+    colorClass = "bg-amber-500/10 text-amber-900 border-amber-500/25";
+  } else if (norm.includes("calidad")) {
+    colorClass = "bg-emerald-500/10 text-emerald-900 border-emerald-500/25";
+  } else if (norm.includes("admin")) {
+    colorClass = "bg-blue-500/10 text-blue-900 border-blue-500/25";
+  } else if (norm.includes("venta") || norm.includes("comercial")) {
+    colorClass = "bg-rose-500/10 text-rose-900 border-rose-500/25";
+  } else if (norm.includes("producc") || norm.includes("planta")) {
+    colorClass = "bg-indigo-500/10 text-indigo-900 border-indigo-500/25";
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${colorClass}`}
+      title={deptName}
+    >
+      <span className="truncate max-w-[100px]">{deptName}</span>
+    </span>
+  );
+}
+
+function renderSlaBadge(sla: { text: string; tone: "overdue" | "warning" | "ok" | "paused" | "completed" }) {
+  if (sla.tone === "completed") {
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-500/10 text-emerald-800 border border-emerald-500/20">
+        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+        {sla.text}
+      </span>
+    );
+  }
+  if (sla.tone === "overdue") {
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-brand-red/10 text-brand-red border border-brand-red/25 shadow-2xs">
+        <AlertTriangle className="h-3 w-3 text-brand-red" />
+        {sla.text}
+      </span>
+    );
+  }
+  if (sla.tone === "warning") {
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-amber-500/10 text-amber-800 border border-amber-500/25">
+        <Clock className="h-3 w-3 text-amber-600" />
+        {sla.text}
+      </span>
+    );
+  }
+  if (sla.tone === "paused") {
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-slate-500/10 text-slate-600 border border-slate-500/20">
+        <Pause className="h-3 w-3 text-slate-500" />
+        {sla.text}
+      </span>
+    );
+  }
+  if (sla.text === "Sin SLA") {
+    return <span className="text-[12px] text-faint font-mono pl-1">—</span>;
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+      <Clock className="h-3 w-3 text-slate-400" />
+      {sla.text}
+    </span>
+  );
 }
 
 const STATUS_MENU_WIDTH = 224;
@@ -482,8 +642,28 @@ export function TicketsPage() {
         title="Tickets"
         summary={
           counts ? (
-            <span className="inline-flex items-center gap-1.5">
-              {`${counts.all} tickets · ${counts.open} abiertos · ${counts.overdue} vencidos · ${counts.waitingOnClient} en espera`}
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-ink">
+                {counts.all} {counts.all === 1 ? "ticket" : "tickets"}
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                {counts.open} abiertos
+              </span>
+              <span className="text-slate-300">·</span>
+              <span
+                className={`inline-flex items-center gap-1.5 font-medium ${
+                  counts.overdue > 0 ? "text-brand-red font-semibold" : "text-subtle"
+                }`}
+              >
+                {counts.overdue > 0 && <span className="h-1.5 w-1.5 rounded-full bg-brand-red" />}
+                {counts.overdue} {counts.overdue === 1 ? "vencido" : "vencidos"}
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className="text-subtle">
+                {counts.waitingOnClient} en espera
+              </span>
               <RowClickHint />
             </span>
           ) : (
@@ -500,62 +680,64 @@ export function TicketsPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         {/* Barra de criterios: búsqueda, filtros estructurales y pastillas */}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por número, asunto o cliente…"
-            className="min-w-[200px] flex-1"
-          />
-
-          <Select
-            size="sm"
-            className="w-[200px]"
-            aria-label="Filtrar por departamento"
-            value={String(departmentId)}
-            onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
-            options={[
-              { value: "todos", label: "Todos los deptos." },
-              ...departments.map((d) => ({
-                value: String(d.id),
-                label: d.name,
-              })),
-            ]}
-          />
-
-          <Select
-            size="sm"
-            className="w-[200px]"
-            aria-label="Filtrar por prioridad"
-            value={priority}
-            onChange={(next) => setPriority(next)}
-            options={[
-              { value: "todas", label: "Todas las prioridades" },
-              { value: "Emergencia", label: "Emergencia" },
-              { value: "Alta", label: "Alta" },
-              { value: "Normal", label: "Normal" },
-              { value: "Baja", label: "Baja" },
-            ]}
-          />
-
-          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-          {primaryFilters.map(({ key, label, countKey }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              count={counts?.[countKey] ?? 0}
-              active={filter === key}
-              onClick={() => setFilter(key)}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-1 flex-wrap items-center gap-2.5 min-w-[280px]">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por número, asunto o cliente…"
+              className="w-full sm:max-w-[260px] md:max-w-[300px]"
             />
-          ))}
 
-          <TicketStatusMenu
-            options={secondaryFilters}
-            activeKey={filter}
-            counts={counts}
-            onSelect={setFilter}
-          />
+            <Select
+              size="sm"
+              className="w-[170px]"
+              aria-label="Filtrar por departamento"
+              value={String(departmentId)}
+              onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+              options={[
+                { value: "todos", label: "Todos los deptos." },
+                ...departments.map((d) => ({
+                  value: String(d.id),
+                  label: d.name,
+                })),
+              ]}
+            />
+
+            <Select
+              size="sm"
+              className="w-[160px]"
+              aria-label="Filtrar por prioridad"
+              value={priority}
+              onChange={(next) => setPriority(next)}
+              options={[
+                { value: "todas", label: "Todas las prioridades" },
+                { value: "Emergencia", label: "Emergencia" },
+                { value: "Alta", label: "Alta" },
+                { value: "Normal", label: "Normal" },
+                { value: "Baja", label: "Baja" },
+              ]}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {primaryFilters.map(({ key, label, countKey }) => (
+              <FilterChip
+                key={key}
+                label={label}
+                count={counts?.[countKey] ?? 0}
+                active={filter === key}
+                onClick={() => setFilter(key)}
+              />
+            ))}
+
+            <TicketStatusMenu
+              options={secondaryFilters}
+              activeKey={filter}
+              counts={counts}
+              onSelect={setFilter}
+            />
+          </div>
         </div>
 
         {bulkFeedback && (
@@ -587,197 +769,189 @@ export function TicketsPage() {
           </div>
         ) : (
           <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable fixed>
-              <thead>
-                <HeadRow>
-                  <Th className="w-10 !px-3">
-                    <input
-                      type="checkbox"
-                      aria-label="Seleccionar todos los tickets visibles"
-                      className="h-4 w-4 rounded-[2px] border-line text-brand-red focus:ring-brand-red cursor-pointer accent-brand-red"
-                      checked={allVisibleSelected}
-                      ref={(input) => {
-                        if (input) {
-                          input.indeterminate = someVisibleSelected && !allVisibleSelected;
-                        }
-                      }}
-                      onChange={toggleSelectAll}
-                    />
-                  </Th>
-                  {columns.map(({ key, label, className }) => (
-                    <Th
-                      key={key}
-                      className={className}
-                      sort={{
-                        dir: sort.key === key ? sort.dir : null,
-                        onToggle: () => toggleSort(key),
-                      }}
-                    >
-                      {label}
+            <div className="rounded-xl border border-line-soft bg-white shadow-2xs overflow-hidden">
+              <DataTable fixed>
+                <thead>
+                  <tr className="border-b border-line bg-slate-50/70">
+                    <Th className="w-11 !pl-4 !pr-2 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label="Seleccionar todos los tickets visibles"
+                        className="h-4 w-4 rounded-[4px] border-line text-brand-red focus:ring-brand-red/30 cursor-pointer accent-brand-red transition-all"
+                        checked={allVisibleSelected}
+                        ref={(input) => {
+                          if (input) {
+                            input.indeterminate = someVisibleSelected && !allVisibleSelected;
+                          }
+                        }}
+                        onChange={toggleSelectAll}
+                      />
                     </Th>
-                  ))}
-                  <Th className={ASSIGNED_COLUMN}>Asignado</Th>
-                </HeadRow>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={columns.length + 2} className="py-16 text-center text-subtle">
-                      <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
-                        <TicketIcon className="h-8 w-8 text-subtle/50" />
-                        <p className="text-[14px] font-medium text-ink">No se encontraron tickets</p>
-                        <p className="text-[12.5px] text-subtle">
-                          No hay registros que coincidan con los criterios de búsqueda o filtros seleccionados.
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((t) => {
-                    const sla = formatSlaRemaining(t.resolutionDueAt, Boolean(t.pausedAt));
-                    return (
-                      <Row
-                        key={t.id}
-                        onClick={() => navigate(`/tickets/${t.id}`)}
-                        className={`cursor-pointer ${selectedIds.has(t.id) ? "bg-brand-red/[0.03]" : ""}`}
+                    {columns.map(({ key, label, className }) => (
+                      <Th
+                        key={key}
+                        className={className}
+                        sort={{
+                          dir: sort.key === key ? sort.dir : null,
+                          onToggle: () => toggleSort(key),
+                        }}
                       >
-                        {/* Selección */}
-                        <Td
-                          className="w-10 !px-3"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
+                        {label}
+                      </Th>
+                    ))}
+                    <Th className={`${ASSIGNED_COLUMN} !pr-4`}>Asignado</Th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line-soft/80">
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length + 2} className="py-16 text-center text-subtle">
+                        <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-subtle">
+                            <TicketIcon className="h-6 w-6 opacity-50" />
+                          </div>
+                          <p className="text-[14px] font-semibold text-ink">No se encontraron tickets</p>
+                          <p className="text-[12.5px] text-subtle">
+                            No hay registros que coincidan con los criterios de búsqueda o filtros seleccionados.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((t) => {
+                      const sla = formatSlaRemaining(t.resolutionDueAt, Boolean(t.pausedAt), t.status, t.closedAt);
+                      const act = formatActivityDate(t.lastActivityAt);
+
+                      return (
+                        <Row
+                          key={t.id}
+                          onClick={() => navigate(`/tickets/${t.id}`)}
+                          className={`group cursor-pointer transition-colors hover:bg-slate-50/75 ${
+                            selectedIds.has(t.id) ? "bg-brand-red/[0.04] ring-1 ring-inset ring-brand-red/15" : ""
+                          }`}
                         >
-                          <input
-                            type="checkbox"
-                            aria-label={`Seleccionar ticket ${t.number}`}
-                            className="h-4 w-4 rounded-[2px] border-line text-brand-red focus:ring-brand-red cursor-pointer accent-brand-red"
-                            checked={selectedIds.has(t.id)}
-                            onChange={() => toggleSelect(t.id)}
-                          />
-                        </Td>
-
-                        {/* Número */}
-                        <Td className={`${columns[0].className} truncate font-mono text-[12px] font-semibold text-ink`}>
-                          {t.number}
-                        </Td>
-
-                        {/* Asunto y Tema */}
-                        <Td className={columns[1].className}>
-                          <div className="truncate font-medium text-ink" title={t.subject}>
-                            {t.subject}
-                          </div>
-                          <div className="truncate text-[11.5px] text-subtle">
-                            {t.topicName || "Sin motivo"}
-                            {t.productLineName && ` · ${t.productLineName}`}
-                          </div>
-                        </Td>
-
-                        {/* Cliente */}
-                        <Td className={columns[2].className}>
-                          <div className="truncate font-medium text-ink" title={t.clientName || "Sin cliente"}>
-                            {t.clientName || "Sin cliente"}
-                          </div>
-                          <div className="truncate text-[11.5px] text-subtle">
-                            {t.contactName ?? t.clientCode ?? "—"}
-                          </div>
-                        </Td>
-
-                        {/* Departamento */}
-                        <Td className={columns[3].className}>
-                          <div
-                            className="truncate text-[12.5px] text-subtle"
-                            title={t.departmentName || "Sin departamento"}
+                          {/* Selección */}
+                          <Td
+                            className="w-11 !pl-4 !pr-2 text-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
                           >
-                            {t.departmentName || "Sin departamento"}
-                          </div>
-                        </Td>
-
-                        {/* Prioridad */}
-                        <Td className={columns[4].className}>
-                          <span
-                            className={`inline-flex items-center rounded px-1.5 py-0.5 text-[11px] border ${priorityBadgeClass(
-                              t.priority,
-                            )}`}
-                          >
-                            {t.priority}
-                          </span>
-                        </Td>
-
-                        {/* Estado */}
-                        <Td className={columns[5].className}>
-                          <span className="flex items-center gap-1.5">
-                            <span
-                              aria-hidden
-                              className={`h-[7px] w-[7px] shrink-0 rounded-full ${
-                                t.status === "Abierto"
-                                  ? "bg-brand-green"
-                                  : t.status === "Cancelado"
-                                  ? "bg-brand-red"
-                                  : "bg-amber-400"
-                              }`}
+                            <input
+                              type="checkbox"
+                              aria-label={`Seleccionar ticket ${t.number}`}
+                              className="h-4 w-4 rounded-[4px] border-line text-brand-red focus:ring-brand-red/30 cursor-pointer accent-brand-red transition-all"
+                              checked={selectedIds.has(t.id)}
+                              onChange={() => toggleSelect(t.id)}
                             />
-                            <span className="min-w-0 truncate text-[12px] text-ink" title={t.status}>
-                              {t.status}
+                          </Td>
+
+                          {/* Número */}
+                          <Td className={columns[0].className}>
+                            <span className="inline-flex items-center font-mono text-[11.5px] font-semibold text-slate-700 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200/80 [font-variant-numeric:normal] tracking-tight">
+                              {t.number}
                             </span>
-                          </span>
-                        </Td>
+                          </Td>
 
-                        {/* SLA */}
-                        <Td className={`${columns[6].className} truncate`}>
-                          {sla.tone === "overdue" ? (
-                            <Badge tone="red">
-                              <span className="inline-flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {sla.text}
-                              </span>
-                            </Badge>
-                          ) : sla.tone === "warning" ? (
-                            <Badge tone="amber">
-                              <span className="inline-flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {sla.text}
-                              </span>
-                            </Badge>
-                          ) : sla.tone === "paused" ? (
-                            <Badge tone="slate">{sla.text}</Badge>
-                          ) : (
-                            <Badge tone="neutral">{sla.text}</Badge>
-                          )}
-                        </Td>
-
-                        {/* Última actividad */}
-                        <Td className={`${columns[7].className} truncate text-[12px] text-subtle`}>
-                          {formatDateTime(t.lastActivityAt)}
-                        </Td>
-
-                        {/* Asignado */}
-                        <Td className={`${ASSIGNED_COLUMN} text-[12px]`}>
-                          {t.assignedStaffName ? (
-                            <div className="truncate font-medium text-ink" title={t.assignedStaffName}>
-                              {t.assignedStaffName}
+                          {/* Asunto y Tema */}
+                          <Td className={columns[1].className}>
+                            <div className="truncate font-semibold text-ink text-[13px] group-hover:text-brand-red transition-colors" title={t.subject}>
+                              {t.subject}
                             </div>
-                          ) : (
-                            <span className="text-subtle/70">Sin asignar</span>
-                          )}
-                        </Td>
-                      </Row>
-                    );
-                  })
-                )}
-              </tbody>
-            </DataTable>
+                            <div className="truncate text-[11.5px] text-subtle mt-0.5">
+                              <span className="text-slate-600">{t.topicName || "Sin motivo"}</span>
+                              {t.productLineName && (
+                                <>
+                                  <span className="mx-1.5 text-slate-300">·</span>
+                                  <span className="text-slate-500">{t.productLineName}</span>
+                                </>
+                              )}
+                            </div>
+                          </Td>
+
+                          {/* Cliente */}
+                          <Td className={columns[2].className}>
+                            {t.clientName && t.clientName !== "Sin cliente" ? (
+                              <>
+                                <div className="truncate font-semibold text-ink text-[12.5px]" title={t.clientName}>
+                                  {t.clientName}
+                                </div>
+                                <div className="truncate text-[11px] text-subtle mt-0.5">
+                                  {t.contactName ?? (t.clientCode && t.clientCode !== "-" ? t.clientCode : null) ?? "—"}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-[11.5px] text-faint italic font-normal">
+                                <UserX className="h-3 w-3 opacity-60" /> Sin cliente
+                              </span>
+                            )}
+                          </Td>
+
+                          {/* Departamento */}
+                          <Td className={columns[3].className}>
+                            {renderDepartmentBadge(t.departmentName)}
+                          </Td>
+
+                          {/* Prioridad */}
+                          <Td className={columns[4].className}>
+                            {renderPriorityBadge(t.priority)}
+                          </Td>
+
+                          {/* Estado */}
+                          <Td className={columns[5].className}>
+                            {renderStatusBadge(t.status)}
+                          </Td>
+
+                          {/* SLA */}
+                          <Td className={columns[6].className}>
+                            {renderSlaBadge(sla)}
+                          </Td>
+
+                          {/* Última actividad */}
+                          <Td className={columns[7].className}>
+                            <span className="text-[11.5px] text-subtle whitespace-nowrap" title={act.full}>
+                              {act.compact}
+                            </span>
+                          </Td>
+
+                          {/* Asignado */}
+                          <Td className={`${ASSIGNED_COLUMN} !pr-4`}>
+                            {t.assignedStaffName ? (
+                              <div className="flex items-center gap-2 min-w-0" title={t.assignedStaffName}>
+                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-white shadow-2xs">
+                                  {formatInitials(t.assignedStaffName)}
+                                </span>
+                                <span className="truncate text-[12px] font-medium text-ink">
+                                  {t.assignedStaffName}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-[11.5px] text-faint italic">
+                                <User className="h-3.5 w-3.5 opacity-50" />
+                                Sin asignar
+                              </span>
+                            )}
+                          </Td>
+                        </Row>
+                      );
+                    })
+                  )}
+                </tbody>
+              </DataTable>
+            </div>
 
             {data.total > 0 && (
-              <Pagination
-                page={data.page}
-                totalPages={data.totalPages}
-                total={data.total}
-                pageSize={data.pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                noun="tickets"
-              />
+              <div className="mt-3.5">
+                <Pagination
+                  page={data.page}
+                  totalPages={data.totalPages}
+                  total={data.total}
+                  pageSize={data.pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
+                  noun="tickets"
+                />
+              </div>
             )}
           </div>
         )}
@@ -785,7 +959,7 @@ export function TicketsPage() {
 
       {/* Barra flotante de acciones en lote */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-[2px] border border-slate-700 bg-ink px-4 py-2.5 text-white shadow-2xl animate-plf-toast-in">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-xl border border-slate-700/80 bg-ink/95 backdrop-blur-md px-4 py-2.5 text-white shadow-2xl animate-plf-toast-in">
           <div className="flex items-center gap-2 text-[12.5px] font-medium text-slate-200">
             <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-red px-1.5 text-[10.5px] font-bold text-white">
               {selectedIds.size}
@@ -797,7 +971,7 @@ export function TicketsPage() {
             <button
               type="button"
               onClick={openBulkAssign}
-              className="flex items-center gap-1.5 rounded-[2px] bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-white/20 cursor-pointer"
+              className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-white/20 cursor-pointer"
             >
               <UserCheck className="h-3.5 w-3.5 text-brand-red" />
               Asignar en lote
@@ -805,7 +979,7 @@ export function TicketsPage() {
             <button
               type="button"
               onClick={() => setBulkPriorityOpen(true)}
-              className="flex items-center gap-1.5 rounded-[2px] bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-white/20 cursor-pointer"
+              className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-white/20 cursor-pointer"
             >
               <Flag className="h-3.5 w-3.5 text-amber-400" />
               Cambiar prioridad
@@ -813,7 +987,7 @@ export function TicketsPage() {
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="rounded-[2px] px-2.5 py-1.5 text-[12px] text-slate-400 transition hover:text-white cursor-pointer"
+              className="rounded-lg px-2.5 py-1.5 text-[12px] text-slate-400 transition hover:text-white cursor-pointer"
             >
               Deseleccionar
             </button>
