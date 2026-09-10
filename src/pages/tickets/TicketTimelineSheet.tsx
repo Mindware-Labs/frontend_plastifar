@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/Button";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatDateTime } from "../../lib/format";
+import { FormattedTicketBody } from "./FormattedTicketBody";
 import type {
   TicketAttachmentResponse,
   TicketDetailResponse,
@@ -150,9 +151,9 @@ export function TicketTimelineSheet({
           >
             {isInternal ? "Nota interna" : isOutbound ? "Respuesta" : "Cliente"}
           </span>
-          <p className="mt-2 whitespace-pre-wrap text-[11.5px] leading-relaxed text-ink">
-            {msg.bodyText ?? msg.bodyHtml?.replace(/<[^>]*>?/gm, "")}
-          </p>
+          <div className="mt-2 w-full text-[11.5px] leading-relaxed text-ink">
+            <FormattedTicketBody text={msg.bodyText} html={msg.bodyHtml} />
+          </div>
           {msg.attachments && msg.attachments.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5 border-t border-line-soft/60 pt-2 text-[10.5px] text-subtle">
               {msg.attachments.map((att) => (

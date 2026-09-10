@@ -27,6 +27,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ticketsApi } from "../../api/tickets";
 import { TicketTimelineSheet } from "./TicketTimelineSheet";
+import { FormattedTicketBody } from "./FormattedTicketBody";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
@@ -710,8 +711,8 @@ export function TicketDetailPage() {
         )}
 
         {/* Cuerpo del mensaje */}
-        <div className="mt-3.5 text-sm leading-relaxed text-ink whitespace-pre-wrap">
-          {msg.bodyText ?? msg.bodyHtml?.replace(/<[^>]*>?/gm, "")}
+        <div className="mt-3.5 w-full text-sm leading-relaxed text-ink">
+          <FormattedTicketBody text={msg.bodyText} html={msg.bodyHtml} />
         </div>
 
         {/* Adjuntos del mensaje */}
@@ -1196,8 +1197,11 @@ export function TicketDetailPage() {
 
               {clientThread.length > 0 ? (
                 <>
-                  <div className="mt-3.5 text-sm leading-relaxed text-ink whitespace-pre-wrap">
-                    {clientThread[0].bodyText ?? clientThread[0].bodyHtml?.replace(/<[^>]*>?/gm, "")}
+                  <div className="mt-3.5 w-full text-sm leading-relaxed text-ink">
+                    <FormattedTicketBody
+                      text={clientThread[0].bodyText}
+                      html={clientThread[0].bodyHtml}
+                    />
                   </div>
 
                   {clientThread[0].attachments && clientThread[0].attachments.length > 0 && (
