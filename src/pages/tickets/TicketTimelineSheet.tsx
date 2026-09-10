@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Download,
   History,
+  Info,
   Lock,
   Mail,
   Paperclip,
@@ -15,6 +16,7 @@ import { Button } from "../../components/ui/Button";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatDateTime } from "../../lib/format";
 import { FormattedTicketBody } from "./FormattedTicketBody";
+import { isEmailChannel, originLabel } from "./ticketOrigin";
 import type {
   TicketAttachmentResponse,
   TicketDetailResponse,
@@ -115,6 +117,9 @@ export function TicketTimelineSheet({
     );
   }
 
+  const isCorreo = isEmailChannel(ticket.channel);
+  const origin = originLabel(ticket.channel);
+
   function renderTimelineMessage(msg: TicketMessageResponse) {
     const isInternal = msg.direction.toLowerCase() === "interna";
     const isOutbound = msg.direction.toLowerCase() === "saliente";
@@ -148,11 +153,24 @@ export function TicketTimelineSheet({
             </span>
             <span className="shrink-0 text-[10px] text-subtle">{formatDateTime(msg.createdAt)}</span>
           </div>
-          <span
-            className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ${dotColor}`}
-          >
-            {isInternal ? "Nota interna" : isOutbound ? "Respuesta" : "Cliente"}
-          </span>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span
+              className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ${dotColor}`}
+            >
+              {isInternal ? "Nota interna" : isOutbound ? "Respuesta" : "Cliente"}
+            </span>
+
+            {/* En una lista cronológica, el primero se confunde con uno más: aquí se nombra. */}
+            {msg.isOrigin && (
+              <span
+                title={`${origin.hint} ${formatDateTime(msg.createdAt)}`}
+                className="inline-flex items-center gap-1 rounded border border-line-strong bg-canvas px-1.5 py-0.5 text-[10px] font-semibold text-ink"
+              >
+                {isCorreo ? <Mail className="h-2.5 w-2.5 text-subtle" /> : <Info className="h-2.5 w-2.5 text-subtle" />}
+                {origin.label}
+              </span>
+            )}
+          </div>
           <div className="mt-2 w-full text-[11.5px] leading-relaxed text-ink">
             <FormattedTicketBody text={msg.bodyText} html={msg.bodyHtml} />
           </div>

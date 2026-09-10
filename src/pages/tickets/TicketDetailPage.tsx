@@ -19,7 +19,6 @@ import {
   RefreshCw,
   RotateCcw,
   Send,
-  ShieldAlert,
   Tag,
   User,
   UserCheck,
@@ -30,6 +29,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ticketsApi } from "../../api/tickets";
 import { TicketTimelineSheet } from "./TicketTimelineSheet";
 import { FormattedTicketBody } from "./FormattedTicketBody";
+import { isEmailChannel, originLabel } from "./ticketOrigin";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
@@ -46,6 +46,12 @@ import type {
   TicketMessageResponse,
   TicketStaffOptionResponse,
 } from "../../types/api";
+
+/** El atajo se nombra con la tecla que la persona tiene delante, no con las dos. */
+const SAVE_SHORTCUT =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent)
+    ? "⌘ + Enter"
+    : "Ctrl + Enter";
 
 /** Como termino el correo de una respuesta. Solo lo ve el personal. */
 const deliveryLabels: Record<string, { label: string; className: string }> = {
@@ -418,12 +424,8 @@ export function TicketDetailPage() {
     }
   };
 
-  const handleSaveNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!noteBody.trim()) {
-      setNoteSendError("Escribe el contenido de la nota.");
-      return;
-    }
+  const saveNote = async () => {
+    if (!noteBody.trim() || noteSending) return;
 
     try {
       setNoteSending(true);
@@ -447,6 +449,19 @@ export function TicketDetailPage() {
       );
     } finally {
       setNoteSending(false);
+    }
+  };
+
+  const handleSaveNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    void saveNote();
+  };
+
+  // Escribir y guardar sin soltar el teclado: es el gesto de cualquier campo de notas.
+  const handleNoteKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      void saveNote();
     }
   };
 
@@ -682,6 +697,9 @@ export function TicketDetailPage() {
   const internalNotes = sortedMessages.filter((m) => m.direction.toLowerCase() === "interna");
   const recipientEmail = ticket.contactEmail ?? ticket.requesterEmail ?? null;
 
+  const isCorreo = isEmailChannel(ticket.channel);
+  const origin = originLabel(ticket.channel);
+
   function renderMessageCard(msg: TicketMessageResponse, isLatest = false) {
     const isInternal = msg.direction.toLowerCase() === "interna";
     const isOutbound = msg.direction.toLowerCase() === "saliente";
@@ -692,9 +710,9 @@ export function TicketDetailPage() {
     return (
       <div
         key={`msg-${msg.id}`}
-        className={`rounded-xl transition-shadow ${
+        className={`rounded-edge transition-shadow ${
           isInternal
-            ? "border-2 border-amber-300 bg-amber-50/75 p-5 shadow-xs"
+            ? "border border-warn/30 bg-warn/[0.045] p-5 shadow-xs"
             : isOutbound
             ? "border border-line-soft bg-white p-5 shadow-xs"
             : "border border-slate-200 bg-slate-50/90 p-5 shadow-xs"
@@ -703,16 +721,17 @@ export function TicketDetailPage() {
         {/* Cabecera del mensaje */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 pb-3">
           <div className="flex flex-wrap items-center gap-2.5">
+            {/* Los tonos medios no llegaban a 4.5:1 con texto blanco encima. */}
             {isInternal ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
+              <span className="inline-flex items-center gap-1 rounded-edge bg-amber-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
                 <Lock className="h-3 w-3" /> Nota Interna
               </span>
             ) : isOutbound ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
+              <span className="inline-flex items-center gap-1 rounded-edge bg-sky-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
                 <Mail className="h-3 w-3" /> Respuesta al cliente
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-md bg-slate-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
+              <span className="inline-flex items-center gap-1 rounded-edge bg-slate-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
                 <User className="h-3 w-3" /> Cliente
               </span>
             )}
@@ -723,6 +742,14 @@ export function TicketDetailPage() {
                 ticket?.requesterName ??
                 "Remitente"}
             </span>
+
+            {/* Sin esto se lee como un mensaje más del hilo, y es la solicitud que abrió el caso. */}
+            {msg.isOrigin && (
+              <span className="inline-flex items-center gap-1 rounded-edge border border-line-strong bg-canvas px-2 py-0.5 text-[10.5px] font-semibold text-ink">
+                {isCorreo ? <Mail className="h-3 w-3 text-subtle" /> : <Info className="h-3 w-3 text-subtle" />}
+                {origin.label}
+              </span>
+            )}
 
             {isLatest && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-800">
@@ -760,15 +787,12 @@ export function TicketDetailPage() {
           </div>
         )}
 
-        {/* Advertencia explícita en notas internas */}
-        {isInternal && (
-          <div className="mt-2.5 flex items-center gap-1.5 rounded-md bg-amber-100/90 px-2.5 py-1 text-[11px] font-medium text-amber-900">
-            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-700" />
-            <span>
-              Solo visible para el personal de Plastifar. El cliente no puede ver este mensaje ni
-              recibe copia.
-            </span>
-          </div>
+        {/* La confidencialidad se dice una vez, al escribir: repetirla en cada tarjeta es ruido. */}
+
+        {msg.isOrigin && (
+          <p className="mt-2.5 text-[11.5px] text-subtle">
+            {origin.hint} {formatDateTime(msg.createdAt)}
+          </p>
         )}
 
         {/* Cuerpo del mensaje */}
@@ -1607,79 +1631,49 @@ export function TicketDetailPage() {
         {activeTab === "notas" && (
           <div className="space-y-4">
             {internalNotes.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
-                Aún no hay notas internas en este ticket.
+              // Sin notas, lo único que cabe hacer es escribir una: el vacío explica para qué sirven.
+              <div className="px-6 pb-2 pt-10 text-center">
+                <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-edge border border-warn/30 bg-warn/[0.07] text-warn">
+                  <Lock className="h-5 w-5" />
+                </span>
+                <p className="mt-4 font-heading text-[15px] font-semibold tracking-[-0.01em] text-ink">
+                  Nada anotado todavía
+                </p>
+                <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-subtle">
+                  Aquí queda lo que el equipo necesita saber y el cliente no: cómo fue la llamada,
+                  qué se intentó ya, con quién quedó pendiente. Nunca sale por correo.
+                </p>
               </div>
             ) : internalNotes.length === 1 ? (
               renderMessageCard(internalNotes[0], true)
             ) : (
               <>
-                {/* Banner destacado para notas internas anteriores */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-amber-200/70 bg-amber-50/40 p-4 shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
-                      <Lock className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-ink">Historial de notas internas</span>
-                        <span className="rounded-full bg-amber-100/80 px-2 py-0.5 text-[11px] font-medium text-amber-900">
-                          {internalNotes.length - 1} {internalNotes.length - 1 === 1 ? "nota previa" : "notas previas"}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-[11.5px] text-subtle">
-                        Consulta las notas internas anteriores en la pestaña lateral o despliégalas aquí.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowEarlierNotes((prev) => !prev)}
-                      className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-ink shadow-2xs transition-all hover:bg-amber-50"
-                    >
-                      {showEarlierNotes ? (
-                        <>
-                          <ChevronUp className="h-3.5 w-3.5 text-subtle" />
-                          <span>Ocultar anteriores</span>
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-3.5 w-3.5 text-subtle" />
-                          <span>Ver anteriores ({internalNotes.length - 1})</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTimelineFilter("messages");
-                        setShowTimelineDrawer(true);
-                      }}
-                      className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3.5 py-2 text-xs font-semibold text-amber-900 shadow-2xs transition-all hover:bg-amber-100"
-                    >
-                      <History className="h-3.5 w-3.5 text-amber-700" />
-                      <span>Desplegar historial</span>
-                    </button>
-                  </div>
+                {/* Un solo control para lo anterior: el banner con dos botones decía tres veces lo mismo. */}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowEarlierNotes((prev) => !prev)}
+                    aria-expanded={showEarlierNotes}
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-edge border border-line
+                      bg-white px-2.5 py-1.5 text-[11.5px] font-semibold text-subtle outline-none
+                      transition-colors hover:border-line-strong hover:text-ink
+                      focus-visible:ring-3 focus-visible:ring-brand-red/12"
+                  >
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform ${showEarlierNotes ? "rotate-180" : ""}`}
+                    />
+                    {showEarlierNotes
+                      ? "Ocultar las anteriores"
+                      : `Ver ${internalNotes.length - 1} ${
+                          internalNotes.length - 1 === 1 ? "nota anterior" : "notas anteriores"
+                        }`}
+                  </button>
+                  <span aria-hidden className="h-px flex-1 bg-line" />
                 </div>
 
-                {/* Notas anteriores colapsables inline */}
                 {showEarlierNotes && (
-                  <div className="space-y-3 rounded-xl border border-amber-200/60 bg-amber-50/30 p-3 sm:p-4">
-                    <div className="flex items-center justify-between px-1 pb-1 text-xs font-semibold text-amber-900">
-                      <span>Notas anteriores ({internalNotes.length - 1})</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowEarlierNotes(false)}
-                        className="cursor-pointer text-[11px] font-medium text-amber-800 hover:text-ink"
-                      >
-                        Ocultar
-                      </button>
-                    </div>
-                    <div className="space-y-3">
-                      {internalNotes.slice(0, -1).map((msg) => renderMessageCard(msg))}
-                    </div>
+                  <div className="space-y-3">
+                    {internalNotes.slice(0, -1).map((msg) => renderMessageCard(msg))}
                   </div>
                 )}
 
@@ -1688,100 +1682,104 @@ export function TicketDetailPage() {
               </>
             )}
 
-            <div className="rounded-edge border border-amber-300 bg-amber-50/40">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/70 px-4 py-2.5 text-[11.5px] text-amber-900">
-                <div className="flex items-start gap-2">
-                  <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" />
-                  <span>
-                    Solo visible para el personal de Plastifar. El cliente no puede verla ni
-                    recibe copia.
+            {/* Mismo casco que el compositor de respuestas: son hermanos, y lo que cambia es lo que marca. */}
+            <form onSubmit={handleSaveNote} className="rounded-edge border border-line bg-white shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft bg-warn/[0.07] px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-edge bg-amber-700 px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-white">
+                    <Lock className="h-2.5 w-2.5" />
+                    Privada
+                  </span>
+                  <span className="text-[12px] text-ink">
+                    Solo la ve el personal de Plastifar. El cliente no recibe copia.
                   </span>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => {
                     setTimelineFilter("messages");
                     setShowTimelineDrawer(true);
                   }}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-amber-300/80 bg-white px-2.5 py-1 text-[11.5px] font-semibold text-amber-900 shadow-2xs transition-colors hover:bg-amber-100"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-soft bg-white px-2.5 py-1 text-[11.5px] font-semibold text-ink shadow-2xs outline-none transition-colors hover:border-red-200 hover:bg-red-50 hover:text-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/12"
                   title="Consultar historial completo del ticket"
                 >
-                  <History className="h-3.5 w-3.5 text-amber-800" />
+                  <History className="h-3.5 w-3.5 text-brand-red" />
                   <span>Ver historial ({timeline.length})</span>
                 </button>
               </div>
 
-              <form onSubmit={handleSaveNote}>
-                <textarea
-                  rows={5}
-                  value={noteBody}
-                  onChange={(e) => setNoteBody(e.target.value)}
-                  placeholder="Escribe una nota interna confidencial para el equipo…"
-                  className="w-full resize-none border-0 bg-transparent px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-amber-700/50 focus:outline-none"
-                />
+              <textarea
+                rows={5}
+                value={noteBody}
+                onChange={(e) => setNoteBody(e.target.value)}
+                onKeyDown={handleNoteKeyDown}
+                placeholder="Lo que el equipo debe saber sobre este caso…"
+                className="w-full resize-none border-0 px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-faint focus:outline-none"
+              />
 
-                {noteAttachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2 border-t border-amber-200/70 px-4 py-2.5">
-                    {noteAttachments.map((f, i) => (
-                      <span
-                        key={`${f.name}-${i}`}
-                        className="inline-flex items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1 text-[11.5px] text-ink"
-                      >
-                        <Paperclip className="h-3 w-3 text-subtle" />
-                        <span className="max-w-[160px] truncate">{f.name}</span>
-                        <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
-                        <button
-                          type="button"
-                          onClick={() => removeNoteFile(i)}
-                          className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {noteSendError && (
-                  <div className="border-t border-amber-200/70 px-4 py-2.5">
-                    <Alert variant="error">{noteSendError}</Alert>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-amber-200/70 px-4 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={noteFileInputRef}
-                      type="file"
-                      multiple
-                      onChange={handleNoteFileChange}
-                      className="hidden"
-                      id="note-attachment-input"
-                    />
-                    <label
-                      htmlFor="note-attachment-input"
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-amber-300 bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-amber-800 transition-colors hover:bg-amber-100"
+              {noteAttachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 border-t border-line-soft px-4 py-2.5">
+                  {noteAttachments.map((f, i) => (
+                    <span
+                      key={`${f.name}-${i}`}
+                      className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-canvas/60 px-2.5 py-1 text-[11.5px] text-ink"
                     >
-                      <Paperclip className="h-3.5 w-3.5" />
-                      Adjuntar
-                    </label>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={noteSending}
-                    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-edge bg-amber-500 px-4 font-heading text-[11.5px] font-semibold uppercase tracking-[0.06em] text-white shadow-xs transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {noteSending ? (
-                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    ) : (
-                      <Lock className="h-3.5 w-3.5" />
-                    )}
-                    Guardar nota interna
-                  </button>
+                      <Paperclip className="h-3 w-3 text-subtle" />
+                      <span className="max-w-[160px] truncate">{f.name}</span>
+                      <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
+                      <button
+                        type="button"
+                        onClick={() => removeNoteFile(i)}
+                        className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
                 </div>
-              </form>
-            </div>
+              )}
+
+              {noteSendError && (
+                <div className="border-t border-line-soft px-4 py-2.5">
+                  <Alert variant="error">{noteSendError}</Alert>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft bg-canvas/40 px-4 py-2.5">
+                <div className="flex items-center gap-3">
+                  <input
+                    ref={noteFileInputRef}
+                    type="file"
+                    multiple
+                    onChange={handleNoteFileChange}
+                    className="hidden"
+                    id="note-attachment-input"
+                  />
+                  <label
+                    htmlFor="note-attachment-input"
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    Adjuntar
+                  </label>
+                  <span className="hidden text-[11px] text-faint sm:inline">
+                    {SAVE_SHORTCUT} para guardar
+                  </span>
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  isLoading={noteSending}
+                  disabled={!noteBody.trim()}
+                  className="gap-2"
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                  Guardar nota
+                </Button>
+              </div>
+            </form>
           </div>
         )}
       </div>

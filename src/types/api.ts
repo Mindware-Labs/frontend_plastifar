@@ -429,6 +429,8 @@ export interface TicketMessageResponse {
   /** Como le fue al correo de esta respuesta; nulo en notas internas y mensajes del cliente. */
   deliveryStatus?: string | null;
   deliveryDetail?: string | null;
+  /** La solicitud que abrio el caso, no un mensaje mas del hilo. */
+  isOrigin?: boolean;
 }
 
 export interface TicketEventResponse {
