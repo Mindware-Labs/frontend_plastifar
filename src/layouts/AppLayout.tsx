@@ -15,7 +15,7 @@ export function AppLayout() {
         {/* flex-col + overflow-hidden: cada pagina decide su propia zona de scroll,
             en vez de que el layout adivine un alto fijo. */}
           {/* relative: los recibos se anclan al area de contenido, no a la ventana. */}
-          <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden px-8 pt-6">
+          <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden px-8">
             <Outlet />
             <ReceiptStack />
           </main>

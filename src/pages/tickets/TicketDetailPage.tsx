@@ -574,8 +574,8 @@ export function TicketDetailPage() {
     ));
 
   return (
-    // -mx-8 -mt-6 anulan el aire del layout: la barra fija corre de borde a borde y el scroll queda en el canto.
-    <div className="-mx-8 -mt-6 min-h-0 flex-1 overflow-y-auto pb-12">
+    // -mx-8 anula el relleno lateral del layout: la barra fija corre de borde a borde y el scroll queda en el canto.
+    <div className="-mx-8 min-h-0 flex-1 overflow-y-auto pb-12">
       <div className="sticky top-0 z-10 border-b border-line bg-white/95 px-8 py-2.5 backdrop-blur-xs">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">

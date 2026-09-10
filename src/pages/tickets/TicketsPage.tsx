@@ -67,7 +67,7 @@ const columns: { key: SortKey; label: string; className: string }[] = [
   { key: "actividad", label: "Actividad", className: "hidden w-[124px] xl:table-cell" },
 ];
 
-const SELECT_COLUMN = "w-10";
+const SELECT_COLUMN = "w-11 pl-[11px]! pr-2!";
 const ASSIGNED_COLUMN = "hidden w-[160px] lg:table-cell";
 
 const priorityOptions = [
@@ -401,7 +401,7 @@ export function TicketsPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="mb-3 grid">
+        <div className="mb-3 grid min-h-8">
           {showCriteria && (
             <div
               inert={criteriaExiting ? true : undefined}
@@ -458,7 +458,7 @@ export function TicketsPage() {
           )}
 
           {showSelection && (
-            <div className="col-start-1 row-start-1 self-center" inert={selectionExiting ? true : undefined}>
+            <div className="col-start-1 row-start-1 w-full" inert={selectionExiting ? true : undefined}>
               <TicketSelectionBar
                 count={isSelecting ? selectedIds.size : preservedCount}
                 pageState={pageState}

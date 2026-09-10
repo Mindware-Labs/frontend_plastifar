@@ -446,7 +446,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
             <Spinner />
           </div>
         ) : (
-          <div className={`min-h-0 flex-1 pb-6 transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className={`min-h-0 flex-1 py-6 transition-opacity ${isStale ? "opacity-60" : ""}`}>
             <ResizablePanelGroup className="h-full rounded-edge border border-line bg-white">
               <ResizablePanel defaultSize="26%" minSize="20%" maxSize="45%" className="flex flex-col">
                 <div className="flex h-10 shrink-0 items-center gap-1 px-4">
