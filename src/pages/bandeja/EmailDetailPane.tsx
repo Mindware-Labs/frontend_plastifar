@@ -1488,7 +1488,10 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       {preview && (
         <AttachmentPreviewModal
-          emailId={preview.emailId}
+          sourceId={preview.emailId}
+          loadLink={(attachmentId, download) =>
+            emailsApi.attachmentLink(preview.emailId, attachmentId, download)
+          }
           attachments={preview.attachments}
           index={preview.index}
           onIndexChange={(index) => setPreview({ ...preview, index })}

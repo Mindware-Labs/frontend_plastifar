@@ -27,6 +27,8 @@ interface SelectProps {
   leftIcon?: React.ReactNode;
   state?: FieldState;
   disabled?: boolean;
+  /** Por defecto aparece solo si hay bastantes opciones que filtrar. */
+  searchable?: boolean;
   id?: string;
   className?: string;
   buttonClassName?: string;
@@ -35,6 +37,16 @@ interface SelectProps {
 }
 
 const PANEL_MAX_HEIGHT = 264;
+
+// El panel puede ser más ancho que su disparador, y con uno estrecho tiene que serlo:
+// la opción comparte fila con el visto de seleccionada y si no, se recorta.
+const PANEL_MIN_WIDTH = 96;
+
+// En xs y en la variante discreta el disparador es una pastilla corta por diseño.
+const PANEL_MIN_WIDTH_COMPACT_TRIGGER = 180;
+
+// Por debajo de esto la lista se recorre de un vistazo y el buscador solo estorba.
+const SEARCH_FROM = 9;
 
 /**
  * Desplegable propio del panel, no el del sistema operativo: el nativo no acepta
@@ -56,6 +68,7 @@ export function Select({
   leftIcon,
   state = "idle",
   disabled,
+  searchable,
   id,
   className = "",
   buttonClassName = "",
@@ -78,6 +91,8 @@ export function Select({
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
 
+  const showSearch = searchable ?? options.filter((option) => !option.hidden).length >= SEARCH_FROM;
+
   /** Visible = no oculta y, si hay busqueda activa, su texto la contiene. */
   function isVisible(option: SelectOption) {
     if (option.hidden) return false;
@@ -92,9 +107,15 @@ export function Select({
     const below = window.innerHeight - rect.bottom;
     const dropUp = below < PANEL_MAX_HEIGHT && rect.top > below;
 
+    const width = Math.max(
+      rect.width,
+      size === "xs" || isSubtle ? PANEL_MIN_WIDTH_COMPACT_TRIGGER : PANEL_MIN_WIDTH,
+    );
+
     setAnchor({
-      left: rect.left,
-      width: rect.width,
+      // Un panel más ancho que su disparador no puede desbordar la ventana por la derecha.
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      width,
       top: dropUp ? undefined : rect.bottom + 4,
       bottom: dropUp ? window.innerHeight - rect.top + 4 : undefined,
     });
@@ -142,12 +163,16 @@ export function Select({
     setActiveIndex(firstMatch);
   }
 
-  // El buscador recibe el foco apenas se abre el panel: se escribe de inmediato.
+  // Al abrir, el foco entra en el panel: al buscador si lo hay, y si no a la propia
+  // lista, que es la que recoge entonces las flechas.
   useEffect(() => {
     if (!open) return;
-    const id = window.setTimeout(() => searchInputRef.current?.focus(), 0);
+    const id = window.setTimeout(
+      () => (showSearch ? searchInputRef.current : listRef.current)?.focus(),
+      0,
+    );
     return () => window.clearTimeout(id);
-  }, [open]);
+  }, [open, showSearch]);
 
   useEffect(() => {
     if (!open) return;
@@ -205,7 +230,8 @@ export function Select({
     }
   }
 
-  function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+  /** Navegación del panel abierto; la usa el buscador o la lista, según cuál tenga el foco. */
+  function handleNavKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
@@ -320,35 +346,39 @@ export function Select({
                 left: anchor.left,
                 top: anchor.top,
                 bottom: anchor.bottom,
-                width: Math.max(anchor.width, size === "xs" || isSubtle ? 180 : anchor.width),
+                width: anchor.width,
                 maxHeight: PANEL_MAX_HEIGHT,
               }}
               className="animate-plf-toast-in z-[80] flex flex-col overflow-hidden rounded-edge border border-line
                 bg-white shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
             >
-              <div className="relative shrink-0 border-b border-line p-1.5">
-                <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={query}
-                  onChange={(event) => handleQueryChange(event.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  placeholder="Buscar…"
-                  aria-label="Buscar opciones"
-                  aria-controls={listId}
-                  className="w-full rounded-edge border border-line bg-canvas/60 py-1.5 pl-8 pr-2 text-[12px]
-                    text-ink outline-none transition-colors placeholder:text-faint focus:border-brand-red/40
-                    focus:bg-white focus:ring-2 focus:ring-brand-red/10"
-                />
-              </div>
+              {showSearch && (
+                <div className="relative shrink-0 border-b border-line p-1.5">
+                  <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={query}
+                    onChange={(event) => handleQueryChange(event.target.value)}
+                    onKeyDown={handleNavKeyDown}
+                    placeholder="Buscar…"
+                    aria-label="Buscar opciones"
+                    aria-controls={listId}
+                    className="w-full rounded-edge border border-line bg-canvas/60 py-1.5 pl-8 pr-2 text-[12px]
+                      text-ink outline-none transition-colors placeholder:text-faint focus:border-brand-red/40
+                      focus:bg-white focus:ring-2 focus:ring-brand-red/10"
+                  />
+                </div>
+              )}
 
               <ul
                 ref={listRef}
                 id={listId}
                 role="listbox"
                 aria-label={ariaLabel}
-                className="min-h-0 flex-1 overflow-y-auto p-1"
+                tabIndex={showSearch ? undefined : -1}
+                onKeyDown={showSearch ? undefined : handleNavKeyDown}
+                className="min-h-0 flex-1 overflow-y-auto p-1 outline-none"
               >
                 {options.map((option, index) => {
                   if (!isVisible(option)) return null;

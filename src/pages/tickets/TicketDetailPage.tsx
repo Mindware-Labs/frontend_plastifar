@@ -3,10 +3,9 @@ import {
   ArrowLeft,
   Building2,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Clock,
-  Download,
+  CornerUpLeft,
+  Eye,
   FileText,
   History,
   Info,
@@ -16,6 +15,7 @@ import {
   Paperclip,
   Pencil,
   Phone,
+  Plus,
   RefreshCw,
   RotateCcw,
   Send,
@@ -29,7 +29,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ticketsApi } from "../../api/tickets";
 import { TicketTimelineSheet } from "./TicketTimelineSheet";
 import { FormattedTicketBody } from "./FormattedTicketBody";
+import { AttachmentPreviewModal } from "../bandeja/AttachmentPreviewModal";
 import { isEmailChannel, originLabel } from "./ticketOrigin";
+import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
+import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
@@ -256,25 +259,30 @@ export function TicketDetailPage() {
   const [showTimelineDrawer, setShowTimelineDrawer] = useState(false);
   const [timelineFilter, setTimelineFilter] = useState<"all" | "messages" | "events">("all");
 
-  // Control de despliegue de mensajes/notas anteriores inline
-  const [showEarlierReplies, setShowEarlierReplies] = useState(false);
-  const [showEarlierNotes, setShowEarlierNotes] = useState(false);
-
   // Composer: Respuesta al cliente (modo correo)
-  const [replyBody, setReplyBody] = useState("");
+  // El mismo editor que la bandeja: lo que sale de aquí también es un correo.
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyBlocks, setReplyBlocks] = useState<unknown>(null);
+  // Remontar el editor es la forma de vaciarlo: su contenido inicial no es controlado.
+  const [replyEditorKey, setReplyEditorKey] = useState(0);
   const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
   const [replySending, setReplySending] = useState(false);
   const [replySendError, setReplySendError] = useState<string | null>(null);
   const replyFileInputRef = useRef<HTMLInputElement>(null);
 
   // Composer: Nota interna
+  const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteBody, setNoteBody] = useState("");
   const [noteAttachments, setNoteAttachments] = useState<File[]>([]);
   const [noteSending, setNoteSending] = useState(false);
   const [noteSendError, setNoteSendError] = useState<string | null>(null);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
 
-  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  // Qué adjunto se está mirando y con qué vecinos, para poder saltar entre ellos.
+  const [preview, setPreview] = useState<{
+    attachments: TicketAttachmentResponse[];
+    index: number;
+  } | null>(null);
 
   const refreshTicket = useCallback(async () => {
     if (!ticketId) return;
@@ -346,6 +354,18 @@ export function TicketDetailPage() {
     };
   }, [ticketId, onTicketsChanged, onTicketStatusChanged, onTicketNewMessage, refreshTicket]);
 
+  // El editor tapa la página entera: Escape tiene que devolverte a donde estabas.
+  useEffect(() => {
+    if (!replyOpen) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setReplyOpen(false);
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [replyOpen]);
+
   const handleReplyFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const chosen = Array.from(e.target.files);
@@ -380,24 +400,14 @@ export function TicketDetailPage() {
     setNoteAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleDownloadAttachment = async (attachment: TicketAttachmentResponse) => {
-    try {
-      setDownloadingId(attachment.id);
-      const link = await ticketsApi.attachmentLink(ticketId, attachment.id, true);
-      window.open(link.url, "_blank");
-    } catch {
-      alert("No se pudo generar el enlace de descarga.");
-    } finally {
-      setDownloadingId(null);
-    }
+  // Abrir el archivo, no bajarlo a ciegas: el visor decide si se ve dentro y ofrece descargarlo.
+  const openAttachment = (attachments: TicketAttachmentResponse[], attachmentId: number) => {
+    const index = attachments.findIndex((a) => a.id === attachmentId);
+    if (index >= 0) setPreview({ attachments, index });
   };
 
-  const handleSendReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!replyBody.trim()) {
-      setReplySendError("Escribe el contenido de la respuesta.");
-      return;
-    }
+  const sendReply = async () => {
+    if (!replyReady || replySending) return;
 
     try {
       setReplySending(true);
@@ -405,15 +415,19 @@ export function TicketDetailPage() {
 
       const formData = new FormData();
       formData.append("Direction", "Saliente");
-      formData.append("BodyText", replyBody.trim());
+      formData.append("BodyText", replyText.trim());
+      // El formato lo lleva el HTML; el texto plano viaja como alternativa del correo.
+      formData.append("BodyHtml", blocksToEmailHtml(replyBlocks));
       replyAttachments.forEach((file) => {
         formData.append("Attachments", file);
       });
 
       await ticketsApi.createMessage(ticketId, formData);
 
-      setReplyBody("");
+      setReplyBlocks(null);
+      setReplyEditorKey((key) => key + 1);
       setReplyAttachments([]);
+      setReplyOpen(false);
       await refreshTicket();
     } catch (err) {
       setReplySendError(
@@ -442,6 +456,7 @@ export function TicketDetailPage() {
 
       setNoteBody("");
       setNoteAttachments([]);
+      setShowNoteModal(false);
       await refreshTicket();
     } catch (err) {
       setNoteSendError(
@@ -450,11 +465,6 @@ export function TicketDetailPage() {
     } finally {
       setNoteSending(false);
     }
-  };
-
-  const handleSaveNote = (e: React.FormEvent) => {
-    e.preventDefault();
-    void saveNote();
   };
 
   // Escribir y guardar sin soltar el teclado: es el gesto de cualquier campo de notas.
@@ -697,6 +707,10 @@ export function TicketDetailPage() {
   const internalNotes = sortedMessages.filter((m) => m.direction.toLowerCase() === "interna");
   const recipientEmail = ticket.contactEmail ?? ticket.requesterEmail ?? null;
 
+  // Se declaran aquí, con el destinatario: sendReply las lee al ejecutarse, no al definirse.
+  const replyText = blocksToText(replyBlocks);
+  const replyReady = Boolean(recipientEmail) && replyText.trim().length > 0;
+
   const isCorreo = isEmailChannel(ticket.channel);
   const origin = originLabel(ticket.channel);
 
@@ -811,14 +825,14 @@ export function TicketDetailPage() {
                 <button
                   key={att.id}
                   type="button"
-                  onClick={() => void handleDownloadAttachment(att)}
-                  disabled={downloadingId === att.id}
-                  className="inline-flex items-center gap-2 rounded-lg border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
+                  onClick={() => openAttachment(msg.attachments, att.id)}
+                  title={`Abrir ${att.fileName}`}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
                 >
                   <FileText className="h-3.5 w-3.5 text-subtle" />
                   <span className="max-w-[180px] truncate">{att.fileName}</span>
                   <span className="text-[10.5px] text-subtle">({formatBytes(att.sizeBytes)})</span>
-                  <Download className="h-3 w-3 text-subtle" />
+                  <Eye className="h-3 w-3 text-subtle" />
                 </button>
               ))}
             </div>
@@ -835,8 +849,8 @@ export function TicketDetailPage() {
     count?: number;
   }[] = [
     { key: "general", label: "Información general", icon: Info },
-    { key: "respuestas", label: "Responder al cliente", icon: Mail, count: clientThread.length },
     { key: "notas", label: "Notas internas", icon: Lock, count: internalNotes.length },
+    { key: "respuestas", label: "Responder al cliente", icon: Mail, count: clientThread.length },
   ];
 
   return (
@@ -1299,14 +1313,14 @@ export function TicketDetailPage() {
                           <button
                             key={att.id}
                             type="button"
-                            onClick={() => void handleDownloadAttachment(att)}
-                            disabled={downloadingId === att.id}
-                            className="inline-flex items-center gap-2 rounded-lg border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
+                            onClick={() => openAttachment(clientThread[0].attachments, att.id)}
+                            title={`Abrir ${att.fileName}`}
+                            className="inline-flex cursor-pointer items-center gap-2 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-xs text-ink transition-colors hover:border-zinc-400 hover:bg-slate-50"
                           >
                             <FileText className="h-3.5 w-3.5 text-subtle" />
                             <span className="max-w-[180px] truncate">{att.fileName}</span>
                             <span className="text-[10.5px] text-subtle">({formatBytes(att.sizeBytes)})</span>
-                            <Download className="h-3 w-3 text-subtle" />
+                            <Eye className="h-3 w-3 text-subtle" />
                           </button>
                         ))}
                       </div>
@@ -1419,12 +1433,11 @@ export function TicketDetailPage() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => void handleDownloadAttachment(att)}
-                            disabled={downloadingId === att.id}
-                            className="rounded-md border border-line-soft p-1.5 text-subtle transition-colors hover:bg-slate-100 hover:text-ink"
-                            title="Descargar"
+                            onClick={() => openAttachment(ticket.attachments, att.id)}
+                            className="cursor-pointer rounded-edge border border-line-soft p-1.5 text-subtle transition-colors hover:bg-slate-100 hover:text-ink"
+                            title={`Abrir ${att.fileName}`}
                           >
-                            <Download className="h-3.5 w-3.5" />
+                            <Eye className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ))}
@@ -1439,191 +1452,49 @@ export function TicketDetailPage() {
         {/* Pestaña 2: Responder al cliente */}
         {activeTab === "respuestas" && (
           <div className="space-y-4">
-            {clientThread.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-line-strong bg-white p-8 text-center text-sm text-subtle">
-                Aún no hay respuestas ni mensajes del cliente en este ticket.
-              </div>
-            ) : clientThread.length === 1 ? (
-              renderMessageCard(clientThread[0], true)
-            ) : (
-              <>
-                {/* Banner destacado para consultar o desplegar el historial de respuestas anteriores */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-line-soft bg-white p-4 shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-brand-red">
-                      <History className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-ink">Historial de la conversación</span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-subtle">
-                          {clientThread.length - 1} {clientThread.length - 1 === 1 ? "mensaje previo" : "mensajes previos"}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-[11.5px] text-subtle">
-                        Consulta los intercambios anteriores con el cliente en la pestaña lateral o despliégalos aquí.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowEarlierReplies((prev) => !prev)}
-                      className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line-soft bg-slate-50 px-3 py-2 text-xs font-semibold text-ink shadow-2xs transition-all hover:bg-slate-100"
-                    >
-                      {showEarlierReplies ? (
-                        <>
-                          <ChevronUp className="h-3.5 w-3.5 text-subtle" />
-                          <span>Ocultar anteriores</span>
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-3.5 w-3.5 text-subtle" />
-                          <span>Ver anteriores ({clientThread.length - 1})</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTimelineFilter("messages");
-                        setShowTimelineDrawer(true);
-                      }}
-                      className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-line-strong bg-white px-3.5 py-2 text-xs font-semibold text-ink shadow-2xs transition-all hover:border-brand-red hover:bg-red-50 hover:text-brand-red"
-                    >
-                      <History className="h-3.5 w-3.5 text-brand-red" />
-                      <span>Desplegar historial</span>
-                    </button>
-                  </div>
-                </div>
+            {/* La acción encabeza el hilo; el editor se pide, no está siempre puesto. */}
+            <div className="flex items-center gap-3">
+              <span className="shrink-0 text-[11.5px] font-semibold text-subtle">
+                {clientThread.length} {clientThread.length === 1 ? "mensaje" : "mensajes"}
+              </span>
 
-                {/* Mensajes anteriores colapsables inline si el usuario desea verlos aquí */}
-                {showEarlierReplies && (
-                  <div className="space-y-3 rounded-xl border border-line-soft bg-slate-50/50 p-3 sm:p-4">
-                    <div className="flex items-center justify-between px-1 pb-1 text-xs font-semibold text-subtle">
-                      <span>Intercambios anteriores ({clientThread.length - 1})</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowEarlierReplies(false)}
-                        className="cursor-pointer text-[11px] font-medium text-subtle hover:text-ink"
-                      >
-                        Ocultar
-                      </button>
-                    </div>
-                    <div className="space-y-3">
-                      {clientThread.slice(0, -1).map((msg) => renderMessageCard(msg))}
-                    </div>
-                  </div>
-                )}
+              <span aria-hidden className="h-px flex-1 bg-line" />
 
-                {/* Último mensaje recibido o enviado: la referencia activa para la respuesta */}
-                {renderMessageCard(clientThread[clientThread.length - 1], true)}
-              </>
-            )}
-
-            <div className="rounded-edge border border-line bg-white shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft px-4 py-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-[12.5px]">
-                    <span className="w-12 shrink-0 font-medium text-subtle">Para:</span>
-                    {recipientEmail ? (
-                      <span className="truncate text-ink">{recipientEmail}</span>
-                    ) : (
-                      <span className="text-brand-red-dark">
-                        Este ticket no tiene un correo de contacto registrado.
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-[12.5px]">
-                    <span className="w-12 shrink-0 font-medium text-subtle">Asunto:</span>
-                    <span className="truncate text-ink">Re: {ticket.subject}</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTimelineFilter("messages");
-                    setShowTimelineDrawer(true);
-                  }}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-soft bg-slate-50 px-2.5 py-1 text-[11.5px] font-semibold text-ink shadow-2xs transition-colors hover:border-red-200 hover:bg-red-50 hover:text-brand-red"
-                  title="Consultar historial completo del ticket"
-                >
-                  <History className="h-3.5 w-3.5 text-brand-red" />
-                  <span>Ver historial ({timeline.length})</span>
-                </button>
-              </div>
-
-              <form onSubmit={handleSendReply}>
-                <textarea
-                  rows={6}
-                  value={replyBody}
-                  onChange={(e) => setReplyBody(e.target.value)}
-                  placeholder="Escribe tu respuesta para el cliente…"
-                  className="w-full resize-none border-0 px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-zinc-400 focus:outline-none"
-                />
-
-                {replyAttachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2 border-t border-line-soft px-4 py-2.5">
-                    {replyAttachments.map((f, i) => (
-                      <span
-                        key={`${f.name}-${i}`}
-                        className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-canvas/60 px-2.5 py-1 text-[11.5px] text-ink"
-                      >
-                        <Paperclip className="h-3 w-3 text-subtle" />
-                        <span className="max-w-[160px] truncate">{f.name}</span>
-                        <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
-                        <button
-                          type="button"
-                          onClick={() => removeReplyFile(i)}
-                          className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {replySendError && (
-                  <div className="border-t border-line-soft px-4 py-2.5">
-                    <Alert variant="error">{replySendError}</Alert>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft bg-canvas/40 px-4 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={replyFileInputRef}
-                      type="file"
-                      multiple
-                      onChange={handleReplyFileChange}
-                      className="hidden"
-                      id="reply-attachment-input"
-                    />
-                    <label
-                      htmlFor="reply-attachment-input"
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
-                    >
-                      <Paperclip className="h-3.5 w-3.5" />
-                      Adjuntar
-                    </label>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    isLoading={replySending}
-                    disabled={!recipientEmail}
-                    title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
-                    className="gap-2"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    Enviar respuesta
-                  </Button>
-                </div>
-              </form>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => setReplyOpen(true)}
+                disabled={!recipientEmail}
+                title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
+                className="shrink-0 gap-2"
+              >
+                <CornerUpLeft className="h-3.5 w-3.5" />
+                Responder
+              </Button>
             </div>
+
+            {clientThread.length === 0 ? (
+              <div className="px-6 pb-4 pt-8 text-center">
+                <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-edge border border-line-strong bg-canvas text-subtle">
+                  <Mail className="h-5 w-5" />
+                </span>
+                <p className="mt-4 font-heading text-[15px] font-semibold tracking-[-0.01em] text-ink">
+                  Todavía no hay conversación
+                </p>
+                <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-subtle">
+                  Ni el cliente ha escrito ni se le ha respondido. Lo que envíes desde aquí le
+                  llegará por correo y quedará registrado en este hilo.
+                </p>
+              </div>
+            ) : (
+              /* Todo el hilo a la vista, en orden; la última es la referencia activa. */
+              <div className="space-y-3">
+                {clientThread.map((msg, index) =>
+                  renderMessageCard(msg, index === clientThread.length - 1),
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1631,8 +1502,8 @@ export function TicketDetailPage() {
         {activeTab === "notas" && (
           <div className="space-y-4">
             {internalNotes.length === 0 ? (
-              // Sin notas, lo único que cabe hacer es escribir una: el vacío explica para qué sirven.
-              <div className="px-6 pb-2 pt-10 text-center">
+              // Sin notas, el vacío es la única pieza: explica para qué sirven y ofrece escribir la primera.
+              <div className="px-6 pb-4 pt-8 text-center">
                 <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-edge border border-warn/30 bg-warn/[0.07] text-warn">
                   <Lock className="h-5 w-5" />
                 </span>
@@ -1643,146 +1514,277 @@ export function TicketDetailPage() {
                   Aquí queda lo que el equipo necesita saber y el cliente no: cómo fue la llamada,
                   qué se intentó ya, con quién quedó pendiente. Nunca sale por correo.
                 </p>
-              </div>
-            ) : internalNotes.length === 1 ? (
-              renderMessageCard(internalNotes[0], true)
-            ) : (
-              <>
-                {/* Un solo control para lo anterior: el banner con dos botones decía tres veces lo mismo. */}
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowEarlierNotes((prev) => !prev)}
-                    aria-expanded={showEarlierNotes}
-                    className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-edge border border-line
-                      bg-white px-2.5 py-1.5 text-[11.5px] font-semibold text-subtle outline-none
-                      transition-colors hover:border-line-strong hover:text-ink
-                      focus-visible:ring-3 focus-visible:ring-brand-red/12"
-                  >
-                    <ChevronDown
-                      className={`h-3.5 w-3.5 transition-transform ${showEarlierNotes ? "rotate-180" : ""}`}
-                    />
-                    {showEarlierNotes
-                      ? "Ocultar las anteriores"
-                      : `Ver ${internalNotes.length - 1} ${
-                          internalNotes.length - 1 === 1 ? "nota anterior" : "notas anteriores"
-                        }`}
-                  </button>
-                  <span aria-hidden className="h-px flex-1 bg-line" />
-                </div>
-
-                {showEarlierNotes && (
-                  <div className="space-y-3">
-                    {internalNotes.slice(0, -1).map((msg) => renderMessageCard(msg))}
-                  </div>
-                )}
-
-                {/* Última nota interna */}
-                {renderMessageCard(internalNotes[internalNotes.length - 1], true)}
-              </>
-            )}
-
-            {/* Mismo casco que el compositor de respuestas: son hermanos, y lo que cambia es lo que marca. */}
-            <form onSubmit={handleSaveNote} className="rounded-edge border border-line bg-white shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft bg-warn/[0.07] px-4 py-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-edge bg-amber-700 px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-white">
-                    <Lock className="h-2.5 w-2.5" />
-                    Privada
-                  </span>
-                  <span className="text-[12px] text-ink">
-                    Solo la ve el personal de Plastifar. El cliente no recibe copia.
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTimelineFilter("messages");
-                    setShowTimelineDrawer(true);
-                  }}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-soft bg-white px-2.5 py-1 text-[11.5px] font-semibold text-ink shadow-2xs outline-none transition-colors hover:border-red-200 hover:bg-red-50 hover:text-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/12"
-                  title="Consultar historial completo del ticket"
-                >
-                  <History className="h-3.5 w-3.5 text-brand-red" />
-                  <span>Ver historial ({timeline.length})</span>
-                </button>
-              </div>
-
-              <textarea
-                rows={5}
-                value={noteBody}
-                onChange={(e) => setNoteBody(e.target.value)}
-                onKeyDown={handleNoteKeyDown}
-                placeholder="Lo que el equipo debe saber sobre este caso…"
-                className="w-full resize-none border-0 px-4 py-3 text-[13px] leading-relaxed text-ink placeholder:text-faint focus:outline-none"
-              />
-
-              {noteAttachments.length > 0 && (
-                <div className="flex flex-wrap gap-2 border-t border-line-soft px-4 py-2.5">
-                  {noteAttachments.map((f, i) => (
-                    <span
-                      key={`${f.name}-${i}`}
-                      className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-canvas/60 px-2.5 py-1 text-[11.5px] text-ink"
-                    >
-                      <Paperclip className="h-3 w-3 text-subtle" />
-                      <span className="max-w-[160px] truncate">{f.name}</span>
-                      <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
-                      <button
-                        type="button"
-                        onClick={() => removeNoteFile(i)}
-                        className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {noteSendError && (
-                <div className="border-t border-line-soft px-4 py-2.5">
-                  <Alert variant="error">{noteSendError}</Alert>
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft bg-canvas/40 px-4 py-2.5">
-                <div className="flex items-center gap-3">
-                  <input
-                    ref={noteFileInputRef}
-                    type="file"
-                    multiple
-                    onChange={handleNoteFileChange}
-                    className="hidden"
-                    id="note-attachment-input"
-                  />
-                  <label
-                    htmlFor="note-attachment-input"
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
-                  >
-                    <Paperclip className="h-3.5 w-3.5" />
-                    Adjuntar
-                  </label>
-                  <span className="hidden text-[11px] text-faint sm:inline">
-                    {SAVE_SHORTCUT} para guardar
-                  </span>
-                </div>
 
                 <Button
-                  type="submit"
+                  type="button"
                   variant="primary"
-                  isLoading={noteSending}
-                  disabled={!noteBody.trim()}
-                  className="gap-2"
+                  onClick={() => setShowNoteModal(true)}
+                  className="mt-5 gap-2"
                 >
-                  <Lock className="h-3.5 w-3.5" />
-                  Guardar nota
+                  <Plus className="h-3.5 w-3.5" />
+                  Añadir nota
                 </Button>
               </div>
-            </form>
+            ) : (
+              <>
+                {/* La acción encabeza la lista: es su cabecera, no una barra suelta. */}
+                <div className="flex items-center gap-3">
+                  <span className="shrink-0 text-[11.5px] font-semibold text-subtle">
+                    {internalNotes.length} {internalNotes.length === 1 ? "nota" : "notas"}
+                  </span>
+
+                  <span aria-hidden className="h-px flex-1 bg-line" />
+
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setShowNoteModal(true)}
+                    className="shrink-0 gap-2"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Añadir nota
+                  </Button>
+                </div>
+
+                {/* Todas a la vista: son pocas y se leen de corrido, la última al final. */}
+                <div className="space-y-3">
+                  {internalNotes.map((msg, index) =>
+                    renderMessageCard(msg, index === internalNotes.length - 1),
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
+
+      {/* Responder es la tarea entera, no un apéndice del hilo: ocupa la pantalla.
+          Cerrar sin enviar conserva el borrador; solo se vacía al salir el correo. */}
+      {replyOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-white">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-3.5">
+            <div className="min-w-0">
+              <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
+                {ticket.number}
+              </p>
+              <h2 className="mt-1 truncate font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+                Re: {ticket.subject}
+              </h2>
+              <p className="mt-0.5 truncate text-[12px] text-subtle">
+                Para <span className="font-medium text-ink">{recipientEmail}</span>
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => !replySending && setReplyOpen(false)}
+              aria-label="Cerrar el editor"
+              className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle
+                transition-colors hover:bg-fill hover:text-ink"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div
+            className="min-h-0 flex-1 overflow-y-auto"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                void sendReply();
+              }
+            }}
+          >
+            <div className="mx-auto h-full max-w-4xl px-4 py-3">
+              <LazyBlockEditor
+                key={replyEditorKey}
+                initialContent={replyBlocks ?? undefined}
+                onChange={setReplyBlocks}
+                placeholder="Escribe tu respuesta para el cliente…"
+              />
+            </div>
+          </div>
+
+          <div className="shrink-0 space-y-2.5 border-t border-line bg-canvas/40 px-6 py-3">
+            {replyAttachments.length > 0 && (
+              <div className="mx-auto flex max-w-4xl flex-wrap gap-2">
+                {replyAttachments.map((f, i) => (
+                  <span
+                    key={`${f.name}-${i}`}
+                    className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-white px-2.5 py-1 text-[11.5px] text-ink"
+                  >
+                    <Paperclip className="h-3 w-3 text-subtle" />
+                    <span className="max-w-[160px] truncate">{f.name}</span>
+                    <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
+                    <button
+                      type="button"
+                      onClick={() => removeReplyFile(i)}
+                      className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {replySendError && (
+              <div className="mx-auto max-w-4xl">
+                <Alert variant="error">{replySendError}</Alert>
+              </div>
+            )}
+
+            <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <input
+                  ref={replyFileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleReplyFileChange}
+                  className="hidden"
+                  id="reply-attachment-input"
+                />
+                <label
+                  htmlFor="reply-attachment-input"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
+                >
+                  <Paperclip className="h-3.5 w-3.5" />
+                  Adjuntar
+                </label>
+                <span className="hidden text-[11px] text-faint sm:inline">
+                  {SAVE_SHORTCUT} para enviar
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={replySending}
+                  onClick={() => setReplyOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  isLoading={replySending}
+                  disabled={!replyReady}
+                  onClick={() => void sendReply()}
+                  className="gap-2"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Enviar respuesta
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Escribir una nota es un acto aparte, no algo que viva bajo el hilo: se pide,
+          se escribe y se cierra. El borrador sobrevive si se cierra sin guardar. */}
+      {showNoteModal && (
+        <Modal
+          eyebrow={ticket.number}
+          title="Añadir nota interna"
+          description={
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-edge bg-amber-700 px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-white">
+                <Lock className="h-2.5 w-2.5" />
+                Privada
+              </span>
+              <span className="text-ink">
+                Solo la ve el personal de Plastifar. El cliente no recibe copia.
+              </span>
+            </span>
+          }
+          onClose={() => {
+            if (!noteSending) setShowNoteModal(false);
+          }}
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={noteSending}
+                onClick={() => setShowNoteModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                isLoading={noteSending}
+                disabled={!noteBody.trim()}
+                onClick={() => void saveNote()}
+                className="gap-2"
+              >
+                <Lock className="h-3.5 w-3.5" />
+                Guardar nota
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <textarea
+              autoFocus
+              rows={7}
+              value={noteBody}
+              onChange={(e) => setNoteBody(e.target.value)}
+              onKeyDown={handleNoteKeyDown}
+              placeholder="Lo que el equipo debe saber sobre este caso…"
+              className="w-full resize-none rounded-edge border border-line-strong bg-white px-3 py-2.5
+                text-[13px] leading-relaxed text-ink outline-none transition-colors
+                placeholder:text-faint focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
+            />
+
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                ref={noteFileInputRef}
+                type="file"
+                multiple
+                onChange={handleNoteFileChange}
+                className="hidden"
+                id="note-attachment-input"
+              />
+              <label
+                htmlFor="note-attachment-input"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5 py-1.5 text-[11.5px] font-medium text-subtle transition-colors hover:bg-canvas hover:text-ink"
+              >
+                <Paperclip className="h-3.5 w-3.5" />
+                Adjuntar
+              </label>
+              <span className="text-[11px] text-faint">{SAVE_SHORTCUT} para guardar</span>
+            </div>
+
+            {noteAttachments.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {noteAttachments.map((f, i) => (
+                  <span
+                    key={`${f.name}-${i}`}
+                    className="inline-flex items-center gap-1.5 rounded-edge border border-line-soft bg-canvas/60 px-2.5 py-1 text-[11.5px] text-ink"
+                  >
+                    <Paperclip className="h-3 w-3 text-subtle" />
+                    <span className="max-w-[160px] truncate">{f.name}</span>
+                    <span className="text-[10px] text-subtle">({formatBytes(f.size)})</span>
+                    <button
+                      type="button"
+                      onClick={() => removeNoteFile(i)}
+                      className="ml-1 cursor-pointer text-subtle hover:text-brand-red"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {noteSendError && <Alert variant="error">{noteSendError}</Alert>}
+          </div>
+        </Modal>
+      )}
 
       {/* Modal para Actualizar Ticket: una sola entrada para todas las transiciones de
           estado válidas; Solucionado pide tipo de solución + comentario, Cancelado exige
@@ -2123,14 +2125,27 @@ export function TicketDetailPage() {
         </Modal>
       )}
 
+      {/* El mismo visor de la bandeja: se ve dentro y, si hace falta, se descarga desde ahí. */}
+      {preview && (
+        <AttachmentPreviewModal
+          sourceId={ticketId}
+          loadLink={(attachmentId, download) =>
+            ticketsApi.attachmentLink(ticketId, attachmentId, download)
+          }
+          attachments={preview.attachments}
+          index={preview.index}
+          onIndexChange={(index) => setPreview({ ...preview, index })}
+          onClose={() => setPreview(null)}
+        />
+      )}
+
       {/* Pestaña lateral desplegable (Sheet) con animación fluida de entrada y salida */}
       {showTimelineDrawer && ticket && (
         <TicketTimelineSheet
           ticket={ticket}
           timeline={timeline}
           sortedMessages={sortedMessages}
-          downloadingId={downloadingId}
-          onDownloadAttachment={handleDownloadAttachment}
+          onOpenAttachment={openAttachment}
           onClose={() => setShowTimelineDrawer(false)}
           onSelectTab={setActiveTab}
           initialFilter={timelineFilter}

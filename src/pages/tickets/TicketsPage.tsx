@@ -49,16 +49,21 @@ const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos", "vencidos"]
 const primaryFilters = filters.filter((f) => PRIMARY_FILTER_KEYS.includes(f.key));
 const secondaryFilters = filters.filter((f) => !PRIMARY_FILTER_KEYS.includes(f.key));
 
-const columns: { key: SortKey; label: string }[] = [
-  { key: "numero", label: "Número" },
-  { key: "asunto", label: "Asunto / Motivo" },
-  { key: "cliente", label: "Cliente" },
-  { key: "departamento", label: "Departamento" },
-  { key: "prioridad", label: "Prioridad" },
-  { key: "estado", label: "Estado" },
-  { key: "sla", label: "SLA" },
-  { key: "actividad", label: "Última actividad" },
+// El ancho es un reparto, no una suma: la tabla nunca desborda y las columnas menos
+// decisivas para triar se retiran por tramos antes de que las demás queden ilegibles.
+const columns: { key: SortKey; label: string; className: string }[] = [
+  { key: "numero", label: "Número", className: "w-[8%]" },
+  { key: "asunto", label: "Asunto / Motivo", className: "w-[20%]" },
+  { key: "cliente", label: "Cliente", className: "hidden w-[13%] lg:table-cell" },
+  // El departamento cae primero: es el único que además tiene su propio filtro arriba.
+  { key: "departamento", label: "Departamento", className: "hidden w-[10%] 2xl:table-cell" },
+  { key: "prioridad", label: "Prioridad", className: "hidden w-[7%] md:table-cell" },
+  { key: "estado", label: "Estado", className: "w-[10%]" },
+  { key: "sla", label: "SLA", className: "w-[10%]" },
+  { key: "actividad", label: "Última actividad", className: "hidden w-[10%] xl:table-cell" },
 ];
+
+const ASSIGNED_COLUMN = "hidden w-[10%] lg:table-cell";
 
 function priorityBadgeClass(priority: string) {
   switch (priority.toLowerCase()) {
@@ -582,7 +587,7 @@ export function TicketsPage() {
           </div>
         ) : (
           <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable>
+            <DataTable fixed>
               <thead>
                 <HeadRow>
                   <Th className="w-10 !px-3">
@@ -599,9 +604,10 @@ export function TicketsPage() {
                       onChange={toggleSelectAll}
                     />
                   </Th>
-                  {columns.map(({ key, label }) => (
+                  {columns.map(({ key, label, className }) => (
                     <Th
                       key={key}
+                      className={className}
                       sort={{
                         dir: sort.key === key ? sort.dir : null,
                         onToggle: () => toggleSort(key),
@@ -610,7 +616,7 @@ export function TicketsPage() {
                       {label}
                     </Th>
                   ))}
-                  <Th>Asignado</Th>
+                  <Th className={ASSIGNED_COLUMN}>Asignado</Th>
                 </HeadRow>
               </thead>
               <tbody>
@@ -652,33 +658,33 @@ export function TicketsPage() {
                         </Td>
 
                         {/* Número */}
-                        <Td className="whitespace-nowrap font-mono text-[12px] font-semibold text-ink">
+                        <Td className={`${columns[0].className} truncate font-mono text-[12px] font-semibold text-ink`}>
                           {t.number}
                         </Td>
 
                         {/* Asunto y Tema */}
-                        <Td className="max-w-[280px]">
+                        <Td className={columns[1].className}>
                           <div className="truncate font-medium text-ink" title={t.subject}>
                             {t.subject}
                           </div>
-                          <div className="text-[11.5px] text-subtle">
+                          <div className="truncate text-[11.5px] text-subtle">
                             {t.topicName || "Sin motivo"}
                             {t.productLineName && ` · ${t.productLineName}`}
                           </div>
                         </Td>
 
                         {/* Cliente */}
-                        <Td className="max-w-[200px]">
+                        <Td className={columns[2].className}>
                           <div className="truncate font-medium text-ink" title={t.clientName || "Sin cliente"}>
                             {t.clientName || "Sin cliente"}
                           </div>
-                          <div className="text-[11.5px] text-subtle">
+                          <div className="truncate text-[11.5px] text-subtle">
                             {t.contactName ?? t.clientCode ?? "—"}
                           </div>
                         </Td>
 
                         {/* Departamento */}
-                        <Td className="max-w-[160px]">
+                        <Td className={columns[3].className}>
                           <div
                             className="truncate text-[12.5px] text-subtle"
                             title={t.departmentName || "Sin departamento"}
@@ -688,7 +694,7 @@ export function TicketsPage() {
                         </Td>
 
                         {/* Prioridad */}
-                        <Td className="whitespace-nowrap">
+                        <Td className={columns[4].className}>
                           <span
                             className={`inline-flex items-center rounded px-1.5 py-0.5 text-[11px] border ${priorityBadgeClass(
                               t.priority,
@@ -699,8 +705,8 @@ export function TicketsPage() {
                         </Td>
 
                         {/* Estado */}
-                        <Td className="whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5">
+                        <Td className={columns[5].className}>
+                          <span className="flex items-center gap-1.5">
                             <span
                               aria-hidden
                               className={`h-[7px] w-[7px] shrink-0 rounded-full ${
@@ -711,12 +717,14 @@ export function TicketsPage() {
                                   : "bg-amber-400"
                               }`}
                             />
-                            <span className="text-[12px] text-ink">{t.status}</span>
+                            <span className="min-w-0 truncate text-[12px] text-ink" title={t.status}>
+                              {t.status}
+                            </span>
                           </span>
                         </Td>
 
                         {/* SLA */}
-                        <Td className="whitespace-nowrap">
+                        <Td className={`${columns[6].className} truncate`}>
                           {sla.tone === "overdue" ? (
                             <Badge tone="red">
                               <span className="inline-flex items-center gap-1">
@@ -739,12 +747,12 @@ export function TicketsPage() {
                         </Td>
 
                         {/* Última actividad */}
-                        <Td className="whitespace-nowrap text-[12px] text-subtle">
+                        <Td className={`${columns[7].className} truncate text-[12px] text-subtle`}>
                           {formatDateTime(t.lastActivityAt)}
                         </Td>
 
                         {/* Asignado */}
-                        <Td className="max-w-[160px] text-[12px]">
+                        <Td className={`${ASSIGNED_COLUMN} text-[12px]`}>
                           {t.assignedStaffName ? (
                             <div className="truncate font-medium text-ink" title={t.assignedStaffName}>
                               {t.assignedStaffName}

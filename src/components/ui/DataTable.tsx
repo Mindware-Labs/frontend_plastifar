@@ -5,10 +5,16 @@ import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } fr
  * Tabla de listado del panel. Sin tarjeta: la tabla es la pagina y solo lleva
  * filetes horizontales. La primera y la ultima celda pegan al borde del modulo.
  */
-export function DataTable({ children }: { children: ReactNode }) {
+/**
+ * `fixed` reparte el ancho entre las columnas en vez de dejar que lo pida el contenido:
+ * la tabla cabe siempre y son las celdas las que recortan. Exige anchos en las cabeceras.
+ */
+export function DataTable({ fixed = false, children }: { fixed?: boolean; children: ReactNode }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-left">{children}</table>
+    <div className={fixed ? "" : "overflow-x-auto"}>
+      <table className={`w-full border-collapse text-left ${fixed ? "table-fixed" : ""}`}>
+        {children}
+      </table>
     </div>
   );
 }

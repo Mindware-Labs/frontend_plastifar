@@ -1,7 +1,7 @@
 import {
   AlertTriangle,
   CheckCircle2,
-  Download,
+  Eye,
   History,
   Info,
   Lock,
@@ -32,8 +32,8 @@ export interface TicketTimelineSheetProps {
   ticket: TicketDetailResponse;
   timeline: TimelineItem[];
   sortedMessages: TicketMessageResponse[];
-  downloadingId: number | null;
-  onDownloadAttachment: (att: TicketAttachmentResponse) => void;
+  /** Abre el visor; desde ahí se decide si además se descarga. */
+  onOpenAttachment: (attachments: TicketAttachmentResponse[], attachmentId: number) => void;
   onClose: () => void;
   onSelectTab?: (tab: "general" | "respuestas" | "notas") => void;
   initialFilter?: "all" | "messages" | "events";
@@ -43,8 +43,7 @@ export function TicketTimelineSheet({
   ticket,
   timeline,
   sortedMessages,
-  downloadingId,
-  onDownloadAttachment,
+  onOpenAttachment,
   onClose,
   onSelectTab,
   initialFilter = "all",
@@ -180,14 +179,13 @@ export function TicketTimelineSheet({
                 <button
                   key={att.id}
                   type="button"
-                  onClick={() => onDownloadAttachment(att)}
-                  disabled={downloadingId === att.id}
-                  className="inline-flex items-center gap-1.5 rounded border border-line-soft bg-white px-2 py-0.5 text-ink transition-colors hover:bg-slate-50"
-                  title="Descargar adjunto"
+                  onClick={() => onOpenAttachment(msg.attachments, att.id)}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-line-soft bg-white px-2 py-0.5 text-ink transition-colors hover:bg-slate-50"
+                  title={`Abrir ${att.fileName}`}
                 >
                   <Paperclip className="h-3 w-3 text-subtle" />
                   <span className="max-w-[140px] truncate">{att.fileName}</span>
-                  <Download className="h-2.5 w-2.5 text-subtle" />
+                  <Eye className="h-2.5 w-2.5 text-subtle" />
                 </button>
               ))}
             </div>

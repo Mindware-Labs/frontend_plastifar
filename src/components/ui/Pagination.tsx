@@ -47,12 +47,12 @@ export function Pagination({
         <span className="font-medium text-ink">{total}</span> {noun}
       </p>
 
-      <div className="flex items-center gap-4">
-        <span className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        <span className="flex items-center gap-1.5">
           Por página
           <Select
             size="sm"
-            className="w-[74px]"
+            className="w-[60px]"
             aria-label="Filas por página"
             value={String(pageSize)}
             onChange={(next) => onPageSizeChange(Number(next))}

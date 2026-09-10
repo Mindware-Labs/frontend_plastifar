@@ -12,14 +12,13 @@ import {
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ApiError } from "../../api/client";
-import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatBytes } from "../../lib/format";
-import type { AttachmentLinkResponse, EmailAttachmentResponse } from "../../types/api";
+import type { AttachmentLinkResponse } from "../../types/api";
 import { dividerClass, iconButtonClass } from "./toolbarStyles";
 
 // pdf.js pesa mas que el resto de la app: se descarga recien al abrir un PDF.
@@ -33,9 +32,19 @@ interface PreviewState {
   error: string | null;
 }
 
+/** Lo único que el visor necesita saber del archivo; lo cumplen los adjuntos de correo y los de ticket. */
+export interface PreviewableAttachment {
+  id: number;
+  fileName: string;
+  sizeBytes: number;
+}
+
 interface AttachmentPreviewModalProps {
-  emailId: number;
-  attachments: EmailAttachmentResponse[];
+  /** De dónde cuelgan los adjuntos. Al cambiar, el enlace se vuelve a pedir. */
+  sourceId: number;
+  /** Cada módulo firma sus enlaces por su cuenta: el visor solo los pide. */
+  loadLink: (attachmentId: number, download?: boolean) => Promise<AttachmentLinkResponse>;
+  attachments: PreviewableAttachment[];
   index: number;
   onIndexChange: (index: number) => void;
   onClose: () => void;
@@ -50,7 +59,8 @@ function previewKind(link: AttachmentLinkResponse, fallback: boolean) {
 }
 
 export function AttachmentPreviewModal({
-  emailId,
+  sourceId,
+  loadLink,
   attachments,
   index,
   onIndexChange,
@@ -65,6 +75,11 @@ export function AttachmentPreviewModal({
   const [downloading, setDownloading] = useState(false);
   const { isExiting, requestClose } = useModalAnimation(onClose);
 
+  // En una referencia: si entrara en las dependencias del efecto, una función nueva
+  // en cada render del padre volvería a pedir el enlace sin parar.
+  const loadLinkRef = useRef(loadLink);
+  loadLinkRef.current = loadLink;
+
   // El id viaja con el enlace: al saltar de adjunto no se ve por un instante el anterior.
   const link = state.id === attachment.id ? state.link : null;
   const error = state.id === attachment.id ? state.error : null;
@@ -76,8 +91,8 @@ export function AttachmentPreviewModal({
   useEffect(() => {
     let cancelled = false;
 
-    emailsApi
-      .attachmentLink(emailId, attachment.id)
+    loadLinkRef
+      .current(attachment.id)
       .then((data) => {
         if (!cancelled) setState({ id: attachment.id, link: data, error: null });
       })
@@ -90,7 +105,7 @@ export function AttachmentPreviewModal({
     return () => {
       cancelled = true;
     };
-  }, [emailId, attachment.id]);
+  }, [sourceId, attachment.id]);
 
   // Las flechas saltan entre adjuntos sin tener que volver al panel.
   useEffect(() => {
@@ -110,7 +125,7 @@ export function AttachmentPreviewModal({
 
     try {
       // Enlace propio: el del visor abre el archivo en la pestana en vez de bajarlo.
-      const target = await emailsApi.attachmentLink(emailId, attachment.id, true);
+      const target = await loadLinkRef.current(attachment.id, true);
       const anchor = document.createElement("a");
       anchor.href = target.url;
       anchor.download = attachment.fileName;

@@ -306,10 +306,10 @@ export function Sidebar() {
           <div className="flex flex-col items-center gap-1.5">
             <Link
               to="/bandeja"
-              className="group flex h-9 w-9 items-center justify-center rounded-edge border border-line-soft bg-canvas transition-all hover:border-brand-red/30 hover:shadow-xs active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+              className="flex h-9 w-9 items-center justify-center rounded-edge transition-opacity hover:opacity-85 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
               title="Plastifar · Ir a Bandeja"
             >
-              <Logo variant="isotipo" height={22} />
+              <Logo variant="isotipo" height={24} />
             </Link>
             <button
               type="button"
