@@ -274,8 +274,10 @@ export function Sidebar() {
     >
       {/* 1. Cabecera superior: Logotipo y control de contracción */}
       <div
-        className={`flex h-16 shrink-0 items-center border-b border-line-soft transition-all duration-200 ${
-          collapsed ? "flex-col justify-center gap-1.5 px-2 py-2" : "justify-between px-4"
+        className={`flex shrink-0 items-center border-b border-line-soft transition-all duration-200 ${
+          collapsed
+            ? "h-[88px] flex-col pt-4 gap-3 px-2"
+            : "h-16 justify-between px-4"
         }`}
       >
         {!collapsed ? (
@@ -303,10 +305,10 @@ export function Sidebar() {
             </button>
           </>
         ) : (
-          <div className="flex flex-col items-center gap-1.5">
+          <>
             <Link
               to="/bandeja"
-              className="flex h-9 w-9 items-center justify-center rounded-edge transition-opacity hover:opacity-85 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+              className="flex items-center justify-center rounded-edge transition-opacity hover:opacity-85 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
               title="Plastifar · Ir a Bandeja"
             >
               <Logo variant="isotipo" height={24} />
@@ -316,11 +318,11 @@ export function Sidebar() {
               onClick={toggleCollapsed}
               aria-label="Expandir la barra lateral"
               title="Expandir barra lateral"
-              className="flex h-5 w-5 items-center justify-center rounded-edge text-faint transition-all hover:bg-canvas hover:text-ink active:scale-95"
+              className="flex h-6 w-6 items-center justify-center rounded-edge text-faint transition-all hover:bg-canvas hover:text-ink active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
             >
-              <PanelLeft className="h-3.5 w-3.5 rotate-180" />
+              <PanelLeft className="h-4 w-4 rotate-180" />
             </button>
-          </div>
+          </>
         )}
       </div>
 

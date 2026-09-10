@@ -854,7 +854,9 @@ export function TicketDetailPage() {
   ];
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/50 pb-16">
+    // -mt-6 anula el pt-6 del layout: la barra fija se pega arriba y su contenido
+    // queda con el mismo aire por encima que por debajo. Ese margen pasa al cuerpo.
+    <div className="-mt-6 min-h-0 flex-1 overflow-y-auto bg-slate-50/50 pb-16">
       {/* Barra superior de navegación y cabecera */}
       <div className="sticky top-0 z-10 border-b border-line-soft bg-white/95 px-6 py-3.5 backdrop-blur-xs">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
@@ -933,7 +935,8 @@ export function TicketDetailPage() {
       </div>
 
       {/* Contenedor principal de 2 columnas */}
-      <div className="mx-auto max-w-7xl px-6 py-6">
+      {/* pt-3.5 = el mismo aire que la barra da a sus elementos: el asunto arranca igual de arriba. */}
+      <div className="mx-auto max-w-7xl px-6 pb-6 pt-3.5">
         {/* Título, metadatos rápidos y botones de acción rápida de estado */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1418,28 +1421,29 @@ export function TicketDetailPage() {
                       Todos los Adjuntos ({ticket.attachments.length})
                     </h3>
                     <div className="mt-3 space-y-2 text-xs">
+                      {/* La fila entera es el control: el ojo solo señala qué hace. */}
                       {ticket.attachments.map((att) => (
-                        <div
+                        <button
                           key={att.id}
-                          className="flex items-center justify-between gap-2 rounded-lg border border-line-soft p-2"
+                          type="button"
+                          onClick={() => openAttachment(ticket.attachments, att.id)}
+                          title={`Abrir ${att.fileName}`}
+                          className="group flex w-full cursor-pointer items-center justify-between gap-2 rounded-edge
+                            border border-line-soft p-2 text-left outline-none transition-colors
+                            hover:border-line-strong hover:bg-canvas
+                            focus-visible:ring-3 focus-visible:ring-brand-red/12"
                         >
                           <div className="min-w-0">
-                            <p className="truncate font-medium text-ink" title={att.fileName}>
-                              {att.fileName}
-                            </p>
+                            <p className="truncate font-medium text-ink">{att.fileName}</p>
                             <span className="text-[10px] text-subtle">
                               {formatBytes(att.sizeBytes)} · {formatDateTime(att.createdAt)}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => openAttachment(ticket.attachments, att.id)}
-                            className="cursor-pointer rounded-edge border border-line-soft p-1.5 text-subtle transition-colors hover:bg-slate-100 hover:text-ink"
-                            title={`Abrir ${att.fileName}`}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                          <Eye
+                            aria-hidden
+                            className="h-3.5 w-3.5 shrink-0 text-faint transition-colors group-hover:text-ink"
+                          />
+                        </button>
                       ))}
                     </div>
                   </div>
