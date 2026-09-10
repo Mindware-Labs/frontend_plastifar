@@ -1067,18 +1067,18 @@ export function TicketDetailPage() {
             </div>
             <div className="mt-3 flex flex-1 flex-col justify-between gap-2.5 text-xs">
               <div className="space-y-2.5">
-                {/* Clasificación: Departamento y Tema / Motivo en 2 columnas */}
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                  <div>
+                {/* Clasificación: Departamento y Tema / Motivo con simetría exacta */}
+                <div className="grid grid-cols-2 divide-x divide-line-soft/60">
+                  <div className="min-w-0 pr-3">
                     <span className="block text-[11px] text-subtle">Departamento:</span>
                     <span className="block truncate font-semibold text-ink" title={ticket.departmentName || undefined}>
                       {ticket.departmentName || "Sin departamento"}
                     </span>
                   </div>
 
-                  <div>
+                  <div className="min-w-0 pl-3">
                     <span className="block text-[11px] text-subtle">Tema / Motivo:</span>
-                    <span className="block truncate font-medium text-ink" title={ticket.topicName || undefined}>
+                    <span className="block truncate font-semibold text-ink" title={ticket.topicName || undefined}>
                       {ticket.topicName || "Sin motivo"}
                     </span>
                   </div>
