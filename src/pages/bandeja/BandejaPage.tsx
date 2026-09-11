@@ -139,7 +139,7 @@ function EmailFilterMenu({
   const hasUnseen = Boolean(assignedUnseen && assignedUnseen > 0);
 
   return (
-    <div className={`relative min-w-0 flex-1 ${className}`}>
+    <div className={`relative min-w-0 w-full ${className}`}>
       <button
         ref={triggerRef}
         type="button"
@@ -149,7 +149,7 @@ function EmailFilterMenu({
         aria-controls={open ? panelId : undefined}
         aria-label={active ? `Más filtros (activo: ${active.label})` : "Más filtros"}
         title={active ? `Filtro activo: ${active.label}` : "Más filtros"}
-        className={`inline-flex h-8 w-full min-w-0 items-center justify-between gap-1.5 rounded-lg px-2.5 text-[12px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
+        className={`inline-flex h-8 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-[12px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
           active
             ? "border border-zinc-300 bg-zinc-100 font-semibold text-zinc-900"
             : "border border-zinc-200 bg-white font-medium text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
@@ -799,7 +799,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                   <div className="grid grid-cols-1 grid-rows-1 h-8 items-center">
                     {showTabs && (
                       <div
-                        className={`col-start-1 row-start-1 flex h-8 items-center gap-1.5 w-full ${
+                        className={`col-start-1 row-start-1 grid grid-cols-3 gap-1.5 w-full h-8 items-center ${
                           tabsExiting
                             ? "animate-plf-tabs-out pointer-events-none"
                             : hasExitedOnce
@@ -808,35 +808,33 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                         }`}
                         inert={tabsExiting ? true : undefined}
                       >
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {primaryFilters.map(({ key, label, countKey }) => {
-                            const isActive = ticketFilter === key;
-                            const count = data?.counts?.[countKey] ?? 0;
-                            return (
-                              <button
-                                key={key}
-                                type="button"
-                                onClick={() => setTicketFilter(key)}
-                                className={`inline-flex h-8 shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-2.5 text-[12px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
+                        {primaryFilters.map(({ key, label, countKey }) => {
+                          const isActive = ticketFilter === key;
+                          const count = data?.counts?.[countKey] ?? 0;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => setTicketFilter(key)}
+                              className={`inline-flex h-8 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-[12px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
+                                isActive
+                                  ? "border border-zinc-300 bg-zinc-100 font-semibold text-zinc-900"
+                                  : "border border-zinc-200 bg-white font-medium text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                              }`}
+                            >
+                              <span className="truncate">{label}</span>
+                              <span
+                                className={`shrink-0 rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums transition-colors ${
                                   isActive
-                                    ? "border border-zinc-300 bg-zinc-100 font-semibold text-zinc-900"
-                                    : "border border-zinc-200 bg-white font-medium text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                                    ? "bg-zinc-200 text-zinc-800"
+                                    : "bg-zinc-100 text-zinc-500"
                                 }`}
                               >
-                                <span>{label}</span>
-                                <span
-                                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums transition-colors ${
-                                    isActive
-                                      ? "bg-zinc-200 text-zinc-800"
-                                      : "bg-zinc-100 text-zinc-500"
-                                  }`}
-                                >
-                                  {count}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                                {count}
+                              </span>
+                            </button>
+                          );
+                        })}
 
                         <EmailFilterMenu
                           options={secondaryFilters}

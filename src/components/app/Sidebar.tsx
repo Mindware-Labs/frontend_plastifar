@@ -51,15 +51,6 @@ interface NavGroup {
 /** Árbol de navegación: cada elemento cuenta con su propio icono vectorizado y ruta. */
 const groups: NavGroup[] = [
   {
-    label: "Tickets",
-    icon: TicketIcon,
-    children: [
-      { label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon },
-      { label: "Motivos", to: "/tickets/motivos", icon: Tag },
-      { label: "Veredictos", to: "/tickets/veredictos", icon: Gavel },
-    ],
-  },
-  {
     label: "Correo",
     icon: Inbox,
     children: [
@@ -69,6 +60,15 @@ const groups: NavGroup[] = [
       { label: "Archivados", to: "/bandeja/archivados", folder: "archived", icon: Archive },
       { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
       { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
+    ],
+  },
+  {
+    label: "Tickets",
+    icon: TicketIcon,
+    children: [
+      { label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon },
+      { label: "Motivos", to: "/tickets/motivos", icon: Tag },
+      { label: "Veredictos", to: "/tickets/veredictos", icon: Gavel },
     ],
   },
   {
