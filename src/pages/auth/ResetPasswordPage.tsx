@@ -7,7 +7,7 @@ import { z } from "zod";
 import { authApi } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import { AuthAlert } from "../../components/auth/AuthAlert";
-import { AuthButton } from "../../components/auth/AuthButton";
+import { AuthButton, type AuthButtonTone } from "../../components/auth/AuthButton";
 import { AuthField, AuthPasswordField } from "../../components/auth/AuthField";
 import { AuthToast } from "../../components/auth/AuthToast";
 import { PasswordStrength } from "../../components/ui/PasswordStrength";
@@ -36,15 +36,27 @@ type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 
 type Step = "code" | "password" | "done";
 /** idle: listo para verificar. El resto describe por qué no prosperó el último envío. */
-type CodePhase = "idle" | "wrong" | "limited" | "failed";
+type CodePhase = "idle" | "verified" | "wrong" | "limited" | "failed";
 
 const codeToneLabels: Record<Exclude<CodePhase, "idle">, string> = {
+  verified: "Código verificado",
   wrong: "Código incorrecto",
   limited: "Demasiados intentos",
   failed: "No se pudo verificar",
 };
 
+/** idle: listo para guardar. El resto describe por qué no prosperó el último envío. */
+type PasswordPhase = "idle" | "expired" | "limited" | "failed";
+
+const passwordToneLabels: Record<Exclude<PasswordPhase, "idle">, string> = {
+  expired: "Código vencido",
+  limited: "Demasiados intentos",
+  failed: "No se pudo actualizar",
+};
+
 const SETTLE_MS = 340;
+// Seis dígitos en cascada de 60 ms más la última confirmación de 420 ms.
+const CONFIRM_HOLD_MS = 760;
 type ToastState = { message: string; variant: "error" | "success" };
 
 const RESEND_COOLDOWN_SECONDS = 120;
@@ -70,6 +82,8 @@ export function ResetPasswordPage() {
   const [relayKey, setRelayKey] = useState(0);
   const [announcement, setAnnouncement] = useState("");
   const verifyButtonRef = useRef<HTMLButtonElement>(null);
+  const [passwordPhase, setPasswordPhase] = useState<PasswordPhase>("idle");
+  const [stalePassword, setStalePassword] = useState<PasswordFormValues | null>(null);
 
   useEffect(() => {
     if (!settle) return;
@@ -107,6 +121,10 @@ export function ResetPasswordPage() {
   });
 
   const newPassword = useWatch({ control: passwordForm.control, name: "newPassword" }) ?? "";
+  const confirmPassword = useWatch({ control: passwordForm.control, name: "confirmPassword" }) ?? "";
+  const strength = evaluatePassword(newPassword);
+  const missingRules = strength.rules.length - strength.score;
+  const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== newPassword;
 
   useEffect(() => {
     if (step !== "code" || resendCooldown <= 0) return;
@@ -142,6 +160,9 @@ export function ResetPasswordPage() {
     setAnnouncement("");
     try {
       await authApi.verifyResetCode(values);
+      setCodePhase("verified");
+      setAnnouncement("Código verificado. Ahora crea tu nueva contraseña.");
+      await new Promise((resolve) => setTimeout(resolve, CONFIRM_HOLD_MS));
       setVerified(values);
       setStep("password");
     } catch (err) {
@@ -173,7 +194,7 @@ export function ResetPasswordPage() {
 
   /** Al primer cambio respecto al envío fallido el botón recupera el rojo. */
   function rechargeCode() {
-    if (codePhase === "idle" || !staleCode) return;
+    if (codePhase === "idle" || codePhase === "verified" || !staleCode) return;
     const { email, code } = codeForm.getValues();
     if (email === staleCode.email && code === staleCode.code) return;
     setCodePhase("idle");
@@ -183,16 +204,56 @@ export function ResetPasswordPage() {
   async function onSubmitPassword(values: PasswordFormValues) {
     if (!verified) return;
 
-    setToast(null);
+    setAnnouncement("");
     try {
       await authApi.resetPassword({ ...verified, newPassword: values.newPassword });
       setStep("done");
     } catch (err) {
-      setToast({
-        message: err instanceof ApiError ? err.message : "No se pudo actualizar la contraseña",
-        variant: "error",
-      });
+      const status = err instanceof ApiError ? err.status : 0;
+      const code = err instanceof ApiError ? err.code : undefined;
+      setStalePassword(values);
+      setSettle(true);
+      if (status === 429) {
+        setPasswordPhase("limited");
+        setAnnouncement("Demasiados intentos. Espera unos minutos antes de volver a intentarlo.");
+        return;
+      }
+      if (status === 400 && code !== "weak_password") {
+        setPasswordPhase("expired");
+        setAnnouncement("El código ya no es válido. Vuelve a ingresar el código o pide uno nuevo.");
+        return;
+      }
+      setPasswordPhase("failed");
+      setAnnouncement("No se pudo actualizar la contraseña. Revisa tu conexión y vuelve a intentarlo.");
     }
+  }
+
+  /** Al primer cambio respecto al envío fallido el botón recupera el rojo. */
+  function rechargePassword() {
+    if (passwordPhase === "idle" || !stalePassword) return;
+    const current = passwordForm.getValues();
+    if (
+      current.newPassword === stalePassword.newPassword &&
+      current.confirmPassword === stalePassword.confirmPassword
+    ) {
+      return;
+    }
+    setPasswordPhase("idle");
+    setAnnouncement("");
+  }
+
+  // El botón dice lo que falta en vez de deshabilitarse: es el indicador de que aún no se puede guardar.
+  let passwordTone: AuthButtonTone = "primary";
+  let passwordToneLabel: string | undefined;
+  if (passwordPhase !== "idle") {
+    passwordTone = "ink";
+    passwordToneLabel = passwordToneLabels[passwordPhase];
+  } else if (newPassword && missingRules > 0) {
+    passwordTone = "ink";
+    passwordToneLabel = missingRules === 1 ? "Falta 1 requisito" : `Faltan ${missingRules} requisitos`;
+  } else if (passwordsMismatch) {
+    passwordTone = "ink";
+    passwordToneLabel = "No coinciden";
   }
 
   if (step === "done") {
@@ -213,6 +274,7 @@ export function ResetPasswordPage() {
   if (step === "password") {
     return (
       <AuthLayout
+        settle={settle}
         title={isInvite ? "Crear contraseña" : "Nueva contraseña"}
         subtitle={
           isInvite
@@ -220,12 +282,6 @@ export function ResetPasswordPage() {
             : `Código verificado para ${verified?.email}`
         }
       >
-        <AuthToast
-          message={toast?.message ?? null}
-          variant={toast?.variant}
-          onDismiss={() => setToast(null)}
-        />
-
         <form
           onSubmit={passwordForm.handleSubmit(onSubmitPassword)}
           noValidate
@@ -238,13 +294,22 @@ export function ResetPasswordPage() {
             icon={<Lock className="h-[18px] w-[18px]" />}
             error={passwordForm.formState.errors.newPassword?.message}
             {...passwordForm.register("newPassword")}
+            onChange={(e) => {
+              passwordForm.register("newPassword").onChange(e);
+              rechargePassword();
+            }}
           />
           <AuthPasswordField
             label="Confirmar contraseña"
             autoComplete="new-password"
             icon={<LockKeyhole className="h-[18px] w-[18px]" />}
             error={passwordForm.formState.errors.confirmPassword?.message}
+            notice={passwordsMismatch ? "No coinciden" : undefined}
             {...passwordForm.register("confirmPassword")}
+            onChange={(e) => {
+              passwordForm.register("confirmPassword").onChange(e);
+              rechargePassword();
+            }}
           />
 
           <PasswordStrength value={newPassword} className="-mt-1" />
@@ -252,7 +317,8 @@ export function ResetPasswordPage() {
           <AuthButton
             type="submit"
             isLoading={passwordForm.formState.isSubmitting}
-            disabled={!evaluatePassword(newPassword).isValid}
+            tone={passwordTone}
+            toneLabel={passwordToneLabel}
             className="mt-1"
           >
             {passwordForm.formState.isSubmitting
@@ -263,6 +329,10 @@ export function ResetPasswordPage() {
                 ? "Activar cuenta"
                 : "Actualizar contraseña"}
           </AuthButton>
+
+          <p role="status" aria-live="polite" className="sr-only">
+            {announcement}
+          </p>
         </form>
 
         <div className="mt-8 flex justify-center">
@@ -270,6 +340,8 @@ export function ResetPasswordPage() {
             type="button"
             onClick={() => {
               setToast(null);
+              setCodePhase("idle");
+              setPasswordPhase("idle");
               setStep("code");
             }}
             className={backLinkClass}
@@ -341,6 +413,8 @@ export function ResetPasswordPage() {
                   rechargeCode();
                 }}
                 error={fieldState.error?.message}
+                invalid={codePhase === "wrong"}
+                success={codePhase === "verified"}
                 relayFrom={verifyButtonRef}
                 relayKey={relayKey}
                 autoFocus
@@ -382,7 +456,7 @@ export function ResetPasswordPage() {
           ref={verifyButtonRef}
           type="submit"
           isLoading={codeForm.formState.isSubmitting}
-          tone={codePhase === "idle" ? "primary" : "ink"}
+          tone={codePhase === "idle" ? "primary" : codePhase === "verified" ? "success" : "ink"}
           toneLabel={codePhase === "idle" ? undefined : codeToneLabels[codePhase]}
           className="mt-1"
         >

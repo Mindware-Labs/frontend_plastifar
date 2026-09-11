@@ -1,41 +1,45 @@
 import { Check } from "lucide-react";
 import { evaluatePassword, type StrengthLevel } from "../../lib/password";
 
-/**
- * Medidor de fuerza + lista de requisitos.
- *
- * La barra crece con transform: scaleX, nunca con width — asi la animacion no
- * reordena el layout en cada tecla. Cada requisito se marca en verde 348 C en
- * cuanto se cumple, para que la persona vea que le falta sin tener que enviar.
- */
-const tierClasses: Record<StrengthLevel, { fill: string; badge: string }> = {
-  weak: { fill: "bg-brand-red", badge: "bg-brand-red" },
-  average: { fill: "bg-warn", badge: "bg-warn" },
-  strong: { fill: "bg-brand-green", badge: "bg-brand-green" },
+// Débil se pinta en tinta, no en rojo: el rojo queda reservado para acción y foco.
+const tierFill: Record<StrengthLevel, string> = {
+  weak: "bg-ink",
+  average: "bg-warn",
+  strong: "bg-brand-green",
 };
 
+/** Medidor de fuerza y lista de requisitos: cada regla se marca en verde en cuanto se cumple. */
 export function PasswordStrength({ value, className = "" }: { value: string; className?: string }) {
-  const { rules, tier } = evaluatePassword(value);
+  const { rules, score, tier } = evaluatePassword(value);
   const empty = value.length === 0;
-  const styles = tierClasses[tier.level];
+  const remaining = rules.length - score;
+
+  let summary = `${rules.length} requisitos`;
+  let summaryClass = "text-faint";
+  if (!empty && remaining === 0) {
+    summary = tier.label;
+    summaryClass = "text-brand-green";
+  } else if (!empty) {
+    summary = `${tier.label} · ${remaining === 1 ? "falta 1" : `faltan ${remaining}`}`;
+    summaryClass = "text-ink";
+  }
 
   return (
     <section aria-live="polite" className={`flex flex-col gap-3 ${className}`}>
       <div className="flex items-center gap-3">
         <div className="h-1 flex-1 overflow-hidden rounded-full bg-line">
+          {/* Crece con scaleX, nunca con width: la animación no reordena el layout en cada tecla. */}
           <div
             className={`h-full origin-left rounded-full transition-[transform,background-color]
-              duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${empty ? "bg-line" : styles.fill}`}
+              duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${empty ? "bg-line" : tierFill[tier.level]}`}
             style={{ transform: `scaleX(${empty ? 0 : tier.scale})` }}
           />
         </div>
 
         <span
-          className={`inline-flex h-[20px] min-w-[52px] items-center justify-center rounded-full px-2
-            font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-white
-            transition-colors ${empty ? "bg-zinc-300" : styles.badge}`}
+          className={`shrink-0 font-heading text-[11px] font-semibold tabular-nums tracking-[0.02em] transition-colors ${summaryClass}`}
         >
-          {empty ? "—" : tier.label}
+          {summary}
         </span>
       </div>
 
