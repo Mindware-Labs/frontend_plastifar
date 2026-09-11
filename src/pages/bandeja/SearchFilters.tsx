@@ -13,7 +13,6 @@ interface FilterButtonProps {
   onChange: (value: AdvancedFilters) => void;
 }
 
-
 export function FilterButton({ value, onChange }: FilterButtonProps) {
   const [open, setOpen] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
@@ -62,7 +61,6 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
         triggerRef.current?.focus();
       }
     }
-    // Reposicionar en cada scroll seria un baile: se cierra suavemente.
     function handleViewportChange() {
       close();
     }
@@ -95,9 +93,7 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Alineado a la derecha del boton, sin salirse por la izquierda de la ventana.
     setAnchor({ top: rect.bottom + 6, left: Math.max(8, rect.right - PANEL_WIDTH) });
-    // El borrador arranca de lo aplicado: lo que se descarto no reaparece.
     setDraft(value);
     setError(null);
     setIsExiting(false);
@@ -132,20 +128,17 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
         aria-expanded={open && !isExiting}
         aria-controls={open ? panelId : undefined}
         aria-label={active > 0 ? `Filtros (${active} activos)` : "Filtros"}
-        title="Filtros"
+        title={active > 0 ? `Filtros avanzados (${active} activos)` : "Filtros avanzados"}
         data-active={active > 0}
-        className="relative flex h-8 w-8 items-center justify-center rounded-edge border border-line-strong
-          bg-white text-brand-gray outline-none transition-all duration-150 hover:border-zinc-400 hover:text-ink
-          active:scale-95 focus-visible:border-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/10
-          data-[active=true]:border-brand-red/40 data-[active=true]:text-brand-red-dark
-          aria-expanded:bg-fill aria-expanded:text-ink"
+        className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 ${
+          active > 0
+            ? "border border-zinc-300 bg-zinc-100 text-zinc-900 font-semibold"
+            : "border border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+        }`}
       >
-        <SlidersHorizontal className="h-4 w-4" />
+        <SlidersHorizontal className="h-3.5 w-3.5" />
         {active > 0 && (
-          <span
-            className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full
-              bg-brand-red px-1 font-heading text-[9.5px] font-bold text-white"
-          >
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[9.5px] font-bold text-white shadow-2xs tabular-nums">
             {active}
           </span>
         )}
@@ -162,11 +155,11 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
           style={{ position: "fixed", top: anchor.top, left: anchor.left, width: PANEL_WIDTH }}
           className={`${
             isExiting ? "animate-plf-popover-out pointer-events-none" : "animate-plf-popover-in"
-          } z-[60] flex flex-col gap-3.5 origin-top-right rounded-edge border border-line/90
-            bg-white p-4 shadow-[0_4px_16px_-2px_rgba(27,27,29,0.08),0_12px_32px_-4px_rgba(27,27,29,0.14)]`}
+          } z-[60] flex flex-col gap-3.5 origin-top-right rounded-lg border border-zinc-200/90
+            bg-white p-3.5 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]`}
         >
-          <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
-            Filtros
+          <p className="font-heading text-[11px] font-semibold uppercase tracking-wider text-zinc-400 select-none">
+            Filtros avanzados
           </p>
 
           <DateRangePicker
@@ -191,7 +184,7 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
             </p>
           )}
 
-          <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
+          <div className="flex items-center justify-between gap-2 border-t border-zinc-100 pt-3">
             <Button type="button" variant="ghost" size="sm" onClick={clear} disabled={active === 0 && countActive(draft) === 0}>
               Limpiar
             </Button>
@@ -215,18 +208,18 @@ interface ChipProps {
 function Chip({ label, onRemove, icon: Icon }: ChipProps) {
   return (
     <span
-      className="inline-flex h-6 max-w-full items-center gap-1 rounded-full border border-brand-red/25
-        bg-brand-red/[0.05] pl-2 pr-0.5 text-[11.5px] font-medium text-brand-red-dark"
+      className="inline-flex h-6 max-w-full items-center gap-1 rounded-md border border-zinc-200
+        bg-zinc-50 pl-2 pr-1 text-[11px] font-medium text-zinc-700 shadow-2xs"
     >
-      {Icon && <Icon className="h-3 w-3 shrink-0" />}
+      {Icon && <Icon className="h-3 w-3 shrink-0 text-zinc-400" />}
       <span className="truncate">{label}</span>
       <button
         type="button"
         onClick={onRemove}
         aria-label={`Quitar el filtro ${label}`}
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-brand-red-dark/70
-          outline-none transition-colors hover:bg-brand-red/10 hover:text-brand-red-dark
-          focus-visible:ring-3 focus-visible:ring-brand-red/20"
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-zinc-400
+          outline-none transition-colors hover:bg-zinc-200/70 hover:text-zinc-700
+          focus-visible:ring-2 focus-visible:ring-brand-red/20"
       >
         <X className="h-3 w-3" />
       </button>

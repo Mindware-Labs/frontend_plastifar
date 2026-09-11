@@ -239,31 +239,31 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
     <div className="flex flex-col gap-2.5 select-none">
       {/* Cabecera de período y estado de selección */}
       <div className="flex items-center justify-between">
-        <span className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">
+        <span className="font-heading text-[10.5px] font-bold uppercase tracking-wider text-zinc-400">
           Período
         </span>
 
         {hasSelection ? (
-          <span className="inline-flex items-center gap-1.5 rounded-edge bg-brand-red/[0.08] px-2 py-0.5 text-[11px] font-medium text-brand-red-dark">
-            <CalendarIcon className="h-3 w-3 shrink-0" />
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-red-200/90 bg-red-50/80 px-2 py-0.5 text-[11px] font-semibold text-brand-red shadow-2xs">
+            <CalendarIcon className="h-3 w-3 shrink-0 text-brand-red" />
             <span className="tabular-nums">{summaryText}</span>
             <button
               type="button"
               onClick={clearDates}
               aria-label="Quitar filtro de fecha"
               title="Quitar filtro de fecha"
-              className="ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded text-brand-red-dark/70 transition-colors hover:bg-brand-red/15 hover:text-brand-red-dark"
+              className="ml-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded text-brand-red hover:bg-red-200/50 transition-colors"
             >
               <X className="h-3 w-3" />
             </button>
           </span>
         ) : (
-          <span className="text-[11px] font-medium text-faint">Cualquier fecha</span>
+          <span className="text-[11px] font-medium text-zinc-400">Cualquier fecha</span>
         )}
       </div>
 
       {/* Accesos rápidos de un solo clic */}
-      <div className="flex items-center gap-1">
+      <div className="grid grid-cols-4 gap-1.5">
         {PRESETS.map((preset) => {
           const range = preset.getRange();
           const isSelected = since === range.since && until === range.until;
@@ -272,10 +272,10 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
               key={preset.label}
               type="button"
               onClick={() => applyPreset(preset)}
-              className={`flex-1 rounded-edge py-1 text-[10.5px] font-medium transition-all ${
+              className={`h-7.5 rounded-lg text-[11.5px] font-medium transition-all outline-none select-none cursor-pointer active:scale-[0.98] shadow-2xs ${
                 isSelected
-                  ? "bg-brand-red font-semibold text-white shadow-[0_1px_3px_rgba(228,0,43,0.3)]"
-                  : "border border-line bg-fill/60 text-brand-gray hover:border-zinc-300 hover:bg-fill hover:text-ink"
+                  ? "border border-zinc-300 bg-zinc-100 font-semibold text-zinc-900"
+                  : "border border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
               }`}
             >
               {preset.label}
@@ -285,18 +285,18 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
       </div>
 
       {/* Calendario interactivo Plastifar */}
-      <div className="rounded-edge border border-line bg-canvas/40 p-2">
+      <div className="rounded-lg border border-zinc-200/90 bg-white p-2.5 shadow-2xs">
         {/* Navegación de mes */}
         <div className="mb-2 flex items-center justify-between">
-          <span className="font-heading text-[11.5px] font-bold tracking-tight text-ink">
+          <span className="font-heading text-[12px] font-bold tracking-tight text-zinc-900 capitalize">
             {MONTH_NAMES[viewMonth]} {viewYear}
           </span>
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={prevMonth}
               aria-label="Mes anterior"
-              className="flex h-6 w-6 items-center justify-center rounded-edge text-brand-gray outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/20"
+              className="flex h-6.5 w-6.5 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
@@ -304,7 +304,7 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
               type="button"
               onClick={nextMonth}
               aria-label="Mes siguiente"
-              className="flex h-6 w-6 items-center justify-center rounded-edge text-brand-gray outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/20"
+              className="flex h-6.5 w-6.5 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
@@ -316,7 +316,7 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
           {WEEKDAY_NAMES.map((name) => (
             <span
               key={name}
-              className="font-heading text-[9.5px] font-semibold uppercase tracking-wider text-faint"
+              className="font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-400 py-0.5"
             >
               {name}
             </span>
@@ -344,25 +344,25 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
             let dayClass = "";
             if (isStart && isEnd) {
               dayClass =
-                "rounded-edge bg-brand-red text-white font-semibold shadow-[0_1px_3px_rgba(228,0,43,0.35)]";
+                "rounded-md bg-brand-red text-white font-semibold shadow-2xs";
             } else if (isStart) {
               dayClass = until
-                ? "rounded-l-edge rounded-r-none bg-brand-red text-white font-semibold shadow-[0_1px_3px_rgba(228,0,43,0.35)]"
-                : "rounded-edge bg-brand-red text-white font-semibold shadow-[0_1px_3px_rgba(228,0,43,0.35)]";
+                ? "rounded-l-md rounded-r-none bg-brand-red text-white font-semibold shadow-2xs"
+                : "rounded-md bg-brand-red text-white font-semibold shadow-2xs";
             } else if (isEnd) {
               dayClass = since
-                ? "rounded-r-edge rounded-l-none bg-brand-red text-white font-semibold shadow-[0_1px_3px_rgba(228,0,43,0.35)]"
-                : "rounded-edge bg-brand-red text-white shadow-[0_1px_3px_rgba(228,0,43,0.35)]";
+                ? "rounded-r-md rounded-l-none bg-brand-red text-white font-semibold shadow-2xs"
+                : "rounded-md bg-brand-red text-white font-semibold shadow-2xs";
             } else if (inSelectedRange) {
-              dayClass = "rounded-none bg-brand-red/[0.08] font-medium text-brand-red-dark";
+              dayClass = "rounded-none bg-red-50 font-medium text-brand-red";
             } else if (inHoverRange) {
-              dayClass = "rounded-none bg-brand-red/[0.05] text-brand-red-dark";
+              dayClass = "rounded-none bg-red-50/50 text-brand-red";
             } else if (isToday) {
-              dayClass = "rounded-edge font-bold text-brand-red ring-1 ring-brand-red/40";
+              dayClass = "rounded-md font-bold text-brand-red bg-red-50/70 ring-1 ring-red-200/90";
             } else if (!isCurrentMonth) {
-              dayClass = "text-zinc-300 hover:text-zinc-500 hover:bg-fill/50 rounded-edge";
+              dayClass = "text-zinc-300 hover:text-zinc-500 hover:bg-zinc-50 rounded-md";
             } else {
-              dayClass = "text-ink hover:bg-fill hover:text-ink rounded-edge";
+              dayClass = "text-zinc-700 font-medium hover:bg-zinc-100 hover:text-zinc-900 rounded-md";
             }
 
             return (
@@ -374,7 +374,7 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
                   if (isSelectingRange) setHoveredDate(dateStr);
                 }}
                 aria-label={dateStr}
-                className={`flex h-7 w-full items-center justify-center text-[11px] tabular-nums outline-none transition-colors ${dayClass}`}
+                className={`flex h-7 w-full items-center justify-center text-[11px] tabular-nums outline-none transition-colors cursor-pointer select-none active:scale-95 ${dayClass}`}
               >
                 {dayNum}
               </button>
@@ -383,7 +383,7 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
         </div>
 
         {/* Mensaje de guía intuitivo */}
-        <p className="mt-2 border-t border-line/70 pt-1.5 text-center text-[10.5px] text-faint">
+        <p className="mt-2 border-t border-zinc-100 pt-2 text-center text-[10.5px] font-medium text-zinc-400">
           {hintText}
         </p>
       </div>

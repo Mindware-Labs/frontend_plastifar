@@ -216,10 +216,11 @@ export const CheckboxField = forwardRef<HTMLInputElement, CheckboxFieldProps>(
     return (
       <label
         htmlFor={fieldId}
-        className={`flex cursor-pointer items-start gap-2.5 rounded-edge border border-line px-3 py-2.5
-          transition-colors hover:border-line-strong hover:bg-canvas
-          has-checked:border-brand-red/35 has-checked:bg-brand-red/[0.03]
-          has-disabled:cursor-not-allowed has-disabled:opacity-60 has-disabled:hover:bg-transparent
+        className={`group flex cursor-pointer items-start gap-2.5 rounded-lg border p-3
+          transition-all duration-150 select-none shadow-2xs
+          border-zinc-200/90 bg-white hover:border-zinc-300 hover:bg-zinc-50/70
+          has-checked:border-zinc-300 has-checked:bg-zinc-50/50
+          has-disabled:cursor-not-allowed has-disabled:opacity-50 has-disabled:hover:bg-white
           ${className}`}
       >
         <input
@@ -227,13 +228,28 @@ export const CheckboxField = forwardRef<HTMLInputElement, CheckboxFieldProps>(
           id={fieldId}
           type="checkbox"
           disabled={disabled}
-          className="mt-px h-4 w-4 shrink-0 rounded-[2px] border-line-strong accent-brand-red"
+          className="peer sr-only"
           {...props}
         />
-        <span className="flex flex-col gap-0.5">
-          <span className="text-[13px] font-medium leading-tight text-ink">{label}</span>
+        <div
+          aria-hidden="true"
+          className="mt-0.5 flex size-4.5 shrink-0 items-center justify-center rounded-[5px] border border-zinc-300 bg-white shadow-2xs transition-all duration-150
+            group-hover:border-zinc-400
+            peer-checked:border-brand-red peer-checked:bg-brand-red peer-checked:[&>svg]:opacity-100
+            peer-focus-visible:ring-2 peer-focus-visible:ring-brand-red/25
+            peer-disabled:opacity-50"
+        >
+          <Check
+            strokeWidth={2.75}
+            className="size-3 text-white opacity-0 transition-opacity duration-150"
+          />
+        </div>
+        <span className="flex flex-col gap-0.5 min-w-0">
+          <span className="font-heading text-[12.5px] font-semibold leading-snug text-zinc-900 group-hover:text-zinc-950 transition-colors">
+            {label}
+          </span>
           {description && (
-            <span className="text-[11.5px] leading-relaxed text-faint">{description}</span>
+            <span className="text-[11.5px] leading-relaxed text-zinc-500">{description}</span>
           )}
         </span>
       </label>
