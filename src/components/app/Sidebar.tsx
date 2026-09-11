@@ -5,7 +5,6 @@ import {
   Building2,
   ChevronDown,
   ClipboardCheck,
-  Headset,
   Inbox,
   KeyRound,
   LayoutDashboard,
@@ -647,35 +646,6 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
-
-      {/* Tarjeta de soporte al pie del menu, con el icono montado sobre el
-          borde. Es la unica superficie roja plena del panel fuera del boton
-          primario, y por eso vive sola al final: si compitiera con un modulo
-          activo habria dos rojos diciendo cosas distintas. */}
-      {!collapsed && (
-        <div className="shrink-0 px-3 pb-3 pt-2">
-          <div className="relative rounded-inset bg-brand-red px-4 pb-4 pt-7 text-center">
-            <span
-              className="absolute -top-4 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center
-                justify-center rounded-full border-2 border-white bg-brand-red text-white"
-            >
-              <Headset className="h-4 w-4" aria-hidden />
-            </span>
-            <p className="font-heading text-[12.5px] font-bold text-white">Ayuda y soporte</p>
-            <p className="mt-1 text-[11px] leading-tight text-white/80">
-              ¿Algo no funciona como esperabas? Escríbenos y lo revisamos.
-            </p>
-            <a
-              href="mailto:soporte@plastifar.com"
-              className="mt-3 flex h-8 items-center justify-center rounded-edge bg-white
-                font-heading text-[11px] font-semibold uppercase tracking-[0.06em]
-                text-brand-red-dark transition-colors hover:bg-canvas"
-            >
-              Contactar soporte
-            </a>
-          </div>
-        </div>
-      )}
 
       {/* Panel emergente del riel contraido: es lo unico que deja llegar a los
           hijos de un grupo cuando la barra esta plegada. */}
