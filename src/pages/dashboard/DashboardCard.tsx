@@ -15,7 +15,11 @@ const paddingClass: Record<NonNullable<DashboardCardProps["padding"]>, string> =
 };
 
 /** Definicion UNICA de la tarjeta: los charts la envuelven en vez de recopiarla. */
-const CARD_SHELL = `${CARD_RADIUS} border border-line-soft bg-white shadow-[0_1px_2px_rgba(27,27,29,0.04),0_8px_24px_-12px_rgba(27,27,29,0.10)]`;
+// `line` y no `line-soft`: al quitarse el canvas tintado, la tarjeta quedo
+// blanca sobre blanco y su unico limite es este filete. `line-soft` esta pensado
+// para separar filas DENTRO de un set, no para delimitar una superficie contra
+// otra del mismo tono — a ese contraste el borde de la tarjeta desaparecia.
+const CARD_SHELL = `${CARD_RADIUS} border border-line bg-white shadow-[0_1px_2px_rgba(27,27,29,0.04),0_8px_24px_-12px_rgba(27,27,29,0.10)]`;
 
 /**
  * EXCEPCION DE DISENO, deliberada y acotada a este modulo: el resto del panel

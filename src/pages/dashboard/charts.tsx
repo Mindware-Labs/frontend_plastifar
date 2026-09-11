@@ -16,7 +16,6 @@ import {
 import { AXIS_TICK, CARD_WHITE, GRID_STROKE } from "./mono-charts/chartTheme";
 import { MonoChartTooltip } from "./mono-charts/MonoChartTooltip";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { INSET_RADIUS } from "./radii";
 
 /* ========================================================================== *
  *  Los dos graficos del tablero, en la anatomia de la referencia.
@@ -44,7 +43,10 @@ export function MonthlyBars({ data, average }: { data: MonthPoint[]; average: nu
   const isMobile = useIsMobile();
 
   return (
-    <div className={`w-full ${INSET_RADIUS} bg-canvas p-2`}>
+    // Sin escenario tintado: la gráfica se apoya directo sobre el blanco de la
+    // tarjeta, como en la referencia. La rejilla ya da la estructura; un segundo
+    // tono debajo era una caja dentro de otra caja.
+    <div className="w-full">
       <ResponsiveContainer width="100%" height={244}>
         <BarChart data={data} margin={{ top: 16, right: 10, left: -14, bottom: 0 }} barGap={4}>
           <CartesianGrid strokeDasharray="2 2" vertical={false} stroke={GRID_STROKE} />
@@ -171,8 +173,12 @@ export function DistributionDonut({ data, unit }: { data: Slice[]; unit: string 
   }
 
   return (
+    // Apilado, NO lado a lado. Esta dona vive en una tarjeta de un tercio de
+    // ancho: puesta la leyenda al costado le quedan ~100 px y trunca todos los
+    // nombres ("Distri...", "Ana ..."), que es justo lo que la leyenda existe
+    // para evitar. Apilada, cada nombre entra entero.
     <div className="flex flex-col gap-4">
-      <div className={`${INSET_RADIUS} bg-canvas p-2`}>
+      <div>
         <ResponsiveContainer width="100%" height={188}>
           <PieChart>
             <Tooltip content={<MonoChartTooltip indicator="dot" />} />
@@ -219,7 +225,7 @@ export function DistributionDonut({ data, unit }: { data: Slice[]; unit: string 
         </ResponsiveContainer>
       </div>
 
-      <ul className="flex flex-col gap-2">
+      <ul className="flex min-w-0 flex-1 flex-col gap-2">
         {slices.map((slice, index) => (
           <li key={slice.name} className="flex items-center gap-2 text-[12.5px]">
             <span

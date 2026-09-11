@@ -260,6 +260,10 @@ export function DashboardPage() {
           {/* 2 — reparto a la izquierda, cifras de Calidad a la derecha: es la
                  fila de la referencia, y separa "como esta repartido" de "que
                  hay que atender". */}
+          {/* Las tarjetas de una fila comparten alto, como en la referencia. El
+              sobrante no se amontona al pie de la tarjeta corta: `Panel` centra
+              su contenido, asi que el aire queda repartido arriba y abajo del
+              grafico en vez de leerse como un panel a medio cargar. */}
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
             <Panel
               title="Cartera por territorio"
@@ -331,6 +335,10 @@ export function DashboardPage() {
           {/* 3 — el grafico ancho y, a su lado, que tan concentrada esta la
                  cartera: la dona responde "¿depende todo de dos personas?",
                  la tabla de abajo da el listado. Son dos preguntas. */}
+          {/* Las tarjetas de una fila comparten alto, como en la referencia. El
+              sobrante no se amontona al pie de la tarjeta corta: `Panel` centra
+              su contenido, asi que el aire queda repartido arriba y abajo del
+              grafico en vez de leerse como un panel a medio cargar. */}
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
             <Panel
               title="HCA por mes"
