@@ -495,6 +495,8 @@ export interface TicketDetailResponse {
   attachments: TicketAttachmentResponse[];
   requesterEmail?: string | null;
   requesterName?: string | null;
+  verdictId: number | null;
+  verdictName: string | null;
   // Campos retrocompatibles
   code?: string;
   source?: string;
@@ -528,6 +530,8 @@ export interface AssignTicketResponse {
 export interface UpdateTicketStatusRequest {
   status: string;
   reason?: string | null;
+  verdictId?: number | null;
+  notifyClient?: boolean;
 }
 
 export interface UpdateTicketStatusResponse {
@@ -706,5 +710,43 @@ export interface SaveTicketTopicRequest {
   defaultDepartmentId: number;
   defaultPriority?: string;
   requiresProductLine: boolean;
+  isActive?: boolean;
+}
+
+/** Opción de veredicto para el selector del diálogo "Actualizar ticket". */
+export interface TicketVerdictOption {
+  id: number;
+  name: string;
+}
+
+/** Veredicto del catálogo, tal como lo lista su pantalla de administración. */
+export interface TicketVerdictResponse {
+  id: number;
+  name: string;
+  isActive: boolean;
+  /** Cuántos tickets lo usan: con uno solo ya no se puede borrar, solo desactivar. */
+  ticketCount: number;
+  updatedAt: string;
+}
+
+/** Contadores de las pastillas: los calcula la busqueda, no la pagina que se ve. */
+export interface TicketVerdictCounts {
+  all: number;
+  active: number;
+  inactive: number;
+}
+
+/** Respuesta paginada del catalogo de veredictos (GET /api/ticket-verdicts). */
+export interface TicketVerdictListResponse {
+  items: TicketVerdictResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: TicketVerdictCounts;
+}
+
+export interface SaveTicketVerdictRequest {
+  name: string;
   isActive?: boolean;
 }

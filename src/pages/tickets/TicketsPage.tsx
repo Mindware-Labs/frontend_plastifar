@@ -503,27 +503,106 @@ export function TicketsPage() {
         title="Tickets"
         summary={
           counts ? (
-            <span className="inline-flex flex-wrap items-center gap-x-2 tabular-nums">
-              <span>
-                {counts.all} {counts.all === 1 ? "ticket" : "tickets"}
-              </span>
-              <span aria-hidden className="text-line-strong">·</span>
-              <span>{counts.open} abiertos</span>
-              <span aria-hidden className="text-line-strong">·</span>
-              <span className={counts.overdue > 0 ? "font-semibold text-brand-red" : ""}>
-                {counts.overdue} {counts.overdue === 1 ? "vencido" : "vencidos"}
-              </span>
-              <span aria-hidden className="text-line-strong">·</span>
-              <span>{counts.waitingOnClient} en espera del cliente</span>
-            </span>
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              {/* Total tickets */}
+              <button
+                type="button"
+                onClick={() => setFilter("todos")}
+                title="Mostrar todos los tickets"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
+                  filter === "todos"
+                    ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
+                    : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                <span className="font-semibold text-zinc-900">{counts.all}</span>
+                <span>{counts.all === 1 ? "ticket" : "tickets"}</span>
+              </button>
+
+              <span aria-hidden className="text-zinc-300">·</span>
+
+              {/* Abiertos */}
+              <button
+                type="button"
+                onClick={() => setFilter("abiertos")}
+                title="Filtrar por tickets abiertos"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
+                  filter === "abiertos"
+                    ? "border border-emerald-300 bg-emerald-50 text-emerald-800 shadow-2xs font-semibold"
+                    : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-emerald-200 hover:bg-emerald-50/50 hover:text-emerald-800"
+                }`}
+              >
+                <span className="relative flex h-2 w-2 shrink-0">
+                  {counts.open > 0 && (
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                  )}
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
+                <span className="font-semibold text-zinc-900">{counts.open}</span>
+                <span>abiertos</span>
+              </button>
+
+              <span aria-hidden className="text-zinc-300">·</span>
+
+              {/* Vencidos */}
+              <button
+                type="button"
+                onClick={() => setFilter("vencidos")}
+                title="Filtrar por tickets vencidos de SLA"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
+                  counts.overdue > 0
+                    ? filter === "vencidos"
+                      ? "border border-red-300 bg-red-100/90 text-brand-red shadow-2xs font-bold ring-1 ring-red-300/40"
+                      : "border border-red-200/90 bg-red-50 text-brand-red font-semibold shadow-2xs hover:bg-red-100/70"
+                    : filter === "vencidos"
+                    ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
+                    : "border border-zinc-200/80 bg-white text-zinc-400 shadow-2xs hover:border-zinc-300 hover:text-zinc-600"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                    counts.overdue > 0 ? "bg-brand-red" : "bg-zinc-300"
+                  }`}
+                />
+                <span className={counts.overdue > 0 ? "font-bold text-brand-red" : "font-semibold text-zinc-800"}>
+                  {counts.overdue}
+                </span>
+                <span>{counts.overdue === 1 ? "vencido" : "vencidos"}</span>
+              </button>
+
+              <span aria-hidden className="text-zinc-300">·</span>
+
+              {/* En espera del cliente */}
+              <button
+                type="button"
+                onClick={() => setFilter("espera")}
+                title="Filtrar por tickets en espera del cliente"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
+                  filter === "espera"
+                    ? "border border-amber-300 bg-amber-50 text-amber-800 shadow-2xs font-semibold"
+                    : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-amber-200 hover:bg-amber-50/50 hover:text-amber-800"
+                }`}
+              >
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                <span className="font-semibold text-zinc-900">{counts.waitingOnClient}</span>
+                <span>en espera del cliente</span>
+              </button>
+            </div>
           ) : (
-            "Cargando los tickets…"
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando los tickets…
+            </span>
           )
         }
         action={
-          <Button size="sm" onClick={() => setCreateModalOpen(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            Nuevo ticket
+          <Button
+            size="sm"
+            onClick={() => setCreateModalOpen(true)}
+            className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            <span>Nuevo ticket</span>
           </Button>
         }
       />

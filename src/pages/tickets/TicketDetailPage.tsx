@@ -1,12 +1,11 @@
 import {
   ArrowLeft,
-  CheckCircle2,
   Clock,
   CornerUpLeft,
+  Gavel,
   History,
   Lock,
   Mail,
-  Package,
   Paperclip,
   Plus,
   RefreshCw,
@@ -17,11 +16,12 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ticketsApi } from "../../api/tickets";
+import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { Tabs, TabsList, TabsTrigger } from "../../components/shadcn/tabs";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { SelectField, TextField } from "../../components/ui/Field";
+import { CheckboxField, SelectField, TextField } from "../../components/ui/Field";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
@@ -33,6 +33,7 @@ import type {
   TicketCreateOptionsResponse,
   TicketDetailResponse,
   TicketStaffOptionResponse,
+  TicketVerdictOption,
 } from "../../types/api";
 import { AttachmentPreviewModal } from "../bandeja/AttachmentPreviewModal";
 import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
@@ -60,20 +61,14 @@ function validateAttachments(chosen: File[], existing: File[]): string | null {
   return null;
 }
 
-/** Categorias de cierre de un ticket solucionado; viajan dentro del motivo, visibles en el historial. */
-const SOLUTION_TYPES = [
-  "Consulta resuelta",
-  "Reemplazo de producto",
-  "Reenvío del pedido",
-  "Reembolso",
-  "Corrección de información",
-  "Otro",
-];
-
 const PRIORITY_OPTIONS = ["Emergencia", "Alta", "Normal", "Baja"].map((value) => ({ value, label: value }));
+
+/** Paso 1 del dialogo "Actualizar ticket": a que grupo de campos lleva cada transicion en el paso 2. */
+type UpdateCategory = "pausar" | "veredicto" | "cancelar" | "otro";
 
 interface StatusTransitionOption {
   target: string;
+  category: UpdateCategory;
   label: string;
   description: string;
   icon: typeof Clock;
@@ -82,34 +77,31 @@ interface StatusTransitionOption {
 
 const CANCEL_TRANSITION: StatusTransitionOption = {
   target: "Cancelado",
+  category: "cancelar",
   label: "Cancelar ticket",
-  description: "Cierre definitivo; exige un motivo explicativo.",
+  description: "El ticket no procede. Exige un motivo explicativo.",
   icon: X,
   danger: true,
 };
 
-/** Transiciones validas desde el estado actual, para el dialogo "Actualizar ticket". */
+/** Transiciones validas desde el estado actual, para el paso 1 del dialogo "Actualizar ticket". */
 function getAvailableTransitions(status: string): StatusTransitionOption[] {
   switch (status) {
     case "Abierto":
       return [
         {
           target: "En espera del cliente",
-          label: "Poner en espera del cliente",
+          category: "pausar",
+          label: "Pausar ticket",
           description: "Pausa el SLA mientras se espera respuesta del cliente.",
           icon: Clock,
         },
         {
-          target: "Reenvío de producto",
-          label: "Marcar para reenvío de producto",
-          description: "Se gestiona un reenvío físico del producto.",
-          icon: Package,
-        },
-        {
           target: "Solucionado",
-          label: "Marcar como solucionado",
-          description: "Requiere haber enviado antes al menos una respuesta al cliente.",
-          icon: CheckCircle2,
+          category: "veredicto",
+          label: "Marcar veredicto",
+          description: "Cierra el caso como resuelto.",
+          icon: Gavel,
         },
         CANCEL_TRANSITION,
       ];
@@ -117,6 +109,7 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
       return [
         {
           target: "Abierto",
+          category: "otro",
           label: "Reanudar a Abierto",
           description: "Reanuda la atención y el cómputo de SLA.",
           icon: RotateCcw,
@@ -127,9 +120,10 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
       return [
         {
           target: "Solucionado",
-          label: "Marcar como solucionado",
+          category: "veredicto",
+          label: "Marcar veredicto",
           description: "Cierra el caso como resuelto.",
-          icon: CheckCircle2,
+          icon: Gavel,
         },
         CANCEL_TRANSITION,
       ];
@@ -137,6 +131,7 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
       return [
         {
           target: "Abierto",
+          category: "otro",
           label: "Reabrir ticket",
           description: "Incrementa el contador de reaperturas.",
           icon: RotateCcw,
@@ -354,13 +349,18 @@ export function TicketDetailPage() {
     }
   };
 
-  // Cambio de estado: un solo dialogo para todas las transiciones validas.
+  // Cambio de estado: un dialogo en dos pasos para todas las transiciones validas.
+  // Paso 1: eligen la categoria (pausar / marcar veredicto / cancelar / otra). Paso 2: los campos de esa categoria.
   const [transitioning, setTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
+  const [updateStep, setUpdateStep] = useState<1 | 2>(1);
   const [updateTargetStatus, setUpdateTargetStatus] = useState("");
-  const [updateSolutionType, setUpdateSolutionType] = useState("");
+  const [updateVerdictId, setUpdateVerdictId] = useState("");
   const [updateComment, setUpdateComment] = useState("");
+  const [updateNotifyClient, setUpdateNotifyClient] = useState(false);
+  const [verdictOptions, setVerdictOptions] = useState<TicketVerdictOption[]>([]);
+  const [loadingVerdicts, setLoadingVerdicts] = useState(false);
 
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignableStaff, setAssignableStaff] = useState<TicketStaffOptionResponse[]>([]);
@@ -372,43 +372,67 @@ export function TicketDetailPage() {
 
   const handleOpenUpdateStatusModal = () => {
     const transitions = getAvailableTransitions(ticket?.status ?? "");
+    setUpdateStep(1);
     setUpdateTargetStatus(transitions[0]?.target ?? "");
-    setUpdateSolutionType("");
+    setUpdateVerdictId("");
     setUpdateComment("");
+    setUpdateNotifyClient(false);
     setTransitionError(null);
     setShowUpdateStatusModal(true);
+
+    setLoadingVerdicts(true);
+    ticketVerdictsApi
+      .list({ page: 1, pageSize: 100, status: "activos" })
+      .then((res) => setVerdictOptions(res.items.map((v) => ({ id: v.id, name: v.name }))))
+      .catch(() => setVerdictOptions([]))
+      .finally(() => setLoadingVerdicts(false));
   };
 
-  const handleConfirmUpdateStatus = async (event: React.FormEvent) => {
-    event.preventDefault();
+  // La categoria decide que campos pide el paso 2; se recalcula del estado actual, no del array de mas abajo.
+  const updateCategory = getAvailableTransitions(ticket?.status ?? "").find(
+    (t) => t.target === updateTargetStatus,
+  )?.category;
+
+  const handleContinueUpdateStatus = () => {
     if (!updateTargetStatus) {
       setTransitionError("Selecciona la nueva situación del ticket.");
       return;
     }
-    if (updateTargetStatus === "Cancelado" && !updateComment.trim()) {
+    setTransitionError(null);
+    setUpdateStep(2);
+  };
+
+  const handleConfirmUpdateStatus = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (updateCategory === "cancelar" && !updateComment.trim()) {
       setTransitionError("La cancelación exige un motivo escrito.");
       return;
     }
-    if (updateTargetStatus === "Solucionado") {
-      if (!updateSolutionType) {
-        setTransitionError("Selecciona el tipo de solución.");
+    if (updateCategory === "pausar" && !updateComment.trim()) {
+      setTransitionError("La pausa exige un motivo escrito.");
+      return;
+    }
+    if (updateCategory === "veredicto") {
+      if (!updateVerdictId) {
+        setTransitionError("Selecciona un veredicto.");
         return;
       }
-      if (!ticket?.messages.some((m) => m.direction === "Saliente")) {
-        setTransitionError("No se puede marcar como solucionado sin haber enviado al menos una respuesta al cliente.");
+      if (!updateComment.trim()) {
+        setTransitionError("El veredicto exige un comentario escrito.");
         return;
       }
     }
-
-    const reason =
-      updateTargetStatus === "Solucionado"
-        ? `Tipo de solución: ${updateSolutionType}${updateComment.trim() ? ` · Comentario: ${updateComment.trim()}` : ""}`
-        : updateComment.trim() || undefined;
 
     try {
       setTransitioning(true);
       setTransitionError(null);
-      await ticketsApi.updateStatus(ticketId, { status: updateTargetStatus, reason });
+      await ticketsApi.updateStatus(ticketId, {
+        status: updateTargetStatus,
+        reason: updateComment.trim() || undefined,
+        verdictId: updateCategory === "veredicto" ? Number(updateVerdictId) : undefined,
+        notifyClient:
+          updateCategory === "cancelar" || updateCategory === "veredicto" ? updateNotifyClient : undefined,
+      });
       setShowUpdateStatusModal(false);
       await refreshTicket();
     } catch (err) {
@@ -921,86 +945,118 @@ export function TicketDetailPage() {
         </Modal>
       )}
 
-      {/* Una sola entrada para todas las transiciones: Solucionado pide tipo de solucion,
-          Cancelado exige motivo, el resto acepta un comentario opcional. */}
+      {/* Dos pasos: primero eligen que hacer (pausar / marcar veredicto / cancelar / otra), luego
+          completan los campos de esa categoria. Cancelado y veredicto pueden avisar al cliente por correo. */}
       {showUpdateStatusModal && (
         <Modal
           eyebrow={ticket.number}
           title="Actualizar ticket"
-          description="Avanzar, pausar o cerrar el ciclo de vida del ticket."
+          description={updateStep === 1 ? "Elige qué hacer con este ticket." : "Completa los datos para confirmar."}
           maxWidth="max-w-md"
           onClose={() => {
             if (!transitioning) setShowUpdateStatusModal(false);
           }}
           footer={
-            <>
-              <Button type="button" variant="secondary" size="sm" disabled={transitioning} onClick={() => setShowUpdateStatusModal(false)}>
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                form="update-status-form"
-                size="sm"
-                variant={updateTargetStatus === "Cancelado" ? "danger" : "primary"}
-                isLoading={transitioning}
-              >
-                {updateTargetStatus === "Cancelado" ? "Cancelar ticket" : "Confirmar"}
-              </Button>
-            </>
+            updateStep === 1 ? (
+              <>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setShowUpdateStatusModal(false)}>
+                  Cancelar
+                </Button>
+                <Button type="button" size="sm" disabled={!updateTargetStatus} onClick={handleContinueUpdateStatus}>
+                  Continuar
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => setUpdateStep(1)}
+                >
+                  Atrás
+                </Button>
+                <Button
+                  type="submit"
+                  form="update-status-form"
+                  size="sm"
+                  variant={updateCategory === "cancelar" ? "danger" : "primary"}
+                  isLoading={transitioning}
+                >
+                  {updateCategory === "cancelar" ? "Cancelar ticket" : "Confirmar"}
+                </Button>
+              </>
+            )
           }
         >
-          <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-3">
-            {transitionError && <Alert variant="error">{transitionError}</Alert>}
+          {updateStep === 1 ? (
+            <div className="space-y-3">
+              {transitionError && <Alert variant="error">{transitionError}</Alert>}
 
-            <div role="radiogroup" aria-label="Nueva situación" className="space-y-1.5">
-              {availableTransitions.map((option) => {
-                const isSelected = updateTargetStatus === option.target;
-                const OptionIcon = option.icon;
-                return (
-                  <button
-                    key={option.target}
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    onClick={() => setUpdateTargetStatus(option.target)}
-                    className={`flex w-full items-start gap-2.5 rounded-lg border p-2.5 text-left outline-none transition-all cursor-pointer
-                      focus-visible:ring-2 focus-visible:ring-brand-red/20 ${
-                        isSelected
-                          ? "border-brand-red bg-brand-red/[0.04] shadow-2xs"
-                          : "border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50"
-                      }`}
-                  >
-                    <OptionIcon
-                      aria-hidden
-                      className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${option.danger ? "text-brand-red" : "text-zinc-500"}`}
-                    />
-                    <span>
-                      <span className="block text-[12.5px] font-semibold text-zinc-900">{option.label}</span>
-                      <span className="block text-[11px] text-zinc-500 leading-tight mt-0.5">{option.description}</span>
-                    </span>
-                  </button>
-                );
-              })}
+              <div role="radiogroup" aria-label="Nueva situación" className="space-y-1.5">
+                {availableTransitions.map((option) => {
+                  const isSelected = updateTargetStatus === option.target;
+                  const OptionIcon = option.icon;
+                  return (
+                    <button
+                      key={option.target}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => setUpdateTargetStatus(option.target)}
+                      className={`flex w-full items-start gap-2.5 rounded-lg border p-2.5 text-left outline-none transition-all cursor-pointer
+                        focus-visible:ring-2 focus-visible:ring-brand-red/20 ${
+                          isSelected
+                            ? "border-brand-red bg-brand-red/[0.04] shadow-2xs"
+                            : "border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50"
+                        }`}
+                    >
+                      <OptionIcon
+                        aria-hidden
+                        className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${option.danger ? "text-brand-red" : "text-zinc-500"}`}
+                      />
+                      <span>
+                        <span className="block text-[12.5px] font-semibold text-zinc-900">{option.label}</span>
+                        <span className="block text-[11px] text-zinc-500 leading-tight mt-0.5">{option.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+          ) : (
+            <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-3">
+              {transitionError && <Alert variant="error">{transitionError}</Alert>}
 
-            {updateTargetStatus === "Solucionado" && (
-              <SelectField
-                id="solution-type"
-                label="Tipo de solución"
-                size="sm"
-                required
-                placeholder="Selecciona un tipo"
-                value={updateSolutionType}
-                onChange={setUpdateSolutionType}
-                options={SOLUTION_TYPES.map((value) => ({ value, label: value }))}
-              />
-            )}
+              {updateCategory === "veredicto" && (
+                <SelectField
+                  id="update-verdict"
+                  label="Veredicto"
+                  size="sm"
+                  required
+                  placeholder={loadingVerdicts ? "Cargando…" : "Selecciona un veredicto"}
+                  value={updateVerdictId}
+                  onChange={setUpdateVerdictId}
+                  options={verdictOptions.map((v) => ({ value: String(v.id), label: v.name }))}
+                  hint={
+                    !loadingVerdicts && verdictOptions.length === 0
+                      ? "No hay veredictos activos en el catálogo. Créalos en Tickets · Veredictos."
+                      : undefined
+                  }
+                />
+              )}
 
-            {updateTargetStatus && (
               <div className="flex flex-col gap-1">
                 <label htmlFor="update-comment" className={labelClass}>
-                  {updateTargetStatus === "Cancelado" ? "Motivo de cancelación" : "Comentario"}
-                  {updateTargetStatus === "Cancelado" ? (
+                  {updateCategory === "cancelar"
+                    ? "Motivo de cancelación"
+                    : updateCategory === "pausar"
+                      ? "Motivo de la pausa"
+                      : updateCategory === "veredicto"
+                        ? "Comentario del veredicto"
+                        : "Comentario"}
+                  {updateCategory === "cancelar" || updateCategory === "pausar" || updateCategory === "veredicto" ? (
                     <span className="ml-1 text-brand-red">*</span>
                   ) : (
                     <span className="ml-1 font-normal text-zinc-400">(opcional)</span>
@@ -1009,19 +1065,36 @@ export function TicketDetailPage() {
                 <textarea
                   id="update-comment"
                   rows={3}
-                  required={updateTargetStatus === "Cancelado"}
                   value={updateComment}
                   onChange={(event) => setUpdateComment(event.target.value)}
                   placeholder={
-                    updateTargetStatus === "Cancelado"
+                    updateCategory === "cancelar"
                       ? "Explica por qué se cancela este ticket…"
-                      : "Contexto adicional para el historial del ticket…"
+                      : updateCategory === "pausar"
+                        ? "Explica por qué se pausa este ticket…"
+                        : updateCategory === "veredicto"
+                          ? "Explica el veredicto…"
+                          : "Contexto adicional para el historial del ticket…"
                   }
                   className={textareaClass}
                 />
               </div>
-            )}
-          </form>
+
+              {(updateCategory === "cancelar" || updateCategory === "veredicto") && (
+                <CheckboxField
+                  label="Notificar al cliente por correo"
+                  description={
+                    recipientEmail
+                      ? `Se le avisará a ${recipientEmail}.`
+                      : "Este ticket no tiene un correo de contacto registrado."
+                  }
+                  checked={updateNotifyClient}
+                  disabled={!recipientEmail}
+                  onChange={(event) => setUpdateNotifyClient(event.target.checked)}
+                />
+              )}
+            </form>
+          )}
         </Modal>
       )}
 

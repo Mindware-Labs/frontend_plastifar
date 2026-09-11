@@ -2,6 +2,7 @@ import {
   Archive,
   Bell,
   ChevronDown,
+  Gavel,
   Inbox,
   KeyRound,
   LogOut,
@@ -55,6 +56,7 @@ const groups: NavGroup[] = [
     children: [
       { label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon },
       { label: "Motivos", to: "/tickets/motivos", icon: Tag },
+      { label: "Veredictos", to: "/tickets/veredictos", icon: Gavel },
     ],
   },
   {

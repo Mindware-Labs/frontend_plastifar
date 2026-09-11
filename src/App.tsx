@@ -10,6 +10,7 @@ import { StaffPage } from "./pages/staff/StaffPage";
 import { RespuestasPage } from "./pages/respuestas/RespuestasPage";
 import { TicketDetailPage } from "./pages/tickets/TicketDetailPage";
 import { MotivosPage } from "./pages/tickets/MotivosPage";
+import { VeredictosPage } from "./pages/tickets/VeredictosPage";
 import { TicketsPage } from "./pages/tickets/TicketsPage";
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
       >
         <Route path="/tickets" element={<TicketsPage />} />
         <Route path="/tickets/motivos" element={<MotivosPage />} />
+        <Route path="/tickets/veredictos" element={<VeredictosPage />} />
         <Route path="/tickets/:id" element={<TicketDetailPage />} />
         <Route path="/bandeja" element={<BandejaPage folder="inbox" />} />
         <Route path="/bandeja/destacados" element={<BandejaPage folder="starred" />} />
