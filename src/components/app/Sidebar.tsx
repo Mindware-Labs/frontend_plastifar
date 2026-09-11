@@ -6,8 +6,6 @@ import {
   Inbox,
   KeyRound,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
   PenLine,
   MessageSquareText,
   Send,
@@ -112,6 +110,77 @@ function FolderBadge({
     >
       {count.unread > 99 ? "99+" : count.unread}
     </span>
+  );
+}
+
+/**
+ * Icono de colapso/expansión de barra lateral artesanal y micro-interactivo:
+ * - Marco con esquinas redondeadas continuas y grosor afinado de 1.25px.
+ * - Carril izquierdo que simula la barra lateral con relieve sutil y realce rojo de marca al hacer hover.
+ * - Línea divisoria y chevron interior dinámico que se desliza sutilmente en la dirección de la acción.
+ */
+function SidebarToggleIcon({ collapsed = false }: { collapsed?: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="shrink-0"
+      aria-hidden="true"
+    >
+      {/* Marco perimetral */}
+      <rect
+        x="1.75"
+        y="2.25"
+        width="14.5"
+        height="13.5"
+        rx="2.75"
+        className="stroke-current"
+        strokeWidth="1.25"
+      />
+      {/* Carril del panel lateral con realce interactivo */}
+      <rect
+        x="2.5"
+        y="3"
+        width="3.75"
+        height="12"
+        rx="1.75"
+        className={`transition-colors duration-200 ${
+          collapsed
+            ? "fill-zinc-200/80"
+            : "fill-zinc-200/60 group-hover:fill-brand-red/20"
+        }`}
+      />
+      {/* Línea divisoria del carril */}
+      <line
+        x1="6.75"
+        y1="2.25"
+        x2="6.75"
+        y2="15.75"
+        className="stroke-current"
+        strokeWidth="1.2"
+      />
+      {/* Chevron de acción dinámico con animación táctil al hover */}
+      {collapsed ? (
+        <path
+          d="M9.75 6.5L12.25 9L9.75 11.5"
+          className="stroke-current transition-transform duration-200 ease-out group-hover:translate-x-0.5"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ) : (
+        <path
+          d="M12.25 6.5L9.75 9L12.25 11.5"
+          className="stroke-current transition-transform duration-200 ease-out group-hover:-translate-x-0.5"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
   );
 }
 
@@ -283,51 +352,50 @@ export function Sidebar() {
       <div
         className={`flex shrink-0 items-center border-b border-zinc-200/80 transition-all duration-200 ${
           collapsed
-            ? "h-[84px] flex-col items-center justify-center gap-2.5 px-2"
-            : "h-14 justify-between px-3"
+            ? "h-20 flex-col items-center justify-center gap-2 px-2"
+            : "h-14 justify-between px-3.5"
         }`}
       >
         {!collapsed ? (
           <>
-            <div className="flex items-center gap-2.5 pl-0.5">
-              <Link
-                to="/bandeja"
-                className="transition-opacity hover:opacity-85 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 rounded-md"
-                title="Plastifar · Ir a Bandeja"
-              >
-                <Logo variant="color" height={22} />
-              </Link>
-              <span className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-heading text-[9.5px] font-semibold tracking-wider text-zinc-500">
-                OPS
-              </span>
-            </div>
+            <Link
+              to="/bandeja"
+              className="group flex items-center pl-1 transition-opacity hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 rounded-lg py-1"
+              title="Plastifar · Ir a Bandeja"
+            >
+              <Logo
+                variant="color"
+                height={24}
+                className="transition-transform duration-150 group-hover:scale-[1.01]"
+              />
+            </Link>
             <button
               type="button"
               onClick={toggleCollapsed}
               aria-label="Contraer la barra lateral"
               title="Contraer barra lateral"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-all duration-150 hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 outline-none"
+              className="group flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200/70 bg-white text-zinc-400 shadow-2xs transition-all duration-150 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-800 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/30 cursor-pointer"
             >
-              <PanelLeftClose className="h-4 w-4" />
+              <SidebarToggleIcon collapsed={false} />
             </button>
           </>
         ) : (
           <>
             <Link
               to="/bandeja"
-              className="flex items-center justify-center rounded-md transition-opacity hover:opacity-85 active:scale-95 outline-none"
+              className="flex items-center justify-center rounded-lg transition-opacity hover:opacity-90 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
               title="Plastifar · Ir a Bandeja"
             >
-              <Logo variant="isotipo" height={22} />
+              <Logo variant="isotipo" height={24} />
             </Link>
             <button
               type="button"
               onClick={toggleCollapsed}
               aria-label="Expandir la barra lateral"
               title="Expandir barra lateral"
-              className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-400 transition-all hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 outline-none"
+              className="group flex h-7.5 w-7.5 items-center justify-center rounded-lg border border-zinc-200/70 bg-white text-zinc-400 shadow-2xs transition-all duration-150 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-800 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/30 cursor-pointer"
             >
-              <PanelLeftOpen className="h-4 w-4" />
+              <SidebarToggleIcon collapsed={true} />
             </button>
           </>
         )}
