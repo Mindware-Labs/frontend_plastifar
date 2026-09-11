@@ -1,9 +1,8 @@
 import { CornerUpLeft, MessagesSquare, Paperclip, Star } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
-import { Badge } from "../../components/shadcn/badge";
-import { formatEmailListDate, formatTicketCode } from "../../lib/format";
+import { TicketChip } from "../../components/app/TicketChip";
+import { formatEmailListDate } from "../../lib/format";
 import type { EmailSummaryResponse } from "../../types/api";
-import { ticketBadgeClass } from "./badgeStyles";
 import { SelectBox } from "../../components/ui/SelectBox";
 
 interface ConversationRowProps {
@@ -184,11 +183,7 @@ export function ConversationRow({
                   {email.attachmentCount}
                 </span>
               )}
-              {email.ticketId && (
-                <Badge variant="secondary" className={`${ticketBadgeClass} h-4 px-1.5`}>
-                  {formatTicketCode(email.ticketId)}
-                </Badge>
-              )}
+              <TicketChip size="xs" ticketId={email.ticketId} />
             </div>
           )}
         </div>

@@ -14,7 +14,7 @@ const EXIT_FALLBACK = 200;
 const TICK = 200;
 
 const cardClass =
-  "group pointer-events-auto relative flex flex-col rounded-edge bg-white " +
+  "group pointer-events-auto relative flex flex-col rounded-lg bg-white " +
   "shadow-[0_1px_2px_-1px_rgba(27,27,29,0.06),0_12px_28px_-16px_rgba(27,27,29,0.32)]";
 
 function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () => void }) {
@@ -111,11 +111,15 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
       }`}
     >
       <div className="flex h-8 shrink-0 items-center gap-2 pl-3.5 pr-2">
-        {failed ? (
-          <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-red-dark" />
-        ) : (
-          <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-green" />
-        )}
+        {/* Sello de estado, como en el chip de ticket: verde pleno al lograrse, rojo pálido al fallar. */}
+        <span
+          aria-hidden
+          className={`flex size-4.5 shrink-0 items-center justify-center rounded-[5px] ${
+            failed ? "bg-brand-red/10 text-brand-red-dark" : "bg-brand-green text-white"
+          }`}
+        >
+          {failed ? <AlertTriangle className="size-2.5" strokeWidth={2.5} /> : <Check className="size-2.5" strokeWidth={3} />}
+        </span>
 
         <span className="font-heading text-[10px] font-bold uppercase leading-none tracking-[0.11em] text-ink">
           {failed ? "No se pudo" : "Listo"}
@@ -134,7 +138,7 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
           type="button"
           onClick={() => setLeaving(true)}
           aria-label="Cerrar el aviso"
-          className="shrink-0 rounded-edge p-1.5 text-subtle outline-none transition-colors
+          className="shrink-0 rounded-md p-1.5 text-subtle outline-none transition-colors
             hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/25"
         >
           <X className="h-3 w-3" />
@@ -181,7 +185,7 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
             type="button"
             onClick={runAction}
             disabled={busy}
-            className="h-8 shrink-0 rounded-edge px-2.5 font-heading text-[10.5px] font-bold
+            className="h-8 shrink-0 rounded-md px-2.5 font-heading text-[10.5px] font-bold
               uppercase leading-none tracking-[0.07em] text-brand-red outline-none
               transition-colors hover:bg-fill hover:text-brand-red-dark
               focus-visible:ring-3 focus-visible:ring-brand-red/25 disabled:opacity-50"

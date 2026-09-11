@@ -23,11 +23,11 @@ import { Alert } from "../../components/ui/Alert";
 import { Button as PfButton } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Spinner } from "../../components/ui/Spinner";
+import { TicketChip } from "../../components/app/TicketChip";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useNoticeInset, useReceipts } from "../../context/useReceipts";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
-import { Badge } from "../../components/shadcn/badge";
 import { Button } from "../../components/shadcn/button";
 import { Separator } from "../../components/shadcn/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/shadcn/tooltip";
@@ -49,7 +49,6 @@ import { AssignmentControl } from "./ConversationTools";
 import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
 import { RecipientInput } from "./RecipientInput";
 import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
-import { ticketBadgeClass } from "./badgeStyles";
 import { SendValidationButton } from "./SendValidationButton";
 import { type ValidationItem } from "./sendValidation";
 
@@ -161,13 +160,13 @@ function TicketsOriginPopover({ note, ticketId }: TicketsOriginPopoverProps) {
             <button
               type="button"
               aria-label="Ver información de origen del ticket"
-              className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-edge border border-brand-red/30 bg-brand-red/8 px-2 text-[11px] font-semibold text-brand-red-dark shadow-2xs transition-all hover:border-brand-red/50 hover:bg-brand-red/15 focus-visible:ring-3 focus-visible:ring-brand-red/20 data-[state=open]:border-brand-red/60 data-[state=open]:bg-brand-red/15"
+              className="group/origin inline-flex h-7 cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-white pl-1 pr-2.5 text-zinc-700 shadow-2xs outline-none transition-[background-color,border-color,color] duration-200 ease-out hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 focus-visible:ring-2 focus-visible:ring-brand-red/25 data-[state=open]:border-zinc-300 data-[state=open]:bg-zinc-100 data-[state=open]:shadow-none motion-reduce:transition-none"
             >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-red text-white shadow-2xs">
-                <TicketIcon className="h-2.5 w-2.5" />
+              <span className="flex size-5 items-center justify-center rounded-md bg-brand-red/10 text-brand-red transition-colors duration-200 group-hover/origin:bg-brand-red group-hover/origin:text-white group-data-[state=open]/origin:bg-brand-red group-data-[state=open]/origin:text-white">
+                <TicketIcon className="size-3" strokeWidth={2.25} />
               </span>
-              <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em]">
-                Tickets
+              <span className="font-heading text-[10px] font-bold uppercase leading-none tracking-[0.08em]">
+                Origen: Tickets
               </span>
             </button>
           </PopoverTrigger>
@@ -261,6 +260,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
+  const [justCreatedTicketId, setJustCreatedTicketId] = useState<number | null>(null);
   const [moving, setMoving] = useState(false);
   const [starring, setStarring] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -782,7 +782,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             </>
           )}
 
-          {ticketsNote(email) && (
+          {ticketsNote(email) && !email.ticketId && (
             <TicketsOriginPopover
               note={ticketsNote(email)!}
               ticketId={email.ticketId}
@@ -799,21 +799,15 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             onNoteAdded={() => setNotesRefreshKey((k) => k + 1)}
           />
 
-          {email.ticketId ? (
-            <Link to={`/tickets/${email.ticketId}`} title="Ver el detalle del ticket">
-              <Badge
-                variant="secondary"
-                className={`${ticketBadgeClass} cursor-pointer transition-colors hover:bg-brand-red/15`}
-              >
-                {formatTicketCode(email.ticketId)}
-              </Badge>
-            </Link>
-          ) : (
-            <PfButton size="sm" className="h-7 px-3" onClick={() => setIsCreateTicketModalOpen(true)}>
-              <TicketIcon className="h-[15px] w-[15px]" />
-              Crear ticket
-            </PfButton>
-          )}
+          <TicketChip
+            ticketId={email.ticketId}
+            provenance={email.origin === "Tickets" ? "thread" : "manual"}
+            note={ticketsNote(email)}
+            justCreated={justCreatedTicketId !== null && justCreatedTicketId === email.ticketId}
+            onSettled={() => setJustCreatedTicketId(null)}
+            active={isCreateTicketModalOpen}
+            onCreate={() => setIsCreateTicketModalOpen(true)}
+          />
 
           <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-line" />
 
@@ -1491,6 +1485,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           onClose={() => setIsCreateTicketModalOpen(false)}
           onCreated={(created) => {
             setEmail({ ...email, ticketId: created.id });
+            setJustCreatedTicketId(created.id);
             onTicketCreated();
             setIsCreateTicketModalOpen(false);
             receipts.done({

@@ -116,6 +116,12 @@ input:-webkit-autofill:focus {
   38% { transform: translateY(3px); }
 }
 
+/* El sello del chip de ticket al confirmar la creación: entra desde pequeño y se asienta. */
+@keyframes plf-seal-pop {
+  from { transform: scale(0.55); }
+  to { transform: none; }
+}
+
 /* Confirmación del código: cada dígito se eleva un instante, en cascada, al verificarse. */
 @keyframes plf-otp-confirm {
   0%, 100% { transform: none; }
@@ -224,6 +230,7 @@ input:-webkit-autofill:focus {
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
 .animate-plf-settle { animation: plf-settle 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-otp-confirm { animation: plf-otp-confirm 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-seal-pop { animation: plf-seal-pop 0.42s var(--ease-plf-spring) both; }
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
 .animate-plf-receipt-in { animation: plf-receipt-in 0.28s var(--ease-plf-spring) both; }
 .animate-plf-receipt-out { animation: plf-receipt-out 0.16s ease-in both; }
@@ -242,6 +249,7 @@ input:-webkit-autofill:focus {
   .animate-plf-shake,
   .animate-plf-settle,
   .animate-plf-otp-confirm,
+  .animate-plf-seal-pop,
   .animate-plf-toast-progress,
   .animate-plf-receipt-in {
     animation: none !important;
