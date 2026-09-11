@@ -197,76 +197,81 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
     >
       {/* Tarjeta encima de la fecha */}
       <div className="group/note relative">
-          {/* Capas visuales apiladas (stacked cards) que denotan físicamente múltiples notas */}
-          {count >= 2 && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-1 -right-1 -z-10 h-full w-full rounded-edge
-                border border-warn/35 bg-warn/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.05)]
-                transition-all duration-200 group-hover/note:-bottom-1.5 group-hover/note:-right-1.5"
-            />
-          )}
-          {count >= 3 && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-2 -right-2 -z-20 h-full w-full rounded-edge
-                border border-warn/20 bg-warn/[0.03]
-                transition-all duration-200 group-hover/note:-bottom-2.5 group-hover/note:-right-2.5"
-            />
-          )}
+        {/* Capas visuales apiladas (stacked cards) que denotan físicamente múltiples notas */}
+        {count >= 2 && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -bottom-1 -right-1 -z-10 h-full w-full rounded-lg
+              border border-amber-200/80 bg-amber-50/50 shadow-2xs
+              transition-all duration-200 group-hover/note:-bottom-1.5 group-hover/note:-right-1.5"
+          />
+        )}
+        {count >= 3 && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -bottom-2 -right-2 -z-20 h-full w-full rounded-lg
+              border border-amber-200/50 bg-amber-50/30
+              transition-all duration-200 group-hover/note:-bottom-2.5 group-hover/note:-right-2.5"
+          />
+        )}
 
-          {/* Tarjeta principal interactiva que muestra la última nota */}
-          <button
-            type="button"
-            onClick={togglePopover}
-            data-open={open && !isClosing}
-            className="flex max-w-[280px] sm:max-w-[340px] md:max-w-[390px] items-center gap-2 rounded-edge
-              border border-warn/35 bg-[#fffdf7] px-2.5 py-1.5 text-left outline-none
-              shadow-[0_1px_2px_rgba(194,118,10,0.08)] transition-all duration-150
-              hover:border-warn/60 hover:bg-[#fff9ea] hover:shadow-xs
-              focus-visible:ring-3 focus-visible:ring-warn/25
-              data-[open=true]:border-warn/70 data-[open=true]:bg-[#fff7e2]"
-            title={count > 1 ? `${count} notas internas · Clic para desplegar todas` : "Nota interna · Clic para ver detalles"}
-          >
-            <StickyNote className="h-3.5 w-3.5 shrink-0 text-warn" />
+        {/* Tarjeta principal interactiva que muestra la última nota */}
+        <button
+          type="button"
+          onClick={togglePopover}
+          data-open={open && !isClosing}
+          className="group/btn flex max-w-[280px] sm:max-w-[340px] md:max-w-[390px] items-center gap-2.5 rounded-lg
+            border border-amber-200/90 bg-amber-50/70 px-2.5 py-1.5 text-left outline-none
+            shadow-2xs transition-all duration-150 cursor-pointer
+            hover:border-amber-300 hover:bg-amber-100/60 active:scale-[0.99]
+            focus-visible:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-400/20
+            data-[open=true]:border-amber-300 data-[open=true]:bg-amber-100/70 data-[open=true]:shadow-xs"
+          title={count > 1 ? `${count} notas internas · Clic para desplegar todas` : "Nota interna · Clic para ver detalles"}
+        >
+          <div className="flex size-5.5 shrink-0 items-center justify-center rounded-md bg-amber-100/90 text-amber-700 shadow-2xs">
+            <StickyNote className="h-3 w-3" />
+          </div>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 text-[10.5px]">
-                <span className="truncate font-semibold text-ink">{latestNote.authorName}</span>
-                <span className="shrink-0 text-faint">·</span>
-                <span className="shrink-0 text-subtle">{formatNoteTime(latestNote.createdAt)}</span>
-              </div>
-              <p className="truncate text-[11.5px] leading-snug text-ink/90">
-                {latestNote.body}
-              </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-[10.5px]">
+              <span className="truncate font-semibold text-amber-950">{latestNote.authorName}</span>
+              <span className="shrink-0 text-amber-300">·</span>
+              <span className="shrink-0 font-medium text-amber-800/80">{formatNoteTime(latestNote.createdAt)}</span>
             </div>
+            <p className="truncate text-[11.5px] leading-snug text-amber-950/90 font-normal">
+              {latestNote.body}
+            </p>
+          </div>
 
-            {/* Distintivo de múltiples notas y chevron */}
+          <div className="flex shrink-0 items-center gap-1">
             {count > 1 && (
-              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-warn/15 px-1.5 py-0.5 font-heading text-[9.5px] font-bold text-warn-dark">
+              <span className="inline-flex shrink-0 items-center rounded-md bg-amber-200/90 px-1.5 py-0.5 font-heading text-[9.5px] font-bold tabular-nums text-amber-950 shadow-2xs">
                 {count}
               </span>
             )}
             <ChevronDown
-              className={`h-3 w-3 shrink-0 text-warn/80 transition-transform duration-200 ${
-                open && !isClosing ? "rotate-180" : ""
+              className={`h-3 w-3 shrink-0 text-amber-600 transition-transform duration-200 group-hover/btn:text-amber-800 ${
+                open && !isClosing ? "rotate-180 text-amber-800" : ""
               }`}
             />
-          </button>
-        </div>
+          </div>
+        </button>
+      </div>
 
       {/* Panel desplegado (Popover) con todas las notas y el creador */}
       {(open || isClosing) && (
         <div
-          className={`absolute right-0 top-full z-50 mt-1.5 w-[340px] sm:w-[400px] rounded-edge border
-            border-line-strong bg-white p-3 shadow-[0_12px_36px_-4px_rgba(27,27,29,0.18)]
+          className={`absolute right-0 top-full z-50 mt-1.5 w-[340px] sm:w-[400px] rounded-lg border
+            border-zinc-200/90 bg-white p-3 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]
             ${isClosing ? "animate-plf-popover-out" : "animate-plf-popover-in"}`}
         >
           {/* Cabecera del popover */}
-          <div className="mb-2.5 flex items-center justify-between border-b border-line pb-2">
-            <div className="flex items-center gap-1.5">
-              <StickyNote className="h-3.5 w-3.5 text-warn" />
-              <span className="font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-ink">
+          <div className="mb-2.5 flex items-center justify-between border-b border-zinc-100 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="flex size-5.5 shrink-0 items-center justify-center rounded-md bg-amber-100/90 text-amber-700 shadow-2xs">
+                <StickyNote className="h-3 w-3" />
+              </div>
+              <span className="font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-900">
                 Notas internas {count > 0 ? `(${count})` : ""}
               </span>
             </div>
@@ -276,8 +281,8 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
                 <button
                   type="button"
                   onClick={() => setShowAddForm(true)}
-                  className="inline-flex items-center gap-1 rounded-edge px-1.5 py-0.5 font-heading text-[10px] font-bold uppercase
-                    tracking-[0.06em] text-brand-red-dark transition-colors hover:bg-brand-red/[0.06]"
+                  className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-0.5 font-heading text-[10.5px] font-bold uppercase
+                    tracking-wider text-zinc-700 shadow-2xs transition-all hover:bg-zinc-50 hover:border-zinc-300"
                 >
                   <Plus className="h-2.5 w-2.5" />
                   Agregar
@@ -287,8 +292,8 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
                 type="button"
                 onClick={closePopover}
                 aria-label="Cerrar notas"
-                className="flex size-5 items-center justify-center rounded-edge text-faint transition-colors
-                  hover:bg-fill hover:text-ink"
+                className="flex size-5 items-center justify-center rounded-md text-zinc-400 transition-colors
+                  hover:bg-zinc-100 hover:text-zinc-700"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -300,14 +305,14 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
             {[...(notes ?? [])].reverse().map((note) => (
               <div
                 key={note.id}
-                className="group/item relative rounded-edge border border-warn/30 bg-warn/[0.06] p-2.5 transition-colors
-                  hover:bg-warn/[0.09]"
+                className="group/item relative rounded-lg border border-amber-200/90 bg-amber-50/70 p-2.5 shadow-2xs transition-colors
+                  hover:bg-amber-50"
               >
                 <div className="flex items-center justify-between text-[10.5px]">
                   <div className="flex items-center gap-1.5 truncate">
-                    <span className="font-semibold text-ink">{note.authorName}</span>
-                    <span className="text-faint">·</span>
-                    <span className="text-subtle">{formatDateTime(note.createdAt)}</span>
+                    <span className="font-semibold text-amber-950">{note.authorName}</span>
+                    <span className="text-amber-300">·</span>
+                    <span className="text-amber-800/80">{formatDateTime(note.createdAt)}</span>
                   </div>
                   {(user?.staffId === note.staffId || user?.isAdmin) && (
                     <button
@@ -315,13 +320,13 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
                       onClick={(e) => handleRemove(note, e)}
                       aria-label="Borrar esta nota"
                       title="Borrar nota"
-                      className="text-faint opacity-60 transition-opacity hover:text-brand-red hover:opacity-100"
+                      className="text-amber-400 opacity-60 transition-opacity hover:text-brand-red hover:opacity-100"
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
                   )}
                 </div>
-                <p className="mt-1.5 whitespace-pre-wrap text-[12px] leading-relaxed text-ink">
+                <p className="mt-1.5 whitespace-pre-wrap text-[12px] leading-relaxed text-amber-950 font-normal">
                   {note.body}
                 </p>
               </div>
@@ -330,7 +335,7 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
 
           {/* Formulario para agregar nota */}
           {(showAddForm || count === 0) && (
-            <div className={`flex flex-col gap-1.5 ${count > 0 ? "mt-3 border-t border-line pt-2.5" : ""}`}>
+            <div className={`flex flex-col gap-1.5 ${count > 0 ? "mt-3 border-t border-zinc-100 pt-2.5" : ""}`}>
               <textarea
                 ref={textareaRef}
                 value={draft}
@@ -342,13 +347,13 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
                 placeholder="Escribe una nota para el equipo… (Ctrl+Enter para guardar)"
                 rows={2}
                 maxLength={4000}
-                className="w-full min-h-[54px] max-h-[340px] resize-none overflow-hidden rounded-edge border border-line
-                  bg-white px-2.5 py-1.5 text-[12px] leading-[18px] text-ink outline-none placeholder:text-faint
-                  focus-visible:border-brand-red/40"
+                className="w-full min-h-[60px] max-h-[340px] resize-none overflow-hidden rounded-lg border border-zinc-200
+                  bg-white px-3 py-2 text-[12px] leading-relaxed text-zinc-900 shadow-2xs outline-none transition-all placeholder:text-zinc-400
+                  focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20"
               />
-              {error && <span className="text-[11px] text-brand-red-dark">{error}</span>}
+              {error && <span className="text-[11px] font-medium text-brand-red-dark">{error}</span>}
               <div className="flex items-center justify-between pt-0.5">
-                <span className="text-[10px] text-faint">Ctrl+Enter para guardar</span>
+                <span className="text-[11px] text-zinc-400">Ctrl+Enter para guardar</span>
                 <div className="flex items-center gap-1.5">
                   {count > 0 && (
                     <button
@@ -357,7 +362,7 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
                         setShowAddForm(false);
                         setDraft("");
                       }}
-                      className="rounded-edge px-2 py-0.5 text-[11px] text-subtle hover:text-ink"
+                      className="h-7 rounded-lg px-2 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
                     >
                       Cancelar
                     </button>
@@ -366,8 +371,8 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
                     type="button"
                     onClick={handleAdd}
                     disabled={busy || !draft.trim()}
-                    className="rounded-edge bg-ink px-2.5 py-1 text-[11px] font-semibold text-white
-                      outline-none transition-opacity hover:opacity-90 disabled:opacity-40"
+                    className="h-7 rounded-lg border border-zinc-900 bg-zinc-900 px-2.5 text-[11px] font-semibold text-white
+                      shadow-2xs outline-none transition-all hover:bg-zinc-800 disabled:opacity-40 active:scale-95"
                   >
                     {busy ? "Guardando…" : "Guardar nota"}
                   </button>
@@ -427,21 +432,25 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
   }
 
   return (
-    <div className="shrink-0 border-t border-line">
+    <div className="shrink-0 border-t border-zinc-200/80 bg-zinc-50/50">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-center gap-2 px-4 py-2 text-left outline-none transition-colors hover:bg-canvas/70"
+        className="group flex w-full items-center gap-2.5 px-4 py-2 text-left outline-none transition-colors hover:bg-zinc-100/70 select-none cursor-pointer"
       >
-        <StickyNote className="h-3.5 w-3.5 text-warn" />
-        <span className="font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+        <div className="flex size-5.5 shrink-0 items-center justify-center rounded-md bg-amber-100/90 text-amber-700 shadow-2xs">
+          <StickyNote className="h-3 w-3" />
+        </div>
+        <span className="font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-600 group-hover:text-zinc-900 transition-colors">
           Agregar nota interna
         </span>
-        <span className="ml-auto text-[10.5px] text-faint">{open ? "Ocultar" : "Mostrar"}</span>
+        <span className="ml-auto rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-zinc-600 shadow-2xs group-hover:border-zinc-300 group-hover:text-zinc-900 transition-all">
+          {open ? "Ocultar" : "Mostrar"}
+        </span>
       </button>
 
       {open && (
-        <div className="flex flex-col gap-2 px-4 pb-3">
+        <div className="flex flex-col gap-2.5 px-4 pb-3.5 pt-1">
           <textarea
             ref={textareaRef}
             value={draft}
@@ -458,13 +467,13 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
             placeholder="Escribe una nota para el equipo… (Ctrl+Enter para guardar)"
             rows={2}
             maxLength={4000}
-            className="w-full min-h-[54px] max-h-[340px] resize-none overflow-hidden rounded-edge border border-line
-              bg-white px-2.5 py-1.5 text-[12px] leading-[18px] text-ink outline-none placeholder:text-faint
-              focus-visible:border-brand-red/40"
+            className="w-full min-h-[64px] max-h-[340px] resize-none overflow-hidden rounded-lg border border-zinc-200
+              bg-white p-3 text-[12.5px] leading-relaxed text-zinc-900 shadow-2xs outline-none transition-all placeholder:text-zinc-400
+              focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20"
           />
-          {error && <span className="text-[11px] text-brand-red-dark">{error}</span>}
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-faint">Ctrl+Enter para guardar</span>
+          {error && <span className="text-[11px] font-medium text-brand-red-dark">{error}</span>}
+          <div className="flex items-center justify-between pt-0.5">
+            <span className="text-[11px] text-zinc-400">Ctrl+Enter para guardar</span>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -472,7 +481,7 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
                   setOpen(false);
                   setDraft("");
                 }}
-                className="rounded-edge px-2 py-1 text-[11.5px] text-subtle hover:text-ink"
+                className="h-7.5 rounded-lg px-2.5 text-[11.5px] font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
@@ -480,8 +489,8 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
                 type="button"
                 onClick={add}
                 disabled={busy || !draft.trim()}
-                className="rounded-edge bg-ink px-2.5 py-1 text-[11.5px] font-semibold text-white outline-none
-                  transition-opacity hover:opacity-90 disabled:opacity-40"
+                className="h-7.5 rounded-lg border border-zinc-900 bg-zinc-900 px-3 text-[11.5px] font-semibold text-white shadow-2xs
+                  transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-40 cursor-pointer"
               >
                 {busy ? "Guardando…" : "Guardar nota"}
               </button>

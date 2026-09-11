@@ -277,9 +277,9 @@ export function Select({
         : "pl-3 pr-2.5 gap-2";
 
   const subtleStateClasses: Record<FieldState, string> = {
-    idle: "border-line bg-canvas/70 hover:bg-canvas hover:border-line-strong text-ink shadow-2xs focus:border-brand-red/60 focus:ring-2 focus:ring-brand-red/15",
-    error: "border-brand-red/60 bg-brand-red/[0.04] text-ink focus:ring-2 focus:ring-brand-red/15",
-    valid: "border-brand-green/60 bg-brand-green/[0.03] focus:ring-2 focus:ring-brand-green/15",
+    idle: "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/80 text-zinc-800 shadow-2xs focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20",
+    error: "border-brand-red bg-brand-red/[0.02] text-zinc-900 focus:ring-2 focus:ring-brand-red/12",
+    valid: "border-brand-green/50 bg-brand-green/[0.02] focus:ring-2 focus:ring-brand-green/10",
   };
 
   const triggerVariantClass = isSubtle
@@ -307,11 +307,11 @@ export function Select({
         onKeyDown={handleKeyDown}
         className={`${
           isSubtle
-            ? "w-full rounded-edge border text-left outline-none transition-all disabled:cursor-not-allowed disabled:bg-canvas disabled:text-faint"
+            ? "w-full rounded-lg border text-left outline-none transition-all disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-400 active:scale-[0.98] cursor-pointer"
             : ""
         } ${triggerVariantClass} ${sizeClass} ${paddingClass}
           flex items-center justify-between font-medium
-          ${selected ? "text-ink" : "text-zinc-400"} ${buttonClassName}`}
+          ${selected ? "text-zinc-900" : "text-zinc-400"} ${buttonClassName}`}
       >
         <div className="flex min-w-0 items-center gap-1.5 truncate">
           {leftIcon}
@@ -321,7 +321,7 @@ export function Select({
           aria-hidden
           className={`${
             size === "xs" ? "h-3 w-3" : "h-4 w-4"
-          } shrink-0 text-faint transition-transform ${open ? "rotate-180" : ""}`}
+          } shrink-0 text-zinc-400 transition-transform duration-150 ${open ? "rotate-180 text-zinc-700" : ""}`}
         />
       </button>
 

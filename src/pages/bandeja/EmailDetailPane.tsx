@@ -48,7 +48,7 @@ import { CannedPicker, textToBlocks } from "./CannedPicker";
 import { AssignmentControl } from "./ConversationTools";
 import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
 import { RecipientInput } from "./RecipientInput";
-import { fieldLabelClass } from "./toolbarStyles";
+import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
 import { ticketBadgeClass } from "./badgeStyles";
 import { SendValidationButton } from "./SendValidationButton";
 import { type ValidationItem } from "./sendValidation";
@@ -109,12 +109,11 @@ const MOVES: Record<string, MoveKind> = {
   },
 };
 
-/** Botones que abren el editor al pie: responder y reenviar. */
 const composerOpenerClass =
-  "flex w-full min-w-0 items-center justify-center gap-2 rounded-edge border border-line bg-canvas px-3 py-2 " +
-  "text-[12px] font-medium text-subtle outline-none transition-[background-color,border-color,color] " +
-  "hover:border-line-strong hover:bg-white hover:text-ink " +
-  "focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12";
+  "group flex h-9 w-full min-w-0 items-center justify-center gap-2 rounded-lg border border-zinc-200 " +
+  "bg-white px-3.5 text-[12.5px] font-medium text-zinc-700 shadow-2xs outline-none " +
+  "transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.99] " +
+  "focus-visible:border-zinc-400 focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer";
 
 /** Acciones de la barra: gris de texto en reposo, tinta sobre relleno al pasar. */
 const toolButtonClass =
@@ -238,16 +237,6 @@ function getThreadMessageBadge(message: { direction: string; subject?: string })
 }
 
 type ComposerMode = "reply" | "forward";
-
-/** Boton pequeno de la fila "Para": abre CC, CCO o pone a todos en copia. */
-const fieldToggleClass =
-  "shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10.5px] font-bold uppercase " +
-  "tracking-[0.08em] text-faint outline-none transition-colors hover:bg-fill hover:text-brand-red " +
-  "focus-visible:ring-3 focus-visible:ring-brand-red/20";
-
-const fieldCloseClass =
-  "flex h-5 w-5 shrink-0 items-center justify-center rounded-edge text-faint outline-none " +
-  "transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20";
 
 /** Primer renglon con contenido: es el resumen que cabe en una linea de la lista. */
 function firstLine(text: string) {
@@ -848,13 +837,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         </div>
       </div>
 
-      <Separator className="bg-line" />
-
+      <Separator className="bg-zinc-100" />
 
       <div className="px-4 pb-2.5 pt-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h2 className="font-heading text-[17px] font-bold leading-tight tracking-[-0.02em] text-ink">
+            <h2 className="font-heading text-[17px] font-bold leading-tight tracking-[-0.02em] text-zinc-900">
               {email.subject || "(sin asunto)"}
             </h2>
 
@@ -863,14 +851,14 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 <AvatarFallback className="text-[10px]">{initials(displayName)}</AvatarFallback>
               </Avatar>
               <div className="min-w-0">
-                <p className="truncate text-[12.5px] font-semibold text-ink">
+                <p className="truncate text-[12.5px] font-semibold text-zinc-900">
                   {displayName}
                   {/* El nombre puede ser el propio correo: repetirlo no aporta. */}
                   {displayName !== email.fromEmail && (
-                    <span className="ml-1.5 font-normal text-subtle">{email.fromEmail}</span>
+                    <span className="ml-1.5 font-normal text-zinc-500">{email.fromEmail}</span>
                   )}
                 </p>
-                <p className="truncate text-[11px] text-faint">
+                <p className="truncate text-[11px] text-zinc-400">
                   Para: {email.toEmails.join(", ") || "—"}
                   {email.ccEmails.length > 0 && ` · CC: ${email.ccEmails.join(", ")}`}
                   {(email.bccEmails ?? []).length > 0 && ` · CCO: ${email.bccEmails.join(", ")}`}
@@ -881,15 +869,15 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
           <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
             <ConversationNotes key={notesRefreshKey} emailId={email.id} />
-            <span className="whitespace-nowrap text-[11px] font-medium text-faint">
+            <span className="whitespace-nowrap text-[11px] font-medium text-zinc-400">
               {formatDateTime(email.createdAt)}
             </span>
           </div>
         </div>
 
         {composers.length > 0 && (
-          <div className="mt-2 flex items-center gap-2 rounded-edge border border-warn/40 bg-warn/[0.08] px-2.5 py-1.5 text-[11.5px] text-ink">
-            <PencilLine className="h-3.5 w-3.5 shrink-0 text-warn" />
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200/90 bg-amber-50/70 px-2.5 py-1.5 text-[11.5px] text-amber-950 shadow-2xs">
+            <PencilLine className="h-3.5 w-3.5 shrink-0 text-amber-600" />
             <span>
               <strong className="font-semibold">{composers.map((p) => p.name).join(", ")}</strong>
               {composers.length === 1 ? " está respondiendo este correo ahora mismo." : " están respondiendo este correo ahora mismo."}
@@ -898,7 +886,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         )}
       </div>
 
-      <Separator className="bg-line" />
+      <Separator className="bg-zinc-100" />
 
       {/* Columna: los avisos ocupan lo suyo y el cuerpo se queda con el resto, sin desbordar sobre el pie. */}
       <div className="relative flex min-h-0 flex-1 flex-col">
@@ -912,16 +900,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               addFiles(Array.from(event.dataTransfer.files));
             }}
           >
-            <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2">
+            <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
               {isForward ? (
                 <Forward className="h-3.5 w-3.5 shrink-0 text-brand-red" />
               ) : (
                 <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-brand-red" />
               )}
-              <span className="shrink-0 text-[12.5px] font-semibold text-ink">
+              <span className="shrink-0 text-[12.5px] font-semibold text-zinc-900">
                 {isForward ? "Reenviar" : "Responder"}
               </span>
-              <span className="truncate text-[11.5px] text-subtle">
+              <span className="truncate text-[11.5px] text-zinc-500">
                 {email.subject ? `${isForward ? "Fwd" : "Re"}: ${email.subject}` : "(sin asunto)"}
               </span>
               <button
@@ -929,16 +917,13 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 onClick={closeComposer}
                 aria-label="Cerrar el editor"
                 title="Cerrar el editor"
-                className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-edge
-                  text-brand-gray outline-none transition-colors hover:bg-fill hover:text-ink
-                  focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
-              transition-colors focus-within:bg-canvas">
+            <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
               <span className={fieldLabelClass}>Para</span>
               {isForward ? (
                 <RecipientInput
@@ -949,7 +934,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   autoFocus
                 />
               ) : (
-                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-zinc-900">
                   {email.fromEmail}
                 </span>
               )}
@@ -984,8 +969,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             </div>
 
             {ccOpen && (
-              <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
-                transition-colors focus-within:bg-canvas">
+              <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
                 <span className={fieldLabelClass}>CC</span>
                 <RecipientInput
                   inputRef={ccRef}
@@ -1009,8 +993,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             )}
 
             {bccOpen && (
-              <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
-                transition-colors focus-within:bg-canvas">
+              <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
                 <span className={fieldLabelClass}>CCO</span>
                 <RecipientInput
                   inputRef={bccRef}
@@ -1034,13 +1017,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             )}
 
             {isForward && email.attachments.length > 0 && (
-              <label className="flex shrink-0 cursor-pointer items-center gap-2 border-b border-line px-4 py-1.5
-                text-[11.5px] text-brand-gray">
+              <label className="flex shrink-0 cursor-pointer items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-1.5 text-[12px] font-medium text-zinc-700">
                 <input
                   type="checkbox"
                   checked={includeAttachments}
                   onChange={(event) => setIncludeAttachments(event.target.checked)}
-                  className="h-3.5 w-3.5 accent-brand-red"
+                  className="h-3.5 w-3.5 accent-brand-red rounded"
                 />
                 Incluir {email.attachments.length === 1 ? "el adjunto original" : `los ${email.attachments.length} adjuntos originales`}
               </label>
@@ -1063,21 +1045,21 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             </div>
 
             {files.length > 0 && (
-              <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-line px-4 py-2">
+              <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-100 px-4 py-2 bg-zinc-50/30">
                 {files.map((file, position) => (
                   <span
                     key={`${file.name}-${position}`}
-                    className="inline-flex items-center gap-1.5 rounded-edge border border-line
-                      bg-canvas px-2 py-1 text-[11.5px] text-brand-gray"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200
+                      bg-white px-2.5 py-1 text-[11.5px] font-medium text-zinc-700 shadow-2xs"
                   >
-                    <Paperclip className="h-3 w-3 text-faint" />
+                    <Paperclip className="h-3 w-3 text-zinc-400" />
                     <span className="max-w-[160px] truncate">{file.name}</span>
-                    <span className="text-faint">{formatBytes(file.size)}</span>
+                    <span className="text-zinc-400 text-[10.5px] tabular-nums">{formatBytes(file.size)}</span>
                     <button
                       type="button"
                       onClick={() => setFiles(files.filter((_, at) => at !== position))}
                       aria-label={`Quitar ${file.name}`}
-                      className="text-faint transition-colors hover:text-brand-red"
+                      className="text-zinc-400 transition-colors hover:text-brand-red ml-0.5"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -1093,17 +1075,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             )}
 
             <ComposerInset />
-            <div className="flex shrink-0 items-center gap-2 border-t border-line px-4 py-2">
+            <div className="flex shrink-0 items-center gap-2 border-t border-zinc-100 px-4 py-2.5 bg-zinc-50/30">
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="inline-flex items-center gap-1.5 rounded-edge border border-line bg-canvas
-                  px-2 py-1 text-[11.5px] font-medium text-brand-gray outline-none
-                  transition-[background-color,border-color,color]
-                  hover:border-line-strong hover:bg-white hover:text-ink
-                  focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white
+                  px-2.5 text-[12px] font-medium text-zinc-700 shadow-2xs outline-none
+                  transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900
+                  active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer"
               >
-                <Paperclip className="h-3.5 w-3.5" />
+                <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
                 Adjuntar
               </button>
               <input
@@ -1117,12 +1098,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 }}
               />
               <CannedPicker onPick={insertCanned} />
-              <span className="truncate text-[11px] text-faint">
+              <span className="truncate text-[11px] font-medium text-zinc-400">
                 Hasta {MAX_FILES} archivos, 10 MB · también puedes soltarlos aquí
               </span>
 
               <div className="ml-auto flex shrink-0 gap-2">
-                <PfButton variant="ghost" size="sm" className="h-7 px-3" onClick={closeComposer}>
+                <PfButton variant="ghost" size="sm" className="h-8 px-3" onClick={closeComposer}>
                   Cancelar
                 </PfButton>
                 <SendValidationButton
@@ -1427,7 +1408,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               title={`Responder a ${email.fromName ?? email.fromEmail}`}
               className={composerOpenerClass}
             >
-              <CornerUpLeft className="h-3.5 w-3.5 text-faint" />
+              <CornerUpLeft className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
               Responder
             </button>
           )}
@@ -1437,7 +1418,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             title="Reenviar este correo a otra dirección"
             className={composerOpenerClass}
           >
-            <Forward className="h-3.5 w-3.5 text-faint" />
+            <Forward className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
             Reenviar
           </button>
         </div>
