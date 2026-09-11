@@ -7,72 +7,82 @@ interface AuthLayoutProps {
   /** Bloque bajo el formulario: separador, avisos, enlaces de vuelta. */
   footer?: ReactNode;
   children: ReactNode;
+  /** Asentamiento de la tarjeta cuando el envío no prospera: baja 3px y vuelve. */
+  settle?: boolean;
 }
 
 /**
- * Estructura del area de autenticacion.
- *
- * Una sola columna centrada, sin panel lateral: el aro del isotipo, ampliado
- * y al 10 % de opacidad, es lo que estructura el espacio. La marca aparece una
- * sola vez y en su version reducida —el isotipo, autorizado por el manual para
- * uso digital pequeno— porque aqui no compite con nada.
+ * Layout principal de autenticación:
+ * Diseño centrado, sobrio y corporativo. Una tarjeta blanca compacta con bordes sutiles,
+ * micro-sombras elegantes y el logotipo de Plastifar encabezando la vista sobre un fondo suave.
  */
-export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProps) {
+export function AuthLayout({ title, subtitle, footer, children, settle = false }: AuthLayoutProps) {
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-canvas px-5 py-14 sm:px-6">
-      {/* Aros concentricos: eco geometrico del isotipo, no el isotipo */}
+    <div className="relative flex min-h-dvh flex-col justify-between items-center bg-[#f8f9fa] px-4 py-8 sm:py-12 overflow-hidden selection:bg-brand-red/10 selection:text-brand-red">
+      {/* Fondo ambiental sutil con luz cenital tenue */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-1/2 h-[980px] w-[980px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-brand-red/10" />
-        <div className="absolute left-1/2 top-1/2 h-[1360px] w-[1360px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-brand-green/10" />
-        <div className="absolute left-1/2 top-[-320px] h-[640px] w-[900px] -translate-x-1/2 rounded-full bg-brand-red/[0.09] blur-[110px]" />
-        <div className="absolute inset-x-0 bottom-0 h-80 bg-linear-to-t from-canvas to-transparent" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[340px] bg-[radial-gradient(ellipse_at_top,rgba(196,18,48,0.06),transparent_70%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_35%,#000_60%,transparent_100%)] opacity-55" />
       </div>
 
-      <main className="relative w-full max-w-[408px]">
-        <header className="animate-plf-rise text-center">
-          <div className="flex justify-center">
-            <Logo variant="isotipo" height={62} />
+      <div className="w-full" /> {/* Spacer top para equilibrio visual */}
+
+      {/* Tarjeta central compacta */}
+      <main className="relative z-10 w-full max-w-[396px] animate-plf-rise">
+        <div
+          className={`rounded-2xl border border-zinc-200/80 bg-white p-7 sm:p-8 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_12px_32px_-4px_rgba(15,23,42,0.06)] ${
+            settle ? "animate-plf-settle" : ""
+          }`}
+        >
+          {/* Cabecera con Logotipo oficial */}
+          <header className="text-center">
+            <div className="flex justify-center mb-5">
+              <Logo variant="color" height={32} />
+            </div>
+
+            <h1 className="font-heading text-[20px] font-bold tracking-[-0.025em] text-zinc-900 leading-tight">
+              {title}
+            </h1>
+
+            {subtitle && (
+              <p className="mt-1.5 text-center text-[13px] text-zinc-500 leading-relaxed max-w-[32ch] mx-auto">
+                {subtitle}
+              </p>
+            )}
+          </header>
+
+          {/* Formulario / Contenido */}
+          <div className="mt-6">
+            {children}
           </div>
 
-          <h1 className="mt-[26px] text-balance font-heading text-[30px] font-bold leading-[1.12] tracking-[-0.03em] text-ink">
-            {title}
-          </h1>
-
-          {subtitle && (
-            <p className="mx-auto mt-2.5 max-w-[36ch] text-[14px] leading-relaxed text-zinc-500">
-              {subtitle}
-            </p>
+          {/* Pie interior de la tarjeta */}
+          {footer && (
+            <div className="mt-6 pt-5 border-t border-zinc-100">
+              {footer}
+            </div>
           )}
-        </header>
-
-        <div className="animate-plf-rise mt-[34px]" style={{ animationDelay: "90ms" }}>
-          {children}
         </div>
-
-        {footer && (
-          <div className="animate-plf-rise mt-[30px]" style={{ animationDelay: "150ms" }}>
-            {footer}
-          </div>
-        )}
       </main>
 
-      <p className="relative mt-14 text-center text-[11.5px] leading-relaxed tracking-[0.04em] text-zinc-400">
-        © {new Date().getFullYear()} Plastifar, S.A. · Autopista Duarte Km. 13½ · Santo Domingo,
-        República Dominicana
-      </p>
-
-      <p className="relative mt-2 flex items-center justify-center gap-1.5 text-[11px] tracking-[0.02em] text-zinc-400">
-        Desarrollado por
-        <img
-          src="/brand/centerquest-icon.png"
-          alt="Center Quest"
-          width={14}
-          height={14}
-          draggable={false}
-          className="select-none opacity-80"
-        />
-        <span className="font-medium text-zinc-500">Center Quest</span>
-      </p>
+      {/* Pie institucional exterior */}
+      <footer className="relative z-10 mt-8 text-center animate-plf-fade">
+        <p className="text-[11.5px] tracking-wide text-zinc-400">
+          © {new Date().getFullYear()} Plastifar, S.A. · Autopista Duarte Km. 13½
+        </p>
+        <div className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] text-zinc-400">
+          <span>Desarrollado por</span>
+          <img
+            src="/brand/centerquest-icon.png"
+            alt="Center Quest"
+            width={13}
+            height={13}
+            draggable={false}
+            className="select-none opacity-75"
+          />
+          <span className="font-medium text-zinc-500">Center Quest</span>
+        </div>
+      </footer>
     </div>
   );
 }

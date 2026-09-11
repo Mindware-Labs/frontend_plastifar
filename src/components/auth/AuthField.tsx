@@ -2,203 +2,277 @@ import { CircleAlert, Eye, EyeOff } from "lucide-react";
 import {
   forwardRef,
   useId,
+  useImperativeHandle,
+  useRef,
   useState,
+  type ForwardedRef,
   type InputHTMLAttributes,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
+import { RelayRing } from "./RelayRing";
+import { useFocusRelay } from "./useFocusRelay";
 
-/**
- * Campo de formulario del area de autenticacion.
- *
- * Sin etiqueta visible: el nombre del campo viaja en el placeholder y en el
- * aria-label, y el icono de la izquierda lo identifica de un vistazo. Es lo que
- * permite que la columna quede en 408px sin apretarse. El icono se tine del
- * 185 C al enfocar —la unica senal de color del formulario en reposo—.
- */
-
-const shellBase =
-  "group relative flex h-12 cursor-text items-center gap-[11px] rounded-edge border bg-gradient-to-b from-white to-zinc-50/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow,background-color] duration-200 ease-out";
-
-const shellIdle =
-  "border-line hover:border-zinc-300 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_-1px_rgba(15,23,42,0.07)] focus-within:border-brand-red focus-within:bg-white focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]";
-
-const shellError =
-  "border-brand-red bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]";
-
-const inputBase =
-  "h-full w-full min-w-0 bg-transparent p-0 text-[15px] font-medium tracking-[-0.01em] text-ink caret-brand-red outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-zinc-400";
-
-interface FieldFrameProps {
-  inputId: string;
-  error?: string;
-  /** Aviso neutro bajo el campo (p. ej. Bloq Mayus). No es un error. */
-  hint?: string;
-  /** Enlace o accion alineada a la derecha, bajo el campo. */
-  action?: ReactNode;
+interface AuthFieldBaseProps {
+  /** Nombre del campo: etiqueta visible y accesible */
+  label: string;
   icon: ReactNode;
-  padded: string;
-  children: ReactNode;
-  trailing?: ReactNode;
+  error?: string;
+  hasError?: boolean;
+  action?: ReactNode;
+  hint?: string;
+  /** Mensaje que ocupa el lugar de action en la etiqueta mientras el envío no prospera. */
+  notice?: ReactNode;
+  /** Control desde el que viaja el anillo de foco hasta este campo. */
+  relayFrom?: RefObject<HTMLElement | null>;
+  /** Cada cambio lanza el relevo: el anillo viaja y el campo recibe el foco con el texto seleccionado. */
+  relayKey?: number;
 }
 
-function FieldFrame({
-  inputId,
-  error,
-  hint,
-  action,
-  icon,
-  padded,
-  children,
-  trailing,
-}: FieldFrameProps) {
+interface AuthFieldProps extends AuthFieldBaseProps, InputHTMLAttributes<HTMLInputElement> {}
+
+interface AuthPasswordFieldProps
+  extends AuthFieldBaseProps,
+    Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {}
+
+const boxClass = (invalid: boolean) =>
+  `group relative flex h-10 w-full items-center rounded-lg border bg-white px-3 transition-all duration-150 ${
+    invalid
+      ? "border-brand-red ring-3 ring-brand-red/10"
+      : "border-zinc-200 hover:border-zinc-300 focus-within:border-brand-red focus-within:ring-3 focus-within:ring-brand-red/10"
+  }`;
+
+const iconClass = (invalid: boolean) =>
+  `mr-2.5 shrink-0 transition-colors ${
+    invalid ? "text-brand-red" : "text-zinc-400 group-focus-within:text-brand-red"
+  }`;
+
+/** Ref local para enfocar desde el relevo; la del formulario recibe el mismo elemento. */
+function useMergedRef<T>(forwarded: ForwardedRef<T>) {
+  const local = useRef<T | null>(null);
+  useImperativeHandle(forwarded, () => local.current as T, []);
+  return local;
+}
+
+/** Al posarse el anillo, el campo recibe el foco con el texto seleccionado: escribir reemplaza. */
+function useFieldRelay(
+  inputRef: RefObject<HTMLInputElement | null>,
+  relayFrom: RefObject<HTMLElement | null> | undefined,
+  relayKey: number | undefined,
+) {
+  return useFocusRelay(relayFrom, relayKey, () => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  });
+}
+
+interface LabelRowProps {
+  inputId: string;
+  label: string;
+  action?: ReactNode;
+  message?: ReactNode;
+  messageId: string;
+}
+
+/** Fila de etiqueta de altura fija: el mensaje sustituye a la acción con un fundido, sin mover nada. */
+function LabelRow({ inputId, label, action, message, messageId }: LabelRowProps) {
+  const hasMessage = message != null;
+  const layer =
+    "absolute inset-y-0 right-0 flex items-center whitespace-nowrap transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-opacity";
+
   return (
-    <div>
-      {/* El <label> envuelve al input: pulsar en cualquier punto de la pieza lo enfoca */}
+    <div className="mb-1.5 flex h-[18px] items-center justify-between gap-2">
       <label
         htmlFor={inputId}
-        className={`${shellBase} ${padded} ${error ? shellError : shellIdle}`}
+        className="shrink-0 text-[12px] font-semibold text-zinc-700 tracking-[-0.01em]"
       >
-        <span
-          className={`shrink-0 transition-[color,transform] duration-200 ${
-            error
-              ? "text-brand-red"
-              : "text-zinc-400 group-focus-within:scale-[1.08] group-focus-within:text-brand-red"
-          }`}
-        >
-          {icon}
-        </span>
-
-        {children}
-        {trailing}
+        {label}
       </label>
-
-      {error && (
-        <p
-          id={`${inputId}-error`}
-          className="animate-plf-rise mt-2.5 flex items-center gap-1.5 text-[12.5px] font-medium text-brand-red"
-        >
-          <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          {error}
-        </p>
-      )}
-
-      {(hint || action) && (
-        <div className="mt-2.5 flex min-h-[18px] items-center justify-between gap-4">
-          {hint ? (
-            <span className="animate-plf-rise text-[12.5px] text-zinc-500">{hint}</span>
-          ) : (
-            <span />
+      {(action != null || hasMessage) && (
+        <div className="relative h-full min-w-0 flex-1">
+          {action != null && (
+            <span
+              inert={hasMessage}
+              className={`${layer} ${hasMessage ? "opacity-0 -translate-y-1 motion-reduce:translate-y-0" : ""}`}
+            >
+              {action}
+            </span>
           )}
-          {action}
+          <span
+            id={messageId}
+            inert={!hasMessage}
+            className={`${layer} text-[12px] font-semibold text-ink ${
+              hasMessage ? "" : "opacity-0 translate-y-1 motion-reduce:translate-y-0"
+            }`}
+          >
+            {message}
+          </span>
         </div>
       )}
     </div>
   );
 }
 
-interface AuthFieldProps extends InputHTMLAttributes<HTMLInputElement> {
-  /** Nombre del campo: se usa como placeholder y como etiqueta accesible. */
-  label: string;
-  icon: ReactNode;
-  error?: string;
-  action?: ReactNode;
+function CapsLockNotice() {
+  return (
+    <span className="flex items-center gap-1.5 font-medium text-amber-600">
+      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+      Bloq Mayús activado
+    </span>
+  );
+}
+
+function ErrorLine({ id, error }: { id: string; error: string }) {
+  return (
+    <p id={id} className="mt-1.5 flex items-center gap-1.5 text-[11.5px] font-medium text-brand-red">
+      <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      {error}
+    </p>
+  );
 }
 
 export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(function AuthField(
-  { label, icon, error, action, id, className = "", placeholder, ...props },
+  {
+    label,
+    icon,
+    error,
+    hasError,
+    action,
+    hint,
+    notice,
+    relayFrom,
+    relayKey,
+    id,
+    className = "",
+    placeholder,
+    ...props
+  },
   ref,
 ) {
   const fallbackId = useId();
   const inputId = id ?? props.name ?? fallbackId;
+  const errorId = `${inputId}-error`;
+  const noticeId = `${inputId}-notice`;
+  const isInvalid = Boolean(error || hasError);
+  const inputRef = useMergedRef(ref);
+  const ringRef = useFieldRelay(inputRef, relayFrom, relayKey);
 
   return (
-    <FieldFrame inputId={inputId} error={error} action={action} icon={icon} padded="px-4">
-      <input
-        ref={ref}
-        id={inputId}
-        aria-label={label}
-        placeholder={placeholder ?? label}
-        className={`${inputBase} ${className}`}
-        aria-invalid={!!error}
-        aria-describedby={error ? `${inputId}-error` : undefined}
-        {...props}
-      />
-    </FieldFrame>
+    <div className="flex flex-col">
+      <LabelRow inputId={inputId} label={label} action={action} message={notice} messageId={noticeId} />
+
+      <div className={boxClass(isInvalid)}>
+        <span className={iconClass(isInvalid)}>{icon}</span>
+
+        <input
+          ref={inputRef}
+          id={inputId}
+          placeholder={placeholder ?? label}
+          className={`h-full w-full min-w-0 bg-transparent text-[13.5px] font-normal text-zinc-900 placeholder:text-zinc-400 placeholder:font-normal outline-none ${className}`}
+          aria-invalid={isInvalid || notice != null}
+          aria-describedby={error ? errorId : notice != null ? noticeId : undefined}
+          {...props}
+        />
+
+        <RelayRing ringRef={ringRef} />
+      </div>
+
+      {error && <ErrorLine id={errorId} error={error} />}
+
+      {hint && !error && <span className="mt-1.5 text-[11.5px] text-zinc-500">{hint}</span>}
+    </div>
   );
 });
 
-interface AuthPasswordFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
-  label: string;
-  icon: ReactNode;
-  error?: string;
-  action?: ReactNode;
-}
-
 export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldProps>(
   function AuthPasswordField(
-    { label, icon, error, action, id, className = "", placeholder, ...props },
+    {
+      label,
+      icon,
+      error,
+      hasError,
+      action,
+      hint,
+      notice,
+      relayFrom,
+      relayKey,
+      id,
+      className = "",
+      placeholder,
+      ...props
+    },
     ref,
   ) {
     const [visible, setVisible] = useState(false);
     const [capsLock, setCapsLock] = useState(false);
     const fallbackId = useId();
     const inputId = id ?? props.name ?? fallbackId;
+    const errorId = `${inputId}-error`;
+    const noticeId = `${inputId}-notice`;
+    const isInvalid = Boolean(error || hasError);
+    const inputRef = useMergedRef(ref);
+    const ringRef = useFieldRelay(inputRef, relayFrom, relayKey);
 
-    // Bloq Mayus activo es la primera causa de un "credenciales incorrectas"
-    // que no lo es: avisar antes de enviar ahorra el intento fallido.
     function trackCapsLock(event: KeyboardEvent<HTMLInputElement>) {
       setCapsLock(event.getModifierState?.("CapsLock") ?? false);
     }
 
     return (
-      <FieldFrame
-        inputId={inputId}
-        error={error}
-        hint={capsLock ? "Bloq Mayús está activado" : undefined}
-        action={action}
-        icon={icon}
-        padded="pl-4 pr-2.5"
-        trailing={
+      <div className="flex flex-col">
+        <LabelRow
+          inputId={inputId}
+          label={label}
+          action={action}
+          message={capsLock ? <CapsLockNotice /> : notice}
+          messageId={noticeId}
+        />
+
+        <div className={boxClass(isInvalid)}>
+          <span className={iconClass(isInvalid)}>{icon}</span>
+
+          <input
+            ref={inputRef}
+            id={inputId}
+            type={visible ? "text" : "password"}
+            placeholder={placeholder ?? label}
+            className={`h-full w-full min-w-0 bg-transparent text-[13.5px] font-normal text-zinc-900 placeholder:text-zinc-400 placeholder:font-normal outline-none ${
+              visible ? "" : "tracking-[0.14em]"
+            } ${className}`}
+            aria-invalid={isInvalid || notice != null}
+            aria-describedby={error ? errorId : notice != null ? noticeId : undefined}
+            {...props}
+            onKeyDown={(event) => {
+              trackCapsLock(event);
+              props.onKeyDown?.(event);
+            }}
+            onKeyUp={(event) => {
+              trackCapsLock(event);
+              props.onKeyUp?.(event);
+            }}
+            onBlur={(event) => {
+              setCapsLock(false);
+              props.onBlur?.(event);
+            }}
+          />
+
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
             tabIndex={-1}
             aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
-            className="flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-400 transition-all duration-150 hover:bg-zinc-100 hover:text-ink active:scale-90"
+            className="ml-1 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
           >
-            {visible ? (
-              <EyeOff className="h-[17px] w-[17px]" />
-            ) : (
-              <Eye className="h-[17px] w-[17px]" />
-            )}
+            {visible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
           </button>
-        }
-      >
-        <input
-          ref={ref}
-          id={inputId}
-          type={visible ? "text" : "password"}
-          aria-label={label}
-          placeholder={placeholder ?? label}
-          className={`${inputBase} ${visible ? "" : "tracking-[0.18em]"} ${className}`}
-          aria-invalid={!!error}
-          aria-describedby={error ? `${inputId}-error` : undefined}
-          {...props}
-          onKeyDown={(event) => {
-            trackCapsLock(event);
-            props.onKeyDown?.(event);
-          }}
-          onKeyUp={(event) => {
-            trackCapsLock(event);
-            props.onKeyUp?.(event);
-          }}
-          onBlur={(event) => {
-            setCapsLock(false);
-            props.onBlur?.(event);
-          }}
-        />
-      </FieldFrame>
+
+          <RelayRing ringRef={ringRef} />
+        </div>
+
+        {error && <ErrorLine id={errorId} error={error} />}
+
+        {hint && !error && <span className="mt-1.5 text-[11.5px] text-zinc-500">{hint}</span>}
+      </div>
     );
   },
 );

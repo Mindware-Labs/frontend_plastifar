@@ -160,7 +160,7 @@ export function StaffPage() {
         <>
           Se eliminará permanentemente a{" "}
           <strong className="font-semibold text-ink">{fullName(member)}</strong>. Esta acción no se
-          puede deshacer. Si ya tiene actividad registrada en el sistema, desactívalo en su lugar.
+          puede deshacer.
         </>
       ),
       confirmLabel: "Eliminar",

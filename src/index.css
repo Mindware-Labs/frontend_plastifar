@@ -161,6 +161,12 @@ input:-webkit-autofill:focus {
   80% { transform: translateX(2px); }
 }
 
+/* Asentamiento del login: la tarjeta se apoya 3px y vuelve, sustituye a la sacudida lateral. */
+@keyframes plf-settle {
+  0%, 100% { transform: translateY(0); }
+  38% { transform: translateY(3px); }
+}
+
 @keyframes plf-toast-in {
   from { opacity: 0; transform: translateY(-14px) scale(0.98); }
   to { opacity: 1; transform: none; }
@@ -286,6 +292,7 @@ input:-webkit-autofill:focus {
 .animate-plf-drawer-in { animation: plf-drawer-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-drawer-out { animation: plf-drawer-out 0.20s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
+.animate-plf-settle { animation: plf-settle 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
 .animate-plf-receipt-out { animation: plf-receipt-out 0.16s ease-in both; }
 .animate-plf-spinner-rotate { animation: plf-spinner-rotate 1.4s linear infinite; }
@@ -305,6 +312,7 @@ input:-webkit-autofill:focus {
   .animate-plf-modal-in,
   .animate-plf-drawer-in,
   .animate-plf-shake,
+  .animate-plf-settle,
   .animate-plf-toast-progress {
     animation: none !important;
   }

@@ -6,29 +6,24 @@ interface AuthAlertProps {
   children: ReactNode;
 }
 
-/**
- * Aviso de formulario. Mismo peso visual que un campo —1px de filete y un
- * fondo al 5 %— para que aparezca dentro de la columna sin romperla.
- */
 export function AuthAlert({ variant = "error", children }: AuthAlertProps) {
   const isError = variant === "error";
 
   return (
     <div
       role={isError ? "alert" : "status"}
-      className={`animate-plf-rise flex items-start gap-2.5 rounded-edge border px-[15px] py-3
-        text-[13px] font-medium leading-relaxed ${
-          isError
-            ? "border-brand-red/20 bg-brand-red/[0.05] text-brand-red-dark"
-            : "border-brand-green/20 bg-brand-green/[0.05] text-brand-green"
-        }`}
+      className={`flex items-start gap-2.5 rounded-lg border p-3 text-[12.5px] font-medium leading-relaxed animate-plf-rise ${
+        isError
+          ? "border-red-200/80 bg-red-50/80 text-red-700"
+          : "border-emerald-200/80 bg-emerald-50/80 text-emerald-800"
+      }`}
     >
       {isError ? (
-        <CircleAlert className="mt-px h-4 w-4 shrink-0" aria-hidden />
+        <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-brand-red" aria-hidden />
       ) : (
-        <ShieldCheck className="mt-px h-4 w-4 shrink-0" aria-hidden />
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
       )}
-      <span>{children}</span>
+      <span className="flex-1">{children}</span>
     </div>
   );
 }

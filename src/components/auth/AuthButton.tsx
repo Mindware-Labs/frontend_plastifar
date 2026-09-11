@@ -1,45 +1,59 @@
 import { LoaderCircle } from "lucide-react";
-import type { ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+
+/** primary: acción en rojo. ink: el envío no prosperó. success: entrando. */
+export type AuthButtonTone = "primary" | "ink" | "success";
 
 interface AuthButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
+  tone?: AuthButtonTone;
+  /** Etiqueta que sustituye a children mientras tone no es primary. */
+  toneLabel?: ReactNode;
 }
 
+const toneClass: Record<AuthButtonTone, string> = {
+  primary:
+    "bg-brand-red shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.06)] hover:bg-[#b0102b] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_5px_rgba(196,18,48,0.25)] disabled:hover:bg-brand-red",
+  ink: "bg-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-ink disabled:hover:bg-ink",
+  success: "bg-brand-green shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-brand-green disabled:hover:bg-brand-green",
+};
+
 /**
- * Boton principal del area de autenticacion.
- *
- * Plano y en 185 C puro: sobre un fondo tan claro no hace falta degradado, la
- * pieza ya es el unico bloque de color de la pantalla. El volumen lo dan una
- * luz interior de 1px arriba y una sombra larga y tenida. Al apuntar sube 1px;
- * al pulsar, baja.
+ * Botón principal de autenticación. El propio botón informa del resultado del envío:
+ * cambia de relleno y de etiqueta con un fundido vertical, sin añadir avisos aparte.
  */
-export function AuthButton({
-  isLoading = false,
-  disabled,
-  className = "",
-  children,
-  ...props
-}: AuthButtonProps) {
+export const AuthButton = forwardRef<HTMLButtonElement, AuthButtonProps>(function AuthButton(
+  { isLoading = false, tone = "primary", toneLabel, disabled, className = "", children, ...props },
+  ref,
+) {
+  const showTone = tone !== "primary" && toneLabel != null;
+  const layer =
+    "absolute inset-0 flex items-center justify-center gap-2 transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-opacity";
+
   return (
     <button
+      ref={ref}
       disabled={disabled || isLoading}
-      className={`flex h-14 w-full cursor-pointer items-center justify-center gap-2.5
-        rounded-edge bg-brand-red font-heading text-[12.5px] font-semibold uppercase
-        tracking-[0.16em] text-white
-        shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_14px_30px_-14px_color-mix(in_srgb,var(--color-brand-red)_60%,transparent)]
-        transition-[transform,box-shadow,filter,opacity] duration-200 ease-out
-        hover:-translate-y-px hover:brightness-105
-        hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_36px_-14px_color-mix(in_srgb,var(--color-brand-red)_70%,transparent)]
-        active:translate-y-px active:brightness-[0.97]
+      className={`relative flex h-10 w-full cursor-pointer items-center justify-center overflow-hidden
+        rounded-lg font-heading text-[13.5px] font-semibold text-white
+        transition-[background-color,box-shadow,transform] duration-200 ease-out
+        active:scale-[0.99]
         focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red
-        disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none
-        disabled:hover:translate-y-0 disabled:hover:brightness-100
-        motion-reduce:hover:translate-y-0
-        ${className}`}
+        disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:active:scale-100
+        motion-reduce:active:scale-100
+        ${toneClass[tone]} ${className}`}
       {...props}
     >
-      {isLoading && <LoaderCircle className="h-[17px] w-[17px] animate-spin" aria-hidden />}
-      <span>{children}</span>
+      <span className={`${layer} ${showTone ? "opacity-0 -translate-y-2 motion-reduce:translate-y-0" : ""}`}>
+        {isLoading && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
+        <span>{children}</span>
+      </span>
+      <span
+        aria-hidden={!showTone}
+        className={`${layer} ${showTone ? "" : "opacity-0 translate-y-2 motion-reduce:translate-y-0"}`}
+      >
+        <span>{toneLabel}</span>
+      </span>
     </button>
   );
-}
+});

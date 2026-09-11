@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Mail } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
 import { ApiError } from "../../api/client";
@@ -19,13 +19,19 @@ type FormValues = z.infer<typeof schema>;
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formError, setFormError] = useState<string | null>(null);
+  // El login manda el correo que no coincidió para no pedirlo dos veces.
+  const prefilledEmail = (location.state as { email?: string } | null)?.email ?? "";
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { email: prefilledEmail },
+  });
 
   async function onSubmit(values: FormValues) {
     setFormError(null);
