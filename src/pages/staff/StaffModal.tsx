@@ -9,6 +9,7 @@ import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../context/useAuth";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { DepartmentResponse, StaffResponse } from "../../types/api";
 
 const schema = z.object({
@@ -43,6 +44,7 @@ interface StaffModalProps {
 export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalProps) {
   const { user } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
+  const { isExiting, requestClose } = useModalAnimation(onClose);
   const isEdit = staff !== undefined;
   const isSelf = isEdit && staff.id === user?.staffId;
 
@@ -90,7 +92,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           });
 
       onSaved(saved);
-      onClose();
+      requestClose();
     } catch (err) {
       // El correo duplicado es un error de un campo concreto: se marca ahi,
       // no en un aviso general que obliga a adivinar cual es.
@@ -114,9 +116,11 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           : "El alta es interna: no existe registro público en el sistema."
       }
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={requestClose}>
             Cancelar
           </Button>
           <Button type="submit" form="staff-form" isLoading={isSubmitting}>

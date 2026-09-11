@@ -176,6 +176,28 @@ export async function downloadFile(
   saveBlob(blob, safeFilename(name ?? fallbackFilename, fallbackFilename));
 }
 
+/**
+ * Descarga autenticada que NO guarda: devuelve el archivo y el nombre que
+ * propuso el servidor. La usa Bandeja para previsualizar adjuntos en pantalla,
+ * donde el blob se muestra en vez de bajarse.
+ */
+export async function apiBlob(path: string): Promise<{ blob: Blob; fileName: string | null }> {
+  const headers = new Headers();
+  const accessToken = tokenStore.getAccessToken();
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+
+  let response = await fetch(`${BASE_URL}${path}`, { headers });
+  if (response.status === 401 && tokenStore.getRefreshToken() && (await refreshSession())) {
+    headers.set("Authorization", `Bearer ${tokenStore.getAccessToken() ?? ""}`);
+    response = await fetch(`${BASE_URL}${path}`, { headers });
+  }
+
+  if (!response.ok) throw await readError(response);
+
+  const name = filenameFromDisposition(response.headers.get("Content-Disposition"));
+  return { blob: await response.blob(), fileName: name };
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},

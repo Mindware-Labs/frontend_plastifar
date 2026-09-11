@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
-import type { ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
+import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
 
 /**
  * Tabla de listado del panel. Sin tarjeta: la tabla es la pagina y solo lleva
@@ -44,13 +44,13 @@ export function Th({ sort, className = "", children, ...props }: ThProps) {
           // Repite versalita y color: un <button> reinicia `text-transform` y el
           // color por las reglas de control de formulario, asi que sin esto la
           // cabecera ordenable salia en caja mixta y mas oscura que sus vecinas.
-          className="inline-flex items-center gap-1.5 rounded-edge uppercase tracking-[0.08em]
+          className="group inline-flex items-center gap-1.5 rounded-edge uppercase tracking-[0.08em]
             text-inherit outline-none transition-colors hover:text-ink
             focus-visible:ring-3 focus-visible:ring-brand-red/25"
         >
           {children}
           {sort.dir === null ? (
-            <ChevronsUpDown className="h-3 w-3" />
+            <ChevronsUpDown className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
           ) : sort.dir === "asc" ? (
             <ChevronUp className="h-3 w-3 text-brand-red" />
           ) : (
@@ -64,7 +64,7 @@ export function Th({ sort, className = "", children, ...props }: ThProps) {
   );
 }
 
-interface RowProps {
+interface RowProps extends HTMLAttributes<HTMLTableRowElement> {
   /** Atenuada mientras una accion sobre ella esta en curso. */
   busy?: boolean;
   /** Para lo puntual que el filete comun no resuelve, p.ej. `group` cuando la
@@ -73,11 +73,12 @@ interface RowProps {
   children: ReactNode;
 }
 
-export function Row({ busy = false, className = "", children }: RowProps) {
+export function Row({ busy = false, className = "", children, ...props }: RowProps) {
   return (
     <tr
       className={`border-b border-line-soft transition-colors last:border-0 hover:bg-canvas
-        [&>td:first-child]:pl-0 [&>td:last-child]:pr-0 ${busy ? "opacity-60" : ""} ${className}`}
+        [&>td:first-child]:pl-0 [&>td:last-child]:pr-0 ${busy ? "opacity-50" : ""} ${className}`}
+      {...props}
     >
       {children}
     </tr>

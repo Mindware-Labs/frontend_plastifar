@@ -20,7 +20,7 @@ const AUTH_BYPASS = import.meta.env.DEV && import.meta.env.VITE_AUTH_BYPASS === 
 function RestoringSession() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-canvas">
-      <Spinner />
+      <Spinner size="lg" label="Restableciendo sesión..." />
     </div>
   );
 }

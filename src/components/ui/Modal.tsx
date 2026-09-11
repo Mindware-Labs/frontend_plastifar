@@ -2,35 +2,58 @@ import { X } from "lucide-react";
 import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 
-interface ModalProps {
+export interface ModalProps {
   title: string;
   /** Linea corta sobre el titulo: situa la accion dentro del modulo. */
   eyebrow?: string;
   description?: ReactNode;
   onClose: () => void;
   /** Acciones del pie, separadas del cuerpo por un filete. */
-  footer?: ReactNode;
+  footer?: ReactNode | ((helpers: { requestClose: () => void; close: () => void }) => ReactNode);
   children: ReactNode;
+  /** Si el padre ya controla la animación de salida (ej: useModalAnimation) */
+  isExiting?: boolean;
+  onRequestClose?: () => void;
+  maxWidth?: string;
 }
 
 /**
  * Dialogo modal del panel. Se monta en un portal sobre document.body para que
  * ningun ancestro con transform o overflow lo recorte ni lo desplace.
+ * Cuenta con animación fluida de entrada (.animate-plf-modal-in) y de salida
+ * (.animate-plf-modal-out) tanto en el panel como en el telón de fondo.
  */
-export function Modal({ title, eyebrow, description, onClose, footer, children }: ModalProps) {
+export function Modal({
+  title,
+  eyebrow,
+  description,
+  onClose,
+  footer,
+  children,
+  isExiting: externalIsExiting,
+  onRequestClose: externalRequestClose,
+  maxWidth = "max-w-lg",
+}: ModalProps) {
+  const internal = useModalAnimation(onClose);
+  const isExiting = externalIsExiting ?? internal.isExiting;
+  const requestClose = externalRequestClose ?? internal.requestClose;
+
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
 
-  useDialogBehavior(panelRef, onClose);
+  useDialogBehavior(panelRef, requestClose);
 
   return createPortal(
     <div
-      className="animate-plf-scrim-in fixed inset-0 z-50 flex items-center justify-center
-        bg-ink/45 px-4 py-8 backdrop-blur-[2px]"
+      inert={isExiting ? true : undefined}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-ink/45 px-4 py-8 ${
+        isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
+      }`}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget && !isExiting) requestClose();
       }}
     >
       <div
@@ -39,9 +62,9 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className="animate-plf-modal-in flex max-h-full w-full max-w-lg flex-col overflow-hidden
-          rounded-edge border border-line bg-white
-          shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]"
+        className={`${
+          isExiting ? "animate-plf-modal-out pointer-events-none" : "animate-plf-modal-in"
+        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-edge border border-line bg-white shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 pb-4 pt-5">
           <div>
@@ -65,7 +88,7 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Cerrar"
             className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle
               transition-colors hover:bg-fill hover:text-ink"
@@ -78,7 +101,7 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
 
         {footer && (
           <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-canvas px-6 py-3.5">
-            {footer}
+            {typeof footer === "function" ? footer({ requestClose, close: requestClose }) : footer}
           </div>
         )}
       </div>

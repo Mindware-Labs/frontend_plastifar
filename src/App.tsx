@@ -23,6 +23,9 @@ import { TerritoriesSection } from "./pages/settings/TerritoriesSection";
 import { TopicsSection } from "./pages/settings/TopicsSection";
 import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
 import { StaffPage } from "./pages/staff/StaffPage";
+import { RespuestasPage } from "./pages/respuestas/RespuestasPage";
+import { TicketDetailPage } from "./pages/tickets/TicketDetailPage";
+import { TicketsPage } from "./pages/tickets/TicketsPage";
 
 export default function App() {
   return (
@@ -53,10 +56,17 @@ export default function App() {
             tickets.read y RF-P6 pide que la interfaz no ofrezca lo que el
             servidor va a rechazar. */}
         <Route element={<PermissionRoute permission="tickets.read"><Outlet /></PermissionRoute>}>
+          <Route path="/tickets" element={<TicketsPage />} />
+          <Route path="/tickets/:id" element={<TicketDetailPage />} />
           <Route path="/bandeja" element={<BandejaPage folder="inbox" />} />
+          <Route path="/bandeja/destacados" element={<BandejaPage folder="starred" />} />
           <Route path="/bandeja/archivados" element={<BandejaPage folder="archived" />} />
-          <Route path="/bandeja/junk" element={<BandejaPage folder="junk" />} />
+          <Route path="/bandeja/enviados" element={<BandejaPage folder="sent" />} />
           <Route path="/bandeja/papelera" element={<BandejaPage folder="trash" />} />
+          {/* La rama de Bandeja colapso Junk en Destacados. Se redirige en vez de
+              caer al 404: es un enlace que la operacion ya tiene guardado. */}
+          <Route path="/bandeja/junk" element={<Navigate to="/bandeja/destacados" replace />} />
+          <Route path="/bandeja/respuestas" element={<RespuestasPage />} />
         </Route>
 
         {/* RF-P6: cada familia de rutas declara el permiso de lectura que exige,

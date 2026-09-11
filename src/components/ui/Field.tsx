@@ -7,7 +7,13 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
-import { controlBase, controlSizes, stateClasses, type FieldState } from "./fieldStyles";
+import {
+  controlBase,
+  controlSizes,
+  stateClasses,
+  type ControlSize,
+  type FieldState,
+} from "./fieldStyles";
 import { LookupSelect, type LookupSelectProps } from "./LookupSelect";
 import { Select, type SelectOption } from "./Select";
 
@@ -36,7 +42,7 @@ function FieldShell({ id, label, error, hint, required, children }: ShellProps) 
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint"
+        className="font-heading text-[11.5px] font-semibold text-faint"
       >
         {label}
         {required && <span className="ml-1 text-brand-red">*</span>}
@@ -171,6 +177,8 @@ interface SelectFieldProps {
   error?: string;
   hint?: ReactNode;
   state?: FieldState;
+  /** md en formularios estandar; sm para secciones densas (varios selects por fila). */
+  size?: ControlSize;
   required?: boolean;
   disabled?: boolean;
   id?: string;
@@ -188,6 +196,7 @@ export function SelectField({
   error,
   hint,
   state = "idle",
+  size = "md",
   required,
   disabled,
   id,
@@ -206,6 +215,7 @@ export function SelectField({
         onBlur={onBlur}
         options={options}
         placeholder={placeholder}
+        size={size}
         state={resolved}
         disabled={disabled}
         aria-invalid={resolved === "error"}

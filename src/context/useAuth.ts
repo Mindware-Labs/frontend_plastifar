@@ -7,6 +7,8 @@ export interface AuthUser {
   isAdmin: boolean;
   /** Accesos por departamento con sus permisos, leidos del token. */
   departmentAccess: DepartmentAccessClaim[];
+  firstName?: string;
+  lastName?: string;
 }
 
 export interface AuthContextValue {

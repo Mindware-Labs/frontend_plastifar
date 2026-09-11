@@ -1,17 +1,27 @@
 import {
+  Archive,
   BarChart3,
+  Bell,
   Building2,
   ChevronDown,
-  Headset,
-  Search,
   ClipboardCheck,
+  Headset,
   Inbox,
   KeyRound,
   LayoutDashboard,
   LogOut,
+  MessageSquareText,
   PanelLeft,
+  PenLine,
+  Search,
+  Send,
   Settings,
+  ShieldCheck,
+  Star,
+  Trash2,
   Users,
+  Ticket as TicketIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
@@ -20,24 +30,44 @@ import { useEmailCounts } from "../../context/useEmailCounts";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { PermissionKey } from "../../lib/permissions";
-import type { EmailFolderCounts } from "../../types/api";
+import type { EmailFolderCounts, FolderCount } from "../../types/api";
 import { Logo } from "../Logo";
+import { formatDisplayName, formatInitials } from "../../lib/format";
 import { ChangePasswordModal } from "./ChangePasswordModal";
+import { NotificationsModal } from "./NotificationsModal";
+import { SignatureModal } from "./SignatureModal";
+
+/** Solo las claves de EmailFolderCounts que son una carpeta con contador. */
+type MailFolderKey = {
+  [K in keyof EmailFolderCounts]: EmailFolderCounts[K] extends FolderCount ? K : never;
+}[keyof EmailFolderCounts];
 
 interface NavItem {
   label: string;
   to: string;
-  /** Coincidencia exacta: sin esto, "/bandeja" quedaria activo tambien en "/bandeja/junk". */
+  /**
+   * Opcional a proposito. Correo y Personal identifican cada carpeta con su
+   * icono; Configuracion son siete renglones de catalogo donde siete iconos
+   * mas serian ruido, no señal.
+   */
+  icon?: LucideIcon;
+  /** Coincidencia exacta: evita que "/bandeja" quede activa también en sus subcarpetas. */
   end?: boolean;
-  /** Carpeta de correo cuyo contador se pinta al final del renglon. */
-  folder?: keyof EmailFolderCounts;
+  /**
+   * Carpeta de correo cuyo contador se pinta al final del renglon. Es la lista
+   * explicita y no `keyof EmailFolderCounts` porque ese tipo incluye
+   * `assignedUnseen`, que es un numero suelto y no una carpeta navegable.
+   */
+  folder?: MailFolderKey;
   /** Permiso que exige la ruta. Ausente = abierta a todo el personal. */
   permission?: PermissionKey;
+  /** Solo lo ve un administrador. */
+  adminOnly?: boolean;
 }
 
 interface NavGroup {
   label: string;
-  icon: typeof Inbox;
+  icon: LucideIcon;
   /**
    * Encabezado bajo el que se agrupa el modulo. Siete modulos seguidos se leen
    * como una lista de la compra; en tres bloques con nombre, el ojo salta al
@@ -65,15 +95,24 @@ interface NavGroup {
 const groups: NavGroup[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", section: "Principal" },
   {
+    label: "Tickets",
+    icon: TicketIcon,
+    section: "Principal",
+    permission: "tickets.read",
+    children: [{ label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon }],
+  },
+  {
     label: "Correo",
     icon: Inbox,
     section: "Principal",
     permission: "tickets.read",
     children: [
-      { label: "Bandeja", to: "/bandeja", end: true, folder: "inbox" },
-      { label: "Archivados", to: "/bandeja/archivados", folder: "archived" },
-      { label: "No deseado", to: "/bandeja/junk", folder: "junk" },
-      { label: "Papelera", to: "/bandeja/papelera", folder: "trash" },
+      { label: "Bandeja", to: "/bandeja", end: true, folder: "inbox", icon: Inbox },
+      { label: "Destacados", to: "/bandeja/destacados", folder: "starred", icon: Star },
+      { label: "Enviados", to: "/bandeja/enviados", folder: "sent", icon: Send },
+      { label: "Archivados", to: "/bandeja/archivados", folder: "archived", icon: Archive },
+      { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
+      { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
     ],
   },
   {
@@ -81,9 +120,9 @@ const groups: NavGroup[] = [
     icon: Users,
     section: "Gestión",
     children: [
-      { label: "Colaboradores", to: "/staff", permission: "staff.read" },
-      { label: "Roles", to: "/roles", permission: "roles.read" },
-      { label: "Permisos", to: "/permisos", permission: "roles.read" },
+      { label: "Colaboradores", to: "/staff", icon: Users, permission: "staff.read" },
+      { label: "Roles", to: "/roles", icon: ShieldCheck, permission: "roles.read" },
+      { label: "Permisos", to: "/permisos", icon: KeyRound, permission: "roles.read" },
     ],
   },
   { label: "Clientes", icon: Building2, to: "/clientes", permission: "clients.read", section: "Gestión" },
@@ -131,31 +170,33 @@ interface Flyout {
   left: number;
 }
 
-const linkBase =
-  "flex items-center gap-2.5 rounded-edge px-3 py-2 text-[13px] font-medium transition-colors";
-
-/** Sin leer manda en rojo; si todo esta leido, el total queda en gris de apoyo. */
-function FolderBadge({ count }: { count: { total: number; unread: number } }) {
-  if (count.unread > 0) {
-    return (
-      <span
-        className="ml-auto flex h-[18px] min-w-[18px] shrink-0 items-center justify-center
-          rounded-full bg-brand-red px-1.5 font-heading text-[10.5px] font-bold tabular-nums
-          text-white shadow-[0_2px_6px_-2px_rgba(228,0,43,0.6)]"
-      >
-        {count.unread > 99 ? "99+" : count.unread}
-      </span>
-    );
-  }
-
-  if (count.total === 0) return null;
+/**
+ * Contador numérico estilo Gmail:
+ * - Con correos sin leer: tipografía destacada con acento de marca.
+ * - Solo leídos: número fino y neutro.
+ */
+function FolderBadge({
+  count,
+  isActive,
+}: {
+  count: { total: number; unread: number };
+  isActive?: boolean;
+}) {
+  if (count.unread <= 0) return null;
 
   return (
-    <span className="ml-auto shrink-0 text-[11px] font-medium tabular-nums text-faint">
-      {count.total}
+    <span
+      className={`ml-auto shrink-0 font-heading text-[12px] font-bold tabular-nums transition-colors ${
+        isActive ? "text-brand-red-dark" : "text-ink"
+      }`}
+    >
+      {count.unread > 99 ? "99+" : count.unread}
     </span>
   );
 }
+
+const linkBase =
+  "flex items-center gap-2.5 rounded-edge px-3 py-2 text-[13px] font-medium transition-colors";
 const linkInactive = "text-brand-gray hover:bg-fill hover:text-ink";
 const linkActive = "bg-brand-red/8 font-semibold text-brand-red-dark";
 
@@ -176,6 +217,11 @@ function readCollapsed() {
 /** Barra lateral: logotipo, arbol de modulos y, al pie, la persona conectada. */
 export function Sidebar() {
   const { user, logout } = useAuth();
+
+  // Lo marcado como solo administradores no aparece para el resto.
+  function visibleChildren(group: NavGroup) {
+    return (group.children ?? []).filter((child) => !child.adminOnly || user?.isAdmin);
+  }
   const { counts } = useEmailCounts();
   const { can } = usePermissions();
 
@@ -216,6 +262,8 @@ export function Sidebar() {
   const setCollapsed = setPreferCollapsed;
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [editingSignature, setEditingSignature] = useState(false);
+  const [editingAlerts, setEditingAlerts] = useState(false);
   const [flyout, setFlyout] = useState<Flyout | null>(null);
   /** Solo los grupos que la persona abrio o cerro a mano; el resto sale de la ruta. */
   const [manualOpen, setManualOpen] = useState<Record<string, boolean>>({});
@@ -413,7 +461,7 @@ export function Sidebar() {
                       id={panelId}
                       className="mb-1 ml-[19px] mt-1 flex flex-col gap-0.5 border-l border-line pl-2.5"
                     >
-                      {group.children.map((child) => (
+                      {visibleChildren(group).map((child) => (
                         <NavLink
                           key={child.to}
                           to={child.to}
@@ -424,16 +472,30 @@ export function Sidebar() {
                           // casi blancos sobre blanco. El gris de texto que
                           // cumple 5.9:1 es `subtle`.
                           className={({ isActive }) =>
-                            `flex h-8 items-center gap-2.5 rounded-edge px-2.5 text-[12.5px]
-                             transition-colors ${
+                            `group/child flex h-8 items-center gap-2.5 rounded-edge px-2.5
+                             text-[12.5px] transition-colors ${
                                isActive
                                  ? "font-semibold text-brand-red-dark"
                                  : "text-subtle hover:bg-fill hover:text-ink"
                              }`
                           }
                         >
-                          <span className="truncate">{child.label}</span>
-                          {child.folder && counts && <FolderBadge count={counts[child.folder]} />}
+                          {({ isActive }) => (
+                            <>
+                              {child.icon && (
+                                <child.icon
+                                  aria-hidden
+                                  className={`h-3.5 w-3.5 shrink-0 ${
+                                    isActive ? "text-brand-red" : "text-faint"
+                                  }`}
+                                />
+                              )}
+                              <span className="truncate">{child.label}</span>
+                              {child.folder && counts && (
+                                <FolderBadge count={counts[child.folder]} isActive={isActive} />
+                              )}
+                            </>
+                          )}
                         </NavLink>
                       ))}
                     </div>
@@ -462,33 +524,67 @@ export function Sidebar() {
     );
   }
 
-  const local = user?.email.split("@")[0] ?? "";
-  const initials = local.slice(0, 2).toUpperCase() || "PF";
+  const displayName = formatDisplayName(user?.firstName, user?.lastName, user?.email);
+  const initials = formatInitials(user?.firstName, user?.lastName, user?.email);
   const pendingMail = counts
-    ? counts.inbox.unread + counts.archived.unread + counts.junk.unread + counts.trash.unread
+    ? counts.inbox.unread + counts.archived.unread + counts.starred.unread + counts.trash.unread
     : 0;
 
   return (
     <aside
-      className={`flex h-screen shrink-0 flex-col border-r border-line bg-white
+      className={`flex h-screen shrink-0 flex-col border-r border-line/80 bg-white select-none
         transition-[width] duration-200 ease-out ${collapsed ? "w-[68px]" : "w-60"}`}
     >
+      {/* 1. Cabecera superior: Logotipo y control de contracción */}
       <div
-        className={`flex h-16 shrink-0 items-center ${
-          collapsed ? "justify-center px-2" : "justify-between px-5"
+        className={`flex h-16 shrink-0 items-center border-b border-line-soft transition-all duration-200 ${
+          collapsed ? "flex-col justify-center gap-1.5 px-2 py-2" : "justify-between px-4"
         }`}
       >
-        {!collapsed && <Logo height={22} />}
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? "Expandir la barra lateral" : "Contraer la barra lateral"}
-          title={collapsed ? "Expandir" : "Contraer"}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-edge text-faint
-            transition-colors hover:bg-fill hover:text-ink"
-        >
-          <PanelLeft className={`h-4 w-4 transition-transform ${collapsed ? "rotate-180" : ""}`} />
-        </button>
+        {!collapsed ? (
+          <>
+            <div className="flex items-center gap-2.5">
+              <Link
+                to="/bandeja"
+                className="transition-opacity hover:opacity-85 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 rounded-edge"
+                title="Plastifar · Ir a Bandeja"
+              >
+                <Logo variant="color" height={23} />
+              </Link>
+              <span className="rounded border border-line-soft bg-canvas px-1.5 py-0.5 font-heading text-[9px] font-bold tracking-[0.08em] text-subtle">
+                OPS
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="Contraer la barra lateral"
+              title="Contraer barra lateral"
+              className="flex h-7 w-7 items-center justify-center rounded-edge text-subtle transition-all duration-150 hover:bg-canvas hover:text-ink active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 outline-none"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-1.5">
+            <Link
+              to="/bandeja"
+              className="group flex h-9 w-9 items-center justify-center rounded-edge border border-line-soft bg-canvas transition-all hover:border-brand-red/30 hover:shadow-xs active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+              title="Plastifar · Ir a Bandeja"
+            >
+              <Logo variant="isotipo" height={22} />
+            </Link>
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="Expandir la barra lateral"
+              title="Expandir barra lateral"
+              className="flex h-5 w-5 items-center justify-center rounded-edge text-faint transition-all hover:bg-canvas hover:text-ink active:scale-95"
+            >
+              <PanelLeft className="h-3.5 w-3.5 rotate-180" />
+            </button>
+          </div>
+        )}
       </div>
 
       {!collapsed && (
@@ -581,73 +677,190 @@ export function Sidebar() {
         </div>
       )}
 
-      <div className="shrink-0 border-t border-line p-3" ref={menuRef}>
+      {/* Panel emergente del riel contraido: es lo unico que deja llegar a los
+          hijos de un grupo cuando la barra esta plegada. */}
+      {collapsed && flyout && (
+        <div
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          style={{ top: flyout.top, left: flyout.left }}
+          className="animate-plf-toast-in fixed z-40 w-[210px] rounded-edge border border-line bg-white p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.14),0_2px_6px_rgba(27,27,29,0.04)]"
+        >
+          <div className="flex items-center justify-between border-b border-line-soft px-2.5 pb-2 pt-1.5">
+            <span className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-subtle">
+              <flyout.group.icon className="h-3.5 w-3.5 text-brand-gray" />
+              {flyout.group.label}
+            </span>
+            {flyout.group.label === "Correo" && pendingMail > 0 && (
+              <span className="rounded-full bg-brand-red/10 px-1.5 py-0.2 font-heading text-[10px] font-bold text-brand-red">
+                {pendingMail}
+              </span>
+            )}
+          </div>
+          <div className="mt-1 flex flex-col gap-0.5">
+            {visibleChildren(flyout.group).map((child) => {
+              const hasUnread = Boolean(child.folder && counts && counts[child.folder]?.unread > 0);
+              return (
+                <NavLink
+                  key={child.to}
+                  to={child.to}
+                  end={child.end}
+                  onClick={() => setFlyout(null)}
+                  className={({ isActive }) =>
+                    `group flex h-[32px] items-center gap-3 rounded-md px-2.5 text-[12.5px] transition-colors ${
+                      isActive
+                        ? "bg-brand-red/[0.08] text-brand-red-dark font-bold"
+                        : hasUnread
+                        ? "font-bold text-ink hover:bg-fill"
+                        : "font-medium text-brand-gray hover:bg-fill hover:text-ink"
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      {child.icon && (
+                      <child.icon
+                        className={`h-4 w-4 shrink-0 transition-colors ${
+                          isActive
+                            ? "text-brand-red"
+                            : hasUnread
+                            ? "text-brand-gray"
+                            : "text-faint group-hover:text-brand-gray"
+                        }`}
+                      />
+                      )}
+                      <span className="truncate flex-1">{child.label}</span>
+                      {child.folder && counts && (
+                        <FolderBadge count={counts[child.folder]} isActive={isActive} />
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 5. Pie de Tarjeta de Usuario y Menú Desplegable */}
+      <div className="shrink-0 border-t border-line p-2.5" ref={menuRef}>
         <div className="relative">
+          {/* Menú flotante de perfil */}
           {menuOpen && (
             <div
               role="menu"
-              className="animate-plf-toast-in absolute bottom-[52px] left-0 z-20 w-full min-w-[224px]
-                rounded-edge border border-line bg-white p-1.5
-                shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.22)]"
+              className="animate-plf-toast-in absolute bottom-[calc(100%+8px)] left-0 z-30 w-full min-w-[240px] rounded-edge border border-line bg-white p-1.5 shadow-[0_12px_32px_-6px_rgba(27,27,29,0.16),0_2px_8px_rgba(27,27,29,0.06)]"
             >
-              <div className="mb-1 border-b border-line-soft px-2.5 pb-2.5 pt-2">
-                <p className="truncate font-heading text-[12.5px] font-semibold text-ink">{local}</p>
-                <p className="mt-0.5 truncate text-[11.5px] text-faint">{user?.email}</p>
+              {/* Encabezado del usuario */}
+              <div className="mb-1.5 flex items-center gap-2.5 border-b border-line-soft p-2">
+                <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink font-heading text-[12px] font-bold text-white shadow-xs">
+                  {initials}
+                  <span
+                    aria-hidden
+                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-brand-green"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-heading text-[13px] font-bold text-ink leading-tight">
+                    {displayName}
+                  </p>
+                  <p className="truncate text-[11px] text-faint leading-tight mt-0.5">{user?.email}</p>
+                  <span className="mt-1 inline-flex items-center rounded-full bg-brand-red/[0.08] px-2 py-0.2 font-heading text-[9.5px] font-bold text-brand-red tracking-wide">
+                    {user?.isAdmin ? "ADMINISTRADOR" : "COLABORADOR"}
+                  </span>
+                </div>
               </div>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setChangingPassword(true);
-                }}
-                className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-2 text-left text-[13px]
-                  text-brand-gray transition-colors hover:bg-fill hover:text-ink"
-              >
-                <KeyRound className="h-4 w-4" />
-                Cambiar contraseña
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => logout()}
-                className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-2 text-left text-[13px]
-                  font-medium text-brand-red-dark transition-colors hover:bg-red-50"
-              >
-                <LogOut className="h-4 w-4" />
-                Cerrar sesión
-              </button>
+
+              {/* Botones de opciones */}
+              <div className="flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setEditingSignature(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] text-[#3e3e44] transition-colors hover:bg-canvas hover:text-ink"
+                >
+                  <PenLine className="h-3.5 w-3.5 text-subtle" />
+                  <span>Tu firma de correo</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setEditingAlerts(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] text-[#3e3e44] transition-colors hover:bg-canvas hover:text-ink"
+                >
+                  <Bell className="h-3.5 w-3.5 text-subtle" />
+                  <span>Avisos y notificaciones</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setChangingPassword(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] text-[#3e3e44] transition-colors hover:bg-canvas hover:text-ink"
+                >
+                  <KeyRound className="h-3.5 w-3.5 text-subtle" />
+                  <span>Cambiar contraseña</span>
+                </button>
+
+                <div className="my-1 border-t border-line-soft" />
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => logout()}
+                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] font-medium text-brand-red-dark transition-colors hover:bg-red-50/80"
+                >
+                  <LogOut className="h-3.5 w-3.5 text-brand-red" />
+                  <span>Cerrar sesión</span>
+                </button>
+              </div>
             </div>
           )}
 
+          {/* Gatillo del perfil */}
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            title={collapsed ? local : undefined}
-            className={`flex w-full items-center rounded-edge transition-colors
-              ${collapsed ? "justify-center py-1.5" : "gap-2.5 py-1.5 pl-1.5 pr-2"}
-              ${menuOpen ? "bg-fill" : "hover:bg-fill"}`}
+            title={collapsed ? `${displayName} · ${user?.email}` : undefined}
+            className={`group flex w-full items-center rounded-edge border transition-all duration-150 outline-none ${
+              menuOpen
+                ? "border-line-strong bg-fill shadow-xs ring-1 ring-line-strong"
+                : "border-transparent hover:border-line-soft hover:bg-canvas"
+            } ${collapsed ? "justify-center p-1.5" : "gap-2.5 p-1.5"}`}
           >
-            <span
-              className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-ink
-                font-heading text-[12px] font-semibold text-white"
-            >
+            {/* Avatar circular con aro y presencia en línea */}
+            <div className="relative flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-ink font-heading text-[11.5px] font-bold text-white shadow-xs transition-transform group-hover:scale-105">
               {initials}
-            </span>
+              <span
+                aria-hidden
+                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-brand-green"
+              />
+            </div>
+
             {!collapsed && (
               <>
-                <span className="min-w-0 flex-1 text-left">
-                  <span className="block truncate text-[12.5px] font-semibold leading-tight text-ink">
-                    {local}
+                <div className="min-w-0 flex-1 text-left">
+                  <span className="block truncate font-heading text-[12.5px] font-bold leading-tight text-ink">
+                    {displayName}
                   </span>
-                  <span className="block truncate text-[11px] leading-tight text-faint">
+                  <span className="block truncate text-[10.5px] leading-tight text-faint mt-0.5">
                     {user?.isAdmin ? "Administrador" : "Staff"}
                   </span>
-                </span>
+                </div>
                 <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-faint transition-transform ${menuOpen ? "rotate-180" : ""}`}
+                  className={`h-4 w-4 shrink-0 text-faint transition-transform duration-200 ${
+                    menuOpen ? "rotate-180 text-ink" : "group-hover:text-subtle"
+                  }`}
                 />
               </>
             )}
@@ -655,38 +868,9 @@ export function Sidebar() {
         </div>
       </div>
 
-      {collapsed && flyout && (
-        <div
-          onMouseEnter={cancelClose}
-          onMouseLeave={scheduleClose}
-          style={{ top: flyout.top, left: flyout.left }}
-          className="animate-plf-toast-in fixed z-30 w-[196px] rounded-edge border border-line
-            bg-white p-1.5 shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.22)]"
-        >
-          <p
-            className="flex items-center gap-2 px-2.5 pb-1.5 pt-1 font-heading text-[10px]
-              font-semibold uppercase tracking-[0.1em] text-faint"
-          >
-            <flyout.group.icon className="h-[13px] w-[13px]" />
-            {flyout.group.label}
-          </p>
-          <div className="flex flex-col gap-0.5">
-            {flyout.group.children?.map((child) => (
-              <NavLink
-                key={child.to}
-                to={child.to}
-                end={child.end}
-                onClick={() => setFlyout(null)}
-                className={({ isActive }) => `${linkBase} ${isActive ? linkActive : linkInactive}`}
-              >
-                {child.label}
-              </NavLink>
-            ))}
-          </div>
-        </div>
-      )}
-
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
+      {editingSignature && <SignatureModal onClose={() => setEditingSignature(false)} />}
+      {editingAlerts && <NotificationsModal onClose={() => setEditingAlerts(false)} />}
     </aside>
   );
 }

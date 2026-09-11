@@ -12,6 +12,7 @@ import { Button } from "../ui/Button";
 import { PasswordField, type FieldState } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { PasswordStrength } from "../ui/PasswordStrength";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 
 const currentSchema = z.object({
   currentPassword: z.string().min(1, "Escribe tu contraseña actual"),
@@ -23,7 +24,7 @@ const newSchema = z
     newPassword: passwordSchema,
     confirmPassword: z.string().min(1, "Repite la nueva contraseña"),
   })
-  .refine((values) => values.newPassword === values.confirmPassword, {
+  .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Las contraseñas no coinciden",
     path: ["confirmPassword"],
   });
@@ -40,6 +41,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<Step>("actual");
   const [currentPassword, setCurrentPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const { isExiting, requestClose } = useModalAnimation(onClose);
 
   const currentForm = useForm<CurrentFormValues>({
     resolver: zodResolver(currentSchema),
@@ -115,8 +117,10 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
       <Modal
         title="Contraseña actualizada"
         onClose={onClose}
+        isExiting={isExiting}
+        onRequestClose={requestClose}
         footer={
-          <Button type="button" onClick={onClose}>
+          <Button type="button" onClick={requestClose}>
             Entendido
           </Button>
         }
@@ -138,9 +142,11 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
         title="Paso 1 de 2 · Confirma tu contraseña"
         description="Antes de cambiarla, escribe la contraseña con la que entras hoy."
         onClose={onClose}
+        isExiting={isExiting}
+        onRequestClose={requestClose}
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={requestClose}>
               Cancelar
             </Button>
             <Button
@@ -185,6 +191,8 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
       title="Paso 2 de 2 · Crea una contraseña"
       description="Debe cumplir todos los requisitos. Al guardar se cierran tus otras sesiones."
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       footer={
         <>
           <Button

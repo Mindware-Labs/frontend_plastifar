@@ -17,6 +17,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatBytes } from "../../lib/format";
 import type { AttachmentLinkResponse, EmailAttachmentResponse } from "../../types/api";
 import { dividerClass, iconButtonClass } from "./toolbarStyles";
@@ -42,7 +43,8 @@ interface AttachmentPreviewModalProps {
 
 /** El servidor ya decidio que se abre dentro del navegador: aca solo se elige el visor. */
 function previewKind(link: AttachmentLinkResponse, fallback: boolean) {
-  if (link.contentType.startsWith("image/")) return "image";
+  // Solo las imagenes que el servidor sirve en linea: un SVG, por ejemplo, se descarga.
+  if (link.inline && link.contentType.startsWith("image/")) return "image";
   if (link.contentType === "application/pdf" && !fallback) return "pdf";
   return link.inline ? "frame" : "none";
 }
@@ -61,6 +63,7 @@ export function AttachmentPreviewModal({
   const [fallbackId, setFallbackId] = useState<number | null>(null);
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const { isExiting, requestClose } = useModalAnimation(onClose);
 
   // El id viaja con el enlace: al saltar de adjunto no se ve por un instante el anterior.
   const link = state.id === attachment.id ? state.link : null;
@@ -68,7 +71,7 @@ export function AttachmentPreviewModal({
   const copied = copiedId === attachment.id;
   const kind = link && previewKind(link, fallbackId === attachment.id);
 
-  useDialogBehavior(panelRef, onClose);
+  useDialogBehavior(panelRef, requestClose);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,10 +135,12 @@ export function AttachmentPreviewModal({
 
   return createPortal(
     <div
-      className="animate-plf-scrim-in fixed inset-0 z-50 flex items-center justify-center
-        bg-ink/55 p-4 backdrop-blur-[2px]"
+      inert={isExiting ? true : undefined}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-ink/55 p-4 ${
+        isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
+      }`}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget && !isExiting) requestClose();
       }}
     >
       <div
@@ -143,9 +148,9 @@ export function AttachmentPreviewModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Adjunto ${attachment.fileName}`}
-        className="animate-plf-modal-in flex h-full w-full max-w-6xl flex-col overflow-hidden
-          rounded-edge border border-line bg-white
-          shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]"
+        className={`flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-edge border border-line bg-white shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)] ${
+          isExiting ? "animate-plf-modal-out pointer-events-none" : "animate-plf-modal-in"
+        }`}
       >
         <div className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -223,7 +228,7 @@ export function AttachmentPreviewModal({
 
             <span aria-hidden className={dividerClass} />
 
-            <button type="button" onClick={onClose} aria-label="Cerrar" className={iconButtonClass}>
+            <button type="button" onClick={requestClose} aria-label="Cerrar" className={iconButtonClass}>
               <X className="h-4 w-4" />
             </button>
           </div>
