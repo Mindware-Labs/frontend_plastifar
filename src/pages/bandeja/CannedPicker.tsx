@@ -1,5 +1,6 @@
 import { MessageSquareText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { cannedApi } from "../../api/canned";
 import type { CannedResponseResponse } from "../../types/api";
 
@@ -28,7 +29,10 @@ export function CannedPicker({ onPick }: CannedPickerProps) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<CannedResponseResponse[] | null>(null);
   const [filter, setFilter] = useState("");
+  const [originX, setOriginX] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const { mounted, exiting, ref: popoverRef } = useDisclosureMotion<HTMLDivElement>(open, { direction: "up" });
 
   useEffect(() => {
     if (!open || items !== null) return;
@@ -64,8 +68,12 @@ export function CannedPicker({ onPick }: CannedPickerProps) {
   return (
     <div ref={panelRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setOriginX((triggerRef.current?.offsetWidth ?? 0) / 2);
+          setOpen((current) => !current);
+        }}
         className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white
           px-2.5 text-[12px] font-medium text-zinc-700 shadow-2xs outline-none
           transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900
@@ -75,12 +83,15 @@ export function CannedPicker({ onPick }: CannedPickerProps) {
         Respuestas rápidas
       </button>
 
-      {open && (
+      {mounted && (
         <div
-          className="animate-plf-popover-in absolute bottom-full left-0 z-40 mb-2 flex w-[340px] flex-col rounded-lg border border-zinc-200/90
-            bg-white shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
+          ref={popoverRef}
+          aria-hidden={exiting}
+          style={{ transformOrigin: `${originX}px bottom` }}
+          className={`absolute bottom-full left-0 z-40 mb-2 flex w-[340px] flex-col rounded-lg border border-zinc-200/90
+            bg-white shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] ${exiting ? "pointer-events-none" : ""}`}
         >
-          <div className="flex items-center gap-2 border-b border-zinc-100 px-3 py-2 bg-zinc-50/50">
+          <div data-motion-item className="flex items-center gap-2 border-b border-zinc-100 px-3 py-2 bg-zinc-50/50">
             <input
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
@@ -111,6 +122,7 @@ export function CannedPicker({ onPick }: CannedPickerProps) {
               visible.map((item) => (
                 <button
                   key={item.id}
+                  data-motion-item
                   type="button"
                   onClick={() => {
                     onPick(item.body);

@@ -1,8 +1,8 @@
 import { X } from "lucide-react";
-import { useId, useRef, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
-import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { useDialogMotion } from "../../hooks/useDialogMotion";
 
 export interface ModalProps {
   title: string;
@@ -34,11 +34,10 @@ export function Modal({
   onRequestClose: externalRequestClose,
   maxWidth = "max-w-lg",
 }: ModalProps) {
-  const internal = useModalAnimation(onClose);
-  const isExiting = externalIsExiting ?? internal.isExiting;
-  const requestClose = externalRequestClose ?? internal.requestClose;
+  const motion = useDialogMotion(onClose, { exiting: externalIsExiting });
+  const { isExiting, scrimRef, panelRef } = motion;
+  const requestClose = externalRequestClose ?? motion.requestClose;
 
-  const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
 
@@ -46,9 +45,10 @@ export function Modal({
 
   return createPortal(
     <div
+      ref={scrimRef}
       inert={isExiting ? true : undefined}
       className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8 backdrop-blur-[2px] ${
-        isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
+        isExiting ? "pointer-events-none" : ""
       }`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !isExiting) requestClose();
@@ -61,7 +61,7 @@ export function Modal({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         className={`${
-          isExiting ? "animate-plf-modal-out pointer-events-none" : "animate-plf-modal-in"
+          isExiting ? "pointer-events-none" : ""
         } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-xl`}
       >
         {/* Cabecera compacta */}

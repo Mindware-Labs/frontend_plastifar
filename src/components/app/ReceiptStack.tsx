@@ -107,7 +107,7 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
       onFocusCapture={hold}
       onBlurCapture={resume}
       className={`${cardClass} ${failed ? "border border-line-strong" : "border border-line"} ${
-        leaving ? "animate-plf-receipt-out" : "animate-plf-modal-in"
+        leaving ? "animate-plf-receipt-out" : "animate-plf-receipt-in"
       }`}
     >
       <div className="flex h-8 shrink-0 items-center gap-2 pl-3.5 pr-2">

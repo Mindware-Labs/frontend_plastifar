@@ -32,7 +32,7 @@ interface RoleModalProps {
 export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const isEdit = role !== undefined;
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose } = useModalAnimation();
 
   const {
     register,

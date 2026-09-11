@@ -43,6 +43,9 @@
 
   --font-heading: "Montserrat", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Poppins", ui-sans-serif, system-ui, sans-serif;
+
+  /* Resorte de apertura (k=380, c=32): 84% del recorrido a mitad de tiempo, llegada con velocidad cero. */
+  --ease-plf-spring: linear(0, 0.023 4.2%, 0.081 8.3%, 0.160 12.5%, 0.251 16.7%, 0.345 20.8%, 0.438 25%, 0.526 29.2%, 0.606 33.3%, 0.678 37.5%, 0.741 41.7%, 0.795 45.8%, 0.840 50%, 0.878 54.2%, 0.909 58.3%, 0.934 62.5%, 0.953 66.7%, 0.968 70.8%, 0.979 75%, 0.987 79.2%, 0.993 83.3%, 0.996 87.5%, 0.999 91.7%, 1.000 95.8%, 1);
 }
 
 html {
@@ -97,60 +100,6 @@ input:-webkit-autofill:focus {
 @keyframes plf-fade {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-@keyframes plf-scrim-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes plf-scrim-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-
-@keyframes plf-modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes plf-modal-out {
-  from {
-    opacity: 1;
-    transform: none;
-  }
-  to {
-    opacity: 0;
-    transform: translateY(6px) scale(0.985);
-  }
-}
-
-@keyframes plf-drawer-in {
-  from {
-    opacity: 0.7;
-    transform: translateX(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes plf-drawer-out {
-  from {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  to {
-    opacity: 0.7;
-    transform: translateX(100%);
-  }
 }
 
 @keyframes plf-shake {
@@ -222,26 +171,9 @@ input:-webkit-autofill:focus {
   }
 }
 
-@keyframes plf-popover-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes plf-popover-out {
-  from {
-    opacity: 1;
-    transform: none;
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
+@keyframes plf-receipt-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
 }
 
 /* El recibo se va mas rapido de lo que llega: el aviso pesa al aparecer, no al irse. */
@@ -289,18 +221,11 @@ input:-webkit-autofill:focus {
 .animate-plf-selection-out { animation: plf-selection-bar-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-tabs-in { animation: plf-tabs-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-tabs-out { animation: plf-tabs-fade-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
-.animate-plf-popover-in { animation: plf-popover-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-plf-popover-out { animation: plf-popover-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
-.animate-plf-scrim-in { animation: plf-scrim-in 0.18s ease-out both; }
-.animate-plf-scrim-out { animation: plf-scrim-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
-.animate-plf-modal-in { animation: plf-modal-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-plf-modal-out { animation: plf-modal-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
-.animate-plf-drawer-in { animation: plf-drawer-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-plf-drawer-out { animation: plf-drawer-out 0.20s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
 .animate-plf-settle { animation: plf-settle 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-otp-confirm { animation: plf-otp-confirm 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
+.animate-plf-receipt-in { animation: plf-receipt-in 0.28s var(--ease-plf-spring) both; }
 .animate-plf-receipt-out { animation: plf-receipt-out 0.16s ease-in both; }
 .animate-plf-spinner-rotate { animation: plf-spinner-rotate 1.4s linear infinite; }
 .animate-plf-spinner-dash { animation: plf-spinner-dash 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
@@ -314,14 +239,11 @@ input:-webkit-autofill:focus {
   .animate-plf-toast-in,
   .animate-plf-selection-in,
   .animate-plf-tabs-in,
-  .animate-plf-popover-in,
-  .animate-plf-scrim-in,
-  .animate-plf-modal-in,
-  .animate-plf-drawer-in,
   .animate-plf-shake,
   .animate-plf-settle,
   .animate-plf-otp-confirm,
-  .animate-plf-toast-progress {
+  .animate-plf-toast-progress,
+  .animate-plf-receipt-in {
     animation: none !important;
   }
 
@@ -329,11 +251,7 @@ input:-webkit-autofill:focus {
      y el elemento se quedaria pegado en pantalla. */
   .animate-plf-selection-out,
   .animate-plf-tabs-out,
-  .animate-plf-popover-out,
-  .animate-plf-receipt-out,
-  .animate-plf-scrim-out,
-  .animate-plf-modal-out,
-  .animate-plf-drawer-out {
+  .animate-plf-receipt-out {
     animation-duration: 1ms !important;
   }
 }

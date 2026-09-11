@@ -1,5 +1,6 @@
 import { ChevronDown, Plus, StickyNote, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { useAuth } from "../../context/useAuth";
@@ -50,35 +51,27 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
   const { user } = useAuth();
   const [notes, setNotes] = useState<EmailNoteResponse[] | null>(null);
   const [open, setOpen] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-  const isClosingRef = useRef(false);
+  const [originX, setOriginX] = useState(0);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { mounted, exiting, ref: popoverRef } = useDisclosureMotion<HTMLDivElement>(open);
 
-  const closePopover = useCallback(() => {
-    if (isClosingRef.current) return;
-    isClosingRef.current = true;
-    setIsClosing(true);
-    window.setTimeout(() => {
-      setOpen(false);
-      setIsClosing(false);
-      isClosingRef.current = false;
-      setShowAddForm(false);
-    }, 160);
-  }, []);
+  const closePopover = useCallback(() => setOpen(false), []);
 
   function togglePopover() {
     if (open) {
       closePopover();
-    } else {
-      isClosingRef.current = false;
-      setIsClosing(false);
-      setOpen(true);
+      return;
     }
+    // El panel va pegado al borde derecho: el origen se mide desde ahí hasta el centro de la tarjeta.
+    setOriginX((triggerRef.current?.offsetWidth ?? 0) / 2);
+    setShowAddForm(false);
+    setOpen(true);
   }
 
   useEffect(() => {
@@ -104,7 +97,7 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
 
   // Cierra al hacer clic fuera
   useEffect(() => {
-    if (!open || isClosing) return;
+    if (!open) return;
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         closePopover();
@@ -121,7 +114,7 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open, isClosing, closePopover]);
+  }, [open, closePopover]);
 
   // Foco automático y auto-ajuste de altura en el textarea cuando se abre el formulario
   useEffect(() => {
@@ -217,9 +210,10 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
 
         {/* Tarjeta principal interactiva que muestra la última nota */}
         <button
+          ref={triggerRef}
           type="button"
           onClick={togglePopover}
-          data-open={open && !isClosing}
+          data-open={open}
           className="group/btn flex max-w-[280px] sm:max-w-[340px] md:max-w-[390px] items-center gap-2.5 rounded-lg
             border border-amber-200/90 bg-amber-50/70 px-2.5 py-1.5 text-left outline-none
             shadow-2xs transition-all duration-150 cursor-pointer
@@ -250,8 +244,8 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
               </span>
             )}
             <ChevronDown
-              className={`h-3 w-3 shrink-0 text-amber-600 transition-transform duration-200 group-hover/btn:text-amber-800 ${
-                open && !isClosing ? "rotate-180 text-amber-800" : ""
+              className={`h-3 w-3 shrink-0 text-amber-600 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none group-hover/btn:text-amber-800 ${
+                open ? "rotate-180 text-amber-800" : ""
               }`}
             />
           </div>
@@ -259,14 +253,17 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
       </div>
 
       {/* Panel desplegado (Popover) con todas las notas y el creador */}
-      {(open || isClosing) && (
+      {mounted && (
         <div
+          ref={popoverRef}
+          aria-hidden={exiting}
+          style={{ transformOrigin: `calc(100% - ${originX}px) top` }}
           className={`absolute right-0 top-full z-50 mt-1.5 w-[340px] sm:w-[400px] rounded-lg border
             border-zinc-200/90 bg-white p-3 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]
-            ${isClosing ? "animate-plf-popover-out" : "animate-plf-popover-in"}`}
+            ${exiting ? "pointer-events-none" : ""}`}
         >
           {/* Cabecera del popover */}
-          <div className="mb-2.5 flex items-center justify-between border-b border-zinc-100 pb-2">
+          <div data-motion-item className="mb-2.5 flex items-center justify-between border-b border-zinc-100 pb-2">
             <div className="flex items-center gap-2">
               <div className="flex size-5.5 shrink-0 items-center justify-center rounded-md bg-amber-100/90 text-amber-700 shadow-2xs">
                 <StickyNote className="h-3 w-3" />
@@ -305,6 +302,7 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
             {[...(notes ?? [])].reverse().map((note) => (
               <div
                 key={note.id}
+                data-motion-item
                 className="group/item relative rounded-lg border border-amber-200/90 bg-amber-50/70 p-2.5 shadow-2xs transition-colors
                   hover:bg-amber-50"
               >

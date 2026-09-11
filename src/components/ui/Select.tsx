@@ -1,10 +1,9 @@
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import {
-  controlBase,
   controlSizes,
-  stateClasses,
   type ControlSize,
   type FieldState,
 } from "./fieldStyles";
@@ -37,6 +36,15 @@ interface SelectProps {
 }
 
 const PANEL_MAX_HEIGHT = 264;
+
+interface Anchor {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  /** Centro del disparador respecto al borde izquierdo del panel: de ahí brota el despliegue. */
+  originX: number;
+}
 
 // El panel puede ser más ancho que su disparador, y con uno estrecho tiene que serlo:
 // la opción comparte fila con el visto de seleccionada y si no, se recorta.
@@ -81,12 +89,15 @@ export function Select({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [query, setQuery] = useState("");
-  const [anchor, setAnchor] = useState<{ left: number; width: number; top?: number; bottom?: number } | null>(null);
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const dropUp = anchor?.bottom !== undefined;
+  const { mounted, exiting, ref: containerRef, snap } = useDisclosureMotion<HTMLDivElement>(open, {
+    direction: dropUp ? "up" : "down",
+  });
 
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
@@ -112,12 +123,15 @@ export function Select({
       size === "xs" || isSubtle ? PANEL_MIN_WIDTH_COMPACT_TRIGGER : PANEL_MIN_WIDTH,
     );
 
+    // Un panel más ancho que su disparador no puede desbordar la ventana por la derecha.
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+
     setAnchor({
-      // Un panel más ancho que su disparador no puede desbordar la ventana por la derecha.
-      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      left,
       width,
       top: dropUp ? undefined : rect.bottom + 4,
       bottom: dropUp ? window.innerHeight - rect.top + 4 : undefined,
+      originX: rect.left + rect.width / 2 - left,
     });
   }
 
@@ -133,8 +147,10 @@ export function Select({
     setOpen(true);
   }
 
-  function closeList() {
+  function closeList(immediate = false) {
+    if (!open) return;
     setOpen(false);
+    if (immediate) snap();
     onBlur?.();
   }
 
@@ -180,8 +196,7 @@ export function Select({
     function handlePointerDown(event: PointerEvent | MouseEvent) {
       const target = event.target as Node;
       if (triggerRef.current?.contains(target) || containerRef.current?.contains(target)) return;
-      setOpen(false);
-      onBlur?.();
+      closeList();
     }
 
     // Reposicionar en cada scroll seria un baile: se cierra, como haria el nativo.
@@ -189,12 +204,11 @@ export function Select({
     // "scroll" no burbujea, mas igual llega aqui en la fase de captura.
     function handleViewportChange(event: Event) {
       if (event.target instanceof Node && containerRef.current?.contains(event.target)) return;
-      setOpen(false);
+      closeList(true);
     }
 
     function handleWindowBlur() {
-      setOpen(false);
-      onBlur?.();
+      closeList(true);
     }
 
     document.addEventListener("pointerdown", handlePointerDown, true);
@@ -277,14 +291,22 @@ export function Select({
         : "pl-3 pr-2.5 gap-2";
 
   const subtleStateClasses: Record<FieldState, string> = {
-    idle: "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/80 text-zinc-800 shadow-2xs focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20",
-    error: "border-brand-red bg-brand-red/[0.02] text-zinc-900 focus:ring-2 focus:ring-brand-red/12",
-    valid: "border-brand-green/50 bg-brand-green/[0.02] focus:ring-2 focus:ring-brand-green/10",
+    idle: "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50 text-zinc-800 shadow-2xs focus:outline-none focus-visible:border-zinc-400 focus-visible:ring-2 focus-visible:ring-zinc-400/20",
+    error: "border-brand-red bg-brand-red/[0.02] text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/12",
+    valid: "border-brand-green/50 bg-brand-green/[0.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green/10",
   };
 
-  const triggerVariantClass = isSubtle
-    ? subtleStateClasses[resolved]
-    : `${controlBase} ${stateClasses[resolved]}`;
+  const defaultStateClasses: Record<FieldState, string> = {
+    idle: "border-zinc-200 bg-white text-zinc-800 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 focus:outline-none focus-visible:border-zinc-400 focus-visible:ring-2 focus-visible:ring-zinc-400/20",
+    error: "border-brand-red bg-brand-red/[0.02] text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/12",
+    valid: "border-brand-green/50 bg-brand-green/[0.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green/10",
+  };
+
+  const triggerVariantClass = open
+    ? "border-zinc-300 bg-zinc-50/80 text-zinc-900 shadow-2xs"
+    : isSubtle
+      ? subtleStateClasses[resolved]
+      : defaultStateClasses[resolved];
 
   const visibleCount = options.filter(isVisible).length;
 
@@ -297,7 +319,7 @@ export function Select({
         role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-controls={open ? listId : undefined}
+        aria-controls={mounted ? listId : undefined}
         aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
@@ -305,11 +327,9 @@ export function Select({
         disabled={disabled}
         onClick={() => (open ? closeList() : openList())}
         onKeyDown={handleKeyDown}
-        className={`${
-          isSubtle
-            ? "w-full rounded-lg border text-left outline-none transition-all disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-400 active:scale-[0.98] cursor-pointer"
-            : ""
-        } ${triggerVariantClass} ${sizeClass} ${paddingClass}
+        className={`w-full rounded-lg border text-left outline-none transition-colors duration-150 cursor-pointer select-none
+          disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-400
+          ${triggerVariantClass} ${sizeClass} ${paddingClass}
           flex items-center justify-between font-medium
           ${selected ? "text-zinc-900" : "text-zinc-400"} ${buttonClassName}`}
       >
@@ -321,26 +341,28 @@ export function Select({
           aria-hidden
           className={`${
             size === "xs" ? "h-3 w-3" : "h-4 w-4"
-          } shrink-0 text-zinc-400 transition-transform duration-150 ${open ? "rotate-180 text-zinc-700" : ""}`}
+          } shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+            open ? "rotate-180 text-zinc-700" : ""
+          }`}
         />
       </button>
 
-      {open &&
+      {mounted &&
         anchor &&
         createPortal(
           <>
-            <div
-              data-select-backdrop="true"
-              className="fixed inset-0 z-[70]"
-              aria-hidden="true"
-              onPointerDown={() => {
-                setOpen(false);
-                onBlur?.();
-              }}
-            />
+            {!exiting && (
+              <div
+                data-select-backdrop="true"
+                className="fixed inset-0 z-[70]"
+                aria-hidden="true"
+                onPointerDown={() => closeList()}
+              />
+            )}
             <div
               ref={containerRef}
               data-select-portal="true"
+              aria-hidden={exiting}
               style={{
                 position: "fixed",
                 left: anchor.left,
@@ -348,12 +370,14 @@ export function Select({
                 bottom: anchor.bottom,
                 width: anchor.width,
                 maxHeight: PANEL_MAX_HEIGHT,
+                transformOrigin: `${anchor.originX}px ${dropUp ? "bottom" : "top"}`,
               }}
-              className="animate-plf-toast-in z-[80] flex flex-col overflow-hidden rounded-lg border border-zinc-200
-                bg-white shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
+              className={`z-[80] flex flex-col overflow-hidden rounded-lg border border-zinc-200/90
+                bg-white/95 backdrop-blur-xs shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]
+                ${exiting ? "pointer-events-none" : ""}`}
             >
               {showSearch && (
-                <div className="relative shrink-0 border-b border-zinc-100 p-1.5">
+                <div data-motion-item className="relative shrink-0 border-b border-zinc-100 p-1.5">
                   <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
                   <input
                     ref={searchInputRef}
@@ -388,6 +412,7 @@ export function Select({
                   return (
                     <li
                       key={option.value}
+                      data-motion-item
                       id={`${listId}-${index}`}
                       data-option-index={index}
                       role="option"

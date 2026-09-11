@@ -77,7 +77,7 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
   const prefs = useNotifyPrefs();
   const [permission, setPermission] = useState<DesktopState>(desktopState);
   const [asking, setAsking] = useState(false);
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose } = useModalAnimation();
 
   async function toggleDesktop(enabled: boolean) {
     if (!enabled) {

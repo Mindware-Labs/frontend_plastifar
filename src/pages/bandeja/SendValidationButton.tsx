@@ -1,5 +1,6 @@
 import { AlertCircle, ChevronRight, Send, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { type ValidationItem } from "./sendValidation";
 
 interface SendValidationButtonProps {
@@ -75,6 +76,7 @@ export function SendValidationButton({
   }
 
   const showTooltip = isHovered && !ready && !sending && missingItems.length > 0;
+  const { mounted, exiting, ref: tooltipRef } = useDisclosureMotion<HTMLDivElement>(showTooltip, { direction: "up" });
 
   return (
     <div
@@ -110,16 +112,21 @@ export function SendValidationButton({
         <span>{label}</span>
       </button>
 
-      {showTooltip && (
+      {mounted && (
         <div
+          ref={tooltipRef}
           role="tooltip"
-          className="animate-plf-popover-in absolute bottom-full right-0 z-40 mb-2.5 w-72 rounded-lg
-            border border-zinc-200/90 bg-white p-3 shadow-[0_10px_28px_-6px_rgba(24,24,27,0.18),0_4px_12px_-2px_rgba(24,24,27,0.08)]"
+          aria-hidden={exiting}
+          style={{ transformOrigin: "calc(100% - 33px) bottom" }}
+          className={`absolute bottom-full right-0 z-40 mb-2.5 w-72 rounded-lg
+            border border-zinc-200/90 bg-white p-3 shadow-[0_10px_28px_-6px_rgba(24,24,27,0.18),0_4px_12px_-2px_rgba(24,24,27,0.08)] ${
+              exiting ? "pointer-events-none" : ""
+            }`}
           onMouseEnter={handleOpen}
           onMouseLeave={handleClose}
         >
           {/* Cabecera con alerta y contador */}
-          <div className="flex items-center justify-between gap-2 border-b border-zinc-100 pb-2">
+          <div data-motion-item className="flex items-center justify-between gap-2 border-b border-zinc-100 pb-2">
             <div className="flex items-center gap-1.5">
               <span className="flex size-4.5 items-center justify-center rounded-full bg-brand-red/10 text-brand-red">
                 <AlertCircle className="size-3 text-brand-red" />
@@ -134,7 +141,7 @@ export function SendValidationButton({
           </div>
 
           {/* Texto explicativo */}
-          <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+          <p data-motion-item className="mt-2 text-[11px] leading-snug text-zinc-500">
             Para poder enviar el correo, completa los siguientes requisitos:
           </p>
 
@@ -143,6 +150,7 @@ export function SendValidationButton({
             {missingItems.map((item) => (
               <button
                 key={item.id}
+                data-motion-item
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();

@@ -15,7 +15,7 @@ import { cannedApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse } from "../../types/api";
 
@@ -28,7 +28,7 @@ interface CannedResponseStudioProps {
 
 export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseStudioProps) {
   const isEdit = item !== undefined;
-  const { isExiting, requestClose } = useModalAnimation(onClose, 220);
+  const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
   const [title, setTitle] = useState(item?.title ?? "");
   const [body, setBody] = useState(item?.body ?? "");
@@ -107,21 +107,23 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
 
   return createPortal(
     <div
+      ref={scrimRef}
       inert={isExiting ? true : undefined}
       className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] transition-opacity ${
-        isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
+        isExiting ? "pointer-events-none" : ""
       }`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !isExiting) requestClose();
       }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className={`relative flex h-full flex-col bg-white shadow-[0_4px_24px_rgba(27,27,29,0.18)] transition-all duration-200 ease-out ${
           isMaximized ? "w-full" : "w-full sm:w-[740px] md:w-[790px] lg:w-[840px]"
-        } ${isExiting ? "animate-plf-drawer-out pointer-events-none" : "animate-plf-drawer-in"}`}
+        } ${isExiting ? "pointer-events-none" : ""}`}
       >
         {/* Barra superior de control del Estudio */}
         <div className="flex shrink-0 items-center justify-between border-b border-line bg-canvas/70 px-6 py-3">

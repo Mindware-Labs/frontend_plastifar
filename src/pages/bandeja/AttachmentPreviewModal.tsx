@@ -16,7 +16,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
-import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { formatBytes } from "../../lib/format";
 import type { AttachmentLinkResponse } from "../../types/api";
 import { dividerClass, iconButtonClass } from "./toolbarStyles";
@@ -67,13 +67,12 @@ export function AttachmentPreviewModal({
   onClose,
 }: AttachmentPreviewModalProps) {
   const attachment = attachments[index];
-  const panelRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<PreviewState>({ id: attachment.id, link: null, error: null });
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [fallbackId, setFallbackId] = useState<number | null>(null);
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose);
 
   // En una referencia: si entrara en las dependencias del efecto, una función nueva
   // en cada render del padre volvería a pedir el enlace sin parar.
@@ -150,9 +149,10 @@ export function AttachmentPreviewModal({
 
   return createPortal(
     <div
+      ref={scrimRef}
       inert={isExiting ? true : undefined}
       className={`fixed inset-0 z-50 flex items-center justify-center bg-ink/55 p-4 ${
-        isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
+        isExiting ? "pointer-events-none" : ""
       }`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !isExiting) requestClose();
@@ -164,7 +164,7 @@ export function AttachmentPreviewModal({
         aria-modal="true"
         aria-label={`Adjunto ${attachment.fileName}`}
         className={`flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-edge border border-line bg-white shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)] ${
-          isExiting ? "animate-plf-modal-out pointer-events-none" : "animate-plf-modal-in"
+          isExiting ? "pointer-events-none" : ""
         }`}
       >
         <div className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-3">

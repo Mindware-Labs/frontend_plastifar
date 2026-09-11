@@ -41,7 +41,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<Step>("actual");
   const [currentPassword, setCurrentPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose } = useModalAnimation();
 
   const currentForm = useForm<CurrentFormValues>({
     resolver: zodResolver(currentSchema),

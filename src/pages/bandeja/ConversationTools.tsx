@@ -41,7 +41,7 @@ function AssignWithNoteModal({
 }: AssignWithNoteModalProps) {
   const [note, setNote] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose } = useModalAnimation();
 
   useEffect(() => {
     setTimeout(() => {

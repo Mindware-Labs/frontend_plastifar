@@ -1,6 +1,7 @@
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 
 export interface TicketFilterOption {
   value: string;
@@ -18,6 +19,17 @@ interface TicketFilterDropdownProps {
   className?: string;
 }
 
+interface Anchor {
+  top: number;
+  left: number;
+  width: number;
+  /** Centro del disparador respecto al borde izquierdo del panel: de ahí brota el despliegue. */
+  originX: number;
+}
+
+const PANEL_MIN_WIDTH = 210;
+const VIEWPORT_GUTTER = 12;
+
 export function TicketFilterDropdown({
   value,
   onChange,
@@ -27,32 +39,51 @@ export function TicketFilterDropdown({
   "aria-label": ariaLabel,
   className = "",
 }: TicketFilterDropdownProps) {
-  const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+  const { mounted, exiting, ref: panelRef, snap } = useDisclosureMotion<HTMLDivElement>(isOpen);
 
   const activeOption = options.find((opt) => opt.value === value) ?? options[0];
 
+  function openDropdown() {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const width = Math.max(rect.width, PANEL_MIN_WIDTH);
+    const left = Math.max(
+      VIEWPORT_GUTTER,
+      Math.min(rect.left, window.innerWidth - width - VIEWPORT_GUTTER),
+    );
+
+    setAnchor({ top: rect.bottom + 6, left, width, originX: rect.left + rect.width / 2 - left });
+    setIsOpen(true);
+  }
+
+  function closeDropdown(immediate = false) {
+    setIsOpen(false);
+    if (immediate) snap();
+  }
+
   useEffect(() => {
-    if (!open) return;
+    if (!isOpen) return;
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node;
       if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      setOpen(false);
+      closeDropdown();
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setOpen(false);
+        closeDropdown();
         triggerRef.current?.focus();
       }
     }
 
     function handleViewportChange() {
-      setOpen(false);
+      closeDropdown(true);
     }
 
     document.addEventListener("pointerdown", handlePointerDown);
@@ -65,45 +96,24 @@ export function TicketFilterDropdown({
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
     };
-  }, [open]);
-
-  function toggle() {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const estimatedWidth = Math.max(rect.width, 210);
-    let left = rect.left;
-    if (left + estimatedWidth > window.innerWidth - 12) {
-      left = Math.max(12, window.innerWidth - estimatedWidth - 12);
-    }
-
-    setAnchor({
-      top: rect.bottom + 6,
-      left,
-      width: estimatedWidth,
-    });
-    setOpen(true);
-  }
+  }, [isOpen]);
 
   return (
     <div className={`relative shrink-0 ${className}`}>
       <button
         ref={triggerRef}
         type="button"
-        onClick={toggle}
+        onClick={() => (isOpen ? closeDropdown() : openDropdown())}
         aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
+        aria-expanded={isOpen}
+        aria-controls={mounted ? panelId : undefined}
         aria-label={ariaLabel ?? activeOption?.label}
-        data-open={open}
-        className="group inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5
-          text-[12.5px] font-medium text-zinc-700 shadow-2xs outline-none transition-all hover:border-zinc-300
-          hover:bg-zinc-50 active:scale-[0.98] focus-visible:border-zinc-400 focus-visible:ring-2
-          focus-visible:ring-zinc-400/20"
+        data-open={isOpen}
+        className={`group inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] font-medium shadow-2xs outline-none transition-colors duration-150 cursor-pointer select-none ${
+          isOpen
+            ? "border-zinc-300 bg-zinc-50/80 text-zinc-900"
+            : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+        }`}
       >
         <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-zinc-500 group-hover:text-zinc-800">
           {activeOption?.icon ?? defaultIcon}
@@ -111,13 +121,13 @@ export function TicketFilterDropdown({
         <span className="max-w-[240px] truncate whitespace-nowrap">{activeOption?.label}</span>
         <ChevronDown
           aria-hidden
-          className={`h-3 w-3 shrink-0 text-zinc-400 transition-transform duration-150 ${
-            open ? "rotate-180 text-zinc-700" : "group-hover:text-zinc-600"
+          className={`h-3 w-3 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+            isOpen ? "rotate-180 text-zinc-700" : "group-hover:text-zinc-600"
           }`}
         />
       </button>
 
-      {open &&
+      {mounted &&
         anchor &&
         createPortal(
           <div
@@ -125,17 +135,24 @@ export function TicketFilterDropdown({
             id={panelId}
             role="listbox"
             aria-label={ariaLabel ?? title}
+            aria-hidden={exiting}
             style={{
               position: "fixed",
               top: anchor.top,
               left: anchor.left,
               minWidth: anchor.width,
+              transformOrigin: `${anchor.originX}px top`,
             }}
-            className="animate-plf-popover-in z-[85] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
-              bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
+            className={`z-[85] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
+              bg-white/95 backdrop-blur-xs p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] ${
+                exiting ? "pointer-events-none" : ""
+              }`}
           >
             {title && (
-              <div className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
+              <div
+                data-motion-item
+                className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400"
+              >
                 {title}
               </div>
             )}
@@ -144,22 +161,23 @@ export function TicketFilterDropdown({
               return (
                 <button
                   key={option.value}
+                  data-motion-item
                   type="button"
                   role="option"
                   aria-selected={isSelected}
                   onClick={() => {
                     onChange(option.value);
-                    setOpen(false);
+                    closeDropdown();
                     triggerRef.current?.focus();
                   }}
-                  className={`group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px]
-                    transition-colors ${
+                  className={`group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px]
+                    transition-colors duration-100 ease-out cursor-pointer select-none ${
                       isSelected
-                        ? "bg-zinc-100 font-semibold text-ink"
-                        : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-ink"
+                        ? "bg-zinc-100 font-semibold text-zinc-900"
+                        : "font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 active:bg-zinc-100/70"
                     }`}
                 >
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500 group-hover:text-ink">
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500 group-hover:text-zinc-900">
                     {option.icon ?? defaultIcon}
                   </span>
                   <span className="flex-1 truncate">{option.label}</span>

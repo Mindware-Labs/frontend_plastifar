@@ -16,7 +16,7 @@ export function SignatureModal({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const receipts = useReceipts();
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose } = useModalAnimation();
 
   useEffect(() => {
     let cancelled = false;

@@ -13,7 +13,7 @@ import {
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/Button";
-import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { useDialogMotion } from "../../hooks/useDialogMotion";
 
 interface RespuestasHelpSheetProps {
   onClose: () => void;
@@ -21,7 +21,7 @@ interface RespuestasHelpSheetProps {
 }
 
 export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSheetProps) {
-  const { isExiting, requestClose } = useModalAnimation(onClose, 220);
+  const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -40,20 +40,22 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
 
   return createPortal(
     <div
+      ref={scrimRef}
       inert={isExiting ? true : undefined}
       className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] transition-opacity ${
-        isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
+        isExiting ? "pointer-events-none" : ""
       }`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !isExiting) requestClose();
       }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] transition-all duration-200 ease-out sm:w-[600px] md:w-[650px] ${
-          isExiting ? "animate-plf-drawer-out pointer-events-none" : "animate-plf-drawer-in"
+          isExiting ? "pointer-events-none" : ""
         }`}
       >
         {/* Cabecera del Sheet */}

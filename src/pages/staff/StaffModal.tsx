@@ -44,7 +44,7 @@ interface StaffModalProps {
 export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalProps) {
   const { user } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose } = useModalAnimation();
   const isEdit = staff !== undefined;
   const isSelf = isEdit && staff.id === user?.staffId;
 

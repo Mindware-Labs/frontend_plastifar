@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi, type EmailQuery } from "../../api/emails";
@@ -88,10 +89,10 @@ function EmailFilterMenu({
   className = "",
 }: EmailFilterMenuProps) {
   const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [anchor, setAnchor] = useState<{ top: number; left: number; originX: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+  const { mounted, exiting, ref: panelRef, snap } = useDisclosureMotion<HTMLDivElement>(open);
 
   useEffect(() => {
     if (!open) return;
@@ -109,6 +110,7 @@ function EmailFilterMenu({
     }
     function handleViewportChange() {
       setOpen(false);
+      snap();
     }
 
     document.addEventListener("pointerdown", handlePointerDown);
@@ -121,7 +123,7 @@ function EmailFilterMenu({
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
     };
-  }, [open]);
+  }, [open, snap]);
 
   function toggle() {
     if (open) {
@@ -130,7 +132,8 @@ function EmailFilterMenu({
     }
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setAnchor({ top: rect.bottom + 6, left: Math.max(8, rect.right - STATUS_MENU_WIDTH) });
+    const left = Math.max(8, rect.right - STATUS_MENU_WIDTH);
+    setAnchor({ top: rect.bottom + 6, left, originX: rect.left + rect.width / 2 - left });
     setOpen(true);
   }
 
@@ -146,7 +149,7 @@ function EmailFilterMenu({
         onClick={toggle}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
+        aria-controls={mounted ? panelId : undefined}
         aria-label={active ? `Más filtros (activo: ${active.label})` : "Más filtros"}
         title={active ? `Filtro activo: ${active.label}` : "Más filtros"}
         className={`inline-flex h-8 w-full min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-[12px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
@@ -168,11 +171,11 @@ function EmailFilterMenu({
           )}
         </span>
         <ChevronDown
-          className={`h-3 w-3 shrink-0 text-zinc-400 transition-transform duration-150 ${open ? "rotate-180 text-zinc-700" : ""}`}
+          className={`h-3 w-3 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-zinc-700" : ""}`}
         />
       </button>
 
-      {open &&
+      {mounted &&
         anchor &&
         createPortal(
           <div
@@ -180,11 +183,20 @@ function EmailFilterMenu({
             id={panelId}
             role="menu"
             aria-label="Más filtros de correo"
-            style={{ position: "fixed", top: anchor.top, left: anchor.left, width: STATUS_MENU_WIDTH }}
-            className="animate-plf-popover-in z-[60] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
-              bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
+            aria-hidden={exiting}
+            style={{
+              position: "fixed",
+              top: anchor.top,
+              left: anchor.left,
+              width: STATUS_MENU_WIDTH,
+              transformOrigin: `${anchor.originX}px top`,
+            }}
+            className={`z-[60] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
+              bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] ${
+                exiting ? "pointer-events-none" : ""
+              }`}
           >
-            <div className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
+            <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
               Vistas secundarias
             </div>
             {options.map(({ key, label, countKey }) => {
@@ -194,6 +206,7 @@ function EmailFilterMenu({
               return (
                 <button
                   key={key}
+                  data-motion-item
                   type="button"
                   role="menuitemradio"
                   aria-checked={isActive}

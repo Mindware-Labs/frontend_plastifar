@@ -39,7 +39,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose } = useModalAnimation();
 
   async function handleConfirm() {
     setError(null);

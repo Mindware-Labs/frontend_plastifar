@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useNavigate } from "react-router-dom";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 import { departmentsApi } from "../../api/departments";
@@ -127,10 +128,10 @@ interface TicketStatusMenuProps {
 /** Vistas de estado menos usadas, en un panel flotante (mismo patron que el filtro de la bandeja de correo). */
 function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatusMenuProps) {
   const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [anchor, setAnchor] = useState<{ top: number; left: number; originX: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+  const { mounted, exiting, ref: panelRef, snap } = useDisclosureMotion<HTMLDivElement>(open);
 
   useEffect(() => {
     if (!open) return;
@@ -148,6 +149,7 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
     }
     function handleViewportChange() {
       setOpen(false);
+      snap();
     }
 
     document.addEventListener("pointerdown", handlePointerDown);
@@ -160,7 +162,7 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
     };
-  }, [open]);
+  }, [open, snap]);
 
   function toggle() {
     if (open) {
@@ -169,7 +171,8 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
     }
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setAnchor({ top: rect.bottom + 6, left: Math.max(8, rect.right - STATUS_MENU_WIDTH) });
+    const left = Math.max(8, rect.right - STATUS_MENU_WIDTH);
+    setAnchor({ top: rect.bottom + 6, left, originX: rect.left + rect.width / 2 - left });
     setOpen(true);
   }
 
@@ -185,7 +188,7 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
         onClick={toggle}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
+        aria-controls={mounted ? panelId : undefined}
         aria-label={active ? `Más vistas (activa: ${active.label})` : "Más vistas"}
         title={active ? `Vista activa: ${active.label}` : "Más vistas"}
         className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
@@ -212,11 +215,11 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
           )
         )}
         <ChevronDown
-          className={`h-3 w-3 text-zinc-400 transition-transform duration-150 ${open ? "rotate-180 text-zinc-700" : ""}`}
+          className={`h-3 w-3 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-zinc-700" : ""}`}
         />
       </button>
 
-      {open &&
+      {mounted &&
         anchor &&
         createPortal(
           <div
@@ -224,11 +227,20 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
             id={panelId}
             role="menu"
             aria-label="Más vistas de estado"
-            style={{ position: "fixed", top: anchor.top, left: anchor.left, width: STATUS_MENU_WIDTH }}
-            className="animate-plf-popover-in z-[60] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
-              bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
+            aria-hidden={exiting}
+            style={{
+              position: "fixed",
+              top: anchor.top,
+              left: anchor.left,
+              width: STATUS_MENU_WIDTH,
+              transformOrigin: `${anchor.originX}px top`,
+            }}
+            className={`z-[60] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
+              bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] ${
+                exiting ? "pointer-events-none" : ""
+              }`}
           >
-            <div className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
+            <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
               Vistas de estado
             </div>
             {options.map(({ key, label, countKey }) => {
@@ -238,6 +250,7 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
               return (
                 <button
                   key={key}
+                  data-motion-item
                   type="button"
                   role="menuitemradio"
                   aria-checked={isActive}

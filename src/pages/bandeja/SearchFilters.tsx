@@ -1,6 +1,7 @@
 import { Calendar, Paperclip, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField } from "../../components/ui/Field";
 import { DateRangePicker } from "../../components/ui/DateRangePicker";
@@ -15,33 +16,18 @@ interface FilterButtonProps {
 
 export function FilterButton({ value, onChange }: FilterButtonProps) {
   const [open, setOpen] = useState(false);
-  const [isExiting, setIsExiting] = useState(false);
-  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [anchor, setAnchor] = useState<{ top: number; left: number; originX: number } | null>(null);
   const [draft, setDraft] = useState<AdvancedFilters>(value);
   const [error, setError] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLFormElement>(null);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const panelId = useId();
   const active = countActive(value);
+  const { mounted, exiting, ref: panelRef, snap } = useDisclosureMotion<HTMLFormElement>(open);
 
-  const close = useCallback(() => {
-    if (!open || isExiting) return;
-    setIsExiting(true);
-    closeTimerRef.current = setTimeout(() => {
-      setOpen(false);
-      setIsExiting(false);
-    }, 160);
-  }, [open, isExiting]);
+  const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!open || isExiting) return;
+    if (!open) return;
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node;
@@ -63,6 +49,7 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
     }
     function handleViewportChange() {
       close();
+      snap();
     }
 
     panelRef.current?.querySelector<HTMLElement>("button, input")?.focus();
@@ -77,14 +64,9 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
     };
-  }, [open, isExiting, close]);
+  }, [open, close, snap]);
 
   function toggle() {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-
     if (open) {
       close();
       return;
@@ -93,10 +75,10 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    setAnchor({ top: rect.bottom + 6, left: Math.max(8, rect.right - PANEL_WIDTH) });
+    const left = Math.max(8, rect.right - PANEL_WIDTH);
+    setAnchor({ top: rect.bottom + 6, left, originX: rect.left + rect.width / 2 - left });
     setDraft(value);
     setError(null);
-    setIsExiting(false);
     setOpen(true);
   }
 
@@ -125,8 +107,8 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
         ref={triggerRef}
         type="button"
         onClick={toggle}
-        aria-expanded={open && !isExiting}
-        aria-controls={open ? panelId : undefined}
+        aria-expanded={open}
+        aria-controls={mounted ? panelId : undefined}
         aria-label={active > 0 ? `Filtros (${active} activos)` : "Filtros"}
         title={active > 0 ? `Filtros avanzados (${active} activos)` : "Filtros avanzados"}
         data-active={active > 0}
@@ -144,18 +126,24 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
         )}
       </button>
 
-      {open &&
+      {mounted &&
         anchor &&
         createPortal(
         <form
           ref={panelRef}
           id={panelId}
           onSubmit={apply}
-          inert={isExiting ? true : undefined}
-          style={{ position: "fixed", top: anchor.top, left: anchor.left, width: PANEL_WIDTH }}
+          inert={exiting ? true : undefined}
+          style={{
+            position: "fixed",
+            top: anchor.top,
+            left: anchor.left,
+            width: PANEL_WIDTH,
+            transformOrigin: `${anchor.originX}px top`,
+          }}
           className={`${
-            isExiting ? "animate-plf-popover-out pointer-events-none" : "animate-plf-popover-in"
-          } z-[60] flex flex-col gap-3.5 origin-top-right rounded-lg border border-zinc-200/90
+            exiting ? "pointer-events-none" : ""
+          } z-[60] flex flex-col gap-3.5 rounded-lg border border-zinc-200/90
             bg-white p-3.5 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]`}
         >
           <p className="font-heading text-[11px] font-semibold uppercase tracking-wider text-zinc-400 select-none">

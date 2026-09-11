@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { FilterChip } from "../../components/ui/FilterChip";
-import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { formatDateTime } from "../../lib/format";
 import type {
   TicketAttachmentResponse,
@@ -43,7 +43,7 @@ export function TicketTimelineSheet({
   onSelectTab,
   initialFilter = "all",
 }: TicketTimelineSheetProps) {
-  const { isExiting, requestClose } = useModalAnimation(onClose, 220);
+  const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [filter, setFilter] = useState<TimelineFilter>(initialFilter);
@@ -157,20 +157,22 @@ export function TicketTimelineSheet({
 
   return createPortal(
     <div
+      ref={scrimRef}
       inert={isExiting ? true : undefined}
       className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] ${
-        isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
+        isExiting ? "pointer-events-none" : ""
       }`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !isExiting) requestClose();
       }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[560px] ${
-          isExiting ? "animate-plf-drawer-out pointer-events-none" : "animate-plf-drawer-in"
+          isExiting ? "pointer-events-none" : ""
         }`}
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">

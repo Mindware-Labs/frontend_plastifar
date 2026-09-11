@@ -22,7 +22,7 @@ import { Button } from "../../components/ui/Button";
 import { SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
-import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { useDialogMotion } from "../../hooks/useDialogMotion";
 import type {
   TicketContactOption,
   TicketCreateOptionsResponse,
@@ -138,14 +138,13 @@ export function CreateTicketModal({
   const [catalogsError, setCatalogsError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [detectedMatch, setDetectedMatch] = useState<{ clientName: string; contactName: string } | null>(null);
-  const { isExiting, requestClose } = useModalAnimation(onClose, 220);
+  const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
   const normalizedInitialMessage = useMemo(
     () => (initialMessage ? reflowPlainText(initialMessage) : ""),
     [initialMessage],
   );
 
-  const panelRef = useRef<HTMLDivElement>(null);
   const messageTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -309,9 +308,10 @@ export function CreateTicketModal({
 
   return createPortal(
     <div
+      ref={scrimRef}
       inert={isExiting ? true : undefined}
       className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] transition-opacity ${
-        isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
+        isExiting ? "pointer-events-none" : ""
       }`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !isExiting) requestClose();
@@ -325,7 +325,7 @@ export function CreateTicketModal({
         aria-describedby={descriptionId}
         className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)]
           sm:w-[620px] md:w-[700px] lg:w-[760px]
-          ${isExiting ? "animate-plf-drawer-out pointer-events-none" : "animate-plf-drawer-in"}`}
+          ${isExiting ? "pointer-events-none" : ""}`}
       >
         {/* Cabecera del Sheet */}
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line bg-canvas/80 px-6 py-4">
