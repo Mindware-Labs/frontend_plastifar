@@ -191,20 +191,18 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
         aria-controls={mounted ? panelId : undefined}
         aria-label={active ? `Más vistas (activa: ${active.label})` : "Más vistas"}
         title={active ? `Vista activa: ${active.label}` : "Más vistas"}
-        className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
-          active
-            ? "border border-zinc-300 bg-zinc-100 font-semibold text-zinc-900"
-            : "border border-zinc-200 bg-white font-medium text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+        className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+          active || open
+            ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
         }`}
       >
         <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
         <span>{active ? active.label : "Más"}</span>
         {active ? (
           <span
-            className={`rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums ${
-              active.key === "vencidos" && activeCount > 0
-                ? "bg-red-100 text-brand-red"
-                : "bg-zinc-200 text-zinc-800"
+            className={`font-heading text-[10px] font-bold leading-none tabular-nums ${
+              active.key === "vencidos" && activeCount > 0 ? "text-brand-red" : "text-zinc-900"
             }`}
           >
             {activeCount}
@@ -284,6 +282,57 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
           document.body,
         )}
     </div>
+  );
+}
+
+interface StatChipProps {
+  label: string;
+  value: number;
+  /** El color vive solo en el punto; vencidos se enciende únicamente cuando hay alguno. */
+  tone?: "neutral" | "open" | "overdue" | "waiting";
+  active: boolean;
+  title: string;
+  onClick: () => void;
+}
+
+/** Contador de cabecera con la anatomía del chip de ticket: pie en versalitas y cifra tabular. */
+function StatChip({ label, value, tone = "neutral", active, title, onClick }: StatChipProps) {
+  const urgent = tone === "overdue" && value > 0;
+  const dot = {
+    neutral: "bg-zinc-300",
+    open: "bg-brand-green",
+    overdue: urgent ? "bg-brand-red" : "bg-zinc-300",
+    waiting: "bg-amber-500",
+  }[tone];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+      className={`inline-flex h-8 cursor-pointer select-none items-center gap-2 rounded-lg border pl-2.5 pr-3 text-left outline-none
+        transition-[background-color,border-color,transform] duration-200 ease-out active:scale-[0.98]
+        focus-visible:ring-2 focus-visible:ring-brand-red/25 motion-reduce:transition-none motion-reduce:active:scale-100 ${
+          active
+            ? "border-zinc-300 bg-zinc-100"
+            : "border-zinc-200 bg-white shadow-2xs hover:border-zinc-300 hover:bg-zinc-50"
+        }`}
+    >
+      <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${dot}`} />
+      <span className="flex flex-col gap-[3px]">
+        <span className="font-heading text-[8.5px] font-bold uppercase leading-none tracking-[0.08em] text-zinc-400">
+          {label}
+        </span>
+        <span
+          className={`font-heading text-[12px] font-bold leading-none tabular-nums ${
+            urgent ? "text-brand-red" : "text-zinc-900"
+          }`}
+        >
+          {value}
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -491,7 +540,7 @@ export function TicketsPage() {
     {
       value: "Emergencia",
       label: "Emergencia",
-      icon: <AlertOctagon className="h-4 w-4 text-rose-600" />,
+      icon: <AlertOctagon className="h-4 w-4 text-brand-red" />,
     },
     {
       value: "Alta",
@@ -501,7 +550,7 @@ export function TicketsPage() {
     {
       value: "Normal",
       label: "Normal",
-      icon: <CheckCircle2 className="h-4 w-4 text-blue-500" />,
+      icon: <CheckCircle2 className="h-4 w-4 text-zinc-500" />,
     },
     {
       value: "Baja",
@@ -516,90 +565,38 @@ export function TicketsPage() {
         title="Tickets"
         summary={
           counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              {/* Total tickets */}
-              <button
-                type="button"
-                onClick={() => setFilter("todos")}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatChip
+                label={counts.all === 1 ? "Ticket" : "Tickets"}
+                value={counts.all}
+                active={filter === "todos"}
                 title="Mostrar todos los tickets"
-                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                  filter === "todos"
-                    ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
-                    : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                }`}
-              >
-                <span className="font-semibold text-zinc-900">{counts.all}</span>
-                <span>{counts.all === 1 ? "ticket" : "tickets"}</span>
-              </button>
-
-              <span aria-hidden className="text-zinc-300">·</span>
-
-              {/* Abiertos */}
-              <button
-                type="button"
-                onClick={() => setFilter("abiertos")}
+                onClick={() => setFilter("todos")}
+              />
+              <StatChip
+                label="Abiertos"
+                value={counts.open}
+                tone="open"
+                active={filter === "abiertos"}
                 title="Filtrar por tickets abiertos"
-                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                  filter === "abiertos"
-                    ? "border border-emerald-300 bg-emerald-50 text-emerald-800 shadow-2xs font-semibold"
-                    : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-emerald-200 hover:bg-emerald-50/50 hover:text-emerald-800"
-                }`}
-              >
-                <span className="relative flex h-2 w-2 shrink-0">
-                  {counts.open > 0 && (
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                  )}
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                </span>
-                <span className="font-semibold text-zinc-900">{counts.open}</span>
-                <span>abiertos</span>
-              </button>
-
-              <span aria-hidden className="text-zinc-300">·</span>
-
-              {/* Vencidos */}
-              <button
-                type="button"
-                onClick={() => setFilter("vencidos")}
+                onClick={() => setFilter("abiertos")}
+              />
+              <StatChip
+                label={counts.overdue === 1 ? "Vencido" : "Vencidos"}
+                value={counts.overdue}
+                tone="overdue"
+                active={filter === "vencidos"}
                 title="Filtrar por tickets vencidos de SLA"
-                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                  counts.overdue > 0
-                    ? filter === "vencidos"
-                      ? "border border-red-300 bg-red-100/90 text-brand-red shadow-2xs font-bold ring-1 ring-red-300/40"
-                      : "border border-red-200/90 bg-red-50 text-brand-red font-semibold shadow-2xs hover:bg-red-100/70"
-                    : filter === "vencidos"
-                    ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
-                    : "border border-zinc-200/80 bg-white text-zinc-400 shadow-2xs hover:border-zinc-300 hover:text-zinc-600"
-                }`}
-              >
-                <span
-                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                    counts.overdue > 0 ? "bg-brand-red" : "bg-zinc-300"
-                  }`}
-                />
-                <span className={counts.overdue > 0 ? "font-bold text-brand-red" : "font-semibold text-zinc-800"}>
-                  {counts.overdue}
-                </span>
-                <span>{counts.overdue === 1 ? "vencido" : "vencidos"}</span>
-              </button>
-
-              <span aria-hidden className="text-zinc-300">·</span>
-
-              {/* En espera del cliente */}
-              <button
-                type="button"
-                onClick={() => setFilter("espera")}
+                onClick={() => setFilter("vencidos")}
+              />
+              <StatChip
+                label="En espera del cliente"
+                value={counts.waitingOnClient}
+                tone="waiting"
+                active={filter === "espera"}
                 title="Filtrar por tickets en espera del cliente"
-                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                  filter === "espera"
-                    ? "border border-amber-300 bg-amber-50 text-amber-800 shadow-2xs font-semibold"
-                    : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-amber-200 hover:bg-amber-50/50 hover:text-amber-800"
-                }`}
-              >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                <span className="font-semibold text-zinc-900">{counts.waitingOnClient}</span>
-                <span>en espera del cliente</span>
-              </button>
+                onClick={() => setFilter("espera")}
+              />
             </div>
           ) : (
             <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
@@ -671,8 +668,12 @@ export function TicketsPage() {
                 )}
               </div>
 
-              {/* Solo 2 tags visibles: Todos y Abiertos + Más */}
-              <div className="inline-flex items-center gap-1.5">
+              {/* Vistas de estado: Todos y Abiertos a la vista, el resto en Más. Un solo control segmentado. */}
+              <div
+                role="group"
+                aria-label="Vista de estado"
+                className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
+              >
                 {primaryFilters.map(({ key, label, countKey }) => {
                   const isActive = filter === key;
                   const count = counts?.[countKey] ?? 0;
@@ -681,18 +682,17 @@ export function TicketsPage() {
                       key={key}
                       type="button"
                       onClick={() => setFilter(key)}
-                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
+                      aria-pressed={isActive}
+                      className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                         isActive
-                          ? "border border-zinc-300 bg-zinc-100 font-semibold text-zinc-900"
-                          : "border border-zinc-200 bg-white font-medium text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                          ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+                          : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
                       }`}
                     >
                       <span>{label}</span>
                       <span
-                        className={`rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums transition-colors ${
-                          isActive
-                            ? "bg-zinc-200 text-zinc-800"
-                            : "bg-zinc-100 text-zinc-500"
+                        className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
+                          isActive ? "text-zinc-900" : "text-zinc-400"
                         }`}
                       >
                         {count}
@@ -800,7 +800,7 @@ export function TicketsPage() {
                       </Td>
 
                       <Td className={columns[0].className}>
-                        <span className="font-heading text-[12px] font-semibold tracking-tight tabular-nums text-zinc-700">
+                        <span className="font-heading text-[11.5px] font-bold tabular-nums tracking-[0.01em] text-zinc-800">
                           {t.number}
                         </span>
                       </Td>
@@ -869,19 +869,24 @@ export function TicketsPage() {
             </DataTable>
 
             {rows.length === 0 && (
-              <div className="flex flex-col items-center gap-2 py-14 text-center">
-                <TicketIcon className="h-6 w-6 text-faint" />
+              <div className="flex flex-col items-center gap-3 py-14 text-center">
+                <span
+                  aria-hidden
+                  className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
+                >
+                  <TicketIcon className="size-4" strokeWidth={2.25} />
+                </span>
                 {hasCriteria ? (
                   <>
-                    <p className="text-[13.5px] text-faint">Ningún ticket coincide con estos criterios.</p>
-                    <Button variant="ghost" size="sm" onClick={clearCriteria}>
+                    <p className="text-[13px] font-medium text-zinc-700">Ningún ticket coincide con estos criterios.</p>
+                    <Button variant="secondary" size="sm" onClick={clearCriteria}>
                       Quitar filtros
                     </Button>
                   </>
                 ) : (
                   <>
-                    <p className="text-[13.5px] text-faint">Todavía no hay tickets.</p>
-                    <p className="max-w-xs text-[12.5px] text-faint">
+                    <p className="text-[13px] font-medium text-zinc-700">Todavía no hay tickets.</p>
+                    <p className="max-w-xs text-[12px] leading-relaxed text-zinc-400">
                       Se crean desde un correo de la bandeja o a mano con «Nuevo ticket».
                     </p>
                   </>

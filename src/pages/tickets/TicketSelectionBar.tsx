@@ -35,7 +35,7 @@ export function TicketSelectionBar({
       aria-label="Acciones sobre la selección"
       className={`${
         isExiting ? "animate-plf-selection-out pointer-events-none" : "animate-plf-selection-in"
-      } flex h-8 w-full items-center rounded-lg border border-zinc-200 bg-zinc-50/80 shadow-2xs pl-2.5 pr-1`}
+      } flex h-8 w-full items-center rounded-lg border border-zinc-200 bg-white shadow-2xs pl-2.5 pr-1`}
     >
       <SelectBox
         checked={pageState}
@@ -44,10 +44,10 @@ export function TicketSelectionBar({
       />
 
       <div className="ml-2.5 flex items-center gap-1.5">
-        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-red px-1.5 text-[11px] font-bold text-white tabular-nums leading-none tracking-tight">
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-brand-red px-1.5 font-heading text-[10.5px] font-bold leading-none tabular-nums text-white">
           {count}
         </span>
-        <span className="font-heading text-[12.5px] font-semibold text-zinc-800">
+        <span className="text-[12.5px] font-semibold text-zinc-800">
           {count === 1 ? "seleccionado" : "seleccionados"}
         </span>
       </div>
@@ -81,7 +81,7 @@ export function TicketSelectionBar({
           onClick={onClear}
           aria-label="Quitar la selección (Esc)"
           title="Quitar la selección (Esc)"
-          className="flex h-6.5 w-6.5 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-200/60 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-zinc-400/20"
+          className="flex h-6.5 w-6.5 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-brand-red/25"
         >
           <X className="h-4 w-4" />
         </button>

@@ -41,10 +41,10 @@ export function Pagination({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-[12px] text-zinc-500">
-      <p>
-        Mostrando <span className="font-medium text-zinc-800">{from}</span>–
-        <span className="font-medium text-zinc-800">{to}</span> de{" "}
-        <span className="font-medium text-zinc-800">{total}</span> {noun}
+      <p className="tabular-nums">
+        Mostrando <span className="font-semibold text-zinc-800">{from}</span>–
+        <span className="font-semibold text-zinc-800">{to}</span> de{" "}
+        <span className="font-semibold text-zinc-800">{total}</span> {noun}
       </p>
 
       <div className="flex items-center gap-3">
@@ -77,10 +77,10 @@ export function Pagination({
               type="button"
               onClick={() => onPageChange(number)}
               aria-current={number === page ? "page" : undefined}
-              className={`h-7 min-w-7 rounded-md px-2 text-[11.5px] font-medium transition-all active:scale-[0.97] ${
+              className={`h-7 min-w-7 rounded-md border px-2 font-heading text-[11px] tabular-nums transition-all outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 active:scale-[0.97] ${
                 number === page
-                  ? "bg-brand-red text-white shadow-2xs font-semibold"
-                  : "border border-zinc-200 bg-white text-zinc-700 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                  ? "border-zinc-300 bg-zinc-100 font-bold text-zinc-900"
+                  : "border-zinc-200 bg-white font-semibold text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
               }`}
             >
               {number}

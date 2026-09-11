@@ -32,19 +32,29 @@ interface AttachmentChipProps {
   onOpen: () => void;
 }
 
-/** Píldora compacta para abrir archivos adjuntos. */
+/** Chip de adjunto con la anatomía del chip de ticket: sello, nombre y peso; el sello se enciende al pasar. */
 export function AttachmentChip({ attachment, onOpen }: AttachmentChipProps) {
   return (
     <button
       type="button"
       onClick={onOpen}
       title={`Abrir ${attachment.fileName}`}
-      className="group inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-zinc-50/70 px-2.5 text-[11.5px] font-medium text-zinc-700 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-100/90 active:scale-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/20"
+      className="group/file inline-flex h-7 max-w-full cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-white pl-1 pr-2.5 text-[11.5px] font-medium text-zinc-700 shadow-2xs outline-none transition-[background-color,border-color,color,transform] duration-200 ease-out hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-red/25 motion-reduce:transition-none motion-reduce:active:scale-100"
     >
-      <FileText aria-hidden className="h-3.5 w-3.5 shrink-0 text-zinc-400 group-hover:text-brand-red transition-colors" />
+      <span
+        aria-hidden
+        className="flex size-5 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-500 transition-colors duration-200 group-hover/file:bg-brand-red/10 group-hover/file:text-brand-red"
+      >
+        <FileText className="size-3" strokeWidth={2.25} />
+      </span>
       <span className="max-w-[220px] truncate">{attachment.fileName}</span>
-      <span className="shrink-0 text-[10.5px] tabular-nums text-zinc-400">{formatBytes(attachment.sizeBytes)}</span>
-      <Eye aria-hidden className="h-3 w-3 shrink-0 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+      <span className="shrink-0 font-heading text-[10px] font-bold tabular-nums text-zinc-400">
+        {formatBytes(attachment.sizeBytes)}
+      </span>
+      <Eye
+        aria-hidden
+        className="size-3 shrink-0 text-zinc-400 opacity-0 transition-opacity duration-200 group-hover/file:opacity-100 group-focus-visible/file:opacity-100"
+      />
     </button>
   );
 }
@@ -81,25 +91,12 @@ export function TicketMessageCard({
   const author = message.authorStaffName ?? message.authorContactName ?? requesterName ?? "Remitente";
   const seed = message.authorStaffId ?? message.authorContactId ?? 1;
 
-  // Estilos de contenedor según tipo de mensaje
-  const containerClass = isInternal
-    ? "border-amber-200/90 bg-amber-50/20"
-    : message.isOrigin
-    ? "border-zinc-200/90 bg-white"
-    : isOutbound
-    ? "border-zinc-200/80 bg-white"
-    : "border-zinc-200/80 bg-white";
-
-  const headerClass = isInternal
-    ? "border-b border-amber-200/70 bg-amber-100/50"
-    : message.isOrigin
-    ? "border-b border-zinc-100 bg-zinc-50/80"
-    : isOutbound
-    ? "border-b border-zinc-100 bg-zinc-50/45"
-    : "border-b border-zinc-100 bg-zinc-50/60";
+  // Papel blanco con filete para todo lo que ve el cliente; ámbar solo para lo interno.
+  const containerClass = isInternal ? "border-amber-200/90 bg-amber-50/30" : "border-zinc-200 bg-white";
+  const headerClass = isInternal ? "border-b border-amber-200/70" : "border-b border-zinc-100";
 
   return (
-    <article className={`rounded-xl border shadow-2xs overflow-hidden transition-all ${containerClass}`}>
+    <article className={`overflow-hidden rounded-lg border shadow-2xs ${containerClass}`}>
       {/* Cabecera del mensaje */}
       <header className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3.5 py-2 ${headerClass}`}>
         <div className="flex min-w-0 items-center gap-2">
@@ -109,24 +106,16 @@ export function TicketMessageCard({
               {author}
             </span>
 
-            {/* Pastilla indicativa del rol/tipo */}
+            {/* Papel del mensaje, en versalitas: la voz de los pies del chip. */}
             {isInternal ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-amber-200/70 px-1.5 py-0.5 text-[10.5px] font-semibold text-amber-900">
-                <Lock aria-hidden className="h-2.5 w-2.5 text-amber-800" />
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-200/70 px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase leading-none tracking-[0.06em] text-amber-900">
+                <Lock aria-hidden className="size-2.5" />
                 Nota interna
               </span>
-            ) : message.isOrigin ? (
-              <span className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-700 shadow-2xs">
-                <Mail aria-hidden className="h-2.5 w-2.5 text-zinc-500" />
-                Correo inicial
-              </span>
-            ) : isOutbound ? (
-              <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-600">
-                Respuesta
-              </span>
             ) : (
-              <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-600">
-                Cliente
+              <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase leading-none tracking-[0.06em] text-zinc-600">
+                {message.isOrigin && <Mail aria-hidden className="size-2.5 text-zinc-500" />}
+                {message.isOrigin ? "Correo inicial" : isOutbound ? "Respuesta" : "Cliente"}
               </span>
             )}
 
@@ -150,7 +139,8 @@ export function TicketMessageCard({
             </span>
           )}
           {isLatest && (
-            <span className="rounded-md border border-zinc-200/80 bg-white px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-500 shadow-2xs">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase leading-none tracking-[0.06em] text-zinc-500">
+              <span aria-hidden className="size-1.5 rounded-full bg-brand-red" />
               Más reciente
             </span>
           )}
@@ -159,17 +149,22 @@ export function TicketMessageCard({
 
       {/* Alerta si falló la entrega */}
       {deliveryWarning && (
-        <div className="mx-3.5 mt-2.5 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50/70 p-2 text-[11.5px] font-medium text-red-800">
-          <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
+        <div className="mx-3.5 mt-2.5 flex items-center gap-2.5 rounded-lg border border-brand-red/25 bg-brand-red/[0.04] py-1.5 pl-1.5 pr-2.5 text-[11.5px] font-medium text-brand-red-dark">
+          <span
+            aria-hidden
+            className="flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
+          >
+            <AlertTriangle className="size-3" strokeWidth={2.5} />
+          </span>
           <span>
             {deliveryWarning}
-            {message.deliveryDetail && <span className="text-red-600 font-normal"> ({message.deliveryDetail})</span>}
+            {message.deliveryDetail && <span className="font-normal text-brand-red"> ({message.deliveryDetail})</span>}
           </span>
         </div>
       )}
 
       {/* Cuerpo del mensaje */}
-      <div className={`px-3.5 py-3 ${isInternal ? "bg-amber-50/10" : "bg-white"}`}>
+      <div className="px-3.5 py-3">
         <div className="text-[13px] leading-relaxed text-zinc-800">
           <FormattedTicketBody text={message.bodyText} html={message.bodyHtml} />
         </div>

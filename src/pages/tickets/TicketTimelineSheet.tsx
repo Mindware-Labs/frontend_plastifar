@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Lock, Mail, User, X } from "lucide-react";
+import { AlertTriangle, Check, History, Lock, Mail, Ticket as TicketIcon, User, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Badge } from "../../components/ui/Badge";
@@ -77,22 +77,29 @@ export function TicketTimelineSheet({
       event.eventType === "SlaBreached" || Boolean(event.details?.toLowerCase().includes("incumplimiento de sla"));
 
     return (
-      <li key={`evt-${event.id}-${index}`} className="relative pb-5 pl-8 last:pb-0">
+      <li key={`evt-${event.id}-${index}`} className="relative pb-5 pl-9 last:pb-0">
         <span
           aria-hidden
-          className={`absolute left-0 top-0 flex h-[18px] w-[18px] items-center justify-center rounded-full ring-4 ring-white ${
-            isBreach ? "bg-brand-red text-white" : "bg-line-strong text-brand-gray"
+          className={`absolute left-0 top-0 flex size-5 items-center justify-center rounded-md ring-4 ring-white ${
+            isBreach ? "bg-brand-red text-white" : "bg-zinc-100 text-zinc-500"
           }`}
         >
-          {isBreach ? <AlertTriangle className="h-2.5 w-2.5" /> : <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+          {isBreach ? (
+            <AlertTriangle className="size-3" strokeWidth={2.5} />
+          ) : (
+            <Check className="size-3" strokeWidth={3} />
+          )}
         </span>
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-[12.5px] font-medium text-ink">{event.actorStaffName ?? "Sistema"}</span>
-          <time dateTime={event.createdAt} className="shrink-0 text-[11px] tabular-nums text-subtle">
+          <time
+            dateTime={event.createdAt}
+            className="shrink-0 font-heading text-[10px] font-bold tabular-nums text-zinc-400"
+          >
             {formatDateTime(event.createdAt)}
           </time>
         </div>
-        <p className={`mt-0.5 text-[12px] ${isBreach ? "font-medium text-brand-red-dark" : "text-subtle"}`}>
+        <p className={`mt-0.5 text-[12px] leading-relaxed ${isBreach ? "font-medium text-brand-red-dark" : "text-zinc-500"}`}>
           {event.details ?? event.eventType}
         </p>
       </li>
@@ -106,29 +113,42 @@ export function TicketTimelineSheet({
     const author = message.authorStaffName ?? message.authorContactName ?? ticket.requesterName ?? "Remitente";
     const role = isInternal ? "Nota interna" : isOutbound ? "Respuesta" : "Cliente";
     const Icon = isInternal ? Lock : isOutbound ? Mail : User;
-    const dotClass = isInternal ? "bg-warn" : isOutbound ? "bg-ink" : "bg-brand-gray";
+    // Nosotros en tinta, el cliente en gris, lo interno en ámbar: se distingue también sin leer.
+    const sealClass = isInternal
+      ? "bg-amber-100 text-amber-700"
+      : isOutbound
+        ? "bg-zinc-900 text-white"
+        : "bg-zinc-100 text-zinc-500";
+    const roleClass = isInternal ? "bg-amber-200/70 text-amber-900" : "bg-zinc-100 text-zinc-600";
 
     return (
-      <li key={`msg-${message.id}`} className="relative pb-5 pl-8 last:pb-0">
+      <li key={`msg-${message.id}`} className="relative pb-5 pl-9 last:pb-0">
         <span
           aria-hidden
-          className={`absolute left-0 top-0 flex h-[18px] w-[18px] items-center justify-center rounded-full text-white ring-4 ring-white ${dotClass}`}
+          className={`absolute left-0 top-0 flex size-5 items-center justify-center rounded-md ring-4 ring-white ${sealClass}`}
         >
-          <Icon className="h-2.5 w-2.5" />
+          <Icon className="size-3" strokeWidth={2.25} />
         </span>
         <div
-          className={`rounded-xl border p-3 shadow-2xs ${
-            isInternal ? "border-amber-200/80 bg-amber-50/25" : isOutbound ? "border-zinc-200/80 bg-white" : "border-zinc-200/80 bg-zinc-50/50"
+          className={`rounded-lg border p-3 shadow-2xs ${
+            isInternal ? "border-amber-200/80 bg-amber-50/30" : "border-zinc-200 bg-white"
           }`}
         >
           <div className="flex items-baseline justify-between gap-3">
             <span className="truncate text-[12.5px] font-semibold text-ink">{author}</span>
-            <time dateTime={message.createdAt} className="shrink-0 text-[11px] tabular-nums text-subtle">
+            <time
+              dateTime={message.createdAt}
+              className="shrink-0 font-heading text-[10px] font-bold tabular-nums text-zinc-400"
+            >
               {formatDateTime(message.createdAt)}
             </time>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11.5px] text-subtle">
-            {role}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span
+              className={`inline-flex items-center rounded-md px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase leading-none tracking-[0.06em] ${roleClass}`}
+            >
+              {role}
+            </span>
             {/* En una lista cronologica el primero se confunde con uno mas: aqui se nombra. */}
             {message.isOrigin && (
               <span title={`${origin.hint} ${formatDateTime(message.createdAt)}`}>
@@ -140,7 +160,7 @@ export function TicketTimelineSheet({
             <FormattedTicketBody text={message.bodyText} html={message.bodyHtml} />
           </div>
           {message.attachments.length > 0 && (
-            <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-line/70 pt-2.5">
+            <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-zinc-100 pt-2.5">
               {message.attachments.map((attachment) => (
                 <AttachmentChip
                   key={attachment.id}
@@ -177,11 +197,26 @@ export function TicketTimelineSheet({
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
           <div className="min-w-0">
-            <h2 id={titleId} className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+            <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
+              Tickets · Cronología
+            </p>
+            <h2 id={titleId} className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
               Historial
             </h2>
-            <p className="mt-0.5 text-[12px] tabular-nums text-subtle">
-              {ticket.number} · {timeline.length} {timeline.length === 1 ? "registro" : "registros"}
+            <p className="mt-1 flex items-center gap-2 text-[12px] text-zinc-500">
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="flex size-4 shrink-0 items-center justify-center rounded-[5px] bg-brand-red/10 text-brand-red"
+                >
+                  <TicketIcon className="size-2.5" strokeWidth={2.25} />
+                </span>
+                <span className="font-heading text-[11px] font-bold tabular-nums text-zinc-900">{ticket.number}</span>
+              </span>
+              <span aria-hidden className="text-zinc-300">·</span>
+              <span className="tabular-nums">
+                {timeline.length} {timeline.length === 1 ? "registro" : "registros"}
+              </span>
             </p>
           </div>
           <button
@@ -190,8 +225,8 @@ export function TicketTimelineSheet({
             onClick={requestClose}
             aria-label="Cerrar el historial (Esc)"
             title="Cerrar (Esc)"
-            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle outline-none
-              transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20"
+            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none
+              transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
           >
             <X className="h-4 w-4" />
           </button>
@@ -210,10 +245,18 @@ export function TicketTimelineSheet({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {filtered.length === 0 ? (
-            <p className="py-10 text-center text-[12.5px] text-faint">No hay registros de este tipo.</p>
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <span
+                aria-hidden
+                className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
+              >
+                <History className="size-4" strokeWidth={2.25} />
+              </span>
+              <p className="text-[13px] font-medium text-zinc-700">No hay registros de este tipo.</p>
+            </div>
           ) : (
             <ol className="relative">
-              <span aria-hidden className="absolute bottom-2 left-[8.5px] top-2 w-px bg-line" />
+              <span aria-hidden className="absolute bottom-2 left-[9.5px] top-2 w-px bg-zinc-200" />
               {filtered.map((item, index) =>
                 item.kind === "event" ? renderEvent(item.data, index) : renderMessage(item.data),
               )}
@@ -221,12 +264,12 @@ export function TicketTimelineSheet({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line px-6 py-3">
-          <span className="text-[11.5px] text-subtle">
-            <kbd className="rounded-edge border border-line-strong bg-white px-1.5 py-0.5 font-heading text-[10px] font-semibold text-ink">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3">
+          <span className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-400">
+            <kbd className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600">
               Esc
-            </kbd>{" "}
-            para cerrar
+            </kbd>
+            <span>para cerrar</span>
           </span>
           <div className="flex items-center gap-2">
             {onSelectTab && (

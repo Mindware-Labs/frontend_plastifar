@@ -11,6 +11,7 @@ import {
   RefreshCw,
   RotateCcw,
   Send,
+  Ticket as TicketIcon,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -154,8 +155,12 @@ const attachLabelClass =
   "text-[11.5px] font-medium text-zinc-600 shadow-2xs transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95";
 
 const tabTriggerClass =
-  "gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium text-zinc-600 transition-all hover:text-zinc-900 " +
-  "data-active:bg-white data-active:font-semibold data-active:text-zinc-900 data-active:shadow-2xs";
+  "gap-1.5 rounded-md border border-transparent px-2.5 py-1 text-[12.5px] font-medium text-zinc-500 transition-colors duration-150 " +
+  "hover:bg-white/60 hover:text-zinc-800 focus-visible:ring-2 focus-visible:ring-brand-red/25 " +
+  "data-active:border-zinc-200 data-active:bg-white data-active:font-semibold data-active:text-zinc-900 data-active:shadow-2xs";
+
+/** Cifra que acompaña a cada pestaña: voz de titular, tabular, se apaga cuando la pestaña no está activa. */
+const tabCountClass = "font-heading text-[10px] font-bold leading-none tabular-nums text-zinc-400 group-data-active:text-zinc-900";
 
 /** Archivo elegido y aun no enviado: nombre, peso y la cruz para quitarlo. */
 function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
@@ -608,13 +613,21 @@ export function TicketDetailPage() {
               onClick={() => navigate("/tickets")}
               aria-label="Volver a tickets"
               title="Volver a tickets"
-              className="-ml-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-brand-gray outline-none
-                transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20"
+              className="-ml-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-zinc-500 outline-none
+                transition-colors hover:bg-zinc-100 hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <span className="font-heading text-[12px] font-semibold tracking-[0.02em] tabular-nums text-ink">
-              {ticket.number}
+            <span className="inline-flex items-center gap-2">
+              <span
+                aria-hidden
+                className="flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
+              >
+                <TicketIcon className="size-3" strokeWidth={2.25} />
+              </span>
+              <span className="font-heading text-[11.5px] font-bold tabular-nums tracking-[0.01em] text-zinc-900">
+                {ticket.number}
+              </span>
             </span>
             <span aria-hidden className="h-4 w-px bg-line" />
             <StatusCell status={ticket.status} />
@@ -644,26 +657,26 @@ export function TicketDetailPage() {
         <h1 className="text-balance font-heading text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink">
           {ticket.subject}
         </h1>
-        <p className="mt-1 text-[12.5px] text-subtle">
-          Creado el {formatDateTime(ticket.createdAt)} por{" "}
-          <span className="text-ink">{ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}</span>
-          <span aria-hidden className="mx-1.5 text-line-strong">·</span>
-          {ticket.channel}
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[12px] text-zinc-500">
+          <span>Creado el {formatDateTime(ticket.createdAt)} por</span>
+          <span className="font-medium text-zinc-800">{ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}</span>
+          <span aria-hidden className="text-zinc-300">·</span>
+          <span className="font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">{ticket.channel}</span>
         </p>
 
         <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-start">
           <div className="min-w-0 flex-1">
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TicketDetailTab)}>
-              <TabsList className="h-8 rounded-lg border border-zinc-200/80 bg-zinc-100/70 p-0.5">
-                <TabsTrigger value="conversacion" className={tabTriggerClass}>
+              <TabsList className="h-8 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+                <TabsTrigger value="conversacion" className={`group ${tabTriggerClass}`}>
                   <Mail aria-hidden className="size-3.5" />
                   Conversación
-                  <span className="tabular-nums opacity-70 font-mono text-[11px]">{clientThread.length}</span>
+                  <span className={tabCountClass}>{clientThread.length}</span>
                 </TabsTrigger>
-                <TabsTrigger value="notas" className={tabTriggerClass}>
+                <TabsTrigger value="notas" className={`group ${tabTriggerClass}`}>
                   <Lock aria-hidden className="size-3.5" />
                   Notas internas
-                  <span className="tabular-nums opacity-70 font-mono text-[11px]">{internalNotes.length}</span>
+                  <span className={tabCountClass}>{internalNotes.length}</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -672,7 +685,7 @@ export function TicketDetailPage() {
               <div className="mt-3.5 space-y-2.5">
                 {/* La accion encabeza el hilo; el editor se pide, no esta siempre puesto. */}
                 <div className="flex items-center gap-3">
-                  <span className="shrink-0 text-[11.5px] font-medium tabular-nums text-zinc-500">
+                  <span className="shrink-0 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
                     {clientThread.length} {clientThread.length === 1 ? "mensaje" : "mensajes"}
                   </span>
                   <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
@@ -689,9 +702,9 @@ export function TicketDetailPage() {
                 </div>
 
                 {clientThread.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-8 text-center">
-                    <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-400 shadow-2xs">
-                      <Mail className="h-4.5 w-4.5" />
+                  <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-8 text-center">
+                    <div className="mx-auto flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red">
+                      <Mail className="size-4" strokeWidth={2.25} />
                     </div>
                     <p className="mt-2.5 font-heading text-[14px] font-semibold text-zinc-800">
                       Todavía no hay conversación
@@ -710,9 +723,9 @@ export function TicketDetailPage() {
             {activeTab === "notas" && (
               <div className="mt-3.5 space-y-2.5">
                 {internalNotes.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-amber-200/80 bg-amber-50/20 px-6 py-8 text-center">
-                    <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200/80 bg-white text-amber-600 shadow-2xs">
-                      <Lock className="h-4.5 w-4.5" />
+                  <div className="rounded-lg border border-dashed border-amber-200/80 bg-amber-50/20 px-6 py-8 text-center">
+                    <div className="mx-auto flex size-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                      <Lock className="size-4" strokeWidth={2.25} />
                     </div>
                     <p className="mt-2.5 font-heading text-[14px] font-semibold text-zinc-800">
                       Nada anotado todavía
@@ -729,7 +742,7 @@ export function TicketDetailPage() {
                 ) : (
                   <>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 text-[11.5px] font-medium tabular-nums text-zinc-500">
+                      <div className="flex items-center gap-1.5 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
                         <Lock className="h-3 w-3 text-amber-600" />
                         <span>{internalNotes.length} {internalNotes.length === 1 ? "nota interna" : "notas internas"}</span>
                       </div>
@@ -779,7 +792,7 @@ export function TicketDetailPage() {
               type="button"
               onClick={() => !replySending && setReplyOpen(false)}
               aria-label="Cerrar el editor (Esc)"
-              className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle outline-none
+              className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none
                 transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20"
             >
               <X className="h-4 w-4" />
