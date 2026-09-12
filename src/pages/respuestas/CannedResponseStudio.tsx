@@ -1,12 +1,10 @@
 import {
-  Check,
   Eye,
   Mail,
   Maximize2,
   Minimize2,
   PenLine,
   Send,
-  User,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -40,6 +38,7 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
   const titleId = useId();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Métricas del cuerpo
   const stats = useMemo(() => {
@@ -121,82 +120,89 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative flex h-full flex-col bg-white shadow-[0_4px_24px_rgba(27,27,29,0.18)] transition-all duration-200 ease-out ${
-          isMaximized ? "w-full" : "w-full sm:w-[740px] md:w-[790px] lg:w-[840px]"
+        className={`relative flex h-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] transition-all duration-200 ease-out ${
+          isMaximized ? "w-full" : "w-full sm:w-[680px] md:w-[740px] lg:w-[800px]"
         } ${isExiting ? "pointer-events-none" : ""}`}
       >
-        {/* Barra superior de control del Estudio */}
-        <div className="flex shrink-0 items-center justify-between border-b border-line bg-canvas/70 px-6 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-edge bg-brand-red/10 text-brand-red">
-              <Mail className="h-4 w-4" />
-            </div>
-            <div>
-              <h2 id={titleId} className="font-heading text-[15px] font-bold text-ink">
-                {isEdit ? "Editar respuesta predefinida" : "Nueva respuesta predefinida"}
-              </h2>
-              <p className="text-[11px] text-faint">
-                Estructura de correo corporativo para agentes de soporte
-              </p>
-            </div>
+        {/* Cabecera del Drawer con nueva jerarquía */}
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
+          <div className="min-w-0">
+            <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
+              Correo · Respuestas rápidas
+            </p>
+            <h2 id={titleId} className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+              {isEdit ? "Editar respuesta predefinida" : "Nueva respuesta predefinida"}
+            </h2>
+            <p className="mt-0.5 text-[12px] leading-relaxed text-subtle">
+              Estructura de correo corporativo para agilizar la atención por soporte.
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Pestañas de modo: Redactor / Vista previa */}
-            <div className="flex items-center rounded-edge border border-line bg-white p-0.5 shadow-2xs">
+            {/* Control segmentado para alternar Redacción / Vista previa */}
+            <div
+              role="tablist"
+              aria-label="Modo de trabajo"
+              className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
+            >
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeTab === "compose"}
                 onClick={() => setActiveTab("compose")}
-                className={`flex items-center gap-1.5 rounded-edge px-3 py-1 text-[11.5px] font-medium transition-colors ${
+                className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                   activeTab === "compose"
-                    ? "bg-brand-red text-white shadow-2xs"
-                    : "text-brand-gray hover:bg-fill hover:text-ink"
+                    ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+                    : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
                 }`}
               >
-                <PenLine className="h-3 w-3" />
-                Redacción
+                <PenLine className="h-3.5 w-3.5" />
+                <span>Redacción</span>
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeTab === "preview"}
                 onClick={() => setActiveTab("preview")}
-                className={`flex items-center gap-1.5 rounded-edge px-3 py-1 text-[11.5px] font-medium transition-colors ${
+                className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                   activeTab === "preview"
-                    ? "bg-brand-red text-white shadow-2xs"
-                    : "text-brand-gray hover:bg-fill hover:text-ink"
+                    ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+                    : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
                 }`}
               >
-                <Eye className="h-3 w-3" />
-                Vista previa
+                <Eye className="h-3.5 w-3.5" />
+                <span>Vista previa</span>
               </button>
             </div>
 
-            <div className="mx-1 h-4 w-px bg-line" />
+            <span aria-hidden className="mx-0.5 h-4 w-px bg-zinc-200" />
 
             {/* Maximizar / Normal */}
             <button
               type="button"
               onClick={() => setIsMaximized((prev) => !prev)}
-              aria-label={isMaximized ? "Restaurar tamaño normal" : "Maximizar estudio a pantalla completa"}
+              aria-label={isMaximized ? "Restaurar tamaño normal" : "Maximizar a pantalla completa"}
               title={isMaximized ? "Restaurar ancho" : "Pantalla completa"}
-              className="flex h-7 w-7 items-center justify-center rounded-edge text-brand-gray transition-colors hover:bg-fill hover:text-ink"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-subtle outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
             >
               {isMaximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
             </button>
 
             {/* Cerrar */}
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={requestClose}
               aria-label="Cerrar estudio"
               title="Cerrar (Esc)"
-              className="flex h-7 w-7 items-center justify-center rounded-edge text-brand-gray transition-colors hover:bg-fill hover:text-ink"
+              className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* Cuerpo del Estudio */}
+        {/* Cuerpo del Sheet */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {formError && (
             <div className="px-6 pt-4">
@@ -206,16 +212,26 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
 
           {activeTab === "compose" ? (
             <div className="flex flex-1 flex-col">
-              {/* Identificador interno de plantilla */}
-              <div className="border-b border-line px-6 py-3.5">
+              {/* Título de la plantilla */}
+              <div className="border-b border-line px-6 py-4">
                 <div className="flex items-center justify-between">
                   <label
                     htmlFor="canned-title"
-                    className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-faint"
+                    className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink"
                   >
-                    Nombre de la plantilla <span className="text-brand-red">*</span>
+                    <span
+                      aria-hidden
+                      className="flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
+                    >
+                      <PenLine className="size-3" strokeWidth={2.25} />
+                    </span>
+                    <span>
+                      Nombre de la plantilla <span className="text-brand-red">*</span>
+                    </span>
                   </label>
-                  <span className="text-[10.5px] text-faint">{title.length}/120</span>
+                  <span className="font-heading text-[10.5px] font-bold tabular-nums text-zinc-400">
+                    {title.length}/120
+                  </span>
                 </div>
                 <input
                   id="canned-title"
@@ -224,82 +240,37 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
                   maxLength={120}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Ej. Solicitud de comprobante de pago, Confirmación de entrega..."
-                  className="mt-1.5 w-full rounded-edge border border-line bg-white px-3 py-2 text-[13.5px] font-semibold text-ink outline-none transition-colors placeholder:font-normal placeholder:text-faint focus:border-brand-red/50 focus:ring-3 focus:ring-brand-red/12"
+                  className="mt-2 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-2xs outline-none transition-colors placeholder:font-normal placeholder:text-zinc-400 focus:border-zinc-300 focus:ring-2 focus:ring-brand-red/25"
                   autoFocus
                 />
-                <p className="mt-1 text-[11px] text-faint">
+                <p className="mt-1.5 text-[11.5px] text-subtle">
                   Este es el nombre visible en el menú "Respuestas rápidas" para encontrarla al redactar correos.
                 </p>
               </div>
 
-              {/* Anatomía / Cabecera visual del Correo */}
-              <div className="border-b border-line bg-canvas/30 px-6 py-3">
-                <div className="flex flex-col gap-2 rounded-edge border border-line bg-white p-3 shadow-2xs">
-                  {/* De: */}
-                  <div className="flex items-center gap-3 text-[12px]">
-                    <span className="w-14 shrink-0 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-faint">
-                      De:
-                    </span>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-red text-[10px] font-bold text-white">
-                        P
-                      </div>
-                      <span className="font-semibold text-ink">Soporte Plastifar</span>
-                      <span className="text-faint">&lt;soporte@plastifar.com&gt;</span>
-                      <span className="ml-auto inline-flex items-center gap-1 rounded-edge bg-brand-green/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand-green">
-                        <Check className="h-2.5 w-2.5" /> Verificado
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="h-px bg-line/60" />
-
-                  {/* Para: */}
-                  <div className="flex items-center gap-3 text-[12px]">
-                    <span className="w-14 shrink-0 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-faint">
-                      Para:
-                    </span>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-fill text-[10px] font-semibold text-brand-gray">
-                        <User className="h-3 w-3 text-faint" />
-                      </div>
-                      <span className="rounded-edge border border-line bg-canvas px-2 py-0.5 font-mono text-[11.5px] text-ink">
-                        [Destinatario del correo]
-                      </span>
-                      <span className="text-[11px] text-subtle">
-                        (Se definirá al seleccionar o responder un correo)
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="h-px bg-line/60" />
-
-                  {/* Asunto contextual */}
-                  <div className="flex items-center gap-3 text-[12px]">
-                    <span className="w-14 shrink-0 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-faint">
-                      Asunto:
-                    </span>
-                    <span className="truncate font-medium text-ink">
-                      {title.trim() ? title.trim() : "Asunto del hilo o correo en curso"}
-                    </span>
-                  </div>
-                </div>
-              </div>
 
               {/* Lienzo de Redacción del Correo */}
               <div className="flex flex-1 flex-col px-6 py-4">
                 <div className="flex items-center justify-between pb-2">
-                  <span className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-faint">
-                    Cuerpo de la plantilla <span className="text-brand-red">*</span>
+                  <span className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink">
+                    <span
+                      aria-hidden
+                      className="flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
+                    >
+                      <Mail className="size-3" strokeWidth={2.25} />
+                    </span>
+                    <span>
+                      Cuerpo del correo <span className="text-brand-red">*</span>
+                    </span>
                   </span>
-                  <div className="flex items-center gap-3 text-[11px] text-faint">
-                    <span>{stats.words} palabras</span>
+                  <div className="flex items-center gap-2 font-heading text-[10.5px] font-bold tabular-nums text-zinc-400">
+                    <span>{stats.words} {stats.words === 1 ? "palabra" : "palabras"}</span>
                     <span>·</span>
                     <span>{stats.chars}/20,000 caracteres</span>
                   </div>
                 </div>
 
-                <div className="relative flex min-h-[300px] flex-1 flex-col rounded-edge border border-line bg-white shadow-2xs focus-within:border-brand-red/50 focus-within:ring-3 focus-within:ring-brand-red/12">
+                <div className="relative flex min-h-[300px] flex-1 flex-col rounded-lg border border-zinc-200 bg-white shadow-2xs focus-within:border-zinc-300 focus-within:ring-2 focus-within:ring-brand-red/25">
                   <textarea
                     ref={bodyRef}
                     value={body}
@@ -311,12 +282,12 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
                       "Quedamos a su entera disposición ante cualquier duda adicional.\n\n" +
                       "Atentamente,"
                     }
-                    className="w-full flex-1 resize-none bg-transparent p-4 font-sans text-[13.5px] leading-[1.7] text-ink outline-none placeholder:text-faint/70"
+                    className="w-full flex-1 resize-none bg-transparent p-4 font-sans text-[13px] leading-[1.7] text-ink outline-none placeholder:text-zinc-400"
                   />
                 </div>
 
                 {/* Controles de pie de redacción */}
-                <div className="mt-2.5 flex items-center justify-between text-[11.5px] text-faint">
+                <div className="mt-2.5 flex items-center justify-between text-[11.5px] text-subtle">
                   <span>
                     Plantilla reutilizable. Al insertarla desde "Respuestas rápidas", podrás ajustar y completar el texto manualmente.
                   </span>
@@ -325,33 +296,33 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
             </div>
           ) : (
             /* MODO: VISTA PREVIA INTERACTIVA DE CORREO */
-            <div className="flex flex-1 flex-col bg-canvas/40 p-6">
+            <div className="flex flex-1 flex-col bg-zinc-50/60 p-6">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <h3 className="font-heading text-[13px] font-bold text-ink">
+                  <h3 className="font-heading text-[13.5px] font-bold text-ink">
                     Vista previa de la plantilla
                   </h3>
-                  <p className="text-[11.5px] text-faint">
+                  <p className="text-[11.5px] text-subtle">
                     Así se estructurará el mensaje como plantilla de correo.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setActiveTab("compose")}
-                  className="inline-flex items-center gap-1 rounded-edge border border-line bg-white px-2.5 py-1 text-[11.5px] font-medium text-brand-gray transition-colors hover:bg-fill hover:text-ink"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[12px] font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50 hover:text-ink transition-colors cursor-pointer"
                 >
-                  <PenLine className="h-3 w-3" />
-                  Volver a editar
+                  <PenLine className="h-3.5 w-3.5 text-zinc-500" />
+                  <span>Volver a redacción</span>
                 </button>
               </div>
 
               {/* Tarjeta de correo recibido */}
-              <div className="flex flex-1 flex-col overflow-hidden rounded-edge border border-line bg-white shadow-sm">
+              <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-2xs">
                 {/* Header del correo cliente */}
-                <div className="border-b border-line bg-white p-5">
+                <div className="border-b border-zinc-100 bg-white p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-red font-heading text-[14px] font-bold text-white shadow-2xs">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-red font-heading text-[14px] font-bold text-white shadow-2xs">
                         PF
                       </div>
                       <div>
@@ -359,26 +330,26 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
                           <span className="font-heading text-[14px] font-bold text-ink">
                             Soporte Plastifar
                           </span>
-                          <span className="text-[12px] text-faint">&lt;soporte@plastifar.com&gt;</span>
+                          <span className="text-[12px] text-zinc-400">&lt;soporte@plastifar.com&gt;</span>
                         </div>
-                        <p className="mt-0.5 text-[12px] text-brand-gray">
+                        <p className="mt-0.5 text-[12px] text-zinc-500">
                           Para:{" "}
                           <span className="font-medium text-ink">[Destinatario del correo]</span>{" "}
-                          <span className="text-faint">&lt;cliente@empresa.com&gt;</span>
+                          <span className="text-zinc-400">&lt;cliente@empresa.com&gt;</span>
                         </p>
                       </div>
                     </div>
 
-                    <div className="text-right text-[11px] text-faint">
+                    <div className="font-heading text-[11px] tabular-nums text-zinc-400">
                       {formatDateTime(new Date().toISOString())}
                     </div>
                   </div>
 
-                  <div className="mt-4 border-t border-line/60 pt-3">
-                    <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint">
+                  <div className="mt-4 border-t border-zinc-100 pt-3">
+                    <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
                       Asunto
                     </span>
-                    <h4 className="font-heading text-[15px] font-semibold text-ink">
+                    <h4 className="mt-0.5 font-heading text-[15px] font-semibold text-ink">
                       {title.trim() ? title.trim() : "Sin asunto especificado"}
                     </h4>
                   </div>
@@ -387,7 +358,7 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
                 {/* Cuerpo de la plantilla */}
                 <div className="flex-1 overflow-y-auto p-6">
                   {body.trim() ? (
-                    <div className="max-w-2xl space-y-4 font-sans text-[14px] leading-[1.75] text-ink">
+                    <div className="max-w-2xl space-y-4 font-sans text-[13.5px] leading-[1.75] text-ink">
                       {body.split(/\n{2,}/).map((para, i) => (
                         <p key={i} className="whitespace-pre-line">
                           {para}
@@ -396,8 +367,8 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
                     </div>
                   ) : (
                     <div className="flex h-48 flex-col items-center justify-center text-center">
-                      <Mail className="h-8 w-8 text-faint/60" />
-                      <p className="mt-2 text-[13px] text-faint">
+                      <Mail className="h-8 w-8 text-zinc-300" />
+                      <p className="mt-2 text-[13px] text-zinc-400">
                         Escribe el texto de la respuesta en la pestaña "Redacción" para previsualizarlo aquí.
                       </p>
                     </div>
@@ -405,9 +376,9 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
                 </div>
 
                 {/* Banner inferior de la vista previa */}
-                <div className="flex items-center justify-between border-t border-line bg-canvas px-4 py-2 text-[11px] text-faint">
-                  <span>Modo plantilla de correo</span>
-                  <span className="text-brand-gray">
+                <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50/80 px-4 py-2.5 text-[11.5px] text-subtle">
+                  <span className="font-medium text-ink">Modo plantilla de correo</span>
+                  <span>
                     El texto se inserta tal cual en el editor para su ajuste manual antes de enviar
                   </span>
                 </div>
@@ -417,26 +388,31 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
         </div>
 
         {/* Pie de Acciones del Estudio */}
-        <div className="flex shrink-0 items-center justify-between border-t border-line bg-canvas/90 px-6 py-3.5">
-          <div className="flex items-center gap-2 text-[11.5px] text-faint">
-            <kbd className="rounded-edge border border-line bg-white px-1.5 py-0.5 font-mono text-[10px] text-brand-gray shadow-2xs">
-              Ctrl + Enter
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3.5">
+          <div className="hidden items-center gap-1.5 text-[11.5px] text-zinc-400 sm:flex">
+            <kbd className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600">
+              Ctrl
             </kbd>
-            <span className="hidden sm:inline">para guardar directamente</span>
+            <span aria-hidden>+</span>
+            <kbd className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600">
+              Enter
+            </kbd>
+            <span>para guardar</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" onClick={requestClose} disabled={isSubmitting}>
+          <div className="ml-auto flex items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose} disabled={isSubmitting}>
               Cancelar
             </Button>
             <Button
               type="button"
+              size="sm"
               onClick={handleSave}
               isLoading={isSubmitting}
               className="gap-1.5"
             >
               <Send className="h-3.5 w-3.5" />
-              {isEdit ? "Guardar cambios" : "Crear respuesta"}
+              <span>{isEdit ? "Guardar cambios" : "Crear respuesta"}</span>
             </Button>
           </div>
         </div>

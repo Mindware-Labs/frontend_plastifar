@@ -94,7 +94,7 @@ export function RespuestasPage() {
           <button
             type="button"
             onClick={() => setHelpOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-edge border border-line bg-white px-3 py-1.5 text-[12px] font-medium text-brand-gray transition-[background-color,border-color,color] hover:border-line-strong hover:bg-canvas hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20 shadow-2xs"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-700 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 transition-all cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-red/25"
           >
             <HelpCircle className="h-3.5 w-3.5 text-brand-red" />
             <span>¿Para qué sirve?</span>
