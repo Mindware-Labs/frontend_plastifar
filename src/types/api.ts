@@ -545,6 +545,66 @@ export interface UpdateTicketStatusResponse {
   reopenedCount: number;
 }
 
+export interface TicketTaskAttachmentResponse {
+  id: number;
+  ticketTaskId: number;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedByStaffId: number | null;
+  uploadedByStaffName: string | null;
+  createdAt: string;
+}
+
+export interface TicketTaskCommentResponse {
+  id: number;
+  ticketTaskId: number;
+  authorStaffId: number;
+  authorStaffName: string;
+  comment: string;
+  createdAt: string;
+}
+
+export interface TicketTaskResponse {
+  id: number;
+  ticketId: number;
+  title: string;
+  description: string | null;
+  status: string;
+  createdByStaffId: number;
+  createdByStaffName: string;
+  assignedStaffId: number | null;
+  assignedStaffName: string | null;
+  dueDate: string | null;
+  completedAt: string | null;
+  completedByStaffId: number | null;
+  completedByStaffName: string | null;
+  completionComment: string | null;
+  createdAt: string;
+  updatedAt: string;
+  attachments: TicketTaskAttachmentResponse[];
+  comments: TicketTaskCommentResponse[];
+}
+
+export interface CreateTicketTaskRequest {
+  title: string;
+  description?: string | null;
+  assignedStaffId?: number | null;
+  dueDate?: string | null;
+}
+
+export interface UpdateTicketTaskRequest {
+  title?: string | null;
+  description?: string | null;
+  assignedStaffId?: number | null;
+  dueDate?: string | null;
+  status?: string | null;
+}
+
+export interface CreateTicketTaskCommentRequest {
+  comment: string;
+}
+
 export interface TicketStaffOptionResponse {
   id: number;
   fullName: string;

@@ -67,12 +67,12 @@ function PropertyRow({
   label,
   children,
   isLast = false,
-  truncateValue = true,
+  className = "",
 }: {
   label: string;
   children: ReactNode;
   isLast?: boolean;
-  truncateValue?: boolean;
+  className?: string;
 }) {
   return (
     <div
@@ -80,12 +80,8 @@ function PropertyRow({
         isLast ? "" : "border-b border-zinc-100"
       }`}
     >
-      <span className="shrink-0 text-[11.5px] text-zinc-500">{label}</span>
-      <div
-        className={`min-w-0 text-right font-medium text-zinc-900 ${
-          truncateValue ? "max-w-[195px] truncate" : "flex-1"
-        }`}
-      >
+      <span className="shrink-0 text-[11.5px] text-zinc-500 select-none">{label}</span>
+      <div className={`min-w-0 flex-1 text-right font-medium text-zinc-900 ${className}`}>
         {children}
       </div>
     </div>
@@ -147,7 +143,9 @@ export function TicketPropertiesAside({
             )}
 
             <PropertyRow label="Contacto">
-              {ticket.contactName ?? <span className="text-zinc-400 font-normal">Sin contacto</span>}
+              <span className="block truncate" title={ticket.contactName ?? undefined}>
+                {ticket.contactName ?? <span className="text-zinc-400 font-normal">Sin contacto</span>}
+              </span>
             </PropertyRow>
 
             {email && (
@@ -155,7 +153,7 @@ export function TicketPropertiesAside({
                 <a
                   href={`mailto:${email}`}
                   title={email}
-                  className="inline-flex items-center gap-1 text-zinc-800 hover:text-brand-red hover:underline transition-colors"
+                  className="inline-flex max-w-full items-center justify-end gap-1 text-zinc-800 hover:text-brand-red hover:underline transition-colors"
                 >
                   <Mail className="h-3 w-3 shrink-0 text-zinc-400" />
                   <span className="truncate">{email}</span>
@@ -167,10 +165,10 @@ export function TicketPropertiesAside({
               <PropertyRow label="Teléfono" isLast>
                 <a
                   href={`tel:${ticket.contactPhone}`}
-                  className="inline-flex items-center gap-1 tabular-nums text-zinc-800 hover:text-brand-red hover:underline transition-colors"
+                  className="inline-flex items-center justify-end gap-1 tabular-nums text-zinc-800 hover:text-brand-red hover:underline transition-colors whitespace-nowrap"
                 >
                   <Phone className="h-3 w-3 shrink-0 text-zinc-400" />
-                  <span>{ticket.contactPhone}</span>
+                  <span className="whitespace-nowrap">{ticket.contactPhone}</span>
                 </a>
               </PropertyRow>
             )}
@@ -185,24 +183,27 @@ export function TicketPropertiesAside({
             action={canEdit && <SectionAction label="Editar" icon={Pencil} onClick={onEdit} />}
           />
           <div className="px-3.5 py-1">
-            <PropertyRow label="Responsable" truncateValue={false}>
+            <PropertyRow label="Responsable">
               <div className="flex items-center justify-end gap-1.5 min-w-0">
                 {ticket.assignedStaffName && ticket.assignedStaffId !== null ? (
-                  <div className="flex items-center justify-end gap-1.5 min-w-0" title={ticket.assignedStaffName}>
+                  <div
+                    className="flex min-w-0 items-center justify-end gap-1.5"
+                    title={ticket.assignedStaffName}
+                  >
                     <Avatar name={ticket.assignedStaffName} seed={ticket.assignedStaffId} size={18} />
-                    <span className="text-zinc-900 font-medium text-[12px] leading-tight text-right">
+                    <span className="truncate whitespace-nowrap text-[12px] font-medium text-zinc-900 leading-tight">
                       {ticket.assignedStaffName}
                     </span>
                   </div>
                 ) : (
-                  <span className="text-zinc-400 font-normal italic">Sin asignar</span>
+                  <span className="text-zinc-400 font-normal italic whitespace-nowrap">Sin asignar</span>
                 )}
                 {canAssign && (
                   <button
                     type="button"
                     onClick={onAssign}
                     title={ticket.assignedStaffId ? "Cambiar responsable" : "Asignar responsable"}
-                    className="ml-0.5 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:ring-2 focus-visible:ring-brand-red/25"
+                    className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:ring-2 focus-visible:ring-brand-red/25"
                   >
                     <Pencil className="size-3" />
                   </button>
@@ -211,19 +212,19 @@ export function TicketPropertiesAside({
             </PropertyRow>
 
             <PropertyRow label="Departamento">
-              <span title={ticket.departmentName ?? undefined}>
+              <span className="block truncate" title={ticket.departmentName ?? undefined}>
                 {ticket.departmentName ?? <span className="text-zinc-400 font-normal">—</span>}
               </span>
             </PropertyRow>
 
             <PropertyRow label="Motivo">
-              <span title={ticket.topicName ?? undefined}>
+              <span className="block truncate" title={ticket.topicName ?? undefined}>
                 {ticket.topicName ?? <span className="text-zinc-400 font-normal">—</span>}
               </span>
             </PropertyRow>
 
             <PropertyRow label="Línea">
-              <span title={ticket.productLineName ?? undefined}>
+              <span className="block truncate" title={ticket.productLineName ?? undefined}>
                 {ticket.productLineName ?? <span className="text-zinc-400 font-normal">No aplica</span>}
               </span>
             </PropertyRow>
@@ -233,7 +234,7 @@ export function TicketPropertiesAside({
             </PropertyRow>
 
             <PropertyRow label="Canal" isLast>
-              <span className="capitalize text-zinc-800">{ticket.channel}</span>
+              <span className="capitalize text-zinc-800 whitespace-nowrap">{ticket.channel}</span>
             </PropertyRow>
           </div>
         </div>
@@ -249,34 +250,37 @@ export function TicketPropertiesAside({
             <PropertyRow label="Resolución">
               {ticket.resolutionDueAt ? (
                 <span
-                  className={`tabular-nums ${
+                  className={`tabular-nums whitespace-nowrap ${
                     sla.tone === "overdue" ? "font-semibold text-brand-red" : "text-zinc-800"
                   }`}
                 >
                   {formatDateTime(ticket.resolutionDueAt)}
                 </span>
               ) : (
-                <span className="text-zinc-400 font-normal">Sin compromiso</span>
+                <span className="text-zinc-400 font-normal whitespace-nowrap">Sin compromiso</span>
               )}
             </PropertyRow>
 
             <PropertyRow label="1.ª respuesta">
               {ticket.firstResponseAt ? (
-                <span className="text-emerald-700 font-medium tabular-nums" title={`Lograda el ${formatDateTime(ticket.firstResponseAt)}`}>
+                <span
+                  className="text-emerald-700 font-medium tabular-nums whitespace-nowrap truncate block"
+                  title={`Lograda el ${formatDateTime(ticket.firstResponseAt)}`}
+                >
                   Lograda · {formatDateTime(ticket.firstResponseAt)}
                 </span>
               ) : ticket.firstResponseDueAt ? (
-                <span className="tabular-nums text-zinc-800">
+                <span className="tabular-nums text-zinc-800 whitespace-nowrap">
                   Límite · {formatDateTime(ticket.firstResponseDueAt)}
                 </span>
               ) : (
-                <span className="text-zinc-400 font-normal">Pendiente</span>
+                <span className="text-zinc-400 font-normal whitespace-nowrap">Pendiente</span>
               )}
             </PropertyRow>
 
             {isPaused && (
               <PropertyRow label="En pausa">
-                <span className="font-medium text-amber-700 tabular-nums">
+                <span className="font-medium text-amber-700 tabular-nums whitespace-nowrap">
                   Desde {formatDateTime(ticket.pausedAt!)}
                 </span>
               </PropertyRow>
@@ -284,30 +288,30 @@ export function TicketPropertiesAside({
 
             {ticket.pausedMinutes > 0 && (
               <PropertyRow label="Tiempo pausa">
-                <span className="tabular-nums text-zinc-800">{ticket.pausedMinutes} min</span>
+                <span className="tabular-nums text-zinc-800 whitespace-nowrap">{ticket.pausedMinutes} min</span>
               </PropertyRow>
             )}
 
             {ticket.reopenedCount > 0 && (
               <PropertyRow label="Reaperturas">
-                <span className="font-bold tabular-nums text-amber-700">{ticket.reopenedCount}</span>
+                <span className="font-bold tabular-nums text-amber-700 whitespace-nowrap">{ticket.reopenedCount}</span>
               </PropertyRow>
             )}
 
             {ticket.resolvedAt && (
               <PropertyRow label="Resuelto">
-                <span className="tabular-nums text-zinc-800">{formatDateTime(ticket.resolvedAt)}</span>
+                <span className="tabular-nums text-zinc-800 whitespace-nowrap">{formatDateTime(ticket.resolvedAt)}</span>
               </PropertyRow>
             )}
 
             {ticket.closedAt && (
               <PropertyRow label="Cerrado">
-                <span className="tabular-nums text-zinc-800">{formatDateTime(ticket.closedAt)}</span>
+                <span className="tabular-nums text-zinc-800 whitespace-nowrap">{formatDateTime(ticket.closedAt)}</span>
               </PropertyRow>
             )}
 
             <PropertyRow label="Actividad" isLast>
-              <span className="tabular-nums text-zinc-600">{formatDateTime(ticket.lastActivityAt)}</span>
+              <span className="tabular-nums text-zinc-600 whitespace-nowrap">{formatDateTime(ticket.lastActivityAt)}</span>
             </PropertyRow>
           </div>
         </div>

@@ -20,7 +20,7 @@ export type TimelineItem =
   | { kind: "message"; data: TicketMessageResponse; createdAt: string }
   | { kind: "event"; data: TicketEventResponse; createdAt: string };
 
-export type TicketDetailTab = "conversacion" | "notas";
+export type TicketDetailTab = "conversacion" | "tareas" | "notas";
 
 type TimelineFilter = "all" | "messages" | "events";
 

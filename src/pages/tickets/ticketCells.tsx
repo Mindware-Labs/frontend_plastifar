@@ -100,7 +100,7 @@ export function AssigneeCell({ id, name }: { id: number | null; name: string | n
   return (
     <span className="flex min-w-0 items-center gap-1.5" title={name}>
       <Avatar name={name} seed={id} size={18} />
-      <span className="truncate text-[12px] font-medium text-zinc-800">{name}</span>
+      <span className="truncate whitespace-nowrap text-[12px] font-medium text-zinc-800">{name}</span>
     </span>
   );
 }

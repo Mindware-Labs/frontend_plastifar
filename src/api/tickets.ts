@@ -73,6 +73,51 @@ export const ticketsApi = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+
+  // Tareas del ticket
+  getTasks: (ticketId: number) =>
+    apiRequest<import("../types/api").TicketTaskResponse[]>(`/api/tickets/${ticketId}/tasks`),
+
+  createTask: (ticketId: number, data: import("../types/api").CreateTicketTaskRequest) =>
+    apiRequest<import("../types/api").TicketTaskResponse>(`/api/tickets/${ticketId}/tasks`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateTask: (ticketId: number, taskId: number, data: import("../types/api").UpdateTicketTaskRequest) =>
+    apiRequest<import("../types/api").TicketTaskResponse>(`/api/tickets/${ticketId}/tasks/${taskId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  completeTask: (ticketId: number, taskId: number, form: FormData) =>
+    apiRequest<import("../types/api").TicketTaskResponse>(`/api/tickets/${ticketId}/tasks/${taskId}/complete`, {
+      method: "POST",
+      body: form,
+    }),
+
+  reopenTask: (ticketId: number, taskId: number) =>
+    apiRequest<import("../types/api").TicketTaskResponse>(`/api/tickets/${ticketId}/tasks/${taskId}/reopen`, {
+      method: "POST",
+    }),
+
+  addTaskComment: (ticketId: number, taskId: number, data: import("../types/api").CreateTicketTaskCommentRequest) =>
+    apiRequest<import("../types/api").TicketTaskCommentResponse>(`/api/tickets/${ticketId}/tasks/${taskId}/comments`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  taskAttachmentLink: (ticketId: number, taskId: number, attachmentId: number, download = false) =>
+    apiRequest<AttachmentLinkResponse>(
+      `/api/tickets/${ticketId}/tasks/${taskId}/attachments/${attachmentId}${toQuery({
+        download: download ? "true" : undefined,
+      })}`,
+    ),
+
+  deleteTask: (ticketId: number, taskId: number) =>
+    apiRequest<void>(`/api/tickets/${ticketId}/tasks/${taskId}`, {
+      method: "DELETE",
+    }),
 };
 
 

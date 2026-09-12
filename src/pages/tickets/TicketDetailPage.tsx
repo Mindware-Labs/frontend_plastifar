@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  CheckSquare,
   Clock,
   CornerUpLeft,
   Gavel,
@@ -26,6 +27,7 @@ import { CheckboxField, SelectField, TextField } from "../../components/ui/Field
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
+import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes, formatDateTime, formatSlaRemaining } from "../../lib/format";
@@ -40,6 +42,7 @@ import { AttachmentPreviewModal } from "../bandeja/AttachmentPreviewModal";
 import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
 import { TicketMessageCard } from "./TicketMessageCard";
 import { TicketPropertiesAside } from "./TicketPropertiesAside";
+import { TicketTasksTab } from "./TicketTasksTab";
 import { TicketTimelineSheet, type TicketDetailTab, type TimelineItem } from "./TicketTimelineSheet";
 
 /** El atajo se nombra con la tecla que la persona tiene delante, no con las dos. */
@@ -190,7 +193,9 @@ export function TicketDetailPage() {
   const [loading, setLoading] = useState(Boolean(ticketId));
   const [error, setError] = useState<string | null>(ticketId ? null : "Identificador de ticket no válido.");
 
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TicketDetailTab>("conversacion");
+  const [tasksCount, setTasksCount] = useState(0);
   const [showTimeline, setShowTimeline] = useState(false);
 
   // Respuesta al cliente: el mismo editor que la bandeja, porque lo que sale de aqui tambien es un correo.
@@ -252,6 +257,13 @@ export function TicketDetailPage() {
     return () => {
       active = false;
     };
+  }, [ticketId]);
+
+  useEffect(() => {
+    if (!ticketId) return;
+    ticketsApi.getAssignableStaff(ticketId)
+      .then(setAssignableStaff)
+      .catch(() => {});
   }, [ticketId]);
 
   const { onTicketsChanged, onTicketStatusChanged, onTicketNewMessage } = useEmailCounts();
@@ -673,6 +685,11 @@ export function TicketDetailPage() {
                   Conversación
                   <span className={tabCountClass}>{clientThread.length}</span>
                 </TabsTrigger>
+                <TabsTrigger value="tareas" className={`group ${tabTriggerClass}`}>
+                  <CheckSquare aria-hidden className="size-3.5" />
+                  Tareas
+                  <span className={tabCountClass}>{tasksCount}</span>
+                </TabsTrigger>
                 <TabsTrigger value="notas" className={`group ${tabTriggerClass}`}>
                   <Lock aria-hidden className="size-3.5" />
                   Notas internas
@@ -718,6 +735,16 @@ export function TicketDetailPage() {
                   renderThread(clientThread)
                 )}
               </div>
+            )}
+
+            {activeTab === "tareas" && (
+              <TicketTasksTab
+                ticketId={ticket.id}
+                isClosed={isClosed}
+                assignableStaff={assignableStaff}
+                currentStaffId={user?.staffId ?? 0}
+                onTasksCountChanged={(count) => setTasksCount(count)}
+              />
             )}
 
             {activeTab === "notas" && (
@@ -767,7 +794,7 @@ export function TicketDetailPage() {
             onEdit={() => void handleOpenEditModal()}
             onAssign={() => void handleOpenAssignModal()}
             onOpenAttachment={openAttachment}
-            className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[330px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-16 self-start"
+            className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[350px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-16 self-start"
           />
         </div>
       </div>
