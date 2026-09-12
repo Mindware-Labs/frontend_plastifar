@@ -602,9 +602,11 @@ export function Sidebar() {
               ref={menuMotion.ref}
               role="menu"
               aria-hidden={menuMotion.exiting}
-              style={{ transformOrigin: "24px bottom" }}
-              className={`absolute bottom-[calc(100%+8px)] z-30 min-w-[240px] rounded-xl border border-zinc-200/90 bg-white p-1.5 shadow-[0_12px_32px_-6px_rgba(27,27,29,0.14),0_2px_8px_rgba(27,27,29,0.04)] ${
-                collapsed ? "left-2" : "left-0 w-full"
+              style={{ transformOrigin: collapsed ? "0 24px" : "24px bottom" }}
+              className={`absolute z-30 rounded-xl border border-zinc-200/90 bg-white p-1.5 shadow-[0_12px_32px_-6px_rgba(27,27,29,0.14),0_2px_8px_rgba(27,27,29,0.04)] ${
+                collapsed
+                  ? "left-[calc(100%+8px)] bottom-0 w-56"
+                  : "left-0 right-0 bottom-[calc(100%+8px)] w-full"
               } ${menuMotion.exiting ? "pointer-events-none" : ""}`}
             >
               {/* Encabezado del usuario */}
