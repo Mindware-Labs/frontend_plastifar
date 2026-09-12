@@ -261,8 +261,8 @@ export function TicketTasksTab({
                 }`}
               >
                 {/* Cabecera: Checkbox, Título, Badges y Acciones */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     {/* Botón interactivo de estado / Checkbox */}
                     {isCompleted ? (
                       <button
@@ -270,7 +270,7 @@ export function TicketTasksTab({
                         onClick={() => void handleReopenTask(task.id)}
                         disabled={isClosed || reopeningId === task.id}
                         title="Tarea completada. Haz clic para reabrir"
-                        className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white shadow-2xs transition-transform active:scale-90 cursor-pointer"
+                        className="flex size-5 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white shadow-2xs transition-transform active:scale-90 cursor-pointer"
                       >
                         <Check className="size-3.5 stroke-[2.5]" />
                       </button>
@@ -280,13 +280,13 @@ export function TicketTasksTab({
                         onClick={() => setTaskToComplete(task)}
                         disabled={isClosed}
                         title="Marcar como completada y adjuntar evidencia"
-                        className="group/btn mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border-2 border-zinc-300 bg-white transition-all hover:border-emerald-600 hover:bg-emerald-50 cursor-pointer active:scale-90"
+                        className="group/btn flex size-5 shrink-0 items-center justify-center rounded-md border-2 border-zinc-300 bg-white transition-all hover:border-emerald-600 hover:bg-emerald-50 cursor-pointer active:scale-90"
                       >
                         <Check className="size-3.5 text-transparent transition-colors group-hover/btn:text-emerald-600 stroke-[2.5]" />
                       </button>
                     )}
 
-                    <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h4
                           className={`font-heading text-[13.5px] font-semibold tracking-tight ${
@@ -326,30 +326,28 @@ export function TicketTasksTab({
                     </div>
                   </div>
 
-                  {/* Acciones de la cabecera */}
+                  {/* Acciones de la cabecera del mismo tamaño que las etiquetas */}
                   <div className="flex items-center gap-1.5 shrink-0">
                     {isCompleted ? (
-                      <Button
+                      <button
                         type="button"
-                        variant="secondary"
-                        size="sm"
                         onClick={() => void handleReopenTask(task.id)}
                         disabled={isClosed || reopeningId === task.id}
                         title="Reabrir esta tarea para continuar trabajando en ella"
-                        className="h-7 text-[11.5px]"
+                        className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer disabled:opacity-50"
                       >
-                        <RotateCcw className="size-3 mr-1" />
-                        {reopeningId === task.id ? "Reabriendo..." : "Reabrir"}
-                      </Button>
+                        <RotateCcw className="size-3 text-zinc-400" />
+                        <span>{reopeningId === task.id ? "Reabriendo..." : "Reabrir"}</span>
+                      </button>
                     ) : (
                       <button
                         type="button"
                         onClick={() => setTaskToComplete(task)}
                         disabled={isClosed}
-                        className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/90 px-2.5 text-[11.5px] font-semibold text-emerald-700 shadow-2xs transition-colors hover:bg-emerald-100 hover:border-emerald-300 active:scale-95 cursor-pointer disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50/90 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 shadow-2xs transition-colors hover:bg-emerald-100 hover:border-emerald-300 active:scale-95 cursor-pointer disabled:opacity-50"
                         title="Marcar tarea como completada"
                       >
-                        <Check className="size-3.5 stroke-[2.5]" />
+                        <Check className="size-3 stroke-[2.5]" />
                         <span>Completar</span>
                       </button>
                     )}
@@ -358,9 +356,9 @@ export function TicketTasksTab({
                       type="button"
                       onClick={() => void handleDeleteTask(task.id)}
                       title="Eliminar tarea"
-                      className="flex size-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-red-600 transition-colors cursor-pointer active:scale-95"
+                      className="flex size-[22px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-red-600 transition-colors cursor-pointer active:scale-95"
                     >
-                      <Trash2 className="size-3.5" />
+                      <Trash2 className="size-3" />
                     </button>
                   </div>
                 </div>
