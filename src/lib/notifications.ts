@@ -7,6 +7,7 @@ export interface NotifyPrefs {
 }
 
 const KEY = "plf.notify";
+const OPENED_KEY = "plf.notify.opened";
 const CHANGED = "plf:notify-changed";
 const DEFAULTS: NotifyPrefs = { desktop: false, sound: false };
 
@@ -35,10 +36,33 @@ export function writePrefs(next: NotifyPrefs) {
 
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
+    // Al guardar preferencias se marca como abierto
+    localStorage.setItem(OPENED_KEY, "true");
   } catch {
     // Sin almacenamiento la preferencia dura lo que dure la pestana.
   }
 
+  window.dispatchEvent(new Event(CHANGED));
+}
+
+/** Devuelve true si el usuario ya abrió o interactuó con los avisos alguna vez. */
+export function hasOpenedNotifications(): boolean {
+  try {
+    const prefs = readPrefs();
+    if (prefs.sound || prefs.desktop) return true;
+    return localStorage.getItem(OPENED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+/** Registra que el usuario ya vio/abrió la configuración de avisos. */
+export function markNotificationsOpened(): void {
+  try {
+    localStorage.setItem(OPENED_KEY, "true");
+  } catch {
+    // Sin almacenamiento local
+  }
   window.dispatchEvent(new Event(CHANGED));
 }
 

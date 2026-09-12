@@ -1,9 +1,10 @@
 import { Bell, Hourglass, LoaderCircle, Mail, Ticket, UserRoundCheck, Volume2 } from "lucide-react";
-import { useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { useNotifyPrefs } from "../../hooks/useNotifyPrefs";
 import {
   desktopState,
+  markNotificationsOpened,
   playChime,
   requestDesktop,
   writePrefs,
@@ -14,8 +15,13 @@ import { Modal } from "../ui/Modal";
 
 type Glyph = ComponentType<{ className?: string; strokeWidth?: number }>;
 
-/** Interruptor: pista gris o roja, botón que viaja con la curva de resorte del tema. */
-function Switch({ checked, disabled, label, onChange }: {
+/** Interruptor táctil de alta definición: pista nítida, aro interior y resorte suave. */
+function Switch({
+  checked,
+  disabled,
+  label,
+  onChange,
+}: {
   checked: boolean;
   disabled?: boolean;
   label: string;
@@ -32,18 +38,15 @@ function Switch({ checked, disabled, label, onChange }: {
         event.stopPropagation();
         onChange(!checked);
       }}
-      className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full outline-none transition-colors duration-200 ease-out
-        focus-visible:ring-2 focus-visible:ring-brand-red/25 focus-visible:ring-offset-2
-        disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none ${
-          checked ? "bg-brand-red" : "bg-zinc-300 hover:bg-zinc-400/80"
-        }`}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent p-0.5 transition-colors duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-brand-red/30 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none ${
+        checked ? "bg-brand-red" : "bg-zinc-200 hover:bg-zinc-300"
+      }`}
     >
       <span
         aria-hidden
-        className={`absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow-[0_1px_2px_rgba(27,27,29,0.3)]
-          transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
-            checked ? "translate-x-4" : "translate-x-0"
-          }`}
+        className={`pointer-events-none inline-block size-4 rounded-full bg-white shadow-xs ring-1 ring-black/5 transition-transform duration-200 ease-plf-spring motion-reduce:transition-none ${
+          checked ? "translate-x-4" : "translate-x-0"
+        }`}
       />
     </button>
   );
@@ -65,7 +68,7 @@ interface ChannelRowProps {
   onChange: (checked: boolean) => void;
 }
 
-/** Fila-canal: el bloque entero conmuta, el interruptor es el control real y el sello dice el estado sin color. */
+/** Fila-canal: tarjeta con borde nítido, sello icónico Plastifar y switch táctil. */
 function ChannelRow({
   icon: Icon,
   title,
@@ -82,44 +85,72 @@ function ChannelRow({
     <div
       data-checked={checked}
       onClick={() => !disabled && onChange(!checked)}
-      className={`group/row flex items-start gap-3 rounded-lg border bg-white py-3 pl-3 pr-3.5 shadow-2xs transition-[border-color,background-color] duration-200 ease-out motion-reduce:transition-none ${
-        disabled ? "cursor-not-allowed" : "cursor-pointer hover:border-zinc-300 hover:bg-zinc-50/60"
-      } ${checked ? "border-zinc-300" : "border-zinc-200"}`}
+      className={`group/row flex items-start gap-3.5 rounded-xl border p-4 shadow-2xs transition-all duration-150 motion-reduce:transition-none ${
+        disabled
+          ? "cursor-not-allowed opacity-60 bg-zinc-50/40 border-zinc-200"
+          : "cursor-pointer"
+      } ${
+        checked
+          ? "border-zinc-300/90 bg-white ring-1 ring-zinc-950/[0.02]"
+          : "border-zinc-200/90 bg-zinc-50/30 hover:border-zinc-300 hover:bg-white"
+      }`}
     >
       <span
         key={pulseKey}
         aria-hidden
-        className={`mt-px flex size-6 shrink-0 items-center justify-center rounded-md transition-colors duration-200 ease-out motion-reduce:transition-none ${
+        className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border transition-all duration-200 ease-out motion-reduce:transition-none ${
           pulseKey > 0 ? "animate-plf-seal-pop" : ""
-        } ${checked ? "bg-brand-red text-white" : "bg-zinc-100 text-zinc-500 group-hover/row:text-zinc-700"}`}
+        } ${
+          checked
+            ? "border-brand-red/25 bg-brand-red/10 text-brand-red shadow-2xs"
+            : "border-zinc-200/80 bg-zinc-100 text-zinc-500 group-hover/row:border-zinc-300 group-hover/row:text-zinc-700"
+        }`}
       >
-        {busy ? <LoaderCircle className="size-3.5 animate-spin" /> : <Icon className="size-3.5" strokeWidth={2.25} />}
+        {busy ? (
+          <LoaderCircle className="size-4 animate-spin" />
+        ) : (
+          <Icon className="size-4" strokeWidth={2} />
+        )}
       </span>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <span className="text-[12.5px] font-semibold leading-none text-ink">{title}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[13.5px] font-semibold leading-none text-ink">
+            {title}
+          </span>
           {action}
         </div>
-        <p className="text-[11.5px] leading-relaxed text-zinc-500">{description}</p>
-        {status && <div className="mt-0.5 text-[11px] leading-none">{status}</div>}
+        <p className="text-[12px] leading-relaxed text-zinc-500">
+          {description}
+        </p>
+        {status && <div className="mt-1">{status}</div>}
       </div>
 
-      <div className="mt-0.5">
+      <div className="mt-0.5 shrink-0 pl-1">
         <Switch checked={checked} disabled={disabled} label={title} onChange={onChange} />
       </div>
     </div>
   );
 }
 
-/** Estado en una línea: punto y texto, legible también en gris. */
+/** Estado en una línea: píldora con borde sutil, punto de color y texto de alto contraste. */
 function StatusLine({ tone, children }: { tone: "ok" | "warn" | "neutral"; children: ReactNode }) {
-  const dot = { ok: "bg-brand-green", warn: "bg-brand-red", neutral: "bg-zinc-300" }[tone];
-  const text = { ok: "text-brand-green", warn: "text-brand-red-dark", neutral: "text-zinc-400" }[tone];
+  const styles = {
+    ok: "border-emerald-200/70 bg-emerald-50/80 text-emerald-700",
+    warn: "border-rose-200/70 bg-rose-50/80 text-rose-700",
+    neutral: "border-zinc-200/80 bg-zinc-50 text-zinc-600",
+  }[tone];
+
+  const dot = {
+    ok: "bg-emerald-600",
+    warn: "bg-rose-600",
+    neutral: "bg-zinc-400",
+  }[tone];
+
   return (
-    <span className={`inline-flex items-center gap-1.5 font-medium ${text}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium leading-normal ${styles}`}>
       <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${dot}`} />
-      {children}
+      <span>{children}</span>
     </span>
   );
 }
@@ -133,10 +164,10 @@ const desktopStatus: Record<DesktopState, { tone: "ok" | "warn" | "neutral"; tex
 
 /** Lo que dispara un aviso hoy, tal como lo escucha InboxAlerts. */
 const EVENTS: Array<{ icon: Glyph; title: string; hint: string }> = [
-  { icon: Mail, title: "Correo nuevo", hint: "Entra a la bandeja" },
-  { icon: UserRoundCheck, title: "Correo asignado", hint: "Alguien te lo pasa" },
-  { icon: Ticket, title: "Ticket asignado", hint: "Queda a tu cargo" },
-  { icon: Hourglass, title: "SLA por vencer o vencido", hint: "De tus tickets" },
+  { icon: Mail, title: "Correo nuevo", hint: "Entra a la bandeja de entrada" },
+  { icon: UserRoundCheck, title: "Correo asignado", hint: "Alguien te pasa una conversación" },
+  { icon: Ticket, title: "Ticket asignado", hint: "Queda bajo tu responsabilidad" },
+  { icon: Hourglass, title: "SLA por vencer o vencido", hint: "De tus tickets asignados" },
 ];
 
 /** Cómo avisar cuando llega algo: sonido con la pestaña a la vista y aviso del sistema fuera de ella. */
@@ -146,6 +177,10 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
   const [asking, setAsking] = useState(false);
   const [chimes, setChimes] = useState(0);
   const { isExiting, requestClose } = useModalAnimation();
+
+  useEffect(() => {
+    markNotificationsOpened();
+  }, []);
 
   async function toggleDesktop(enabled: boolean) {
     if (!enabled) {
@@ -173,24 +208,34 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
   }
 
   const desktopOn = prefs.desktop && permission === "granted";
-  const status = asking ? { tone: "neutral" as const, text: "Esperando tu respuesta…" } : desktopStatus[permission];
+  const status = asking ? { tone: "neutral" as const, text: "Esperando tu respuesta en el navegador…" } : desktopStatus[permission];
 
   return (
     <Modal
-      eyebrow="Tu cuenta"
-      title="Avisos"
+      eyebrow="Configuración"
+      title="Avisos y notificaciones"
       description="Cómo te enteras de lo que llega. Se guardan en este navegador y cada persona decide los suyos."
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={requestClose}
+      maxWidth="max-w-[500px]"
       footer={
-        <Button size="sm" onClick={requestClose}>
-          Listo
-        </Button>
+        <div className="flex w-full items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-400">
+            <kbd className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600 shadow-2xs">
+              Esc
+            </kbd>
+            <span>para cerrar</span>
+          </span>
+          <Button size="sm" onClick={requestClose}>
+            Listo
+          </Button>
+        </div>
       }
     >
       <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
+        {/* Canales principales */}
+        <div className="flex flex-col gap-2.5">
           <ChannelRow
             icon={Volume2}
             title="Sonido"
@@ -204,9 +249,10 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
                   event.stopPropagation();
                   chime();
                 }}
-                className="cursor-pointer rounded font-heading text-[9.5px] font-bold uppercase leading-none tracking-[0.08em] text-zinc-400 underline-offset-4 transition-colors hover:text-brand-red hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+                className="inline-flex items-center gap-1 rounded-md border border-zinc-200/90 bg-zinc-50 px-2 py-0.5 text-[11px] font-medium text-zinc-600 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25"
               >
-                Probar
+                <Volume2 className="size-3 text-zinc-400" />
+                <span>Probar sonido</span>
               </button>
             }
             onChange={toggleSound}
@@ -224,8 +270,9 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
           />
         </div>
 
-        <section className="flex flex-col gap-2.5 border-t border-line-soft pt-4">
-          <div className="flex h-5 items-center justify-between gap-3">
+        {/* Bloque explicativo de eventos */}
+        <section className="flex flex-col gap-3 border-t border-line pt-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span
                 aria-hidden
@@ -234,30 +281,32 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
                 <Bell className="size-3" strokeWidth={2.25} />
               </span>
               <span className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink">
-                Qué avisa
+                Qué dispara un aviso
               </span>
             </div>
-            <span className="text-[11px] text-zinc-400">Con ambos canales</span>
+            <span className="text-[11px] font-medium text-zinc-400">Canales activos</span>
           </div>
 
-          <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {EVENTS.map(({ icon: Icon, title, hint }) => (
               <li
                 key={title}
-                className="flex items-center gap-2.5 rounded-lg border border-zinc-200 bg-white py-1.5 pl-1.5 pr-2.5"
+                className="flex items-start gap-2.5 rounded-lg border border-zinc-200/80 bg-zinc-50/40 p-2.5 transition-colors hover:border-zinc-300 hover:bg-zinc-50"
               >
                 <span
                   aria-hidden
-                  className="flex size-5 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-500"
+                  className="mt-0.5 flex size-6.5 shrink-0 items-center justify-center rounded-md border border-zinc-200/70 bg-white text-zinc-600 shadow-2xs"
                 >
-                  <Icon className="size-3" strokeWidth={2.25} />
+                  <Icon className="size-3.5" strokeWidth={2} />
                 </span>
-                <span className="flex min-w-0 flex-col gap-[3px]">
-                  <span className="truncate text-[12px] font-medium leading-none text-ink">{title}</span>
-                  <span className="font-heading text-[8.5px] font-bold uppercase leading-none tracking-[0.08em] text-zinc-400">
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-[12px] font-semibold leading-tight text-ink">
+                    {title}
+                  </span>
+                  <span className="text-[11px] leading-snug text-zinc-500">
                     {hint}
                   </span>
-                </span>
+                </div>
               </li>
             ))}
           </ul>

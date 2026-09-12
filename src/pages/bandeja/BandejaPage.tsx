@@ -29,7 +29,8 @@ import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { useNotifyPrefs } from "../../hooks/useNotifyPrefs";
+import { useHasOpenedNotifications, useNotifyPrefs } from "../../hooks/useNotifyPrefs";
+import { markNotificationsOpened } from "../../lib/notifications";
 import { usePagedList } from "../../hooks/usePagedList";
 import type { EmailBulkAction, EmailListResponse, EmailSummaryResponse } from "../../types/api";
 import { ConversationRow } from "./ConversationRow";
@@ -339,6 +340,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   // Eliminar definitivamente y vaciar la papelera son de administradores.
   const isAdmin = Boolean(useAuth().user?.isAdmin);
   const prefs = useNotifyPrefs();
+  const hasOpenedAlerts = useHasOpenedNotifications();
   const debouncedSearch = useDebouncedValue(search).trim();
   const meta = folderMeta[folder];
   const selectable = folder !== "sent";
@@ -735,25 +737,93 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                 </button>
               )}
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => setEditingAlerts(true)}
-                    aria-label="Avisos de correo nuevo"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 transition-all outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 active:scale-95"
+              <div className="relative">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        markNotificationsOpened();
+                        setEditingAlerts(true);
+                      }}
+                      aria-label="Avisos de correo nuevo"
+                      className={`relative flex h-8 w-8 items-center justify-center rounded-lg border bg-white shadow-2xs transition-all outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 active:scale-95 cursor-pointer ${
+                        !hasOpenedAlerts
+                          ? "border-brand-red/50 text-brand-red ring-2 ring-brand-red/15 hover:border-brand-red hover:bg-brand-red/[0.04]"
+                          : "border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                      }`}
+                    >
+                      {alertsOn ? (
+                        <Bell className="h-4 w-4 text-brand-red" />
+                      ) : (
+                        <BellOff className={`h-4 w-4 ${!hasOpenedAlerts ? "text-brand-red" : "text-zinc-400"}`} />
+                      )}
+
+                      {!hasOpenedAlerts && (
+                        <span className="absolute -top-1 -right-1 flex size-2.5 pointer-events-none">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-red opacity-75" />
+                          <span className="relative inline-flex size-2.5 rounded-full bg-brand-red ring-2 ring-white" />
+                        </span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {!hasOpenedAlerts
+                      ? "Configura tus avisos de sonido y escritorio"
+                      : alertsOn
+                        ? "Avisos activados"
+                        : "Avisos desactivados"}
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Llamada de atención visual si el usuario nunca ha abierto la configuración */}
+                {!hasOpenedAlerts && (
+                  <div
+                    onClick={() => {
+                      markNotificationsOpened();
+                      setEditingAlerts(true);
+                    }}
+                    className="group absolute right-0 top-full mt-2.5 z-30 w-72 cursor-pointer rounded-xl border border-brand-red/25 bg-white p-3.5 shadow-[0_10px_28px_rgba(228,0,43,0.14)] animate-in fade-in slide-in-from-top-2 duration-200 hover:border-brand-red/40 transition-all"
                   >
-                    {alertsOn ? (
-                      <Bell className="h-4 w-4 text-brand-red" />
-                    ) : (
-                      <BellOff className="h-4 w-4 text-zinc-400" />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {alertsOn ? "Avisos activados" : "Avisos desactivados"}
-                </TooltipContent>
-              </Tooltip>
+                    {/* Flecha indicadora hacia la campanita */}
+                    <div className="absolute -top-1.5 right-3 size-3 rotate-45 border-t border-l border-brand-red/25 bg-white" />
+
+                    <div className="relative">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red">
+                            <Bell className="size-3.5" />
+                          </span>
+                          <span className="font-heading text-[12px] font-bold text-ink">
+                            ¡Activa tus avisos!
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markNotificationsOpened();
+                          }}
+                          aria-label="Cerrar sugerencia"
+                          title="Cerrar sugerencia"
+                          className="-mr-1 -mt-1 flex size-5 items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+
+                      <p className="mt-1.5 text-[11.5px] leading-relaxed text-zinc-600">
+                        Entérate al instante con <strong>sonido</strong> y <strong>alertas de escritorio</strong> cuando lleguen nuevos correos o se te asignen tickets.
+                      </p>
+
+                      <div className="mt-2.5 flex items-center justify-between border-t border-zinc-100 pt-2 text-[11px] font-semibold text-brand-red">
+                        <span>Configurar ahora</span>
+                        <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <Button
                 size="sm"

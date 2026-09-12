@@ -27,6 +27,7 @@ import { formatDisplayName, formatInitials } from "../../lib/format";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { NotificationsModal } from "./NotificationsModal";
 import { SignatureModal } from "./SignatureModal";
+import { useHasOpenedNotifications } from "../../hooks/useNotifyPrefs";
 
 interface NavItem {
   label: string;
@@ -242,6 +243,7 @@ export function Sidebar() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [editingSignature, setEditingSignature] = useState(false);
   const [editingAlerts, setEditingAlerts] = useState(false);
+  const hasOpenedAlerts = useHasOpenedNotifications();
   // El contenido del desplegable sobrevive al cierre para que la salida tenga qué animar.
   const [flyout, setFlyout] = useState<Flyout | null>(null);
   const [flyoutOpen, setFlyoutOpen] = useState(false);
@@ -652,6 +654,11 @@ export function Sidebar() {
                 >
                   <Bell className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
                   <span>Avisos</span>
+                  {!hasOpenedAlerts && (
+                    <span className="ml-auto rounded-full bg-brand-red/10 px-1.5 py-0.5 font-heading text-[9.5px] font-bold text-brand-red">
+                      Nuevo
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"

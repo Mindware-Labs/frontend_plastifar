@@ -62,24 +62,24 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         className={`${
           isExiting ? "pointer-events-none" : ""
-        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-xl`}
+        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-[0_12px_36px_rgba(27,27,29,0.14)]`}
       >
-        {/* Cabecera compacta */}
-        <div className="flex items-start justify-between gap-3 border-b border-zinc-100 bg-zinc-50/60 px-5 py-3">
+        {/* Cabecera compacta con borde nítido y buena jerarquía */}
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line bg-zinc-50/50 px-6 py-4">
           <div className="min-w-0 flex-1">
             {eyebrow && (
-              <p className="font-heading text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">
+              <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
                 {eyebrow}
               </p>
             )}
             <h2
               id={titleId}
-              className="font-heading text-[15px] font-bold tracking-tight text-zinc-900 leading-snug"
+              className="font-heading text-[16px] font-bold tracking-tight text-ink leading-snug"
             >
               {title}
             </h2>
             {description && (
-              <p id={descriptionId} className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">
+              <p id={descriptionId} className="mt-1 text-[12px] leading-relaxed text-subtle">
                 {description}
               </p>
             )}
@@ -89,18 +89,19 @@ export function Modal({
             type="button"
             onClick={requestClose}
             aria-label="Cerrar"
-            className="-mr-1 flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-zinc-200/70 hover:text-zinc-800 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
+            title="Cerrar (Esc)"
+            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none transition-colors hover:bg-zinc-200/60 hover:text-ink active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Cuerpo del modal */}
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        <div className="overflow-y-auto px-6 py-5">{children}</div>
 
         {/* Pie de acción */}
         {footer && (
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50/60 px-5 py-2.5">
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-line bg-zinc-50/50 px-6 py-3.5">
             {typeof footer === "function" ? footer({ requestClose, close: requestClose }) : footer}
           </div>
         )}
