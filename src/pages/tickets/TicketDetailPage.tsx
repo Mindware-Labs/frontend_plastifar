@@ -27,6 +27,7 @@ import { CheckboxField, SelectField, TextField } from "../../components/ui/Field
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
+import { useSettle } from "../../hooks/useSettle";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
@@ -342,8 +343,18 @@ export function TicketDetailPage() {
     }
   };
 
+  const [updateSettle, triggerUpdateSettle] = useSettle();
+  const [assignSettle, triggerAssignSettle] = useSettle();
+  const [editSettle, triggerEditSettle] = useSettle();
+  const [noteSettle, triggerNoteSettle] = useSettle();
+
   const saveNote = async () => {
-    if (!noteBody.trim() || noteSending) return;
+    if (noteSending) return;
+    if (!noteBody.trim()) {
+      setNoteSendError("Nota requerida");
+      triggerNoteSettle();
+      return;
+    }
     try {
       setNoteSending(true);
       setNoteSendError(null);
@@ -360,7 +371,8 @@ export function TicketDetailPage() {
       setShowNoteModal(false);
       await refreshTicket();
     } catch (err) {
-      setNoteSendError(err instanceof Error ? err.message : "Ocurrió un error al guardar la nota.");
+      setNoteSendError(err instanceof Error ? err.message : "Error al guardar nota");
+      triggerNoteSettle();
     } finally {
       setNoteSending(false);
     }
@@ -412,7 +424,8 @@ export function TicketDetailPage() {
 
   const handleContinueUpdateStatus = () => {
     if (!updateTargetStatus) {
-      setTransitionError("Selecciona la nueva situación del ticket.");
+      setTransitionError("Selecciona una opción");
+      triggerUpdateSettle();
       return;
     }
     setTransitionError(null);
@@ -422,20 +435,24 @@ export function TicketDetailPage() {
   const handleConfirmUpdateStatus = async (event: React.FormEvent) => {
     event.preventDefault();
     if (updateCategory === "cancelar" && !updateComment.trim()) {
-      setTransitionError("La cancelación exige un motivo escrito.");
+      setTransitionError("Motivo de cancelación requerido");
+      triggerUpdateSettle();
       return;
     }
     if (updateCategory === "pausar" && !updateComment.trim()) {
-      setTransitionError("La pausa exige un motivo escrito.");
+      setTransitionError("Motivo de pausa requerido");
+      triggerUpdateSettle();
       return;
     }
     if (updateCategory === "veredicto") {
       if (!updateVerdictId) {
-        setTransitionError("Selecciona un veredicto.");
+        setTransitionError("Selecciona un veredicto");
+        triggerUpdateSettle();
         return;
       }
       if (!updateComment.trim()) {
-        setTransitionError("El veredicto exige un comentario escrito.");
+        setTransitionError("Comentario de veredicto requerido");
+        triggerUpdateSettle();
         return;
       }
     }
@@ -453,7 +470,8 @@ export function TicketDetailPage() {
       setShowUpdateStatusModal(false);
       await refreshTicket();
     } catch (err) {
-      setTransitionError(err instanceof Error ? err.message : "Error al actualizar el estado del ticket.");
+      setTransitionError(err instanceof Error ? err.message : "Error al actualizar");
+      triggerUpdateSettle();
     } finally {
       setTransitioning(false);
     }
@@ -487,7 +505,8 @@ export function TicketDetailPage() {
       setShowAssignModal(false);
       await refreshTicket();
     } catch (err) {
-      setAssignError(err instanceof Error ? err.message : "Error al asignar el ticket.");
+      setAssignError(err instanceof Error ? err.message : "Error al asignar");
+      triggerAssignSettle();
     } finally {
       setAssigning(false);
     }
@@ -530,12 +549,14 @@ export function TicketDetailPage() {
   const handleConfirmEdit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!editSubject.trim()) {
-      setEditError("El asunto no puede estar vacío.");
+      setEditError("El asunto es obligatorio");
+      triggerEditSettle();
       return;
     }
     const currentTopic = editCatalogs?.topics.find((t) => t.id === editTopicId);
     if (currentTopic?.requiresProductLine && !editProductLineId) {
-      setEditError(`El motivo «${currentTopic.name}» exige indicar una línea de producto.`);
+      setEditError("Línea de producto requerida");
+      triggerEditSettle();
       return;
     }
 
@@ -552,7 +573,8 @@ export function TicketDetailPage() {
       setShowEditModal(false);
       await refreshTicket();
     } catch (err) {
-      setEditError(err instanceof Error ? err.message : "Error al actualizar los detalles del ticket.");
+      setEditError(err instanceof Error ? err.message : "Error al actualizar");
+      triggerEditSettle();
     } finally {
       setSavingEdit(false);
     }
@@ -839,7 +861,10 @@ export function TicketDetailPage() {
               <LazyBlockEditor
                 key={replyEditorKey}
                 initialContent={replyBlocks ?? undefined}
-                onChange={setReplyBlocks}
+                onChange={(blocks) => {
+                  setReplyBlocks(blocks);
+                  if (replySendError) setReplySendError(null);
+                }}
                 placeholder="Escribe tu respuesta para el cliente…"
               />
             </div>
@@ -858,12 +883,6 @@ export function TicketDetailPage() {
               </div>
             )}
 
-            {replySendError && (
-              <div className="mx-auto max-w-4xl">
-                <Alert variant="error">{replySendError}</Alert>
-              </div>
-            )}
-
             <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <input
@@ -872,9 +891,10 @@ export function TicketDetailPage() {
                   type="file"
                   multiple
                   className="hidden"
-                  onChange={(event) =>
-                    pickFiles(event.target, replyAttachments, setReplyAttachments, setReplySendError)
-                  }
+                  onChange={(event) => {
+                    pickFiles(event.target, replyAttachments, setReplyAttachments, setReplySendError);
+                    if (replySendError) setReplySendError(null);
+                  }}
                 />
                 <label htmlFor="reply-attachment-input" className={attachLabelClass}>
                   <Paperclip className="h-3.5 w-3.5" />
@@ -890,7 +910,9 @@ export function TicketDetailPage() {
                 <Button
                   type="button"
                   isLoading={replySending}
-                  disabled={!replyReady}
+                  disabled={!replyReady && !replySendError}
+                  tone={replySendError ? "ink" : "primary"}
+                  toneLabel={replySendError}
                   onClick={() => void sendReply()}
                 >
                   <Send className="h-[15px] w-[15px]" />
@@ -905,6 +927,7 @@ export function TicketDetailPage() {
       {/* Escribir una nota es un acto aparte: se pide, se escribe y se cierra. El borrador sobrevive si se cierra sin guardar. */}
       {showNoteModal && (
         <Modal
+          settle={noteSettle}
           eyebrow={ticket.number}
           title="Añadir nota interna"
           description={
@@ -927,7 +950,9 @@ export function TicketDetailPage() {
               <Button
                 type="button"
                 isLoading={noteSending}
-                disabled={!noteBody.trim()}
+                disabled={!noteBody.trim() && !noteSendError}
+                tone={noteSendError ? "ink" : "primary"}
+                toneLabel={noteSendError}
                 onClick={() => void saveNote()}
               >
                 Guardar nota
@@ -940,7 +965,10 @@ export function TicketDetailPage() {
               autoFocus
               rows={7}
               value={noteBody}
-              onChange={(event) => setNoteBody(event.target.value)}
+              onChange={(event) => {
+                setNoteBody(event.target.value);
+                if (noteSendError) setNoteSendError(null);
+              }}
               onKeyDown={(event) => {
                 // Escribir y guardar sin soltar el teclado: es el gesto de cualquier campo de notas.
                 if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
@@ -949,7 +977,9 @@ export function TicketDetailPage() {
                 }
               }}
               placeholder="Lo que el equipo debe saber sobre este caso…"
-              className={textareaClass}
+              className={`${textareaClass} ${
+                noteSendError ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red" : ""
+              }`}
             />
 
             <div className="flex flex-wrap items-center gap-3">
@@ -979,8 +1009,6 @@ export function TicketDetailPage() {
                 ))}
               </div>
             )}
-
-            {noteSendError && <Alert variant="error">{noteSendError}</Alert>}
           </div>
         </Modal>
       )}
@@ -989,6 +1017,7 @@ export function TicketDetailPage() {
           completan los campos de esa categoria. Cancelado y veredicto pueden avisar al cliente por correo. */}
       {showUpdateStatusModal && (
         <Modal
+          settle={updateSettle}
           eyebrow={ticket.number}
           title="Actualizar ticket"
           description={updateStep === 1 ? "Elige qué hacer con este ticket." : "Completa los datos para confirmar."}
@@ -1002,7 +1031,14 @@ export function TicketDetailPage() {
                 <Button type="button" variant="secondary" size="sm" onClick={() => setShowUpdateStatusModal(false)}>
                   Cancelar
                 </Button>
-                <Button type="button" size="sm" disabled={!updateTargetStatus} onClick={handleContinueUpdateStatus}>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!updateTargetStatus && !transitionError}
+                  tone={transitionError ? "ink" : "primary"}
+                  toneLabel={transitionError}
+                  onClick={handleContinueUpdateStatus}
+                >
                   Continuar
                 </Button>
               </>
@@ -1023,6 +1059,8 @@ export function TicketDetailPage() {
                   size="sm"
                   variant={updateCategory === "cancelar" ? "danger" : "primary"}
                   isLoading={transitioning}
+                  tone={transitionError ? "ink" : "primary"}
+                  toneLabel={transitionError}
                 >
                   {updateCategory === "cancelar" ? "Cancelar ticket" : "Confirmar"}
                 </Button>
@@ -1032,8 +1070,6 @@ export function TicketDetailPage() {
         >
           {updateStep === 1 ? (
             <div className="space-y-3">
-              {transitionError && <Alert variant="error">{transitionError}</Alert>}
-
               <div role="radiogroup" aria-label="Nueva situación" className="space-y-1.5">
                 {availableTransitions.map((option) => {
                   const isSelected = updateTargetStatus === option.target;
@@ -1044,7 +1080,10 @@ export function TicketDetailPage() {
                       type="button"
                       role="radio"
                       aria-checked={isSelected}
-                      onClick={() => setUpdateTargetStatus(option.target)}
+                      onClick={() => {
+                        setUpdateTargetStatus(option.target);
+                        if (transitionError) setTransitionError(null);
+                      }}
                       className={`flex w-full items-start gap-2.5 rounded-lg border p-2.5 text-left outline-none transition-all cursor-pointer
                         focus-visible:ring-2 focus-visible:ring-brand-red/20 ${
                           isSelected
@@ -1067,8 +1106,6 @@ export function TicketDetailPage() {
             </div>
           ) : (
             <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-3">
-              {transitionError && <Alert variant="error">{transitionError}</Alert>}
-
               {updateCategory === "veredicto" && (
                 <SelectField
                   id="update-verdict"
@@ -1077,7 +1114,11 @@ export function TicketDetailPage() {
                   required
                   placeholder={loadingVerdicts ? "Cargando…" : "Selecciona un veredicto"}
                   value={updateVerdictId}
-                  onChange={setUpdateVerdictId}
+                  onChange={(val) => {
+                    setUpdateVerdictId(val);
+                    if (transitionError) setTransitionError(null);
+                  }}
+                  state={transitionError && !updateVerdictId ? "error" : "idle"}
                   options={verdictOptions.map((v) => ({ value: String(v.id), label: v.name }))}
                   hint={
                     !loadingVerdicts && verdictOptions.length === 0
@@ -1106,7 +1147,10 @@ export function TicketDetailPage() {
                   id="update-comment"
                   rows={3}
                   value={updateComment}
-                  onChange={(event) => setUpdateComment(event.target.value)}
+                  onChange={(event) => {
+                    setUpdateComment(event.target.value);
+                    if (transitionError) setTransitionError(null);
+                  }}
                   placeholder={
                     updateCategory === "cancelar"
                       ? "Explica por qué se cancela este ticket…"
@@ -1116,7 +1160,13 @@ export function TicketDetailPage() {
                           ? "Explica el veredicto…"
                           : "Contexto adicional para el historial del ticket…"
                   }
-                  className={textareaClass}
+                  className={`${textareaClass} ${
+                    transitionError &&
+                    !updateComment.trim() &&
+                    (updateCategory === "cancelar" || updateCategory === "pausar" || updateCategory === "veredicto")
+                      ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
+                      : ""
+                  }`}
                 />
               </div>
 
@@ -1140,6 +1190,7 @@ export function TicketDetailPage() {
 
       {showAssignModal && (
         <Modal
+          settle={assignSettle}
           eyebrow={ticket.number}
           title="Asignar ticket"
           description="Solo aparecen colaboradores activos con acceso al departamento del ticket."
@@ -1152,15 +1203,20 @@ export function TicketDetailPage() {
               <Button type="button" variant="secondary" size="sm" disabled={assigning} onClick={() => setShowAssignModal(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" form="assign-ticket-form" size="sm" isLoading={assigning}>
+              <Button
+                type="submit"
+                form="assign-ticket-form"
+                size="sm"
+                isLoading={assigning}
+                tone={assignError ? "ink" : "primary"}
+                toneLabel={assignError}
+              >
                 Guardar asignación
               </Button>
             </>
           }
         >
           <form id="assign-ticket-form" onSubmit={handleConfirmAssign} className="space-y-3">
-            {assignError && <Alert variant="error">{assignError}</Alert>}
-
             {loadingStaff ? (
               <div className="flex justify-center py-6">
                 <Spinner size="sm" label="Cargando colaboradores…" />
@@ -1172,7 +1228,10 @@ export function TicketDetailPage() {
                   label="Colaborador"
                   size="sm"
                   value={selectedStaffId}
-                  onChange={setSelectedStaffId}
+                  onChange={(val) => {
+                    setSelectedStaffId(val);
+                    if (assignError) setAssignError(null);
+                  }}
                   options={[
                     { value: "", label: "Sin asignar" },
                     ...assignableStaff.map((s) => ({ value: String(s.id), label: s.fullName })),
@@ -1184,7 +1243,10 @@ export function TicketDetailPage() {
                   size="sm"
                   hint="Opcional: por qué cambia la persona responsable."
                   value={assignComment}
-                  onChange={(event) => setAssignComment(event.target.value)}
+                  onChange={(event) => {
+                    setAssignComment(event.target.value);
+                    if (assignError) setAssignError(null);
+                  }}
                   placeholder="Ej.: reasignado para soporte de producto"
                 />
               </>
@@ -1195,6 +1257,7 @@ export function TicketDetailPage() {
 
       {showEditModal && (
         <Modal
+          settle={editSettle}
           eyebrow={ticket.number}
           title="Editar clasificación y detalles"
           description="Ajusta el asunto y la clasificación. El SLA se recalcula automáticamente."
@@ -1207,15 +1270,20 @@ export function TicketDetailPage() {
               <Button type="button" variant="secondary" size="sm" disabled={savingEdit} onClick={() => setShowEditModal(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" form="edit-ticket-form" size="sm" isLoading={savingEdit}>
+              <Button
+                type="submit"
+                form="edit-ticket-form"
+                size="sm"
+                isLoading={savingEdit}
+                tone={editError ? "ink" : "primary"}
+                toneLabel={editError}
+              >
                 Guardar cambios
               </Button>
             </>
           }
         >
           <form id="edit-ticket-form" onSubmit={handleConfirmEdit} className="space-y-3">
-            {editError && <Alert variant="error">{editError}</Alert>}
-
             {loadingEditCatalogs ? (
               <div className="flex justify-center py-6">
                 <Spinner size="sm" label="Cargando catálogos…" />
@@ -1229,7 +1297,11 @@ export function TicketDetailPage() {
                   required
                   maxLength={200}
                   value={editSubject}
-                  onChange={(event) => setEditSubject(event.target.value)}
+                  onChange={(event) => {
+                    setEditSubject(event.target.value);
+                    if (editError) setEditError(null);
+                  }}
+                  state={editError && !editSubject.trim() ? "error" : "idle"}
                   placeholder="Describe brevemente el caso…"
                 />
 
@@ -1242,6 +1314,7 @@ export function TicketDetailPage() {
                     onChange={(value) => {
                       const nextId = value ? Number(value) : null;
                       setEditTopicId(nextId);
+                      if (editError) setEditError(null);
                       // El motivo trae su departamento y prioridad por defecto; se pueden corregir despues.
                       const topic = nextId ? editCatalogs?.topics.find((t) => t.id === nextId) : undefined;
                       if (topic?.defaultDepartmentId) setEditDepartmentId(topic.defaultDepartmentId);
@@ -1256,10 +1329,13 @@ export function TicketDetailPage() {
                   <SelectField
                     id="edit-priority"
                     label="Prioridad"
-                    required
                     size="sm"
+                    required
                     value={editPriority}
-                    onChange={setEditPriority}
+                    onChange={(value) => {
+                      setEditPriority(value as TicketDetailResponse["priority"]);
+                      if (editError) setEditError(null);
+                    }}
                     options={PRIORITY_OPTIONS}
                   />
                   <SelectField
@@ -1267,7 +1343,10 @@ export function TicketDetailPage() {
                     label="Departamento"
                     size="sm"
                     value={editDepartmentId !== null ? String(editDepartmentId) : ""}
-                    onChange={(value) => setEditDepartmentId(value ? Number(value) : null)}
+                    onChange={(value) => {
+                      setEditDepartmentId(value ? Number(value) : null);
+                      if (editError) setEditError(null);
+                    }}
                     placeholder="Sin departamento"
                     options={[
                       { value: "", label: "Sin departamento" },
@@ -1279,8 +1358,12 @@ export function TicketDetailPage() {
                     label="Línea de producto"
                     size="sm"
                     required={editRequiresProductLine}
+                    state={editError && editRequiresProductLine && !editProductLineId ? "error" : "idle"}
                     value={editProductLineId !== null ? String(editProductLineId) : ""}
-                    onChange={(value) => setEditProductLineId(value ? Number(value) : null)}
+                    onChange={(value) => {
+                      setEditProductLineId(value ? Number(value) : null);
+                      if (editError) setEditError(null);
+                    }}
                     placeholder="No aplica"
                     options={[
                       { value: "", label: "No aplica" },

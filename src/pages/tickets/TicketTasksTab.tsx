@@ -22,6 +22,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Spinner } from "../../components/ui/Spinner";
+import { Toast } from "../../components/ui/Toast";
 import { formatBytes, formatDateTime } from "../../lib/format";
 import type {
   CreateTicketTaskRequest,
@@ -53,6 +54,7 @@ export function TicketTasksTab({
   const [tasks, setTasks] = useState<TicketTaskResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toastError, setToastError] = useState<string | null>(null);
   const [filter, setFilter] = useState<TaskFilter>("all");
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -97,7 +99,7 @@ export function TicketTasksTab({
       const updated = await ticketsApi.reopenTask(ticketId, taskId);
       setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error al reabrir la tarea.");
+      setToastError(err instanceof Error ? err.message : "Error al reabrir la tarea.");
     } finally {
       setReopeningId(null);
     }
@@ -112,7 +114,7 @@ export function TicketTasksTab({
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
       onTasksCountChanged?.(tasks.length - 1);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error al eliminar la tarea.");
+      setToastError(err instanceof Error ? err.message : "Error al eliminar la tarea.");
     }
   };
 
@@ -127,7 +129,7 @@ export function TicketTasksTab({
       );
       setCommentInputs((prev) => ({ ...prev, [taskId]: "" }));
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error al agregar comentario.");
+      setToastError(err instanceof Error ? err.message : "Error al agregar comentario.");
     } finally {
       setSendingCommentTaskId(null);
     }
@@ -140,7 +142,7 @@ export function TicketTasksTab({
         window.open(link.url, "_blank", "noopener,noreferrer");
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error al abrir el archivo.");
+      setToastError(err instanceof Error ? err.message : "Error al abrir el archivo.");
     }
   };
 
@@ -649,6 +651,8 @@ export function TicketTasksTab({
         onClose={() => setTaskToComplete(null)}
         onComplete={handleCompleteTask}
       />
+
+      <Toast message={toastError} variant="error" onDismiss={() => setToastError(null)} />
     </div>
   );
 }

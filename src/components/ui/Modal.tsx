@@ -17,6 +17,8 @@ export interface ModalProps {
   isExiting?: boolean;
   onRequestClose?: () => void;
   maxWidth?: string;
+  /** Asentamiento del modal cuando el envío no prospera: baja 3px y vuelve. */
+  settle?: boolean;
 }
 
 /**
@@ -33,6 +35,7 @@ export function Modal({
   isExiting: externalIsExiting,
   onRequestClose: externalRequestClose,
   maxWidth = "max-w-lg",
+  settle = false,
 }: ModalProps) {
   const motion = useDialogMotion(onClose, { exiting: externalIsExiting });
   const { isExiting, scrimRef, panelRef } = motion;
@@ -62,6 +65,8 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         className={`${
           isExiting ? "pointer-events-none" : ""
+        } ${
+          settle ? "animate-plf-settle" : ""
         } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-[0_12px_36px_rgba(27,27,29,0.14)]`}
       >
         {/* Cabecera compacta con borde nítido y buena jerarquía */}

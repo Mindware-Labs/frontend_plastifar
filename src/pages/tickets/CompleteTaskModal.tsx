@@ -2,6 +2,7 @@ import { Check, CheckCircle2, FileText, Image as ImageIcon, Upload, X } from "lu
 import { useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
+import { useSettle } from "../../hooks/useSettle";
 import { formatBytes } from "../../lib/format";
 import type { TicketTaskResponse } from "../../types/api";
 
@@ -25,6 +26,7 @@ export function CompleteTaskModal({
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [settle, triggerSettle] = useSettle();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!open || !task) return null;
@@ -36,7 +38,8 @@ export function CompleteTaskModal({
     const newFiles = Array.from(files);
     for (const f of newFiles) {
       if (f.size > MAX_SINGLE_FILE) {
-        setError(`El archivo «${f.name}» supera el límite individual de 10 MB.`);
+        setError("Máx. 10 MB por archivo");
+        triggerSettle();
         return;
       }
     }
@@ -44,7 +47,8 @@ export function CompleteTaskModal({
     const currentTotal = evidenceFiles.reduce((acc, f) => acc + f.size, 0);
     const incomingTotal = newFiles.reduce((acc, f) => acc + f.size, 0);
     if (currentTotal + incomingTotal > MAX_TOTAL_FILES) {
-      setError("El total de los archivos supera el límite de 25 MB.");
+      setError("Total supera 25 MB");
+      triggerSettle();
       return;
     }
 
@@ -52,6 +56,7 @@ export function CompleteTaskModal({
   };
 
   const handleRemoveFile = (index: number) => {
+    if (error) setError(null);
     setEvidenceFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -72,7 +77,8 @@ export function CompleteTaskModal({
       await onComplete(task.id, formData);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al completar la tarea.");
+      setError(err instanceof Error ? err.message : "Error al completar");
+      triggerSettle();
     } finally {
       setSaving(false);
     }
@@ -80,6 +86,7 @@ export function CompleteTaskModal({
 
   return (
     <Modal
+      settle={settle}
       onClose={() => {
         if (!saving) onClose();
       }}
@@ -99,11 +106,13 @@ export function CompleteTaskModal({
             Cancelar
           </Button>
           <Button
-            type="submit"
+            type="button"
             size="sm"
             disabled={saving}
             onClick={handleSubmit}
-            className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"
+            tone={error ? "ink" : "primary"}
+            toneLabel={error}
+            className={error ? "" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"}
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             {saving ? "Guardando..." : "Marcar como completada"}
@@ -112,12 +121,6 @@ export function CompleteTaskModal({
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50/70 p-3 text-[12.5px] text-red-700">
-            {error}
-          </div>
-        )}
-
         {/* Resumen de la tarea a completar */}
         <div className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
           <div className="flex items-start gap-2.5">
@@ -150,7 +153,10 @@ export function CompleteTaskModal({
             rows={3}
             placeholder="Explica qué se encontró, qué gestiones se hicieron o las observaciones pertinentes..."
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
+            onChange={(e) => {
+              setComment(e.target.value);
+              if (error) setError(null);
+            }}
             className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-[12.5px] text-zinc-800 shadow-2xs outline-none transition-colors focus:border-brand-red focus:ring-1 focus:ring-brand-red/20 placeholder:text-zinc-400"
             autoFocus
           />

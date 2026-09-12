@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { DatePicker } from "../../components/ui/DatePicker";
 import { SelectField, TextField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { useSettle } from "../../hooks/useSettle";
 import type { CreateTicketTaskRequest, TicketStaffOptionResponse } from "../../types/api";
 
 interface CreateTaskModalProps {
@@ -27,17 +28,20 @@ export function CreateTaskModal({
   const [dueDate, setDueDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [settle, triggerSettle] = useSettle();
 
   if (!open) return null;
 
   const handleAutoassign = () => {
     setAssignedStaffId(String(currentStaffId));
+    if (error) setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      setError("El título de la tarea es obligatorio.");
+      setError("Título requerido");
+      triggerSettle();
       return;
     }
 
@@ -52,7 +56,8 @@ export function CreateTaskModal({
       });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al crear la tarea.");
+      setError(err instanceof Error ? err.message : "Error al crear la tarea");
+      triggerSettle();
     } finally {
       setSaving(false);
     }
@@ -62,6 +67,7 @@ export function CreateTaskModal({
 
   return (
     <Modal
+      settle={settle}
       onClose={() => {
         if (!saving) onClose();
       }}
@@ -83,7 +89,9 @@ export function CreateTaskModal({
           <Button
             type="submit"
             size="sm"
-            disabled={saving || !title.trim()}
+            disabled={saving}
+            tone={error ? "ink" : "primary"}
+            toneLabel={error}
             onClick={handleSubmit}
           >
             <Plus className="h-3.5 w-3.5" />
@@ -93,18 +101,16 @@ export function CreateTaskModal({
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50/70 p-3 text-[12.5px] text-red-700">
-            {error}
-          </div>
-        )}
-
         <TextField
           id="task-title"
           label="Título de la tarea *"
           placeholder="Ej.: Investigar lote reportado con almacén"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            if (error) setError(null);
+          }}
+          state={error && !title.trim() ? "error" : "idle"}
           size="sm"
           autoFocus
         />
@@ -121,7 +127,10 @@ export function CreateTaskModal({
             rows={3}
             placeholder="Detalla qué se necesita averiguar, qué pruebas realizar o qué información recopilar..."
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              if (error) setError(null);
+            }}
             className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-[12.5px] text-zinc-800 shadow-2xs outline-none transition-colors focus:border-brand-red focus:ring-1 focus:ring-brand-red/20 placeholder:text-zinc-400"
           />
         </div>
@@ -150,7 +159,10 @@ export function CreateTaskModal({
             id="task-assignee"
             label=""
             value={assignedStaffId}
-            onChange={(val: string) => setAssignedStaffId(val)}
+            onChange={(val: string) => {
+              setAssignedStaffId(val);
+              if (error) setError(null);
+            }}
             options={[
               { value: "", label: "Sin asignar (cualquiera del equipo)" },
               ...assignableStaff.map((staff) => ({
@@ -174,7 +186,10 @@ export function CreateTaskModal({
           <DatePicker
             id="task-due-date"
             value={dueDate}
-            onChange={setDueDate}
+            onChange={(val) => {
+              setDueDate(val);
+              if (error) setError(null);
+            }}
             placeholder="Seleccionar fecha límite..."
             headerLabel="Fecha límite"
           />
