@@ -97,6 +97,7 @@ interface TicketPropertiesAsideProps {
   onAssign: () => void;
   onOpenAttachment: (attachments: TicketAttachmentResponse[], attachmentId: number) => void;
   className?: string;
+  innerCardRef?: React.Ref<HTMLDivElement>;
 }
 
 /** Ficha compacta del ticket: panel unificado de propiedades alineado con el nuevo diseño SaaS. */
@@ -109,13 +110,14 @@ export function TicketPropertiesAside({
   onAssign,
   onOpenAttachment,
   className = "",
+  innerCardRef,
 }: TicketPropertiesAsideProps) {
   const email = ticket.contactEmail ?? ticket.requesterEmail ?? null;
   const isPaused = Boolean(ticket.pausedAt);
 
   return (
     <aside aria-label="Datos del ticket" className={className}>
-      <div className="divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xs">
+      <div ref={innerCardRef} className="divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xs">
         {/* SECCIÓN 1: CLIENTE */}
         <div>
           <SectionHeader title="Cliente" icon={Building2} />

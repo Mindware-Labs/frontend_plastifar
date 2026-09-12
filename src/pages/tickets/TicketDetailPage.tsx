@@ -37,10 +37,13 @@ import type {
   TicketCreateOptionsResponse,
   TicketDetailResponse,
   TicketStaffOptionResponse,
+  TicketTaskCommentResponse,
+  TicketTaskResponse,
   TicketVerdictOption,
 } from "../../types/api";
 import { AttachmentPreviewModal } from "../bandeja/AttachmentPreviewModal";
 import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
+import { TaskCommentsAside } from "./TaskCommentsAside";
 import { TicketMessageCard } from "./TicketMessageCard";
 import { TicketPropertiesAside } from "./TicketPropertiesAside";
 import { TicketTasksTab } from "./TicketTasksTab";
@@ -198,6 +201,35 @@ export function TicketDetailPage() {
   const [activeTab, setActiveTab] = useState<TicketDetailTab>("conversacion");
   const [tasksCount, setTasksCount] = useState(0);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [activeCommentsTask, setActiveCommentsTask] = useState<TicketTaskResponse | null>(null);
+  const [latestAddedComment, setLatestAddedComment] = useState<{
+    taskId: number;
+    comment: TicketTaskCommentResponse;
+  } | null>(null);
+
+  const handleToggleTaskComments = useCallback((task: TicketTaskResponse) => {
+    setActiveCommentsTask((prev) => (prev?.id === task.id ? null : task));
+  }, []);
+
+  const propertiesCardRef = useRef<HTMLDivElement>(null);
+  const [propertiesHeight, setPropertiesHeight] = useState<number>(520);
+
+  useEffect(() => {
+    const el = propertiesCardRef.current;
+    if (!el) return;
+    const updateHeight = () => {
+      const h = el.offsetHeight;
+      if (h > 0) {
+        setPropertiesHeight(h);
+      }
+    };
+    updateHeight();
+    const observer = new ResizeObserver(() => {
+      updateHeight();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ticket]);
 
   // Respuesta al cliente: el mismo editor que la bandeja, porque lo que sale de aqui tambien es un correo.
   const [replyOpen, setReplyOpen] = useState(false);
@@ -700,7 +732,16 @@ export function TicketDetailPage() {
 
         <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-start">
           <div className="min-w-0 flex-1">
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TicketDetailTab)}>
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => {
+                const nextTab = value as TicketDetailTab;
+                setActiveTab(nextTab);
+                if (nextTab !== "tareas") {
+                  setActiveCommentsTask(null);
+                }
+              }}
+            >
               <TabsList className="h-8 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
                 <TabsTrigger value="conversacion" className={`group ${tabTriggerClass}`}>
                   <Mail aria-hidden className="size-3.5" />
@@ -765,7 +806,10 @@ export function TicketDetailPage() {
                 isClosed={isClosed}
                 assignableStaff={assignableStaff}
                 currentStaffId={user?.staffId ?? 0}
-                onTasksCountChanged={(count) => setTasksCount(count)}
+                onTasksCountChanged={setTasksCount}
+                activeCommentsTaskId={activeCommentsTask?.id}
+                onToggleTaskComments={handleToggleTaskComments}
+                latestAddedComment={latestAddedComment}
               />
             )}
 
@@ -808,16 +852,46 @@ export function TicketDetailPage() {
             )}
           </div>
 
-          <TicketPropertiesAside
-            ticket={ticket}
-            sla={sla}
-            canEdit={!isClosed}
-            canAssign={ticket.status !== "Cancelado"}
-            onEdit={() => void handleOpenEditModal()}
-            onAssign={() => void handleOpenAssignModal()}
-            onOpenAttachment={openAttachment}
-            className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[350px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-16 self-start"
-          />
+          {activeCommentsTask ? (
+            <TaskCommentsAside
+              key={`task-comments-${activeCommentsTask.id}`}
+              ticketId={ticket.id}
+              task={activeCommentsTask}
+              currentStaffId={user?.staffId ?? 0}
+              currentStaffName={
+                [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Usuario"
+              }
+              onClose={() => setActiveCommentsTask(null)}
+              onCommentAdded={(taskId, newComment) => {
+                setActiveCommentsTask((prev) =>
+                  prev && prev.id === taskId
+                    ? {
+                        ...prev,
+                        comments: [...prev.comments, newComment],
+                      }
+                    : prev,
+                );
+                setLatestAddedComment({
+                  taskId,
+                  comment: newComment,
+                });
+              }}
+              targetHeight={propertiesHeight}
+              className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[350px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-16 self-start"
+            />
+          ) : (
+            <TicketPropertiesAside
+              ticket={ticket}
+              sla={sla}
+              canEdit={!isClosed}
+              canAssign={ticket.status !== "Cancelado"}
+              onEdit={() => void handleOpenEditModal()}
+              onAssign={() => void handleOpenAssignModal()}
+              onOpenAttachment={openAttachment}
+              innerCardRef={propertiesCardRef}
+              className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[350px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-16 self-start animate-plf-side-panel-back"
+            />
+          )}
         </div>
       </div>
 

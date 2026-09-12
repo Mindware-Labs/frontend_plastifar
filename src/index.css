@@ -135,6 +135,32 @@ input:-webkit-autofill:focus {
   to { opacity: 1; transform: none; }
 }
 
+@keyframes plf-side-panel-in {
+  0% {
+    opacity: 0;
+    transform: translateX(20px) scale(0.988);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes plf-side-panel-back {
+  0% {
+    opacity: 0;
+    transform: translateX(-16px) scale(0.988);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
 @keyframes plf-selection-bar-in {
   from {
     opacity: 0;
@@ -229,6 +255,8 @@ input:-webkit-autofill:focus {
 .animate-plf-selection-out { animation: plf-selection-bar-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-tabs-in { animation: plf-tabs-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-tabs-out { animation: plf-tabs-fade-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
+.animate-plf-side-panel-in { animation: plf-side-panel-in 0.44s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-side-panel-back { animation: plf-side-panel-back 0.40s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
 .animate-plf-settle { animation: plf-settle 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-otp-confirm { animation: plf-otp-confirm 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -248,6 +276,8 @@ input:-webkit-autofill:focus {
   .animate-plf-toast-in,
   .animate-plf-selection-in,
   .animate-plf-tabs-in,
+  .animate-plf-side-panel-in,
+  .animate-plf-side-panel-back,
   .animate-plf-shake,
   .animate-plf-settle,
   .animate-plf-otp-confirm,

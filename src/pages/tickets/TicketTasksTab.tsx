@@ -3,19 +3,16 @@ import {
   Check,
   CheckCircle2,
   CheckSquare,
-  ChevronDown,
-  ChevronUp,
+  ChevronRight,
   Eye,
   FileText,
   Image as ImageIcon,
-  Loader2,
   MessageSquare,
   Plus,
   RotateCcw,
-  Send,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ticketsApi } from "../../api/tickets";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
@@ -28,6 +25,7 @@ import type {
   CreateTicketTaskRequest,
   TicketStaffOptionResponse,
   TicketTaskAttachmentResponse,
+  TicketTaskCommentResponse,
   TicketTaskResponse,
 } from "../../types/api";
 import { CompleteTaskModal } from "./CompleteTaskModal";
@@ -39,6 +37,9 @@ interface TicketTasksTabProps {
   assignableStaff: TicketStaffOptionResponse[];
   currentStaffId: number;
   onTasksCountChanged?: (count: number) => void;
+  activeCommentsTaskId?: number | null;
+  onToggleTaskComments?: (task: TicketTaskResponse) => void;
+  latestAddedComment?: { taskId: number; comment: TicketTaskCommentResponse } | null;
 }
 
 type TaskFilter = "all" | "pending" | "completed" | "mine";
@@ -49,8 +50,10 @@ export function TicketTasksTab({
   assignableStaff,
   currentStaffId,
   onTasksCountChanged,
+  activeCommentsTaskId,
+  onToggleTaskComments,
+  latestAddedComment,
 }: TicketTasksTabProps) {
-  const currentStaff = assignableStaff.find((s) => s.id === currentStaffId);
   const [tasks, setTasks] = useState<TicketTaskResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,26 +63,46 @@ export function TicketTasksTab({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<TicketTaskResponse | null>(null);
   const [reopeningId, setReopeningId] = useState<number | null>(null);
-  const [expandedCommentsTaskId, setExpandedCommentsTaskId] = useState<number | null>(null);
-  const [commentInputs, setCommentInputs] = useState<Record<number, string>>({});
-  const [sendingCommentTaskId, setSendingCommentTaskId] = useState<number | null>(null);
 
-  const loadTasks = useCallback(async () => {
+  // Sincronizar comentario agregado desde el panel lateral
+  useEffect(() => {
+    if (latestAddedComment) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === latestAddedComment.taskId &&
+          !t.comments.some((c) => c.id === latestAddedComment.comment.id)
+            ? { ...t, comments: [...t.comments, latestAddedComment.comment] }
+            : t,
+        ),
+      );
+    }
+  }, [latestAddedComment]);
+
+  const onTasksCountChangedRef = useRef(onTasksCountChanged);
+  useEffect(() => {
+    onTasksCountChangedRef.current = onTasksCountChanged;
+  }, [onTasksCountChanged]);
+
+  const loadTasks = useCallback(async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) {
+        setLoading(true);
+      }
       setError(null);
       const data = await ticketsApi.getTasks(ticketId);
       setTasks(data);
-      onTasksCountChanged?.(data.length);
+      onTasksCountChangedRef.current?.(data.length);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar las tareas.");
     } finally {
-      setLoading(false);
+      if (isInitial) {
+        setLoading(false);
+      }
     }
-  }, [ticketId, onTasksCountChanged]);
+  }, [ticketId]);
 
   useEffect(() => {
-    void loadTasks();
+    void loadTasks(true);
   }, [loadTasks]);
 
   const handleCreateTask = async (taskData: CreateTicketTaskRequest) => {
@@ -118,22 +141,7 @@ export function TicketTasksTab({
     }
   };
 
-  const handleAddComment = async (taskId: number) => {
-    const text = (commentInputs[taskId] ?? "").trim();
-    if (!text || sendingCommentTaskId === taskId) return;
-    try {
-      setSendingCommentTaskId(taskId);
-      const newComment = await ticketsApi.addTaskComment(ticketId, taskId, { comment: text });
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, comments: [...t.comments, newComment] } : t)),
-      );
-      setCommentInputs((prev) => ({ ...prev, [taskId]: "" }));
-    } catch (err) {
-      setToastError(err instanceof Error ? err.message : "Error al agregar comentario.");
-    } finally {
-      setSendingCommentTaskId(null);
-    }
-  };
+
 
   const handleOpenEvidenceFile = async (taskId: number, att: TicketTaskAttachmentResponse) => {
     try {
@@ -245,7 +253,7 @@ export function TicketTasksTab({
           {filteredTasks.map((task) => {
             const isCompleted = task.status === "Completada";
             const isAssignedToMe = task.assignedStaffId === currentStaffId;
-            const isCommentsExpanded = expandedCommentsTaskId === task.id;
+            const isCommentsActive = activeCommentsTaskId === task.id;
             const isPastDue =
               !isCompleted &&
               task.dueDate &&
@@ -460,21 +468,28 @@ export function TicketTasksTab({
                     </span>
                   </div>
 
-                  {/* Píldora 3: Toggle de Comentarios */}
+                  {/* Píldora 3: Toggle de Comentarios hacia el panel lateral */}
                   <button
                     type="button"
-                    onClick={() =>
-                      setExpandedCommentsTaskId(isCommentsExpanded ? null : task.id)
-                    }
+                    onClick={() => onToggleTaskComments?.(task)}
                     className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11.5px] font-medium transition-all cursor-pointer shadow-2xs select-none active:scale-95 ${
-                      isCommentsExpanded
-                        ? "border-zinc-300 bg-zinc-100 text-zinc-900 font-semibold"
+                      isCommentsActive
+                        ? "border-brand-red/40 bg-red-50/80 text-brand-red font-semibold ring-1 ring-brand-red/20 shadow-xs"
                         : task.comments.length > 0
                           ? "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
                           : "border-zinc-200/80 bg-zinc-50/80 text-zinc-500 hover:border-zinc-300 hover:bg-white hover:text-zinc-800"
                     }`}
+                    title={
+                      isCommentsActive
+                        ? "Cerrar panel de comentarios"
+                        : `Ver y escribir comentarios (${task.comments.length})`
+                    }
                   >
-                    <MessageSquare className="size-3.5 text-zinc-400" />
+                    <MessageSquare
+                      className={`size-3.5 ${
+                        isCommentsActive ? "text-brand-red" : "text-zinc-400"
+                      }`}
+                    />
                     <span>
                       {task.comments.length === 0
                         ? "Comentar"
@@ -482,149 +497,15 @@ export function TicketTasksTab({
                             task.comments.length === 1 ? "comentario" : "comentarios"
                           }`}
                     </span>
-                    {isCommentsExpanded ? (
-                      <ChevronUp className="size-3 text-zinc-400" />
-                    ) : (
-                      <ChevronDown className="size-3 text-zinc-400" />
-                    )}
+                    <ChevronRight
+                      className={`size-3 transition-transform ${
+                        isCommentsActive
+                          ? "text-brand-red translate-x-0.5"
+                          : "text-zinc-400"
+                      }`}
+                    />
                   </button>
                 </div>
-
-                {/* Hilo de comentarios expandido */}
-                {isCommentsExpanded && (
-                  <div className="mt-3 ml-7.5 rounded-xl border border-zinc-200/90 bg-zinc-50/50 p-3.5 space-y-3">
-                    {/* Cabecera del hilo de comentarios */}
-                    <div className="flex items-center justify-between pb-1 border-b border-zinc-200/60">
-                      <div className="flex items-center gap-1.5 font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-500">
-                        <MessageSquare className="size-3.5 text-zinc-400" />
-                        <span>Comentarios y seguimiento ({task.comments.length})</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setExpandedCommentsTaskId(null)}
-                        className="text-[11px] font-medium text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer"
-                      >
-                        Ocultar
-                      </button>
-                    </div>
-
-                    {/* Lista de comentarios existentes */}
-                    {task.comments.length > 0 ? (
-                      <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
-                        {task.comments.map((c) => {
-                          const isMyComment = c.authorStaffId === currentStaffId;
-                          return (
-                            <div
-                              key={c.id}
-                              className="rounded-lg border border-zinc-200/80 bg-white p-3 shadow-2xs transition-colors"
-                            >
-                              <div className="flex items-center justify-between gap-2 text-[11.5px]">
-                                <div className="flex items-center gap-1.5 font-medium text-zinc-800">
-                                  <Avatar name={c.authorStaffName} seed={c.authorStaffId} size={18} />
-                                  <span className="font-semibold text-zinc-900">{c.authorStaffName}</span>
-                                  {isMyComment && (
-                                    <span className="rounded bg-zinc-100 px-1 py-0.2 font-heading text-[9px] font-bold text-zinc-600">
-                                      Tú
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="text-[10.5px] text-zinc-400 tabular-nums">
-                                  {formatDateTime(c.createdAt)}
-                                </span>
-                              </div>
-                              <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-700 whitespace-pre-wrap">
-                                {c.comment}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-3 text-center rounded-lg border border-dashed border-zinc-200 bg-white/70">
-                        <MessageSquare className="size-4 text-zinc-300 mb-1" />
-                        <p className="text-[12px] text-zinc-500 font-medium">Aún no hay comentarios en esta tarea</p>
-                        <p className="text-[11px] text-zinc-400">Deja una nota o actualización sobre el progreso de esta tarea.</p>
-                      </div>
-                    )}
-
-                    {/* Formulario para nuevo comentario */}
-                    <div className="rounded-lg border border-zinc-200 bg-white p-2.5 shadow-2xs focus-within:border-brand-red focus-within:ring-2 focus-within:ring-brand-red/15 transition-all">
-                      <div className="flex items-start gap-2.5">
-                        <div className="mt-0.5 shrink-0">
-                          <Avatar
-                            name={currentStaff?.fullName ?? "Usuario"}
-                            seed={currentStaffId}
-                            size={22}
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <textarea
-                            rows={2}
-                            autoFocus
-                            placeholder="Escribe un comentario o actualización sobre esta tarea..."
-                            value={commentInputs[task.id] ?? ""}
-                            onChange={(e) =>
-                              setCommentInputs((prev) => ({ ...prev, [task.id]: e.target.value }))
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                void handleAddComment(task.id);
-                              }
-                            }}
-                            className="w-full resize-none bg-transparent text-[12.5px] leading-relaxed text-zinc-800 outline-none placeholder:text-zinc-400"
-                          />
-                          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-2 text-[11px]">
-                            <span className="text-[10.5px] text-zinc-400">
-                              <kbd className="rounded border border-zinc-200 bg-zinc-50 px-1 py-0.5 font-mono text-[9px] text-zinc-500">
-                                Enter
-                              </kbd>{" "}
-                              para enviar ·{" "}
-                              <kbd className="rounded border border-zinc-200 bg-zinc-50 px-1 py-0.5 font-mono text-[9px] text-zinc-500">
-                                Shift+Enter
-                              </kbd>{" "}
-                              nueva línea
-                            </span>
-                            <div className="flex items-center gap-1.5 ml-auto">
-                              {(commentInputs[task.id] ?? "").trim() && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setCommentInputs((prev) => ({ ...prev, [task.id]: "" }))
-                                  }
-                                  className="h-7 rounded-md px-2 text-[11px] font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 transition-colors cursor-pointer"
-                                >
-                                  Limpiar
-                                </button>
-                              )}
-                              <Button
-                                type="button"
-                                size="sm"
-                                disabled={
-                                  !(commentInputs[task.id] ?? "").trim() ||
-                                  sendingCommentTaskId === task.id
-                                }
-                                onClick={() => void handleAddComment(task.id)}
-                              >
-                                {sendingCommentTaskId === task.id ? (
-                                  <>
-                                    <Loader2 className="size-3 animate-spin mr-1.5" />
-                                    <span>Enviando...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Send className="size-3 mr-1.5" />
-                                    <span>Comentar</span>
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             );
           })}
