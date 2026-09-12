@@ -1,0 +1,241 @@
+/**
+ * Estilos del tablero de operación — dirección «filete de acento».
+ *
+ * TODA regla cuelga de `.cxhub`. Nada de acá alcanza al resto de la aplicación,
+ * y las reglas de la aplicación se neutralizan al entrar con el reset acotado,
+ * sin tocar el reset global.
+ *
+ * Sobre blanco, la sombra no separa nada: sólo ensucia. Acá NO HAY NINGUNA.
+ * La separación la hace el borde, y la identidad la hace el filete de acento.
+ */
+
+@import "@fontsource/plus-jakarta-sans/400.css";
+@import "@fontsource/plus-jakarta-sans/500.css";
+@import "@fontsource/plus-jakarta-sans/600.css";
+@import "@fontsource/plus-jakarta-sans/700.css";
+@import "@fontsource/plus-jakarta-sans/800.css";
+
+.cxhub {
+  --cx-card: #ffffff;
+  --cx-hair: #e6e9ee;
+  --cx-hair-2: #f0f2f5;
+  --cx-hair-hover: #d8dce4;
+  --cx-ink: #14161c;
+  --cx-body: #4e5563;
+  --cx-soft: #6e7583;
+  --cx-chip: #f0f2f5;
+  --cx-hover: #f8f9fb;
+  --cx-serie: #2f5fd0;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Reset acotado                                                      */
+/* ------------------------------------------------------------------ */
+
+.cxhub,
+.cxhub *,
+.cxhub *::before,
+.cxhub *::after {
+  box-sizing: border-box;
+}
+
+.cxhub button,
+.cxhub input,
+.cxhub select,
+.cxhub textarea {
+  margin: 0;
+  font-family: inherit;
+  line-height: normal;
+}
+
+.cxhub table {
+  border-spacing: 0;
+}
+
+.cxhub p,
+.cxhub h1,
+.cxhub h2,
+.cxhub h3,
+.cxhub ul,
+.cxhub ol,
+.cxhub dl {
+  margin: 0;
+  padding: 0;
+}
+
+.cxhub ul,
+.cxhub ol {
+  list-style: none;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Superficie                                                         */
+/* ------------------------------------------------------------------ */
+
+.cxhub {
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--cx-ink);
+  background: #ffffff;
+  /* Todas las cifras del tablero se comparan entre sí. */
+  font-variant-numeric: tabular-nums;
+}
+
+.cxhub ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.cxhub ::-webkit-scrollbar-thumb {
+  background: var(--cx-hair);
+  border-radius: 99px;
+}
+
+.cxhub ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tarjetas                                                           */
+/*                                                                     */
+/*  Sin sombra. El filete de acento es un div de 4 px dentro de la     */
+/*  tarjeta, no un `border-top`: un borde de un solo lado con radio se */
+/*  corta en las esquinas y deja dos muescas.                          */
+/* ------------------------------------------------------------------ */
+
+.cxhub .cx-card {
+  background: var(--cx-card);
+  border: 1px solid var(--cx-hair);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* El hover responde con el borde y con un lavado casi imperceptible del fondo.
+   Sin sombra y sin desplazamiento: la tarjeta acusa recibo, no se levanta. */
+.cxhub .cx-hover {
+  transition:
+    border-color 0.16s ease-out,
+    background-color 0.16s ease-out;
+}
+
+.cxhub .cx-hover:hover {
+  border-color: var(--cx-hair-hover);
+}
+
+/* La sparkline de una tarjeta apagada se despierta al pasar por encima: de
+   gris a la tinta del dato. Es el unico movimiento de color del tablero y
+   responde a una accion, que es la condicion para que exista. */
+.cxhub .cx-card .cx-spark {
+  transition: stroke 0.16s ease-out;
+}
+
+.cxhub .cx-card:hover .cx-spark {
+  stroke: var(--cx-serie);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Filas y controles                                                  */
+/* ------------------------------------------------------------------ */
+
+.cxhub .cx-row:hover,
+.cxhub .cx-link:hover {
+  background: var(--cx-hover);
+}
+
+.cxhub .cx-tr:hover td {
+  background: var(--cx-hover);
+}
+
+.cxhub .cx-menu-item:hover {
+  background: var(--cx-chip);
+}
+
+.cxhub .cx-search:focus-within {
+  border-color: var(--cx-hair-hover);
+}
+
+.cxhub .cx-id:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Foco de teclado                                                    */
+/*                                                                     */
+/*  El anillo toma el tono del elemento cuando lo tiene; el resto cae  */
+/*  al rojo de marca. `--cx-focus` lo publica cada componente con      */
+/*  acento propio.                                                     */
+/* ------------------------------------------------------------------ */
+
+.cxhub a:focus-visible,
+.cxhub button:focus-visible,
+.cxhub input:focus-visible,
+.cxhub [tabindex]:focus-visible {
+  outline: 2px solid var(--cx-focus, var(--color-brand-red));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Menús                                                              */
+/* ------------------------------------------------------------------ */
+
+.cxhub .cx-menu {
+  animation: cxpop 0.13s ease-out;
+  transform-origin: top;
+}
+
+@keyframes cxpop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Responsive                                                         */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 1240px) {
+  .cxhub .cx-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .cxhub .cx-kpi-lead {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .cxhub .cx-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .cxhub .cx-pair {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Movimiento reducido                                                */
+/*                                                                     */
+/*  Reducir no es apagar. Se elimina el DESPLAZAMIENTO —el viaje de la */
+/*  fila, el del tooltip, la redistribucion del anillo— y se conserva  */
+/*  lo que confirma una accion: opacidad, color y fondo. Un hover que  */
+/*  deja de responder no es accesible, es roto.                        */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .cxhub *,
+  .cxhub *::before,
+  .cxhub *::after {
+    animation-duration: 0.01ms !important;
+    transition-property: opacity, color, background-color, border-color, stroke, fill !important;
+    transition-duration: 120ms !important;
+  }
+}

@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { fetchAllPages } from "../../api/paging";
 import { productLinesApi } from "../../api/productLines";
 import {
@@ -76,7 +76,15 @@ export function HcaPage() {
   const [clientId, setClientId] = useState("todos");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todas");
+  // La pastilla inicial puede venir en la URL (`/calidad/hca?estado=vencidas`):
+  // es como el Dashboard abre la lista que produjo una de sus cifras. Solo se
+  // lee al montar y no se sincroniza de vuelta —cambiar de pastilla no reescribe
+  // la barra de direcciones—, para no meterle historial a un filtro.
+  const [searchParams] = useSearchParams();
+  const [chip, setChip] = useState<ChipKey>(() => {
+    const requested = searchParams.get("estado");
+    return CHIPS.some((entry) => entry.key === requested) ? (requested as ChipKey) : "todas";
+  });
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "compromiso", dir: "asc" });
   const [pageSize, setPageSize] = useState(10);
 

@@ -45,13 +45,6 @@
   /* Lo conceptualmente redondo: avatares, punto de estado, contadores y chips. */
   --radius-pill: 9999px;
 
-  /* Excepcion declarada del Dashboard, y solo de el: es la unica superficie de
-     tarjetas del panel. Dos radios, no cinco — la tarjeta y lo que va dentro.
-     Ningun otro modulo los usa; si aparecen fuera de src/pages/dashboard es una
-     fuga, no una decision. */
-  --radius-card: 16px;
-  --radius-inset: 8px;
-
   /* Filete de un control al pasar el mouse. Estaba escrito a mano como
      `zinc-400` en cada campo: nombrarlo evita que el literal siga creciendo. */
   --color-hairline-hover: #a1a1aa;
@@ -347,6 +340,18 @@ input:-webkit-autofill:focus {
 .animate-plf-spinner-dash { animation: plf-spinner-dash 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 .animate-plf-spinner-pulse { animation: plf-spinner-pulse 2s ease-in-out infinite; }
 
+/* Entrada escalonada de las bandas del Dashboard.
+
+   UN solo momento animado y sobre TRES bloques, no sobre cada tarjeta: doce
+   fichas entrando de a una es un desfile, y el tablero se mira para trabajar,
+   no para verlo aparecer. El escalon es corto a proposito —90 ms— porque la
+   pantalla ya esta cargada cuando entra: esto ordena la lectura, no la retrasa.
+   El apagado bajo `prefers-reduced-motion` lo da la regla general de arriba mas
+   la lista de abajo. */
+.plf-stagger > * { animation: plf-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.plf-stagger > *:nth-child(2) { animation-delay: 90ms; }
+.plf-stagger > *:nth-child(3) { animation-delay: 180ms; }
+
 /* Regla general: alcanza tambien a lo que no nombramos aqui — el `animate-spin`
    de Tailwind en los botones que cargan, y cualquier transicion o transform de
    utilidad. Sin esto solo se apagaban los fotogramas propios. */
@@ -373,7 +378,8 @@ input:-webkit-autofill:focus {
   .animate-plf-scrim-in,
   .animate-plf-modal-in,
   .animate-plf-drawer-in,
-  .animate-plf-shake {
+  .animate-plf-shake,
+  .plf-stagger > * {
     animation: none !important;
   }
 

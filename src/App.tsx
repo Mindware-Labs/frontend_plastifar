@@ -7,6 +7,7 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
 import { ClientsPage } from "./pages/clients/ClientsPage";
+import { CXDashboard } from "./features/cx-dashboard";
 import { DashboardPage } from "./pages/dashboard/DashboardPage";
 import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
@@ -49,7 +50,12 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<DashboardPage />} />
+        {/* Tablero CX. Se monta dentro del layout: el riel, la barra superior y
+            el shell exterior del mock quedaron fuera a proposito, porque la
+            aplicacion ya los provee. El tablero de reportes reales sigue en
+            /dashboard-calidad. */}
+        <Route path="/dashboard" element={<CXDashboard />} />
+        <Route path="/dashboard-calidad" element={<DashboardPage />} />
 
         {/* Bandeja de tickets y correo (modulo de Richard De Leon). Lleva el
             mismo guard de lectura que el resto: la seccion 6.2 define

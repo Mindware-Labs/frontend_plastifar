@@ -302,7 +302,7 @@ export function ReportsPage() {
         <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
           <span
             aria-hidden
-            className="flex h-12 w-12 items-center justify-center rounded-card bg-fill text-faint"
+            className="flex h-12 w-12 items-center justify-center rounded-edge bg-fill text-faint"
           >
             <BarChart3 className="h-5 w-5" />
           </span>
@@ -348,7 +348,7 @@ export function ReportsPage() {
           )}
 
           {payload === null && error === null && (
-            <div aria-hidden className="h-[220px] animate-pulse rounded-card bg-fill" />
+            <div aria-hidden className="h-[220px] animate-pulse rounded-edge bg-fill" />
           )}
 
           <div className={isGenerating ? "opacity-60" : ""}>

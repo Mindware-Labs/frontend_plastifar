@@ -1,7 +1,7 @@
 import { Clock, Flag, Info, MousePointerClick, Plus, SlidersHorizontal, Ticket as TicketIcon, UserCheck } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -300,7 +300,17 @@ export function TicketsPage() {
   const navigate = useNavigate();
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<TicketFilterKey>("todos");
+  /* El estado inicial sale de la URL, igual que ya hace HcaPage. Es lo que
+     permite que el tablero enlace a `/tickets?estado=vencidos` y la bandeja
+     abra ya filtrada; sin esto, cada cifra del tablero llevaba a una lista sin
+     filtrar, que es peor que no enlazar. */
+  const [searchParams] = useSearchParams();
+  const [filter, setFilter] = useState<TicketFilterKey>(() => {
+    const requested = searchParams.get("estado");
+    return filters.some((f) => f.key === requested)
+      ? (requested as TicketFilterKey)
+      : "todos";
+  });
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
   const [priority, setPriority] = useState<string>("todas");
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({

@@ -12,7 +12,6 @@ import {
   MessageSquareText,
   PanelLeft,
   PenLine,
-  Search,
   Send,
   Settings,
   ShieldCheck,
@@ -268,8 +267,6 @@ export function Sidebar() {
   const [manualOpen, setManualOpen] = useState<Record<string, boolean>>({});
   const menuRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<number | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const [query, setQuery] = useState("");
 
   /**
    * El buscador FILTRA el menu de verdad; no es un adorno.
@@ -279,36 +276,7 @@ export function Sidebar() {
    * escribir "terri" y quedarse con Territorios ahorra abrir Configuracion y
    * recorrerla.
    */
-  const filteredGroups = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (needle === "") return visibleGroups;
 
-    return visibleGroups
-      .map((group) => {
-        // Si el nombre del modulo coincide, se muestra entero con sus hijos:
-        // buscar "calidad" y ver Calidad sin sus dos secciones seria un
-        // resultado a medias.
-        if (group.label.toLowerCase().includes(needle)) return group;
-        const children = group.children?.filter((child) =>
-          child.label.toLowerCase().includes(needle),
-        );
-        return children && children.length > 0 ? { ...group, children } : null;
-      })
-      .filter((group): group is NonNullable<typeof group> => group !== null);
-  }, [visibleGroups, query]);
-
-  // Atajo del sistema, el mismo que anuncia la tecla dibujada en el campo.
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setCollapsed(false);
-        searchRef.current?.focus();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -586,35 +554,6 @@ export function Sidebar() {
         )}
       </div>
 
-      {!collapsed && (
-        <div className="shrink-0 px-3 pb-2">
-          <label className="relative flex items-center">
-            <span className="sr-only">Buscar en el menú</span>
-            <Search
-              aria-hidden
-              className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-faint"
-            />
-            <input
-              ref={searchRef}
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar"
-              className="h-9 w-full rounded-edge border border-line bg-canvas pl-8 pr-12
-                text-[12.5px] text-ink outline-none transition-colors
-                placeholder:text-faint hover:border-line-strong
-                focus:border-brand-red focus:bg-white focus:ring-3 focus:ring-brand-red/15"
-            />
-            <kbd
-              aria-hidden
-              className="pointer-events-none absolute right-2 rounded-edge border border-line
-                bg-white px-1.5 font-heading text-[10px] font-semibold text-faint"
-            >
-              ⌘K
-            </kbd>
-          </label>
-        </div>
-      )}
 
       {/* Aire entre modulos: sin el, siete grupos y sus hijos se leen como una
           sola lista larga y cuesta ver donde termina uno y empieza el otro.
@@ -625,16 +564,12 @@ export function Sidebar() {
           collapsed ? "items-center gap-1 px-2" : "gap-1 px-3"
         }`}
       >
-        {filteredGroups.length === 0 && (
-          <p className="px-3 py-6 text-center text-[12.5px] text-faint">Ningún módulo coincide.</p>
-        )}
-
-        {filteredGroups.map((group, index) => (
+        {visibleGroups.map((group, index) => (
           <div key={`sec-${group.label}`} className="contents">
             {/* El encabezado se pinta cuando cambia la seccion, no una vez por
                 bloque: asi el filtro puede vaciar un bloque entero y su titulo
                 se va con el, en vez de quedar colgado sobre nada. */}
-            {!collapsed && group.section !== filteredGroups[index - 1]?.section && (
+            {!collapsed && group.section !== visibleGroups[index - 1]?.section && (
               <p
                 className={`px-3 pb-1 font-heading text-[10px] font-semibold uppercase
                   tracking-[0.08em] text-faint ${index === 0 ? "pt-1" : "pt-4"}`}

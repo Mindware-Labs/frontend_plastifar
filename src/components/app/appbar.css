@@ -1,0 +1,98 @@
+/**
+ * Barra de aplicación.
+ *
+ * Todas las reglas van prefijadas `pf-` y ancladas a `.pf-bar` o `.pf-menu`,
+ * así que nada de acá alcanza al resto de la aplicación.
+ *
+ * ------------------------------------------------------------------
+ * POR QUÉ ESTOS TOKENS Y NO LOS DEL TABLERO
+ * ------------------------------------------------------------------
+ * Esta barra es chrome de la APLICACIÓN: la ve cada pantalla, no sólo el
+ * tablero. El mundo visual del tablero está fijado aparte a propósito, y
+ * arrastrarlo hasta acá lo convertiría en el sistema de toda la app por la
+ * puerta de atrás.
+ *
+ * La rampa de `DESIGN.md` ya cumple el piso de contraste — `subtle` da 5,9:1 y
+ * `faint` 4,8:1 sobre blanco —, que era lo que motivaba el cambio de grises. Lo
+ * que sí se corrige es el rojo: `#E1123C` desaparece y manda el 185 C.
+ */
+
+.pf-bar,
+.pf-bar *,
+.pf-bar *::before,
+.pf-bar *::after {
+  box-sizing: border-box;
+}
+
+.pf-btn {
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.pf-btn:hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-canvas);
+}
+
+.pf-ico {
+  transition:
+    background 0.14s,
+    color 0.14s;
+}
+
+.pf-ico:hover {
+  background: var(--color-fill);
+  color: var(--color-brand-gray);
+}
+
+.pf-menu-item:hover {
+  background: var(--color-fill);
+}
+
+.pf-crumb:hover {
+  color: var(--color-brand-gray);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.pf-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.pf-bar a:focus-visible,
+.pf-bar button:focus-visible,
+.pf-menu button:focus-visible {
+  outline: 2px solid var(--color-brand-red);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.pf-menu {
+  animation: pfpop 0.13s ease-out;
+  transform-origin: top;
+}
+
+@keyframes pfpop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-menu {
+    animation: none;
+  }
+
+  .pf-bar,
+  .pf-btn,
+  .pf-ico {
+    transition: none;
+  }
+}
