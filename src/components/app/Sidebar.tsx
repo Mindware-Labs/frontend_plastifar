@@ -345,71 +345,75 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`flex h-screen shrink-0 flex-col border-r border-zinc-200/80 bg-white select-none
-        transition-[width] duration-280 ease-plf-spring motion-reduce:transition-none ${collapsed ? "w-[68px]" : "w-60"}`}
+      className={`relative flex h-screen shrink-0 flex-col border-r border-zinc-200/80 bg-white select-none will-change-[width]
+        transition-[width] duration-[230ms] ease-plf-glide motion-reduce:transition-none ${collapsed ? "w-[68px]" : "w-60"}`}
     >
-      {/* 1. Cabecera superior: Logotipo y control de contracción */}
-      <div
-        className={`flex shrink-0 items-center border-b border-zinc-200/80 transition-all duration-200 ${
-          collapsed
-            ? "h-20 flex-col items-center justify-center gap-2 px-2"
-            : "h-14 justify-between px-3.5"
-        }`}
-      >
-        {!collapsed ? (
-          <>
-            <Link
-              to="/bandeja"
-              className="group flex items-center pl-1 transition-opacity hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 rounded-lg py-1"
-              title="Plastifar · Ir a Bandeja"
-            >
-              <Logo
-                variant="color"
-                height={24}
-                className="transition-transform duration-150 group-hover:scale-[1.01]"
-              />
-            </Link>
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              aria-label="Contraer la barra lateral"
-              title="Contraer barra lateral"
-              className="group flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors duration-150 hover:bg-zinc-100 hover:text-zinc-800 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer motion-reduce:active:scale-100"
-            >
-              <SidebarToggleIcon collapsed={false} />
-            </button>
-          </>
-        ) : (
-          <>
-            <Link
-              to="/bandeja"
-              className="flex items-center justify-center rounded-lg transition-opacity hover:opacity-90 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
-              title="Plastifar · Ir a Bandeja"
-            >
-              <Logo variant="isotipo" height={24} />
-            </Link>
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              aria-label="Expandir la barra lateral"
-              title="Expandir barra lateral"
-              className="group flex h-7.5 w-7.5 items-center justify-center rounded-lg text-zinc-400 transition-colors duration-150 hover:bg-zinc-100 hover:text-zinc-800 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer motion-reduce:active:scale-100"
-            >
-              <SidebarToggleIcon collapsed={true} />
-            </button>
-          </>
-        )}
+      {/* 1. Cabecera superior: altura fija elegante (h-14) con cross-fade ágil */}
+      <div className="relative flex h-14 shrink-0 items-center border-b border-zinc-200/80 px-3 overflow-hidden">
+        {/* Versión expandida */}
+        <div
+          className={`flex w-full items-center justify-between transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
+            collapsed ? "opacity-0 pointer-events-none -translate-x-3" : "opacity-100 translate-x-0"
+          }`}
+        >
+          <Link
+            to="/bandeja"
+            className="group flex items-center pl-1 transition-opacity hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 rounded-lg py-1"
+            title="Plastifar · Ir a Bandeja"
+          >
+            <Logo
+              variant="color"
+              height={24}
+              className="transition-transform duration-150 group-hover:scale-[1.01]"
+            />
+          </Link>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="Contraer la barra lateral"
+            title="Contraer barra lateral"
+            className="group flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors duration-150 hover:bg-zinc-100 hover:text-zinc-800 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer motion-reduce:active:scale-100"
+          >
+            <SidebarToggleIcon collapsed={false} />
+          </button>
+        </div>
+
+        {/* Versión contraída */}
+        <div
+          className={`absolute inset-0 flex items-center justify-center gap-1.5 px-2 transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
+            collapsed ? "opacity-100 pointer-events-auto scale-100" : "opacity-0 pointer-events-none scale-95"
+          }`}
+        >
+          <Link
+            to="/bandeja"
+            className="flex size-7 items-center justify-center rounded-lg transition-opacity hover:opacity-90 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+            title="Plastifar · Ir a Bandeja"
+          >
+            <Logo variant="isotipo" height={22} />
+          </Link>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="Expandir la barra lateral"
+            title="Expandir barra lateral"
+            className="group flex size-7 items-center justify-center rounded-lg text-zinc-400 transition-colors duration-150 hover:bg-zinc-100 hover:text-zinc-800 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer motion-reduce:active:scale-100"
+          >
+            <SidebarToggleIcon collapsed={true} />
+          </button>
+        </div>
       </div>
 
-      {/* 2. Árbol de Navegación Principal */}
-      <nav
-        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${
-          collapsed ? "flex flex-col items-center gap-2 px-2" : "px-2 space-y-3"
-        }`}
-      >
-        {groups.map((group) =>
-          collapsed ? (
-            /* Modo Riel (Contraído) */
+      {/* 2. Árbol de Navegación Principal con transición suave y ágil */}
+      <nav className="relative flex-1 overflow-y-auto overflow-x-hidden">
+        {/* Modo Riel (Contraído) */}
+        <div
+          className={`flex flex-col items-center gap-2 p-2 transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
+            collapsed
+              ? "opacity-100 pointer-events-auto scale-100"
+              : "opacity-0 pointer-events-none scale-95 absolute inset-x-0 top-0"
+          }`}
+        >
+          {groups.map((group) => (
             <div key={group.label} className="relative">
               <Link
                 to={group.to ?? group.children![0].to}
@@ -435,8 +439,18 @@ export function Sidebar() {
                 )}
               </Link>
             </div>
-          ) : (
-            /* Modo Extendido (Expandido) */
+          ))}
+        </div>
+
+        {/* Modo Extendido (Expandido) */}
+        <div
+          className={`w-full space-y-3 p-2 transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
+            collapsed
+              ? "opacity-0 pointer-events-none -translate-x-3 absolute inset-x-0 top-0"
+              : "opacity-100 pointer-events-auto translate-x-0"
+          }`}
+        >
+          {groups.map((group) => (
             <div key={group.label} className="flex flex-col">
               {/* Cabecera interactiva colapsable estilo moderno y discreto */}
               <button
@@ -519,8 +533,8 @@ export function Sidebar() {
                 </div>
               </div>
             </div>
-          ),
-        )}
+          ))}
+        </div>
       </nav>
 
       {/* 3. Flyout en Modo Contraído */}
@@ -692,7 +706,7 @@ export function Sidebar() {
             </div>
           )}
 
-          {/* Gatillo del perfil */}
+          {/* Gatillo del perfil con transición ultra fluida */}
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
@@ -703,7 +717,7 @@ export function Sidebar() {
               menuOpen
                 ? "bg-zinc-100 text-zinc-900"
                 : "hover:bg-zinc-100/80 text-zinc-700"
-            } ${collapsed ? "justify-center p-2" : "gap-2.5 p-2"}`}
+            } ${collapsed ? "justify-center p-1.5" : "p-1.5"}`}
           >
             {/* Avatar circular con aro y presencia en línea */}
             <div className="relative flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-zinc-900 font-heading text-[11px] font-bold text-white shadow-xs">
@@ -714,23 +728,26 @@ export function Sidebar() {
               />
             </div>
 
-            {!collapsed && (
-              <>
-                <div className="min-w-0 flex-1 text-left">
-                  <span className="block truncate font-heading text-[12.5px] font-semibold leading-tight text-zinc-800">
-                    {displayName}
-                  </span>
-                  <span className="block truncate text-[11px] leading-tight text-zinc-400 mt-0.5 font-normal">
-                    {user?.isAdmin ? "Administrador" : "Staff"}
-                  </span>
-                </div>
-                <ChevronDown
-                  className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
-                    menuOpen ? "rotate-180 text-zinc-800" : "group-hover:text-zinc-600"
-                  }`}
-                />
-              </>
-            )}
+            {/* Contenedor del nombre y chevron con transición continua y rápida */}
+            <div
+              className={`flex min-w-0 flex-1 items-center justify-between transition-all duration-[200ms] ease-plf-glide motion-reduce:transition-none overflow-hidden ${
+                collapsed ? "max-w-0 opacity-0 pointer-events-none" : "max-w-[160px] opacity-100 pl-2.5"
+              }`}
+            >
+              <div className="min-w-0 flex-1 text-left">
+                <span className="block truncate font-heading text-[12.5px] font-semibold leading-tight text-zinc-800">
+                  {displayName}
+                </span>
+                <span className="block truncate text-[11px] leading-tight text-zinc-400 mt-0.5 font-normal">
+                  {user?.isAdmin ? "Administrador" : "Staff"}
+                </span>
+              </div>
+              <ChevronDown
+                className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+                  menuOpen ? "rotate-180 text-zinc-800" : "group-hover:text-zinc-600"
+                }`}
+              />
+            </div>
           </button>
         </div>
       </div>

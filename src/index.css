@@ -46,6 +46,8 @@
 
   /* Resorte de apertura (k=380, c=32): 84% del recorrido a mitad de tiempo, llegada con velocidad cero. */
   --ease-plf-spring: linear(0, 0.023 4.2%, 0.081 8.3%, 0.160 12.5%, 0.251 16.7%, 0.345 20.8%, 0.438 25%, 0.526 29.2%, 0.606 33.3%, 0.678 37.5%, 0.741 41.7%, 0.795 45.8%, 0.840 50%, 0.878 54.2%, 0.909 58.3%, 0.934 62.5%, 0.953 66.7%, 0.968 70.8%, 0.979 75%, 0.987 79.2%, 0.993 83.3%, 0.996 87.5%, 0.999 91.7%, 1.000 95.8%, 1);
+  /* Curva de planeo ágil y premium: arranque inmediato con aterrizaje suave y sin lag */
+  --ease-plf-glide: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html {
