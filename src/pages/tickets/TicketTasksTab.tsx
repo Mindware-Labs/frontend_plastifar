@@ -428,50 +428,52 @@ export function TicketTasksTab({
                   </div>
                 )}
 
-                {/* Barra de pie: Asignado, Creador y botón de comentarios */}
-                <div className="mt-3 ml-7.5 pt-2.5 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-2 text-[11.5px]">
-                  {/* Metadatos: Asignado y Creador */}
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-zinc-500">
-                    {/* Asignado */}
-                    <div className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200/80 bg-zinc-50/80 px-2 py-0.5 text-[11.5px]">
-                      <span className="text-[10.5px] font-medium text-zinc-400">Asignada a:</span>
-                      {task.assignedStaffName && task.assignedStaffId ? (
-                        <div className="inline-flex items-center gap-1.5 font-medium text-zinc-800">
-                          <Avatar name={task.assignedStaffName} seed={task.assignedStaffId} size={15} />
-                          <span className="truncate max-w-[150px]">{task.assignedStaffName}</span>
-                          {isAssignedToMe && (
-                            <span className="rounded bg-brand-red/10 px-1 py-0.2 font-heading text-[9px] font-bold text-brand-red">
-                              Tú
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="italic text-zinc-400">Sin asignar</span>
-                      )}
-                    </div>
-
-                    <span aria-hidden className="text-zinc-300">·</span>
-
-                    {/* Creador */}
-                    <div className="text-[11px] text-zinc-500">
-                      <span>Por </span>
-                      <strong className="font-semibold text-zinc-700">{task.createdByStaffName}</strong>
-                      <span className="text-zinc-400"> ({formatDateTime(task.createdAt)})</span>
-                    </div>
+                {/* Barra de pie: Asignado, Creador y botón de comentarios alineados simétricamente */}
+                <div className="mt-3 ml-7.5 pt-2.5 border-t border-zinc-100 flex flex-wrap items-center gap-2 text-[11.5px]">
+                  {/* Píldora 1: Asignada a */}
+                  <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-1 text-[11.5px] text-zinc-600 shadow-2xs">
+                    <span className="text-[10.5px] font-medium text-zinc-400">Asignada a:</span>
+                    {task.assignedStaffName && task.assignedStaffId ? (
+                      <div className="inline-flex items-center gap-1.5 font-medium text-zinc-800">
+                        <Avatar name={task.assignedStaffName} seed={task.assignedStaffId} size={15} />
+                        <span className="truncate max-w-[130px] sm:max-w-[170px]">{task.assignedStaffName}</span>
+                        {isAssignedToMe && (
+                          <span className="rounded bg-brand-red/10 px-1 py-0.2 font-heading text-[9px] font-bold text-brand-red">
+                            Tú
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="italic text-zinc-400">Sin asignar</span>
+                    )}
                   </div>
 
-                  {/* Toggle de Comentarios */}
+                  {/* Píldora 2: Creada por */}
+                  <div
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-1 text-[11.5px] text-zinc-600 shadow-2xs"
+                    title={`Creado el ${formatDateTime(task.createdAt)} por ${task.createdByStaffName}`}
+                  >
+                    <span className="text-[10.5px] font-medium text-zinc-400">Por:</span>
+                    <strong className="font-semibold text-zinc-700 truncate max-w-[130px] sm:max-w-[170px]">
+                      {task.createdByStaffName}
+                    </strong>
+                    <span className="text-zinc-400 font-normal">
+                      ({formatDateTime(task.createdAt).split(",")[0]})
+                    </span>
+                  </div>
+
+                  {/* Píldora 3: Toggle de Comentarios */}
                   <button
                     type="button"
                     onClick={() =>
                       setExpandedCommentsTaskId(isCommentsExpanded ? null : task.id)
                     }
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11.5px] font-medium transition-all cursor-pointer shadow-2xs select-none active:scale-95 ${
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11.5px] font-medium transition-all cursor-pointer shadow-2xs select-none active:scale-95 ${
                       isCommentsExpanded
                         ? "border-zinc-300 bg-zinc-100 text-zinc-900 font-semibold"
                         : task.comments.length > 0
                           ? "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                          : "border-zinc-200/80 bg-zinc-50/70 text-zinc-500 hover:border-zinc-300 hover:bg-white hover:text-zinc-800"
+                          : "border-zinc-200/80 bg-zinc-50/80 text-zinc-500 hover:border-zinc-300 hover:bg-white hover:text-zinc-800"
                     }`}
                   >
                     <MessageSquare className="size-3.5 text-zinc-400" />
@@ -482,11 +484,6 @@ export function TicketTasksTab({
                             task.comments.length === 1 ? "comentario" : "comentarios"
                           }`}
                     </span>
-                    {task.comments.length > 0 && (
-                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-zinc-200/80 px-1 text-[9.5px] font-bold text-zinc-700 tabular-nums">
-                        {task.comments.length}
-                      </span>
-                    )}
                     {isCommentsExpanded ? (
                       <ChevronUp className="size-3 text-zinc-400" />
                     ) : (
