@@ -7,6 +7,8 @@
 // endpoint, y esta capa existe para que la persona no descubra que no puede
 // hacer algo despues de haber llenado un formulario.
 
+import { ancestorsOf, descendantsOf } from "./departments";
+
 /** Convencion del catalogo: modulo.accion. */
 export type PermissionKey = string;
 
@@ -67,8 +69,19 @@ export function can(
   if (!holder) return false;
   if (holder.isAdmin) return true;
 
+  /*
+   * El alcance baja por el arbol: quien tiene rol en «VENTAS INTERNACIONALES»
+   * lo ejerce tambien sobre «VENTAS INTERNACIONALES / Florida». Por eso no se
+   * compara contra un solo id sino contra la cadena del departamento y todos
+   * los que lo contienen.
+   *
+   * Sin jerarquia registrada la cadena es un solo elemento, y esto se comporta
+   * exactamente como la comparacion por igualdad de antes.
+   */
+  const alcance = departmentId === undefined ? null : ancestorsOf(departmentId);
+
   return holder.departmentAccess.some((access) => {
-    if (departmentId !== undefined && access.deptId !== departmentId) {
+    if (alcance !== null && !alcance.includes(access.deptId)) {
       // La lectura ampliada de tickets alcanza departamentos donde no hay rol.
       return permission === WIDENED_BY_READ_ALL && grants(access, READ_ALL);
     }
@@ -88,9 +101,17 @@ export function departmentsWith(
 ): number[] {
   if (!holder) return [];
 
-  return holder.departmentAccess
-    .filter((access) => grants(access, permission))
-    .map((access) => access.deptId);
+  /* Cada acceso arrastra su descendencia: quien tiene el rol en «VENTAS
+     INTERNACIONALES» lo ejerce tambien en Florida y en Cuba, asi que el filtro
+     que se arme con esta lista tiene que incluirlas. Sin jerarquia registrada,
+     `descendantsOf` devuelve un solo id y esto no cambia nada. */
+  const alcance = new Set<number>();
+  for (const access of holder.departmentAccess) {
+    if (!grants(access, permission)) continue;
+    for (const id of descendantsOf(access.deptId)) alcance.add(id);
+  }
+
+  return [...alcance];
 }
 
 /**

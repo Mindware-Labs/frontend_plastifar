@@ -166,3 +166,83 @@ export function departmentWithDescendants(
 
   return salida;
 }
+
+/* ==================================================================
+   LA FORMA DEL ORGANIGRAMA, PARA QUIEN DECIDE PERMISOS
+   ==================================================================
+   `can()` compara departamentos y necesita saber cuál cuelga de cuál. No puede
+   pedir la lista en cada llamada —se la pregunta cientos de veces por render—
+   ni recibirla por parámetro sin obligar a tocar cada sitio que la consulta.
+
+   Así que la jerarquía se registra una vez, y quien la registra es el propio
+   cliente de la API al traerla: no hay forma de olvidarse de hacerlo, que es lo
+   que haría que los permisos fueran correctos en unas pantallas y no en otras.
+
+   MIENTRAS NO HAYA NADA REGISTRADO, `ancestorsOf` devuelve sólo el
+   departamento que le pidieron. Es exactamente el comportamiento de hoy, y es
+   el lado correcto donde equivocarse: un permiso que no se concede esconde un
+   botón; uno que se concede de más abre una puerta. */
+
+let padres = new Map<number, number>();
+
+/** Registra la forma del árbol. Idempotente: la última lista manda. */
+export function setDepartmentHierarchy(departments: DepartmentLike[]): void {
+  const siguiente = new Map<number, number>();
+  for (const d of departments) {
+    if (d.parentId != null && d.parentId !== d.id) siguiente.set(d.id, d.parentId);
+  }
+  padres = siguiente;
+}
+
+/**
+ * El departamento pedido y todos los que lo contienen, de dentro hacia fuera.
+ *
+ * Es lo que convierte «tengo rol en VENTAS INTERNACIONALES» en «puedo sobre un
+ * ticket de Florida»: se comprueba si alguno de los ancestros del ticket está
+ * entre los accesos de la persona.
+ */
+export function ancestorsOf(departmentId: number): number[] {
+  const cadena = [departmentId];
+  const vistos = new Set([departmentId]);
+
+  let actual = padres.get(departmentId);
+  // El tope corta un ciclo que se hubiera colado en los datos.
+  while (actual != null && !vistos.has(actual) && cadena.length <= MAX_DEPTH) {
+    cadena.push(actual);
+    vistos.add(actual);
+    actual = padres.get(actual);
+  }
+
+  return cadena;
+}
+
+/**
+ * El departamento pedido y todo lo que cuelga de él, según lo registrado.
+ *
+ * Es la vuelta de `ancestorsOf`, y hace falta para la pregunta inversa: no
+ * «¿puedo sobre este ticket?» sino «¿sobre qué departamentos puedo?», que es lo
+ * que acota un listado o llena un selector. Sin esto, un gerente regional vería
+ * su propio departamento en el filtro pero ninguna de sus zonas.
+ */
+export function descendantsOf(departmentId: number): number[] {
+  const hijosDe = new Map<number, number[]>();
+  for (const [hijo, padre] of padres) {
+    const grupo = hijosDe.get(padre);
+    if (grupo) grupo.push(hijo);
+    else hijosDe.set(padre, [hijo]);
+  }
+
+  const salida: number[] = [];
+  const pendientes = [departmentId];
+  const vistos = new Set<number>();
+
+  while (pendientes.length > 0) {
+    const actual = pendientes.pop() as number;
+    if (vistos.has(actual)) continue;
+    vistos.add(actual);
+    salida.push(actual);
+    pendientes.push(...(hijosDe.get(actual) ?? []));
+  }
+
+  return salida;
+}
