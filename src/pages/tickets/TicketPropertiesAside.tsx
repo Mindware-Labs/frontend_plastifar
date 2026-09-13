@@ -306,6 +306,14 @@ export function TicketPropertiesAside({
               </PropertyRow>
             )}
 
+            {ticket.verdictName && (
+              <PropertyRow label="Veredicto">
+                <span className="font-semibold text-emerald-800 whitespace-nowrap truncate block" title={ticket.verdictName}>
+                  {ticket.verdictName}
+                </span>
+              </PropertyRow>
+            )}
+
             {ticket.closedAt && (
               <PropertyRow label="Cerrado">
                 <span className="tabular-nums text-zinc-800 whitespace-nowrap">{formatDateTime(ticket.closedAt)}</span>

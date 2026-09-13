@@ -1,4 +1,4 @@
-import { Check, Pause, Slash } from "lucide-react";
+import { Check, Lock, Pause, Slash } from "lucide-react";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import type { formatSlaRemaining } from "../../lib/format";
@@ -38,18 +38,22 @@ export function StatusCell({ status }: { status: string }) {
 
   if (norm === "solucionado" || norm === "solucionada") {
     return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-emerald-700">
-        <Check aria-hidden className="h-3 w-3 text-emerald-600" strokeWidth={2.5} />
+      <Badge tone="green" className="gap-1.5 px-2 py-0.5 font-heading text-[11px] font-semibold text-emerald-800 shadow-2xs">
+        <Check aria-hidden className="size-3 text-emerald-600" strokeWidth={2.5} />
         Solucionado
-      </span>
+      </Badge>
     );
   }
   if (norm === "cancelado" || norm === "cerrado") {
     return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-zinc-400">
-        <Slash aria-hidden className="h-3 w-3 text-zinc-300" />
+      <Badge tone="neutral" className="gap-1.5 px-2 py-0.5 font-heading text-[11px] font-medium text-zinc-600 shadow-2xs">
+        {norm === "cerrado" ? (
+          <Lock aria-hidden className="size-3 text-zinc-400" strokeWidth={2} />
+        ) : (
+          <Slash aria-hidden className="size-3 text-zinc-400" strokeWidth={2} />
+        )}
         {norm === "cerrado" ? "Cerrado" : "Cancelado"}
-      </span>
+      </Badge>
     );
   }
 
@@ -70,10 +74,10 @@ export function SlaCell({ sla }: { sla: Sla }) {
       return <Badge tone="amber">{sla.text}</Badge>;
     case "completed":
       return (
-        <span className="inline-flex items-center gap-1 whitespace-nowrap text-[12px] font-medium text-emerald-700">
-          <Check aria-hidden className="h-3 w-3" strokeWidth={2.5} />
+        <Badge tone="completed" className="gap-1.5 px-2 py-0.5 font-heading text-[11px] font-semibold text-emerald-800 shadow-2xs">
+          <Check aria-hidden className="size-3 text-emerald-600" strokeWidth={2.5} />
           {sla.text}
-        </span>
+        </Badge>
       );
     case "paused":
       if (sla.text === "Cancelado") {

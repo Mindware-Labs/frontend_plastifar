@@ -775,7 +775,11 @@ export function TicketDetailPage() {
 
   const sla = formatSlaRemaining(ticket.resolutionDueAt, Boolean(ticket.pausedAt), ticket.status, ticket.closedAt);
   const availableTransitions = getAvailableTransitions(ticket.status);
-  const isClosed = ticket.status === "Cancelado" || ticket.status === "Cerrado";
+  const normStatus = ticket.status.toLowerCase().trim();
+  const isSolucionado = normStatus === "solucionado" || normStatus === "solucionada";
+  const isCancelado = normStatus === "cancelado";
+  const isCerrado = normStatus === "cerrado";
+  const isClosed = isCancelado || isCerrado;
   const editRequiresProductLine = Boolean(editCatalogs?.topics.find((t) => t.id === editTopicId)?.requiresProductLine);
 
   const byDate = (a: { createdAt: string }, b: { createdAt: string }) =>
@@ -836,6 +840,15 @@ export function TicketDetailPage() {
             </span>
             <span aria-hidden className="h-4 w-px bg-line" />
             <StatusCell status={ticket.status} />
+            {isSolucionado && ticket.verdictName && (
+              <span
+                className="inline-flex h-5 items-center gap-1 rounded-md border border-emerald-200/80 bg-white px-2 font-heading text-[10.5px] font-bold text-emerald-800 shadow-2xs"
+                title={`Veredicto de resolución: ${ticket.verdictName}`}
+              >
+                <Gavel className="size-3 text-emerald-600" strokeWidth={2} />
+                <span className="max-w-[150px] truncate">{ticket.verdictName}</span>
+              </span>
+            )}
             <PriorityCell priority={ticket.priority} />
             <SlaCell sla={sla} />
           </div>
@@ -850,14 +863,27 @@ export function TicketDetailPage() {
               <Button
                 type="button"
                 size="sm"
+                variant={isSolucionado ? "secondary" : "primary"}
                 onClick={handleOpenUpdateStatusModal}
                 className="group font-heading font-semibold tracking-[-0.01em] shadow-xs hover:shadow-sm transition-all active:scale-[0.98]"
               >
-                <Workflow className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-110" />
-                Actualizar ticket
+                {isSolucionado ? (
+                  <>
+                    <RotateCcw className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-rotate-45" />
+                    Reabrir Ticket
+                  </>
+                ) : (
+                  <>
+                    <Workflow className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-110" />
+                    Actualizar ticket
+                  </>
+                )}
               </Button>
             ) : (
-              <span className="text-[12px] text-subtle">Cierre definitivo</span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-1 text-[11.5px] font-semibold text-zinc-600 shadow-2xs">
+                <Lock className="size-3 text-zinc-400" strokeWidth={2.25} />
+                <span>Cierre definitivo</span>
+              </span>
             )}
           </div>
         </div>
