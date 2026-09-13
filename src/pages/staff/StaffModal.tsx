@@ -9,7 +9,9 @@ import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../context/useAuth";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { DepartmentResponse, StaffResponse } from "../../types/api";
+import { departmentOptions } from "../../lib/departments";
 
 const schema = z.object({
   firstName: z
@@ -43,6 +45,7 @@ interface StaffModalProps {
 export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalProps) {
   const { user } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
+  const { isExiting, requestClose } = useModalAnimation(onClose);
   const isEdit = staff !== undefined;
   const isSelf = isEdit && staff.id === user?.staffId;
 
@@ -90,7 +93,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           });
 
       onSaved(saved);
-      onClose();
+      requestClose();
     } catch (err) {
       // El correo duplicado es un error de un campo concreto: se marca ahi,
       // no en un aviso general que obliga a adivinar cual es.
@@ -100,24 +103,25 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
         return;
       }
 
-      const fallback = isEdit ? "No se pudo guardar el usuario" : "No se pudo crear el usuario";
+      const fallback = isEdit ? "No se pudo guardar el colaborador" : "No se pudo crear el colaborador";
       setFormError(err instanceof ApiError ? err.message : fallback);
     }
   }
 
   return (
     <Modal
-      eyebrow="Personal"
-      title={isEdit ? "Editar colaborador" : "Agregar personal"}
+      title={isEdit ? "Editar colaborador" : "Nuevo colaborador"}
       description={
         isEdit
           ? "Los cambios se aplican de inmediato. La contraseña no se toca."
           : "El alta es interna: no existe registro público en el sistema."
       }
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={requestClose}>
             Cancelar
           </Button>
           <Button type="submit" form="staff-form" isLoading={isSubmitting}>
@@ -179,10 +183,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
               onChange={field.onChange}
               onBlur={field.onBlur}
               placeholder="Selecciona un departamento"
-              options={departments.map((dept) => ({
-                value: String(dept.id),
-                label: dept.name,
-              }))}
+              options={departmentOptions(departments)}
               state={stateOf("primaryDepartmentId")}
               error={errors.primaryDepartmentId?.message}
             />
@@ -214,7 +215,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           </Alert>
         ) : (
           !isEdit && (
-            <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
+            <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-subtle">
               Se genera una contraseña aleatoria y se envía un código de activación de 6 dígitos al
               correo indicado. La persona define su propia contraseña desde “Olvidé mi contraseña”.
             </p>

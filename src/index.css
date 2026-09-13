@@ -1,12 +1,11 @@
 @import "tailwindcss";
 
-@import "@fontsource/montserrat/500.css";
-@import "@fontsource/montserrat/600.css";
-@import "@fontsource/montserrat/700.css";
-@import "@fontsource/poppins/300.css";
-@import "@fontsource/poppins/400.css";
-@import "@fontsource/poppins/500.css";
-@import "@fontsource/poppins/600.css";
+@import "@fontsource-variable/onest";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
 
 @theme {
   /* Plastifar Brandbook 2026 — Pantone 185 C / 348 C / 369 C / Cool Gray 11 C */
@@ -18,28 +17,117 @@
   --color-brand-gray: #515151;
 
   /* Neutros de interfaz (no institucionales: soporte de pantalla) */
-  --color-ink: #1b1b1d;
-  --color-canvas: #f5f5f6;
-  --color-line: #e7e7ea;
-  --color-line-soft: #f0f0f2;
-  --color-line-strong: #dcdce0;
-  --color-muted: #8a8a90;
-  --color-faint: #9a9aa0;
+  --color-ink: #23232b;
+  --color-canvas: #f3f5f7;
+  --color-line: #eaeaef;
+  --color-line-soft: #f3f3f7;
+  --color-line-strong: #e3e3e9;
+  /* Los dos grises de texto secundario cumplen 4.5:1 sobre blanco: 5.9:1 el
+     apagado y 4.8:1 el tenue. Se llama "subtle" y no "muted" porque shadcn ya
+     usa --color-muted para superficies claras (fondo de pastillas/avatares),
+     un concepto distinto a este gris de texto. */
+  --color-subtle: #63636d;
+  /* 4.8:1 contra BLANCO, que es contra lo que se valido... y el panel dejo de
+     tener fondo blanco. Sobre el lienzo tintado (#f3f5f7) caia a 4.42:1 y sobre
+     `fill` a 4.28: por debajo del piso de 4.5 que este mismo sistema declara, y
+     justo en el token que visten TODAS las versalitas y cabeceras de columna.
+     Medido en pantalla, no estimado. #6d6d76 pasa en las tres superficies
+     (blanco 5.12, lienzo 4.69, fill 4.54). */
+  --color-faint: #6d6d76;
   --color-fill: #f1f1f3;
   /* Ambar de apoyo: solo estados intermedios en pantalla (fuerza media,
-     prioridad alta). No es un color institucional. */
-  --color-warn: #c2760a;
+     prioridad alta). No es un color institucional. 5.4:1 sobre blanco. */
+  --color-warn: #9a5c04;
 
-  /* Radio unico de los controles: casi recto, coherente con el trazo
-     industrial del logotipo. Un solo lugar donde ajustarlo. */
-  --radius-edge: 2px;
+  /* ------------------------------------------------------------------
+     FORMA
+     ------------------------------------------------------------------
+     Referencia: Center Quest (`public/image.png`). Radio generoso y
+     consistente en tres pasos; nada cuadrado.
 
-  --font-heading: "Montserrat", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "Poppins", ui-sans-serif, system-ui, sans-serif;
+     `--radius-edge` era 2 px —el trazo industrial del logotipo— y lo usan 236
+     sitios del codigo. Cambiar ESTE valor redondea toda la aplicacion de una
+     vez, sin tocar una sola pantalla: por eso el token existia en un solo
+     lugar. El Brandbook 2026 dejo de ser vinculante el 12/09/2026 (ver
+     PRODUCT.md), que es lo que habilita el cambio. */
+  --radius-edge: 10px;
+  /* La superficie que flota sobre el lienzo. */
+  --radius-card: 16px;
+  /* La segunda superficie dentro de una tarjeta. */
+  --radius-inset: 12px;
+  /* Lo conceptualmente redondo: avatares, punto de estado, contadores y chips. */
+  --radius-pill: 9999px;
+
+  /* Filete de un control al pasar el mouse. Estaba escrito a mano como
+     `zinc-400` en cada campo: nombrarlo evita que el literal siga creciendo. */
+  --color-hairline-hover: #a1a1aa;
+
+  /* ------------------------------------------------------------------
+     ELEVACION
+     ------------------------------------------------------------------
+     `--shadow-card` es nueva y rompe a proposito la regla anterior de que
+     nada que scrollee lleva sombra. Esa regla era correcta MIENTRAS el fondo
+     era blanco: sobre blanco una sombra no separa nada, solo ensucia. Sobre el
+     lienzo tintado si separa, y es lo que hace flotar la tarjeta.
+
+     Lleva desplazamiento y desenfoque suave —eso la distingue de un halo
+     decorativo— y alfa muy baja: lo que despega la tarjeta es el contraste con
+     el lienzo, no la sombra. */
+  --shadow-card:
+    0 1px 2px rgba(35, 35, 43, 0.03),
+    0 10px 32px -16px rgba(35, 35, 43, 0.12);
+  --shadow-bloom: 0 10px 24px -14px rgba(228, 0, 43, 0.38);
+  --shadow-panel: 0 4px 10px rgba(35, 35, 43, 0.03), 0 28px 56px -24px rgba(35, 35, 43, 0.22);
+  --shadow-dialog: 0 4px 12px rgba(35, 35, 43, 0.05), 0 36px 72px -30px rgba(35, 35, 43, 0.34);
+
+  /* ------------------------------------------------------------------
+     TIPOGRAFIA
+     ------------------------------------------------------------------
+     Una sola familia de trabajo. Montserrat pesaba de mas en titulos chicos y
+     Poppins es una geometrica de bocas muy redondas: simpatica en una marca,
+     floja en una tabla de datos. Geist es una grotesca neutra con cifras
+     tabulares solidas y versalitas que aguantan tracking abierto, que es lo
+     que pide un panel de operacion.
+
+     Los titulos llevan Onest: una humanista de formas abiertas y terminales
+     suaves, dibujada justamente para legibilidad amable.
+
+     Antes estaba Bricolage Grotesque y fue un error mio. Una regla de
+     tipografia lo explica: se empareja por CONTRASTE, no por parecido — dos
+     sans casi iguales se leen como un descuido, no como una decision.
+     Bricolage caia en el peor punto: era sans como el cuerpo, asi que el par
+     no se leia deliberado, y encima tiene formas irregulares a proposito, que
+     en una pantalla de trabajo se leen como aspereza.
+
+     Onest contrasta con Geist por TEMPERATURA —mas redonda, mas abierta, mayor
+     altura de x— en vez de por rareza. Es la diferencia entre suave y rustico.
+
+     Montserrat y Poppins salieron del bundle: nada las consumia ya, y eran dos
+     tercios de la deriva de cuatro familias anotada en PRODUCT.md.
+
+     Los DOS tokens se conservan con su nombre: 141 sitios del codigo usan
+     `font-heading` y `font-body`. Repuntarlos aca cambia toda la aplicacion sin
+     editar una sola pantalla. */
+  --font-heading: "Onest Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+/* Relleno de la pagina, en un solo sitio. AppLayout lo aplica y el Dashboard lo
+   cancela con margenes negativos para que su tinte llegue a los bordes: mientras
+   fueron dos numeros escritos a mano en dos archivos, cambiar el del marco
+   rompia el tinte del Dashboard en silencio. */
+:root {
+  --plf-page-x: 2rem;
+  --plf-page-t: 1rem;
+  --plf-page-b: 3rem;
+
+  /* Los controles que pinta el navegador (casillas, radios, barras de progreso)
+     tomaban el azul del sistema: aqui el acento es el rojo 185 C. */
+  accent-color: var(--color-brand-red);
 }
 
 body {
@@ -52,6 +140,19 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
+}
+
+/* El cursor de texto es parte del foco: rojo en todo campo, no solo en los dos
+   del area de acceso donde estaba puesto a mano. */
+input,
+textarea {
+  caret-color: var(--color-brand-red);
+}
+
+/* Separacion del subrayado: estaba aplicada instancia por instancia en dos
+   archivos, aqui vale para todo enlace. */
+a {
+  text-underline-offset: 4px;
 }
 
 ::selection {
@@ -68,6 +169,58 @@ input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
   caret-color: var(--color-ink);
   transition: background-color 9999s ease-out 0s;
+}
+
+/* ------------------------------------------------------------------
+   LO QUE SE PUEDE PULSAR LO DICE EL PUNTERO
+   ------------------------------------------------------------------
+   Tailwind v3 aplicaba `cursor: pointer` a todo `button` desde su Preflight.
+   La v4 lo quito para alinearse con el comportamiento nativo del navegador, y
+   como ningun primitivo de la casa lo declaraba, el panel entero se quedo sin
+   el. Medido sobre once rutas: 69 controles pulsables con el cursor de una
+   flecha normal —incluidos «Nuevo ticket», «Nueva HCA», «Nueva solicitud» y
+   «Generar reporte»—.
+
+   No es un detalle estetico. El puntero es la promesa mas barata que hace una
+   interfaz: dice «esto responde» antes de que nadie se arriesgue a hacer clic.
+   Sin el, cada boton primario del sistema parecia una etiqueta pintada.
+
+   Se arregla en un sitio y no en sesenta y nueve, porque el fallo es uno solo.
+   Lo deshabilitado va aparte: un puntero de «prohibido» dice que existe pero
+   ahora no, que es informacion distinta de no decir nada. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="option"],
+  [role="menuitem"],
+  [role="menuitemradio"],
+  [role="tab"],
+  summary,
+  label[for],
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"],
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* El buscador del tablero apaga el `outline` del input —el borde lo dibuja la
+   caja de fuera, no el campo— y se quedaba sin ninguna señal de foco: quien
+   navega con teclado llegaba al buscador y no veía dónde estaba. El anillo lo
+   pinta el contenedor cuando el foco entra en cualquier parte de él, que es
+   donde de verdad se ve la caja. */
+.cx-search:focus-within {
+  border-color: color-mix(in srgb, var(--color-brand-red) 45%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand-red) 12%, transparent);
 }
 
 /* --- Movimiento --- */
@@ -92,14 +245,98 @@ input:-webkit-autofill:focus {
   to { opacity: 1; }
 }
 
+/* El velo no solo se opaca: el desenfoque del fondo CRECE con el.
+   Encendido de golpe, el fondo salta de nitido a borroso en un fotograma y esa
+   sacudida es lo que delata que hay dos capas pegadas en vez de una escena con
+   profundidad. Llevandolo de 0 a su valor, el fondo se aparta y el panel ocupa
+   el primer plano, que es lo que de verdad esta pasando.
+
+   Se anima `backdrop-filter` sobre una region acotada y de vida corta, no en
+   bucle: el coste esta pagado. */
 @keyframes plf-scrim-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(2px);
+  }
+}
+
+@keyframes plf-scrim-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 @keyframes plf-modal-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.985); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plf-modal-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+
+/* ------------------------------------------------------------------
+   EL PANEL LATERAL NACE FUERA DE LA PANTALLA
+   ------------------------------------------------------------------
+   Habia DOS `plf-drawer-in` en este archivo, y en CSS gana el ultimo: el que
+   de verdad corria movia el panel 24 px. Un panel de 460 px que aparece con un
+   empujoncito de 24 no se lee como algo que llega, se lee como algo que
+   parpadea — y era la causa de que los drawers se sintieran baratos.
+
+   Ahora es uno solo y entra desde su propio borde, que es de donde viene: los
+   botones que lo abren viven arriba a la derecha. La opacidad arranca en 0.6 y
+   no en 0 a proposito; un panel opaco deslizandose se lee como un objeto que
+   entra, mientras que uno que nace transparente se lee como un fantasma que se
+   materializa encima del contenido.
+
+   88 px, no el ancho entero. Recorrer los 460 px completos suena a lo correcto
+   y es peor por dos razones. La primera es de lectura: un panel que cruza toda
+   su anchura tarda en llegar y se siente pesado; el ojo entiende «viene del
+   borde» con una fraccion del recorrido. La segunda es de robustez, y esta se
+   midio: mientras una animacion esta viva pero su primer fotograma no llega a
+   pintarse, el elemento se queda EN ese fotograma. Con el ancho entero, ese
+   fotograma esta fuera de la pantalla y el panel no existe para quien lo abrio.
+   Con 88 px, el peor caso es un panel ligeramente descolocado — se pierde el
+   movimiento, nunca el contenido.
+
+   340 ms de entrada contra 220 de salida: se va mas rapido de lo que llega,
+   porque al cerrar ya no hay nada que explicar. */
+@keyframes plf-drawer-in {
+  from {
+    opacity: 0.6;
+    transform: translateX(88px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes plf-drawer-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(88px);
+  }
 }
 
 @keyframes plf-shake {
@@ -115,9 +352,106 @@ input:-webkit-autofill:focus {
   to { opacity: 1; transform: none; }
 }
 
+@keyframes plf-selection-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plf-selection-bar-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+}
+
+@keyframes plf-tabs-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plf-tabs-fade-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+}
+
+@keyframes plf-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plf-popover-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+/* El recibo se va mas rapido de lo que llega: el aviso pesa al aparecer, no al irse. */
+@keyframes plf-receipt-out {
+  to { opacity: 0; transform: translateY(6px); }
+}
+
 @keyframes plf-toast-progress {
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
+}
+
+/* Spinner cinético Plastifar: rotación continua con arco elástico y pulso suave del núcleo */
+@keyframes plf-spinner-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes plf-spinner-dash {
+  0% {
+    stroke-dasharray: 1 120;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 85 120;
+    stroke-dashoffset: -28;
+  }
+  100% {
+    stroke-dasharray: 1 120;
+    stroke-dashoffset: -116;
+  }
+}
+
+@keyframes plf-spinner-pulse {
+  0%, 100% { transform: scale(0.96); opacity: 0.9; }
+  50% { transform: scale(1.04); opacity: 1; }
 }
 
 .animate-plf-float { animation: plf-float 16s ease-in-out infinite; }
@@ -125,10 +459,116 @@ input:-webkit-autofill:focus {
 .animate-plf-rise { animation: plf-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-fade { animation: plf-fade 1.1s ease-out both; }
 .animate-plf-toast-in { animation: plf-toast-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-plf-scrim-in { animation: plf-scrim-in 0.18s ease-out both; }
-.animate-plf-modal-in { animation: plf-modal-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-selection-in { animation: plf-selection-bar-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-selection-out { animation: plf-selection-bar-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
+.animate-plf-tabs-in { animation: plf-tabs-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-tabs-out { animation: plf-tabs-fade-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
+.animate-plf-popover-in { animation: plf-popover-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-popover-out { animation: plf-popover-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
+.animate-plf-scrim-in { animation: plf-scrim-in 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-plf-scrim-out { animation: plf-scrim-out 0.18s cubic-bezier(0.2, 0, 0, 1) forwards; }
+.animate-plf-modal-in { animation: plf-modal-in 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-plf-modal-out { animation: plf-modal-out 0.18s cubic-bezier(0.2, 0, 0, 1) forwards; }
+/* ------------------------------------------------------------------
+   SIN `both` EN LAS ENTRADAS: EL REPOSO ES LO VISIBLE
+   ------------------------------------------------------------------
+   `both` aplica el fotograma inicial ANTES de que la animacion arranque, y
+   desde que la entrada del panel empieza fuera de pantalla, ese fotograma
+   inicial es «invisible». Si la animacion no llega a correr —una pestaña que
+   no pinta, un navegador que ignora la regla— el panel se queda en
+   translateX(100%) para siempre y la aplicacion parece rota. Comprobado en el
+   navegador de pruebas: a los 900 ms el panel seguia 460 px fuera del borde.
+
+   Sin `fill-mode`, el elemento reposa en su posicion natural —dentro, opaco— y
+   la animacion solo lo trae. Si no corre, se ve igual; simplemente no se
+   desliza. Esa es la degradacion correcta: se pierde el movimiento, nunca el
+   contenido.
+
+   La SALIDA si lleva `forwards`, y por el mismo motivo al reves: tiene que
+   quedarse fuera al terminar, y el nodo se desmonta justo despues. */
+.animate-plf-drawer-in { animation: plf-drawer-in 0.34s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-plf-drawer-out { animation: plf-drawer-out 0.22s cubic-bezier(0.3, 0, 0.8, 0.15) forwards; }
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
+.animate-plf-receipt-out { animation: plf-receipt-out 0.16s ease-in both; }
+.animate-plf-spinner-rotate { animation: plf-spinner-rotate 1.4s linear infinite; }
+.animate-plf-spinner-dash { animation: plf-spinner-dash 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.animate-plf-spinner-pulse { animation: plf-spinner-pulse 2s ease-in-out infinite; }
+
+/* ------------------------------------------------------------------
+   LOS RESULTADOS LLEGAN, NO APARECEN
+   ------------------------------------------------------------------
+   El paso de esqueleto a tabla era un corte seco: la misma superficie cambiaba
+   de contenido en un fotograma y el ojo lo lee como un parpadeo, no como una
+   respuesta. Esto es UN gesto sobre el bloque entero —200 ms, 3 px— y no un
+   escalonado fila a fila: diez filas entrando de una en una convierten una
+   respuesta de la que ya se dispone en una espera, que es justo lo que un panel
+   de trabajo no puede permitirse.
+
+   SOLO opacidad, sin desplazamiento, y por dos razones que apuntan al mismo
+   sitio. La primera la dice el propio gesto: no hay que explicar de donde
+   vienen las filas —vienen exactamente de donde estaba el esqueleto—, asi que
+   moverlas seria inventar un origen que no existe.
+
+   La segunda se midio. El elemento animado es hijo directo del contenedor con
+   scroll horizontal, y un `transform` ahi crea un contexto de bloque nuevo: el
+   contenedor perdia 11 px de ancho util y la tabla, que medía 1081, dejaba de
+   caber en 1074. Tres pixeles de adorno encendian una barra de scroll. */
+@keyframes plf-results-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.plf-results-in {
+  animation: plf-results-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ------------------------------------------------------------------
+   LA BARRA SE LLENA DE IZQUIERDA A DERECHA
+   ------------------------------------------------------------------
+   Por mascara y no por `width`. Animar el ancho obliga al navegador a
+   recalcular la caja en cada fotograma, y ademas romperia el apilado: cada
+   tramo de una barra apilada mide un porcentaje del total, asi que crecer uno
+   empuja a los demas. `clip-path` recorta la barra ya compuesta, de modo que
+   los tres tramos guardan su proporcion durante todo el recorrido y lo unico
+   que avanza es hasta donde se ve.
+
+   Va con la cifra: el numero cuenta mientras la barra se llena, y los dos
+   terminan a la vez. */
+@keyframes plf-bar-fill {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+.plf-bar-fill {
+  animation: plf-bar-fill 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Entrada escalonada de las bandas del Dashboard.
+
+   UN solo momento animado y sobre TRES bloques, no sobre cada tarjeta: doce
+   fichas entrando de a una es un desfile, y el tablero se mira para trabajar,
+   no para verlo aparecer. El escalon es corto a proposito —90 ms— porque la
+   pantalla ya esta cargada cuando entra: esto ordena la lectura, no la retrasa.
+   El apagado bajo `prefers-reduced-motion` lo da la regla general de arriba mas
+   la lista de abajo. */
+.plf-stagger > * { animation: plf-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.plf-stagger > *:nth-child(2) { animation-delay: 90ms; }
+.plf-stagger > *:nth-child(3) { animation-delay: 180ms; }
+
+/* Regla general: alcanza tambien a lo que no nombramos aqui — el `animate-spin`
+   de Tailwind en los botones que cargan, y cualquier transicion o transform de
+   utilidad. Sin esto solo se apagaban los fotogramas propios. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .animate-plf-float,
@@ -136,10 +576,287 @@ input:-webkit-autofill:focus {
   .animate-plf-rise,
   .animate-plf-fade,
   .animate-plf-toast-in,
+  .animate-plf-selection-in,
+  .animate-plf-tabs-in,
+  .animate-plf-popover-in,
   .animate-plf-scrim-in,
   .animate-plf-modal-in,
+  .animate-plf-drawer-in,
   .animate-plf-shake,
+  .plf-bar-fill,
+  .plf-results-in,
+  .plf-stagger > * {
+    animation: none !important;
+  }
+
+  /* La barra de progreso del toast no se congela: congelada se queda en
+     scaleX(1), o sea en "100 % de tiempo restante", y el aviso desaparece
+     igual unos segundos despues. Un indicador que miente es peor que ninguno.
+     Por eso va aparte de `shake`: aqui `display:none` es lo correcto, y sobre
+     el elemento que tiembla lo dejaria invisible. */
   .animate-plf-toast-progress {
     animation: none !important;
+    display: none;
+  }
+
+  /* La salida se acorta en vez de anularse: con animation:none nunca llega animationend
+     y el elemento se quedaria pegado en pantalla. */
+  .animate-plf-selection-out,
+  .animate-plf-tabs-out,
+  .animate-plf-popover-out,
+  .animate-plf-receipt-out,
+  .animate-plf-scrim-out,
+  .animate-plf-modal-out,
+  .animate-plf-drawer-out {
+    animation-duration: 1ms !important;
+  }
+}
+
+/* Filete del recibo fallido: textura en vez de color, legible en escala de grises. */
+.plf-rule-broken {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-subtle) 0 2px,
+    transparent 2px 5px
+  );
+}
+
+/* Sin movimiento, un filete lleno y quieto diria que el tiempo no corre: manda la cifra. */
+@media (prefers-reduced-motion: reduce) {
+  .plf-clock {
+    display: none !important;
+  }
+}
+
+@theme inline {
+  /* --font-heading no se toca aqui: Plastifar usa Montserrat para titulos en
+     toda la app, shadcn/Geist queda solo para sus propios componentes. */
+  --font-sans: 'Geist Variable', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  /* La escala de shadcn se aplana sobre --radius-edge: un solo canto en toda la app. */
+  --radius-sm: var(--radius-edge);
+  --radius-md: var(--radius-edge);
+  --radius-lg: var(--radius-edge);
+  --radius-xl: var(--radius-edge);
+  --radius-2xl: var(--radius-edge);
+  --radius-3xl: var(--radius-edge);
+  --radius-4xl: var(--radius-edge);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: var(--radius-edge);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  /* El `body { bg-background text-foreground }` que trae shadcn no se aplica:
+     pintaba el panel de blanco y el texto de casi negro, encima del lienzo y el
+     gris institucional que ya define la regla `body` de arriba. */
+  html {
+    @apply font-sans;
+  }
+}
+
+/* El panel tiene cinco contenedores con scroll permanente. Sin esto el
+   navegador dibuja su propia barra gris de sistema encima de una interfaz de
+   filetes de 1 px, y se ve como una pieza de otro programa. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-line-strong);
+  border-radius: var(--radius-pill);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-faint);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Esqueletos de carga                                                */
+/*                                                                     */
+/*  El brillo es un barrido, no un latido: un `opacity` que sube y     */
+/*  baja parpadea y cansa, mientras que un reflejo que cruza sugiere   */
+/*  movimiento hacia adelante. Va sobre `background-position`, que el  */
+/*  compositor resuelve sin recalcular layout.                         */
+/* ------------------------------------------------------------------ */
+
+.plf-skeleton {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-fill) 0%,
+    var(--color-line-soft) 40%,
+    #ffffff 50%,
+    var(--color-line-soft) 60%,
+    var(--color-fill) 100%
+  );
+  background-size: 320% 100%;
+  animation: plf-shimmer 1.25s ease-in-out infinite;
+}
+
+@keyframes plf-shimmer {
+  from { background-position: 140% 0; }
+  to { background-position: -40% 0; }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Entrada de las bandas del tablero                                  */
+/*                                                                     */
+/*  Arranca desde un estado YA VISIBLE (opacidad 0.001 dura un solo    */
+/*  cuadro) para que una animacion que no corre deje contenido legible */
+/*  y no una pagina en blanco.                                         */
+/*                                                                     */
+/*  El escalonado se corta a la quinta banda: pasada esa, el retardo   */
+/*  deja de leerse como secuencia y empieza a leerse como lentitud.    */
+/*  Es una superficie de operacion — el movimiento acompania la carga, */
+/*  nunca la hace esperar.                                             */
+/* ------------------------------------------------------------------ */
+
+@keyframes plf-band-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.plf-band {
+  animation: plf-band-in 340ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.plf-band:nth-child(1) { animation-delay: 0ms; }
+.plf-band:nth-child(2) { animation-delay: 45ms; }
+.plf-band:nth-child(3) { animation-delay: 90ms; }
+.plf-band:nth-child(4) { animation-delay: 135ms; }
+.plf-band:nth-child(n + 5) { animation-delay: 180ms; }
+
+/* Reducir no es apagar: se quita el DESPLAZAMIENTO y se conserva lo que
+   confirma que algo llego. El esqueleto se queda gris y quieto. */
+@media (prefers-reduced-motion: reduce) {
+  .plf-skeleton {
+    animation: none;
+    background-image: none;
+  }
+
+  .plf-band {
+    animation-duration: 160ms;
+    animation-delay: 0ms !important;
+    animation-name: plf-fade-in;
+  }
+
+  @keyframes plf-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }

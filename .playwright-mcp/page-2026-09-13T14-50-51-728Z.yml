@@ -1,0 +1,435 @@
+- generic [ref=f98e3]:
+  - complementary [ref=f98e4]:
+    - generic [ref=f98e5]:
+      - generic [ref=f98e6]:
+        - link [ref=f98e7] [cursor=pointer]:
+          - /url: /bandeja
+          - img "Plastifar" [ref=f98e8]
+        - generic [ref=f98e9]: OPS
+      - button "Contraer la barra lateral" [ref=f98e10]
+    - navigation [ref=f98e13]:
+      - generic [ref=f98e14]:
+        - paragraph [ref=f98e15]: Principal
+        - generic [ref=f98e16]:
+          - link "Dashboard" [ref=f98e17] [cursor=pointer]:
+            - /url: /dashboard
+          - button "Tickets" [ref=f98e25]
+          - button "Correo" [ref=f98e32]
+      - generic [ref=f98e39]:
+        - paragraph [ref=f98e40]: Gestión
+        - generic [ref=f98e41]:
+          - button "Personal" [ref=f98e43]
+          - link "Clientes" [ref=f98e52] [cursor=pointer]:
+            - /url: /clientes
+          - button "Calidad" [ref=f98e59]
+      - generic [ref=f98e67]:
+        - paragraph [ref=f98e68]: Otros
+        - generic [ref=f98e69]:
+          - link "Reportes" [ref=f98e70] [cursor=pointer]:
+            - /url: /reportes
+          - button "Configuración" [ref=f98e75]
+    - button "ML Mindware Labs Administrador" [ref=f98e84]:
+      - generic [ref=f98e85]: ML
+      - generic [ref=f98e87]:
+        - generic [ref=f98e88]: Mindware Labs
+        - generic [ref=f98e89]: Administrador
+  - main [ref=f98e92]:
+    - generic [ref=f98e93]:
+      - navigation "Ruta" [ref=f98e94]:
+        - generic [ref=f98e95]: Dashboard
+      - button "Notificaciones" [ref=f98e97] [cursor=pointer]
+    - generic [ref=f98e103]:
+      - generic [ref=f98e105]:
+        - button "Fuera de plazo 19 sube contra ayer 8% de los vivos" [ref=f98e108] [cursor=pointer]:
+          - generic [ref=f98e109]: Fuera de plazo
+          - generic [ref=f98e114]:
+            - generic [ref=f98e115]: "19"
+            - generic "sube contra ayer" [ref=f98e116]: "4"
+          - generic [ref=f98e119]: 8% de los vivos
+        - button "Por vencer 42 sube contra ayer 19% de los vivos" [ref=f98e122] [cursor=pointer]:
+          - generic [ref=f98e123]: Por vencer
+          - generic [ref=f98e129]:
+            - generic [ref=f98e130]: "42"
+            - generic "sube contra ayer" [ref=f98e131]: "6"
+          - generic [ref=f98e134]: 19% de los vivos
+        - button "Abiertos 137 baja contra ayer 61% de los vivos" [ref=f98e137] [cursor=pointer]:
+          - generic [ref=f98e138]: Abiertos
+          - generic [ref=f98e144]:
+            - generic [ref=f98e145]: "137"
+            - generic "baja contra ayer" [ref=f98e146]: "3"
+          - generic [ref=f98e149]: 61% de los vivos
+        - button "En espera 28 sube contra ayer del cliente" [ref=f98e152] [cursor=pointer]:
+          - generic [ref=f98e153]: En espera
+          - generic [ref=f98e158]:
+            - generic [ref=f98e159]: "28"
+            - generic "sube contra ayer" [ref=f98e160]: "2"
+          - generic [ref=f98e163]: del cliente
+        - button "HCA abiertas 31 baja contra ayer 7 vencidas" [ref=f98e166] [cursor=pointer]:
+          - generic [ref=f98e167]: HCA abiertas
+          - generic [ref=f98e174]:
+            - generic [ref=f98e175]: "31"
+            - generic "baja contra ayer" [ref=f98e176]: "2"
+          - generic [ref=f98e179]: 7 vencidas
+      - generic [ref=f98e180]:
+        - generic [ref=f98e182]:
+          - generic [ref=f98e183]:
+            - generic [ref=f98e184]:
+              - heading "Entrados y cerrados" [level=2] [ref=f98e185]
+              - paragraph [ref=f98e186]: Entrados contra cerrados, día a día, en los últimos 30 días. Pasa el cursor por una columna para ver el detalle del día. Cuando la barra azul supera a la verde, ese día la cola creció.
+            - generic [ref=f98e188]:
+              - generic [ref=f98e189]:
+                - generic [ref=f98e190]: 17,363
+                - generic [ref=f98e191]: entrados
+              - generic [ref=f98e192]:
+                - generic [ref=f98e193]: 16,748
+                - generic [ref=f98e194]: cerrados
+              - generic [ref=f98e195]: 30 días
+          - 'img "Comparación diaria de 28 días. Totales — Entrados: 17363; Cerrados: 16748 tickets." [ref=f98e197]':
+            - generic [ref=f98e198]: "800"
+            - generic [ref=f98e200]: "600"
+            - generic [ref=f98e202]: "400"
+            - generic [ref=f98e204]: "200"
+            - generic [ref=f98e206]: "0"
+            - generic:
+              - generic: Día 1
+              - generic:
+                - generic: Entrados
+                - generic: "618"
+              - generic:
+                - generic: Cerrados
+                - generic: "640"
+            - generic [ref=f98e264]: 1-7
+            - generic [ref=f98e265]: 8-15
+            - generic [ref=f98e266]: 16-22
+            - generic [ref=f98e267]: 23-30
+            - generic [ref=f98e268]:
+              - generic [ref=f98e269]: Entrados
+              - generic [ref=f98e272]: Cerrados
+            - generic [ref=f98e275] [cursor=pointer]
+            - generic [ref=f98e276] [cursor=pointer]
+            - generic [ref=f98e277] [cursor=pointer]
+            - generic [ref=f98e278] [cursor=pointer]
+            - generic [ref=f98e279] [cursor=pointer]
+            - generic [ref=f98e280] [cursor=pointer]
+            - generic [ref=f98e281] [cursor=pointer]
+            - generic [ref=f98e282] [cursor=pointer]
+            - generic [ref=f98e283] [cursor=pointer]
+            - generic [ref=f98e284] [cursor=pointer]
+            - generic [ref=f98e285] [cursor=pointer]
+            - generic [ref=f98e286] [cursor=pointer]
+            - generic [ref=f98e287] [cursor=pointer]
+            - generic [ref=f98e288] [cursor=pointer]
+            - generic [ref=f98e289] [cursor=pointer]
+            - generic [ref=f98e290] [cursor=pointer]
+            - generic [ref=f98e291] [cursor=pointer]
+            - generic [ref=f98e292] [cursor=pointer]
+            - generic [ref=f98e293] [cursor=pointer]
+            - generic [ref=f98e294] [cursor=pointer]
+            - generic [ref=f98e295] [cursor=pointer]
+            - generic [ref=f98e296] [cursor=pointer]
+            - generic [ref=f98e297] [cursor=pointer]
+            - generic [ref=f98e298] [cursor=pointer]
+            - generic [ref=f98e299] [cursor=pointer]
+            - generic [ref=f98e300] [cursor=pointer]
+            - generic [ref=f98e301] [cursor=pointer]
+            - generic [ref=f98e302] [cursor=pointer]
+        - generic [ref=f98e304]:
+          - generic [ref=f98e305]:
+            - generic [ref=f98e306]:
+              - heading "Cumplimiento de plazo" [level=2] [ref=f98e307]
+              - paragraph [ref=f98e308]: Reparto de los tickets vivos según su estado de plazo. Click en un estado para filtrar la bandeja.
+            - generic [ref=f98e309]: 226 vivos
+          - generic [ref=f98e311]:
+            - generic [ref=f98e312]: 92%
+            - generic [ref=f98e313]: 207 de 226
+          - generic [aria-hidden] [ref=f98e314]:
+            - generic [ref=f98e315] [cursor=pointer]
+            - generic [ref=f98e316] [cursor=pointer]
+            - generic [ref=f98e317] [cursor=pointer]
+            - generic [ref=f98e318] [cursor=pointer]
+          - list [ref=f98e319]:
+            - listitem [ref=f98e320]:
+              - button "En curso 61% 137" [ref=f98e321] [cursor=pointer]:
+                - generic [ref=f98e322]: En curso
+                - generic [ref=f98e325]:
+                  - generic [ref=f98e326]: 61%
+                  - generic [ref=f98e327]: "137"
+            - listitem [ref=f98e328]:
+              - button "Por vencer 19% 42" [ref=f98e329] [cursor=pointer]:
+                - generic [ref=f98e330]: Por vencer
+                - generic [ref=f98e333]:
+                  - generic [ref=f98e334]: 19%
+                  - generic [ref=f98e335]: "42"
+            - listitem [ref=f98e336]:
+              - button "Vencidos 8% 19" [ref=f98e337] [cursor=pointer]:
+                - generic [ref=f98e338]: Vencidos
+                - generic [ref=f98e341]:
+                  - generic [ref=f98e342]: 8%
+                  - generic [ref=f98e343]: "19"
+            - listitem [ref=f98e344]:
+              - button "En espera 12% 28" [ref=f98e345] [cursor=pointer]:
+                - generic [ref=f98e346]: En espera
+                - generic [ref=f98e349]:
+                  - generic [ref=f98e350]: 12%
+                  - generic [ref=f98e351]: "28"
+          - paragraph [ref=f98e352]: 19 fuera de plazo — atender primero.
+      - generic [ref=f98e353]:
+        - generic [ref=f98e355]:
+          - generic [ref=f98e356]:
+            - generic [ref=f98e357]:
+              - heading "Estados de tickets" [level=2] [ref=f98e358]
+              - paragraph [ref=f98e359]: Cuántos tickets hay en cada estado y cuánto llevan ahí. Cuanto más oscura la barra, más viejo el ticket. Click en un estado para filtrar la bandeja.
+            - generic [ref=f98e361]:
+              - generic [ref=f98e362]: "327"
+              - generic [ref=f98e363]: vivos
+          - list [ref=f98e364]:
+            - listitem [ref=f98e365]:
+              - button "Abierto 137" [ref=f98e366] [cursor=pointer]:
+                - generic [ref=f98e367]: Abierto
+                - generic [ref=f98e372]: "137"
+            - listitem [ref=f98e373]:
+              - button "En progreso 109" [ref=f98e374] [cursor=pointer]:
+                - generic [ref=f98e375]: En progreso
+                - generic [ref=f98e380]: "109"
+            - listitem [ref=f98e381]:
+              - button "En espera del cliente 28" [ref=f98e382] [cursor=pointer]:
+                - generic [ref=f98e383]: En espera del cliente
+                - generic [ref=f98e388]: "28"
+            - listitem [ref=f98e389]:
+              - button "En verificación 33" [ref=f98e390] [cursor=pointer]:
+                - generic [ref=f98e391]: En verificación
+                - generic [ref=f98e396]: "33"
+            - listitem [ref=f98e397]:
+              - button "Escalado 20" [ref=f98e398] [cursor=pointer]:
+                - generic [ref=f98e399]: Escalado
+                - generic [ref=f98e404]: "20"
+          - generic [ref=f98e405]:
+            - generic [ref=f98e406]: Menos de 1 día
+            - generic [ref=f98e409]: 1 a 3 días
+            - generic [ref=f98e412]: Más de 3 días
+            - generic [ref=f98e415]:
+              - text: 74 llevan más de 3 días · el atasco está en
+              - strong [ref=f98e416]: en progreso
+        - generic [ref=f98e418]:
+          - generic [ref=f98e420]:
+            - heading "Tickets por tema" [level=2] [ref=f98e421]
+            - paragraph [ref=f98e422]: Los cinco temas con más tickets en la ventana. Click en un tema para incluirlo o excluirlo del total.
+          - generic [ref=f98e423]:
+            - img "334 tickets repartidos entre 5 temas" [ref=f98e424]:
+              - generic [ref=f98e426]:
+                - generic [ref=f98e427] [cursor=pointer]
+                - generic [ref=f98e428] [cursor=pointer]
+                - generic [ref=f98e429] [cursor=pointer]
+                - generic [ref=f98e430] [cursor=pointer]
+                - generic [ref=f98e431] [cursor=pointer]
+              - generic [ref=f98e432]: "334"
+              - generic [ref=f98e433]: tickets
+            - list [ref=f98e434]:
+              - listitem [ref=f98e435]:
+                - button "Reclamo de calidad 102" [ref=f98e436] [cursor=pointer]:
+                  - generic [ref=f98e437]: Reclamo de calidad
+                  - generic [ref=f98e440]: "102"
+              - listitem [ref=f98e441]:
+                - button "Nota de crédito 80" [ref=f98e442] [cursor=pointer]:
+                  - generic [ref=f98e443]: Nota de crédito
+                  - generic [ref=f98e446]: "80"
+              - listitem [ref=f98e447]:
+                - button "Despacho y entrega 70" [ref=f98e448] [cursor=pointer]:
+                  - generic [ref=f98e449]: Despacho y entrega
+                  - generic [ref=f98e452]: "70"
+              - listitem [ref=f98e453]:
+                - button "Facturación 58" [ref=f98e454] [cursor=pointer]:
+                  - generic [ref=f98e455]: Facturación
+                  - generic [ref=f98e458]: "58"
+              - listitem [ref=f98e459]:
+                - button "Improcedente 24" [ref=f98e460] [cursor=pointer]:
+                  - generic [ref=f98e461]: Improcedente
+                  - generic [ref=f98e464]: "24"
+      - generic [ref=f98e467]:
+        - generic [ref=f98e468]:
+          - generic [ref=f98e469]:
+            - heading "Bandeja reciente" [level=2] [ref=f98e470]
+            - paragraph [ref=f98e471]: Los últimos movimientos de tu equipo. Click en una fila para abrir el ticket.
+          - textbox "Buscar en la bandeja" [ref=f98e477]:
+            - /placeholder: Buscar ticket o cliente…
+        - generic [ref=f98e478]:
+          - button "Todos" [pressed] [ref=f98e479] [cursor=pointer]
+          - button "Vencido" [ref=f98e480] [cursor=pointer]
+          - button "Por vencer" [ref=f98e481] [cursor=pointer]
+          - button "Abierto" [ref=f98e482] [cursor=pointer]
+          - button "En espera" [ref=f98e483] [cursor=pointer]
+          - button "Cerrado" [ref=f98e484] [cursor=pointer]
+        - table [ref=f98e486]:
+          - rowgroup [ref=f98e487]:
+            - row [ref=f98e488]:
+              - columnheader [ref=f98e489]:
+                - button "Ticket" [ref=f98e490] [cursor=pointer]
+              - columnheader [ref=f98e491]:
+                - button "Cliente" [ref=f98e492] [cursor=pointer]
+              - columnheader [ref=f98e493]:
+                - button "Canal" [ref=f98e494] [cursor=pointer]
+              - columnheader [ref=f98e495]:
+                - button "Prioridad" [ref=f98e496] [cursor=pointer]
+              - columnheader [ref=f98e497]:
+                - button "Estado" [ref=f98e498] [cursor=pointer]
+              - columnheader "Responsable" [ref=f98e499]
+              - columnheader [ref=f98e500]:
+                - button "Actividad" [ref=f98e501] [cursor=pointer]
+          - rowgroup [ref=f98e504]:
+            - row [ref=f98e505]:
+              - cell "TCK-2836 Nunca llegó la confirmación del pedido" [ref=f98e506]:
+                - button "TCK-2836" [ref=f98e507] [cursor=pointer]
+                - generic [ref=f98e508]: Nunca llegó la confirmación del pedido
+              - cell "Distribuidora Corripio" [ref=f98e509]
+              - cell "WhatsApp" [ref=f98e510]
+              - cell "Media" [ref=f98e511]
+              - cell "Abierto" [ref=f98e512]
+              - cell "Mina" [ref=f98e514]:
+                - generic [ref=f98e515]:
+                  - generic [aria-hidden] [ref=f98e516]: MS
+                  - generic [ref=f98e517]: Mina
+              - cell "hace 7 min" [ref=f98e518]
+            - row [ref=f98e519]:
+              - cell "TCK-2841 Nota de crédito sin reflejar a 5 días" [ref=f98e520]:
+                - button "TCK-2841" [ref=f98e521] [cursor=pointer]
+                - generic [ref=f98e522]: Nota de crédito sin reflejar a 5 días
+              - cell "Farmacia Carol" [ref=f98e523]
+              - cell "Correo" [ref=f98e524]
+              - cell "Alta" [ref=f98e525]
+              - cell "Vencido" [ref=f98e526]
+              - cell "Alejandro" [ref=f98e528]:
+                - generic [ref=f98e529]:
+                  - generic [aria-hidden] [ref=f98e530]: AR
+                  - generic [ref=f98e531]: Alejandro
+              - cell "hace 14 min" [ref=f98e532]
+            - row [ref=f98e533]:
+              - cell "TCK-2840 No puede subir el comprobante fiscal" [ref=f98e534]:
+                - button "TCK-2840" [ref=f98e535] [cursor=pointer]
+                - generic [ref=f98e536]: No puede subir el comprobante fiscal
+              - cell "Grupo Ramos" [ref=f98e537]
+              - cell "Chat web" [ref=f98e538]
+              - cell "Media" [ref=f98e539]
+              - cell "En espera" [ref=f98e540]
+              - cell "Mina" [ref=f98e542]:
+                - generic [ref=f98e543]:
+                  - generic [aria-hidden] [ref=f98e544]: MS
+                  - generic [ref=f98e545]: Mina
+              - cell "hace 38 min" [ref=f98e546]
+            - row [ref=f98e547]:
+              - cell "TCK-2839 Doble cargo en la factura de febrero" [ref=f98e548]:
+                - button "TCK-2839" [ref=f98e549] [cursor=pointer]
+                - generic [ref=f98e550]: Doble cargo en la factura de febrero
+              - cell "Supermercados Nacional" [ref=f98e551]
+              - cell "WhatsApp" [ref=f98e552]
+              - cell "Alta" [ref=f98e553]
+              - cell "Por vencer" [ref=f98e554]
+              - cell "Dimitri" [ref=f98e556]:
+                - generic [ref=f98e557]:
+                  - generic [aria-hidden] [ref=f98e558]: DV
+                  - generic [ref=f98e559]: Dimitri
+              - cell "hace 51 min" [ref=f98e560]
+            - row [ref=f98e561]:
+              - cell "TCK-2835 Lo transfirieron tres veces" [ref=f98e562]:
+                - button "TCK-2835" [ref=f98e563] [cursor=pointer]
+                - generic [ref=f98e564]: Lo transfirieron tres veces
+              - cell "Almacenes Unidos" [ref=f98e565]
+              - cell "Chat web" [ref=f98e566]
+              - cell "Alta" [ref=f98e567]
+              - cell "Vencido" [ref=f98e568]
+              - cell "Dimitri" [ref=f98e570]:
+                - generic [ref=f98e571]:
+                  - generic [aria-hidden] [ref=f98e572]: DV
+                  - generic [ref=f98e573]: Dimitri
+              - cell "hace 1 h 2 min" [ref=f98e574]
+        - generic [ref=f98e575]:
+          - generic [ref=f98e576]: 5 de 8
+          - button "Ver la bandeja completa" [ref=f98e577] [cursor=pointer]
+      - generic [ref=f98e578]:
+        - generic [ref=f98e580]:
+          - generic [ref=f98e582]:
+            - heading "Tickets por canal" [level=2] [ref=f98e583]
+            - paragraph [ref=f98e584]: Por dónde entran los tickets y cómo cambió respecto al periodo anterior.
+          - list [ref=f98e585]:
+            - listitem [ref=f98e586]:
+              - button "Correo sube 12.4% contra el período anterior 742" [ref=f98e587] [cursor=pointer]:
+                - generic [ref=f98e588]: Correo
+                - generic "sube 12.4% contra el período anterior" [ref=f98e592]: +12.4%
+                - generic [ref=f98e593]: "742"
+            - listitem [ref=f98e594]:
+              - button "WhatsApp baja 3.1% contra el período anterior 508" [ref=f98e595] [cursor=pointer]:
+                - generic [ref=f98e596]: WhatsApp
+                - generic "baja 3.1% contra el período anterior" [ref=f98e600]: −3.1%
+                - generic [ref=f98e601]: "508"
+            - listitem [ref=f98e602]:
+              - button "Teléfono sube 6.8% contra el período anterior 361" [ref=f98e603] [cursor=pointer]:
+                - generic [ref=f98e604]: Teléfono
+                - generic "sube 6.8% contra el período anterior" [ref=f98e608]: +6.8%
+                - generic [ref=f98e609]: "361"
+            - listitem [ref=f98e610]:
+              - button "Chat web baja 8.2% contra el período anterior 244" [ref=f98e611] [cursor=pointer]:
+                - generic [ref=f98e612]: Chat web
+                - generic "baja 8.2% contra el período anterior" [ref=f98e616]: −8.2%
+                - generic [ref=f98e617]: "244"
+            - listitem [ref=f98e618]:
+              - button "Presencial sube 21.6% contra el período anterior 145" [ref=f98e619] [cursor=pointer]:
+                - generic [ref=f98e620]: Presencial
+                - generic "sube 21.6% contra el período anterior" [ref=f98e624]: +21.6%
+                - generic [ref=f98e625]: "145"
+          - paragraph [ref=f98e626]: 2,000 en la ventana · Correo concentra el 37%
+        - generic [ref=f98e628]:
+          - generic [ref=f98e629]:
+            - generic [ref=f98e630]:
+              - heading "Carga por responsable" [level=2] [ref=f98e631]
+              - paragraph [ref=f98e632]: Tickets resueltos contra meta, con los vencidos de cada quien.
+            - 'button "Ordenar por: Cerrados" [ref=f98e635] [cursor=pointer]'
+          - list [ref=f98e638]:
+            - listitem [ref=f98e639]:
+              - button "Alejandro Rivera 142 Calidad · 18 en cola 0 venc." [ref=f98e640] [cursor=pointer]:
+                - generic [aria-hidden] [ref=f98e641]: AR
+                - generic [ref=f98e642]:
+                  - generic [ref=f98e643]:
+                    - generic [ref=f98e644]: Alejandro Rivera
+                    - generic [ref=f98e645]: "142"
+                  - generic [ref=f98e648]:
+                    - generic [ref=f98e649]: Calidad · 18 en cola
+                    - generic [ref=f98e650]: 0 venc.
+            - listitem [ref=f98e651]:
+              - button "Mina Santos 128 Servicio al cliente · 24 en cola 2 venc." [ref=f98e652] [cursor=pointer]:
+                - generic [aria-hidden] [ref=f98e653]: MS
+                - generic [ref=f98e654]:
+                  - generic [ref=f98e655]:
+                    - generic [ref=f98e656]: Mina Santos
+                    - generic [ref=f98e657]: "128"
+                  - generic [ref=f98e660]:
+                    - generic [ref=f98e661]: Servicio al cliente · 24 en cola
+                    - generic [ref=f98e662]: 2 venc.
+            - listitem [ref=f98e663]:
+              - button "Kevin Batista 119 Despacho · 31 en cola 5 venc." [ref=f98e664] [cursor=pointer]:
+                - generic [aria-hidden] [ref=f98e665]: KB
+                - generic [ref=f98e666]:
+                  - generic [ref=f98e667]:
+                    - generic [ref=f98e668]: Kevin Batista
+                    - generic [ref=f98e669]: "119"
+                  - generic [ref=f98e672]:
+                    - generic [ref=f98e673]: Despacho · 31 en cola
+                    - generic [ref=f98e674]: 5 venc.
+            - listitem [ref=f98e675]:
+              - button "Laura Ortiz 97 Facturación · 27 en cola 8 venc." [ref=f98e676] [cursor=pointer]:
+                - generic [aria-hidden] [ref=f98e677]: LO
+                - generic [ref=f98e678]:
+                  - generic [ref=f98e679]:
+                    - generic [ref=f98e680]: Laura Ortiz
+                    - generic [ref=f98e681]: "97"
+                  - generic [ref=f98e684]:
+                    - generic [ref=f98e685]: Facturación · 27 en cola
+                    - generic [ref=f98e686]: 8 venc.
+            - listitem [ref=f98e687]:
+              - button "Dimitri Volkov 64 Escalados · 12 en cola 4 venc." [ref=f98e688] [cursor=pointer]:
+                - generic [aria-hidden] [ref=f98e689]: DV
+                - generic [ref=f98e690]:
+                  - generic [ref=f98e691]:
+                    - generic [ref=f98e692]: Dimitri Volkov
+                    - generic [ref=f98e693]: "64"
+                  - generic [ref=f98e696]:
+                    - generic [ref=f98e697]: Escalados · 12 en cola
+                    - generic [ref=f98e698]: 4 venc.

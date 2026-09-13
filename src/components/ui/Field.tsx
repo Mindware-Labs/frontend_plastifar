@@ -1,6 +1,20 @@
 import { AlertCircle, Check, Eye, EyeOff } from "lucide-react";
-import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode } from "react";
-import { controlBase, controlSizes, stateClasses, type FieldState } from "./fieldStyles";
+import {
+  forwardRef,
+  useId,
+  useState,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type TextareaHTMLAttributes,
+} from "react";
+import {
+  controlBase,
+  controlSizes,
+  stateClasses,
+  type ControlSize,
+  type FieldState,
+} from "./fieldStyles";
+import { LookupSelect, type LookupSelectProps } from "./LookupSelect";
 import { Select, type SelectOption } from "./Select";
 
 /**
@@ -28,7 +42,7 @@ function FieldShell({ id, label, error, hint, required, children }: ShellProps) 
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint"
+        className="font-heading text-[11.5px] font-semibold text-faint"
       >
         {label}
         {required && <span className="ml-1 text-brand-red">*</span>}
@@ -36,7 +50,7 @@ function FieldShell({ id, label, error, hint, required, children }: ShellProps) 
 
       {children}
 
-      {error ? (
+      {error && (
         <p
           id={`${id}-error`}
           className="animate-plf-shake flex items-start gap-1.5 text-[11.5px] font-medium text-brand-red-dark"
@@ -44,18 +58,27 @@ function FieldShell({ id, label, error, hint, required, children }: ShellProps) 
           <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
           {error}
         </p>
-      ) : hint ? (
+      )}
+      {/* La pista sobrevive al error: describe la regla, y es justo cuando el
+          campo falla cuando hace falta leerla. Ademas mantiene vivo el id que
+          aria-describedby referencia. */}
+      {hint && (
         <p id={`${id}-hint`} className="text-[11.5px] leading-relaxed text-faint">
           {hint}
         </p>
-      ) : null}
+      )}
     </div>
   );
 }
 
+/**
+ * El error no reemplaza a la pista: FieldShell muestra uno u otro, pero cuando
+ * hay pista se anuncian ambos ids si el nodo existe. Devolver solo el error
+ * dejaba a quien usa lector de pantalla sin la regla que acaba de incumplir.
+ */
 function describedBy(id: string, error?: string, hint?: ReactNode) {
-  if (error) return `${id}-error`;
-  return hint ? `${id}-hint` : undefined;
+  const ids = [error ? `${id}-error` : null, hint ? `${id}-hint` : null].filter(Boolean);
+  return ids.length > 0 ? ids.join(" ") : undefined;
 }
 
 interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -82,7 +105,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
           aria-invalid={resolved === "error"}
           aria-describedby={describedBy(fieldId, error, hint)}
           className={`${controlBase} ${stateClasses[resolved]} ${controlSizes.md} px-3
-            placeholder:text-zinc-400 ${resolved === "valid" ? "pr-9" : ""} ${className}`}
+            placeholder:text-faint ${resolved === "valid" ? "pr-9" : ""} ${className}`}
           {...props}
         />
         {resolved === "valid" && (
@@ -124,7 +147,7 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
             aria-invalid={resolved === "error"}
             aria-describedby={describedBy(fieldId, error, hint)}
             className={`${controlBase} ${stateClasses[resolved]} ${controlSizes.md} pl-3 pr-10
-              placeholder:text-zinc-400 ${className}`}
+              placeholder:text-faint ${className}`}
             {...props}
           />
           <button
@@ -134,7 +157,7 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
             tabIndex={-1}
             aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
             className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center
-              rounded-edge text-muted transition-colors hover:bg-fill hover:text-ink"
+              rounded-edge text-subtle transition-colors hover:bg-fill hover:text-ink"
           >
             {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -154,6 +177,8 @@ interface SelectFieldProps {
   error?: string;
   hint?: ReactNode;
   state?: FieldState;
+  /** md en formularios estandar; sm para secciones densas (varios selects por fila). */
+  size?: ControlSize;
   required?: boolean;
   disabled?: boolean;
   id?: string;
@@ -171,6 +196,7 @@ export function SelectField({
   error,
   hint,
   state = "idle",
+  size = "md",
   required,
   disabled,
   id,
@@ -189,13 +215,93 @@ export function SelectField({
         onBlur={onBlur}
         options={options}
         placeholder={placeholder}
+        size={size}
         state={resolved}
         disabled={disabled}
+        aria-invalid={resolved === "error"}
         aria-describedby={describedBy(fieldId, error, hint)}
       />
     </FieldShell>
   );
 }
+
+interface LookupFieldProps extends Omit<LookupSelectProps, "aria-invalid" | "aria-describedby"> {
+  label: string;
+  error?: string;
+  hint?: ReactNode;
+  required?: boolean;
+  name?: string;
+}
+
+/**
+ * Campo de búsqueda contra el servidor, con la misma etiqueta y validación que
+ * `SelectField`. Se usa donde el catálogo no tiene tope --clientes y personal--
+ * y por eso no cabe en un desplegable cargado de antemano.
+ */
+export function LookupField({
+  label,
+  error,
+  hint,
+  state = "idle",
+  required,
+  id,
+  name,
+  ...props
+}: LookupFieldProps) {
+  const generated = useId();
+  const fieldId = id ?? name ?? generated;
+  const resolved: FieldState = error ? "error" : state;
+
+  return (
+    <FieldShell id={fieldId} label={label} error={error} hint={hint} required={required}>
+      <LookupSelect
+        {...props}
+        id={fieldId}
+        state={resolved}
+        aria-invalid={resolved === "error"}
+        aria-describedby={describedBy(fieldId, error, hint)}
+      />
+    </FieldShell>
+  );
+}
+
+interface TextAreaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: string;
+  error?: string;
+  hint?: ReactNode;
+}
+
+/**
+ * Texto largo con la misma gramatica que TextField: etiqueta versalita, filete
+ * gris, foco rojo y el error debajo, en su campo. No lleva estado "correcto":
+ * una palomita verde junto a un parrafo de causa raiz no dice nada util.
+ */
+export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
+  function TextAreaField({ label, error, hint, id, className = "", required, rows = 3, ...props }, ref) {
+    const generated = useId();
+    const fieldId = id ?? props.name ?? generated;
+
+    return (
+      <FieldShell id={fieldId} label={label} error={error} hint={hint} required={required}>
+        <textarea
+          ref={ref}
+          id={fieldId}
+          rows={rows}
+          aria-invalid={error !== undefined}
+          aria-describedby={describedBy(fieldId, error, hint)}
+          className={`w-full rounded-edge border bg-white px-3 py-2.5 text-[13px] leading-relaxed
+            text-ink outline-none transition-colors placeholder:text-faint
+            ${
+              error
+                ? "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/10"
+                : "border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
+            } ${className}`}
+          {...props}
+        />
+      </FieldShell>
+    );
+  },
+);
 
 interface CheckboxFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label: string;
@@ -222,7 +328,7 @@ export const CheckboxField = forwardRef<HTMLInputElement, CheckboxFieldProps>(
           id={fieldId}
           type="checkbox"
           disabled={disabled}
-          className="mt-px h-4 w-4 shrink-0 rounded-[2px] border-line-strong accent-brand-red"
+          className="mt-px h-4 w-4 shrink-0 rounded-edge border-line-strong accent-brand-red"
           {...props}
         />
         <span className="flex flex-col gap-0.5">

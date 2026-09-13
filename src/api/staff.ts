@@ -3,8 +3,21 @@ import type {
   CreateStaffRequest,
   StaffListResponse,
   StaffResponse,
+  StaffSignatureResponse,
   UpdateStaffRequest,
 } from "../types/api";
+import type { StaffDetail } from "../types/permissions";
+
+export interface GrantDepartmentAccessRequest {
+  departmentId: number;
+  roleId: number;
+  isPrimary: boolean;
+}
+
+export interface UpdateDepartmentAccessRequest {
+  roleId: number;
+  isPrimary: boolean;
+}
 
 export interface StaffQuery {
   page: number;
@@ -19,6 +32,16 @@ export interface StaffQuery {
 }
 
 export const staffApi = {
+  getSignature: () => apiRequest<StaffSignatureResponse>("/api/staff/me/signature"),
+
+  updateSignature: (signature: string) =>
+    apiRequest<StaffSignatureResponse>("/api/staff/me/signature", {
+      method: "PUT",
+      body: JSON.stringify({ signature }),
+    }),
+
+  getById: (id: number) => apiRequest<StaffResponse>(`/api/staff/${id}`),
+
   list: (query: StaffQuery) => apiRequest<StaffListResponse>(`/api/staff${toQuery({ ...query })}`),
 
   create: (data: CreateStaffRequest) =>
@@ -39,5 +62,26 @@ export const staffApi = {
   deactivate: (id: number) =>
     apiRequest<void>(`/api/staff/${id}/deactivate`, { method: "POST" }),
 
+  activate: (id: number) => apiRequest<void>(`/api/staff/${id}/activate`, { method: "POST" }),
+
   remove: (id: number) => apiRequest<void>(`/api/staff/${id}`, { method: "DELETE" }),
+
+  /** RF-P4: accesos vigentes y permiso efectivo, resuelto por el servidor. */
+  getDepartmentAccess: (id: number) =>
+    apiRequest<StaffDetail>(`/api/staff/${id}/department-access`),
+
+  grantDepartmentAccess: (id: number, data: GrantDepartmentAccessRequest) =>
+    apiRequest<void>(`/api/staff/${id}/department-access`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateDepartmentAccess: (id: number, departmentId: number, data: UpdateDepartmentAccessRequest) =>
+    apiRequest<void>(`/api/staff/${id}/department-access/${departmentId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  revokeDepartmentAccess: (id: number, departmentId: number) =>
+    apiRequest<void>(`/api/staff/${id}/department-access/${departmentId}`, { method: "DELETE" }),
 };

@@ -31,11 +31,18 @@ export const PASSWORD_RULES: PasswordRule[] = [
 
 export type StrengthLevel = "weak" | "average" | "strong";
 
-/** Cuantas reglas se cumplen decide el tramo; la escala es el ancho de la barra. */
+/**
+ * Cuantas reglas se cumplen decide el tramo; la escala es el ancho de la barra.
+ *
+ * La puerta es binaria: el formulario no deja enviar hasta cumplir las cuatro
+ * reglas. Por eso el tramo intermedio no dice "Media" —una palabra que suena a
+ * aceptable— sino "Incompleta", en ambar, que es el color que este sistema usa
+ * para "todavia no". Solo el tramo que el servidor aceptaria dice "Válida".
+ */
 const STRENGTH_LEVELS: { max: number; scale: number; level: StrengthLevel; label: string }[] = [
   { max: 1, scale: 0.15, level: "weak", label: "Débil" },
-  { max: 3, scale: 0.6, level: "average", label: "Media" },
-  { max: 4, scale: 1, level: "strong", label: "Fuerte" },
+  { max: 3, scale: 0.6, level: "average", label: "Incompleta" },
+  { max: 4, scale: 1, level: "strong", label: "Válida" },
 ];
 
 export function evaluatePassword(value: string) {

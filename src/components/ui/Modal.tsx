@@ -1,87 +1,59 @@
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useDialogBehavior } from "../../hooks/useDialogBehavior";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 
-interface ModalProps {
+export interface ModalProps {
   title: string;
   /** Linea corta sobre el titulo: situa la accion dentro del modulo. */
   eyebrow?: string;
   description?: ReactNode;
   onClose: () => void;
   /** Acciones del pie, separadas del cuerpo por un filete. */
-  footer?: ReactNode;
+  footer?: ReactNode | ((helpers: { requestClose: () => void; close: () => void }) => ReactNode);
   children: ReactNode;
+  /** Si el padre ya controla la animación de salida (ej: useModalAnimation) */
+  isExiting?: boolean;
+  onRequestClose?: () => void;
+  maxWidth?: string;
 }
-
-const focusableSelector =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * Dialogo modal del panel. Se monta en un portal sobre document.body para que
  * ningun ancestro con transform o overflow lo recorte ni lo desplace.
+ * Cuenta con animación fluida de entrada (.animate-plf-modal-in) y de salida
+ * (.animate-plf-modal-out) tanto en el panel como en el telón de fondo.
  */
-export function Modal({ title, eyebrow, description, onClose, footer, children }: ModalProps) {
+export function Modal({
+  title,
+  eyebrow,
+  description,
+  onClose,
+  footer,
+  children,
+  isExiting: externalIsExiting,
+  onRequestClose: externalRequestClose,
+  maxWidth = "max-w-lg",
+}: ModalProps) {
+  const internal = useModalAnimation(onClose);
+  const isExiting = externalIsExiting ?? internal.isExiting;
+  const requestClose = externalRequestClose ?? internal.requestClose;
+
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
 
-  // El efecto de montaje no debe depender de onClose: si el padre recrea esa
-  // funcion en cada render, el efecto se reiniciaria y devolveria el foco al
-  // primer campo en mitad del tecleo.
-  const closeRef = useRef(onClose);
-  useEffect(() => {
-    closeRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    // El foco entra al primer campo, no al aspa: se llega a escribir de inmediato.
-    const panel = panelRef.current;
-    const firstField = panel?.querySelector<HTMLElement>(
-      "input:not([type='hidden']), select, textarea",
-    );
-    (firstField ?? panel?.querySelector<HTMLElement>("button"))?.focus();
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closeRef.current();
-        return;
-      }
-      if (event.key !== "Tab" || !panel) return;
-
-      // Trampa de foco: el tabulador no debe escaparse al fondo de la pagina.
-      const items = Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector));
-      if (items.length === 0) return;
-
-      const first = items[0];
-      const last = items[items.length - 1];
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = originalOverflow;
-      previouslyFocused?.focus();
-    };
-  }, []);
+  useDialogBehavior(panelRef, requestClose);
 
   return createPortal(
     <div
-      className="animate-plf-scrim-in fixed inset-0 z-50 flex items-center justify-center
-        bg-ink/45 px-4 py-8 backdrop-blur-[2px]"
+      inert={isExiting ? true : undefined}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-8 backdrop-blur-[2px] ${
+        isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
+      }`}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget && !isExiting) requestClose();
       }}
     >
       <div
@@ -90,25 +62,25 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className="animate-plf-modal-in flex max-h-full w-full max-w-lg flex-col overflow-hidden
-          rounded-edge border border-line bg-white
-          shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]"
+        className={`${
+          isExiting ? "animate-plf-modal-out pointer-events-none" : "animate-plf-modal-in"
+        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-card border border-line bg-white shadow-dialog`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 pb-4 pt-5">
           <div>
             {eyebrow && (
-              <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
+              <p className="font-heading text-[10px] font-medium uppercase tracking-[0.07em] text-faint">
                 {eyebrow}
               </p>
             )}
             <h2
               id={titleId}
-              className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink"
+              className="mt-1.5 font-heading text-[18px] font-semibold tracking-[-0.015em] text-ink"
             >
               {title}
             </h2>
             {description && (
-              <p id={descriptionId} className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
+              <p id={descriptionId} className="mt-1.5 text-[12.5px] leading-relaxed text-subtle">
                 {description}
               </p>
             )}
@@ -116,10 +88,11 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Cerrar"
-            className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-muted
-              transition-colors hover:bg-fill hover:text-ink"
+            className="-mr-1.5 -mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-edge
+              text-subtle transition-colors hover:bg-fill hover:text-ink
+              focus-visible:ring-3 focus-visible:ring-brand-red/20 outline-none"
           >
             <X className="h-4 w-4" />
           </button>
@@ -128,8 +101,8 @@ export function Modal({ title, eyebrow, description, onClose, footer, children }
         <div className="overflow-y-auto px-6 py-5">{children}</div>
 
         {footer && (
-          <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-canvas px-6 py-3.5">
-            {footer}
+          <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-line bg-fill px-6 py-3.5">
+            {typeof footer === "function" ? footer({ requestClose, close: requestClose }) : footer}
           </div>
         )}
       </div>

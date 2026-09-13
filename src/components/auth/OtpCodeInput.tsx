@@ -6,14 +6,22 @@ interface OtpCodeInputProps {
   onChange: (value: string) => void;
   error?: string;
   autoFocus?: boolean;
+  /** Id del encabezado que nombra al conjunto de casillas. */
+  labelledBy?: string;
 }
 
+/**
+ * Las seis casillas son un solo campo repartido. Van en un `role="group"`
+ * nombrado por su encabezado: el aria-label de cada casilla dice "Digito 3 de
+ * 6", pero sin el grupo nada decia de que codigo son esos seis digitos.
+ */
 export function OtpCodeInput({
   length = 6,
   value,
   onChange,
   error,
   autoFocus,
+  labelledBy,
 }: OtpCodeInputProps) {
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
   const errorId = useId();
@@ -59,11 +67,16 @@ export function OtpCodeInput({
 
   return (
     <div>
-      <div className="flex justify-center gap-1.5 sm:gap-2.5">
+      <div
+        role="group"
+        aria-labelledby={labelledBy}
+        aria-describedby={error ? errorId : undefined}
+        className="flex justify-center gap-1.5 sm:gap-2.5"
+      >
         {digits.map((digit, index) => {
           const stateClass = error
             ? "border-brand-red bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]"
-            : `${digit ? "border-zinc-300" : "border-line"} hover:border-zinc-300 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_-1px_rgba(15,23,42,0.07)] focus:border-brand-red focus:bg-white focus:scale-[1.05] focus:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]`;
+            : `${digit ? "border-line-strong" : "border-line"} hover:border-hairline-hover hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_-1px_rgba(27,27,29,0.07)] focus:border-brand-red focus:bg-white focus:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]`;
 
           return (
             <input
@@ -82,7 +95,7 @@ export function OtpCodeInput({
               aria-label={`Dígito ${index + 1} de ${length} del código`}
               aria-invalid={!!error}
               aria-describedby={error ? errorId : undefined}
-              className={`h-10 w-10 shrink-0 rounded-edge border bg-gradient-to-b from-white to-zinc-50/70 text-center font-heading text-base font-semibold tabular-nums text-ink caret-brand-red shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[border-color,box-shadow,background-color,transform] duration-200 ease-out sm:h-12 sm:w-12 sm:text-lg ${stateClass}`}
+              className={`h-10 w-10 shrink-0 rounded-edge border bg-gradient-to-b from-white to-canvas/70 text-center font-heading text-base font-semibold tabular-nums text-ink caret-brand-red shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(27,27,29,0.04)] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out sm:h-12 sm:w-12 sm:text-lg ${stateClass}`}
             />
           );
         })}

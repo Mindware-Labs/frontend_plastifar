@@ -5,20 +5,29 @@
  */
 export type FieldState = "idle" | "error" | "valid";
 
-export const controlBase =
-  "w-full rounded-edge border bg-white text-left text-ink outline-none transition-colors " +
-  "disabled:cursor-not-allowed disabled:bg-canvas disabled:text-muted";
+/**
+ * Todo menos el ancho. Lo usa el control que se mide solo — la fila de
+ * criterios lleva medidas fijas por columna. Esta separado en vez de recortar
+ * `w-full` de la cadena completa: un recorte por texto se rompe en silencio en
+ * cuanto alguien reordena las clases.
+ */
+export const controlBaseUnsized =
+  "rounded-edge border bg-white text-left text-ink outline-none transition-colors " +
+  "disabled:cursor-not-allowed disabled:bg-canvas disabled:text-faint";
+
+export const controlBase = `w-full ${controlBaseUnsized}`;
 
 export const stateClasses: Record<FieldState, string> = {
-  idle: "border-line-strong hover:border-zinc-400 focus:border-brand-red focus:ring-3 focus:ring-brand-red/10",
+  idle: "border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10",
   error: "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/12",
   valid: "border-brand-green/50 focus:border-brand-green focus:ring-3 focus:ring-brand-green/10",
 };
 
-/** Alturas: md para formularios, sm para barras de criterios y paginacion. */
+/** Alturas: md para formularios, sm para barras de criterios y paginacion, xs para cabeceras y barras compactas. */
 export const controlSizes = {
   md: "h-10 text-[13.5px]",
   sm: "h-8 text-[12.5px]",
+  xs: "h-7 text-[11.5px]",
 } as const;
 
 export type ControlSize = keyof typeof controlSizes;

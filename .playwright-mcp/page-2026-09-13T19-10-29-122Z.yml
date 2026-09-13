@@ -1,0 +1,10 @@
+- generic [ref=f22e3]:
+  - link [ref=f22e6] [cursor=pointer]:
+    - /url: /scp/
+    - img "osTicket — Customer Support System" [ref=f22e9]
+  - heading "Authentication Required" [level=3] [ref=f22e10]
+  - group [ref=f22e12]:
+    - textbox "Email or Username" [active] [ref=f22e14]
+    - textbox "Password" [ref=f22e16]
+    - button "Log In" [ref=f22e17] [cursor=pointer]
+    - heading [level=3] [ref=f22e19]

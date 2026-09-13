@@ -6,12 +6,13 @@ import { z } from "zod";
 import { authApi } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import { tokenStore } from "../../api/tokenStore";
-import { evaluatePassword, passwordSchema } from "../../lib/password";
+import { PASSWORD_MAX_LENGTH, evaluatePassword, passwordSchema } from "../../lib/password";
 import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
 import { PasswordField, type FieldState } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { PasswordStrength } from "../ui/PasswordStrength";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 
 const currentSchema = z.object({
   currentPassword: z.string().min(1, "Escribe tu contraseña actual"),
@@ -23,7 +24,7 @@ const newSchema = z
     newPassword: passwordSchema,
     confirmPassword: z.string().min(1, "Repite la nueva contraseña"),
   })
-  .refine((values) => values.newPassword === values.confirmPassword, {
+  .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Las contraseñas no coinciden",
     path: ["confirmPassword"],
   });
@@ -40,6 +41,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<Step>("actual");
   const [currentPassword, setCurrentPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const { isExiting, requestClose } = useModalAnimation(onClose);
 
   const currentForm = useForm<CurrentFormValues>({
     resolver: zodResolver(currentSchema),
@@ -113,11 +115,12 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   if (step === "listo") {
     return (
       <Modal
-        eyebrow="Mi cuenta"
         title="Contraseña actualizada"
         onClose={onClose}
+        isExiting={isExiting}
+        onRequestClose={requestClose}
         footer={
-          <Button type="button" onClick={onClose}>
+          <Button type="button" onClick={requestClose}>
             Entendido
           </Button>
         }
@@ -133,13 +136,17 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   if (step === "actual") {
     return (
       <Modal
-        eyebrow="Mi cuenta · Paso 1 de 2"
-        title="Confirma tu contraseña"
+        // El contador de pasos baja al titulo: el eyebrow desaparece del panel
+        // entero, pero "1 de 2" es informacion real, no un adorno sobre el
+        // encabezado, y sin el nadie sabe cuanto le queda por delante.
+        title="Paso 1 de 2 · Confirma tu contraseña"
         description="Antes de cambiarla, escribe la contraseña con la que entras hoy."
         onClose={onClose}
+        isExiting={isExiting}
+        onRequestClose={requestClose}
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={requestClose}>
               Cancelar
             </Button>
             <Button
@@ -181,10 +188,11 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      eyebrow="Mi cuenta · Paso 2 de 2"
-      title="Crea una contraseña"
+      title="Paso 2 de 2 · Crea una contraseña"
       description="Debe cumplir todos los requisitos. Al guardar se cierran tus otras sesiones."
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       footer={
         <>
           <Button
@@ -222,6 +230,9 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
           label="Nueva contraseña"
           autoComplete="new-password"
           required
+          // El limite se valida en el esquema; ponerlo tambien en el control
+          // evita que alguien escriba de mas y se entere solo al enviar.
+          maxLength={PASSWORD_MAX_LENGTH}
           state={strength.isValid ? "valid" : "idle"}
           error={newForm.formState.errors.newPassword?.message}
           {...newForm.register("newPassword")}
@@ -231,6 +242,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
           label="Repetir nueva contraseña"
           autoComplete="new-password"
           required
+          maxLength={PASSWORD_MAX_LENGTH}
           state={confirmState}
           error={newForm.formState.errors.confirmPassword?.message}
           {...newForm.register("confirmPassword")}

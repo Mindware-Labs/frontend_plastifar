@@ -1,0 +1,655 @@
+import { Pencil, Plus, Power, Trash2, UserCog, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { clientsApi, type ClientQuery } from "../../api/clients";
+import { fetchAllPages } from "../../api/paging";
+import { staffApi } from "../../api/staff";
+import { territoriesApi } from "../../api/territories";
+import { Alert } from "../../components/ui/Alert";
+import { Avatar } from "../../components/ui/Avatar";
+import { Badge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
+import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
+import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { FilterChip } from "../../components/ui/FilterChip";
+import { EmptyResult } from "../../components/ui/EmptyResult";
+import { ListPanel } from "../../components/ui/ListPanel";
+import { Pagination } from "../../components/ui/Pagination";
+import { RowAction } from "../../components/ui/RowAction";
+import { SearchInput } from "../../components/ui/SearchInput";
+import { LookupSelect } from "../../components/ui/LookupSelect";
+import { Select } from "../../components/ui/Select";
+import { TableSkeleton } from "../../components/ui/Skeleton";
+import { StatusDot } from "../../components/ui/StatusDot";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePagedList } from "../../hooks/usePagedList";
+import { usePermissions } from "../../hooks/usePermissions";
+import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
+import type { Client, ClientListResponse, Territory } from "../../types/clients";
+import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
+import { ClientModal } from "./ClientModal";
+import { ReassignSalesRepModal } from "./ReassignSalesRepModal";
+import { FilterPopover } from "../../components/ui/FilterPopover";
+
+type ChipKey = "todos" | "activos" | "inactivos" | "sinVendedor";
+
+/**
+ * Exactamente las cuatro claves que ClientsController sabe ordenar —`nombre`
+ * por defecto, mas `codigo`, `territorio` y `estado`—. No se ofrece cabecera
+ * clicable para tipo, vendedor ni contactos: el servidor ignoraria el parametro
+ * y la tabla se quedaria igual despues de pulsarla, que es peor que no poder.
+ */
+type SortKey = "nombre" | "codigo" | "territorio" | "estado";
+
+const COLUMNS: ColumnOption[] = [
+  { id: "cliente", label: "Cliente", locked: true },
+  { id: "codigo", label: "Código" },
+  { id: "tipo", label: "Tipo" },
+  { id: "territorio", label: "Territorio" },
+  { id: "vendedor", label: "Vendedor" },
+  { id: "contactos", label: "Contactos" },
+  { id: "estado", label: "Estado" },
+];
+
+// El tipo de cliente no es ni accion principal, ni estado activo, ni salud: es
+// una clasificacion. Por la regla del rojo unico y del verde reservado a lo
+// sano, las cuatro variantes van en el mismo tono neutro.
+
+const chipToStatus: Record<ChipKey, string | undefined> = {
+  todos: undefined,
+  activos: "activos",
+  inactivos: "inactivos",
+  sinVendedor: "sinvendedor",
+};
+
+// Declarativas como en Personal y Roles: una sola fuente para etiqueta y
+// contador es lo que evita que los numeros se desalineen al agregar una pastilla.
+const chips: { key: ChipKey; label: string; countKey: keyof ClientListResponse["counts"] }[] = [
+  { key: "todos", label: "Todos", countKey: "all" },
+  { key: "activos", label: "Activos", countKey: "active" },
+  { key: "inactivos", label: "Inactivos", countKey: "inactive" },
+  { key: "sinVendedor", label: "Sin vendedor", countKey: "withoutSalesRep" },
+];
+
+export function ClientsPage() {
+  const navigate = useNavigate();
+  const { can } = usePermissions();
+  const canWrite = can("clients.write");
+
+  const [territories, setTerritories] = useState<Territory[]>([]);
+  const [salesReps, setSalesReps] = useState<{ id: number; name: string }[]>([]);
+  // Misma politica que la ficha: los catalogos de apoyo degradan la pantalla,
+  // no la tumban, pero su fallo se dice y se puede reintentar.
+  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [territoryId, setTerritoryId] = useState("todos");
+  const [salesRepId, setSalesRepId] = useState("todos");
+  const [type, setType] = useState("todos");
+  const [chip, setChip] = useState<ChipKey>("todos");
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "nombre", dir: "asc" });
+  const [pageSize, setPageSize] = useState(10);
+
+  const [modal, setModal] = useState<"nuevo" | Client | null>(null);
+  const [reassigning, setReassigning] = useState<Client | null>(null);
+  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(COLUMNS.map((c) => c.id));
+  /**
+   * RF-C7 en lote: la seleccion es sobre la pagina visible, no sobre todo el
+   * filtro. `POST /api/clients/bulk/sales-rep` solo acepta una lista explicita
+   * de ids, asi que "todos los filtrados" exigiria traer los ids de todas las
+   * paginas — justo la consulta sin tope que la seccion 4.1 prohibe.
+   */
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkReassigning, setBulkReassigning] = useState(false);
+
+  const debouncedSearch = useDebouncedValue(search).trim();
+
+  function isVisible(id: string) {
+    return visibleColumns.includes(id);
+  }
+
+  function loadReferenceData() {
+    setReferenceError(null);
+    return Promise.all([
+      // Catalogo acotado: se recorre entero. Con el tope de cien, un territorio
+      // mas alla de esa cifra no existia para el filtro ni para la tabla.
+      fetchAllPages<Territory>((page, pageSize) => territoriesApi.list({ page, pageSize })).then(
+        setTerritories,
+      ),
+      // Los SELECTORES de vendedor ya no salen de aqui: buscan en el servidor.
+      // Esta lista solo resuelve el nombre de la columna «Vendedor», porque el
+      // DTO del listado trae el id y no el nombre. Se recorre entera para no
+      // pintar «Sin vendedor» sobre un cliente que si lo tiene; el arreglo de
+      // fondo es que el API devuelva `salesRepName` en la fila.
+      fetchAllPages((page, pageSize) =>
+        staffApi.list({ page, pageSize, status: "activos", sort: "nombre", dir: "asc" }),
+      ).then((items) =>
+        setSalesReps(items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))),
+      ),
+    ]).catch(() =>
+      setReferenceError(
+        "No se pudieron cargar los territorios ni los vendedores: la tabla los muestra como «—» y sus dos filtros quedan vacíos.",
+      ),
+    );
+  }
+
+  useEffect(() => {
+    void loadReferenceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const { data, isStale, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
+    fetch: clientsApi.list,
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      territoryId: territoryId === "todos" ? undefined : Number(territoryId),
+      salesRepId: salesRepId === "todos" ? undefined : Number(salesRepId),
+      type: type === "todos" ? undefined : type,
+      status: chipToStatus[chip],
+      sort: sort.key,
+      dir: sort.dir,
+    },
+    fallbackError: "No se pudieron cargar los clientes",
+  });
+
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const unfiltered =
+    chip === "todos" && territoryId === "todos" && salesRepId === "todos" && type === "todos" && !debouncedSearch;
+
+  /* Los tres criterios que viven detras del boton. */
+  const filtrosPuestos =
+    (territoryId !== "todos" ? 1 : 0) +
+    (salesRepId !== "todos" ? 1 : 0) +
+    (type !== "todos" ? 1 : 0);
+
+  /** Quita solo lo del panel; la busqueda y las pastillas no se tocan. */
+  function clearNarrowFilters() {
+    setTerritoryId("todos");
+    setSalesRepId("todos");
+    setType("todos");
+    setPage(1);
+  }
+
+  /** Quita los cinco recortes de una vez: es la salida del estado vacio. */
+  function clearFilters() {
+    setSearch("");
+    setTerritoryId("todos");
+    setSalesRepId("todos");
+    setType("todos");
+    setChip("todos");
+    setPage(1);
+  }
+
+  // Se descarta la seleccion en cuanto cambian las filas visibles — otra
+  // pagina, otro filtro, o un refresco que movio la lista. Anclarlo a las filas
+  // y no a los criterios es lo que garantiza que `selected` nunca contenga un
+  // id que la persona ya no tiene delante, que es como una reasignacion en lote
+  // podria alcanzar a un cliente que nadie eligio.
+  const visibleIdsKey = rows.map((client) => client.id).join(",");
+  const [lastVisibleIdsKey, setLastVisibleIdsKey] = useState(visibleIdsKey);
+  if (visibleIdsKey !== lastVisibleIdsKey) {
+    setLastVisibleIdsKey(visibleIdsKey);
+    setSelectedIds([]);
+  }
+
+  /**
+   * Ascendente significa lo que la persona espera de cada columna: de la A a la
+   * Z en nombre, codigo y territorio, y «activos primero» en estado. Esa ultima
+   * es la razon de que el servidor invierta la direccion en su rama `estado`:
+   * ordenar IsActive de menor a mayor pondria a los inactivos arriba, y nadie
+   * abre el listado para ver primero lo que ya no opera.
+   */
+  function toggleSort(key: SortKey) {
+    setSort((previous) =>
+      previous.key === key
+        ? { key, dir: previous.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" },
+    );
+  }
+
+  /** Cabecera ordenable; las columnas que el servidor no ordena no la reciben. */
+  function sortProps(key: SortKey) {
+    return { dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) };
+  }
+
+  function territoryName(id: number) {
+    return territories.find((territory) => territory.id === id)?.name ?? "—";
+  }
+
+  function repName(id: number | null) {
+    if (id === null) return null;
+    return salesReps.find((rep) => rep.id === id)?.name ?? null;
+  }
+
+  const selected = rows.filter((client) => selectedIds.includes(client.id));
+  const allPageSelected = rows.length > 0 && rows.every((client) => selectedIds.includes(client.id));
+
+  function toggleSelection(id: number) {
+    setSelectedIds((previous) =>
+      previous.includes(id) ? previous.filter((entry) => entry !== id) : [...previous, id],
+    );
+  }
+
+  function toggleAllOnPage() {
+    setSelectedIds((previous) => {
+      if (allPageSelected) return previous.filter((id) => !rows.some((client) => client.id === id));
+      const ids = new Set(previous);
+      for (const client of rows) ids.add(client.id);
+      return [...ids];
+    });
+  }
+
+  async function runOnRow(id: number, action: () => Promise<void>) {
+    setBusyId(id);
+    try {
+      await action();
+      refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function askToggle(client: Client) {
+    setConfirmation({
+      tone: "warn",
+      icon: Power,
+      title: client.isActive ? "Desactivar cliente" : "Reactivar cliente",
+      description: client.isActive ? (
+        <>
+          <strong className="font-semibold text-ink">{client.name}</strong> deja de poder recibir
+          tickets nuevos. Su historial se conserva.
+        </>
+      ) : (
+        <>
+          <strong className="font-semibold text-ink">{client.name}</strong> vuelve a poder recibir
+          tickets nuevos.
+        </>
+      ),
+      confirmLabel: client.isActive ? "Desactivar" : "Reactivar",
+      onConfirm: () =>
+        runOnRow(client.id, () =>
+          client.isActive ? clientsApi.deactivate(client.id) : clientsApi.activate(client.id),
+        ),
+    });
+  }
+
+  /** RF-C4: el servidor rechaza con 409 si tiene contactos (o tickets, cuando exista esa tabla). */
+  function askDelete(client: Client) {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      title: "Eliminar cliente",
+      description: (
+        <>
+          Se eliminará permanentemente a{" "}
+          <strong className="font-semibold text-ink">{client.name}</strong>. Esta acción no se puede
+          deshacer.
+        </>
+      ),
+      confirmLabel: "Eliminar",
+      onConfirm: () => runOnRow(client.id, () => clientsApi.remove(client.id)),
+    });
+  }
+
+  return (
+    <div>
+
+      {/* El reintento va en linea con su aviso, no debajo: apilados en columna
+          eran dos bloques de dos alturas cada uno empujando la tabla. */}
+      {referenceError !== null && (
+        <div className="mb-3 flex items-start gap-3">
+          <Alert variant="error">{referenceError}</Alert>
+          <Button size="sm" variant="secondary" onClick={() => void loadReferenceData()}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-3 flex items-start gap-3">
+          <Alert variant="error">{error}</Alert>
+          <Button size="sm" variant="secondary" onClick={refresh}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
+      {canWrite && selected.length > 0 && (
+        // Hairline, sin tinte ni recuadro: la barra de seleccion es estructura,
+        // y en este sistema la estructura es un filete de 1 px.
+        <div className="mb-3 flex flex-wrap items-center gap-3 border-y border-line py-2">
+          <span className="text-[12.5px] font-medium tabular-nums text-ink">
+            {selected.length} {selected.length === 1 ? "cliente seleccionado" : "clientes seleccionados"}
+          </span>
+          <Button size="sm" variant="secondary" onClick={() => setBulkReassigning(true)}>
+            <UserCog className="h-[15px] w-[15px]" />
+            Reasignar vendedor
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
+            Limpiar selección
+          </Button>
+        </div>
+      )}
+
+      {/* Un error de carga no deja el spinner girando debajo: la primera version
+          mostraba el aviso y seguia fingiendo que la tabla estaba en camino. */}
+      {/* Criterios, tabla y pie en UNA sola superficie. La barra se dibuja
+          tambien mientras carga: perder el buscador durante el spinner es
+          perder el control justo cuando alguien esta esperando. */}
+      <ListPanel
+        toolbar={
+          <>
+          {/* Dos renglones explicitos: arriba lo que BUSCA y la accion
+              principal; abajo lo que RECORTA. Sueltos en una sola fila que
+              envuelve, la pastilla activa terminaba al final del renglon de
+              los selectores, lejos de sus hermanas. */}
+          <div className="flex w-full flex-wrap items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            // La seccion 7.3 regla 7 mete tambien el nombre y el correo del
+            // contacto en la misma caja; sin decirlo, nadie encuentra esa mitad.
+            placeholder="Buscar por nombre, código, RNC o contacto…"
+            className="w-[240px]"
+          />
+
+          {/* Territorio, vendedor y tipo, guardados. Eran tres desplegables
+              siempre a la vista que empujaban las pastillas a un segundo
+              renglón; se usan al buscar un recorte concreto, no al abrir. */}
+          <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
+            <Select
+            size="sm"
+            className="w-[200px]"
+            aria-label="Filtrar por territorio"
+            value={territoryId}
+            onChange={setTerritoryId}
+            options={[
+              { value: "todos", label: "Todos los territorios" },
+              ...territories.map((territory) => ({ value: String(territory.id), label: territory.name })),
+            ]}
+          />
+
+          {/* Buscador contra el servidor: el personal crece sin tope y un
+              desplegable precargado dejaba fuera a quien no cupiera. */}
+            <LookupSelect
+            size="sm"
+            className="w-[200px]"
+            aria-label="Filtrar por vendedor"
+            placeholder="Todos los vendedores"
+            searchPlaceholder="Buscar vendedor…"
+            clearLabel="Todos los vendedores"
+            value={salesRepId === "todos" ? "" : salesRepId}
+            selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
+            resolveSelectedLabel={resolveStaffLabel}
+            search={searchActiveStaff}
+            onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
+          />
+
+            <Select
+            size="sm"
+            className="w-[200px]"
+            aria-label="Filtrar por tipo"
+            value={type}
+            onChange={setType}
+            options={[
+              { value: "todos", label: "Todos los tipos" },
+              { value: "Distribuidor", label: "Distribuidor" },
+              { value: "Mayorista", label: "Mayorista" },
+              { value: "Detallista", label: "Detallista" },
+              { value: "Institucional", label: "Institucional" },
+            ]}
+          />
+          </FilterPopover>
+
+          {canWrite && (
+            <div className="ml-auto">
+              <Button size="sm" onClick={() => setModal("nuevo")}>
+                <Plus className="h-[15px] w-[15px]" />
+                Nuevo cliente
+              </Button>
+            </div>
+          )}
+          </div>
+
+          <div className="flex w-full flex-wrap items-center gap-2">
+          {/* Antes de la primera respuesta las pastillas van en esqueleto, no en
+              cero: un cero es una afirmacion, y todavia no se sabe nada. */}
+          {counts === undefined
+            ? chips.map(({ key }) => (
+                <span key={key} aria-hidden className="h-8 w-[104px] animate-pulse rounded-full bg-fill" />
+              ))
+            : chips.map(({ key, label, countKey }) => (
+                <FilterChip
+                  key={key}
+                  label={label}
+                  count={counts[countKey]}
+                  active={chip === key}
+                  onClick={() => setChip(key)}
+                />
+              ))}
+
+          <div className="ml-auto">
+            <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
+          </div>
+          </div>
+          </>
+        }
+        footer={
+          data !== null && (
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="clientes"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={9} />
+        ) : rows.length === 0 ? (
+          <EmptyResult
+            message={
+              unfiltered
+                ? "Todavía no hay clientes registrados."
+                : "Ningún cliente coincide con este filtro o búsqueda."
+            }
+            onClear={unfiltered ? undefined : clearFilters}
+          />
+        ) : (
+          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  {canWrite && (
+                    <Th className="w-9">
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        onChange={toggleAllOnPage}
+                        aria-label={
+                          allPageSelected
+                            ? "Quitar la selección de esta página"
+                            : "Seleccionar todos los clientes de esta página"
+                        }
+                        className="h-4 w-4 rounded-edge border-line-strong accent-brand-red"
+                      />
+                    </Th>
+                  )}
+                  <Th sort={sortProps("nombre")}>Cliente</Th>
+                  {isVisible("codigo") && <Th sort={sortProps("codigo")}>Código</Th>}
+                  {isVisible("tipo") && <Th>Tipo</Th>}
+                  {isVisible("territorio") && <Th sort={sortProps("territorio")}>Territorio</Th>}
+                  {isVisible("vendedor") && <Th>Vendedor</Th>}
+                  {isVisible("contactos") && <Th>Contactos</Th>}
+                  {isVisible("estado") && <Th sort={sortProps("estado")}>Estado</Th>}
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+
+              <tbody>
+                {rows.map((client) => (
+                  /* La fila entera lleva al detalle, como en la bandeja de
+                     tickets. El resaltado al pasar por encima ya prometia que
+                     la fila respondia; sin esto, la promesa obligaba a acertarle
+                     al enlace del nombre, que es el 15 % del ancho de la fila.
+                     Los controles de dentro paran la propagacion: quien marca
+                     una casilla o pulsa una accion no queria viajar. */
+                  <Row
+                    key={client.id}
+                    busy={busyId === client.id}
+                    onClick={() => navigate(`/clientes/${client.id}`)}
+                    className="cursor-pointer"
+                  >
+                    {canWrite && (
+                      <Td onClick={(event) => event.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(client.id)}
+                          onChange={() => toggleSelection(client.id)}
+                          aria-label={`Seleccionar ${client.name}`}
+                          className="h-4 w-4 rounded-edge border-line-strong accent-brand-red"
+                        />
+                      </Td>
+                    )}
+                    <Td>
+                      <Link
+                        to={`/clientes/${client.id}`}
+                        className="flex items-center gap-2.5 rounded-edge underline-offset-4 outline-none
+                          focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                      >
+                        <Avatar name={client.name} seed={client.id} />
+                        <span className="whitespace-nowrap text-[13px] font-medium text-ink hover:underline">
+                          {client.name}
+                        </span>
+                      </Link>
+                    </Td>
+                    {isVisible("codigo") && (
+                      <Td>
+                        {/* El codigo comercial lo lee la operacion, no una maquina: va en
+                            Poppins como el resto de la fila, no en mono. */}
+                        <span className="text-[12.5px] tabular-nums text-brand-gray">{client.code}</span>
+                      </Td>
+                    )}
+                    {isVisible("tipo") && (
+                      <Td>
+                        <Badge tone="neutral">{client.type}</Badge>
+                      </Td>
+                    )}
+                    {isVisible("territorio") && (
+                      <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{territoryName(client.territoryId)}</Td>
+                    )}
+                    {isVisible("vendedor") && (
+                      <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
+                        {/* Ambar: "sin asignar" es un estado intermedio, no un dato ausente.
+                            `nowrap`: "Richard De Leon Ramirez" partia en dos lineas y esa
+                            fila quedaba 10 px mas alta que sus vecinas. Un listado se lee
+                            por el ritmo de sus filas; con alturas dispares no hay ritmo. */}
+                        <span
+                          className="block max-w-[170px] truncate"
+                          title={repName(client.salesRepStaffId) ?? undefined}
+                        >
+                          {repName(client.salesRepStaffId) ?? <span className="text-warn">Sin vendedor</span>}
+                        </span>
+                      </Td>
+                    )}
+                    {isVisible("contactos") && (
+                      <Td>
+                        {client.contactCount === 0 ? (
+                          <span className="text-[12.5px] text-faint">Ninguno</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[12.5px] tabular-nums text-brand-gray">
+                            <Users aria-hidden className="h-3.5 w-3.5 text-faint" />
+                            {client.contactCount}
+                          </span>
+                        )}
+                      </Td>
+                    )}
+                    {isVisible("estado") && (
+                      <Td>
+                        <StatusDot active={client.isActive} />
+                      </Td>
+                    )}
+                    {canWrite && (
+                      /* `pl-0`: los iconos van pegados a la derecha, asi que el
+                         relleno izquierdo de la celda son 14 px muertos — y eran
+                         justo los que empujaban la tabla mas alla del panel y
+                         encendian una barra de scroll horizontal por 10 px. */
+                      <Td className="pl-0" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Reasignar vendedor de ${client.name}`}
+                            icon={UserCog}
+                            onClick={() => setReassigning(client)}
+                            disabled={busyId === client.id}
+                          />
+                          <RowAction
+                            label={`Editar ${client.name}`}
+                            icon={Pencil}
+                            onClick={() => setModal(client)}
+                            disabled={busyId === client.id}
+                          />
+                          <RowAction
+                            label={client.isActive ? `Desactivar ${client.name}` : `Reactivar ${client.name}`}
+                            icon={Power}
+                            onClick={() => askToggle(client)}
+                            disabled={busyId === client.id}
+                          />
+                          <RowAction
+                            label={`Eliminar ${client.name}`}
+                            icon={Trash2}
+                            onClick={() => askDelete(client)}
+                            disabled={busyId === client.id}
+                            danger
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
+      </ListPanel>
+
+      {modal !== null && (
+        <ClientModal
+          client={modal === "nuevo" ? undefined : modal}
+          territories={territories}
+          onClose={() => setModal(null)}
+          onSaved={refresh}
+        />
+      )}
+
+      {reassigning && (
+        <ReassignSalesRepModal
+          client={reassigning}
+          onClose={() => setReassigning(null)}
+          onSaved={refresh}
+        />
+      )}
+
+      {bulkReassigning && (
+        <BulkReassignSalesRepModal
+          clients={selected}
+          onClose={() => setBulkReassigning(false)}
+          onSaved={() => {
+            setSelectedIds([]);
+            refresh();
+          }}
+        />
+      )}
+
+      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+    </div>
+  );
+}

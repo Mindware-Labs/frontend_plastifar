@@ -1,17 +1,17 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { rolesApi, type RoleQuery } from "../../api/roles";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -86,13 +86,15 @@ export function RolesPage() {
   }
 
   return (
-    <div>
-      <ModuleHeader
-        summary={
-          counts
-            ? `${counts.all} roles definidos · ${counts.custom} personalizados · los permisos llegan en una fase posterior`
-            : "Cargando los roles del sistema…"
-        }
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        {error && (
+          <div className="mb-3">
+            <Alert variant="error">{error}</Alert>
+          </div>
+        )}
+
+        <ListPanel
         action={
           isAdmin && (
             <Button size="sm" onClick={() => setModal("nuevo")}>
@@ -101,109 +103,104 @@ export function RolesPage() {
             </Button>
           )
         }
-      />
+          toolbar={
+            <>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por nombre de rol…"
+                className="w-[240px]"
+              />
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar por nombre de rol…"
-          className="w-[240px]"
-        />
+              <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-        {filters.map(({ key, label, countKey }) => (
-          <FilterChip
-            key={key}
-            label={label}
-            count={counts?.[countKey] ?? 0}
-            active={filter === key}
-            onClick={() => setFilter(key)}
-          />
-        ))}
-      </div>
-
-      {error && (
-        <div className="mb-3">
-          <Alert variant="error">{error}</Alert>
-        </div>
-      )}
-
-      {data === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      ) : (
-        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Nombre</Th>
-                <Th>Tipo</Th>
-                <Th>Estado</Th>
-                {isAdmin && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
-            <tbody>
-              {rows.map((role) => (
-                <Row key={role.id} busy={busyId === role.id}>
-                  <Td className="text-[13px] font-medium text-ink">{role.name}</Td>
-                  <Td>
-                    {role.isSystem ? (
-                      <Badge>Sistema</Badge>
-                    ) : (
-                      <Badge tone="green">Personalizado</Badge>
-                    )}
-                  </Td>
-                  <Td>
-                    <StatusDot active={role.isActive} />
-                  </Td>
-                  {isAdmin && (
-                    <Td>
-                      {canManage(role) && (
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar el rol ${role.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(role)}
-                            disabled={busyId === role.id}
-                          />
-                          <RowAction
-                            label={`Eliminar el rol ${role.name}`}
-                            icon={Trash2}
-                            onClick={() => askDelete(role)}
-                            disabled={busyId === role.id}
-                            danger
-                          />
-                        </div>
-                      )}
-                    </Td>
-                  )}
-                </Row>
+              {filters.map(({ key, label, countKey }) => (
+                <FilterChip
+                  key={key}
+                  label={label}
+                  count={counts?.[countKey] ?? 0}
+                  active={filter === key}
+                  onClick={() => setFilter(key)}
+                />
               ))}
-            </tbody>
-          </DataTable>
-
-          {rows.length === 0 && (
+            </>
+          }
+          footer={
+            data !== null && (
+              <Pagination
+                page={data.page}
+                pageSize={data.pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="roles"
+              />
+            )
+          }
+        >
+          {data === null ? (
+            error === null && <TableSkeleton rows={pageSize} columns={4} />
+          ) : rows.length === 0 ? (
             <p className="py-14 text-center text-[13.5px] text-faint">
               {unfiltered
                 ? "Todavía no hay roles creados."
                 : "Ningún rol coincide con este filtro o búsqueda."}
             </p>
+          ) : (
+            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+              <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Nombre</Th>
+                  <Th>Tipo</Th>
+                  <Th>Estado</Th>
+                  {isAdmin && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+              <tbody>
+                {rows.map((role) => (
+                  <Row key={role.id} busy={busyId === role.id}>
+                    <Td className="text-[13px] font-medium text-ink">{role.name}</Td>
+                    <Td>
+                      {role.isSystem ? (
+                        <Badge>Sistema</Badge>
+                      ) : (
+                        <Badge tone="green">Personalizado</Badge>
+                      )}
+                    </Td>
+                    <Td>
+                      <StatusDot active={role.isActive} />
+                    </Td>
+                    {isAdmin && (
+                      <Td>
+                        {canManage(role) && (
+                          <div className="flex items-center justify-end gap-1">
+                            <RowAction
+                              label={`Editar el rol ${role.name}`}
+                              icon={Pencil}
+                              onClick={() => setModal(role)}
+                              disabled={busyId === role.id}
+                            />
+                            <RowAction
+                              label={`Eliminar el rol ${role.name}`}
+                              icon={Trash2}
+                              onClick={() => askDelete(role)}
+                              disabled={busyId === role.id}
+                              danger
+                            />
+                          </div>
+                        )}
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+            </div>
           )}
-
-          <Pagination
-            page={data.page}
-            pageSize={data.pageSize}
-            total={data.total}
-            totalPages={data.totalPages}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            noun="roles"
-          />
-        </div>
-      )}
+        </ListPanel>
+      </div>
 
       {confirmation && (
         <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />

@@ -1,16 +1,74 @@
 import { Outlet } from "react-router-dom";
-import { ModuleTabs } from "../components/app/ModuleTabs";
-import { TopBar } from "../components/app/TopBar";
+import { AppBar } from "../components/app/AppBar";
+import { InboxAlerts } from "../components/app/InboxAlerts";
+import { Sidebar } from "../components/app/Sidebar";
+import { ReceiptStack } from "../components/app/ReceiptStack";
+import { EmailCountsProvider } from "../context/EmailCountsContext";
+import { ReceiptProvider } from "../context/ReceiptContext";
+import { BreadcrumbLabelContext } from "../context/useBreadcrumb";
+import { PageChromeProvider } from "./PageChromeContext";
+import { usePageChromeStore } from "./usePageChrome";
 
 export function AppLayout() {
   return (
-    <div className="min-h-screen bg-white">
-      <TopBar />
-      <ModuleTabs />
+    <EmailCountsProvider>
+      <ReceiptProvider>
+        <PageChromeProvider>
+          <Shell />
+        </PageChromeProvider>
+      </ReceiptProvider>
+    </EmailCountsProvider>
+  );
+}
 
-      <main className="px-8 pb-12 pt-4">
-        <Outlet />
-      </main>
-    </div>
+/**
+ * El armazón.
+ *
+ * Vive dentro de `PageChromeProvider` porque la barra lee lo que cada pantalla
+ * declaró, y el proveedor de la etiqueta dinámica del breadcrumb se monta acá
+ * por la misma razón: `useDynamicBreadcrumb` llevaba tres pantallas publicando
+ * un nombre en un contexto que no tenía proveedor, así que no se renderizaba en
+ * ninguna parte.
+ */
+function Shell() {
+  const { setDynamicLabel } = usePageChromeStore();
+
+  return (
+    <>
+      <InboxAlerts />
+      {/* El lienzo ya no empieza en el area de contenido: lo lleva el shell
+          entero, y el carril lateral y la barra superior flotan encima como
+          dos superficies blancas mas. Con el shell en blanco, esas dos piezas
+          no eran superficies —eran el fondo— y por eso la pagina se partia en
+          dos mundos: cromo plano arriba y a la izquierda, tarjetas flotando en
+          el resto. */}
+      <div className="flex h-screen bg-canvas">
+        <Sidebar />
+
+        {/* `overflow-hidden` sigue siendo a proposito: cada pagina decide su
+            propia zona de scroll en vez de que el layout adivine un alto fijo.
+
+            La barra va ARRIBA de esa zona, no dentro: por estar encima del
+            elemento que scrollea se queda quieta por construccion, sin
+            `position: sticky` y sin que ninguna pantalla ceda el scroll.
+
+            El padding que antes vivia aca bajo al div de contenido: la barra va
+            a sangre, borde a borde. */}
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+          <BreadcrumbLabelContext.Provider value={setDynamicLabel}>
+            <AppBar />
+
+            {/* El lienzo tintado. Las superficies de trabajo —tablas, paneles,
+                tarjetas— flotan encima en blanco. Esa diferencia minima de
+                valor es lo que las despega sin necesitar una sombra pesada. */}
+            <div className="flex min-h-0 flex-1 flex-col px-3 pt-3 lg:px-4 lg:pt-4">
+              <Outlet />
+            </div>
+          </BreadcrumbLabelContext.Provider>
+
+          <ReceiptStack />
+        </main>
+      </div>
+    </>
   );
 }

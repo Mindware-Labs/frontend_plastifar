@@ -31,7 +31,7 @@ export function SearchInput({ value, onChange, placeholder, className = "" }: Se
         placeholder={placeholder}
         aria-label={placeholder}
         className={`${controlBase} ${stateClasses.idle} ${controlSizes.sm}
-          pl-8 pr-8 font-medium placeholder:font-normal placeholder:text-zinc-400
+          pl-8 pr-8 font-medium placeholder:font-normal placeholder:text-faint
           [&::-webkit-search-cancel-button]:hidden`}
       />
       {value && (

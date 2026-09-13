@@ -1,0 +1,106 @@
+- generic [ref=f46e10]:
+  - complementary [ref=f46e11]:
+    - generic [ref=f46e12]:
+      - generic [ref=f46e13]:
+        - link [ref=f46e14] [cursor=pointer]:
+          - /url: /bandeja
+          - img "Plastifar" [ref=f46e15]
+        - generic [ref=f46e16]: OPS
+      - button "Contraer la barra lateral" [ref=f46e17]
+    - navigation [ref=f46e20]:
+      - generic [ref=f46e21]:
+        - paragraph [ref=f46e22]: Principal
+        - generic [ref=f46e23]:
+          - link "Dashboard" [ref=f46e24] [cursor=pointer]:
+            - /url: /dashboard
+          - button "Tickets" [ref=f46e32]
+          - generic [ref=f46e38]:
+            - button "Correo" [expanded] [ref=f46e39]
+            - generic [ref=f46e46]:
+              - link "Bandeja" [ref=f46e47] [cursor=pointer]:
+                - /url: /bandeja
+              - link "Destacados" [ref=f46e52] [cursor=pointer]:
+                - /url: /bandeja/destacados
+              - link "Enviados" [ref=f46e56] [cursor=pointer]:
+                - /url: /bandeja/enviados
+              - link "Archivados" [ref=f46e61] [cursor=pointer]:
+                - /url: /bandeja/archivados
+              - link "Papelera" [ref=f46e66] [cursor=pointer]:
+                - /url: /bandeja/papelera
+              - link "Respuestas" [ref=f46e71] [cursor=pointer]:
+                - /url: /bandeja/respuestas
+      - generic [ref=f46e75]:
+        - paragraph [ref=f46e76]: Gestión
+        - generic [ref=f46e77]:
+          - button "Personal" [ref=f46e79]
+          - link "Clientes" [ref=f46e88] [cursor=pointer]:
+            - /url: /clientes
+          - button "Calidad" [ref=f46e95]
+      - generic [ref=f46e103]:
+        - paragraph [ref=f46e104]: Otros
+        - generic [ref=f46e105]:
+          - link "Reportes" [ref=f46e106] [cursor=pointer]:
+            - /url: /reportes
+          - button "Configuración" [ref=f46e111]
+    - button "ML Mindware Labs Administrador" [ref=f46e120]:
+      - generic [ref=f46e121]: ML
+      - generic [ref=f46e123]:
+        - generic [ref=f46e124]: Mindware Labs
+        - generic [ref=f46e125]: Administrador
+  - main [ref=f46e128]:
+    - generic [ref=f46e129]:
+      - navigation "Ruta" [ref=f46e130]:
+        - link "Correo" [ref=f46e131] [cursor=pointer]:
+          - /url: /bandeja
+        - generic [ref=f46e134]: Bandeja
+      - button "Notificaciones" [ref=f46e136] [cursor=pointer]
+    - generic [ref=f46e143]:
+      - generic [ref=f46e145]:
+        - generic [ref=f46e146]:
+          - heading "Bandeja" [level=2] [ref=f46e147]
+          - button "Avisos de correo nuevo" [ref=f46e148]
+        - generic [ref=f46e155]:
+          - searchbox "Buscar por remitente o asunto…" [ref=f46e157]
+          - button "Filtros" [ref=f46e159]
+        - tablist [ref=f46e165]:
+          - tab "Todos" [selected] [ref=f46e166]
+          - tab "Sin ticket" [ref=f46e167]
+          - tab "Sin responder" [ref=f46e168]
+          - tab "Míos" [ref=f46e169]
+        - generic [ref=f46e174]:
+          - button "R richard2512006@gmail.com 11-sept Destacar Lorem Ipsum PLT-000001 *Lorem Ipsum* is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever si…" [ref=f46e175] [cursor=pointer]:
+            - generic [ref=f46e176]:
+              - generic [ref=f46e177]: R
+              - generic [ref=f46e180]: richard2512006@gmail.com
+              - generic [ref=f46e181]:
+                - generic [ref=f46e182]: 11-sept
+                - button "Destacar" [ref=f46e183]
+            - generic [ref=f46e186]:
+              - generic [ref=f46e187]: Lorem Ipsum
+              - generic [ref=f46e188]: PLT-000001
+            - generic [ref=f46e190]: "*Lorem Ipsum* is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever si…"
+          - 'checkbox "Seleccionar: richard2512006@gmail.com" [ref=f46e191]'
+      - separator [ref=f46e194]
+      - generic [ref=f46e199]:
+        - img "Plastifar" [ref=f46e201]
+        - heading "Buenas noches, Mindware Labs" [level=3] [ref=f46e202]
+        - paragraph [ref=f46e203]: Centro de Operaciones y Mensajería · Plastifar
+        - generic [ref=f46e204]:
+          - button [ref=f46e205]:
+            - generic [ref=f46e206]: Prioritario
+            - paragraph [ref=f46e212]: "1"
+            - paragraph [ref=f46e213]: Sin responder
+            - paragraph [ref=f46e214]: Esperando respuesta
+          - button [ref=f46e215]:
+            - generic [ref=f46e216]: Por clasificar
+            - paragraph [ref=f46e222]: "0"
+            - paragraph [ref=f46e223]: Sin ticket
+            - paragraph [ref=f46e224]: Pendientes de caso
+          - button [ref=f46e225]:
+            - generic [ref=f46e226]: Total bandeja
+            - paragraph [ref=f46e232]: "1"
+            - paragraph [ref=f46e233]: Conversaciones
+            - paragraph [ref=f46e234]: 1 con ticket PLT
+        - generic [ref=f46e235]:
+          - button "Escribir un correo" [ref=f46e236]
+          - button "Ver pendientes urgentes (1)" [ref=f46e239]

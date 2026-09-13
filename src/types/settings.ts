@@ -1,0 +1,126 @@
+// Espejo de los DTOs de /api/settings/... (api/Dtos/SettingsDtos.cs).
+
+/** Se guardan como texto legible, nunca como numeros. */
+export type Priority = "Emergencia" | "Alta" | "Normal" | "Baja";
+
+export const PRIORITIES: Priority[] = ["Emergencia", "Alta", "Normal", "Baja"];
+
+/** Dias laborables por inicial, en el orden de la semana. */
+export type Weekday = "L" | "M" | "X" | "J" | "V" | "S" | "D";
+
+export const WEEKDAYS: { key: Weekday; label: string; jsDay: number }[] = [
+  { key: "L", label: "Lunes", jsDay: 1 },
+  { key: "M", label: "Martes", jsDay: 2 },
+  { key: "X", label: "Miércoles", jsDay: 3 },
+  { key: "J", label: "Jueves", jsDay: 4 },
+  { key: "V", label: "Viernes", jsDay: 5 },
+  { key: "S", label: "Sábado", jsDay: 6 },
+  { key: "D", label: "Domingo", jsDay: 0 },
+];
+
+/** Motivo o tema del ticket. Admite un segundo nivel de detalle. */
+export interface TicketTopic {
+  id: number;
+  name: string;
+  /** Motivo padre; null en el primer nivel. */
+  parentId: number | null;
+  /** Departamento al que se encola por defecto. */
+  defaultDepartmentId: number;
+  defaultPriority: Priority;
+  /** Politica aplicable; si es null se usa la de la prioridad. */
+  slaPolicyId: number | null;
+  /** Obliga a indicar linea de producto (reclamaciones de calidad). */
+  requiresProductLine: boolean;
+  isActive: boolean;
+  /** Tickets que ya lo usan. Es null mientras la Bandeja no exista: no hay
+   *  tabla que contar, y un cero afirmaria que ninguno lo usa. */
+  ticketCount: number | null;
+}
+
+export interface SlaPolicy {
+  id: number;
+  name: string;
+  priority: Priority;
+  firstResponseMinutes: number;
+  resolutionMinutes: number;
+  /** Si es verdadero, el reloj corre solo en horario laboral. */
+  businessHoursOnly: boolean;
+  /** Jornada aplicable, en formato HH:mm. */
+  workdayStart: string;
+  workdayEnd: string;
+  workDays: Weekday[];
+  /** Predeterminada de su prioridad: el sistema impide desactivar la ultima. */
+  isDefault: boolean;
+  isActive: boolean;
+}
+
+export interface Holiday {
+  id: number;
+  /** Fecha en formato ISO corto (YYYY-MM-DD): es un dia, no un instante. */
+  date: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface ProductLine {
+  id: number;
+  code: string;
+  name: string;
+  isActive: boolean;
+}
+
+/** Variables permitidas en una plantilla. Una desconocida se rechaza al guardar. */
+export const TEMPLATE_VARIABLES = [
+  { key: "contacto", label: "Nombre del contacto", sample: "María Reyes" },
+  { key: "ticket", label: "Número de ticket", sample: "000482" },
+  { key: "agente", label: "Nombre del agente", sample: "Yordy Acosta" },
+  { key: "cliente", label: "Nombre del cliente", sample: "Distribuidora del Este" },
+] as const;
+
+export type TemplateVariable = (typeof TEMPLATE_VARIABLES)[number]["key"];
+
+export interface EmailTemplate {
+  id: number;
+  /** Clave estable con la que el sistema la invoca. */
+  key: string;
+  name: string;
+  subject: string;
+  body: string;
+  isActive: boolean;
+}
+
+/** Valor de cable, tal como lo emite y espera el enum del servidor. */
+export type MailboxProvider = "IMAP" | "Gmail" | "Office365";
+
+/** El "Office 365" con espacio es solo como se lee en pantalla: mandarlo como
+ *  valor dejaba el desplegable en blanco al reabrir el buzon para editarlo. */
+export const MAILBOX_PROVIDERS: { value: MailboxProvider; label: string }[] = [
+  { value: "IMAP", label: "IMAP" },
+  { value: "Gmail", label: "Gmail" },
+  { value: "Office365", label: "Office 365" },
+];
+
+export function providerLabel(provider: MailboxProvider): string {
+  return MAILBOX_PROVIDERS.find((option) => option.value === provider)?.label ?? provider;
+}
+
+/**
+ * Buzon de entrada. Solo administracion (RF-K4): la lectura real del correo
+ * -que convertiria un mensaje entrante en ticket- es un subsistema aparte que
+ * el plan deja pendiente (seccion 9.7, decision de Plastifar todavia abierta).
+ */
+export interface Mailbox {
+  id: number;
+  address: string;
+  displayName: string;
+  provider: MailboxProvider;
+  /** Departamento donde caen los tickets que este buzon origine. */
+  departmentId: number;
+  /** Referencia al secreto en la configuracion protegida del servidor; nunca
+   *  la contraseña en si. Una contraseña de correo en una columna es una fuga
+   *  esperando su turno. Solo baja a quien puede escribir la configuracion;
+   *  para el resto es null. */
+  secretRef: string | null;
+  isActive: boolean;
+  lastSyncedAt: string | null;
+}

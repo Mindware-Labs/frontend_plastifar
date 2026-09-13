@@ -8,6 +8,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { RoleResponse } from "../../types/api";
 
 const schema = z.object({
@@ -31,6 +32,7 @@ interface RoleModalProps {
 export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const isEdit = role !== undefined;
+  const { isExiting, requestClose } = useModalAnimation(onClose);
 
   const {
     register,
@@ -63,7 +65,7 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
       } else {
         onSaved(await rolesApi.create({ name: values.name, permissions: [] }));
       }
-      onClose();
+      requestClose();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError("name", { message: err.message });
@@ -82,9 +84,11 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
       title={isEdit ? "Editar rol" : "Nuevo rol"}
       description="Los roles agrupan permisos y se asignan al personal por departamento."
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={requestClose}>
             Cancelar
           </Button>
           <Button type="submit" form="role-form" isLoading={isSubmitting}>
@@ -114,7 +118,7 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
           />
         )}
 
-        <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
+        <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-subtle">
           Los permisos del rol se configuran en un paso posterior, cuando existan las entidades
           sobre las que aplican (tickets, departamentos, etc.).
         </p>
