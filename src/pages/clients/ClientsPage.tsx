@@ -5,7 +5,6 @@ import { clientsApi, type ClientQuery } from "../../api/clients";
 import { fetchAllPages } from "../../api/paging";
 import { staffApi } from "../../api/staff";
 import { territoriesApi } from "../../api/territories";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
@@ -272,16 +271,6 @@ export function ClientsPage() {
 
   return (
     <div>
-      <ModuleHeader
-        action={
-          canWrite && (
-            <Button size="sm" onClick={() => setModal("nuevo")}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nuevo cliente
-            </Button>
-          )
-        }
-      />
 
       {/* El reintento va en linea con su aviso, no debajo: apilados en columna
           eran dos bloques de dos alturas cada uno empujando la tabla. */}
@@ -328,6 +317,11 @@ export function ClientsPage() {
       <ListPanel
         toolbar={
           <>
+          {/* Dos renglones explicitos: arriba lo que BUSCA y la accion
+              principal; abajo lo que RECORTA. Sueltos en una sola fila que
+              envuelve, la pastilla activa terminaba al final del renglon de
+              los selectores, lejos de sus hermanas. */}
+          <div className="flex w-full flex-wrap items-center gap-2">
           <SearchInput
             value={search}
             onChange={setSearch}
@@ -380,8 +374,17 @@ export function ClientsPage() {
             ]}
           />
 
-          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+          {canWrite && (
+            <div className="ml-auto">
+              <Button size="sm" onClick={() => setModal("nuevo")}>
+                <Plus className="h-[15px] w-[15px]" />
+                Nuevo cliente
+              </Button>
+            </div>
+          )}
+          </div>
 
+          <div className="flex w-full flex-wrap items-center gap-2">
           {/* Antes de la primera respuesta las pastillas van en esqueleto, no en
               cero: un cero es una afirmacion, y todavia no se sabe nada. */}
           {counts === undefined
@@ -400,6 +403,7 @@ export function ClientsPage() {
 
           <div className="ml-auto">
             <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
+          </div>
           </div>
           </>
         }
@@ -495,12 +499,20 @@ export function ClientsPage() {
                       </Td>
                     )}
                     {isVisible("territorio") && (
-                      <Td className="text-[12.5px] text-brand-gray">{territoryName(client.territoryId)}</Td>
+                      <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{territoryName(client.territoryId)}</Td>
                     )}
                     {isVisible("vendedor") && (
-                      <Td className="text-[12.5px] text-brand-gray">
-                        {/* Ambar: "sin asignar" es un estado intermedio, no un dato ausente. */}
-                        {repName(client.salesRepStaffId) ?? <span className="text-warn">Sin vendedor</span>}
+                      <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
+                        {/* Ambar: "sin asignar" es un estado intermedio, no un dato ausente.
+                            `nowrap`: "Richard De Leon Ramirez" partia en dos lineas y esa
+                            fila quedaba 10 px mas alta que sus vecinas. Un listado se lee
+                            por el ritmo de sus filas; con alturas dispares no hay ritmo. */}
+                        <span
+                          className="block max-w-[170px] truncate"
+                          title={repName(client.salesRepStaffId) ?? undefined}
+                        >
+                          {repName(client.salesRepStaffId) ?? <span className="text-warn">Sin vendedor</span>}
+                        </span>
                       </Td>
                     )}
                     {isVisible("contactos") && (
@@ -521,7 +533,11 @@ export function ClientsPage() {
                       </Td>
                     )}
                     {canWrite && (
-                      <Td>
+                      /* `pl-0`: los iconos van pegados a la derecha, asi que el
+                         relleno izquierdo de la celda son 14 px muertos — y eran
+                         justo los que empujaban la tabla mas alla del panel y
+                         encendian una barra de scroll horizontal por 10 px. */
+                      <Td className="pl-0">
                         <div className="flex items-center justify-end gap-1">
                           <RowAction
                             label={`Reasignar vendedor de ${client.name}`}

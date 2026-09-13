@@ -28,7 +28,14 @@ export function DetailTable({ children }: { children: ReactNode }) {
      * filete dentro del mismo panel, que es la misma jerarquia sin pagar ese
      * precio.
      */
-    <div className="overflow-x-auto rounded-card border border-line bg-white px-5 shadow-card">
+    /*
+     * Medida acotada. A todo el ancho de la pagina la etiqueta quedaba a 285 px
+     * del margen, el valor arrancaba a 505 y de ahi a la derecha habia 670 px de
+     * nada: el ojo tenia que cruzar un vacio para emparejar cada par, y los
+     * filetes de fila subrayaban aire. Una ficha es un documento, no un listado;
+     * se lee mejor en una columna que en una pista de aterrizaje.
+     */
+    <div className="max-w-[880px] overflow-x-auto rounded-card border border-line bg-white px-5 shadow-card">
       {/* El aire va antes de cada titulo de grupo, salvo el primero: es lo que
           separa un bloque del anterior. El modificador no puede vivir en el
           propio `th` —ahi `first:` siempre acierta, porque el `th` es el unico
@@ -106,7 +113,7 @@ export function DetailRow({ label, wide = false, children }: DetailRowProps) {
     <tr className="border-t border-line-soft transition-colors hover:bg-fill">
       <th
         scope="row"
-        className="w-[220px] py-3 pr-3.5 text-left align-top font-heading text-[10.5px]
+        className="w-[186px] py-3 pr-3.5 text-left align-top font-heading text-[10.5px]
           font-medium uppercase tracking-[0.06em] text-faint"
       >
         {label}

@@ -276,7 +276,11 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   }
 
   return (
-    <div>
+    /* En «Datos» la ficha se acota a la medida de lectura, y la tira de
+       secciones con su accion se acota con ella: un boton a 260 px del borde
+       derecho del panel que gobierna deja de leerse como suyo. Contactos e
+       Historial son tablas y se quedan a todo el ancho. */
+    <div className={section === "datos" ? "max-w-[880px]" : undefined}>
       <ModuleHeader
         sections={sections}
         action={
