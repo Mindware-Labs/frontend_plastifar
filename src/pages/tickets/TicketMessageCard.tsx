@@ -7,7 +7,7 @@ import type { TicketAttachmentResponse, TicketMessageResponse } from "../../type
 import { FormattedTicketBody } from "./FormattedTicketBody";
 import { originLabel } from "./ticketOrigin";
 
-type BadgeTone = "neutral" | "red" | "green" | "amber" | "slate" | "completed";
+type BadgeTone = "neutral" | "red" | "green" | "amber" | "slate" | "completed" | "white" | "red-solid";
 
 /** Tono de la insignia segun como terminó el correo de una respuesta. Solo lo ve el personal. */
 const deliveryTones: Record<string, BadgeTone> = {
@@ -132,20 +132,22 @@ export function TicketMessageCard({
         {/* Insignias de la derecha (origen, entrega, más reciente) */}
         <div className="flex flex-wrap items-center gap-1.5">
           {message.isOrigin && (
-            <span title={`${origin.hint} ${formatDateTime(message.createdAt)}`}>
-              <Badge tone="neutral">{origin.label}</Badge>
-            </span>
+            <Badge tone="neutral" title={`${origin.hint} ${formatDateTime(message.createdAt)}`}>
+              {origin.label}
+            </Badge>
           )}
           {deliveryKey && deliveryTone && (
-            <span title={message.deliveryDetail ?? undefined}>
-              <Badge tone={deliveryTone}>{DELIVERY_LABELS[deliveryKey]}</Badge>
-            </span>
+            <Badge tone={deliveryTone} title={message.deliveryDetail ?? undefined}>
+              {DELIVERY_LABELS[deliveryKey]}
+            </Badge>
           )}
           {isLatest && (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase leading-none tracking-[0.06em] text-zinc-500">
-              <span aria-hidden className="size-1.5 rounded-full bg-brand-red" />
+            <Badge
+              tone="red"
+              className="uppercase tracking-[0.06em] animate-pulse motion-reduce:animate-none"
+            >
               Más reciente
-            </span>
+            </Badge>
           )}
         </div>
       </header>
