@@ -346,7 +346,10 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   })();
 
   return (
-    <div>
+    /* Igual que en las fichas de cliente y de colaborador: en «Datos» la tira de
+       secciones y su accion se acotan a la medida de la hoja. Un boton a 210 px
+       del borde derecho del panel que gobierna deja de leerse como suyo. */
+    <div className={section === "datos" ? "max-w-[880px]" : undefined}>
       <ModuleHeader sections={sections} action={primaryAction} />
 
       {actionError && (

@@ -222,7 +222,11 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   }
 
   return (
-    <div>
+    /* En «Datos» la ficha se acota a la medida de lectura y la tira de secciones
+       se acota con ella: el filete que cierra la tira llegaba 210 px mas alla
+       del panel que encabeza, y una linea que no termina donde termina lo que
+       nombra no separa nada. «Accesos» es una matriz y se queda a todo el ancho. */
+    <div className={section === "datos" ? "max-w-[880px]" : undefined}>
       <ModuleHeader
         sections={sections}
         action={
