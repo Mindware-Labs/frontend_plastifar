@@ -10,6 +10,7 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -100,6 +101,14 @@ export function StaffPage() {
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const unfiltered = filter === "todos" && departmentId === "todos" && !debouncedSearch;
+
+  /** Quita los tres recortes de una vez: es la salida del estado vacio. */
+  function clearFilters() {
+    setSearch("");
+    setDepartmentId("todos");
+    setFilter("todos");
+    setPage(1);
+  }
 
   /**
    * La selección se descarta en cuanto cambian las filas que están a la vista
@@ -429,11 +438,14 @@ export function StaffPage() {
           {data === null ? (
             error === null && <TableSkeleton rows={pageSize} columns={8} />
           ) : rows.length === 0 ? (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {unfiltered
-                ? "Todavía no hay personal registrado."
-                : "Ningún colaborador coincide con este filtro o búsqueda."}
-            </p>
+            <EmptyResult
+              message={
+                unfiltered
+                  ? "Todavía no hay personal registrado."
+                  : "Ningún colaborador coincide con este filtro o búsqueda."
+              }
+              onClear={unfiltered ? undefined : clearFilters}
+            />
           ) : (
             <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
               <DataTable>

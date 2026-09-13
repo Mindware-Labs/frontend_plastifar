@@ -15,6 +15,7 @@ import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup, CriteriaSelect } from "../../components/ui/CriteriaField";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -131,6 +132,18 @@ export function HcaPage() {
     from === "" &&
     to === "" &&
     !debouncedSearch;
+
+  /** Quita los siete recortes de una vez: es la salida del estado vacio. */
+  function clearFilters() {
+    setSearch("");
+    setProductLineId("todas");
+    setResponsibleId("todos");
+    setClientId("todos");
+    setFrom("");
+    setTo("");
+    setChip("todas");
+    setPage(1);
+  }
 
   function toggleSort(key: SortKey) {
     setSort((prev) =>
@@ -286,11 +299,14 @@ export function HcaPage() {
           // reintento, y una rueda eterna debajo del aviso mentia.
           error === null && <TableSkeleton rows={pageSize} columns={7} />
         ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {unfiltered
-              ? "Todavía no hay HCA registradas."
-              : "Ninguna HCA coincide con este filtro o búsqueda."}
-          </p>
+          <EmptyResult
+            message={
+              unfiltered
+                ? "Todavía no hay HCA registradas."
+                : "Ninguna HCA coincide con este filtro o búsqueda."
+            }
+            onClear={unfiltered ? undefined : clearFilters}
+          />
         ) : (
           <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
             <DataTable>

@@ -13,6 +13,7 @@ import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicke
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -157,6 +158,16 @@ export function ClientsPage() {
   const counts = data?.counts;
   const unfiltered =
     chip === "todos" && territoryId === "todos" && salesRepId === "todos" && type === "todos" && !debouncedSearch;
+
+  /** Quita los cinco recortes de una vez: es la salida del estado vacio. */
+  function clearFilters() {
+    setSearch("");
+    setTerritoryId("todos");
+    setSalesRepId("todos");
+    setType("todos");
+    setChip("todos");
+    setPage(1);
+  }
 
   // Se descarta la seleccion en cuanto cambian las filas visibles — otra
   // pagina, otro filtro, o un refresco que movio la lista. Anclarlo a las filas
@@ -424,11 +435,14 @@ export function ClientsPage() {
         {data === null ? (
           error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {unfiltered
-              ? "Todavía no hay clientes registrados."
-              : "Ningún cliente coincide con este filtro o búsqueda."}
-          </p>
+          <EmptyResult
+            message={
+              unfiltered
+                ? "Todavía no hay clientes registrados."
+                : "Ningún cliente coincide con este filtro o búsqueda."
+            }
+            onClear={unfiltered ? undefined : clearFilters}
+          />
         ) : (
           <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
             <DataTable>
