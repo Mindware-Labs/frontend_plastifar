@@ -210,41 +210,41 @@ export function CompleteTaskModal({
               setIsDragging(false);
               handleFilesSelected(e.dataTransfer.files);
             }}
-            className={`group flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition-all duration-300 ${
+            className={`group relative flex h-[106px] min-h-[106px] w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-3 transition-colors duration-300 outline-none ${
               showUploadFeedback
                 ? uploadExiting
-                  ? "border-emerald-200 bg-emerald-50/20 opacity-70 scale-[0.99]"
-                  : "border-emerald-400 bg-emerald-50/60 shadow-xs ring-2 ring-emerald-100"
+                  ? "border-emerald-200 bg-emerald-50/25"
+                  : "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-100/80"
                 : isDragging
-                  ? "border-brand-red bg-brand-red/5 ring-2 ring-brand-red/20 scale-[0.99]"
+                  ? "border-brand-red bg-brand-red/5 ring-2 ring-brand-red/20"
                   : "border-zinc-200 bg-zinc-50/50 hover:border-brand-red/40 hover:bg-brand-red/5"
             }`}
           >
             {showUploadFeedback ? (
               <div
-                className={`flex flex-col items-center justify-center ${
+                className={`flex flex-col items-center justify-center text-center ${
                   uploadExiting ? "animate-plf-check-out" : "animate-plf-check-in"
                 }`}
               >
-                <div className="relative flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-4 ring-emerald-50 shadow-xs animate-plf-check-breathe">
-                  <AnimatedCheckIcon size={20} strokeWidth={2.8} />
+                <div className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-2 ring-emerald-200/70 shadow-3xs animate-plf-check-breathe">
+                  <AnimatedCheckIcon size={16} strokeWidth={2.8} />
                 </div>
-                <p className="mt-2 font-heading text-[12.5px] font-bold text-emerald-700">
+                <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-bold text-emerald-700 leading-tight">
                   ¡{evidenceFiles.length === 1 ? "Archivo adjuntado correctamente" : `${evidenceFiles.length} archivos adjuntados correctamente`}!
                 </p>
-                <p className="text-[11px] text-emerald-600/80">
+                <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-emerald-600/80 leading-tight">
                   Haz clic o arrastra para añadir más si lo deseas
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center transition-opacity duration-300">
-                <div className="flex size-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-transform group-hover:scale-110">
+              <div className="flex flex-col items-center justify-center text-center transition-opacity duration-300">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-transform group-hover:scale-105">
                   <Upload className="size-4" />
                 </div>
-                <p className="mt-1.5 font-heading text-[12px] font-semibold text-zinc-700">
+                <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-semibold text-zinc-700 leading-tight">
                   Haz clic para adjuntar evidencias
                 </p>
-                <p className="text-[11px] text-zinc-400">
+                <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-zinc-400 leading-tight">
                   Imágenes (PNG, JPG), reportes en PDF, hojas de Excel, etc.
                 </p>
               </div>
