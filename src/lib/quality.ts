@@ -88,6 +88,22 @@ export function describeDue(dueDate: string, from = today()): string {
   return late === 1 ? "Venció ayer" : `Venció hace ${late} días`;
 }
 
+/**
+ * La misma cuenta atras, en version corta para una celda de tabla: «hace 18 d»,
+ * «en 2 d», «hoy».
+ *
+ * No es un capricho de ancho. En el listado, la columna «Estado» ya dice si la
+ * hoja esta vencida y el color del texto lo repite; gastar ahi «Venció hace 18
+ * días» es escribir tres veces el mismo hecho, y esos ~60 px eran justo los que
+ * empujaban la tabla fuera del panel. En una ficha, donde no hay pastilla al
+ * lado que lo diga, sigue usandose `describeDue` entero.
+ */
+export function describeDueShort(dueDate: string, from = today()): string {
+  const days = daysUntil(dueDate, from);
+  if (days === 0) return "hoy";
+  return days > 0 ? `en ${days} d` : `hace ${Math.abs(days)} d`;
+}
+
 /** Una accion resuelta es la que ya no bloquea: cumplida o anulada con justificacion. */
 export function isPlanItemSettled(item: ActionPlanItem): boolean {
   return item.status === "Cumplida" || item.status === "Anulada";

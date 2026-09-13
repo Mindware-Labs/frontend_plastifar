@@ -9,7 +9,6 @@ import {
   type SheetListResponse,
   type SheetQuery,
 } from "../../api/quality";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
@@ -29,7 +28,7 @@ import {
   searchActiveStaff,
   searchClients,
 } from "../../lib/lookups";
-import { describeDue, formatDay, isSheetOverdue } from "../../lib/quality";
+import { describeDueShort, formatDay, isSheetOverdue } from "../../lib/quality";
 import type { ProductLine } from "../../types/settings";
 import { HcaModal } from "./HcaModal";
 import { HcaStatusBadge } from "./StatusBadges";
@@ -141,17 +140,6 @@ export function HcaPage() {
 
   return (
     <div>
-      <ModuleHeader
-        action={
-          canWrite && (
-            <Button size="sm" onClick={() => setModalOpen(true)}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nueva HCA
-            </Button>
-          )
-        }
-      />
-
       {error && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="min-w-[240px] flex-1">
@@ -163,13 +151,14 @@ export function HcaPage() {
         </div>
       )}
 
-      {counts && (counts.overdue > 0 || counts.open > 0) && (
-        <p className="mb-3 text-[12.5px] text-brand-gray">{listDebt(counts)}</p>
-      )}
-
       <ListPanel
         toolbar={
           <>
+          {/* Dos renglones: arriba los criterios y la accion principal; abajo
+              las pastillas y la deuda que resumen. El boton y esa frase vivian
+              sueltos sobre el lienzo, gastando dos renglones enteros para no
+              pertenecer a nada. */}
+          <div className="flex w-full flex-wrap items-end gap-2">
         <CriteriaField label="Buscar">
           <SearchInput
             value={search}
@@ -241,9 +230,19 @@ export function HcaPage() {
           </CriteriaField>
         </div>
 
+        {canWrite && (
+          <div className="ml-auto">
+            <Button size="sm" onClick={() => setModalOpen(true)}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva HCA
+            </Button>
+          </div>
+        )}
+        </div>
+
         {/* Antes de la primera respuesta no hay contadores: un «0» al lado de
             «Vencidas» es un dato, y seria falso. Se reserva el sitio y nada mas. */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2">
           {counts
             ? CHIPS.map(({ key, label, countKey }) => (
                 <FilterChip
@@ -261,6 +260,10 @@ export function HcaPage() {
                   className="h-8 w-[104px] animate-pulse rounded-full bg-fill"
                 />
               ))}
+
+          {counts && (counts.overdue > 0 || counts.open > 0) && (
+            <p className="ml-auto text-[12.5px] text-brand-gray">{listDebt(counts)}</p>
+          )}
         </div>
           </>
         }
@@ -327,29 +330,40 @@ export function HcaPage() {
                         {sheet.number}
                       </Link>
                     </Td>
-                    <Td className="text-[12.5px] text-brand-gray">{sheet.clientName}</Td>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      <span className="block max-w-[172px] truncate" title={sheet.clientName}>
+                        {sheet.clientName}
+                      </span>
+                    </Td>
                     <Td className="text-[12.5px] text-brand-gray">{sheet.productLineName}</Td>
                     <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
                       {sheet.responsibleName}
                     </Td>
+                    {/* Fecha y cuenta atras EN LA MISMA LINEA. Apiladas, la fila
+                        de una HCA abierta medía 57 px y la de una cerrada 43: el
+                        listado perdía su ritmo y la altura pasaba a señalar el
+                        estado, que ya lo dice la pastilla de al lado. */}
                     <Td className="whitespace-nowrap">
-                      <span className="block text-[12.5px] tabular-nums text-brand-gray">
+                      <span className="text-[12.5px] tabular-nums text-brand-gray">
                         {formatDay(sheet.dueDate)}
                       </span>
                       {sheet.status !== "Cerrada" && (
-                        <span
-                          className={`block text-[11.5px] ${
-                            overdue ? "font-medium text-brand-red-dark" : "text-faint"
-                          }`}
-                        >
-                          {describeDue(sheet.dueDate)}
-                        </span>
+                        <>
+                          <span aria-hidden className="px-1.5 text-line-strong">·</span>
+                          <span
+                            className={`text-[11.5px] ${
+                              overdue ? "font-medium text-brand-red-dark" : "text-faint"
+                            }`}
+                          >
+                            {describeDueShort(sheet.dueDate)}
+                          </span>
+                        </>
                       )}
                     </Td>
                     <Td>
                       <HcaStatusBadge status={sheet.status} overdue={overdue} />
                     </Td>
-                    <Td>
+                    <Td className="whitespace-nowrap">
                       <TicketLink number={sheet.ticketNumber} />
                     </Td>
                   </Row>
