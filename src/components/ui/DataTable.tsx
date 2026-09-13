@@ -96,7 +96,12 @@ interface RowProps extends HTMLAttributes<HTMLTableRowElement> {
 export function Row({ busy = false, className = "", children, ...props }: RowProps) {
   return (
     <tr
-      className={`border-b border-line-soft transition-colors last:border-0 hover:bg-fill
+      /* `transition-colors` no alcanza a `opacity`, asi que la fila que espera al
+         servidor se apagaba de golpe: el salto a medio tono se lee como un
+         parpadeo de error, no como «esto esta en marcha». Con la opacidad
+         incluida, atenuarse ES la señal de que la accion salio. */
+      className={`border-b border-line-soft transition-[background-color,opacity] duration-150
+        last:border-0 hover:bg-fill
         [&>td:first-child]:pl-4 [&>td:last-child]:pr-4 ${busy ? "opacity-50" : ""} ${className}`}
       {...props}
     >

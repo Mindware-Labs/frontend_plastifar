@@ -1066,7 +1066,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 return (
                   <span
                     className={`mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 font-heading
-                      text-[9px] font-bold uppercase tracking-[0.05em] ${openBadge.className}`}
+                      text-[10px] font-bold uppercase tracking-[0.05em] ${openBadge.className}`}
                   >
                     {openBadge.label}
                   </span>
@@ -1298,7 +1298,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 >
                   <span
                     className={`inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 font-heading
-                      text-[9px] font-bold uppercase tracking-[0.05em] ${badge.className}`}
+                      text-[10px] font-bold uppercase tracking-[0.05em] ${badge.className}`}
                   >
                     {badge.label}
                   </span>
@@ -1306,7 +1306,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                     <span
                       title={ticketsNote(reply) ?? undefined}
                       className="inline-flex shrink-0 items-center rounded-full border border-brand-red/20
-                        bg-brand-red/8 px-1.5 py-0.5 font-heading text-[9px] font-bold uppercase
+                        bg-brand-red/8 px-1.5 py-0.5 font-heading text-[10px] font-bold uppercase
                         tracking-[0.05em] text-brand-red-dark"
                     >
                       Tickets

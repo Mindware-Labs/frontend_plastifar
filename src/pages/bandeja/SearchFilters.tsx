@@ -144,7 +144,7 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
         {active > 0 && (
           <span
             className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full
-              bg-brand-red px-1 font-heading text-[9.5px] font-bold text-white"
+              bg-brand-red px-1 font-heading text-[10px] font-bold text-white"
           >
             {active}
           </span>

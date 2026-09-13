@@ -76,7 +76,7 @@ export function LoginPage() {
         <>
           <div className="flex items-center gap-3">
             <span className="h-px flex-1 bg-line" />
-            <span className="font-heading text-[9.5px] font-semibold uppercase tracking-[0.22em] text-faint">
+            <span className="font-heading text-[10px] font-semibold uppercase tracking-[0.22em] text-faint">
               Acceso restringido
             </span>
             <span className="h-px flex-1 bg-line" />

@@ -95,7 +95,7 @@ export function ConversationRow({
               }`}
             >
               <AvatarFallback
-                className="bg-fill text-[9px] font-semibold text-brand-gray transition-colors
+                className="bg-fill text-[10px] font-semibold text-brand-gray transition-colors
                   group-data-[selected=true]:bg-canvas
                   group-data-[selected=true]:text-ink"
               >
@@ -131,7 +131,7 @@ export function ConversationRow({
                   e.stopPropagation();
                   onToggleStar();
                 }}
-                className={`flex size-4 items-center justify-center rounded outline-none transition-all focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                className={`flex size-4 items-center justify-center rounded outline-none transition-all focus-visible:ring-2 focus-visible:ring-warn ${
                   email.starred
                     ? "text-amber-500 hover:text-amber-600 opacity-100"
                     : "text-zinc-300 opacity-0 group-hover:opacity-100 hover:text-amber-500"
@@ -162,7 +162,7 @@ export function ConversationRow({
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
               {delivery && (
                 <span
-                  className={`rounded-full px-1.5 py-px font-heading text-[9.5px] font-bold uppercase tracking-[0.06em] ${delivery.className}`}
+                  className={`rounded-full px-1.5 py-px font-heading text-[10px] font-bold uppercase tracking-[0.06em] ${delivery.className}`}
                 >
                   {delivery.label}
                 </span>

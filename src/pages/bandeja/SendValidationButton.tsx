@@ -129,7 +129,7 @@ export function SendValidationButton({
                 No se puede enviar
               </span>
             </div>
-            <span className="rounded-edge bg-brand-red/[0.08] px-1.5 py-0.5 font-heading text-[9.5px] font-semibold tabular-nums text-brand-red">
+            <span className="rounded-edge bg-brand-red/[0.08] px-1.5 py-0.5 font-heading text-[10px] font-semibold tabular-nums text-brand-red">
               {missingItems.length} {missingItems.length === 1 ? "pendiente" : "pendientes"}
             </span>
           </div>
@@ -175,7 +175,7 @@ export function SendValidationButton({
           {/* Pie informativo */}
           <div className="mt-2.5 flex items-center justify-between border-t border-line pt-2 text-[10px] text-faint">
             <span>Atajo de teclado</span>
-            <span className="rounded-edge border border-line bg-fill px-1 py-0.5 font-mono text-[9.5px] font-semibold text-brand-gray">
+            <span className="rounded-edge border border-line bg-fill px-1 py-0.5 font-mono text-[10px] font-semibold text-brand-gray">
               Ctrl + ↵
             </span>
           </div>

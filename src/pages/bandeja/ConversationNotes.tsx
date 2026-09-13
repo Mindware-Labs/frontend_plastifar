@@ -243,7 +243,7 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
 
             {/* Distintivo de múltiples notas y chevron */}
             {count > 1 && (
-              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-warn/15 px-1.5 py-0.5 font-heading text-[9.5px] font-bold text-warn-dark">
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-warn/15 px-1.5 py-0.5 font-heading text-[10px] font-bold text-warn-dark">
                 {count}
               </span>
             )}
