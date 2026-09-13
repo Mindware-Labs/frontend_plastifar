@@ -12,11 +12,18 @@ const toneClasses: Record<NonNullable<StatTileProps["tone"]>, string> = {
   warn: "text-warn",
 };
 
-/** Tarjeta de indicador: sin sombra ni borde grueso, apoyada solo en el filete
- *  compartido con el resto del panel — el flat-page rule tambien aplica aqui. */
+/**
+ * Tarjeta de indicador.
+ *
+ * Eran las unicas cifras del panel sin superficie: un filete fino sobre el
+ * lienzo tintado, al lado de una tabla que si venia en tarjeta con sombra. Las
+ * cuatro cifras se leian como notas al margen de la tabla en vez de como el
+ * resumen que encabeza el resultado. Ahora llevan la misma superficie que las
+ * fichas del dashboard, que es lo que son.
+ */
 export function StatTile({ label, value, tone = "neutral", hint }: StatTileProps) {
   return (
-    <div className="flex flex-col gap-1 border border-line-soft px-4 py-3.5">
+    <div className="flex flex-col gap-1 rounded-card border border-line bg-white px-4 py-3.5 shadow-card">
       <span className="font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
         {label}
       </span>

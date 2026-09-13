@@ -88,16 +88,55 @@ export function ReportFilters({
     ];
   });
 
+  const family = REPORT_FAMILIES.find((entry) => entry.key === report.family);
+  /* Los recortes que este reporte SI honra, sin contar el periodo: es lo que
+     decide si la seccion «Acotar» tiene algo que ofrecer. */
+  const narrowers = report.filters.filter((key) => key !== "range");
+
   return (
-    <div className="flex flex-col gap-5">
-      <SelectField
-        label="Reporte"
-        id={`${id}-reporte`}
-        value={report.id}
-        onChange={onSelectReport}
-        options={reportOptions}
-        hint={report.description}
-      />
+    <div className="flex min-h-full flex-col gap-5">
+      {/*
+        ELEGIR EL REPORTE NO ES UN CAMPO MAS.
+
+        Los cinco controles se apilaban identicos, asi que la decision que
+        gobierna la pantalla —cual de los 33 reportes, repartidos en 7 familias—
+        pesaba lo mismo que «Tipo de cliente», que es un recorte opcional. Y es
+        al reves: el reporte decide QUE se mide y ademas decide que recortes
+        existen; los demas controles solo aparecen porque el reporte los admite.
+
+        Aca encabeza el panel con su propia superficie, su familia arriba y su
+        descripcion debajo: se lee como una decision tomada, no como el primero
+        de una lista de cinco.
+      */}
+      <div className="rounded-inset border border-line bg-fill/50 p-3.5">
+        {family && (
+          <p className="mb-2 font-heading text-[10px] font-semibold uppercase tracking-[0.07em] text-faint">
+            {family.label}
+          </p>
+        )}
+        <SelectField
+          label="Reporte"
+          id={`${id}-reporte`}
+          value={report.id}
+          onChange={onSelectReport}
+          options={reportOptions}
+        />
+        <p className="mt-2 text-[12.5px] leading-relaxed text-brand-gray">{report.description}</p>
+      </div>
+
+      {/* Un rotulo antes de los recortes. Sin el, «Cliente» y «Territorio» se
+          leian como datos que el reporte PIDE, cuando son opcionales: en blanco
+          significan «todos», y eso no se deducia de ningun sitio. */}
+      {(has("range") || narrowers.length > 0) && (
+        <p className="-mb-1 font-heading text-[10px] font-semibold uppercase tracking-[0.07em] text-faint">
+          Acotar
+          {narrowers.length > 0 && (
+            <span className="ml-2 font-body text-[11.5px] font-normal normal-case tracking-normal text-faint">
+              lo que dejes en blanco no recorta
+            </span>
+          )}
+        </p>
+      )}
 
       {has("range") && (
         <div className="grid grid-cols-2 gap-3">
@@ -209,8 +248,16 @@ export function ReportFilters({
 
       {/* La vista previa cierra el panel: despues de acotar, dice que va a
           traer eso que se acaba de acotar. Va al final y no arriba porque se
-          lee DESPUES de elegir, no antes. */}
-      <ReportPreview report={report} criteria={criteria} reference={reference} />
+          lee DESPUES de elegir, no antes.
+
+          `mt-auto` la ancla al fondo del cuerpo. Con pocos criterios —y la
+          mayoria de los reportes tienen dos o tres— quedaban 182 px de aire
+          muerto entre ella y el pie, y la consecuencia de lo que acabas de
+          acotar se leia lejos del boton que la ejecuta. Pegada abajo, la
+          frase y la accion se miran. */}
+      <div className="mt-auto pt-1">
+        <ReportPreview report={report} criteria={criteria} reference={reference} />
+      </div>
 
       {report.filters.length === 0 && (
         <p className="flex items-start gap-2 border-l-[3px] border-line-strong bg-fill px-3 py-2.5 text-[12.5px] leading-relaxed text-subtle">

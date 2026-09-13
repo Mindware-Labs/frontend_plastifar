@@ -134,7 +134,7 @@ export function QualityResult({
           <StatTile
             label="HCA cerradas en el período"
             value={String(data.closedInRange)}
-            tone="green"
+            tone={data.closedInRange > 0 ? "green" : "neutral"}
           />
           <StatTile label="HCA abiertas hoy" value={String(data.openNow)} />
           <StatTile
@@ -239,7 +239,14 @@ export function QualityResult({
     <>
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile label="Abiertas en el período" value={String(data.openedInRange)} />
-        <StatTile label="Cerradas en el período" value={String(data.closedInRange)} tone="green" />
+        <StatTile
+          label="Cerradas en el período"
+          value={String(data.closedInRange)}
+          /* Condicional, no fijo. En verde fijo, «0 cerradas» —la peor noticia
+             que puede dar este reporte— se pintaba de buena noticia. El color
+             dice el veredicto; la categoria ya la dice el rotulo. */
+          tone={data.closedInRange > 0 ? "green" : "neutral"}
+        />
         <StatTile label="Abiertas hoy" value={String(data.openNow)} />
         <StatTile
           label="Vencidas hoy"
@@ -269,7 +276,11 @@ export function ClientsResult({
     <>
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatTile label="Clientes en el recorte" value={String(data.total)} />
-        <StatTile label="Activos" value={String(data.active)} tone="green" />
+        <StatTile
+          label="Activos"
+          value={String(data.active)}
+          tone={data.active > 0 ? "green" : "neutral"}
+        />
         <StatTile
           label="Sin vendedor"
           value={String(data.withoutSalesRep)}

@@ -78,6 +78,17 @@ function findReport(id: string | null): ReportDefinition {
   );
 }
 
+/** «14 ago — 13 sept de 2026 · 31 días»: el recorte al que responde la cifra. */
+function rangeLabel(from: string, to: string): string {
+  if (!from || !to) return "Sobre todo el histórico";
+  const a = new Date(`${from}T00:00:00`);
+  const b = new Date(`${to}T00:00:00`);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return "";
+  const short = (d: Date) => d.toLocaleDateString("es-DO", { day: "numeric", month: "short" });
+  const days = Math.round((b.getTime() - a.getTime()) / 86_400_000) + 1;
+  return `${short(a)} — ${short(b)} de ${b.getFullYear()} · ${days} día${days === 1 ? "" : "s"}`;
+}
+
 export function ReportsPage() {
   const { can } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -271,10 +282,30 @@ export function ReportsPage() {
 
   return (
     <div>
-      <ModuleHeader
-        summary={hasRun ? report.name : undefined}
-        action={
-          hasRun && (
+      {/*
+        CABECERA DEL RESULTADO.
+
+        El nombre del reporte viajaba como `summary` del encabezado: gris, 12.5 px,
+        del mismo peso que un hint. Es el titulo de lo que estas mirando.
+
+        Y faltaba lo mas importante: EL PERIODO. La pantalla mostraba «3 abiertas»
+        sin decir en ningun sitio sobre que fechas, que es exactamente la
+        confusion que la vista previa del panel promete evitar —un numero sin su
+        recorte responde a otra pregunta y nada en pantalla lo contradice—.
+      */}
+      {hasRun && (
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+          <div>
+            <h1 className="font-heading text-[18px] font-semibold tracking-[-0.015em] text-ink">
+              {report.name}
+            </h1>
+            {report.filters.includes("range") && (
+              <p className="mt-1 text-[12.5px] tabular-nums text-subtle">
+                {rangeLabel(criteria.from, criteria.to)}
+              </p>
+            )}
+          </div>
+          {(
             <div className="flex items-center gap-2">
               <Button size="sm" variant="secondary" onClick={() => setPanelOpen(true)}>
                 <SlidersHorizontal className="h-[15px] w-[15px]" />
@@ -292,9 +323,9 @@ export function ReportsPage() {
                 </Button>
               )}
             </div>
-          )
-        }
-      />
+          )}
+        </div>
+      )}
 
       {/* Paso 1: la pantalla vacia. No es un hueco por falta de datos, es el
           punto de partida, y por eso dice que hacer en vez de disculparse. */}
