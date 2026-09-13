@@ -1,4 +1,4 @@
-import { Check, Lock, Minus } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import { Fragment, useId, useMemo, useRef, useState } from "react";
 import type { PermissionGroup, PermissionKey, RoleSummary } from "../../types/permissions";
 
@@ -343,16 +343,25 @@ export function PermissionMatrix({
                                 if (locked) return;
                                 onToggle(role.id, permission.key);
                               }}
-                              className={`inline-flex h-6 w-6 items-center justify-center rounded-edge border
+                              /* EL «NO» NO ES UN OBJETO.
+                                 Antes el guion vivia dentro de un cuadro con
+                                 borde, igual que el check: dieciseis permisos
+                                 por cinco roles son ochenta cajas identicas y
+                                 unas setenta estaban vacias, asi que el ojo veia
+                                 ochenta objetos y ninguna jerarquia. No habia
+                                 forma de barrer la rejilla y ver DONDE se
+                                 concede, que es lo unico que se viene a leer.
+                                 Ahora solo el «si» lleva tinta y caja; el «no»
+                                 es un punto tenue que aparece al pasar por
+                                 encima. El patron de concesiones salta solo. */
+                              className={`group inline-flex h-6 w-6 items-center justify-center rounded-edge
                                 outline-none transition-[background-color,border-color,color]
                                 focus-visible:ring-3 focus-visible:ring-brand-red/25
                                 ${locked ? "cursor-not-allowed" : ""}
                                 ${
                                   granted
-                                    ? "border-brand-red/35 bg-brand-red/8 text-brand-red"
-                                    : `border-line-strong bg-white text-zinc-400 ${
-                                        locked ? "" : "hover:border-zinc-400 hover:text-subtle"
-                                      }`
+                                    ? "border border-brand-red/35 bg-brand-red/8 text-brand-red"
+                                    : `text-line-strong ${locked ? "" : "hover:bg-fill hover:text-subtle"}`
                                 }
                                 ${changed ? "ring-2 ring-inset ring-warn/45" : ""}`}
                             >
@@ -361,7 +370,7 @@ export function PermissionMatrix({
                               ) : granted ? (
                                 <Check aria-hidden className="h-3.5 w-3.5" strokeWidth={2.75} />
                               ) : (
-                                <Minus aria-hidden className="h-3 w-3" />
+                                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-current" />
                               )}
                             </button>
 

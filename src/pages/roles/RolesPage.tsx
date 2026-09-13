@@ -1,7 +1,6 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { rolesApi, type RoleQuery } from "../../api/roles";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -88,15 +87,6 @@ export function RolesPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <ModuleHeader
-        title="Personal"
-        summary={
-          counts
-            ? `${counts.all} roles definidos · ${counts.custom} personalizados · los permisos llegan en una fase posterior`
-            : "Cargando los roles del sistema…"
-        }
-      />
-
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         {error && (
           <div className="mb-3">

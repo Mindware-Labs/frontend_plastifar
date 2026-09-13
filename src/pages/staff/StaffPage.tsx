@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
@@ -330,15 +329,6 @@ export function StaffPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <ModuleHeader
-        title="Personal"
-        summary={
-          counts
-            ? `${counts.all} colaboradores · ${counts.active} activos · ${counts.admins} con permisos de administrador`
-            : "Cargando el personal con acceso al sistema…"
-        }
-      />
-
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         {error && (
           <div className="mb-3">

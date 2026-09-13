@@ -2,7 +2,6 @@ import { HelpCircle, MessageSquareText, Pencil, Plus, Trash2 } from "lucide-reac
 import { useEffect, useState } from "react";
 import { cannedApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -73,15 +72,6 @@ export function RespuestasPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <ModuleHeader
-        title="Respuestas"
-        summary={
-          items
-            ? `${items.length} ${items.length === 1 ? "respuesta predefinida" : "respuestas predefinidas"} · se insertan desde el editor con "Respuestas rápidas"`
-            : "Cargando las respuestas…"
-        }
-      />
-
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         {error && (
           <div className="mb-3">

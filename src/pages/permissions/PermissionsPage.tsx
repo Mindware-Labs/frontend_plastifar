@@ -1,8 +1,8 @@
+import { Check, Lock } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { ApiError } from "../../api/client";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker } from "../../components/ui/ColumnPicker";
@@ -277,32 +277,16 @@ export function PermissionsPage() {
 
   return (
     <div>
-      <ModuleHeader
-        action={
-          // La accion primaria se pinta siempre que se pueda escribir, apagada
-          // mientras no haya nada que guardar: desmontarla dejaba la cabecera
-          // vacia y sin decir que guardar es el proposito de la pagina.
-          canWrite && (
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirmingDiscard(true)}
-                disabled={isSaving || dirtyCells === 0}
-              >
-                Descartar
-              </Button>
-              <Button size="sm" onClick={save} isLoading={isSaving} disabled={dirtyCells === 0}>
-                {dirtyCells === 0
-                  ? "Guardar cambios"
-                  : `Guardar ${dirtyCells} ${dirtyCells === 1 ? "cambio" : "cambios"}`}
-              </Button>
-            </div>
-          )
-        }
-      />
-
-      <div className="mb-3 flex flex-wrap items-end gap-2">
+      {/* La matriz es la unica pantalla del panel que vivia a la intemperie: la
+          cabecera blanca, las bandas de modulo grises y las filas blancas se
+          apilaban sin nada que las contuviera, asi que se leian como tres capas
+          sueltas en vez de como una tabla. Aca va la misma superficie que usa
+          cada listado —borde, radio y sombra— construida a mano y no con
+          `ListPanel`, porque la rejilla trae su propio desbordamiento en dos ejes
+          con cabecera y columna congeladas, y meterla dentro de otro contenedor
+          con scroll despega justamente eso. */}
+      <section className="overflow-hidden rounded-card border border-line bg-white shadow-card">
+      <div className="flex flex-wrap items-end gap-2 border-b border-line px-4 py-3">
         <CriteriaField label="Buscar">
           <SearchInput
             value={search}
@@ -361,6 +345,8 @@ export function PermissionsPage() {
           />
         </div>
       </div>
+
+      <div className="px-4 pt-3">
 
       {error && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -439,8 +425,56 @@ export function PermissionsPage() {
           />
         </div>
       )}
+      </div>
 
-      <p className="mt-4 max-w-[76ch] text-[12px] leading-relaxed text-faint">
+      {/* Leyenda: hasta ahora el punto ambar, el candado y el anillo de cambio
+          no se explicaban en ninguna parte visible de la pantalla. Un simbolo
+          que hay que adivinar no informa, decora. */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line px-4 py-2.5">
+        <span className="flex items-center gap-1.5 text-[11.5px] text-faint">
+          <span aria-hidden className="inline-flex h-4 w-4 items-center justify-center rounded-edge bg-brand-red/10 text-brand-red">
+            <Check className="h-3 w-3" strokeWidth={3} />
+          </span>
+          Concede
+        </span>
+        <span className="flex items-center gap-1.5 text-[11.5px] text-faint">
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-warn" />
+          Ningún rol lo concede
+        </span>
+        <span className="flex items-center gap-1.5 text-[11.5px] text-faint">
+          <span aria-hidden className="inline-flex h-4 w-4 items-center justify-center rounded-edge ring-2 ring-inset ring-warn/45" />
+          Sin guardar
+        </span>
+        <span className="flex items-center gap-1.5 text-[11.5px] text-faint">
+          <Lock aria-hidden className="h-3 w-3" />
+          Rol del sistema
+        </span>
+
+        {/* El guardado vivia arriba del todo y apagado: ocupaba el mejor sitio de
+            la pantalla para no decir nada durante el 95 % del tiempo. Aparece
+            cuando hay algo que guardar, al pie de lo que se estuvo tocando. */}
+        {canWrite && dirtyCells > 0 && (
+          <span className="ml-auto flex items-center gap-2">
+            <span className="text-[12px] font-medium tabular-nums text-ink">
+              {dirtyCells} sin guardar
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirmingDiscard(true)}
+              disabled={isSaving}
+            >
+              Descartar
+            </Button>
+            <Button size="sm" onClick={save} isLoading={isSaving}>
+              Guardar
+            </Button>
+          </span>
+        )}
+      </div>
+      </section>
+
+      <p className="mt-3 max-w-[76ch] text-[12px] leading-relaxed text-faint">
         Un permiso concede la acción, pero solo sobre los recursos de los departamentos donde esa
         persona tiene el rol que lo otorga. La única excepción es{" "}
         <span className="font-mono text-[11px] text-subtle">tickets.read_all</span>, pensada para

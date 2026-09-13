@@ -1,10 +1,9 @@
-import { Clock, Flag, Info, MousePointerClick, Plus, SlidersHorizontal, Ticket as TicketIcon, UserCheck } from "lucide-react";
+import { Clock, Flag, Plus, SlidersHorizontal, Ticket as TicketIcon, UserCheck } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -209,94 +208,6 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
     </div>
   );
 }
-
-/** Señal discreta junto al resumen del encabezado: al hacer clic despliega el
- * aviso de que las filas de la tabla son interactivas y abren el detalle. */
-function RowClickHint() {
-  const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const panelId = useId();
-
-  useEffect(() => {
-    if (!open) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      setOpen(false);
-    }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    }
-    function handleViewportChange() {
-      setOpen(false);
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("scroll", handleViewportChange, true);
-    window.addEventListener("resize", handleViewportChange);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("scroll", handleViewportChange, true);
-      window.removeEventListener("resize", handleViewportChange);
-    };
-  }, [open]);
-
-  function toggle() {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setAnchor({ top: rect.bottom + 8, left: rect.left });
-    setOpen(true);
-  }
-
-  return (
-    <span className="relative inline-flex">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={toggle}
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        aria-label="Cómo ver el detalle de un ticket"
-        className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-red/15 text-brand-red-dark
-          outline-none transition-colors hover:bg-brand-red/25 focus-visible:ring-2 focus-visible:ring-brand-red/25
-          cursor-pointer animate-pulse"
-      >
-        <Info className="h-2.5 w-2.5" />
-      </button>
-
-      {open &&
-        anchor &&
-        createPortal(
-          <div
-            ref={panelRef}
-            id={panelId}
-            role="tooltip"
-            style={{ position: "fixed", top: anchor.top, left: anchor.left, width: 230 }}
-            className="animate-plf-popover-in z-[60] flex items-start gap-1.5 rounded-edge border border-line/90
-              bg-white p-2.5 text-[11.5px] leading-relaxed text-subtle
-              shadow-[0_4px_16px_-2px_rgba(27,27,29,0.08),0_12px_32px_-4px_rgba(27,27,29,0.14)]"
-          >
-            <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-brand-red" />
-            Haz clic en una fila para ver todos los detalles del ticket.
-          </div>,
-          document.body,
-        )}
-    </span>
-  );
-}
-
 export function TicketsPage() {
   const navigate = useNavigate();
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
@@ -484,20 +395,6 @@ export function TicketsPage() {
 
   return (
     <div className="flex h-full flex-col relative">
-      <ModuleHeader
-        title="Tickets"
-        summary={
-          counts ? (
-            <span className="inline-flex items-center gap-1.5">
-              {`${counts.all} tickets · ${counts.open} abiertos · ${counts.overdue} vencidos · ${counts.waitingOnClient} en espera`}
-              <RowClickHint />
-            </span>
-          ) : (
-            "Cargando bandeja de tickets…"
-          )
-        }
-      />
-
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         {bulkFeedback && (
           <div className="mb-3">
