@@ -11,6 +11,7 @@ import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { DepartmentResponse, StaffResponse } from "../../types/api";
+import { departmentOptions } from "../../lib/departments";
 
 const schema = z.object({
   firstName: z
@@ -182,10 +183,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
               onChange={field.onChange}
               onBlur={field.onBlur}
               placeholder="Selecciona un departamento"
-              options={departments.map((dept) => ({
-                value: String(dept.id),
-                label: dept.name,
-              }))}
+              options={departmentOptions(departments)}
               state={stateOf("primaryDepartmentId")}
               error={errors.primaryDepartmentId?.message}
             />

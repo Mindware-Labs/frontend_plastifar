@@ -29,6 +29,7 @@ import type {
   TicketStaffOptionResponse,
 } from "../../types/api";
 import { CreateTicketModal } from "./CreateTicketModal";
+import { departmentOptions } from "../../lib/departments";
 
 type TicketFilterKey = "todos" | "abiertos" | "por-vencer" | "vencidos" | "espera" | "cerrados";
 type SortKey = "numero" | "asunto" | "cliente" | "departamento" | "prioridad" | "estado" | "sla" | "actividad";
@@ -452,10 +453,7 @@ export function TicketsPage() {
                 onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
                 options={[
                   { value: "todos", label: "Todos los deptos." },
-                  ...departments.map((d) => ({
-                    value: String(d.id),
-                    label: d.name,
-                  })),
+                  ...departmentOptions(departments),
                 ]}
               />
 

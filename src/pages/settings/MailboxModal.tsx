@@ -9,6 +9,7 @@ import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { MAILBOX_PROVIDERS, type Mailbox } from "../../types/settings";
+import { departmentOptions } from "../../lib/departments";
 
 /**
  * Espejo de la validacion del servidor en POST/PUT /api/settings/mailboxes:
@@ -170,10 +171,7 @@ export function MailboxModal({ mailbox, departments, onClose, onSaved }: Mailbox
               onChange={field.onChange}
               onBlur={field.onBlur}
               placeholder="Elige uno"
-              options={departments.map((department) => ({
-                value: String(department.id),
-                label: department.name,
-              }))}
+              options={departmentOptions(departments)}
               state={stateOf("departmentId")}
               error={errors.departmentId?.message}
               hint="Los tickets que este buzón origine caen en la cola de este departamento."

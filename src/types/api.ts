@@ -107,6 +107,20 @@ export interface DepartmentResponse {
   id: number;
   name: string;
   isActive: boolean;
+  /**
+   * Departamento padre, o `null` en los de primer nivel.
+   *
+   * La operación real no tiene cuatro departamentos planos sino más de
+   * veinticinco en dos niveles —«VENTAS INTERNACIONALES / Florida»,
+   * «PLASTIFAR CENTROAMERICA / Compras»—, y el sistema al que este panel
+   * reemplaza ya los modela así.
+   *
+   * Es OPCIONAL a propósito: mientras el servidor no lo envíe, todo el panel
+   * sigue funcionando exactamente como hoy, con la lista plana. El día que
+   * empiece a enviarlo, la jerarquía aparece sola en los selectores y en los
+   * filtros. Así el frontend deja de ser lo que bloquea el cambio.
+   */
+  parentId?: number | null;
 }
 
 export interface ApiMessage {

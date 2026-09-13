@@ -23,6 +23,7 @@ import { SelectField, TextField, type FieldState } from "../../components/ui/Fie
 import { Spinner } from "../../components/ui/Spinner";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { departmentOptions } from "../../lib/departments";
 import type {
   TicketContactOption,
   TicketCreateOptionsResponse,
@@ -479,10 +480,7 @@ export function CreateTicketModal({
                         placeholder="Aún sin departamento"
                         options={[
                           { value: "", label: "Aún sin departamento" },
-                          ...(catalogs?.departments ?? []).map((d) => ({
-                            value: String(d.id),
-                            label: d.name,
-                          })),
+                          ...departmentOptions(catalogs?.departments ?? []),
                         ]}
                       />
                     )}

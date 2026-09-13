@@ -23,6 +23,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
 import { StaffModal } from "./StaffModal";
+import { departmentOptions } from "../../lib/departments";
 
 type FilterKey = "todos" | "activos" | "inactivos" | "administradores";
 type SortKey = "nombre" | "correo" | "departamento" | "rol" | "estado";
@@ -401,10 +402,7 @@ export function StaffPage() {
                 onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
                 options={[
                   { value: "todos", label: "Todos los departamentos" },
-                  ...departments.map((department) => ({
-                    value: String(department.id),
-                    label: department.name,
-                  })),
+                  ...departmentOptions(departments),
                 ]}
               />
 

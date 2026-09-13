@@ -23,6 +23,7 @@ import type { SlaPolicy, TicketTopic } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass, useRecordCache, useReferenceData } from "./catalogState";
 import { TopicModal } from "./TopicModal";
+import { departmentOptions, departmentPath } from "../../lib/departments";
 
 type ChipKey = "todos" | "activos" | "inactivos";
 
@@ -107,8 +108,11 @@ export function TopicsSection() {
     topicOptionsRef.reload();
   }
 
+  /* El camino completo, no el nombre suelto: hay tres departamentos llamados
+     «Calidad» —el propio, el de Centroamérica y el de otra planta— y en una
+     tabla, «Calidad» a secas no dice a cuál pertenece la fila. */
   function departmentName(id: number) {
-    return departments.find((department) => department.id === id)?.name ?? "—";
+    return departmentPath(departments, id) ?? "—";
   }
 
   /**
@@ -228,10 +232,7 @@ export function TopicsSection() {
               onChange={setDepartmentId}
               options={[
                 { value: "todos", label: "Todos los departamentos" },
-                ...departments.map((department) => ({
-                  value: String(department.id),
-                  label: department.name,
-                })),
+                ...departmentOptions(departments),
               ]}
             />
 

@@ -22,6 +22,7 @@ import { providerLabel, type Mailbox } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { MailboxModal } from "./MailboxModal";
+import { departmentPath } from "../../lib/departments";
 
 type ChipKey = "todos" | "activos" | "inactivos";
 type TestResult = { ok: boolean; message: string };
@@ -92,8 +93,11 @@ export function MailboxesSection() {
   // calculan sobre el filtro base, no sobre la tabla entera.
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
 
+  /* El camino completo, no el nombre suelto: hay tres departamentos llamados
+     «Calidad» —el propio, el de Centroamérica y el de otra planta— y en una
+     tabla, «Calidad» a secas no dice a cuál pertenece la fila. */
   function departmentName(id: number) {
-    return departments.find((department) => department.id === id)?.name ?? "—";
+    return departmentPath(departments, id) ?? "—";
   }
 
   // El resultado pertenece a una fila concreta y a un instante concreto: si

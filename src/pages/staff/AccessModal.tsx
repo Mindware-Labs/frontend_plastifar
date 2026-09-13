@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import type { DepartmentAccess, RoleSummary } from "../../types/permissions";
+import { departmentOptions } from "../../lib/departments";
 
 /**
  * Espejo de la validacion del servidor en POST /api/staff/{id}/department-access:
@@ -131,10 +132,7 @@ export function AccessModal({
               onBlur={field.onBlur}
               disabled={isEdit}
               placeholder="Elige un departamento"
-              options={available.map((department) => ({
-                value: String(department.id),
-                label: department.name,
-              }))}
+              options={departmentOptions(available)}
               state={stateOf("departmentId")}
               error={errors.departmentId?.message}
               hint={
