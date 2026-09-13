@@ -1,6 +1,6 @@
 import { LogOut, Pencil, Plus, Trash2, UserCheck, UserX } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
 import { Alert } from "../../components/ui/Alert";
@@ -56,6 +56,7 @@ const columns: { key: SortKey; label: string }[] = [
 ];
 
 export function StaffPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
 
@@ -482,7 +483,18 @@ export function StaffPage() {
 
               <tbody>
                 {rows.map((member) => (
-                  <Row key={member.id} busy={busyId === member.id}>
+                  /* La fila entera lleva al detalle, como en la bandeja de
+                     tickets. El resaltado al pasar por encima ya prometia que
+                     la fila respondia; sin esto, la promesa obligaba a acertarle
+                     al enlace del nombre, que es el 15 % del ancho de la fila.
+                     Los controles de dentro paran la propagacion: quien marca
+                     una casilla o pulsa una accion no queria viajar. */
+                  <Row
+                    key={member.id}
+                    busy={busyId === member.id}
+                    onClick={() => navigate(`/staff/${member.id}`)}
+                    className="cursor-pointer"
+                  >
                     {isAdmin && (
                       <Td>
                         {/* La propia fila no lleva casilla. El hueco se deja
@@ -528,7 +540,7 @@ export function StaffPage() {
                       <StatusDot active={member.isActive} />
                     </Td>
                     {isAdmin && (
-                      <Td>
+                      <Td onClick={(event) => event.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <RowAction
                             label={`Editar a ${fullName(member)}`}

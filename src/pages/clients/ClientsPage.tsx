@@ -1,6 +1,6 @@
 import { Pencil, Plus, Power, Trash2, UserCog, Users } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { clientsApi, type ClientQuery } from "../../api/clients";
 import { fetchAllPages } from "../../api/paging";
 import { staffApi } from "../../api/staff";
@@ -73,6 +73,7 @@ const chips: { key: ChipKey; label: string; countKey: keyof ClientListResponse["
 ];
 
 export function ClientsPage() {
+  const navigate = useNavigate();
   const { can } = usePermissions();
   const canWrite = can("clients.write");
 
@@ -496,9 +497,20 @@ export function ClientsPage() {
 
               <tbody>
                 {rows.map((client) => (
-                  <Row key={client.id} busy={busyId === client.id}>
+                  /* La fila entera lleva al detalle, como en la bandeja de
+                     tickets. El resaltado al pasar por encima ya prometia que
+                     la fila respondia; sin esto, la promesa obligaba a acertarle
+                     al enlace del nombre, que es el 15 % del ancho de la fila.
+                     Los controles de dentro paran la propagacion: quien marca
+                     una casilla o pulsa una accion no queria viajar. */
+                  <Row
+                    key={client.id}
+                    busy={busyId === client.id}
+                    onClick={() => navigate(`/clientes/${client.id}`)}
+                    className="cursor-pointer"
+                  >
                     {canWrite && (
-                      <Td>
+                      <Td onClick={(event) => event.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(client.id)}
@@ -571,7 +583,7 @@ export function ClientsPage() {
                          relleno izquierdo de la celda son 14 px muertos — y eran
                          justo los que empujaban la tabla mas alla del panel y
                          encendian una barra de scroll horizontal por 10 px. */
-                      <Td className="pl-0">
+                      <Td className="pl-0" onClick={(event) => event.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <RowAction
                             label={`Reasignar vendedor de ${client.name}`}

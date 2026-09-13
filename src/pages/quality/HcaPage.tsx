@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { fetchAllPages } from "../../api/paging";
 import { productLinesApi } from "../../api/productLines";
 import {
@@ -67,6 +67,7 @@ function listDebt(counts: SheetCounts): string {
 /** RF-Q1: listado paginado de HCA con pastillas por estado y filtros por linea
  *  de producto, responsable, cliente y rango de fechas. */
 export function HcaPage() {
+  const navigate = useNavigate();
   const { can } = usePermissions();
   const canWrite = can("quality.write");
 
@@ -365,7 +366,17 @@ export function HcaPage() {
                 const overdue = isSheetOverdue(sheet);
 
                 return (
-                  <Row key={sheet.id}>
+                  /* La fila entera lleva al detalle, como en la bandeja de
+                     tickets. El resaltado al pasar por encima ya prometia que
+                     la fila respondia; sin esto, la promesa obligaba a acertarle
+                     al enlace del nombre, que es el 15 % del ancho de la fila.
+                     Los controles de dentro paran la propagacion: quien marca
+                     una casilla o pulsa una accion no queria viajar. */
+                  <Row
+                    key={sheet.id}
+                    onClick={() => navigate(`/calidad/hca/${sheet.id}`)}
+                    className="cursor-pointer"
+                  >
                     <Td>
                       <Link
                         to={`/calidad/hca/${sheet.id}`}
