@@ -1,4 +1,4 @@
-import { CHANNELS } from "../mockData";
+import { useDashboard } from "../dashboardContext";
 import { useApplyFilter } from "../filters";
 import { C, FONT, NUM, S, SERIES, T, n } from "../styles";
 import { Card, CardHead, Delta } from "./primitives";
@@ -23,6 +23,8 @@ const NAME_W = 96;
 
 export function CallDetails() {
   const applyFilter = useApplyFilter();
+
+  const { channels: CHANNELS } = useDashboard();
 
   const total = CHANNELS.reduce((sum, c) => sum + c.value, 0);
   const max = Math.max(...CHANNELS.map((c) => c.value), 1);
@@ -102,8 +104,18 @@ export function CallDetails() {
 
               {/* Anchos mínimos para que las dos columnas de la derecha cuadren
                   entre filas: sin ellos, «+12,4%» y «−3,1%» desalinean el valor. */}
+              {/* Sin ventana anterior no hay variacion que mostrar. Antes iba
+                  un cero, y un cero AFIRMA «no cambio»: no es lo mismo que «no
+                  se puede saber». El hueco conserva el ancho para que la
+                  columna no se desalinee entre filas. */}
               <span style={{ width: 52, flexShrink: 0, textAlign: "right" }}>
-                <Delta value={channel.delta} />
+                {channel.delta === null ? (
+                  <span style={{ ...T.caption, color: C.soft }} title="Sin datos del periodo anterior">
+                    —
+                  </span>
+                ) : (
+                  <Delta value={channel.delta} />
+                )}
               </span>
               <span
                 style={{

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AGENTS } from "../mockData";
+import { colorIndex, useDashboard } from "../dashboardContext";
 import { useApplyFilter } from "../filters";
 import { AVATAR, C, FONT, NUM, T, hueFor } from "../styles";
 import { Avatar, Card, CardHead, Select } from "./primitives";
@@ -21,6 +21,7 @@ const ROW_H = 62;
 
 export function AgentPerformance() {
   const applyFilter = useApplyFilter();
+  const { agents: AGENTS } = useDashboard();
   const [sortBy, setSortBy] = useState("Cerrados");
   const sorted = useMemo(() => {
     const list = [...AGENTS];
@@ -92,7 +93,7 @@ export function AgentPerformance() {
                 transition: "background .15s",
               }}
             >
-              <Avatar name={a.name} index={a.id - 1} size={26} />
+              <Avatar name={a.name} index={colorIndex(a.id, AVATAR.length)} size={26} />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span
                   style={{
@@ -136,7 +137,7 @@ export function AgentPerformance() {
                       height: "100%",
                       width: `${(a.closed / maxClosed) * 100}%`,
                       borderRadius: 99,
-                      background: AVATAR[(a.id - 1) % AVATAR.length],
+                      background: AVATAR[colorIndex(a.id, AVATAR.length)],
                     }}
                   />
                 </span>

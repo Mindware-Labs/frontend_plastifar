@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { COUNTS } from "../mockData";
+import { useDashboard } from "../dashboardContext";
 import { useApplyFilter, type DashboardFilter } from "../filters";
 import { C, FONT, NUM, T, hueFor } from "../styles";
 import { Card, CardHead } from "./primitives";
@@ -30,7 +30,15 @@ export function TicketByStage() {
   const applyFilter = useApplyFilter();
   const [hover, setHover] = useState<string | null>(null);
 
-  const live = COUNTS.open + COUNTS.upcoming + COUNTS.overdue + COUNTS.waitingOnClient;
+  const { counts: COUNTS, stage } = useDashboard();
+
+  /* `live` LO MANDA EL SERVIDOR y ya no se recompone sumando los cuatro tramos.
+     Esa suma era falsa: «abierto» y «vencido» se solapan —un ticket abierto y
+     fuera de plazo esta en los dos— asi que el mismo ticket se contaba dos
+     veces y el total de vivos salia inflado. Por eso esta tarjeta y la de
+     estados mostraban dos totales distintos de lo mismo. Los vivos son,
+     exactamente, los que no estan cerrados. */
+  const live = COUNTS.live;
   const onTime = live - COUNTS.overdue;
   const share = live === 0 ? 0 : onTime / live;
 
@@ -38,7 +46,7 @@ export function TicketByStage() {
     {
       key: "open",
       label: "En curso",
-      value: COUNTS.open,
+      value: stage.onTrack,
       color: hueFor("cumplido").color,
       hint: "con plazo holgado",
       filter: { kind: "estado", value: "abiertos", label: "los tickets en curso" },
@@ -46,7 +54,7 @@ export function TicketByStage() {
     {
       key: "upcoming",
       label: "Por vencer",
-      value: COUNTS.upcoming,
+      value: stage.upcoming,
       color: hueFor("porVencer").color,
       hint: "vencen hoy",
       filter: { kind: "estado", value: "por-vencer", label: "los tickets por vencer" },
@@ -54,7 +62,7 @@ export function TicketByStage() {
     {
       key: "overdue",
       label: "Vencidos",
-      value: COUNTS.overdue,
+      value: stage.overdue,
       color: hueFor("vencido").color,
       hint: "fuera de plazo",
       filter: { kind: "estado", value: "vencidos", label: "los tickets vencidos" },
@@ -62,7 +70,7 @@ export function TicketByStage() {
     {
       key: "waiting",
       label: "En espera",
-      value: COUNTS.waitingOnClient,
+      value: stage.waiting,
       color: C.faintMark,
       hint: "del cliente",
       filter: { kind: "estado", value: "espera", label: "los tickets en espera" },

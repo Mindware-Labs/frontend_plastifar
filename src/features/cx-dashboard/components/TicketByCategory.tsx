@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { TOPICS } from "../mockData";
+import { useDashboard } from "../dashboardContext";
 import { SERIES, C, FONT, NUM, S, T, n } from "../styles";
 import { Card, CardHead } from "./primitives";
 
@@ -25,6 +25,8 @@ export function TicketByCategory() {
     setOff((current) =>
       current.includes(label) ? current.filter((x) => x !== label) : [...current, label],
     );
+
+  const { topics: TOPICS } = useDashboard();
 
   const visible = TOPICS.filter((t) => !off.includes(t.label));
   const total = visible.reduce((sum, t) => sum + t.value, 0);

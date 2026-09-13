@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import "./dashboard.css";
 import { AgentPerformance } from "./components/AgentPerformance";
 import { CallDetails } from "./components/CallDetails";
@@ -8,7 +8,10 @@ import { TicketByState } from "./components/TicketByState";
 import { TicketByCategory } from "./components/TicketByCategory";
 import { TicketByStage } from "./components/TicketByStage";
 import { TicketTrend } from "./components/TicketTrend";
-import { COUNTS } from "./mockData";
+import { dashboardApi, type DashboardResponse } from "../../api/dashboard";
+import { DashboardContext } from "./dashboardContext";
+import { LoadErrorAlert } from "../../pages/settings/catalogSection";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { S } from "./styles";
 import { usePageChrome } from "../../layouts/usePageChrome";
 
@@ -42,9 +45,6 @@ import { usePageChrome } from "../../layouts/usePageChrome";
  */
 
 /** 1.85fr / 1fr en escritorio; `cx-pair` lo colapsa a una columna bajo 1024 px. */
-/** La ventana que gobierna las nueve cajas. */
-const RANGE = "30 días";
-
 const WIDE: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(0,1.85fr) minmax(0,1fr)",
@@ -61,23 +61,73 @@ const WIDE: CSSProperties = {
  * maquetacion, no como una decision.
  */
 
+/** La ventana, en días. Ver «LA VENTANA NO SE ELIGE» arriba. */
+const DIAS = 30;
+
 export function CXDashboard({ query }: { query?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const live = COUNTS.open + COUNTS.upcoming + COUNTS.overdue + COUNTS.waitingOnClient;
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let cancelado = false;
+
+    dashboardApi
+      .get(DIAS)
+      .then((respuesta) => {
+        if (cancelado) return;
+        setData(respuesta);
+        setError(null);
+      })
+      .catch(() => {
+        if (!cancelado) setError("No se pudo cargar el tablero");
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [reloadKey]);
 
   /* Lo que la barra de aplicación muestra cuando esta pantalla ya scrolleó. El
      ítem `danger` es el único que sobrevive al condensado, así que lleva lo
-     único que exige una acción. */
+     único que exige una acción.
+
+     `live` lo manda el servidor y NO se recompone sumando tramos: «abierto» y
+     «vencido» se solapan, así que la suma contaba dos veces el mismo ticket. */
   usePageChrome({
     title: "Dashboard de operaciones",
-    context: [
-      { text: `${live} tickets vivos`, strong: true },
-      { text: `${COUNTS.overdue} fuera de plazo`, tone: "danger" },
-    ],
+    context: data
+      ? [
+          { text: `${data.counts.live} tickets vivos`, strong: true },
+          { text: `${data.counts.overdue} fuera de plazo`, tone: "danger" as const },
+        ]
+      : [],
     scrollRoot: scrollRef,
   });
 
+  if (error !== null) {
+    return (
+      <div className="cxhub" style={{ padding: "2px 3px" }}>
+        <LoadErrorAlert message={error} onRetry={() => setReloadKey((k) => k + 1)} />
+      </div>
+    );
+  }
+
+  /* Mientras carga NO se pintan ceros. Un cero en un tablero de operación es la
+     afirmación «no hay ninguno vencido», no un «todavía no se sabe», y durante
+     ese medio segundo la pantalla estaría mintiendo sobre lo único que la
+     persona vino a mirar. */
+  if (data === null) {
+    return (
+      <div className="cxhub" style={{ padding: "2px 3px" }}>
+        <TableSkeleton rows={10} columns={4} />
+      </div>
+    );
+  }
+
   return (
+    <DashboardContext.Provider value={data}>
     <div className="cxhub" style={{ display: "flex", flexDirection: "column", height: "100%", minWidth: 0 }}>
       {/* `minHeight: 0` es lo que permite que un hijo flex baje de la altura de
           su contenido; sin eso la caja crece y el overflow nunca se activa. El
@@ -109,7 +159,7 @@ export function CXDashboard({ query }: { query?: string }) {
 
         {/* 2 — CÓMO VIENE + SI ESTAMOS EN PLAZO. */}
         <div className="cx-pair plf-band" style={WIDE}>
-          <TicketTrend range={RANGE} />
+          <TicketTrend />
           <TicketByStage />
         </div>
 
@@ -130,6 +180,7 @@ export function CXDashboard({ query }: { query?: string }) {
           <AgentPerformance />
         </div>
       </div>
-    </div>
+      </div>
+    </DashboardContext.Provider>
   );
 }

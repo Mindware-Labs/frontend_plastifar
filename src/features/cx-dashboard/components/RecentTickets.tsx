@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { AGENTS, TICKETS, type Ticket, type TicketPriority, type TicketStatus } from "../mockData";
+import { nombreDeEstado, type DashboardRecentTicket } from "../../../api/dashboard";
+import { colorIndex, useDashboard } from "../dashboardContext";
 import { useApplyFilter } from "../filters";
 import { C, FONT, NUM, T, hueFor } from "../styles";
 import { Avatar, Card, CardHead } from "./primitives";
@@ -8,22 +9,29 @@ import { useFlip } from "./useFlip";
 
 /** El estado es la única columna con semáforo: un segundo código de color en la
  *  misma fila obliga a leer dos leyendas a la vez. */
-const STATUS_TONE: Record<TicketStatus, { fg: string; bg: string }> = {
+const STATUS_TONE: Record<string, { fg: string; bg: string }> = {
   Abierto: { fg: C.body, bg: C.chip },
-  "Por vencer": { fg: hueFor("porVencer").color, bg: hueFor("porVencer").tint },
-  "En espera": { fg: C.body, bg: C.chip },
-  Vencido: { fg: hueFor("vencido").color, bg: hueFor("vencido").tint },
-  Cerrado: { fg: hueFor("cumplido").color, bg: hueFor("cumplido").tint },
+  "En espera del cliente": { fg: hueFor("espera").color, bg: hueFor("espera").tint },
+  "Reenvío de producto": { fg: C.body, bg: C.chip },
+  Solucionado: { fg: hueFor("cumplido").color, bg: hueFor("cumplido").tint },
+  Cancelado: { fg: C.soft, bg: C.chip },
 };
 
+/* VENCIDO NO ES UN ESTADO, es una condicion. Un ticket puede estar «Abierto» y
+   fuera de plazo a la vez: el estado dice en que parte del flujo esta y el
+   vencimiento dice si llego tarde. Se pinta encima del estado porque es lo que
+   exige accion, pero no lo reemplaza en el dato. */
+const TONO_VENCIDO = { fg: hueFor("vencido").color, bg: hueFor("vencido").tint };
+
 /** La prioridad va por PESO tipográfico, no por color. */
-const PRIORITY_STYLE: Record<TicketPriority, { color: string; fontWeight: number }> = {
+const PRIORITY_STYLE: Record<string, { color: string; fontWeight: number }> = {
+  Emergencia: { color: hueFor("vencido").color, fontWeight: 700 },
   Alta: { color: C.ink, fontWeight: 700 },
-  Media: { color: C.body, fontWeight: 500 },
+  Normal: { color: C.body, fontWeight: 500 },
   Baja: { color: C.soft, fontWeight: 500 },
 };
 
-type SortKey = "id" | "customer" | "channel" | "priority" | "status" | "mins";
+type SortKey = "id" | "customer" | "channel" | "priority" | "status" | "minutesSinceActivity";
 
 const VISIBLE = 5;
 
@@ -95,29 +103,38 @@ function InlineSearch({ value, onChange }: { value: string; onChange: (value: st
  */
 export function RecentTickets({ query }: { query?: string }) {
   const applyFilter = useApplyFilter();
-  const [tab, setTab] = useState<"Todos" | TicketStatus>("Todos");
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "mins", dir: "asc" });
+  const { recent } = useDashboard();
+  const [tab, setTab] = useState<string>("Todos");
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
+    key: "minutesSinceActivity",
+    dir: "asc",
+  });
   const [ownQuery, setOwnQuery] = useState("");
 
   const controlled = query !== undefined;
   const effectiveQuery = controlled ? query : ownQuery;
 
-  const tabs: ("Todos" | TicketStatus)[] = [
+  /* Las pestanas son los estados REALES del sistema, mas «Vencidos», que no es
+     un estado sino una condicion. Las anteriores —«Por vencer», «Cerrado»—
+     nombraban estados que el sistema no tiene. */
+  const tabs = [
     "Todos",
-    "Vencido",
-    "Por vencer",
+    "Vencidos",
     "Abierto",
-    "En espera",
-    "Cerrado",
+    "En espera del cliente",
+    "Reenvío de producto",
+    "Solucionado",
   ];
 
   const matches = useMemo(() => {
     const needle = effectiveQuery.trim().toLowerCase();
-    const filtered = TICKETS.filter((t) => {
-      if (tab !== "Todos" && t.status !== tab) return false;
+    const filtered = recent.filter((t) => {
+      if (tab === "Vencidos" && !t.overdue) return false;
+      if (tab !== "Todos" && tab !== "Vencidos" && nombreDeEstado(t.status) !== tab) return false;
       if (!needle) return true;
-      const agent = AGENTS.find((a) => a.id === t.agentId)?.name ?? "";
-      return [t.id, t.customer, t.subject, agent].some((f) => f.toLowerCase().includes(needle));
+      return [t.id, t.customer, t.subject, t.agentName ?? ""].some((f) =>
+        f.toLowerCase().includes(needle),
+      );
     });
     return [...filtered].sort((a, b) => {
       const A = a[sort.key];
@@ -128,7 +145,7 @@ export function RecentTickets({ query }: { query?: string }) {
           : String(A).localeCompare(String(B), "es-DO");
       return sort.dir === "asc" ? cmp : -cmp;
     });
-  }, [tab, effectiveQuery, sort]);
+  }, [recent, tab, effectiveQuery, sort]);
 
   const rows = matches.slice(0, VISIBLE);
   /* Las filas viajan a su nuevo sitio en vez de teletransportarse. */
@@ -244,7 +261,7 @@ export function RecentTickets({ query }: { query?: string }) {
               <th scope="col" style={{ textAlign: "left", padding: "0 10px 8px", ...T.caption, fontWeight: 700, color: C.soft }}>
                 Responsable
               </th>
-              {th("Actividad", "mins", "right")}
+              {th("Actividad", "minutesSinceActivity", "right")}
             </tr>
           </thead>
           <tbody>
@@ -310,14 +327,15 @@ function TicketRow({
   fmt,
   flipRef,
 }: {
-  ticket: Ticket;
+  ticket: DashboardRecentTicket;
   td: React.CSSProperties;
   fmt: (m: number) => string;
   flipRef: (node: HTMLElement | null) => void;
 }) {
   const applyFilter = useApplyFilter();
-  const agent = AGENTS.find((a) => a.id === ticket.agentId);
-  const status = STATUS_TONE[ticket.status];
+  const estado = nombreDeEstado(ticket.status);
+  /* Vencido manda sobre el estado en el color: es lo que exige actuar. */
+  const status = ticket.overdue ? TONO_VENCIDO : (STATUS_TONE[estado] ?? { fg: C.body, bg: C.chip });
 
   return (
     <tr ref={flipRef} className="cx-tr">
@@ -377,17 +395,23 @@ function TicketRow({
             whiteSpace: "nowrap",
           }}
         >
-          {ticket.status}
+          {ticket.overdue ? `${estado} · vencido` : estado}
         </span>
       </td>
       <td style={td}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap" }}>
-          <Avatar name={agent?.name ?? "—"} index={ticket.agentId - 1} size={22} />
-          <span style={{ ...T.label, color: C.body }}>{agent?.name.split(" ")[0] ?? "Sin asignar"}</span>
+          <Avatar
+            name={ticket.agentName ?? "—"}
+            index={colorIndex(ticket.agentId ?? 0, 5)}
+            size={22}
+          />
+          <span style={{ ...T.label, color: C.body }}>
+            {ticket.agentName?.split(" ")[0] ?? "Sin asignar"}
+          </span>
         </span>
       </td>
       <td style={{ ...td, ...T.caption, fontWeight: 500, color: C.soft, textAlign: "right", whiteSpace: "nowrap" }}>
-        {fmt(ticket.mins)}
+        {fmt(ticket.minutesSinceActivity)}
       </td>
     </tr>
   );

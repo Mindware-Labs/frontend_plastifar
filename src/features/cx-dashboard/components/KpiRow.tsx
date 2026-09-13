@@ -1,15 +1,15 @@
 import {
+  AlarmClock,
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   ClipboardCheck,
   Clock,
+  History,
   Inbox,
-  Minus,
   PauseCircle,
+  UserX,
   type LucideIcon,
 } from "lucide-react";
-import { COUNTS, QUALITY } from "../mockData";
+import { useDashboard } from "../dashboardContext";
 import { useApplyFilter, type DashboardFilter } from "../filters";
 import { useCountUp } from "../../../hooks/useCountUp";
 import { C, FONT, NUM, R, S, T, hueFor, n, type Role } from "../styles";
@@ -61,21 +61,23 @@ interface Kpi {
    * formatea en cada fotograma, asi que necesita la magnitud, no el texto.
    */
   count: number;
-  /** La magnitud de la variación, SIN signo: el signo lo dice la flecha. */
-  breakdown: string;
   /** Calificador: contra qué se lee. */
   qualifier: string;
-  /** Cuánto se movió contra ayer. El signo decide la dirección. */
-  change: number;
   /**
-   * Hacia dónde es MEJOR que se mueva esta cifra.
+   * EL ACOMPAÑANTE. Un hecho del presente, al lado de la cifra.
    *
-   * Las seis son medidas de atraso o de espera, así que en las seis bajar es
-   * bueno. Queda escrito por KPI y no asumido, porque un indicador futuro
-   * —«cerrados en el día»— sería al revés, y ahí el color diría lo contrario
-   * de lo que pasa.
+   * Aquí vivía «cuánto se movió contra ayer», y era imposible de sostener:
+   * vencidos, por vencer, en espera y HCA abiertas son cantidades del INSTANTE
+   * —se deducen comparando una fecha de compromiso contra el reloj— así que el
+   * valor de ayer no está guardado en ninguna tabla y no se puede reconstruir.
+   * Los cinco deltas que había eran literales escritos a mano.
+   *
+   * Lo que hay ahora sale de una consulta y además contesta algo más útil: no
+   * «ayer estábamos mejor» sino DÓNDE ACTUAR. `null` cuando no hay nada que
+   * señalar, y entonces no se pinta nada: una pastilla que dice «0» ocupa sitio
+   * para no informar.
    */
-  betterWhen: "lower" | "higher";
+  hint: { icon: LucideIcon; text: string; urgent: boolean } | null;
   filter: DashboardFilter;
 }
 
@@ -97,24 +99,21 @@ interface Kpi {
  * Ahora la FLECHA dice la dirección y el COLOR dice el veredicto. Una flecha
  * hacia abajo sobre verde se lee sin esfuerzo: «bajó, y eso está bien».
  */
-function Change({ kpi }: { kpi: Kpi }) {
-  const flat = kpi.change === 0;
-  const rising = kpi.change > 0;
-  const good = kpi.betterWhen === "lower" ? !rising : rising;
-  const hue = hueFor(good ? "cumplido" : "vencido");
+function Acompanante({ kpi }: { kpi: Kpi }) {
+  if (kpi.hint === null) return null;
 
-  const Arrow = flat ? Minus : rising ? ArrowUp : ArrowDown;
-  const fg = flat ? C.soft : hue.color;
-  const bg = flat ? C.chip : hue.tint;
+  const hue = hueFor(kpi.hint.urgent ? "vencido" : "cumplido");
+  const fg = kpi.hint.urgent ? hue.color : C.soft;
+  const bg = kpi.hint.urgent ? hue.tint : C.chip;
+  const Icon = kpi.hint.icon;
 
   return (
     <span
-      aria-label={`${flat ? "sin cambios" : rising ? "sube" : "baja"} contra ayer`}
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 3,
-        padding: "2px 7px 2px 5px",
+        gap: 4,
+        padding: "2px 8px 2px 6px",
         borderRadius: 999,
         background: bg,
         color: fg,
@@ -125,8 +124,8 @@ function Change({ kpi }: { kpi: Kpi }) {
         whiteSpace: "nowrap",
       }}
     >
-      <Arrow size={11} strokeWidth={2.5} aria-hidden />
-      {kpi.breakdown}
+      <Icon size={11} strokeWidth={2.5} aria-hidden />
+      {kpi.hint.text}
     </span>
   );
 }
@@ -212,7 +211,7 @@ function KpiCard({ kpi, index }: { kpi: Kpi; index: number }) {
             son el mismo hecho leído dos veces. */}
         <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
           <span style={{ ...T.figure, ...NUM, fontSize: 24, color: C.ink }}>{n(shown)}</span>
-          <Change kpi={kpi} />
+          <Acompanante kpi={kpi} />
         </span>
 
         <span
@@ -236,7 +235,12 @@ function KpiCard({ kpi, index }: { kpi: Kpi; index: number }) {
 /* -------------------------------------------------------------------------- */
 
 export function KpiRow() {
-  const live = COUNTS.open + COUNTS.upcoming + COUNTS.overdue + COUNTS.waitingOnClient;
+  const { counts, quality, attention } = useDashboard();
+
+  /* `live` viene del SERVIDOR y no se recompone sumando tramos: «abierto» y
+     «vencido» se solapan, así que la suma contaba dos veces el mismo ticket y
+     todos estos porcentajes salían sobre un total inflado. */
+  const live = counts.live;
   const pct = (v: number) => (live === 0 ? "—" : `${Math.round((v / live) * 100)}% de los vivos`);
 
   const kpis: Kpi[] = [
@@ -244,55 +248,77 @@ export function KpiRow() {
       label: "Fuera de plazo",
       role: "vencido",
       icon: AlertTriangle,
-      count: COUNTS.overdue,
-      breakdown: "4",
-      change: 4,
-      betterWhen: "lower",
-      qualifier: pct(COUNTS.overdue),
+      count: counts.overdue,
+      qualifier: pct(counts.overdue),
+      // Cuánto lleva esperando el peor caso. Diez vencidos de ayer y diez de
+      // hace tres semanas son el mismo número y no son el mismo problema.
+      hint:
+        attention.oldestOverdueDays === null
+          ? null
+          : {
+              icon: History,
+              text: `${n(attention.oldestOverdueDays)} d el más viejo`,
+              urgent: attention.oldestOverdueDays >= 1,
+            },
       filter: { kind: "estado", value: "vencidos", label: "los tickets vencidos" },
     },
     {
       label: "Por vencer",
       role: "porVencer",
       icon: Clock,
-      count: COUNTS.upcoming,
-      breakdown: "6",
-      change: 6,
-      betterWhen: "lower",
-      qualifier: pct(COUNTS.upcoming),
+      count: counts.upcoming,
+      qualifier: pct(counts.upcoming),
+      // La emergencia dentro de la ventana de 24 h: lo que hay que tocar ya.
+      hint:
+        attention.dueWithin2h === 0
+          ? null
+          : { icon: AlarmClock, text: `${n(attention.dueWithin2h)} en 2 h`, urgent: true },
       filter: { kind: "estado", value: "por-vencer", label: "los tickets por vencer" },
     },
     {
       label: "Abiertos",
       role: "abierto",
       icon: Inbox,
-      count: COUNTS.open,
-      breakdown: "3",
-      change: -3,
-      betterWhen: "lower",
-      qualifier: pct(COUNTS.open),
+      count: counts.open,
+      qualifier: pct(counts.open),
+      // Trabajo que nadie tomó. No está atrasado todavía, y por eso no aparece
+      // en ninguna otra cifra de esta fila.
+      hint:
+        attention.unassigned === 0
+          ? null
+          : { icon: UserX, text: `${n(attention.unassigned)} sin asignar`, urgent: true },
       filter: { kind: "estado", value: "abiertos", label: "los tickets abiertos" },
     },
     {
       label: "En espera",
       role: "espera",
       icon: PauseCircle,
-      count: COUNTS.waitingOnClient,
-      breakdown: "2",
-      change: 2,
-      betterWhen: "lower",
+      count: counts.waitingOnClient,
       qualifier: "del cliente",
+      // Esperar al cliente es normal; esperar una semana es una fuga. El reloj
+      // se cuenta desde que entró en espera, no desde que se creó.
+      hint:
+        attention.waitingOver7Days === 0
+          ? null
+          : {
+              icon: History,
+              text: `${n(attention.waitingOver7Days)} > 7 días`,
+              urgent: true,
+            },
       filter: { kind: "estado", value: "espera", label: "los tickets en espera del cliente" },
     },
     {
       label: "HCA abiertas",
       role: "hca",
       icon: ClipboardCheck,
-      count: QUALITY.openNow,
-      breakdown: "2",
-      change: -2,
-      betterWhen: "lower",
-      qualifier: `${n(QUALITY.overdueNow)} vencidas`,
+      count: quality.openNow,
+      // El acompañante ya dice cuántas están vencidas; repetirlo aquí gastaba
+      // las dos líneas de la tarjeta en el mismo dato.
+      qualifier: "hojas sin cerrar",
+      hint:
+        quality.overdueNow === 0
+          ? null
+          : { icon: AlertTriangle, text: `${n(quality.overdueNow)} vencidas`, urgent: true },
       filter: { kind: "hca", value: "abiertas", label: "las HCA abiertas" },
     },
   ];

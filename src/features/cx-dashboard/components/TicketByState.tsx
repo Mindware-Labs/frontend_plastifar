@@ -1,4 +1,5 @@
-import { STATE_AGING } from "../mockData";
+import { nombreDeEstado } from "../../../api/dashboard";
+import { useDashboard } from "../dashboardContext";
 import { useApplyFilter } from "../filters";
 import { C, FONT, NUM, S, T, n } from "../styles";
 import { Card, CardHead } from "./primitives";
@@ -63,7 +64,17 @@ const NAME_W = 158;
 export function TicketByState() {
   const applyFilter = useApplyFilter();
 
-  const rows = STATE_AGING.map((r) => ({ ...r, total: r.fresh + r.aging + r.stale }));
+  const { stateAging } = useDashboard();
+
+  /* El servidor manda el nombre del enum —«EnEsperaDelCliente»— porque es su
+     identificador estable. La traduccion a algo legible vive en una sola
+     funcion para que dos tarjetas no acaben llamando de dos formas distintas
+     al mismo estado. */
+  const rows = stateAging.map((r) => ({
+    ...r,
+    state: nombreDeEstado(r.state),
+    total: r.fresh + r.aging + r.stale,
+  }));
   const max = Math.max(...rows.map((r) => r.total), 1);
   const stale = rows.reduce((sum, r) => sum + r.stale, 0);
   const total = rows.reduce((sum, r) => sum + r.total, 0);

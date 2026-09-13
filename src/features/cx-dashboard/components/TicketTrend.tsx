@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { RANGES, derivedSeries, series } from "../mockData";
+import { useDashboard } from "../dashboardContext";
 import { C, NUM, T, n } from "../styles";
 import { BarChart, SERIES_IN, SERIES_OUT } from "./BarChart";
 import { Card, CardHead } from "./primitives";
@@ -29,16 +29,39 @@ import { Card, CardHead } from "./primitives";
  * segundo eje a la derecha dejaría que cualquiera de las dos pareciera mayor
  * con sólo elegir los topes, y el cruce entre ellas dejaría de significar algo.
  */
-export function TicketTrend({ range }: { range: string }) {
-  const cfg = RANGES[range];
-  const entered = useMemo(() => series(cfg.seed, cfg.count, cfg.band[0], cfg.band[1]), [cfg]);
-  /* Cerrados deriva de entrados: en una operación real las dos están
-     correlacionadas, y dos series aleatorias sueltas se cruzarían de un modo
-     que ningún equipo reconocería. */
-  const closed = useMemo(() => derivedSeries(entered, cfg.seed + 91, 17, 150), [entered, cfg.seed]);
+export function TicketTrend() {
+  const { trend, range } = useDashboard();
+
+  const entered = useMemo(() => trend.map((d) => d.opened), [trend]);
+  const closed = useMemo(() => trend.map((d) => d.closed), [trend]);
 
   const totalIn = entered.reduce((a, b) => a + b, 0);
   const totalOut = closed.reduce((a, b) => a + b, 0);
+
+  /* EL TOPE DEL EJE SALE DEL DATO, no de una constante.
+     Antes venia fijo en la configuracion del rango porque las series eran
+     inventadas y su techo se conocia de antemano. Con dato real un tope fijo
+     tiene dos formas de mentir: si se queda corto, las barras se salen; si se
+     pasa, la serie entera queda aplastada contra el suelo y no se distingue un
+     dia de otro. Se redondea hacia arriba para que la ultima marca del eje sea
+     un numero legible y no el maximo exacto. */
+  const pico = Math.max(1, ...entered, ...closed);
+  const escala = Math.pow(10, Math.floor(Math.log10(pico)));
+  const max = Math.ceil(pico / escala) * escala;
+
+  /* Marcas del eje: cuatro a lo largo de la ventana. Con treinta columnas,
+     rotular todas es ilegible y rotular dos no ubica nada. */
+  const etiquetaDe = (i: number) => {
+    const punto = trend[i];
+    if (!punto) return "";
+    const [, mes, dia] = punto.date.split("-");
+    return `${Number(dia)}/${Number(mes)}`;
+  };
+  const ticks: [number, string][] = trend.length === 0
+    ? []
+    : [0, 0.33, 0.66, 0.99]
+        .map((f) => Math.floor(f * (trend.length - 1)))
+        .map((i) => [i, etiquetaDe(i)] as [number, string]);
 
 
   return (
@@ -61,7 +84,7 @@ export function TicketTrend({ range }: { range: string }) {
               <span style={{ ...T.label, ...NUM, fontWeight: 600, color: C.body }}>{n(totalOut)}</span>
               <span style={{ ...T.caption, color: C.soft }}>cerrados</span>
             </span>
-            <span style={{ ...T.caption, color: C.soft }}>{range}</span>
+            <span style={{ ...T.caption, color: C.soft }}>{range.days} días</span>
           </span>
         }
       />
@@ -72,9 +95,9 @@ export function TicketTrend({ range }: { range: string }) {
             { label: "Entrados", values: entered, color: SERIES_IN },
             { label: "Cerrados", values: closed, color: SERIES_OUT },
           ]}
-          max={cfg.max}
-          ticks={cfg.ticks}
-          tooltipTop={(i) => cfg.labelFor(i)}
+          max={max}
+          ticks={ticks}
+          tooltipTop={etiquetaDe}
           tooltipUnit="tickets"
         />
       </div>
