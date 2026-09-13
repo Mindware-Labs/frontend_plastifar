@@ -354,6 +354,76 @@ input:-webkit-autofill:focus {
   animation: plf-check-stroke 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.06s forwards;
 }
 
+/* Transiciones de Pasos y Selección Tipo Apple UI — Ultra Fluidas e Integradas */
+@keyframes plf-apple-slide-forward {
+  0% {
+    opacity: 0;
+    transform: translate3d(8px, 0, 0);
+    filter: blur(1.5px);
+  }
+  35% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+
+@keyframes plf-apple-slide-backward {
+  0% {
+    opacity: 0;
+    transform: translate3d(-8px, 0, 0);
+    filter: blur(1.5px);
+  }
+  35% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+
+@keyframes plf-header-fade {
+  0% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes plf-apple-pop {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-plf-step-forward {
+  animation: plf-apple-slide-forward 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity, filter;
+}
+.animate-plf-step-backward {
+  animation: plf-apple-slide-backward 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity, filter;
+}
+.animate-plf-header-fade {
+  animation: plf-header-fade 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-plf-apple-pop { animation: plf-apple-pop 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
 .animate-plf-spinner-rotate { animation: plf-spinner-rotate 1.4s linear infinite; }
 .animate-plf-spinner-dash { animation: plf-spinner-dash 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 .animate-plf-spinner-pulse { animation: plf-spinner-pulse 2s ease-in-out infinite; }
@@ -376,7 +446,11 @@ input:-webkit-autofill:focus {
   .animate-plf-receipt-in,
   .animate-plf-check-in,
   .animate-plf-check-breathe,
-  .animate-plf-check-stroke {
+  .animate-plf-check-stroke,
+  .animate-plf-step-forward,
+  .animate-plf-step-backward,
+  .animate-plf-header-fade,
+  .animate-plf-apple-pop {
     animation: none !important;
   }
 

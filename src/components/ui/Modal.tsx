@@ -67,26 +67,34 @@ export function Modal({
           isExiting ? "pointer-events-none" : ""
         } ${
           settle ? "animate-plf-settle" : ""
-        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-[0_12px_36px_rgba(27,27,29,0.14)]`}
+        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-[0_12px_36px_rgba(27,27,29,0.14)] transition-[max-width] duration-350 ease-[cubic-bezier(0.22,1,0.36,1)]`}
       >
         {/* Cabecera compacta con borde nítido y buena jerarquía */}
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line bg-zinc-50/50 px-6 py-4">
           <div className="min-w-0 flex-1">
             {eyebrow && (
-              <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
+              <p
+                key={eyebrow}
+                className="animate-plf-header-fade font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400"
+              >
                 {eyebrow}
               </p>
             )}
             <h2
+              key={title}
               id={titleId}
-              className="font-heading text-[16px] font-bold tracking-tight text-ink leading-snug"
+              className="animate-plf-header-fade font-heading text-[16px] font-bold tracking-tight text-ink leading-snug"
             >
               {title}
             </h2>
             {description && (
-              <p id={descriptionId} className="mt-1 text-[12px] leading-relaxed text-subtle">
+              <div
+                key={typeof description === "string" ? description : undefined}
+                id={descriptionId}
+                className="animate-plf-header-fade mt-1 text-[12px] leading-relaxed text-subtle"
+              >
                 {description}
-              </p>
+              </div>
             )}
           </div>
 
