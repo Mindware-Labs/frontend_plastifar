@@ -1,4 +1,4 @@
-import { LogOut, Pencil, Plus, Trash2, UserX } from "lucide-react";
+import { Building2, LogOut, Pencil, Plus, Trash2, UserX, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
@@ -9,16 +9,17 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { FilterDropdown } from "../../components/ui/FilterDropdown";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Select } from "../../components/ui/Select";
+import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
 import { StaffModal } from "./StaffModal";
 
@@ -83,6 +84,8 @@ export function StaffPage() {
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const unfiltered = filter === "todos" && departmentId === "todos" && !debouncedSearch;
+
+  const departmentOptions = buildDepartmentFilterOptions(departments);
 
   function departmentName(id: number) {
     return departments.find((d) => d.id === id)?.name ?? "—";
@@ -188,41 +191,50 @@ export function StaffPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {/* Criterios: busqueda, departamento y pastillas de estado */}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por nombre o correo…"
-            className="w-[240px]"
-          />
-
-          <Select
-            size="sm"
-            className="w-[220px]"
-            aria-label="Filtrar por departamento"
-            value={String(departmentId)}
-            onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
-            options={[
-              { value: "todos", label: "Todos los departamentos" },
-              ...departments.map((department) => ({
-                value: String(department.id),
-                label: department.name,
-              })),
-            ]}
-          />
-
-          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-          {filters.map(({ key, label, countKey }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              count={counts?.[countKey] ?? 0}
-              active={filter === key}
-              onClick={() => setFilter(key)}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre o correo…"
+              className="w-[240px] sm:w-[260px]"
             />
-          ))}
+
+            <FilterDropdown
+              title="Seleccionar departamento"
+              value={String(departmentId)}
+              onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+              options={departmentOptions}
+              defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
+              aria-label="Filtrar por departamento"
+            />
+
+            {(search || departmentId !== "todos") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setDepartmentId("todos");
+                }}
+                title="Limpiar filtros"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
+              >
+                <X className="h-3.5 w-3.5 text-zinc-400" />
+                <span>Limpiar</span>
+              </button>
+            )}
+          </div>
+
+          <SegmentedFilter
+            aria-label="Filtro de colaboradores"
+            value={filter}
+            onChange={setFilter}
+            items={filters.map(({ key, label, countKey }) => ({
+              key,
+              label,
+              count: counts?.[countKey] ?? 0,
+            }))}
+          />
         </div>
 
         {error && (

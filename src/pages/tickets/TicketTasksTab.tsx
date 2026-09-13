@@ -18,7 +18,7 @@ import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { Spinner } from "../../components/ui/Spinner";
 import { Toast } from "../../components/ui/Toast";
 import { formatBytes, formatDateTime } from "../../lib/format";
@@ -169,32 +169,17 @@ export function TicketTasksTab({
     <div className="mt-3.5 space-y-3.5">
       {/* Barra de control superior */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FilterChip
-            label="Todas"
-            count={tasks.length}
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-          />
-          <FilterChip
-            label="Pendientes"
-            count={pendingTasks.length}
-            active={filter === "pending"}
-            onClick={() => setFilter("pending")}
-          />
-          <FilterChip
-            label="Completadas"
-            count={completedTasks.length}
-            active={filter === "completed"}
-            onClick={() => setFilter("completed")}
-          />
-          <FilterChip
-            label="Mis tareas"
-            count={myTasks.length}
-            active={filter === "mine"}
-            onClick={() => setFilter("mine")}
-          />
-        </div>
+        <SegmentedFilter
+          aria-label="Filtro de tareas"
+          value={filter}
+          onChange={setFilter}
+          items={[
+            { key: "all", label: "Todas", count: tasks.length },
+            { key: "pending", label: "Pendientes", count: pendingTasks.length },
+            { key: "completed", label: "Completadas", count: completedTasks.length },
+            { key: "mine", label: "Mis tareas", count: myTasks.length },
+          ]}
+        />
 
         <Button
           type="button"

@@ -1,21 +1,14 @@
 import {
   AlertOctagon,
   AlertTriangle,
-  Boxes,
-  Briefcase,
   Building2,
   CheckCircle2,
   ChevronDown,
   Clock,
-  Factory,
   Flag,
-  LayoutGrid,
   Plus,
-  ShieldCheck,
   SlidersHorizontal,
   Ticket as TicketIcon,
-  TrendingUp,
-  Wrench,
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -24,6 +17,7 @@ import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
 import { useNavigate } from "react-router-dom";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
+import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -455,35 +449,7 @@ export function TicketsPage() {
 
   const bulkIds = () => Array.from(selectedIds);
 
-  const departmentOptions: TicketFilterOption[] = [
-    {
-      value: "todos",
-      label: "Todos los departamentos",
-      icon: <LayoutGrid className="h-4 w-4 text-zinc-500" />,
-    },
-    ...departments.map((d) => {
-      const name = d.name.toLowerCase();
-      let icon = <Building2 className="h-4 w-4 text-zinc-500" />;
-      if (name.includes("almac")) {
-        icon = <Boxes className="h-4 w-4 text-amber-600" />;
-      } else if (name.includes("admin")) {
-        icon = <Briefcase className="h-4 w-4 text-blue-600" />;
-      } else if (name.includes("calidad")) {
-        icon = <ShieldCheck className="h-4 w-4 text-emerald-600" />;
-      } else if (name.includes("producc")) {
-        icon = <Factory className="h-4 w-4 text-purple-600" />;
-      } else if (name.includes("manten")) {
-        icon = <Wrench className="h-4 w-4 text-orange-600" />;
-      } else if (name.includes("ventas") || name.includes("comercial")) {
-        icon = <TrendingUp className="h-4 w-4 text-cyan-600" />;
-      }
-      return {
-        value: String(d.id),
-        label: d.name,
-        icon,
-      };
-    }),
-  ];
+  const departmentOptions = buildDepartmentFilterOptions(departments);
 
   const priorityFilterOptions: TicketFilterOption[] = [
     {

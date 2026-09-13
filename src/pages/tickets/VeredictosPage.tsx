@@ -1,4 +1,4 @@
-import { Ban, CheckCircle2, Gavel, Pencil, Plus, Trash2 } from "lucide-react";
+import { Ban, CheckCircle2, Gavel, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { ApiError } from "../../api/client";
 import { ticketVerdictsApi, type TicketVerdictQuery } from "../../api/ticketVerdicts";
@@ -7,11 +7,12 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { Spinner } from "../../components/ui/Spinner";
+import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -131,25 +132,37 @@ export function VeredictosPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por veredicto…"
-            className="w-[280px]"
-          />
-
-          <div className="flex flex-wrap gap-1.5">
-            {statusFilters.map((filter) => (
-              <FilterChip
-                key={filter.key}
-                label={filter.label}
-                count={counts?.[filter.countKey] ?? 0}
-                active={status === filter.key}
-                onClick={() => setStatus(filter.key)}
-              />
-            ))}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por veredicto…"
+              className="w-[260px] sm:w-[280px]"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                title="Limpiar búsqueda"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
+              >
+                <X className="h-3.5 w-3.5 text-zinc-400" />
+                <span>Limpiar</span>
+              </button>
+            )}
           </div>
+
+          <SegmentedFilter
+            aria-label="Filtro de veredictos"
+            value={status}
+            onChange={setStatus}
+            items={statusFilters.map((f) => ({
+              key: f.key,
+              label: f.label,
+              count: counts?.[f.countKey] ?? 0,
+            }))}
+          />
         </div>
 
         {(error || actionError) && (
@@ -181,17 +194,7 @@ export function VeredictosPage() {
                     <Td className="text-[13px] font-medium text-ink">{verdict.name}</Td>
                     <Td className="text-[12.5px] text-subtle">{verdict.ticketCount}</Td>
                     <Td>
-                      <span className="inline-flex items-center gap-1.5 text-[12.5px]">
-                        <span
-                          aria-hidden
-                          className={`h-[7px] w-[7px] rounded-full ${
-                            verdict.isActive ? "bg-brand-green" : "bg-line-strong"
-                          }`}
-                        />
-                        <span className={verdict.isActive ? "text-ink" : "text-subtle"}>
-                          {verdict.isActive ? "Activo" : "Inactivo"}
-                        </span>
-                      </span>
+                      <StatusDot active={verdict.isActive} />
                     </Td>
                     <Td className="whitespace-nowrap text-[12.5px] text-subtle">
                       {formatDateTime(verdict.updatedAt)}

@@ -2,21 +2,14 @@ import {
   AlertOctagon,
   AlertTriangle,
   Ban,
-  Boxes,
-  Briefcase,
   Building2,
   CheckCircle2,
   Clock,
-  Factory,
   Flag,
-  LayoutGrid,
   Pencil,
   Plus,
-  ShieldCheck,
   Tag,
   Trash2,
-  TrendingUp,
-  Wrench,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -31,10 +24,12 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { formatDateTime } from "../../lib/format";
 import type {
   DepartmentResponse,
@@ -157,35 +152,7 @@ export function MotivosPage() {
     });
   }
 
-  const departmentOptions: TicketFilterOption[] = [
-    {
-      value: "todos",
-      label: "Todos los departamentos",
-      icon: <LayoutGrid className="h-4 w-4 text-zinc-500" />,
-    },
-    ...departments.map((d) => {
-      const name = d.name.toLowerCase();
-      let icon = <Building2 className="h-4 w-4 text-zinc-500" />;
-      if (name.includes("almac")) {
-        icon = <Boxes className="h-4 w-4 text-amber-600" />;
-      } else if (name.includes("admin")) {
-        icon = <Briefcase className="h-4 w-4 text-blue-600" />;
-      } else if (name.includes("calidad")) {
-        icon = <ShieldCheck className="h-4 w-4 text-emerald-600" />;
-      } else if (name.includes("producc")) {
-        icon = <Factory className="h-4 w-4 text-purple-600" />;
-      } else if (name.includes("manten")) {
-        icon = <Wrench className="h-4 w-4 text-orange-600" />;
-      } else if (name.includes("ventas") || name.includes("comercial")) {
-        icon = <TrendingUp className="h-4 w-4 text-cyan-600" />;
-      }
-      return {
-        value: String(d.id),
-        label: d.name,
-        icon,
-      };
-    }),
-  ];
+  const departmentOptions = buildDepartmentFilterOptions(departments);
 
   const priorityFilterOptions: TicketFilterOption[] = [
     {
@@ -277,39 +244,16 @@ export function MotivosPage() {
             )}
           </div>
 
-          {/* Vistas de estado: Todos, Activos e Inactivos a la derecha */}
-          <div
-            role="group"
+          <SegmentedFilter
             aria-label="Filtro de estado"
-            className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
-          >
-            {statusFilters.map((filter) => {
-              const isActive = status === filter.key;
-              const count = counts?.[filter.countKey] ?? 0;
-              return (
-                <button
-                  key={filter.key}
-                  type="button"
-                  onClick={() => setStatus(filter.key)}
-                  aria-pressed={isActive}
-                  className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-                    isActive
-                      ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                      : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-                  }`}
-                >
-                  <span>{filter.label}</span>
-                  <span
-                    className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
-                      isActive ? "text-zinc-900" : "text-zinc-400"
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+            value={status}
+            onChange={setStatus}
+            items={statusFilters.map((filter) => ({
+              key: filter.key,
+              label: filter.label,
+              count: counts?.[filter.countKey] ?? 0,
+            }))}
+          />
         </div>
 
         {(error || actionError) && (

@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { openOverlay } from "../../hooks/overlayStack";
 import { formatDateTime } from "../../lib/format";
@@ -236,14 +236,16 @@ export function TicketTimelineSheet({
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-1.5 border-b border-line px-6 py-2.5">
-          <FilterChip label="Todos" count={timeline.length} active={filter === "all"} onClick={() => setFilter("all")} />
-          <FilterChip
-            label="Mensajes"
-            count={messageCount}
-            active={filter === "messages"}
-            onClick={() => setFilter("messages")}
+          <SegmentedFilter
+            aria-label="Filtro del historial"
+            value={filter}
+            onChange={setFilter}
+            items={[
+              { key: "all", label: "Todos", count: timeline.length },
+              { key: "messages", label: "Mensajes", count: messageCount },
+              { key: "events", label: "Eventos", count: eventCount },
+            ]}
           />
-          <FilterChip label="Eventos" count={eventCount} active={filter === "events"} onClick={() => setFilter("events")} />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
