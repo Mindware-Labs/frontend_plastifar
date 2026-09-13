@@ -496,12 +496,6 @@ export function TicketsPage() {
             "Cargando bandeja de tickets…"
           )
         }
-        action={
-          <Button size="sm" onClick={() => setCreateModalOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Nuevo ticket
-          </Button>
-        }
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
@@ -529,6 +523,12 @@ export function TicketsPage() {
         )}
 
         <ListPanel
+          action={
+            <Button size="sm" onClick={() => setCreateModalOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Nuevo ticket
+            </Button>
+          }
           toolbar={
             <>
               <SearchInput

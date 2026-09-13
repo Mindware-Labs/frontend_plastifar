@@ -80,12 +80,6 @@ export function RespuestasPage() {
             ? `${items.length} ${items.length === 1 ? "respuesta predefinida" : "respuestas predefinidas"} · se insertan desde el editor con "Respuestas rápidas"`
             : "Cargando las respuestas…"
         }
-        action={
-          <Button size="sm" onClick={() => setModal("nueva")}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nueva respuesta
-          </Button>
-        }
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
@@ -96,6 +90,12 @@ export function RespuestasPage() {
         )}
 
         <ListPanel
+        action={
+          <Button size="sm" onClick={() => setModal("nueva")}>
+            <Plus className="h-[15px] w-[15px]" />
+            Nueva respuesta
+          </Button>
+        }
           toolbar={
             <>
               <SearchInput value={search} onChange={setSearch} placeholder="Buscar por título o texto…" className="w-[260px]" />

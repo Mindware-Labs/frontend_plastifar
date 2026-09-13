@@ -95,14 +95,6 @@ export function RolesPage() {
             ? `${counts.all} roles definidos · ${counts.custom} personalizados · los permisos llegan en una fase posterior`
             : "Cargando los roles del sistema…"
         }
-        action={
-          isAdmin && (
-            <Button size="sm" onClick={() => setModal("nuevo")}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nuevo rol
-            </Button>
-          )
-        }
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
@@ -113,6 +105,14 @@ export function RolesPage() {
         )}
 
         <ListPanel
+        action={
+          isAdmin && (
+            <Button size="sm" onClick={() => setModal("nuevo")}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nuevo rol
+            </Button>
+          )
+        }
           toolbar={
             <>
               <SearchInput

@@ -6,7 +6,6 @@ import {
   type CreditListResponse,
   type CreditQuery,
 } from "../../api/quality";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
@@ -139,16 +138,6 @@ export function CreditRequestsPage() {
 
   return (
     <div>
-      <ModuleHeader
-        action={
-          canWrite && (
-            <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nueva solicitud
-            </Button>
-          )
-        }
-      />
 
       {error && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -164,6 +153,14 @@ export function CreditRequestsPage() {
       {counts && <p className="mb-3 text-[12.5px] text-brand-gray">{listDebt(counts)}</p>}
 
       <ListPanel
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva solicitud
+            </Button>
+          )
+        }
         toolbar={
           <>
         <CriteriaField label="Buscar">
@@ -281,7 +278,7 @@ export function CreditRequestsPage() {
                     <Td className="text-[12.5px] text-brand-gray">
                       <span
                         title={request.clientName}
-                        className="block max-w-[130px] truncate sm:max-w-none sm:overflow-visible"
+                        className="block max-w-[170px] truncate"
                       >
                         {request.clientName}
                       </span>
@@ -292,22 +289,31 @@ export function CreditRequestsPage() {
                     <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
                       {formatDay(request.requestedAt.slice(0, 10))}
                     </Td>
+                    {/* Pastilla y resolucion EN LINEA, y la resolucion truncada.
+                        Apiladas, la columna pedia 317 px —la mas ancha de la
+                        tabla, por un dato secundario— y empujaba el listado 86 px
+                        fuera del panel; ademas dejaba las filas resueltas 20 px
+                        mas altas que las pendientes. */}
                     <Td>
-                      <span className="flex flex-col items-start gap-0.5">
+                      <span className="flex items-center gap-2">
                         <CreditStatusBadge status={request.status} />
                         {request.decidedAt && (
-                          <span className="whitespace-nowrap text-[11.5px] text-faint">
-                            {staffLabel(request.decidedByStaffId, request.decidedByName)} ·{" "}
-                            {formatInstant(request.decidedAt)}
+                          <span
+                            className="whitespace-nowrap text-[11.5px] tabular-nums text-faint"
+                            title={`${staffLabel(request.decidedByStaffId, request.decidedByName)} · ${formatInstant(request.decidedAt)}`}
+                          >
+                            {formatDay(request.decidedAt.slice(0, 10))}
                           </span>
                         )}
                       </span>
                     </Td>
-                    <Td>
+                    {/* `nowrap`: con la columna estrujada, «Sin ticket» partia en
+                        dos lineas y esos 36 px marcaban la altura de la fila entera. */}
+                    <Td className="whitespace-nowrap">
                       <TicketLink number={request.ticketNumber} />
                     </Td>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex h-7 items-center justify-end gap-1">
                         {request.status === "Solicitada" ? (
                           block === null ? (
                             <>

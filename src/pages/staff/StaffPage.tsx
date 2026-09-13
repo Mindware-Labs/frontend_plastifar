@@ -337,14 +337,6 @@ export function StaffPage() {
             ? `${counts.all} colaboradores · ${counts.active} activos · ${counts.admins} con permisos de administrador`
             : "Cargando el personal con acceso al sistema…"
         }
-        action={
-          isAdmin && (
-            <Button size="sm" onClick={() => setModal("nuevo")}>
-              <Plus className="h-[15px] w-[15px]" />
-              Agregar personal
-            </Button>
-          )
-        }
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
@@ -385,6 +377,14 @@ export function StaffPage() {
         )}
 
         <ListPanel
+        action={
+          isAdmin && (
+            <Button size="sm" onClick={() => setModal("nuevo")}>
+              <Plus className="h-[15px] w-[15px]" />
+              Agregar personal
+            </Button>
+          )
+        }
           toolbar={
             <>
               <SearchInput

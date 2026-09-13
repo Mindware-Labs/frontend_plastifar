@@ -30,12 +30,23 @@ import { ListPanelContext } from "./listPanelContext";
  */
 export function ListPanel({
   toolbar,
+  action,
   footer,
   children,
   className = "",
 }: {
   /** Criterios que gobiernan la tabla: búsqueda, selects, pastillas, columnas. */
   toolbar?: ReactNode;
+  /**
+   * La acción principal del módulo: «Nuevo cliente», «Nueva HCA», «Nuevo rol».
+   *
+   * Vivía suelta sobre el lienzo, encima del panel, gastando un renglón entero
+   * para no pertenecer a nada — y eso pasaba en nueve pantallas, así que no era
+   * un descuido de una sino la forma por defecto. Un botón que crea una fila de
+   * ESTA tabla pertenece a ESTA tabla: anclado arriba a la derecha del panel, la
+   * relación se lee sin explicarla.
+   */
+  action?: ReactNode;
   /** Normalmente `Pagination`, o el conteo cuando el listado no pagina. */
   footer?: ReactNode;
   children: ReactNode;
@@ -46,9 +57,10 @@ export function ListPanel({
       <section
         className={`overflow-hidden rounded-card border border-line bg-white shadow-card ${className}`}
       >
-        {toolbar && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
-            {toolbar}
+        {(toolbar || action) && (
+          <div className="flex items-start gap-3 border-b border-line px-4 py-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{toolbar}</div>
+            {action && <div className="shrink-0">{action}</div>}
           </div>
         )}
 
