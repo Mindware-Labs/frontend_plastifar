@@ -2,7 +2,8 @@ import { Calendar, Plus, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { DatePicker } from "../../components/ui/DatePicker";
-import { SelectField, TextField } from "../../components/ui/Field";
+import { TextField } from "../../components/ui/Field";
+import { Select } from "../../components/ui/Select";
 import { Modal } from "../../components/ui/Modal";
 import { useSettle } from "../../hooks/useSettle";
 import type { CreateTicketTaskRequest, TicketStaffOptionResponse } from "../../types/api";
@@ -136,11 +137,14 @@ export function CreateTaskModal({
         </div>
 
         {/* Asignación y autoasignación rápida */}
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between">
-            <span className="font-heading text-[11px] font-semibold text-zinc-500">
+            <label
+              htmlFor="task-assignee"
+              className="font-heading text-[11px] font-semibold text-zinc-500"
+            >
               Asignar a
-            </span>
+            </label>
             <button
               type="button"
               onClick={handleAutoassign}
@@ -155,9 +159,8 @@ export function CreateTaskModal({
             </button>
           </div>
 
-          <SelectField
+          <Select
             id="task-assignee"
-            label=""
             value={assignedStaffId}
             onChange={(val: string) => {
               setAssignedStaffId(val);

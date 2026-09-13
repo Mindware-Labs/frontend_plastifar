@@ -3,16 +3,19 @@ import {
   CheckSquare,
   Clock,
   CornerUpLeft,
+  FileText,
   Gavel,
   History,
+  Image as ImageIcon,
   Lock,
   Mail,
   Paperclip,
   Plus,
-  RefreshCw,
   RotateCcw,
   Send,
   Ticket as TicketIcon,
+  Upload,
+  Workflow,
   X,
 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
@@ -90,7 +93,7 @@ const CANCEL_TRANSITION: StatusTransitionOption = {
   target: "Cancelado",
   category: "cancelar",
   label: "Cancelar ticket",
-  description: "El ticket no procede. Exige un motivo explicativo.",
+  description: "Para tickets creados por error, duplicados o pruebas. Exige un motivo explicativo.",
   icon: X,
   danger: true,
 };
@@ -449,12 +452,13 @@ export function TicketDetailPage() {
     }
   };
 
-  // Cambio de estado: un dialogo en dos pasos para todas las transiciones validas.
-  // Paso 1: eligen la categoria (pausar / marcar veredicto / cancelar / otra). Paso 2: los campos de esa categoria.
+  // Cambio de estado: un dialogo para todas las transiciones validas.
+  // Para veredicto: 3 pasos (Paso 1: accion, Paso 2: veredicto y notificacion, Paso 3: comentario y evidencias).
+  // Para las demas categorias: 2 pasos (Paso 1: accion, Paso 2: motivo y confirmacion).
   const [transitioning, setTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
-  const [updateStep, setUpdateStep] = useState<1 | 2>(1);
+  const [updateStep, setUpdateStep] = useState<1 | 2 | 3>(1);
   const [updateTargetStatus, setUpdateTargetStatus] = useState("");
   const [updateVerdictId, setUpdateVerdictId] = useState("");
   const [updateComment, setUpdateComment] = useState("");
@@ -462,11 +466,12 @@ export function TicketDetailPage() {
   const [verdictOptions, setVerdictOptions] = useState<TicketVerdictOption[]>([]);
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const [verdictAttachments, setVerdictAttachments] = useState<File[]>([]);
+  const [isDraggingVerdict, setIsDraggingVerdict] = useState(false);
   const {
     isShowing: showVerdictAttachedFeedback,
     isExiting: verdictAttachedExiting,
     trigger: triggerVerdictAttachedFeedback,
-  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
+  } = useUploadFeedback({ duration: 2300, exitDuration: 360 });
   const verdictFileInputRef = useRef<HTMLInputElement>(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const updateSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -509,6 +514,7 @@ export function TicketDetailPage() {
     setUpdateComment("");
     setUpdateNotifyClient(false);
     setVerdictAttachments([]);
+    setIsDraggingVerdict(false);
     setUpdateSuccess(false);
     if (updateSuccessTimerRef.current) {
       clearTimeout(updateSuccessTimerRef.current);
@@ -526,7 +532,7 @@ export function TicketDetailPage() {
       .finally(() => setLoadingVerdicts(false));
   };
 
-  // La categoria decide que campos pide el paso 2; se recalcula del estado actual, no del array de mas abajo.
+  // La categoria decide que campos pide el paso 2 o 3; se recalcula del estado actual, no del array de mas abajo.
   const updateCategory = getAvailableTransitions(ticket?.status ?? "").find(
     (t) => t.target === updateTargetStatus,
   )?.category;
@@ -541,6 +547,37 @@ export function TicketDetailPage() {
     setTransitionError(null);
     step2EnteredAtRef.current = Date.now();
     setUpdateStep(2);
+  };
+
+  const handleContinueToStep3 = (event?: React.MouseEvent | React.FormEvent) => {
+    event?.preventDefault();
+    if (!updateVerdictId) {
+      setTransitionError("Selecciona un veredicto");
+      triggerUpdateSettle();
+      return;
+    }
+    setTransitionError(null);
+    step2EnteredAtRef.current = Date.now();
+    setUpdateStep(3);
+  };
+
+  const handleVerdictFilesSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const chosen = Array.from(files);
+    const problem = validateAttachments(chosen, verdictAttachments);
+    if (problem) {
+      setTransitionError(problem);
+      triggerUpdateSettle();
+      return;
+    }
+    setTransitionError(null);
+    setVerdictAttachments((prev) => [...prev, ...chosen]);
+    triggerVerdictAttachedFeedback();
+  };
+
+  const handleRemoveVerdictFile = (index: number) => {
+    if (transitionError) setTransitionError(null);
+    setVerdictAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleConfirmUpdateStatus = async (event: React.FormEvent) => {
@@ -806,8 +843,13 @@ export function TicketDetailPage() {
               <span className="tabular-nums text-subtle">{timeline.length}</span>
             </Button>
             {availableTransitions.length > 0 ? (
-              <Button type="button" size="sm" onClick={handleOpenUpdateStatusModal}>
-                <RefreshCw className="h-[15px] w-[15px]" />
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleOpenUpdateStatusModal}
+                className="group font-heading font-semibold tracking-[-0.01em] shadow-xs hover:shadow-sm transition-all active:scale-[0.98]"
+              >
+                <Workflow className="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-110" />
                 Actualizar ticket
               </Button>
             ) : (
@@ -1247,21 +1289,49 @@ export function TicketDetailPage() {
         </Modal>
       )}
 
-      {/* Dos pasos: primero eligen que hacer (pausar / marcar veredicto / cancelar / otra), luego
-          completan los campos de esa categoria. Cancelado y veredicto pueden avisar al cliente por correo. */}
+      {/* Para veredicto: 3 pasos (1: accion, 2: veredicto + notificar cliente, 3: comentario + evidencias).
+          Para las demas: 2 pasos (1: accion, 2: motivo + confirmacion). */}
       {showUpdateStatusModal && (
         <Modal
           settle={updateSettle}
-          eyebrow={updateSuccess ? undefined : ticket.number}
-          title={updateSuccess ? "¡Operación exitosa!" : "Actualizar ticket"}
+          eyebrow={
+            updateSuccess
+              ? undefined
+              : updateCategory === "veredicto"
+                ? `${ticket.number} · Paso ${updateStep} de 3`
+                : updateStep === 2
+                  ? `${ticket.number} · Paso 2 de 2`
+                  : ticket.number
+          }
+          title={
+            updateSuccess
+              ? "¡Operación exitosa!"
+              : updateCategory === "veredicto"
+                ? updateStep === 1
+                  ? "Actualizar ticket"
+                  : updateStep === 2
+                    ? "Marcar veredicto"
+                    : "Resolución y evidencias"
+                : updateStep === 1
+                  ? "Actualizar ticket"
+                  : updateCategory === "cancelar"
+                    ? "Cancelar ticket"
+                    : "Pausar ticket"
+          }
           description={
             updateSuccess
               ? undefined
-              : updateStep === 1
-                ? "Elige qué hacer con este ticket."
-                : "Completa los datos para confirmar."
+              : updateCategory === "veredicto"
+                ? updateStep === 1
+                  ? "Elige qué hacer con este ticket."
+                  : updateStep === 2
+                    ? "Selecciona el motivo y confirma si deseas notificar al cliente."
+                    : "Redacta el comentario del veredicto y adjunta archivos de soporte."
+                : updateStep === 1
+                  ? "Elige qué hacer con este ticket."
+                  : "Completa los datos para confirmar."
           }
-          maxWidth="max-w-md"
+          maxWidth={updateCategory === "veredicto" && updateStep === 3 ? "max-w-lg" : "max-w-md"}
           onClose={() => {
             if (!transitioning) {
               if (updateSuccessTimerRef.current) {
@@ -1313,10 +1383,10 @@ export function TicketDetailPage() {
                   Continuar
                 </Button>
               </Fragment>
-            ) : (
-              <Fragment key="status-step-2">
+            ) : updateStep === 2 && updateCategory === "veredicto" ? (
+              <Fragment key="status-step-2-verdict">
                 <Button
-                  key="btn-status-back"
+                  key="btn-status-back-1"
                   type="button"
                   variant="secondary"
                   size="sm"
@@ -1329,7 +1399,64 @@ export function TicketDetailPage() {
                   Atrás
                 </Button>
                 <Button
-                  key="btn-status-confirm"
+                  key="btn-status-continue-step2"
+                  type="submit"
+                  form="update-status-step2-form"
+                  size="sm"
+                  disabled={!updateVerdictId && !transitionError}
+                  tone={transitionError ? "ink" : "primary"}
+                  toneLabel={transitionError}
+                >
+                  Continuar
+                </Button>
+              </Fragment>
+            ) : updateStep === 3 && updateCategory === "veredicto" ? (
+              <Fragment key="status-step-3-verdict">
+                <Button
+                  key="btn-status-back-2"
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => {
+                    setTransitionError(null);
+                    setUpdateStep(2);
+                  }}
+                >
+                  Atrás
+                </Button>
+                <Button
+                  key="btn-status-confirm-verdict"
+                  type="submit"
+                  form="update-status-form"
+                  size="sm"
+                  variant="primary"
+                  isLoading={transitioning}
+                  tone={transitionError ? "ink" : "primary"}
+                  toneLabel={transitionError}
+                  className={transitionError ? "" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"}
+                >
+                  <Gavel className="h-3.5 w-3.5" />
+                  Confirmar veredicto
+                </Button>
+              </Fragment>
+            ) : (
+              <Fragment key="status-step-2-other">
+                <Button
+                  key="btn-status-back-other"
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={transitioning}
+                  onClick={() => {
+                    setTransitionError(null);
+                    setUpdateStep(1);
+                  }}
+                >
+                  Atrás
+                </Button>
+                <Button
+                  key="btn-status-confirm-other"
                   type="submit"
                   form="update-status-form"
                   size="sm"
@@ -1416,41 +1543,198 @@ export function TicketDetailPage() {
                 })}
               </div>
             </div>
-          ) : (
-            <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-3">
-              {updateCategory === "veredicto" && (
-                <SelectField
-                  id="update-verdict"
-                  label="Veredicto"
-                  size="sm"
-                  required
-                  placeholder={loadingVerdicts ? "Cargando…" : "Selecciona un veredicto"}
-                  value={updateVerdictId}
-                  onChange={(val) => {
-                    setUpdateVerdictId(val);
+          ) : updateStep === 2 && updateCategory === "veredicto" ? (
+            <form id="update-status-step2-form" onSubmit={handleContinueToStep3} className="space-y-4">
+              <SelectField
+                id="update-verdict"
+                label="Veredicto"
+                size="sm"
+                required
+                placeholder={loadingVerdicts ? "Cargando…" : "Selecciona un veredicto"}
+                value={updateVerdictId}
+                onChange={(val) => {
+                  setUpdateVerdictId(val);
+                  if (transitionError) setTransitionError(null);
+                }}
+                state={transitionError && !updateVerdictId ? "error" : "idle"}
+                error={transitionError && !updateVerdictId ? transitionError : undefined}
+                options={verdictOptions.map((v) => ({ value: String(v.id), label: v.name }))}
+                hint={
+                  !loadingVerdicts && verdictOptions.length === 0
+                    ? "No hay veredictos activos en el catálogo. Créalos en Tickets · Veredictos."
+                    : undefined
+                }
+              />
+
+              <CheckboxField
+                label="Notificar al cliente por correo"
+                description={
+                  recipientEmail
+                    ? `Se le avisará a ${recipientEmail}.`
+                    : "Este ticket no tiene un correo de contacto registrado."
+                }
+                checked={updateNotifyClient}
+                disabled={!recipientEmail}
+                onChange={(event) => setUpdateNotifyClient(event.target.checked)}
+              />
+            </form>
+          ) : updateStep === 3 && updateCategory === "veredicto" ? (
+            <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-4">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="update-comment" className={labelClass}>
+                  Comentario del veredicto
+                  <span className="ml-1 text-brand-red">*</span>
+                </label>
+                <textarea
+                  id="update-comment"
+                  rows={3}
+                  value={updateComment}
+                  onChange={(event) => {
+                    setUpdateComment(event.target.value);
                     if (transitionError) setTransitionError(null);
                   }}
-                  state={transitionError && !updateVerdictId ? "error" : "idle"}
-                  error={transitionError && !updateVerdictId ? transitionError : undefined}
-                  options={verdictOptions.map((v) => ({ value: String(v.id), label: v.name }))}
-                  hint={
-                    !loadingVerdicts && verdictOptions.length === 0
-                      ? "No hay veredictos activos en el catálogo. Créalos en Tickets · Veredictos."
-                      : undefined
-                  }
+                  placeholder="Explica el veredicto y las conclusiones de la reclamación…"
+                  className={`${textareaClass} ${
+                    transitionError && !updateComment.trim()
+                      ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
+                      : ""
+                  }`}
+                  autoFocus
                 />
-              )}
+              </div>
 
+              {/* Carga de evidencias con el mismo diseño que CompleteTaskModal */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-heading text-[11px] font-semibold text-zinc-500">
+                    Archivos de evidencia (opcional)
+                  </span>
+                  <span className="text-[11px] text-zinc-400">Máx. 10 MB por archivo</span>
+                </div>
+
+                <input
+                  ref={verdictFileInputRef}
+                  id="verdict-attachment-input"
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    handleVerdictFilesSelected(e.target.files);
+                    if (verdictFileInputRef.current) verdictFileInputRef.current.value = "";
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => verdictFileInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingVerdict(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingVerdict(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingVerdict(false);
+                    handleVerdictFilesSelected(e.dataTransfer.files);
+                  }}
+                  className={`group relative flex h-[106px] min-h-[106px] w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-3 transition-colors duration-300 outline-none ${
+                    showVerdictAttachedFeedback
+                      ? verdictAttachedExiting
+                        ? "border-emerald-200 bg-emerald-50/25"
+                        : "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-100/80"
+                      : isDraggingVerdict
+                        ? "border-brand-red bg-brand-red/5 ring-2 ring-brand-red/20"
+                        : "border-zinc-200 bg-zinc-50/50 hover:border-brand-red/40 hover:bg-brand-red/5"
+                  }`}
+                >
+                  {showVerdictAttachedFeedback ? (
+                    <div
+                      className={`flex flex-col items-center justify-center text-center ${
+                        verdictAttachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+                      }`}
+                    >
+                      <div className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-2 ring-emerald-200/70 shadow-3xs animate-plf-check-breathe">
+                        <AnimatedCheckIcon size={16} strokeWidth={2.8} />
+                      </div>
+                      <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-bold text-emerald-700 leading-tight">
+                        ¡{verdictAttachments.length === 1 ? "Archivo adjuntado correctamente" : `${verdictAttachments.length} archivos adjuntados correctamente`}!
+                      </p>
+                      <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-emerald-600/80 leading-tight">
+                        Haz clic o arrastra para añadir más si lo deseas
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-center transition-opacity duration-300">
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-transform group-hover:scale-105">
+                        <Upload className="size-4" />
+                      </div>
+                      <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-semibold text-zinc-700 leading-tight">
+                        Haz clic para adjuntar evidencias
+                      </p>
+                      <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-zinc-400 leading-tight">
+                        Imágenes (PNG, JPG), reportes en PDF, hojas de Excel, etc.
+                      </p>
+                    </div>
+                  )}
+                </button>
+
+                {/* Lista de archivos seleccionados */}
+                {verdictAttachments.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    {verdictAttachments.map((file, idx) => (
+                      <div
+                        key={`${file.name}-${idx}`}
+                        className="animate-plf-seal-pop flex items-center justify-between gap-2 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px] shadow-2xs"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-2xs animate-plf-check-in"
+                            title="Adjuntado correctamente"
+                          >
+                            <AnimatedCheckIcon size={12} strokeWidth={3} />
+                          </span>
+                          {file.type.startsWith("image/") ? (
+                            <ImageIcon className="size-3.5 shrink-0 text-brand-red" />
+                          ) : (
+                            <FileText className="size-3.5 shrink-0 text-zinc-400" />
+                          )}
+                          <span className="truncate font-medium text-zinc-800" title={file.name}>
+                            {file.name}
+                          </span>
+                          <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">
+                            ({formatBytes(file.size)})
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVerdictFile(idx)}
+                          title="Quitar archivo"
+                          className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </form>
+          ) : (
+            <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-3">
               <div className="flex flex-col gap-1">
                 <label htmlFor="update-comment" className={labelClass}>
                   {updateCategory === "cancelar"
                     ? "Motivo de cancelación"
                     : updateCategory === "pausar"
                       ? "Motivo de la pausa"
-                      : updateCategory === "veredicto"
-                        ? "Comentario del veredicto"
-                        : "Comentario"}
-                  {updateCategory === "cancelar" || updateCategory === "pausar" || updateCategory === "veredicto" ? (
+                      : "Comentario"}
+                  {updateCategory === "cancelar" || updateCategory === "pausar" ? (
                     <span className="ml-1 text-brand-red">*</span>
                   ) : (
                     <span className="ml-1 font-normal text-zinc-400">(opcional)</span>
@@ -1466,93 +1750,23 @@ export function TicketDetailPage() {
                   }}
                   placeholder={
                     updateCategory === "cancelar"
-                      ? "Explica por qué se cancela este ticket…"
+                      ? "Explica la razón de anulación (creado por error, duplicado, prueba)…"
                       : updateCategory === "pausar"
                         ? "Explica por qué se pausa este ticket…"
-                        : updateCategory === "veredicto"
-                          ? "Explica el veredicto…"
-                          : "Contexto adicional para el historial del ticket…"
+                        : "Contexto adicional para el historial del ticket…"
                   }
                   className={`${textareaClass} ${
                     transitionError &&
                     !updateComment.trim() &&
-                    (updateCategory === "cancelar" || updateCategory === "pausar" || updateCategory === "veredicto")
+                    (updateCategory === "cancelar" || updateCategory === "pausar")
                       ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
                       : ""
                   }`}
+                  autoFocus
                 />
               </div>
 
-              {updateCategory === "veredicto" && (
-                <div className="space-y-2 pt-1 border-t border-zinc-100">
-                  <div className="flex items-center justify-between">
-                    <label className={labelClass}>
-                      Evidencias o adjuntos
-                      <span className="ml-1 font-normal text-zinc-400">(opcional)</span>
-                    </label>
-                    <div>
-                      <input
-                        ref={verdictFileInputRef}
-                        id="verdict-attachment-input"
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={(event) =>
-                          pickFiles(
-                            event.target,
-                            verdictAttachments,
-                            setVerdictAttachments,
-                            setTransitionError,
-                            () => triggerVerdictAttachedFeedback(),
-                          )
-                        }
-                      />
-                      <label
-                        htmlFor="verdict-attachment-input"
-                        className={`${
-                          showVerdictAttachedFeedback
-                            ? verdictAttachedExiting
-                              ? attachExitingLabelClass
-                              : attachSuccessLabelClass
-                            : attachLabelClass
-                        } text-xs py-1 px-2.5`}
-                      >
-                        {showVerdictAttachedFeedback ? (
-                          <span
-                            className={`inline-flex items-center gap-1.5 ${
-                              verdictAttachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
-                            }`}
-                          >
-                            <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
-                              <AnimatedCheckIcon size={11} strokeWidth={3} />
-                            </span>
-                            <span>¡Adjuntado!</span>
-                          </span>
-                        ) : (
-                          <>
-                            <Paperclip className="h-3.5 w-3.5" />
-                            Adjuntar archivos
-                          </>
-                        )}
-                      </label>
-                    </div>
-                  </div>
-
-                  {verdictAttachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {verdictAttachments.map((file, index) => (
-                        <PendingFile
-                          key={`${file.name}-${index}`}
-                          file={file}
-                          onRemove={() => setVerdictAttachments((prev) => prev.filter((_, i) => i !== index))}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {(updateCategory === "cancelar" || updateCategory === "veredicto") && (
+              {updateCategory === "cancelar" && (
                 <CheckboxField
                   label="Notificar al cliente por correo"
                   description={
