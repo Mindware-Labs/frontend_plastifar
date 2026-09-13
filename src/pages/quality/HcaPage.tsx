@@ -34,6 +34,7 @@ import type { ProductLine } from "../../types/settings";
 import { HcaModal } from "./HcaModal";
 import { HcaStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
+import { FilterPopover } from "../../components/ui/FilterPopover";
 
 type ChipKey = "todas" | "abiertas" | "vencidas" | "cerradas";
 /** Solo lo que el servidor sabe ordenar (SheetQuery.sort). */
@@ -133,6 +134,25 @@ export function HcaPage() {
     to === "" &&
     !debouncedSearch;
 
+  /* Cuantos criterios del panel estan puestos. El numero viaja al disparador:
+     un filtro aplicado que no se ve es la peor averia de un listado, porque se
+     lee una tabla recortada creyendo que es la tabla entera. */
+  const filtrosPuestos =
+    (productLineId !== "todas" ? 1 : 0) +
+    (responsibleId !== "todos" ? 1 : 0) +
+    (clientId !== "todos" ? 1 : 0) +
+    (from !== "" || to !== "" ? 1 : 0);
+
+  /** Quita solo lo del panel; la busqueda y las pastillas siguen donde estaban. */
+  function clearNarrowFilters() {
+    setProductLineId("todas");
+    setResponsibleId("todos");
+    setClientId("todos");
+    setFrom("");
+    setTo("");
+    setPage(1);
+  }
+
   /** Quita los siete recortes de una vez: es la salida del estado vacio. */
   function clearFilters() {
     setSearch("");
@@ -172,16 +192,24 @@ export function HcaPage() {
               sueltos sobre el lienzo, gastando dos renglones enteros para no
               pertenecer a nada. */}
           <div className="flex w-full flex-wrap items-end gap-2">
-        <CriteriaField label="Buscar">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Número, cliente o descripción…"
-            className="w-[230px]"
-          />
-        </CriteriaField>
+        {/* Sin rótulo. Con los demás criterios detrás del botón, «BUSCAR» era la
+            única versalita de la barra y flotaba sola sobre un campo que ya dice
+            qué busca en su propio texto de ayuda. Una etiqueta que repite el
+            placeholder cobra un renglón entero para no añadir nada. */}
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Número, cliente o descripción…"
+          className="w-[230px]"
+        />
 
-        <CriteriaSelect
+        {/* Los cuatro criterios de acotacion, guardados hasta que hacen falta.
+            De los siete que tenia esta barra, quien abre la pantalla usa el
+            buscador y las pastillas; linea, responsable, cliente y el rango de
+            fechas se tocan cuando se busca algo concreto. Tenerlos desplegados
+            cobraba 119 px a la tabla, que es lo unico que se vino a leer. */}
+        <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
+          <CriteriaSelect
           label="Línea"
           ariaLabel="Filtrar por línea de producto"
           value={productLineId}
@@ -242,6 +270,7 @@ export function HcaPage() {
             />
           </CriteriaField>
         </div>
+        </FilterPopover>
 
         {canWrite && (
           <div className="ml-auto">

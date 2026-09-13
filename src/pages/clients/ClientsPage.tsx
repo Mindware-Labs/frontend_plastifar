@@ -30,6 +30,7 @@ import type { Client, ClientListResponse, Territory } from "../../types/clients"
 import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
 import { ClientModal } from "./ClientModal";
 import { ReassignSalesRepModal } from "./ReassignSalesRepModal";
+import { FilterPopover } from "../../components/ui/FilterPopover";
 
 type ChipKey = "todos" | "activos" | "inactivos" | "sinVendedor";
 
@@ -158,6 +159,20 @@ export function ClientsPage() {
   const counts = data?.counts;
   const unfiltered =
     chip === "todos" && territoryId === "todos" && salesRepId === "todos" && type === "todos" && !debouncedSearch;
+
+  /* Los tres criterios que viven detras del boton. */
+  const filtrosPuestos =
+    (territoryId !== "todos" ? 1 : 0) +
+    (salesRepId !== "todos" ? 1 : 0) +
+    (type !== "todos" ? 1 : 0);
+
+  /** Quita solo lo del panel; la busqueda y las pastillas no se tocan. */
+  function clearNarrowFilters() {
+    setTerritoryId("todos");
+    setSalesRepId("todos");
+    setType("todos");
+    setPage(1);
+  }
 
   /** Quita los cinco recortes de una vez: es la salida del estado vacio. */
   function clearFilters() {
@@ -342,7 +357,11 @@ export function ClientsPage() {
             className="w-[240px]"
           />
 
-          <Select
+          {/* Territorio, vendedor y tipo, guardados. Eran tres desplegables
+              siempre a la vista que empujaban las pastillas a un segundo
+              renglón; se usan al buscar un recorte concreto, no al abrir. */}
+          <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
+            <Select
             size="sm"
             className="w-[200px]"
             aria-label="Filtrar por territorio"
@@ -356,7 +375,7 @@ export function ClientsPage() {
 
           {/* Buscador contra el servidor: el personal crece sin tope y un
               desplegable precargado dejaba fuera a quien no cupiera. */}
-          <LookupSelect
+            <LookupSelect
             size="sm"
             className="w-[200px]"
             aria-label="Filtrar por vendedor"
@@ -370,7 +389,7 @@ export function ClientsPage() {
             onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
           />
 
-          <Select
+            <Select
             size="sm"
             className="w-[200px]"
             aria-label="Filtrar por tipo"
@@ -384,6 +403,7 @@ export function ClientsPage() {
               { value: "Institucional", label: "Institucional" },
             ]}
           />
+          </FilterPopover>
 
           {canWrite && (
             <div className="ml-auto">

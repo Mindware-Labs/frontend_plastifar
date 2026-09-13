@@ -30,6 +30,7 @@ import type {
 } from "../../types/api";
 import { CreateTicketModal } from "./CreateTicketModal";
 import { departmentOptions } from "../../lib/departments";
+import { FilterPopover } from "../../components/ui/FilterPopover";
 
 type TicketFilterKey = "todos" | "abiertos" | "por-vencer" | "vencidos" | "espera" | "cerrados";
 type SortKey = "numero" | "asunto" | "cliente" | "departamento" | "prioridad" | "estado" | "sla" | "actividad";
@@ -235,6 +236,18 @@ export function TicketsPage() {
   });
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
   const [priority, setPriority] = useState<string>("todas");
+
+  /* Los dos criterios que viven detras del boton. El numero viaja al
+     disparador: un recorte que no se ve deja leer una bandeja parcial como si
+     fuera la bandeja entera. */
+  const filtrosPuestos = (departmentId !== "todos" ? 1 : 0) + (priority !== "todas" ? 1 : 0);
+
+  /** Quita solo lo del panel; la busqueda y las pastillas no se tocan. */
+  function clearNarrowFilters() {
+    setDepartmentId("todos");
+    setPriority("todas");
+    setPage(1);
+  }
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
     key: "actividad",
     dir: "desc",
@@ -445,7 +458,12 @@ export function TicketsPage() {
                 className="min-w-[200px] flex-1"
               />
 
-              <Select
+              {/* Departamento y prioridad, guardados. La bandeja ya tenia un
+                  menu para los estados secundarios; tener ademas dos
+                  desplegables sueltos repartia el filtrado en tres sitios
+                  distintos de la misma barra. */}
+              <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
+                <Select
                 size="sm"
                 className="w-[200px]"
                 aria-label="Filtrar por departamento"
@@ -457,7 +475,7 @@ export function TicketsPage() {
                 ]}
               />
 
-              <Select
+                <Select
                 size="sm"
                 className="w-[200px]"
                 aria-label="Filtrar por prioridad"
@@ -471,6 +489,7 @@ export function TicketsPage() {
                   { value: "Baja", label: "Baja" },
                 ]}
               />
+              </FilterPopover>
 
               <span aria-hidden className="mx-1 h-5 w-px bg-line" />
 

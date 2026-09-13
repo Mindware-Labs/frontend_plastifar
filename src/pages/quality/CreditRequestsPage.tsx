@@ -29,6 +29,7 @@ import { CreditDecisionModal } from "./CreditDecisionModal";
 import { CreditRequestModal } from "./CreditRequestModal";
 import { CreditStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
+import { FilterPopover } from "../../components/ui/FilterPopover";
 
 type ChipKey = "todas" | CreditStatus;
 
@@ -117,6 +118,17 @@ export function CreditRequestsPage() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
+  /* Los criterios que viven detras del boton. El numero viaja al disparador:
+     un recorte que no se ve deja leer una tabla parcial como si fuera entera. */
+  const filtrosPuestos = (clientId !== "todos" ? 1 : 0) + (minAmount !== "" ? 1 : 0);
+
+  /** Quita solo lo del panel; la busqueda y las pastillas no se tocan. */
+  function clearNarrowFilters() {
+    setClientId("todos");
+    setMinAmount("");
+    setPage(1);
+  }
+
   const unfiltered =
     chip === "todas" && clientId === "todos" && debouncedMinAmount === "" && !debouncedSearch;
 
@@ -146,16 +158,19 @@ export function CreditRequestsPage() {
         }
         toolbar={
           <>
-        <CriteriaField label="Buscar">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Número, cliente, factura o motivo…"
-            className="w-[260px]"
-          />
-        </CriteriaField>
+        {/* Sin rótulo: el placeholder ya dice qué busca. */}
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Número, cliente, factura o motivo…"
+          className="w-[260px]"
+        />
 
-        <CriteriaLookup
+        {/* Cliente y monto minimo, guardados. La barra tenia nueve controles en
+            tres renglones y 119 px; los dos que se esconden se usan cuando se
+            busca una solicitud concreta, no al abrir la pantalla. */}
+        <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
+          <CriteriaLookup
           label="Cliente"
           ariaLabel="Filtrar por cliente"
           width="w-[220px]"
@@ -168,7 +183,7 @@ export function CreditRequestsPage() {
           resolveSelectedLabel={resolveClientLabel}
         />
 
-        <CriteriaField label="Monto desde" htmlFor="credito-monto">
+          <CriteriaField label="Monto desde" htmlFor="credito-monto">
           <ControlInput
             id="credito-monto"
             type="number"
@@ -180,7 +195,8 @@ export function CreditRequestsPage() {
             value={minAmount}
             onChange={(event) => setMinAmount(event.target.value)}
           />
-        </CriteriaField>
+          </CriteriaField>
+        </FilterPopover>
 
         {/* Antes de la primera respuesta no hay contadores: un «0» junto a
             «Solicitadas» es un dato, y seria falso. Se reserva el sitio. */}
