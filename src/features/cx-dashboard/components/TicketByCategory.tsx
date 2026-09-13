@@ -173,7 +173,7 @@ export function TicketByCategory() {
         >
           {shown ? shown.value : total}
         </text>
-        <text x={SIZE / 2} y={SIZE / 2 + 12} textAnchor="middle" fontSize={9} fill={C.soft} fontFamily={FONT}>
+        <text x={SIZE / 2} y={SIZE / 2 + 13} textAnchor="middle" fontSize={10} fill={C.soft} fontFamily={FONT}>
           {shown ? `${shownShare}% del total` : "tickets"}
         </text>
       </svg>

@@ -30,11 +30,31 @@ import { Card, CardHead } from "./primitives";
  * la fila con más tinta es la fila con el problema.
  */
 
-/** Un solo tono, tres claridades. Ordenadas y monótonas, como manda una escala. */
+/**
+ * Un solo tono, tres claridades. Ordenadas y monótonas, como manda una escala.
+ *
+ * ------------------------------------------------------------------
+ * POR QUÉ EL LÍMITE LO PONE UN FILETE Y NO EL RELLENO
+ * ------------------------------------------------------------------
+ * El primer escalón era #C3D2F0 y daba 1.27:1 contra la pista de la barra:
+ * medido, no estimado. El tramo «menos de 1 día» era prácticamente invisible,
+ * que es el peor sitio para perder un dato porque es el tramo SANO —el que dice
+ * que ahí no hay problema—.
+ *
+ * Oscurecerlo hasta 3:1 no es posible manteniendo la escala: tres pasos
+ * secuenciales, cada uno a 3:1 del fondo Y separado de su vecino, no caben en un
+ * solo tono. Es física del color, no un descuido; forzarlo rompería la
+ * monotonía, que es lo único que hace que esto se LEA como una escala.
+ *
+ * Así que el contraste contra el fondo lo aporta la FORMA: la pista lleva un
+ * filete que delimita dónde empieza y acaba el dato. El relleno queda libre para
+ * decir solo una cosa —cuán viejo— y la escala se desplaza un paso hacia el
+ * oscuro para ganar lo que se pueda sin colisionar entre tramos.
+ */
 const AGE_STEPS = [
-  { key: "fresh" as const, label: "Menos de 1 día", color: "#C3D2F0" },
-  { key: "aging" as const, label: "1 a 3 días", color: "#6C8EDC" },
-  { key: "stale" as const, label: "Más de 3 días", color: "#1F4FC4" },
+  { key: "fresh" as const, label: "Menos de 1 día", color: "#9CB8E8" },
+  { key: "aging" as const, label: "1 a 3 días", color: "#4F7AD0" },
+  { key: "stale" as const, label: "Más de 3 días", color: "#1B3F9E" },
 ];
 
 /** Ancho fijo del nombre: sin él, las barras arrancan a distinta altura. */
@@ -119,6 +139,8 @@ export function TicketByState() {
                   borderRadius: 99,
                   overflow: "hidden",
                   background: C.hair2,
+                  /* El filete que delimita el dato, ver AGE_STEPS. */
+                  boxShadow: `inset 0 0 0 1px ${C.hair}`,
                 }}
               >
                 {/* Sólo los EXTREMOS de la barra se redondean. Con radio en

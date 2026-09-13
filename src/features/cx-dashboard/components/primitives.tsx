@@ -256,7 +256,10 @@ export function Avatar({ name, index, size = 26 }: { name: string; index: number
         color: C.card,
         display: "grid",
         placeItems: "center",
-        fontSize: Math.round(size * 0.36),
+        /* Con el factor en 0.36 un avatar de 22 px escribia sus iniciales a 8 px
+           —dos por debajo del piso legible del sistema— y a ese tamaño «MS» y
+           «M5» son el mismo dibujo. El piso manda sobre la proporcion. */
+        fontSize: Math.max(10, Math.round(size * 0.42)),
         fontWeight: 700,
         letterSpacing: "-0.02em",
       }}

@@ -189,7 +189,11 @@ export const T = {
    * cifra grande justo debajo. Fuera de ese par no se usa.
    */
   micro: {
-    fontSize: 9.5,
+    /* 10 px es el piso legible que declara el sistema (`DESIGN.md`, regla de la
+       versalita) y aqui estaba en 9.5. Medio pixel no compra jerarquia —la
+       compran la caja alta, el tracking y la cifra de 24 px justo debajo— y en
+       cambio metia el rotulo de los cinco KPI por debajo del minimo. */
+    fontSize: 10,
     fontWeight: 550,
     letterSpacing: "0.06em",
     lineHeight: 1.2,
