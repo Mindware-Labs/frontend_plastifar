@@ -14,6 +14,7 @@ import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
 import { HcaPage } from "./pages/quality/HcaPage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
+import { DepartmentsPage } from "./pages/departments/DepartmentsPage";
 import { RolesPage } from "./pages/roles/RolesPage";
 import { HolidaysSection } from "./pages/settings/HolidaysSection";
 import { MailboxesSection } from "./pages/settings/MailboxesSection";
@@ -87,6 +88,12 @@ export default function App() {
           <Route path="/roles" element={<RolesPage />} />
           <Route path="/permisos" element={<PermissionsPage />} />
         </Route>
+
+        {/* El organigrama decide hasta donde llega un rol, asi que se
+            administra donde se administran los roles. La lectura queda abierta
+            como la de los demas catalogos (seccion 8.4); escribir exige
+            settings.write y lo comprueba el servidor en cada endpoint. */}
+        <Route path="/departamentos" element={<DepartmentsPage />} />
 
         <Route element={<PermissionRoute permission="clients.read"><Outlet /></PermissionRoute>}>
           <Route path="/clientes" element={<ClientsPage />} />

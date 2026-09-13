@@ -121,6 +121,30 @@ export interface DepartmentResponse {
    * filtros. Así el frontend deja de ser lo que bloquea el cambio.
    */
   parentId?: number | null;
+  /**
+   * Colaboradores cuyo departamento primario es este.
+   *
+   * Opcional por la misma razón que `parentId`: un desplegable no lo necesita y
+   * no debe romperse si algún día llega recortado. La pantalla de
+   * administración sí lo usa, porque es la mitad de la consecuencia de un
+   * departamento —a cuánta gente afecta lo que se decida sobre él— y enterarse
+   * por un 409 después de pulsar «Eliminar» es enterarse tarde.
+   */
+  staffCount?: number;
+}
+
+/**
+ * Alta o movimiento de un departamento.
+ *
+ * `parentId` es el campo con consecuencias: no reordena un renglón del
+ * organigrama, redefine sobre qué puede la gente que tiene un rol en el nuevo
+ * padre. El servidor lo valida de nuevo —que el padre exista y que el
+ * movimiento no cierre un ciclo— porque esta capa es una cortesía.
+ */
+export interface SaveDepartmentRequest {
+  name: string;
+  parentId: number | null;
+  isActive: boolean;
 }
 
 export interface ApiMessage {

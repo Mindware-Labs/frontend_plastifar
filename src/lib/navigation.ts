@@ -163,6 +163,23 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Colaboradores", to: "/staff", icon: Users, permission: "staff.read" },
       { label: "Roles", to: "/roles", icon: ShieldCheck, permission: "roles.read" },
       { label: "Permisos", to: "/permisos", icon: KeyRound, permission: "roles.read" },
+      /*
+       * EL ORGANIGRAMA VIVE CON LOS PERMISOS, NO CON LOS CATALOGOS.
+       *
+       * Configuracion agrupa lo que define COMO SE COMPORTA el sistema: a que
+       * cola entra un ticket, cuando vence, con que texto se responde. Un
+       * departamento no es eso. Un departamento define QUIEN PUEDE SOBRE QUE:
+       * un rol concedido en uno se ejerce tambien sobre todo lo que cuelga de
+       * el, asi que mover una unidad de sitio es una operacion de permisos.
+       *
+       * Su sitio esta junto a Colaboradores, Roles y Permisos, que son las
+       * otras tres piezas de la misma respuesta.
+       *
+       * Lleva settings.write y no roles.read porque a esta pantalla no se entra
+       * a consultar —el catalogo ya se ve en cada desplegable del panel— sino a
+       * cambiarlo.
+       */
+      { label: "Departamentos", to: "/departamentos", icon: Building2, permission: "settings.write" },
     ],
   },
   {
