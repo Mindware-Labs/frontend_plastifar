@@ -506,7 +506,7 @@ export function TicketsPage() {
           {data === null ? (
             error === null && <TableSkeleton rows={pageSize} columns={10} />
           ) : (
-            <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
               <DataTable>
               <thead>
                 <HeadRow>

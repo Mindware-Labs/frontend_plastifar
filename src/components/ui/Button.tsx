@@ -19,10 +19,18 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "active:translate-y-px active:bg-brand-red-dark active:shadow-[0_6px_12px_-9px_rgba(228,0,43,0.6)] " +
     "disabled:bg-line-strong disabled:text-subtle disabled:shadow-none " +
     "disabled:hover:bg-line-strong disabled:hover:shadow-none",
+  /* Las tres llevan el mismo `active:translate-y-px` que la primaria. Solo la
+     primaria acusaba la pulsacion, asi que «Crear» se hundia bajo el dedo y
+     «Cancelar», a dos centimetros, no se movia: el mismo gesto contestado en
+     una y muerto en la otra. El hundimiento es el acuse; la sombra de color se
+     queda solo en la primaria, que es la unica que la tiene en reposo. */
   secondary:
-    "border border-line-strong bg-white text-brand-gray hover:border-hairline-hover hover:bg-canvas hover:text-ink",
-  danger: "border border-brand-red bg-white text-brand-red hover:bg-brand-red/[0.06]",
-  ghost: "text-brand-gray hover:bg-fill hover:text-ink",
+    "border border-line-strong bg-white text-brand-gray hover:border-hairline-hover hover:bg-canvas hover:text-ink " +
+    "active:translate-y-px active:bg-fill",
+  danger:
+    "border border-brand-red bg-white text-brand-red hover:bg-brand-red/[0.06] " +
+    "active:translate-y-px active:bg-brand-red/[0.11]",
+  ghost: "text-brand-gray hover:bg-fill hover:text-ink active:translate-y-px active:bg-line-soft",
 };
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {

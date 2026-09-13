@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { COUNTS, QUALITY } from "../mockData";
 import { useApplyFilter, type DashboardFilter } from "../filters";
+import { useCountUp } from "../../../hooks/useCountUp";
 import { C, FONT, NUM, R, S, T, hueFor, n, type Role } from "../styles";
 
 /**
@@ -55,7 +56,11 @@ interface Kpi {
   label: string;
   role: Role;
   icon: LucideIcon;
-  value: string;
+  /**
+   * El numero SIN formatear. La tarjeta lo cuenta desde cero al montar y lo
+   * formatea en cada fotograma, asi que necesita la magnitud, no el texto.
+   */
+  count: number;
   /** La magnitud de la variación, SIN signo: el signo lo dice la flecha. */
   breakdown: string;
   /** Calificador: contra qué se lee. */
@@ -128,8 +133,15 @@ function Change({ kpi }: { kpi: Kpi }) {
 
 /* -------------------------------------------------------------------------- */
 
-function KpiCard({ kpi }: { kpi: Kpi }) {
+function KpiCard({ kpi, index }: { kpi: Kpi; index: number }) {
   const applyFilter = useApplyFilter();
+  /*
+   * Las cinco cifras arrancan a la vez y tardan lo mismo, asi que la velocidad
+   * de cada una dice su magnitud: 137 abiertos corre visiblemente mas rapido
+   * que 19 fuera de plazo. El escalon de 60 ms por tarjeta ordena la lectura de
+   * izquierda a derecha sin convertirla en un desfile —240 ms en total—.
+   */
+  const shown = useCountUp(kpi.count, { duration: 750, delay: index * 60 });
   const hue = hueFor(kpi.role);
   const Icon = kpi.icon;
 
@@ -199,7 +211,7 @@ function KpiCard({ kpi }: { kpi: Kpi }) {
         {/* Cifra y variación comparten línea base: cuánto hay y hacia dónde va
             son el mismo hecho leído dos veces. */}
         <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-          <span style={{ ...T.figure, ...NUM, fontSize: 24, color: C.ink }}>{kpi.value}</span>
+          <span style={{ ...T.figure, ...NUM, fontSize: 24, color: C.ink }}>{n(shown)}</span>
           <Change kpi={kpi} />
         </span>
 
@@ -232,7 +244,7 @@ export function KpiRow() {
       label: "Fuera de plazo",
       role: "vencido",
       icon: AlertTriangle,
-      value: n(COUNTS.overdue),
+      count: COUNTS.overdue,
       breakdown: "4",
       change: 4,
       betterWhen: "lower",
@@ -243,7 +255,7 @@ export function KpiRow() {
       label: "Por vencer",
       role: "porVencer",
       icon: Clock,
-      value: n(COUNTS.upcoming),
+      count: COUNTS.upcoming,
       breakdown: "6",
       change: 6,
       betterWhen: "lower",
@@ -254,7 +266,7 @@ export function KpiRow() {
       label: "Abiertos",
       role: "abierto",
       icon: Inbox,
-      value: n(COUNTS.open),
+      count: COUNTS.open,
       breakdown: "3",
       change: -3,
       betterWhen: "lower",
@@ -265,7 +277,7 @@ export function KpiRow() {
       label: "En espera",
       role: "espera",
       icon: PauseCircle,
-      value: n(COUNTS.waitingOnClient),
+      count: COUNTS.waitingOnClient,
       breakdown: "2",
       change: 2,
       betterWhen: "lower",
@@ -276,7 +288,7 @@ export function KpiRow() {
       label: "HCA abiertas",
       role: "hca",
       icon: ClipboardCheck,
-      value: n(QUALITY.openNow),
+      count: QUALITY.openNow,
       breakdown: "2",
       change: -2,
       betterWhen: "lower",
@@ -295,8 +307,8 @@ export function KpiRow() {
         alignItems: "stretch",
       }}
     >
-      {kpis.map((kpi) => (
-        <KpiCard key={kpi.label} kpi={kpi} />
+      {kpis.map((kpi, index) => (
+        <KpiCard key={kpi.label} kpi={kpi} index={index} />
       ))}
     </div>
   );

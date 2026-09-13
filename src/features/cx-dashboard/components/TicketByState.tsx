@@ -130,6 +130,7 @@ export function TicketByState() {
                   lo que están una debajo de la otra. */}
               <span
                 aria-hidden
+                className="plf-bar-fill"
                 style={{
                   flex: 1,
                   minWidth: 0,

@@ -193,9 +193,23 @@ input:-webkit-autofill:focus {
   to { opacity: 1; }
 }
 
+/* El velo no solo se opaca: el desenfoque del fondo CRECE con el.
+   Encendido de golpe, el fondo salta de nitido a borroso en un fotograma y esa
+   sacudida es lo que delata que hay dos capas pegadas en vez de una escena con
+   profundidad. Llevandolo de 0 a su valor, el fondo se aparta y el panel ocupa
+   el primer plano, que es lo que de verdad esta pasando.
+
+   Se anima `backdrop-filter` sobre una region acotada y de vida corta, no en
+   bucle: el coste esta pagado. */
 @keyframes plf-scrim-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(2px);
+  }
 }
 
 @keyframes plf-scrim-out {
@@ -225,10 +239,36 @@ input:-webkit-autofill:focus {
   }
 }
 
+/* ------------------------------------------------------------------
+   EL PANEL LATERAL NACE FUERA DE LA PANTALLA
+   ------------------------------------------------------------------
+   Habia DOS `plf-drawer-in` en este archivo, y en CSS gana el ultimo: el que
+   de verdad corria movia el panel 24 px. Un panel de 460 px que aparece con un
+   empujoncito de 24 no se lee como algo que llega, se lee como algo que
+   parpadea — y era la causa de que los drawers se sintieran baratos.
+
+   Ahora es uno solo y entra desde su propio borde, que es de donde viene: los
+   botones que lo abren viven arriba a la derecha. La opacidad arranca en 0.6 y
+   no en 0 a proposito; un panel opaco deslizandose se lee como un objeto que
+   entra, mientras que uno que nace transparente se lee como un fantasma que se
+   materializa encima del contenido.
+
+   88 px, no el ancho entero. Recorrer los 460 px completos suena a lo correcto
+   y es peor por dos razones. La primera es de lectura: un panel que cruza toda
+   su anchura tarda en llegar y se siente pesado; el ojo entiende «viene del
+   borde» con una fraccion del recorrido. La segunda es de robustez, y esta se
+   midio: mientras una animacion esta viva pero su primer fotograma no llega a
+   pintarse, el elemento se queda EN ese fotograma. Con el ancho entero, ese
+   fotograma esta fuera de la pantalla y el panel no existe para quien lo abrio.
+   Con 88 px, el peor caso es un panel ligeramente descolocado — se pierde el
+   movimiento, nunca el contenido.
+
+   340 ms de entrada contra 220 de salida: se va mas rapido de lo que llega,
+   porque al cerrar ya no hay nada que explicar. */
 @keyframes plf-drawer-in {
   from {
-    opacity: 0.7;
-    transform: translateX(100%);
+    opacity: 0.6;
+    transform: translateX(88px);
   }
   to {
     opacity: 1;
@@ -242,16 +282,9 @@ input:-webkit-autofill:focus {
     transform: translateX(0);
   }
   to {
-    opacity: 0.7;
-    transform: translateX(100%);
+    opacity: 0;
+    transform: translateX(88px);
   }
-}
-
-/* El panel lateral entra desde su propio borde: nace donde lo abrio el boton,
-   no cae desde el centro como un dialogo. */
-@keyframes plf-drawer-in {
-  from { opacity: 0; transform: translateX(24px); }
-  to { opacity: 1; transform: none; }
 }
 
 @keyframes plf-shake {
@@ -380,18 +413,84 @@ input:-webkit-autofill:focus {
 .animate-plf-tabs-out { animation: plf-tabs-fade-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-popover-in { animation: plf-popover-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-popover-out { animation: plf-popover-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
-.animate-plf-scrim-in { animation: plf-scrim-in 0.18s ease-out both; }
-.animate-plf-scrim-out { animation: plf-scrim-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
-.animate-plf-modal-in { animation: plf-modal-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-plf-modal-out { animation: plf-modal-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
-.animate-plf-drawer-in { animation: plf-drawer-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-plf-drawer-out { animation: plf-drawer-out 0.20s cubic-bezier(0.2, 0, 0, 1) both; }
+.animate-plf-scrim-in { animation: plf-scrim-in 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-plf-scrim-out { animation: plf-scrim-out 0.18s cubic-bezier(0.2, 0, 0, 1) forwards; }
+.animate-plf-modal-in { animation: plf-modal-in 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-plf-modal-out { animation: plf-modal-out 0.18s cubic-bezier(0.2, 0, 0, 1) forwards; }
+/* ------------------------------------------------------------------
+   SIN `both` EN LAS ENTRADAS: EL REPOSO ES LO VISIBLE
+   ------------------------------------------------------------------
+   `both` aplica el fotograma inicial ANTES de que la animacion arranque, y
+   desde que la entrada del panel empieza fuera de pantalla, ese fotograma
+   inicial es «invisible». Si la animacion no llega a correr —una pestaña que
+   no pinta, un navegador que ignora la regla— el panel se queda en
+   translateX(100%) para siempre y la aplicacion parece rota. Comprobado en el
+   navegador de pruebas: a los 900 ms el panel seguia 460 px fuera del borde.
+
+   Sin `fill-mode`, el elemento reposa en su posicion natural —dentro, opaco— y
+   la animacion solo lo trae. Si no corre, se ve igual; simplemente no se
+   desliza. Esa es la degradacion correcta: se pierde el movimiento, nunca el
+   contenido.
+
+   La SALIDA si lleva `forwards`, y por el mismo motivo al reves: tiene que
+   quedarse fuera al terminar, y el nodo se desmonta justo despues. */
+.animate-plf-drawer-in { animation: plf-drawer-in 0.34s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-plf-drawer-out { animation: plf-drawer-out 0.22s cubic-bezier(0.3, 0, 0.8, 0.15) forwards; }
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
 .animate-plf-receipt-out { animation: plf-receipt-out 0.16s ease-in both; }
 .animate-plf-spinner-rotate { animation: plf-spinner-rotate 1.4s linear infinite; }
 .animate-plf-spinner-dash { animation: plf-spinner-dash 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 .animate-plf-spinner-pulse { animation: plf-spinner-pulse 2s ease-in-out infinite; }
+
+/* ------------------------------------------------------------------
+   LOS RESULTADOS LLEGAN, NO APARECEN
+   ------------------------------------------------------------------
+   El paso de esqueleto a tabla era un corte seco: la misma superficie cambiaba
+   de contenido en un fotograma y el ojo lo lee como un parpadeo, no como una
+   respuesta. Esto es UN gesto sobre el bloque entero —200 ms, 3 px— y no un
+   escalonado fila a fila: diez filas entrando de una en una convierten una
+   respuesta de la que ya se dispone en una espera, que es justo lo que un panel
+   de trabajo no puede permitirse.
+
+   SOLO opacidad, sin desplazamiento, y por dos razones que apuntan al mismo
+   sitio. La primera la dice el propio gesto: no hay que explicar de donde
+   vienen las filas —vienen exactamente de donde estaba el esqueleto—, asi que
+   moverlas seria inventar un origen que no existe.
+
+   La segunda se midio. El elemento animado es hijo directo del contenedor con
+   scroll horizontal, y un `transform` ahi crea un contexto de bloque nuevo: el
+   contenedor perdia 11 px de ancho util y la tabla, que medía 1081, dejaba de
+   caber en 1074. Tres pixeles de adorno encendian una barra de scroll. */
+@keyframes plf-results-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.plf-results-in {
+  animation: plf-results-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ------------------------------------------------------------------
+   LA BARRA SE LLENA DE IZQUIERDA A DERECHA
+   ------------------------------------------------------------------
+   Por mascara y no por `width`. Animar el ancho obliga al navegador a
+   recalcular la caja en cada fotograma, y ademas romperia el apilado: cada
+   tramo de una barra apilada mide un porcentaje del total, asi que crecer uno
+   empuja a los demas. `clip-path` recorta la barra ya compuesta, de modo que
+   los tres tramos guardan su proporcion durante todo el recorrido y lo unico
+   que avanza es hasta donde se ve.
+
+   Va con la cifra: el numero cuenta mientras la barra se llena, y los dos
+   terminan a la vez. */
+@keyframes plf-bar-fill {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+.plf-bar-fill {
+  animation: plf-bar-fill 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 
 /* Entrada escalonada de las bandas del Dashboard.
 
@@ -432,6 +531,8 @@ input:-webkit-autofill:focus {
   .animate-plf-modal-in,
   .animate-plf-drawer-in,
   .animate-plf-shake,
+  .plf-bar-fill,
+  .plf-results-in,
   .plf-stagger > * {
     animation: none !important;
   }

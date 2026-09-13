@@ -148,7 +148,7 @@ export function RolesPage() {
                 : "Ningún rol coincide con este filtro o búsqueda."}
             </p>
           ) : (
-            <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
               <DataTable>
               <thead>
                 <HeadRow>
