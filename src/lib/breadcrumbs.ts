@@ -26,14 +26,25 @@ function patternsFromSidebar(): BreadcrumbPattern[] {
 
   for (const module of SIDEBAR_NAV) {
     if (module.children && module.children.length > 0) {
+      /* El modulo solo es enlace si tiene ruta propia o si su primer hijo la
+         hereda: un crumb que no lleva a ningun lado es un enlace roto con
+         aspecto de enlace. */
+      const moduleTo = module.to ?? module.children[0].to;
       for (const child of module.children) {
+        /* «Tickets › Bandeja» cuando ambos apuntan al mismo sitio no es una
+           jerarquia, es la misma palabra dos veces: se deja solo el modulo. */
+        const collapse = module.children.length === 1 && child.to === moduleTo;
         patterns.push({
           path: child.to,
-          build: () => [{ label: module.label, to: module.to }, { label: child.label }],
+          build: () =>
+            collapse
+              ? [{ label: module.label }]
+              : [{ label: module.label, to: moduleTo }, { label: child.label }],
         });
       }
-    } else {
-      patterns.push({ path: module.to, build: () => [{ label: module.label }] });
+    } else if (module.to) {
+      const to = module.to;
+      patterns.push({ path: to, build: () => [{ label: module.label }] });
     }
   }
 
@@ -43,6 +54,13 @@ function patternsFromSidebar(): BreadcrumbPattern[] {
 /** Fichas de un registro concreto: no tienen entrada en el Sidebar porque la
  *  ruta lleva un id, asi que se registran a mano, una vez, aqui. */
 const detailPatterns: BreadcrumbPattern[] = [
+  {
+    path: "/tickets/:id",
+    build: (subject) => [
+      { label: "Tickets", to: "/tickets" },
+      { label: subject ?? "Ticket" },
+    ],
+  },
   {
     path: "/staff/:id",
     build: (name) => [

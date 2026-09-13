@@ -49,7 +49,7 @@ export function Modal({
   return createPortal(
     <div
       inert={isExiting ? true : undefined}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-ink/45 px-4 py-8 ${
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-8 backdrop-blur-[2px] ${
         isExiting ? "animate-plf-scrim-out pointer-events-none" : "animate-plf-scrim-in"
       }`}
       onMouseDown={(event) => {
@@ -64,18 +64,18 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         className={`${
           isExiting ? "animate-plf-modal-out pointer-events-none" : "animate-plf-modal-in"
-        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-edge border border-line bg-white shadow-[0_4px_10px_rgba(27,27,29,0.06),0_32px_64px_-28px_rgba(27,27,29,0.45)]`}
+        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-card border border-line bg-white shadow-dialog`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 pb-4 pt-5">
           <div>
             {eyebrow && (
-              <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
+              <p className="font-heading text-[10px] font-medium uppercase tracking-[0.07em] text-faint">
                 {eyebrow}
               </p>
             )}
             <h2
               id={titleId}
-              className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink"
+              className="mt-1.5 font-heading text-[18px] font-semibold tracking-[-0.015em] text-ink"
             >
               {title}
             </h2>
@@ -90,8 +90,9 @@ export function Modal({
             type="button"
             onClick={requestClose}
             aria-label="Cerrar"
-            className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-edge text-subtle
-              transition-colors hover:bg-fill hover:text-ink"
+            className="-mr-1.5 -mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-edge
+              text-subtle transition-colors hover:bg-fill hover:text-ink
+              focus-visible:ring-3 focus-visible:ring-brand-red/20 outline-none"
           >
             <X className="h-4 w-4" />
           </button>
@@ -100,7 +101,7 @@ export function Modal({
         <div className="overflow-y-auto px-6 py-5">{children}</div>
 
         {footer && (
-          <div className="flex shrink-0 justify-end gap-2 border-t border-line bg-canvas px-6 py-3.5">
+          <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-line bg-fill px-6 py-3.5">
             {typeof footer === "function" ? footer({ requestClose, close: requestClose }) : footer}
           </div>
         )}

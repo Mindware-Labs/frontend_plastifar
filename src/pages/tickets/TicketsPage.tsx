@@ -683,7 +683,7 @@ export function TicketsPage() {
 
                         {/* Asunto y Tema */}
                         <Td className="max-w-[280px]">
-                          <div className="truncate font-medium text-ink" title={t.subject}>
+                          <div className="truncate text-[13px] font-medium text-ink" title={t.subject}>
                             {t.subject}
                           </div>
                           <div className="text-[11.5px] text-subtle">
@@ -694,7 +694,7 @@ export function TicketsPage() {
 
                         {/* Cliente */}
                         <Td className="max-w-[200px]">
-                          <div className="truncate font-medium text-ink" title={t.clientName || "Sin cliente"}>
+                          <div className="truncate text-[13px] font-medium text-ink" title={t.clientName || "Sin cliente"}>
                             {t.clientName || "Sin cliente"}
                           </div>
                           <div className="text-[11.5px] text-subtle">

@@ -1,4 +1,5 @@
 import { Lock } from "lucide-react";
+import { ReportPreview } from "./ReportPreview";
 import { useId } from "react";
 import { LookupField, SelectField, TextField } from "../../components/ui/Field";
 import {
@@ -205,6 +206,11 @@ export function ReportFilters({
           Solo clientes activos
         </label>
       )}
+
+      {/* La vista previa cierra el panel: despues de acotar, dice que va a
+          traer eso que se acaba de acotar. Va al final y no arriba porque se
+          lee DESPUES de elegir, no antes. */}
+      <ReportPreview report={report} criteria={criteria} reference={reference} />
 
       {report.filters.length === 0 && (
         <p className="flex items-start gap-2 border-l-[3px] border-line-strong bg-fill px-3 py-2.5 text-[12.5px] leading-relaxed text-subtle">

@@ -54,17 +54,10 @@ export function InboxTriageEmptyState({
 
   return (
     <div className="relative flex h-full w-full flex-col items-center justify-center overflow-y-auto overflow-x-hidden p-6">
-      {/* Fondo con aros geométricos decorativos (eco sutil del isotipo Plastifar) */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden select-none">
-        <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-brand-red/[0.04]" />
-        <div className="absolute left-1/2 top-1/2 h-[740px] w-[740px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-brand-green/[0.04]" />
-        <div className="absolute left-1/2 top-1/3 h-[240px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-red/[0.025] blur-[80px]" />
-      </div>
-
       {/* Contenido principal centrado */}
       <div className="relative z-10 flex w-full max-w-[580px] flex-col items-center text-center">
-        {/* Isotipo Plastifar con halo suave */}
-        <div className="mb-3.5 flex h-13 w-13 items-center justify-center rounded-2xl border border-line-soft bg-white p-2.5 shadow-[0_8px_20px_-6px_rgba(228,0,43,0.14),0_2px_6px_rgba(27,27,29,0.04)]">
+        {/* Isotipo Plastifar */}
+        <div className="mb-3.5 flex h-13 w-13 items-center justify-center rounded-card border border-line-soft bg-white p-2.5 shadow-card">
           <Logo variant="isotipo" height={32} />
         </div>
 
@@ -93,7 +86,7 @@ export function InboxTriageEmptyState({
             <button
               type="button"
               onClick={() => onSelectTicketFilter("sin-responder")}
-              className={`group flex flex-col rounded-edge border p-3 text-left transition-all
+              className={`group flex flex-col rounded-inset border p-3 text-left transition-all
                 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-4px_rgba(228,0,43,0.12)]
                 ${
                   activeTicketFilter === "sin-responder"
@@ -119,7 +112,7 @@ export function InboxTriageEmptyState({
             <button
               type="button"
               onClick={() => onSelectTicketFilter("sin-ticket")}
-              className={`group flex flex-col rounded-edge border p-3 text-left transition-all
+              className={`group flex flex-col rounded-inset border p-3 text-left transition-all
                 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-4px_rgba(194,118,10,0.12)]
                 ${
                   activeTicketFilter === "sin-ticket"
@@ -145,11 +138,11 @@ export function InboxTriageEmptyState({
             <button
               type="button"
               onClick={() => onSelectTicketFilter("todos")}
-              className={`group flex flex-col rounded-edge border p-3 text-left transition-all
+              className={`group flex flex-col rounded-inset border p-3 text-left transition-all
                 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-4px_rgba(27,27,29,0.08)]
                 ${
                   activeTicketFilter === "todos"
-                    ? "border-line-strong bg-canvas shadow-xs ring-1 ring-line-strong"
+                    ? "border-line-strong bg-canvas ring-1 ring-line-strong"
                     : "border-line bg-white hover:border-line-strong"
                 }`}
             >
@@ -173,7 +166,7 @@ export function InboxTriageEmptyState({
 
         {/* Estado en otras carpetas que no sean bandeja */}
         {!isInbox && (
-          <div className="mt-5 flex items-center gap-3 rounded-edge border border-line bg-white px-4 py-3 shadow-xs">
+          <div className="mt-5 flex items-center gap-3 rounded-inset border border-line bg-white px-4 py-3 shadow-card">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-canvas text-brand-gray">
               <Inbox className="h-4.5 w-4.5 text-faint" />
             </div>

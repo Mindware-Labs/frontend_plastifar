@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
+import { cn } from "../../lib/utils";
 import { useInListPanel } from "./listPanelContext";
 
 /**
@@ -104,6 +105,19 @@ export function Row({ busy = false, className = "", children, ...props }: RowPro
   );
 }
 
+/**
+ * Una celda.
+ *
+ * Declara su tamano de texto —13 px, el de la casa— porque sin el, una celda
+ * que se olvide de poner el suyo hereda los 16 px del `body`. Eso paso en la
+ * tabla de tickets: asunto y cliente salian a 16 px contra 11,5 y 12,5 del
+ * resto de la misma fila, y no era una decision de jerarquia sino un olvido.
+ *
+ * Se compone con `cn` y no interpolando la clase: con dos clases de la misma
+ * especificidad gana la que el compilador emitio ultima, que es impredecible.
+ * `tailwind-merge` resuelve el conflicto por familia, asi que una celda que
+ * pida `text-[12.5px]` lo obtiene siempre.
+ */
 export function Td({ className = "", ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={`px-3.5 py-2.5 ${className}`} {...props} />;
+  return <td className={cn("px-3.5 py-2.5 text-[13px]", className)} {...props} />;
 }

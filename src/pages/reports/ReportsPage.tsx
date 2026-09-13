@@ -299,15 +299,19 @@ export function ReportsPage() {
       {/* Paso 1: la pantalla vacia. No es un hueco por falta de datos, es el
           punto de partida, y por eso dice que hacer en vez de disculparse. */}
       {!hasRun && (
-        <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+        /* El punto de partida tambien es una superficie. Era lo unico del panel
+           que quedaba como texto suelto sobre el lienzo gris, y sobre un fondo
+           tintado un bloque sin superficie no se lee como «vacio a proposito»
+           sino como «algo no cargo». */
+        <div className="flex flex-col items-center justify-center gap-4 rounded-card border border-line bg-white px-6 py-20 text-center shadow-card">
           <span
             aria-hidden
-            className="flex h-12 w-12 items-center justify-center rounded-edge bg-fill text-faint"
+            className="flex h-12 w-12 items-center justify-center rounded-inset bg-fill text-faint"
           >
             <BarChart3 className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+            <h2 className="font-heading text-[18px] font-semibold tracking-[-0.015em] text-ink">
               Todavía no has generado ningún reporte
             </h2>
             <p className="mx-auto mt-1.5 max-w-[54ch] text-[13.5px] leading-relaxed text-subtle">
