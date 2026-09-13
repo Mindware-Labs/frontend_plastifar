@@ -1,8 +1,44 @@
 // Espejo de api/Dtos/PermissionDtos.cs en el backend. GET /api/permissions/matrix
 // y GET /api/staff/{id}/department-access devuelven exactamente estas formas.
 
-/** Clave estable del catalogo, con la convencion modulo.accion. */
-export type PermissionKey = string;
+/**
+ * Clave estable del catalogo, con la convencion modulo.accion.
+ *
+ * ==================================================================
+ * ES UNA UNION, NO `string`
+ * ==================================================================
+ * Era `string`, y eso convertia cada permiso en una cadena que nadie revisaba:
+ * `can("setting.write")` —sin la ese— compila, no avisa y simplemente no
+ * concede nunca. El sintoma es un boton que no aparece, que es exactamente lo
+ * que se espera ver cuando alguien no tiene el permiso. Un fallo asi no se
+ * distingue del funcionamiento correcto ni mirandolo.
+ *
+ * REGLA ESPEJO (seccion 4.2): esta lista es la misma que
+ * `api/Security/PermissionCatalog.cs`. Si agregas un permiso alli, agregalo
+ * aqui; si no, el frontend no podra nombrarlo y el compilador lo dira.
+ *
+ * Que el servidor mande la matriz como texto no lo debilita: esa respuesta se
+ * castea sin validar de todos modos, asi que la union no promete nada sobre el
+ * dato recibido. Lo que si hace es revisar cada literal que escribimos nosotros,
+ * que es donde de verdad se cuelan las erratas.
+ */
+export type PermissionKey =
+  | "staff.read"
+  | "staff.write"
+  | "roles.read"
+  | "roles.write"
+  | "clients.read"
+  | "clients.write"
+  | "tickets.read"
+  | "tickets.write"
+  | "tickets.assign"
+  | "tickets.close"
+  | "tickets.read_all"
+  | "quality.read"
+  | "quality.write"
+  | "quality.approve"
+  | "reports.read"
+  | "settings.write";
 
 export interface Permission {
   key: PermissionKey;

@@ -9,8 +9,15 @@
 
 import { ancestorsOf, descendantsOf } from "./departments";
 
-/** Convencion del catalogo: modulo.accion. */
-export type PermissionKey = string;
+/* UNA SOLA DEFINICION, REEXPORTADA.
+   `PermissionKey` estaba declarada dos veces —aqui y en types/permissions.ts—
+   con el mismo nombre y sin relacion entre si. Es el mismo error que dejo el
+   panel con dos arboles de navegacion: dos copias de una definicion no se
+   quedan iguales, se quedan parecidas, y la diferencia aparece el dia que una
+   de las dos se aprieta. Se reexporta para no tocar quien ya importaba de
+   aqui. */
+export type { PermissionKey } from "../types/permissions";
+import type { PermissionKey } from "../types/permissions";
 
 /** Una entrada del claim `dept_access` que emite TokenService. */
 export interface DepartmentAccessClaim {
