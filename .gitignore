@@ -33,4 +33,11 @@ dist-ssr
 
 # Documentacion interna y material de referencia, fuera del control de versiones
 Plan-de-construccion-Plastifar.pdf
-image.png.playwright-mcp/
+# public/image.png SI esta versionado a proposito: PRODUCT.md lo declara
+# referencia visual vinculante para dashboards y reportes, asi que el equipo lo
+# necesita en el repo. La barra inicial ancla la regla a la raiz: sin ella el
+# patron matchea en cualquier nivel y tapaba justo el archivo que hay que tener.
+/image.png
+
+# Transcripciones del MCP de Playwright: ruido de sesion, no del producto.
+.playwright-mcp/
