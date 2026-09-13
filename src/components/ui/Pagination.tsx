@@ -20,6 +20,21 @@ interface PaginationProps {
 
 const pageSizes = [10, 25, 50];
 
+/**
+ * Los tamaños ofrecidos, incluyendo SIEMPRE el que está en uso.
+ *
+ * El desplegable recibía `value={pageSize}` contra una lista fija, así que
+ * cualquier pantalla que arrancara con un tamaño fuera de esa lista —tickets
+ * abre en 8— pintaba el control vacío: ni el valor actual ni un aviso, sólo un
+ * hueco. Y quien lo tocara no podría volver a su tamaño de partida, porque no
+ * estaba entre las opciones.
+ *
+ * Se inserta ordenado para que la lista siga leyéndose de menor a mayor.
+ */
+function opcionesDeTamano(actual: number): number[] {
+  return pageSizes.includes(actual) ? pageSizes : [...pageSizes, actual].sort((a, b) => a - b);
+}
+
 /** Ventana de 5 paginas alrededor de la actual, sin salirse del rango. */
 function pageWindow(page: number, totalPages: number) {
   const start = Math.max(1, Math.min(page - 2, totalPages - 4));
@@ -84,7 +99,10 @@ export function Pagination({
             aria-label="Filas por página"
             value={String(pageSize)}
             onChange={(next) => onPageSizeChange(Number(next))}
-            options={pageSizes.map((size) => ({ value: String(size), label: String(size) }))}
+            options={opcionesDeTamano(pageSize).map((size) => ({
+              value: String(size),
+              label: String(size),
+            }))}
           />
         </span>
 

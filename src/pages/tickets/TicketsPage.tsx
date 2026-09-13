@@ -530,7 +530,10 @@ export function TicketsPage() {
             error === null && <TableSkeleton rows={pageSize} columns={10} />
           ) : (
             <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
-              <DataTable>
+              {/* Compacta: la bandeja es la única tabla que tiene que mostrar
+                  diez renglones enteros sin que el último quede bajo el pliegue.
+                  No esconde ningún dato, quita aire. */}
+              <DataTable density="compacta">
               <thead>
                 <HeadRow>
                   <Th className="w-10 !px-3">
@@ -621,10 +624,13 @@ export function TicketsPage() {
                         */}
                         <Td>
                           <div className="w-[164px]">
-                            <div className="truncate text-[13px] font-medium text-ink" title={t.subject}>
+                            <div
+                              className="truncate text-[13px] font-medium leading-[17px] text-ink"
+                              title={t.subject}
+                            >
                               {t.subject}
                             </div>
-                            <div className="truncate text-[11.5px] text-subtle">
+                            <div className="truncate text-[11.5px] leading-[15px] text-subtle">
                               {t.topicName || "Sin motivo"}
                               {t.productLineName && ` · ${t.productLineName}`}
                             </div>
@@ -634,10 +640,13 @@ export function TicketsPage() {
                         {/* Cliente */}
                         <Td>
                           <div className="w-[102px]">
-                            <div className="truncate text-[13px] font-medium text-ink" title={t.clientName || "Sin cliente"}>
+                            <div
+                              className="truncate text-[13px] font-medium leading-[17px] text-ink"
+                              title={t.clientName || "Sin cliente"}
+                            >
                               {t.clientName || "Sin cliente"}
                             </div>
-                            <div className="truncate text-[11.5px] text-subtle">
+                            <div className="truncate text-[11.5px] leading-[15px] text-subtle">
                               {t.contactName ?? t.clientCode ?? "—"}
                             </div>
                           </div>
@@ -678,9 +687,9 @@ export function TicketsPage() {
                                   : "bg-warn"
                               }`}
                             />
-                            <span className="text-[12px] text-ink">{t.status}</span>
+                            <span className="text-[12px] leading-[17px] text-ink">{t.status}</span>
                           </span>
-                          <span className="mt-1 block">
+                          <span className="mt-0.5 block">
                           {sla.tone === "overdue" ? (
                             <Badge tone="red">
                               <span className="inline-flex items-center gap-1">

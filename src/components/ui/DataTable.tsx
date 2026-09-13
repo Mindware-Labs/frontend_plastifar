@@ -2,6 +2,7 @@ import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
 import { cn } from "../../lib/utils";
 import { useInListPanel } from "./listPanelContext";
+import { DataTableDensityContext, useTableDensity, type TableDensity } from "./dataTableContext";
 
 /**
  * Tabla de listado del panel.
@@ -15,9 +16,20 @@ import { useInListPanel } from "./listPanelContext";
  * Cambiarlo aca alcanza a las doce pantallas de listado a la vez, que es la
  * razon por la que este primitivo existe.
  */
-export function DataTable({ children }: { children: ReactNode }) {
+export function DataTable({
+  children,
+  density = "comoda",
+}: {
+  children: ReactNode;
+  /** «compacta» aprieta el aire vertical. Ver dataTableContext. */
+  density?: TableDensity;
+}) {
   const inPanel = useInListPanel();
-  const table = <table className="w-full border-collapse text-left">{children}</table>;
+  const table = (
+    <DataTableDensityContext.Provider value={density}>
+      <table className="w-full border-collapse text-left">{children}</table>
+    </DataTableDensityContext.Provider>
+  );
 
   // Dentro de un `ListPanel` la superficie ya la puso el panel, junto con su
   // scroll horizontal. Volver a dibujarla aca serian dos bordes, dos sombras y
@@ -50,10 +62,11 @@ interface ThProps extends ThHTMLAttributes<HTMLTableCellElement> {
 }
 
 export function Th({ sort, className = "", children, ...props }: ThProps) {
+  const density = useTableDensity();
   return (
     <th
       aria-sort={sort?.dir === "asc" ? "ascending" : sort?.dir === "desc" ? "descending" : undefined}
-      className={`px-3.5 py-2.5 font-heading text-[10.5px] font-medium uppercase tracking-[0.06em]
+      className={`px-3.5 ${density === "compacta" ? "py-2" : "py-2.5"} font-heading text-[10.5px] font-medium uppercase tracking-[0.06em]
         text-faint ${className}`}
       {...props}
     >
@@ -124,5 +137,15 @@ export function Row({ busy = false, className = "", children, ...props }: RowPro
  * pida `text-[12.5px]` lo obtiene siempre.
  */
 export function Td({ className = "", ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("px-3.5 py-2.5 text-[13px]", className)} {...props} />;
+  const density = useTableDensity();
+  return (
+    <td
+      className={cn(
+        "px-3.5 text-[13px]",
+        density === "compacta" ? "py-1.5" : "py-2.5",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
