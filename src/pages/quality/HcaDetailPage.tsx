@@ -25,6 +25,7 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { Spinner } from "../../components/ui/Spinner";
@@ -463,119 +464,128 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
         </p>
       )}
 
-      {section === "plan" && planData === null ? (
-        planError === null && (
-          <div className="flex justify-center py-12">
-            <Spinner />
-          </div>
-        )
-      ) : section !== "plan" ? null : (
-        planItems.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-[13.5px] text-faint">
-              Esta HCA todavía no tiene plan de acción.
-            </p>
-            {canWrite && !isClosed && (
-              <div className="mt-3 flex justify-center">
-                <Button size="sm" onClick={() => setItemModal("nueva")}>
-                  <Plus className="h-[15px] w-[15px]" />
-                  Agregar la primera acción
-                </Button>
+      {section === "plan" && (
+        <ListPanel
+          footer={
+            planData !== null &&
+            planData.total > 0 && (
+              <Pagination
+                page={plan.page}
+                pageSize={planPageSize}
+                total={planData.total}
+                totalPages={planData.totalPages}
+                onPageChange={plan.setPage}
+                onPageSizeChange={setPlanPageSize}
+                noun="acciones"
+                nounSingular="acción"
+              />
+            )
+          }
+        >
+          {planData === null ? (
+            planError === null && (
+              <div className="flex justify-center py-12">
+                <Spinner />
               </div>
-            )}
-          </div>
-        ) : (
-          <div className={`transition-opacity ${plan.isStale ? "opacity-60" : ""}`}>
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Acción</Th>
-                <Th>Responsable</Th>
-                <Th>Comprometida</Th>
-                <Th>Cumplida</Th>
-                <Th>Estado</Th>
-                {canWrite && !isClosed && <Th className="w-36 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+            )
+          ) : planItems.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-[13.5px] text-faint">
+                Esta HCA todavía no tiene plan de acción.
+              </p>
+              {canWrite && !isClosed && (
+                <div className="mt-3 flex justify-center">
+                  <Button size="sm" onClick={() => setItemModal("nueva")}>
+                    <Plus className="h-[15px] w-[15px]" />
+                    Agregar la primera acción
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className={`transition-opacity ${plan.isStale ? "opacity-60" : ""}`}>
+              <DataTable>
+                <thead>
+                  <HeadRow>
+                    <Th>Acción</Th>
+                    <Th>Responsable</Th>
+                    <Th>Comprometida</Th>
+                    <Th>Cumplida</Th>
+                    <Th>Estado</Th>
+                    {canWrite && !isClosed && <Th className="w-36 text-right">Acciones</Th>}
+                  </HeadRow>
+                </thead>
 
-            <tbody>
-              {planItems.map((item) => {
-                const itemOverdue = isPlanItemOverdue(item);
-                const settled = isPlanItemSettled(item);
+                <tbody>
+                  {planItems.map((item) => {
+                    const itemOverdue = isPlanItemOverdue(item);
+                    const settled = isPlanItemSettled(item);
 
-                return (
-                  <Row key={item.id}>
-                    <Td className="max-w-[460px] text-[12.5px] text-brand-gray">
-                      {item.description}
-                      {item.cancelReason && (
-                        <span className="mt-1 block text-[11.5px] leading-relaxed text-faint">
-                          Anulada: {item.cancelReason}
-                        </span>
-                      )}
-                    </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
-                      {item.responsibleName}
-                    </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
-                      {formatDay(item.dueDate)}
-                    </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
-                      {item.completedAt ? formatDay(item.completedAt) : <span className="text-faint">—</span>}
-                    </Td>
-                    <Td>
-                      <PlanItemStatusBadge status={item.status} overdue={itemOverdue} />
-                    </Td>
-                    {canWrite && !isClosed && (
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar la acción de ${item.responsibleName}`}
-                            icon={Pencil}
-                            onClick={() => setItemModal(item)}
-                            disabled={settled}
-                          />
-                          <RowAction
-                            label="Poner en curso"
-                            icon={Play}
-                            onClick={() => void startItem(item)}
-                            disabled={settled || item.status === "En curso"}
-                          />
-                          <RowAction
-                            label="Marcar como cumplida"
-                            icon={Check}
-                            onClick={() => askComplete(item)}
-                            disabled={settled}
-                          />
-                          <RowAction
-                            label="Anular con justificación"
-                            icon={CircleSlash}
-                            onClick={() => setCancelling(item)}
-                            disabled={settled}
-                            danger
-                          />
-                        </div>
-                      </Td>
-                    )}
-                  </Row>
-                );
-              })}
-            </tbody>
-          </DataTable>
-          </div>
-        )
-      )}
-
-      {section === "plan" && planData !== null && planData.total > 0 && (
-        <Pagination
-          page={plan.page}
-          pageSize={planPageSize}
-          total={planData.total}
-          totalPages={planData.totalPages}
-          onPageChange={plan.setPage}
-          onPageSizeChange={setPlanPageSize}
-          noun="acciones"
-          nounSingular="acción"
-        />
+                    return (
+                      <Row key={item.id}>
+                        <Td className="max-w-[460px] text-[12.5px] text-brand-gray">
+                          {item.description}
+                          {item.cancelReason && (
+                            <span className="mt-1 block text-[11.5px] leading-relaxed text-faint">
+                              Anulada: {item.cancelReason}
+                            </span>
+                          )}
+                        </Td>
+                        <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
+                          {item.responsibleName}
+                        </Td>
+                        <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
+                          {formatDay(item.dueDate)}
+                        </Td>
+                        <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
+                          {item.completedAt ? (
+                            formatDay(item.completedAt)
+                          ) : (
+                            <span className="text-faint">—</span>
+                          )}
+                        </Td>
+                        <Td>
+                          <PlanItemStatusBadge status={item.status} overdue={itemOverdue} />
+                        </Td>
+                        {canWrite && !isClosed && (
+                          <Td>
+                            <div className="flex items-center justify-end gap-1">
+                              <RowAction
+                                label={`Editar la acción de ${item.responsibleName}`}
+                                icon={Pencil}
+                                onClick={() => setItemModal(item)}
+                                disabled={settled}
+                              />
+                              <RowAction
+                                label="Poner en curso"
+                                icon={Play}
+                                onClick={() => void startItem(item)}
+                                disabled={settled || item.status === "En curso"}
+                              />
+                              <RowAction
+                                label="Marcar como cumplida"
+                                icon={Check}
+                                onClick={() => askComplete(item)}
+                                disabled={settled}
+                              />
+                              <RowAction
+                                label="Anular con justificación"
+                                icon={CircleSlash}
+                                onClick={() => setCancelling(item)}
+                                disabled={settled}
+                                danger
+                              />
+                            </div>
+                          </Td>
+                        )}
+                      </Row>
+                    );
+                  })}
+                </tbody>
+              </DataTable>
+            </div>
+          )}
+        </ListPanel>
       )}
 
       {section === "cierre" && (
@@ -587,48 +597,50 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
 
             {/* Condicion y estado son dos columnas, no una lista: asi se ve de un
                 vistazo cuantas faltan sin leer las tres entradas enteras. */}
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Condición</Th>
-                  <Th>Estado</Th>
-                </HeadRow>
-              </thead>
-              <tbody>
-                {conditions.map((condition) => (
-                  <Row key={condition.id}>
-                    <Td className="w-[300px] py-3 align-top text-[13px] font-medium text-ink">
-                      {condition.label}
-                    </Td>
-                    <Td className="py-3 align-top">
-                      <span className="flex items-start gap-2">
-                        <span
-                          aria-hidden
-                          className={`mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-edge ${
-                            condition.met
-                              ? "bg-brand-green/10 text-brand-green"
-                              : "bg-warn/10 text-warn"
-                          }`}
-                        >
-                          {condition.met ? (
-                            <Check className="h-3.5 w-3.5" />
-                          ) : (
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                          )}
+            <div className="rounded-card border border-line bg-white p-5 shadow-card">
+              <DataTable>
+                <thead>
+                  <HeadRow>
+                    <Th>Condición</Th>
+                    <Th>Estado</Th>
+                  </HeadRow>
+                </thead>
+                <tbody>
+                  {conditions.map((condition) => (
+                    <Row key={condition.id}>
+                      <Td className="w-[300px] py-3 align-top text-[13px] font-medium text-ink">
+                        {condition.label}
+                      </Td>
+                      <Td className="py-3 align-top">
+                        <span className="flex items-start gap-2">
+                          <span
+                            aria-hidden
+                            className={`mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-edge ${
+                              condition.met
+                                ? "bg-brand-green/10 text-brand-green"
+                                : "bg-warn/10 text-warn"
+                            }`}
+                          >
+                            {condition.met ? (
+                              <Check className="h-3.5 w-3.5" />
+                            ) : (
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                            )}
+                          </span>
+                          <span
+                            className={`max-w-[76ch] text-[12.5px] leading-relaxed ${
+                              condition.met ? "text-brand-green" : "text-warn"
+                            }`}
+                          >
+                            {condition.met ? "Cumplida" : `Falta: ${condition.missing}`}
+                          </span>
                         </span>
-                        <span
-                          className={`max-w-[76ch] text-[12.5px] leading-relaxed ${
-                            condition.met ? "text-brand-green" : "text-warn"
-                          }`}
-                        >
-                          {condition.met ? "Cumplida" : `Falta: ${condition.missing}`}
-                        </span>
-                      </span>
-                    </Td>
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
+                      </Td>
+                    </Row>
+                  ))}
+                </tbody>
+              </DataTable>
+            </div>
           </section>
 
           <section>
@@ -636,41 +648,43 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
               Verificación de eficacia
             </h2>
 
-            {sheet.effectivenessCheckAt ? (
-              <>
-                <DetailTable>
-                  <tbody>
-                    <DetailRow label="Verificada el">
-                      {formatDay(sheet.effectivenessCheckAt.slice(0, 10))}
-                    </DetailRow>
-                    <DetailRow label="Qué se comprobó" wide>
-                      <p className="whitespace-pre-line">{sheet.effectivenessNotes}</p>
-                    </DetailRow>
-                  </tbody>
-                </DetailTable>
-                {canWrite && !isClosed && (
-                  <div className="mt-3">
+            <div className="rounded-card border border-line bg-white p-5 shadow-card">
+              {sheet.effectivenessCheckAt ? (
+                <>
+                  <DetailTable>
+                    <tbody>
+                      <DetailRow label="Verificada el">
+                        {formatDay(sheet.effectivenessCheckAt.slice(0, 10))}
+                      </DetailRow>
+                      <DetailRow label="Qué se comprobó" wide>
+                        <p className="whitespace-pre-line">{sheet.effectivenessNotes}</p>
+                      </DetailRow>
+                    </tbody>
+                  </DetailTable>
+                  {canWrite && !isClosed && (
+                    <div className="mt-3">
+                      <Button variant="secondary" size="sm" onClick={() => setVerifying(true)}>
+                        <Pencil className="h-[15px] w-[15px]" />
+                        Corregir verificación
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-start gap-3">
+                  <p className="max-w-[76ch] text-[13px] leading-relaxed text-brand-gray">
+                    Todavía no consta que la acción funcionara. Sin esta comprobación la HCA no se
+                    puede cerrar.
+                  </p>
+                  {canWrite && !isClosed && (
                     <Button variant="secondary" size="sm" onClick={() => setVerifying(true)}>
-                      <Pencil className="h-[15px] w-[15px]" />
-                      Corregir verificación
+                      <ShieldCheck className="h-[15px] w-[15px]" />
+                      Registrar verificación
                     </Button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-col items-start gap-3">
-                <p className="max-w-[76ch] text-[13px] leading-relaxed text-brand-gray">
-                  Todavía no consta que la acción funcionara. Sin esta comprobación la HCA no se
-                  puede cerrar.
-                </p>
-                {canWrite && !isClosed && (
-                  <Button variant="secondary" size="sm" onClick={() => setVerifying(true)}>
-                    <ShieldCheck className="h-[15px] w-[15px]" />
-                    Registrar verificación
-                  </Button>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
           </section>
 
           {isClosed && (
@@ -678,15 +692,17 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
               <h2 className="mb-3 font-heading text-[17px] font-bold leading-tight tracking-[-0.01em] text-ink">
                 Cierre
               </h2>
-              <DetailTable>
-                <tbody>
-                  <DetailRow label="Cerrada el">{formatInstant(sheet.closedAt)}</DetailRow>
-                  <DetailRow label="Cerrada por">{sheet.closedByName ?? "—"}</DetailRow>
-                  <DetailRow label="Nota de cierre" wide>
-                    {sheet.closingNote ?? <span className="text-faint">Sin nota</span>}
-                  </DetailRow>
-                </tbody>
-              </DetailTable>
+              <div className="rounded-card border border-line bg-white p-5 shadow-card">
+                <DetailTable>
+                  <tbody>
+                    <DetailRow label="Cerrada el">{formatInstant(sheet.closedAt)}</DetailRow>
+                    <DetailRow label="Cerrada por">{sheet.closedByName ?? "—"}</DetailRow>
+                    <DetailRow label="Nota de cierre" wide>
+                      {sheet.closingNote ?? <span className="text-faint">Sin nota</span>}
+                    </DetailRow>
+                  </tbody>
+                </DetailTable>
+              </div>
             </section>
           )}
         </div>

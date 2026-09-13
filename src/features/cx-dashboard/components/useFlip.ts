@@ -33,6 +33,21 @@ export function useFlip<Key extends string | number>(keys: readonly Key[]) {
   const nodes = useRef(new Map<Key, HTMLElement>());
   const previous = useRef(new Map<Key, number>());
 
+  /**
+   * El efecto depende del ORDEN, no del arreglo.
+   *
+   * El sitio de llamada pasa `rows.map(t => t.id)`, que es un arreglo nuevo en
+   * cada render. Con el arreglo en las dependencias, el efecto corría en CADA
+   * render —un hover, un cambio de ancho, cualquier cosa— y como al redibujar
+   * las filas sí habían cambiado de sitio, FLIP las mandaba a viajar sin que
+   * nadie hubiera reordenado nada. Al cambiar el ancho de la ventana la tabla
+   * entera salía volando.
+   *
+   * La firma sólo cambia cuando cambia el orden, que es exactamente la
+   * condición que esta animación existe para acompañar.
+   */
+  const order = keys.join("|");
+
   useLayoutEffect(() => {
     const reduce =
       typeof window !== "undefined" &&
@@ -67,7 +82,7 @@ export function useFlip<Key extends string | number>(keys: readonly Key[]) {
     }
 
     previous.current = next;
-  }, [keys]);
+  }, [order]);
 
   /** Se pasa como `ref` a cada elemento de la lista. */
   return (key: Key) => (node: HTMLElement | null) => {

@@ -10,11 +10,12 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { Modal } from "../../components/ui/Modal";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useEmailCounts } from "../../context/useEmailCounts";
@@ -504,65 +505,6 @@ export function TicketsPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {/* Barra de criterios: búsqueda, filtros estructurales y pastillas */}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por número, asunto o cliente…"
-            className="min-w-[200px] flex-1"
-          />
-
-          <Select
-            size="sm"
-            className="w-[200px]"
-            aria-label="Filtrar por departamento"
-            value={String(departmentId)}
-            onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
-            options={[
-              { value: "todos", label: "Todos los deptos." },
-              ...departments.map((d) => ({
-                value: String(d.id),
-                label: d.name,
-              })),
-            ]}
-          />
-
-          <Select
-            size="sm"
-            className="w-[200px]"
-            aria-label="Filtrar por prioridad"
-            value={priority}
-            onChange={(next) => setPriority(next)}
-            options={[
-              { value: "todas", label: "Todas las prioridades" },
-              { value: "Emergencia", label: "Emergencia" },
-              { value: "Alta", label: "Alta" },
-              { value: "Normal", label: "Normal" },
-              { value: "Baja", label: "Baja" },
-            ]}
-          />
-
-          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-          {primaryFilters.map(({ key, label, countKey }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              count={counts?.[countKey] ?? 0}
-              active={filter === key}
-              onClick={() => setFilter(key)}
-            />
-          ))}
-
-          <TicketStatusMenu
-            options={secondaryFilters}
-            activeKey={filter}
-            counts={counts}
-            onSelect={setFilter}
-          />
-        </div>
-
         {bulkFeedback && (
           <div className="mb-3">
             <Alert variant={bulkFeedback.variant}>
@@ -586,13 +528,86 @@ export function TicketsPage() {
           </div>
         )}
 
-        {data === null ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
-        ) : (
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable>
+        <ListPanel
+          toolbar={
+            <>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por número, asunto o cliente…"
+                className="min-w-[200px] flex-1"
+              />
+
+              <Select
+                size="sm"
+                className="w-[200px]"
+                aria-label="Filtrar por departamento"
+                value={String(departmentId)}
+                onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+                options={[
+                  { value: "todos", label: "Todos los deptos." },
+                  ...departments.map((d) => ({
+                    value: String(d.id),
+                    label: d.name,
+                  })),
+                ]}
+              />
+
+              <Select
+                size="sm"
+                className="w-[200px]"
+                aria-label="Filtrar por prioridad"
+                value={priority}
+                onChange={(next) => setPriority(next)}
+                options={[
+                  { value: "todas", label: "Todas las prioridades" },
+                  { value: "Emergencia", label: "Emergencia" },
+                  { value: "Alta", label: "Alta" },
+                  { value: "Normal", label: "Normal" },
+                  { value: "Baja", label: "Baja" },
+                ]}
+              />
+
+              <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+              {primaryFilters.map(({ key, label, countKey }) => (
+                <FilterChip
+                  key={key}
+                  label={label}
+                  count={counts?.[countKey] ?? 0}
+                  active={filter === key}
+                  onClick={() => setFilter(key)}
+                />
+              ))}
+
+              <TicketStatusMenu
+                options={secondaryFilters}
+                activeKey={filter}
+                counts={counts}
+                onSelect={setFilter}
+              />
+            </>
+          }
+          footer={
+            data !== null &&
+            data.total > 0 && (
+              <Pagination
+                page={data.page}
+                totalPages={data.totalPages}
+                total={data.total}
+                pageSize={data.pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="tickets"
+              />
+            )
+          }
+        >
+          {data === null ? (
+            error === null && <TableSkeleton rows={pageSize} columns={10} />
+          ) : (
+            <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+              <DataTable>
               <thead>
                 <HeadRow>
                   <Th className="w-10 !px-3">
@@ -769,20 +784,9 @@ export function TicketsPage() {
                 )}
               </tbody>
             </DataTable>
-
-            {data.total > 0 && (
-              <Pagination
-                page={data.page}
-                totalPages={data.totalPages}
-                total={data.total}
-                pageSize={data.pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                noun="tickets"
-              />
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </ListPanel>
       </div>
 
       {/* Barra flotante de acciones en lote */}

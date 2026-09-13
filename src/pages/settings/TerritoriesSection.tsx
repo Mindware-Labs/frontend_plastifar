@@ -6,10 +6,11 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -57,7 +58,6 @@ export function TerritoriesSection() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  const isFirstLoad = data === null && error === null;
   // Sin criterio activo, una pagina vacia significa catalogo vacio; con
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
@@ -114,123 +114,126 @@ export function TerritoriesSection() {
         )
       }
     >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar por nombre o código…"
-          className="w-[240px]"
-        />
-
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-          <FilterChip
-            label="Todos"
-            count={counts?.all ?? 0}
-            active={chip === "todos"}
-            onClick={() => setChip("todos")}
-          />
-          <FilterChip
-            label="Activos"
-            count={counts?.active ?? 0}
-            active={chip === "activos"}
-            onClick={() => setChip("activos")}
-          />
-          <FilterChip
-            label="Inactivos"
-            count={counts?.inactive ?? 0}
-            active={chip === "inactivos"}
-            onClick={() => setChip("inactivos")}
-          />
-        </ChipGroup>
-      </div>
-
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
-      {isFirstLoad ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      ) : data === null ? null : rows.length === 0 ? (
-        <p className="py-14 text-center text-[13.5px] text-faint">
-          {isFiltering
-            ? "Ningún territorio coincide con este filtro o búsqueda."
-            : "Todavía no hay ningún territorio registrado."}
-        </p>
-      ) : (
-        <div className={staleClass(isStale)}>
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Código</Th>
-                <Th>Territorio</Th>
-                <Th>Clientes</Th>
-                <Th>Estado</Th>
-                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+      <ListPanel
+        toolbar={
+          <>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre o código…"
+              className="w-[240px]"
+            />
 
-            <tbody>
-              {rows.map((territory) => (
-                <Row key={territory.id} busy={busyId === territory.id}>
-                  <Td>
-                    <span className="font-mono text-[12px] text-brand-gray">{territory.code}</span>
-                  </Td>
-                  <Td className="text-[12.5px] font-medium text-ink">{territory.name}</Td>
-                  <Td>
-                    {territory.clientCount > 0 ? (
-                      <Badge>
-                        <span className="tabular-nums">{territory.clientCount}</span>
-                      </Badge>
-                    ) : (
-                      <span className="text-[12.5px] text-faint">Ninguno</span>
-                    )}
-                  </Td>
-                  <Td>
-                    <StatusDot active={territory.isActive} />
-                  </Td>
-                  {canWrite && (
+            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
+              <FilterChip
+                label="Todos"
+                count={counts?.all ?? 0}
+                active={chip === "todos"}
+                onClick={() => setChip("todos")}
+              />
+              <FilterChip
+                label="Activos"
+                count={counts?.active ?? 0}
+                active={chip === "activos"}
+                onClick={() => setChip("activos")}
+              />
+              <FilterChip
+                label="Inactivos"
+                count={counts?.inactive ?? 0}
+                active={chip === "inactivos"}
+                onClick={() => setChip("inactivos")}
+              />
+            </ChipGroup>
+          </>
+        }
+        footer={
+          data !== null &&
+          data.total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="territorios"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={5} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {isFiltering
+              ? "Ningún territorio coincide con este filtro o búsqueda."
+              : "Todavía no hay ningún territorio registrado."}
+          </p>
+        ) : (
+          <div className={staleClass(isStale)}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Código</Th>
+                  <Th>Territorio</Th>
+                  <Th>Clientes</Th>
+                  <Th>Estado</Th>
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+
+              <tbody>
+                {rows.map((territory) => (
+                  <Row key={territory.id} busy={busyId === territory.id}>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Editar ${territory.name}`}
-                          icon={Pencil}
-                          onClick={() => setModal(territory)}
-                          disabled={busyId === territory.id}
-                        />
-                        <RowAction
-                          label={
-                            territory.isActive
-                              ? `Desactivar ${territory.name}`
-                              : `Reactivar ${territory.name}`
-                          }
-                          icon={Power}
-                          onClick={() => askToggle(territory)}
-                          disabled={busyId === territory.id}
-                        />
-                      </div>
+                      <span className="font-mono text-[12px] text-brand-gray">{territory.code}</span>
                     </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-        </div>
-      )}
-
-      {data !== null && data.total > 0 && (
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={data.total}
-          totalPages={data.totalPages}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          noun="territorios"
-        />
-      )}
-
+                    <Td className="text-[12.5px] font-medium text-ink">{territory.name}</Td>
+                    <Td>
+                      {territory.clientCount > 0 ? (
+                        <Badge>
+                          <span className="tabular-nums">{territory.clientCount}</span>
+                        </Badge>
+                      ) : (
+                        <span className="text-[12.5px] text-faint">Ninguno</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <StatusDot active={territory.isActive} />
+                    </Td>
+                    {canWrite && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Editar ${territory.name}`}
+                            icon={Pencil}
+                            onClick={() => setModal(territory)}
+                            disabled={busyId === territory.id}
+                          />
+                          <RowAction
+                            label={
+                              territory.isActive
+                                ? `Desactivar ${territory.name}`
+                                : `Reactivar ${territory.name}`
+                            }
+                            icon={Power}
+                            onClick={() => askToggle(territory)}
+                            disabled={busyId === territory.id}
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
+      </ListPanel>
 
       {modal !== null && (
         <TerritoryModal

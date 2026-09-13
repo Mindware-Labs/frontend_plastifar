@@ -1,12 +1,6 @@
 @import "tailwindcss";
 
-@import "@fontsource/montserrat/500.css";
-@import "@fontsource/montserrat/600.css";
-@import "@fontsource/montserrat/700.css";
-@import "@fontsource/poppins/300.css";
-@import "@fontsource/poppins/400.css";
-@import "@fontsource/poppins/500.css";
-@import "@fontsource/poppins/600.css";
+@import "@fontsource-variable/onest";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
@@ -23,11 +17,11 @@
   --color-brand-gray: #515151;
 
   /* Neutros de interfaz (no institucionales: soporte de pantalla) */
-  --color-ink: #1b1b1d;
-  --color-canvas: #f5f5f6;
-  --color-line: #e7e7ea;
-  --color-line-soft: #f0f0f2;
-  --color-line-strong: #dcdce0;
+  --color-ink: #23232b;
+  --color-canvas: #f3f5f7;
+  --color-line: #eaeaef;
+  --color-line-soft: #f3f3f7;
+  --color-line-strong: #e3e3e9;
   /* Los dos grises de texto secundario cumplen 4.5:1 sobre blanco: 5.9:1 el
      apagado y 4.8:1 el tenue. Se llama "subtle" y no "muted" porque shadcn ya
      usa --color-muted para superficies claras (fondo de pastillas/avatares),
@@ -39,9 +33,22 @@
      prioridad alta). No es un color institucional. 5.4:1 sobre blanco. */
   --color-warn: #9a5c04;
 
-  /* Radio unico de los controles: casi recto, coherente con el trazo
-     industrial del logotipo. Un solo lugar donde ajustarlo. */
-  --radius-edge: 2px;
+  /* ------------------------------------------------------------------
+     FORMA
+     ------------------------------------------------------------------
+     Referencia: Center Quest (`public/image.png`). Radio generoso y
+     consistente en tres pasos; nada cuadrado.
+
+     `--radius-edge` era 2 px —el trazo industrial del logotipo— y lo usan 236
+     sitios del codigo. Cambiar ESTE valor redondea toda la aplicacion de una
+     vez, sin tocar una sola pantalla: por eso el token existia en un solo
+     lugar. El Brandbook 2026 dejo de ser vinculante el 12/09/2026 (ver
+     PRODUCT.md), que es lo que habilita el cambio. */
+  --radius-edge: 10px;
+  /* La superficie que flota sobre el lienzo. */
+  --radius-card: 16px;
+  /* La segunda superficie dentro de una tarjeta. */
+  --radius-inset: 12px;
   /* Lo conceptualmente redondo: avatares, punto de estado, contadores y chips. */
   --radius-pill: 9999px;
 
@@ -49,14 +56,54 @@
      `zinc-400` en cada campo: nombrarlo evita que el literal siga creciendo. */
   --color-hairline-hover: #a1a1aa;
 
-  /* Las tres unicas elevaciones del sistema. Nada que haga scroll con la pagina
-     lleva sombra; estas son para lo que flota encima y se va. */
-  --shadow-bloom: 0 10px 20px -12px rgba(228, 0, 43, 0.55);
-  --shadow-panel: 0 4px 8px rgba(27, 27, 29, 0.04), 0 24px 48px -20px rgba(27, 27, 29, 0.28);
-  --shadow-dialog: 0 4px 10px rgba(27, 27, 29, 0.06), 0 32px 64px -28px rgba(27, 27, 29, 0.45);
+  /* ------------------------------------------------------------------
+     ELEVACION
+     ------------------------------------------------------------------
+     `--shadow-card` es nueva y rompe a proposito la regla anterior de que
+     nada que scrollee lleva sombra. Esa regla era correcta MIENTRAS el fondo
+     era blanco: sobre blanco una sombra no separa nada, solo ensucia. Sobre el
+     lienzo tintado si separa, y es lo que hace flotar la tarjeta.
 
-  --font-heading: "Montserrat", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "Poppins", ui-sans-serif, system-ui, sans-serif;
+     Lleva desplazamiento y desenfoque suave —eso la distingue de un halo
+     decorativo— y alfa muy baja: lo que despega la tarjeta es el contraste con
+     el lienzo, no la sombra. */
+  --shadow-card:
+    0 1px 2px rgba(35, 35, 43, 0.03),
+    0 10px 32px -16px rgba(35, 35, 43, 0.12);
+  --shadow-bloom: 0 10px 24px -14px rgba(228, 0, 43, 0.38);
+  --shadow-panel: 0 4px 10px rgba(35, 35, 43, 0.03), 0 28px 56px -24px rgba(35, 35, 43, 0.22);
+  --shadow-dialog: 0 4px 12px rgba(35, 35, 43, 0.05), 0 36px 72px -30px rgba(35, 35, 43, 0.34);
+
+  /* ------------------------------------------------------------------
+     TIPOGRAFIA
+     ------------------------------------------------------------------
+     Una sola familia de trabajo. Montserrat pesaba de mas en titulos chicos y
+     Poppins es una geometrica de bocas muy redondas: simpatica en una marca,
+     floja en una tabla de datos. Geist es una grotesca neutra con cifras
+     tabulares solidas y versalitas que aguantan tracking abierto, que es lo
+     que pide un panel de operacion.
+
+     Los titulos llevan Onest: una humanista de formas abiertas y terminales
+     suaves, dibujada justamente para legibilidad amable.
+
+     Antes estaba Bricolage Grotesque y fue un error mio. Una regla de
+     tipografia lo explica: se empareja por CONTRASTE, no por parecido — dos
+     sans casi iguales se leen como un descuido, no como una decision.
+     Bricolage caia en el peor punto: era sans como el cuerpo, asi que el par
+     no se leia deliberado, y encima tiene formas irregulares a proposito, que
+     en una pantalla de trabajo se leen como aspereza.
+
+     Onest contrasta con Geist por TEMPERATURA —mas redonda, mas abierta, mayor
+     altura de x— en vez de por rareza. Es la diferencia entre suave y rustico.
+
+     Montserrat y Poppins salieron del bundle: nada las consumia ya, y eran dos
+     tercios de la deriva de cuatro familias anotada en PRODUCT.md.
+
+     Los DOS tokens se conservan con su nombre: 141 sitios del codigo usan
+     `font-heading` y `font-body`. Repuntarlos aca cambia toda la aplicacion sin
+     editar una sola pantalla. */
+  --font-heading: "Onest Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
 html {
@@ -572,4 +619,85 @@ input:-webkit-autofill:focus {
 
 *::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-faint);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Esqueletos de carga                                                */
+/*                                                                     */
+/*  El brillo es un barrido, no un latido: un `opacity` que sube y     */
+/*  baja parpadea y cansa, mientras que un reflejo que cruza sugiere   */
+/*  movimiento hacia adelante. Va sobre `background-position`, que el  */
+/*  compositor resuelve sin recalcular layout.                         */
+/* ------------------------------------------------------------------ */
+
+.plf-skeleton {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-fill) 0%,
+    var(--color-line-soft) 40%,
+    #ffffff 50%,
+    var(--color-line-soft) 60%,
+    var(--color-fill) 100%
+  );
+  background-size: 320% 100%;
+  animation: plf-shimmer 1.25s ease-in-out infinite;
+}
+
+@keyframes plf-shimmer {
+  from { background-position: 140% 0; }
+  to { background-position: -40% 0; }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Entrada de las bandas del tablero                                  */
+/*                                                                     */
+/*  Arranca desde un estado YA VISIBLE (opacidad 0.001 dura un solo    */
+/*  cuadro) para que una animacion que no corre deje contenido legible */
+/*  y no una pagina en blanco.                                         */
+/*                                                                     */
+/*  El escalonado se corta a la quinta banda: pasada esa, el retardo   */
+/*  deja de leerse como secuencia y empieza a leerse como lentitud.    */
+/*  Es una superficie de operacion — el movimiento acompania la carga, */
+/*  nunca la hace esperar.                                             */
+/* ------------------------------------------------------------------ */
+
+@keyframes plf-band-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.plf-band {
+  animation: plf-band-in 340ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.plf-band:nth-child(1) { animation-delay: 0ms; }
+.plf-band:nth-child(2) { animation-delay: 45ms; }
+.plf-band:nth-child(3) { animation-delay: 90ms; }
+.plf-band:nth-child(4) { animation-delay: 135ms; }
+.plf-band:nth-child(n + 5) { animation-delay: 180ms; }
+
+/* Reducir no es apagar: se quita el DESPLAZAMIENTO y se conserva lo que
+   confirma que algo llego. El esqueleto se queda gris y quieto. */
+@media (prefers-reduced-motion: reduce) {
+  .plf-skeleton {
+    animation: none;
+    background-image: none;
+  }
+
+  .plf-band {
+    animation-duration: 160ms;
+    animation-delay: 0ms !important;
+    animation-name: plf-fade-in;
+  }
+
+  @keyframes plf-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }

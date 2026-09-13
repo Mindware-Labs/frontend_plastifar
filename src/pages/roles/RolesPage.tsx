@@ -8,10 +8,11 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -105,40 +106,60 @@ export function RolesPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por nombre de rol…"
-            className="w-[240px]"
-          />
-
-          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-          {filters.map(({ key, label, countKey }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              count={counts?.[countKey] ?? 0}
-              active={filter === key}
-              onClick={() => setFilter(key)}
-            />
-          ))}
-        </div>
-
         {error && (
           <div className="mb-3">
             <Alert variant="error">{error}</Alert>
           </div>
         )}
 
-        {data === null ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
-        ) : (
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable>
+        <ListPanel
+          toolbar={
+            <>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por nombre de rol…"
+                className="w-[240px]"
+              />
+
+              <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+              {filters.map(({ key, label, countKey }) => (
+                <FilterChip
+                  key={key}
+                  label={label}
+                  count={counts?.[countKey] ?? 0}
+                  active={filter === key}
+                  onClick={() => setFilter(key)}
+                />
+              ))}
+            </>
+          }
+          footer={
+            data !== null && (
+              <Pagination
+                page={data.page}
+                pageSize={data.pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="roles"
+              />
+            )
+          }
+        >
+          {data === null ? (
+            error === null && <TableSkeleton rows={pageSize} columns={4} />
+          ) : rows.length === 0 ? (
+            <p className="py-14 text-center text-[13.5px] text-faint">
+              {unfiltered
+                ? "Todavía no hay roles creados."
+                : "Ningún rol coincide con este filtro o búsqueda."}
+            </p>
+          ) : (
+            <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+              <DataTable>
               <thead>
                 <HeadRow>
                   <Th>Nombre</Th>
@@ -186,26 +207,9 @@ export function RolesPage() {
                 ))}
               </tbody>
             </DataTable>
-
-            {rows.length === 0 && (
-              <p className="py-14 text-center text-[13.5px] text-faint">
-                {unfiltered
-                  ? "Todavía no hay roles creados."
-                  : "Ningún rol coincide con este filtro o búsqueda."}
-              </p>
-            )}
-
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="roles"
-            />
-          </div>
-        )}
+            </div>
+          )}
+        </ListPanel>
       </div>
 
       {confirmation && (

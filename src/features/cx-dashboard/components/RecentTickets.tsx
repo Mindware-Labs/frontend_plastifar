@@ -37,11 +37,11 @@ function InlineSearch({ value, onChange }: { value: string; onChange: (value: st
         gap: 7,
         width: 230,
         maxWidth: "100%",
-        height: 30,
-        padding: "0 9px",
+        height: 32,
+        padding: "0 12px",
         background: C.card,
         border: `1px solid ${C.hair}`,
-        borderRadius: 8,
+        borderRadius: 999,
       }}
     >
       <Search size={13} color={C.soft} aria-hidden />
@@ -193,7 +193,10 @@ export function RecentTickets({ query }: { query?: string }) {
           gap: 3,
           margin: "12px 0",
           background: C.chip,
-          borderRadius: 8,
+          /* Pildora: el riel y sus segmentos comparten forma, y el activo se
+             lee como una ficha apoyada dentro del carril en vez de como un
+             rectangulo mas chico encima de otro. */
+          borderRadius: 999,
           padding: 3,
           width: "fit-content",
           maxWidth: "100%",
@@ -209,14 +212,18 @@ export function RecentTickets({ query }: { query?: string }) {
               onClick={() => setTab(t)}
               style={{
                 border: "none",
-                borderRadius: 6,
-                padding: "5px 10px",
+                borderRadius: 999,
+                padding: "5px 12px",
                 ...T.caption,
+                fontWeight: active ? 550 : 400,
                 fontFamily: FONT,
                 cursor: "pointer",
                 background: active ? C.card : "transparent",
                 color: active ? C.ink : C.body,
-                boxShadow: active ? "none" : "none",
+                /* 1 px de desplazamiento, no una elevacion: es lo que levanta
+                   el segmento activo del riel sin que parezca que flota. */
+                boxShadow: active ? "0 1px 2px rgba(35,35,43,.08)" : "none",
+                transition: "background-color .16s ease-out, color .16s ease-out",
               }}
             >
               {t}

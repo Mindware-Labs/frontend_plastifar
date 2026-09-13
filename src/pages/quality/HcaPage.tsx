@@ -16,9 +16,10 @@ import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup, CriteriaSelect } from "../../components/ui/CriteriaField";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -151,7 +152,24 @@ export function HcaPage() {
         }
       />
 
-      <div className="mb-3 flex flex-wrap items-end gap-2">
+      {error && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="min-w-[240px] flex-1">
+            <Alert variant="error">{error}</Alert>
+          </div>
+          <Button size="sm" variant="secondary" onClick={refresh}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
+      {counts && (counts.overdue > 0 || counts.open > 0) && (
+        <p className="mb-3 text-[12.5px] text-brand-gray">{listDebt(counts)}</p>
+      )}
+
+      <ListPanel
+        toolbar={
+          <>
         <CriteriaField label="Buscar">
           <SearchInput
             value={search}
@@ -244,40 +262,35 @@ export function HcaPage() {
                 />
               ))}
         </div>
-      </div>
-
-      {error && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button size="sm" variant="secondary" onClick={refresh}>
-            Reintentar
-          </Button>
-        </div>
-      )}
-
-      {counts && (counts.overdue > 0 || counts.open > 0) && (
-        <p className="mb-3 text-[12.5px] text-brand-gray">{listDebt(counts)}</p>
-      )}
-
-      {data === null ? (
-        // Con un error de carga no hay nada que esperar: el aviso ya trae el
-        // reintento, y una rueda eterna debajo del aviso mentia.
-        error === null && (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
-        )
-      ) : rows.length === 0 ? (
-        <p className="py-14 text-center text-[13.5px] text-faint">
-          {unfiltered
-            ? "Todavía no hay HCA registradas."
-            : "Ninguna HCA coincide con este filtro o búsqueda."}
-        </p>
-      ) : (
-        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-          <DataTable>
+          </>
+        }
+        footer={
+          data !== null && (
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="HCA"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          // Con un error de carga no hay nada que esperar: el aviso ya trae el
+          // reintento, y una rueda eterna debajo del aviso mentia.
+          error === null && <TableSkeleton rows={pageSize} columns={7} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {unfiltered
+              ? "Todavía no hay HCA registradas."
+              : "Ninguna HCA coincide con este filtro o búsqueda."}
+          </p>
+        ) : (
+          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <DataTable>
             <thead>
               <HeadRow>
                 {/* Sin flecha: el servidor no ordena por número (SheetQuery.sort
@@ -344,18 +357,9 @@ export function HcaPage() {
               })}
             </tbody>
           </DataTable>
-
-          <Pagination
-            page={data.page}
-            pageSize={data.pageSize}
-            total={data.total}
-            totalPages={data.totalPages}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            noun="HCA"
-          />
-        </div>
-      )}
+          </div>
+        )}
+      </ListPanel>
 
       {modalOpen && (
         <HcaModal

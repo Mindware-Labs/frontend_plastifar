@@ -9,11 +9,12 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -109,7 +110,6 @@ export function SlaSection() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  const isFirstLoad = data === null && error === null;
   // Sin criterio activo, una pagina vacia significa catalogo vacio; con
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
@@ -190,50 +190,6 @@ export function SlaSection() {
         )
       }
     >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar política…"
-          className="w-[240px]"
-        />
-
-        <Select
-          size="sm"
-          className="w-[200px]"
-          aria-label="Filtrar por prioridad"
-          value={priority}
-          onChange={(value) => setPriority(value as Priority | "todas")}
-          options={[
-            { value: "todas", label: "Todas las prioridades" },
-            ...PRIORITIES.map((value) => ({ value, label: value })),
-          ]}
-        />
-
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-          <FilterChip
-            label="Todas"
-            count={counts?.all ?? 0}
-            active={chip === "todas"}
-            onClick={() => setChip("todas")}
-          />
-          <FilterChip
-            label="Activas"
-            count={counts?.active ?? 0}
-            active={chip === "activas"}
-            onClick={() => setChip("activas")}
-          />
-          <FilterChip
-            label="Inactivas"
-            count={counts?.inactive ?? 0}
-            active={chip === "inactivas"}
-            onClick={() => setChip("inactivas")}
-          />
-        </ChipGroup>
-      </div>
-
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {actionError && (
@@ -252,123 +208,170 @@ export function SlaSection() {
         </div>
       )}
 
-      {isFirstLoad ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      ) : data === null ? null : rows.length === 0 ? (
-        <p className="py-14 text-center text-[13.5px] text-faint">
-          {isFiltering
-            ? "Ninguna política coincide con este filtro o búsqueda."
-            : "Todavía no hay ninguna política de SLA configurada."}
-        </p>
-      ) : (
-        <div className={staleClass(isStale)}>
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Política</Th>
-                <Th>Prioridad</Th>
-                <Th>1ª respuesta</Th>
-                <Th>Resolución</Th>
-                <Th>Reloj</Th>
-                <Th>Predeterminada</Th>
-                <Th>Estado</Th>
-                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+      <ListPanel
+        toolbar={
+          <>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar política…"
+              className="w-[240px]"
+            />
 
-            <tbody>
-              {rows.map((policy) => (
-                <Row key={policy.id} busy={busyId === policy.id}>
-                  <Td className="text-[12.5px] font-medium text-ink">{policy.name}</Td>
-                  <Td>
-                    <Badge tone={policy.priority === "Emergencia" ? "red" : "neutral"}>
-                      {policy.priority}
-                    </Badge>
-                  </Td>
-                  <Td className="text-[12.5px] tabular-nums text-brand-gray">
-                    {humanizeMinutes(policy.firstResponseMinutes, workdayMinutes(policy))}
-                  </Td>
-                  <Td className="text-[12.5px] tabular-nums text-brand-gray">
-                    {humanizeMinutes(policy.resolutionMinutes, workdayMinutes(policy))}
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">
-                    {policy.businessHoursOnly ? (
-                      <span className="flex flex-col gap-0.5">
-                        <span className="leading-tight">Solo jornada</span>
-                        <span className="text-[11px] leading-tight tabular-nums text-faint">
-                          {policy.workdayStart}–{policy.workdayEnd} · {policy.workDays.join("")}
-                        </span>
-                      </span>
-                    ) : (
-                      "Continuo"
-                    )}
-                  </Td>
-                  <Td>
-                    {policy.isDefault ? (
-                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
-                        {/* Marcador de estado, no accion: el rojo 185 C esta
-                            reservado a la primaria y al estado activo. */}
-                        <Star aria-hidden className="h-3.5 w-3.5 fill-subtle text-subtle" />
-                        De {policy.priority.toLowerCase()}
-                      </span>
-                    ) : (
-                      <span className="text-[12.5px] text-faint">—</span>
-                    )}
-                  </Td>
-                  <Td>
-                    <StatusDot active={policy.isActive} />
-                  </Td>
-                  {canWrite && (
+            <Select
+              size="sm"
+              className="w-[200px]"
+              aria-label="Filtrar por prioridad"
+              value={priority}
+              onChange={(value) => setPriority(value as Priority | "todas")}
+              options={[
+                { value: "todas", label: "Todas las prioridades" },
+                ...PRIORITIES.map((value) => ({ value, label: value })),
+              ]}
+            />
+
+            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
+              <FilterChip
+                label="Todas"
+                count={counts?.all ?? 0}
+                active={chip === "todas"}
+                onClick={() => setChip("todas")}
+              />
+              <FilterChip
+                label="Activas"
+                count={counts?.active ?? 0}
+                active={chip === "activas"}
+                onClick={() => setChip("activas")}
+              />
+              <FilterChip
+                label="Inactivas"
+                count={counts?.inactive ?? 0}
+                active={chip === "inactivas"}
+                onClick={() => setChip("inactivas")}
+              />
+            </ChipGroup>
+          </>
+        }
+        footer={
+          data !== null &&
+          data.total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="políticas"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={8} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {isFiltering
+              ? "Ninguna política coincide con este filtro o búsqueda."
+              : "Todavía no hay ninguna política de SLA configurada."}
+          </p>
+        ) : (
+          <div className={staleClass(isStale)}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Política</Th>
+                  <Th>Prioridad</Th>
+                  <Th>1ª respuesta</Th>
+                  <Th>Resolución</Th>
+                  <Th>Reloj</Th>
+                  <Th>Predeterminada</Th>
+                  <Th>Estado</Th>
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+
+              <tbody>
+                {rows.map((policy) => (
+                  <Row key={policy.id} busy={busyId === policy.id}>
+                    <Td className="text-[12.5px] font-medium text-ink">{policy.name}</Td>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        {!policy.isDefault && policy.isActive && (
+                      <Badge tone={policy.priority === "Emergencia" ? "red" : "neutral"}>
+                        {policy.priority}
+                      </Badge>
+                    </Td>
+                    <Td className="text-[12.5px] tabular-nums text-brand-gray">
+                      {humanizeMinutes(policy.firstResponseMinutes, workdayMinutes(policy))}
+                    </Td>
+                    <Td className="text-[12.5px] tabular-nums text-brand-gray">
+                      {humanizeMinutes(policy.resolutionMinutes, workdayMinutes(policy))}
+                    </Td>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      {policy.businessHoursOnly ? (
+                        <span className="flex flex-col gap-0.5">
+                          <span className="leading-tight">Solo jornada</span>
+                          <span className="text-[11px] leading-tight tabular-nums text-faint">
+                            {policy.workdayStart}–{policy.workdayEnd} · {policy.workDays.join("")}
+                          </span>
+                        </span>
+                      ) : (
+                        "Continuo"
+                      )}
+                    </Td>
+                    <Td>
+                      {policy.isDefault ? (
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
+                          {/* Marcador de estado, no accion: el rojo 185 C esta
+                              reservado a la primaria y al estado activo. */}
+                          <Star aria-hidden className="h-3.5 w-3.5 fill-subtle text-subtle" />
+                          De {policy.priority.toLowerCase()}
+                        </span>
+                      ) : (
+                        <span className="text-[12.5px] text-faint">—</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <StatusDot active={policy.isActive} />
+                    </Td>
+                    {canWrite && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          {!policy.isDefault && policy.isActive && (
+                            <RowAction
+                              label={`Hacer predeterminada de ${policy.priority.toLowerCase()}: ${policy.name}`}
+                              icon={Star}
+                              onClick={() => makeDefault(policy)}
+                              disabled={busyId === policy.id}
+                            />
+                          )}
                           <RowAction
-                            label={`Hacer predeterminada de ${policy.priority.toLowerCase()}: ${policy.name}`}
-                            icon={Star}
-                            onClick={() => makeDefault(policy)}
+                            label={`Editar ${policy.name}`}
+                            icon={Pencil}
+                            onClick={() => setModal(policy)}
                             disabled={busyId === policy.id}
                           />
-                        )}
-                        <RowAction
-                          label={`Editar ${policy.name}`}
-                          icon={Pencil}
-                          onClick={() => setModal(policy)}
-                          disabled={busyId === policy.id}
-                        />
-                        <RowAction
-                          label={
-                            policy.isActive
-                              ? `Desactivar ${policy.name}`
-                              : `Reactivar ${policy.name}`
-                          }
-                          icon={Power}
-                          onClick={() => askToggle(policy)}
-                          disabled={busyId === policy.id}
-                        />
-                      </div>
-                    </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-        </div>
-      )}
-
-      {data !== null && data.total > 0 && (
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={data.total}
-          totalPages={data.totalPages}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          noun="políticas"
-        />
-      )}
-
+                          <RowAction
+                            label={
+                              policy.isActive
+                                ? `Desactivar ${policy.name}`
+                                : `Reactivar ${policy.name}`
+                            }
+                            icon={Power}
+                            onClick={() => askToggle(policy)}
+                            disabled={busyId === policy.id}
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
+      </ListPanel>
 
       {modal !== null && (
         <SlaModal

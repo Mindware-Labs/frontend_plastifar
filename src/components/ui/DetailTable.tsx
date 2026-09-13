@@ -16,14 +16,26 @@ import type { ReactNode } from "react";
  */
 export function DetailTable({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto">
+    /*
+     * La ficha vive en un panel: superficie blanca con radio y sombra sobre el
+     * lienzo tintado, igual que un listado.
+     *
+     * Los grupos NO se parten en una tarjeta cada uno, aunque la referencia
+     * tenga esa forma. Esto es una <table> de verdad a proposito —el lector de
+     * pantalla anuncia la etiqueta como cabecera de su fila y se puede saltar
+     * de dato en dato— y trocearla en <div> para que cada bloque tenga su caja
+     * cambiaria accesibilidad real por estetica. Los grupos se separan con
+     * filete dentro del mismo panel, que es la misma jerarquia sin pagar ese
+     * precio.
+     */
+    <div className="overflow-x-auto rounded-card border border-line bg-white px-5 shadow-card">
       {/* El aire va antes de cada titulo de grupo, salvo el primero: es lo que
           separa un bloque del anterior. El modificador no puede vivir en el
           propio `th` —ahi `first:` siempre acierta, porque el `th` es el unico
           hijo de su fila— asi que se ancla al primer `tbody` de la tabla. */}
       <table
         className="w-full border-collapse text-left
-          [&>tbody:first-child>tr:first-child>th]:pt-0"
+          [&>tbody:first-child>tr:first-child>th]:pt-6"
       >
         {children}
       </table>
@@ -45,14 +57,14 @@ interface DetailGroupProps {
  */
 export function DetailGroup({ title, hint, children }: DetailGroupProps) {
   return (
-    <tbody className="border-b border-line last:border-0">
+    <tbody className="border-b border-line last:border-0 last:[&>tr:last-child>*]:pb-6">
       <tr>
         <th
           scope="colgroup"
           colSpan={2}
-          className="pt-8 pb-2.5 pl-0 text-left align-bottom"
+          className="pt-7 pb-2.5 text-left align-bottom"
         >
-          <span className="font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-ink">
+          <span className="font-heading text-[11px] font-semibold uppercase tracking-[0.06em] text-ink">
             {title}
           </span>
           {hint && <span className="ml-2.5 text-[12px] font-normal text-faint">{hint}</span>}
@@ -78,8 +90,8 @@ export function DetailRow({ label, wide = false, children }: DetailRowProps) {
   if (wide) {
     return (
       <tr className="border-t border-line-soft">
-        <td colSpan={2} className="py-3 pl-0">
-          <p className="font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+        <td colSpan={2} className="py-3">
+          <p className="font-heading text-[10.5px] font-medium uppercase tracking-[0.06em] text-faint">
             {label}
           </p>
           <div className="mt-1.5 max-w-[86ch] text-[13px] leading-relaxed text-brand-gray">
@@ -91,15 +103,15 @@ export function DetailRow({ label, wide = false, children }: DetailRowProps) {
   }
 
   return (
-    <tr className="border-t border-line-soft transition-colors hover:bg-canvas">
+    <tr className="border-t border-line-soft transition-colors hover:bg-fill">
       <th
         scope="row"
-        className="w-[220px] py-3 pl-0 pr-3.5 text-left align-top font-heading text-[10px]
-          font-semibold uppercase tracking-[0.08em] text-faint"
+        className="w-[220px] py-3 pr-3.5 text-left align-top font-heading text-[10.5px]
+          font-medium uppercase tracking-[0.06em] text-faint"
       >
         {label}
       </th>
-      <td className="py-3 pr-0 align-top text-[13px] text-brand-gray">{children}</td>
+      <td className="py-3 align-top text-[13px] text-brand-gray">{children}</td>
     </tr>
   );
 }

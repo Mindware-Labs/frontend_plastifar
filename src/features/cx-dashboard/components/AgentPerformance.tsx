@@ -16,6 +16,9 @@ import { Avatar, Card, CardHead, Select } from "./primitives";
  * único rojo de la caja. Cero vencidos NO se pinta de verde: la ausencia de un
  * problema no es un logro que merezca color.
  */
+/** Alto de una fila: avatar de 26 px, dos líneas de texto y su relleno. */
+const ROW_H = 62;
+
 export function AgentPerformance() {
   const applyFilter = useApplyFilter();
   const [sortBy, setSortBy] = useState("Cerrados");
@@ -42,7 +45,25 @@ export function AgentPerformance() {
           />
         }
       />
-      <ul style={{ marginTop: 8 }}>
+      {/* Tres a la vista y el resto por scroll, dentro de la tarjeta.
+          El alto se fija en filas, no en pixeles: `maxHeight` sale de medir la
+          fila real —avatar de 26 mas dos lineas de texto mas relleno— asi que
+          si manana la fila crece, la ventana crece con ella en vez de cortar a
+          la cuarta por la mitad.
+
+          El corte cae a proposito DENTRO de la cuarta fila y no entre la
+          tercera y la cuarta: una lista que termina justo en un borde limpio se
+          lee como completa, y entonces nadie scrollea. Ver media fila asomando
+          es lo que dice que hay mas. */}
+      <ul
+        className="cx-agents"
+        style={{
+          marginTop: 8,
+          maxHeight: ROW_H * 3.5,
+          overflowY: "auto",
+          overflowX: "hidden",
+        }}
+      >
         {sorted.map((a, i) => (
           <li key={a.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${C.hair2}` }}>
             <button

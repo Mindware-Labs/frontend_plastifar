@@ -4,36 +4,41 @@
  * Única fuente de color, tipografía y espaciado del feature. Ningún componente
  * escribe un hex ni un tamaño suelto — tampoco los SVG.
  *
- * ------------------------------------------------------------------
- * EL COLOR VIVE DENTRO DE LAS GRÁFICAS, NUNCA EN EL CROMO
- * ------------------------------------------------------------------
- * Barras, líneas, segmentos y puntos de leyenda llevan color. El borde y el
- * fondo de una tarjeta se quedan neutros siempre.
+ * ==================================================================
+ * REFERENCIA: CENTER QUEST (`public/image.png`)
+ * ==================================================================
+ * Esta pantalla ejecuta ese sistema, sin ironía y sin agregarle un giro propio.
+ * Lo que lo hace verse como se ve son cuatro decisiones, y ninguna es un truco:
  *
- * La versión anterior ponía un filete de 4 px de color arriba de cada tarjeta,
- * y eso era decoración disfrazada de dato: «Cumplimiento de plazo» pintaba su
- * filete de rojo con un 92 % de cumplimiento, o sea alarmaba sobre una cifra
- * buena. Si el color no codifica nada, no es información.
+ * 1. LIENZO TINTADO, SUPERFICIE BLANCA. El fondo de página es un gris muy
+ *    claro y las tarjetas son blanco puro. Esa diferencia mínima —tres pasos de
+ *    valor— es lo que hace que la tarjeta flote sin necesitar una sombra
+ *    pesada. Sobre blanco no había nada que separar; sobre este gris, sí.
  *
- * Única excepción: la celda de «Fuera de plazo» lleva fondo tintado y su cifra
- * en rojo, porque ahí el color sí dice algo.
+ * 2. PANEL HUNDIDO. Dentro de una tarjeta, el contenido medible vive en una
+ *    segunda superficie MÁS CALLADA que la tarjeta: apenas tintada, con su
+ *    propio filete y su propio radio. Que sea más callada es lo que la hace
+ *    leer como un hueco y no como una caja apilada encima. Blanco sobre blanco
+ *    sería ruido; tintado sobre blanco es profundidad.
  *
- * ------------------------------------------------------------------
- * UN SOLO VALOR POR ROL
- * ------------------------------------------------------------------
- * La paleta anterior era de primarios puros y necesitaba dos columnas —una
- * para relleno y otra para texto— porque el naranja y el verde puros no se
- * leían sobre blanco. Desaturada, cada rol vive con un valor solo.
+ * 3. RADIO GENEROSO Y CONSISTENTE. Tres pasos, nada cuadrado.
  *
- * TRES valores de la tabla propuesta no llegaban y se corrigieron:
+ * 4. FILETE DE BAJÍSIMO CONTRASTE. La separación la hace una línea muy tenue
+ *    más una sombra suave, nunca un borde fuerte.
+ *
+ * ==================================================================
+ * EL COLOR SIGUE VIVIENDO EN EL DATO
+ * ==================================================================
+ * Barras, líneas, segmentos, filetes de acento y puntos de leyenda llevan
+ * color. La superficie sobre la que se lee, no. Un panel no se tinta «para
+ * destacarlo»: para eso están la jerarquía tipográfica y el espacio.
+ *
+ * Los valores de rol están medidos contra blanco y los tres que no llegaban se
+ * corrigieron en su momento — se conservan tal cual:
  *
  *   porVencer #B87514 → #996111   3,75 → 5,16 sobre blanco
  *   espera    #0E7C8A → #0E7886   4,39 → 4,63 sobre su tinte
  *   soft      #767E8D → #6E7583   4,09 → 4,63 sobre blanco
- *
- * El ámbar era el peor: 3,75:1 no llega ni al piso de 3:1 de texto grande. Y
- * `soft` es el gris de los subtítulos de tarjeta y los pies, o sea el que más
- * texto lleva en la pantalla.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -45,7 +50,7 @@ export type Role = "vencido" | "porVencer" | "abierto" | "espera" | "hca" | "cum
 export interface Hue {
   /** Un solo valor: sirve para relleno y para texto. */
   color: string;
-  /** Fondo tintado. Sólo lo usa «Fuera de plazo». */
+  /** Lavado del tono. Fondo del círculo de icono y de la ficha de alarma. */
   tint: string;
 }
 
@@ -88,54 +93,108 @@ export const AVATAR = ["#3D4557", "#2F5FD0", "#0E7886", "#6247B5", "#6E7583"] as
 /* -------------------------------------------------------------------------- */
 
 export const C = {
-  page: "#FFFFFF",
+  /** El lienzo. Sobre esto flotan las tarjetas. */
+  page: "#F3F5F7",
+  /** La superficie de trabajo. */
   card: "#FFFFFF",
+  /**
+   * El panel hundido: la segunda superficie dentro de una tarjeta. Más callada
+   * que la tarjeta, nunca más brillante — es un hueco, no una caja encima.
+   */
+  inset: "#F8FAFB",
 
-  /** Títulos y cifras. 18,08:1 */
-  ink: "#14161C",
+  /** Títulos y cifras. Grafito, no negro puro. 15,8:1 sobre blanco. */
+  ink: "#23232B",
   /** Etiquetas y texto de tabla. 7,49:1 */
   body: "#4E5563",
-  /** Subtítulos, pies y metadatos. 4,63:1 — el piso. */
-  soft: "#6E7583",
+  /**
+   * Subtítulos, pies y metadatos.
+   *
+   * 4,95:1 sobre blanco y **4,73:1 sobre el panel hundido**, que es el número
+   * que manda. El valor anterior (#6E7583) se había medido solo contra blanco
+   * —4,63— y ahí pasaba; pero este gris vive también dentro de `inset`, que es
+   * un paso más oscuro, y ahí caía a 4,42. Un token se valida contra la
+   * superficie MÁS oscura sobre la que se lo usa, no contra la más clara.
+   */
+  soft: "#6A7080",
 
-  /** Borde de tarjeta y división entre celdas. */
-  hair: "#E6E9EE",
-  /** Filete interno: entre filas y en la rejilla de las gráficas. */
-  hair2: "#F0F2F5",
+  /** Borde de tarjeta contra el lienzo. */
+  hair: "#E9ECF1",
+  /** Filete interno: entre filas, borde del panel hundido, rejilla de gráficas. */
+  hair2: "#F1F4F8",
   /** Borde de tarjeta al pasar el mouse. */
-  hairHover: "#D8DCE4",
+  hairHover: "#D6DCE5",
 
-  rail: "#E6E9EE",
+  rail: "#E7EAF0",
   chip: "#F0F2F5",
-  hover: "#F8F9FB",
+  hover: "#F7F9FB",
 
-  /** NO ES TEXTO. Trazo de sparkline y marcas de eje sin peso. */
+  /** NO ES TEXTO. Marcas de eje sin peso. */
   faintMark: "#B6BDC9",
 
-  /** Barra en reposo de una serie temporal. */
-  barRest: "#D7DEEC",
+  /** Barra en reposo de una serie temporal. El azul de serie, lavado. */
+  barRest: "#AEC0E8",
 } as const;
 
 /* -------------------------------------------------------------------------- */
 /*  Tipografía                                                                 */
 /*                                                                             */
-/*  Los pesos bajaron: casi todo vivía en 800 y eso solo se lee infantil.      */
-/*  El tracking negativo se queda — es lo que sostiene una cifra grande.       */
+/*  Una sola familia, de trabajo. Geist tiene cifras tabulares sólidas y        */
+/*  versalitas que aguantan tracking abierto, que es exactamente lo que pide    */
+/*  un tablero: la referencia apoya toda su jerarquía en una versalita          */
+/*  diminuta y muy trackeada sobre una cifra grande.                            */
 /* -------------------------------------------------------------------------- */
 
 export const FONT =
-  "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  "'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+/**
+ * La cara de los titulos.
+ *
+ * Onest: humanista, de formas abiertas y terminales suaves. Contrasta con la
+ * cara de cuerpo por temperatura —mas redonda, mayor altura de x— y no por
+ * rareza, que es la diferencia entre suave y rustico. Va en lo que se lee UNA
+ * vez por pantalla, nunca en la celda que se lee mil veces.
+ */
+export const FONT_HEADING =
+  "'Onest Variable', 'Geist Variable', ui-sans-serif, system-ui, sans-serif";
 
 export const T = {
-  pageTitle: { fontSize: 19, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2 },
-  cardTitle: { fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", lineHeight: 1.3 },
+  pageTitle: {
+    fontSize: 19,
+    fontWeight: 600,
+    letterSpacing: "-0.02em",
+    lineHeight: 1.2,
+    fontFamily: FONT_HEADING,
+  },
+  cardTitle: {
+    fontSize: 15.5,
+    fontWeight: 550,
+    letterSpacing: "-0.012em",
+    lineHeight: 1.3,
+    fontFamily: FONT_HEADING,
+  },
   /** Subtítulo: qué se está viendo y qué se puede hacer con ello. */
   cardHint: { fontSize: 11.5, fontWeight: 400, lineHeight: 1.5 },
-  figure: { fontSize: 22, fontWeight: 700, letterSpacing: "-0.035em", lineHeight: 1 },
-  figureXl: { fontSize: 30, fontWeight: 700, letterSpacing: "-0.035em", lineHeight: 1 },
-  /** Etiqueta de KPI y de fila. Formato oración, nunca versalita. */
+  figure: { fontSize: 19, fontWeight: 550, letterSpacing: "-0.02em", lineHeight: 1 },
+  figureXl: { fontSize: 24, fontWeight: 550, letterSpacing: "-0.025em", lineHeight: 1 },
   label: { fontSize: 12, fontWeight: 500, lineHeight: 1.3 },
   caption: { fontSize: 11, fontWeight: 400, lineHeight: 1.4 },
+  /**
+   * La versalita micro.
+   *
+   * El rótulo de un KPI y el título de un panel hundido. Diminuta, en
+   * mayúsculas y muy trackeada: es el gesto tipográfico que sostiene la
+   * jerarquía de la referencia entera, y funciona porque contrasta con una
+   * cifra grande justo debajo. Fuera de ese par no se usa.
+   */
+  micro: {
+    fontSize: 9.5,
+    fontWeight: 550,
+    letterSpacing: "0.06em",
+    lineHeight: 1.2,
+    textTransform: "uppercase" as const,
+  },
 } as const;
 
 /** Tamaños para SVG, donde `fontSize` es atributo y no hereda de `T`. */
@@ -148,7 +207,18 @@ export const NUM = { fontVariantNumeric: "tabular-nums" } as const;
 /*  Formato                                                                    */
 /* -------------------------------------------------------------------------- */
 
-/** Miles con punto y decimales con coma, que es como se escribe en español. */
+/**
+ * Formato numérico dominicano.
+ *
+ * `es-DO` produce `17,363` y `4.2`: coma para miles y punto para decimales,
+ * que es la convención de República Dominicana. NO es la de España, donde se
+ * escribe al revés.
+ *
+ * Se aclara porque el comentario anterior decía justamente lo contrario —
+ * «miles con punto y decimales con coma»— y describía una salida que esta
+ * función nunca produjo. Cualquier cifra escrita a mano en el feature tiene que
+ * seguir a esta función, no al comentario viejo.
+ */
 export function n(value: number, decimals = 0): string {
   return value.toLocaleString("es-DO", {
     minimumFractionDigits: decimals,
@@ -157,11 +227,25 @@ export function n(value: number, decimals = 0): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Espaciado — múltiplos de 4                                                 */
+/*  Espaciado y forma — múltiplos de 4                                         */
 /* -------------------------------------------------------------------------- */
 
 export const S = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 } as const;
 
-export const CARD_PAD = "14px 16px";
-export const CARD_RADIUS = 10;
-export const CHART_H = { main: 220, side: 170 } as const;
+export const CARD_PAD = "16px 18px";
+
+/** Tres pasos de radio. Nada cuadrado, nada exagerado. */
+export const R = { card: 16, inset: 12, control: 10 } as const;
+
+/** Compatibilidad con los componentes que ya leían un radio único. */
+export const CARD_RADIUS = R.card;
+
+/**
+ * Alto de las graficas.
+ *
+ * Subio porque el aire lo tenian las cabeceras, no los datos: la banda de
+ * cifras de «Tickets entrados» ocupaba cuarenta pixeles para decir dos numeros
+ * y dejaba las barras en una franja donde no se distinguia una de otra. Lo que
+ * hay que poder comparar es la forma de la serie, no leer el total dos veces.
+ */
+export const CHART_H = { main: 304, side: 248 } as const;

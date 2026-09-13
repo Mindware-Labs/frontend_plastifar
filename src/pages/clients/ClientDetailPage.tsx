@@ -19,10 +19,12 @@ import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/Conf
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -359,37 +361,8 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
       {section === "contactos" && (
         <>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <SearchInput
-              value={contactSearch}
-              onChange={setContactSearch}
-              // Las tres columnas que busca el servidor; nombrarlas evita
-              // intentar por cargo o telefono y creer que no hay resultados.
-              placeholder="Buscar por nombre, apellido o correo…"
-              className="w-[240px]"
-            />
-
-            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-            {/* Antes de la primera respuesta las pastillas van en esqueleto, no
-                en cero: un cero es una afirmacion, y todavia no se sabe nada. */}
-            {contactCounts === undefined
-              ? contactChips.map(({ key }) => (
-                  <span key={key} aria-hidden className="h-8 w-[104px] animate-pulse rounded-full bg-fill" />
-                ))
-              : contactChips.map(({ key, label, countKey }) => (
-                  <FilterChip
-                    key={key}
-                    label={label}
-                    count={contactCounts[countKey]}
-                    active={contactChip === key}
-                    onClick={() => setContactChip(key)}
-                  />
-                ))}
-          </div>
-
-          {/* El reintento va en linea con su aviso, y el spinner de abajo no
-              sigue girando debajo de un error: o carga, o explica por que no. */}
+          {/* El reintento va en linea con su aviso, y afuera del panel: es un
+              error de carga, no un dato de la tabla. */}
           {contactsError !== null && (
             <div className="mb-3 flex items-start gap-3">
               <Alert variant="error">{contactsError}</Alert>
@@ -399,33 +372,77 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
             </div>
           )}
 
-          {contactPage === null ? (
-            contactsError === null && (
-              <div className="flex justify-center py-16">
-                <Spinner />
-              </div>
-            )
-          ) : (
-            <div className={`transition-opacity ${contactsStale ? "opacity-60" : ""}`}>
-              {contactRows.length === 0 ? (
-                contactsUnfiltered ? (
-                  <div className="py-12 text-center">
-                    <p className="text-[13.5px] text-faint">Todavía no tiene contactos registrados.</p>
-                    {canWrite && (
-                      <div className="mt-3 flex justify-center">
-                        <Button size="sm" onClick={() => setContactModal("nuevo")}>
-                          <Plus className="h-[15px] w-[15px]" />
-                          Agregar el primero
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="py-14 text-center text-[13.5px] text-faint">
-                    Ningún contacto coincide con este filtro o búsqueda.
-                  </p>
-                )
+          <ListPanel
+            toolbar={
+              <>
+                <SearchInput
+                  value={contactSearch}
+                  onChange={setContactSearch}
+                  // Las tres columnas que busca el servidor; nombrarlas evita
+                  // intentar por cargo o telefono y creer que no hay resultados.
+                  placeholder="Buscar por nombre, apellido o correo…"
+                  className="w-[240px]"
+                />
+
+                <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+                {/* Antes de la primera respuesta las pastillas van en esqueleto, no
+                    en cero: un cero es una afirmacion, y todavia no se sabe nada. */}
+                {contactCounts === undefined
+                  ? contactChips.map(({ key }) => (
+                      <span
+                        key={key}
+                        aria-hidden
+                        className="h-8 w-[104px] animate-pulse rounded-full bg-fill"
+                      />
+                    ))
+                  : contactChips.map(({ key, label, countKey }) => (
+                      <FilterChip
+                        key={key}
+                        label={label}
+                        count={contactCounts[countKey]}
+                        active={contactChip === key}
+                        onClick={() => setContactChip(key)}
+                      />
+                    ))}
+              </>
+            }
+            footer={
+              contactPage !== null && (
+                <Pagination
+                  page={contactPage.page}
+                  pageSize={contactPage.pageSize}
+                  total={contactPage.total}
+                  totalPages={contactPage.totalPages}
+                  onPageChange={setContactPage}
+                  onPageSizeChange={setContactPageSize}
+                  noun="contactos"
+                />
+              )
+            }
+          >
+            {contactPage === null ? (
+              contactsError === null && <TableSkeleton rows={contactPageSize} columns={7} />
+            ) : contactRows.length === 0 ? (
+              contactsUnfiltered ? (
+                <div className="py-12 text-center">
+                  <p className="text-[13.5px] text-faint">Todavía no tiene contactos registrados.</p>
+                  {canWrite && (
+                    <div className="mt-3 flex justify-center">
+                      <Button size="sm" onClick={() => setContactModal("nuevo")}>
+                        <Plus className="h-[15px] w-[15px]" />
+                        Agregar el primero
+                      </Button>
+                    </div>
+                  )}
+                </div>
               ) : (
+                <p className="py-14 text-center text-[13.5px] text-faint">
+                  Ningún contacto coincide con este filtro o búsqueda.
+                </p>
+              )
+            ) : (
+              <div className={`transition-opacity ${contactsStale ? "opacity-60" : ""}`}>
                 <DataTable>
                   <thead>
                     <HeadRow>
@@ -501,19 +518,9 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     ))}
                   </tbody>
                 </DataTable>
-              )}
-
-              <Pagination
-                page={contactPage.page}
-                pageSize={contactPage.pageSize}
-                total={contactPage.total}
-                totalPages={contactPage.totalPages}
-                onPageChange={setContactPage}
-                onPageSizeChange={setContactPageSize}
-                noun="contactos"
-              />
-            </div>
-          )}
+              </div>
+            )}
+          </ListPanel>
         </>
       )}
 

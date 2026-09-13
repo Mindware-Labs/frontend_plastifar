@@ -467,9 +467,17 @@ export function AppBar({
         flexShrink: 0,
         padding: narrow ? "0 12px" : "0 18px",
         background: "#ffffff",
-        borderBottom: "1px solid var(--color-line)",
-        /* La sombra aparece SÓLO cuando hay contenido pasando por debajo. */
-        boxShadow: condensed ? "0 1px 8px rgba(27,27,29,.06)" : "none",
+        /* Panel flotante sobre el lienzo, igual que el carril y las tarjetas.
+           El `borderBottom` se fue con el mismo argumento que el `border-r` del
+           carril: contra una esquina redondeada, un borde recto deja muesca. */
+        margin: narrow ? "12px 12px 0" : "16px 16px 0",
+        border: "1px solid var(--color-line)",
+        borderRadius: "var(--radius-card)",
+        /* La sombra sube cuando hay contenido pasando por debajo: en reposo es
+           la misma elevacion que cualquier otra superficie. */
+        boxShadow: condensed
+          ? "0 1px 2px rgba(35,35,43,.03), 0 12px 28px -12px rgba(35,35,43,.20)"
+          : "var(--shadow-card)",
         transition: "box-shadow .18s",
       }}
     >

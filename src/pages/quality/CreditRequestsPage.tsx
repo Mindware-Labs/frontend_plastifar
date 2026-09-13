@@ -14,10 +14,11 @@ import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -149,7 +150,22 @@ export function CreditRequestsPage() {
         }
       />
 
-      <div className="mb-3 flex flex-wrap items-end gap-2">
+      {error && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="min-w-[240px] flex-1">
+            <Alert variant="error">{error}</Alert>
+          </div>
+          <Button size="sm" variant="secondary" onClick={refresh}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
+      {counts && <p className="mb-3 text-[12.5px] text-brand-gray">{listDebt(counts)}</p>}
+
+      <ListPanel
+        toolbar={
+          <>
         <CriteriaField label="Buscar">
           <SearchInput
             value={search}
@@ -207,36 +223,33 @@ export function CreditRequestsPage() {
                 />
               ))}
         </div>
-      </div>
-
-      {error && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button size="sm" variant="secondary" onClick={refresh}>
-            Reintentar
-          </Button>
-        </div>
-      )}
-
-      {counts && <p className="mb-3 text-[12.5px] text-brand-gray">{listDebt(counts)}</p>}
-
-      {data === null ? (
-        error === null && (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
-        )
-      ) : rows.length === 0 ? (
-        <p className="py-14 text-center text-[13.5px] text-faint">
-          {unfiltered
-            ? "Todavía no hay solicitudes de crédito."
-            : "Ninguna solicitud coincide con este filtro o búsqueda."}
-        </p>
-      ) : (
-        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-          <DataTable>
+          </>
+        }
+        footer={
+          data !== null && (
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="solicitudes"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={8} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {unfiltered
+              ? "Todavía no hay solicitudes de crédito."
+              : "Ninguna solicitud coincide con este filtro o búsqueda."}
+          </p>
+        ) : (
+          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <DataTable>
             <thead>
               <HeadRow>
                 <Th>Número</Th>
@@ -337,18 +350,9 @@ export function CreditRequestsPage() {
               })}
             </tbody>
           </DataTable>
-
-          <Pagination
-            page={data.page}
-            pageSize={data.pageSize}
-            total={data.total}
-            totalPages={data.totalPages}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            noun="solicitudes"
-          />
-        </div>
-      )}
+          </div>
+        )}
+      </ListPanel>
 
       {creating && (
         <CreditRequestModal

@@ -1,31 +1,52 @@
 /**
- * Estilos del tablero de operación — dirección «filete de acento».
+ * Estilos del tablero de operación.
  *
  * TODA regla cuelga de `.cxhub`. Nada de acá alcanza al resto de la aplicación,
  * y las reglas de la aplicación se neutralizan al entrar con el reset acotado,
  * sin tocar el reset global.
  *
- * Sobre blanco, la sombra no separa nada: sólo ensucia. Acá NO HAY NINGUNA.
- * La separación la hace el borde, y la identidad la hace el filete de acento.
+ * Referencia: Center Quest (`public/image.png`). Lienzo tintado, superficie
+ * blanca encima, panel hundido dentro, radio generoso y filete muy tenue.
  */
 
-@import "@fontsource/plus-jakarta-sans/400.css";
-@import "@fontsource/plus-jakarta-sans/500.css";
-@import "@fontsource/plus-jakarta-sans/600.css";
-@import "@fontsource/plus-jakarta-sans/700.css";
-@import "@fontsource/plus-jakarta-sans/800.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/onest";
 
 .cxhub {
+  /* Lienzo y superficies */
+  --cx-page: #f3f5f7;
   --cx-card: #ffffff;
-  --cx-hair: #e6e9ee;
-  --cx-hair-2: #f0f2f5;
-  --cx-hair-hover: #d8dce4;
-  --cx-ink: #14161c;
+  --cx-inset: #f8fafb;
+
+  /* Filetes */
+  --cx-hair: #e9ecf1;
+  --cx-hair-2: #f1f4f8;
+  --cx-hair-hover: #d6dce5;
+
+  /* Texto */
+  --cx-ink: #23232b;
   --cx-body: #4e5563;
-  --cx-soft: #6e7583;
+  --cx-soft: #6a7080;
+
   --cx-chip: #f0f2f5;
-  --cx-hover: #f8f9fb;
+  --cx-hover: #f7f9fb;
   --cx-serie: #2f5fd0;
+  --cx-select: #dbe4f8;
+
+  /* Tres pasos de radio. Nada cuadrado. */
+  --cx-r-card: 16px;
+  --cx-r-inset: 12px;
+  --cx-r-control: 10px;
+
+  /*
+   * La sombra lleva desplazamiento y desenfoque suave — eso es lo que separa
+   * una sombra de un halo decorativo. Dos capas: una corta que define el canto
+   * contra el lienzo, y una larga y abierta que da la altura. Muy baja alfa:
+   * lo que despega la tarjeta es el contraste con el lienzo, no la sombra.
+   */
+  --cx-lift:
+    0 1px 2px rgba(35, 35, 43, 0.03),
+    0 10px 32px -16px rgba(35, 35, 43, 0.12);
 }
 
 /* ------------------------------------------------------------------ */
@@ -73,9 +94,14 @@
 /* ------------------------------------------------------------------ */
 
 .cxhub {
-  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* El area que scrollea se ensancha 3 px con margenes negativos para dejarle
+     sitio al anillo de foco. Eso desbordaba el ancho del modulo. `clip` lo
+     recorta sin crear un contenedor de scroll —cosa que `hidden` si hace— asi
+     que no rompe ni el scroll interno ni ningun `position: sticky`. */
+  overflow-x: clip;
+  font-family: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--cx-ink);
-  background: #ffffff;
+  background: var(--cx-page);
   /* Todas las cifras del tablero se comparan entre sí. */
   font-variant-numeric: tabular-nums;
 }
@@ -86,7 +112,7 @@
 }
 
 .cxhub ::-webkit-scrollbar-thumb {
-  background: var(--cx-hair);
+  background: var(--cx-hair-hover);
   border-radius: 99px;
 }
 
@@ -95,22 +121,29 @@
 }
 
 /* ------------------------------------------------------------------ */
-/*  Tarjetas                                                           */
-/*                                                                     */
-/*  Sin sombra. El filete de acento es un div de 4 px dentro de la     */
-/*  tarjeta, no un `border-top`: un borde de un solo lado con radio se */
-/*  corta en las esquinas y deja dos muescas.                          */
+/*  Tarjetas y panel hundido                                           */
 /* ------------------------------------------------------------------ */
 
 .cxhub .cx-card {
   background: var(--cx-card);
   border: 1px solid var(--cx-hair);
-  border-radius: 10px;
+  border-radius: var(--cx-r-card);
   overflow: hidden;
+  box-shadow: var(--cx-lift);
 }
 
-/* El hover responde con el borde y con un lavado casi imperceptible del fondo.
-   Sin sombra y sin desplazamiento: la tarjeta acusa recibo, no se levanta. */
+/* La segunda superficie dentro de una tarjeta. MAS CALLADA que la tarjeta:
+   apenas tintada y con un filete mas tenue todavia. Ese orden —blanco afuera,
+   tinte adentro— es lo que la hace leer como un hueco. Al reves seria una caja
+   apilada encima, que es el error que convierte esto en ruido. */
+.cxhub .cx-inset {
+  background: var(--cx-inset);
+  border: 1px solid var(--cx-hair-2);
+  border-radius: var(--cx-r-inset);
+}
+
+/* El hover responde con el borde. Sin desplazamiento y sin subir la sombra:
+   la tarjeta acusa recibo, no se levanta. */
 .cxhub .cx-hover {
   transition:
     border-color 0.16s ease-out,
@@ -121,15 +154,55 @@
   border-color: var(--cx-hair-hover);
 }
 
-/* La sparkline de una tarjeta apagada se despierta al pasar por encima: de
-   gris a la tinta del dato. Es el unico movimiento de color del tablero y
-   responde a una accion, que es la condicion para que exista. */
-.cxhub .cx-card .cx-spark {
-  transition: stroke 0.16s ease-out;
+/* ------------------------------------------------------------------ */
+/*  Texto que solo oyen los lectores de pantalla                       */
+/*                                                                     */
+/*  No es `display: none` ni `visibility: hidden`: las dos lo sacan    */
+/*  tambien del arbol de accesibilidad, que es justo lo que aca hay    */
+/*  que conservar. El recorte a un pixel lo saca de la vista dejandolo */
+/*  en el documento.                                                   */
+/* ------------------------------------------------------------------ */
+
+.cxhub .cx-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
-.cxhub .cx-card:hover .cx-spark {
-  stroke: var(--cx-serie);
+/* ------------------------------------------------------------------ */
+/*  La columna que scrollea                                            */
+/*                                                                     */
+/*  Un item de flex encoge por defecto, y `overflow: auto` en el padre */
+/*  NO lo impide. Con la altura del contenedor fijada, las bandas se   */
+/*  aplastaban hasta caber: `scrollHeight` quedaba igual a             */
+/*  `clientHeight`, o sea que la pagina nunca scrolleaba, y como la    */
+/*  tarjeta recorta con `overflow: hidden`, la tabla de la bandeja se  */
+/*  veia cortada a la primera fila.                                    */
+/* ------------------------------------------------------------------ */
+
+.cxhub .cx-scroll > * {
+  flex-shrink: 0;
+}
+
+/* La lista de responsables scrollea dentro de su tarjeta. El riel va mas fino
+   que el de la pagina: es un scroll secundario y no debe competir con el
+   principal por atencion. */
+.cxhub .cx-agents::-webkit-scrollbar {
+  width: 5px;
+}
+
+.cxhub .cx-agents::-webkit-scrollbar-thumb {
+  background: var(--cx-hair);
+}
+
+.cxhub .cx-agents:hover::-webkit-scrollbar-thumb {
+  background: var(--cx-hair-hover);
 }
 
 /* ------------------------------------------------------------------ */
@@ -172,7 +245,7 @@
 .cxhub [tabindex]:focus-visible {
   outline: 2px solid var(--cx-focus, var(--color-brand-red));
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--cx-r-control);
 }
 
 /* ------------------------------------------------------------------ */
@@ -202,10 +275,6 @@
 @media (max-width: 1240px) {
   .cxhub .cx-kpis {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  }
-
-  .cxhub .cx-kpi-lead {
-    grid-column: 1 / -1 !important;
   }
 }
 

@@ -11,11 +11,12 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -33,10 +34,22 @@ const filters: { key: FilterKey; label: string; countKey: keyof StaffListRespons
   { key: "administradores", label: "Administradores", countKey: "admins" },
 ];
 
+/**
+ * Orden de columnas: quién, dónde, cómo se le escribe, qué puede hacer, si opera.
+ *
+ * El correo estaba entre el nombre y el departamento, y eso separaba los dos
+ * datos que identifican a una persona dentro de la operación —cómo se llama y
+ * en qué departamento está— con una dirección de correo en medio. El correo es
+ * un dato de contacto: va después de la identificación, no dentro de ella.
+ *
+ * `id` NO está acá porque el servidor no lo ordena: las claves que acepta son
+ * exactamente estas cinco. Una cabecera ordenable que el backend ignora es una
+ * promesa que la pantalla no puede cumplir.
+ */
 const columns: { key: SortKey; label: string }[] = [
   { key: "nombre", label: "Nombre" },
-  { key: "correo", label: "Correo" },
   { key: "departamento", label: "Departamento" },
+  { key: "correo", label: "Correo" },
   { key: "rol", label: "Rol" },
   { key: "estado", label: "Estado" },
 ];
@@ -60,6 +73,10 @@ export function StaffPage() {
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "nombre", dir: "asc" });
   const [pageSize, setPageSize] = useState(10);
   const debouncedSearch = useDebouncedValue(search).trim();
+
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  /** Lo que falló en una acción en lote, dicho por nombre y no por conteo. */
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
   useEffect(() => {
     departmentsApi
@@ -85,6 +102,21 @@ export function StaffPage() {
   const counts = data?.counts;
   const unfiltered = filter === "todos" && departmentId === "todos" && !debouncedSearch;
 
+  /**
+   * La selección se descarta en cuanto cambian las filas que están a la vista
+   * —otra página, otro filtro, un refresco que reordenó la lista—. Anclarla a
+   * las filas y no a los criterios es lo que garantiza que una desactivación en
+   * lote no alcance a un colaborador que la persona ya no tiene delante. Mismo
+   * mecanismo que el listado de Clientes.
+   */
+  const visibleIdsKey = rows.map((member) => member.id).join(",");
+  const [lastVisibleIdsKey, setLastVisibleIdsKey] = useState(visibleIdsKey);
+  if (visibleIdsKey !== lastVisibleIdsKey) {
+    setLastVisibleIdsKey(visibleIdsKey);
+    setSelectedIds([]);
+    setBulkError(null);
+  }
+
   function departmentName(id: number) {
     return departments.find((d) => d.id === id)?.name ?? "—";
   }
@@ -102,6 +134,115 @@ export function StaffPage() {
   /** Desactivar y eliminar nunca aplican sobre uno mismo; editar si. */
   function canManage(member: StaffResponse) {
     return isAdmin && member.id !== user?.staffId;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Selección en lote                                                  */
+  /*                                                                     */
+  /*  Sólo se puede marcar lo que se puede gestionar. La propia fila no  */
+  /*  se marca —nadie se cierra la sesión a sí mismo desde acá— y sin    */
+  /*  permisos de administrador la columna entera no se dibuja: una      */
+  /*  casilla que al final rechaza la acción es peor que no ofrecerla.   */
+  /* ------------------------------------------------------------------ */
+
+  const selectableRows = rows.filter(canManage);
+  const selected = selectableRows.filter((member) => selectedIds.includes(member.id));
+  const allPageSelected =
+    selectableRows.length > 0 && selectableRows.every((member) => selectedIds.includes(member.id));
+
+  function toggleSelection(id: number) {
+    setSelectedIds((previous) =>
+      previous.includes(id) ? previous.filter((entry) => entry !== id) : [...previous, id],
+    );
+  }
+
+  function toggleAllOnPage() {
+    setSelectedIds((previous) => {
+      if (allPageSelected) {
+        return previous.filter((id) => !selectableRows.some((member) => member.id === id));
+      }
+      const ids = new Set(previous);
+      for (const member of selectableRows) ids.add(member.id);
+      return [...ids];
+    });
+  }
+
+  /**
+   * Una acción sobre varios colaboradores.
+   *
+   * Va de a uno y a propósito: no hay endpoint en lote, y lanzar cinco
+   * peticiones en paralelo contra el mismo recurso deja el servidor resolviendo
+   * un orden que nadie pidió. Secuencial además permite lo importante — que un
+   * fallo no cancele al resto y que al final se pueda decir QUIÉN quedó afuera.
+   *
+   * Un «falló en 2 de 5» obliga a adivinar cuáles dos. Los nombres no.
+   */
+  async function runOnMany(members: StaffResponse[], action: (id: number) => Promise<void>) {
+    setBulkError(null);
+    const failed: string[] = [];
+
+    for (const member of members) {
+      setBusyId(member.id);
+      try {
+        await action(member.id);
+      } catch {
+        failed.push(fullName(member));
+      }
+    }
+
+    setBusyId(null);
+    setSelectedIds([]);
+    refresh();
+
+    if (failed.length > 0) {
+      setBulkError(
+        failed.length === 1
+          ? `No se pudo completar la acción sobre ${failed[0]}. El resto sí se aplicó.`
+          : `No se pudo completar la acción sobre ${failed.length} colaboradores: ${failed.join(", ")}. El resto sí se aplicó.`,
+      );
+    }
+  }
+
+  function askBulkRevokeSessions() {
+    const members = selected;
+    setConfirmation({
+      tone: "warn",
+      icon: LogOut,
+      eyebrow: "Personal",
+      title: `Cerrar sesiones de ${members.length} colaboradores`,
+      description: (
+        <>
+          Se cerrarán todas las sesiones abiertas de{" "}
+          <strong className="font-semibold text-ink">{members.map(fullName).join(", ")}</strong>, en
+          cualquier dispositivo. Las cuentas siguen activas: podrán volver a entrar con su
+          contraseña.
+        </>
+      ),
+      confirmLabel: "Cerrar sesiones",
+      onConfirm: () => runOnMany(members, staffApi.revokeSessions),
+    });
+  }
+
+  function askBulkDeactivate() {
+    /* Reactivar no viene en lote: encender accesos de a varios sin mirar a quién
+       se le está encendiendo qué es justo lo que el módulo de permisos existe
+       para evitar. Apagar en lote es contención; encender en lote es un riesgo. */
+    const members = selected.filter((member) => member.isActive);
+    setConfirmation({
+      tone: "warn",
+      icon: UserX,
+      eyebrow: "Personal",
+      title: `Desactivar ${members.length} colaboradores`,
+      description: (
+        <>
+          <strong className="font-semibold text-ink">{members.map(fullName).join(", ")}</strong>{" "}
+          dejarán de poder iniciar sesión y sus sesiones abiertas se cerrarán. Las cuentas y su
+          historial se conservan, y puedes reactivarlas una por una cuando quieras.
+        </>
+      ),
+      confirmLabel: "Desactivar",
+      onConfirm: () => runOnMany(members, staffApi.deactivate),
+    });
   }
 
   /** El error sube al dialogo, que lo muestra sin cerrarse. */
@@ -207,58 +348,126 @@ export function StaffPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {/* Criterios: busqueda, departamento y pastillas de estado */}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por nombre o correo…"
-            className="w-[240px]"
-          />
-
-          <Select
-            size="sm"
-            className="w-[220px]"
-            aria-label="Filtrar por departamento"
-            value={String(departmentId)}
-            onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
-            options={[
-              { value: "todos", label: "Todos los departamentos" },
-              ...departments.map((department) => ({
-                value: String(department.id),
-                label: department.name,
-              })),
-            ]}
-          />
-
-          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-          {filters.map(({ key, label, countKey }) => (
-            <FilterChip
-              key={key}
-              label={label}
-              count={counts?.[countKey] ?? 0}
-              active={filter === key}
-              onClick={() => setFilter(key)}
-            />
-          ))}
-        </div>
-
         {error && (
           <div className="mb-3">
             <Alert variant="error">{error}</Alert>
           </div>
         )}
 
-        {data === null ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
+        {bulkError && (
+          <div className="mb-3">
+            <Alert variant="error">{bulkError}</Alert>
           </div>
-        ) : (
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable>
+        )}
+
+        {/* Barra de selección: filete arriba y abajo, sin tinte ni recuadro.
+            En este sistema la estructura es una línea de 1 px, no una caja. */}
+        {selected.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 border-y border-line py-2">
+            <span className="text-[12.5px] font-medium tabular-nums text-ink">
+              {selected.length}{" "}
+              {selected.length === 1 ? "colaborador seleccionado" : "colaboradores seleccionados"}
+            </span>
+            <Button size="sm" variant="secondary" onClick={askBulkRevokeSessions}>
+              <LogOut className="h-[15px] w-[15px]" />
+              Cerrar sesiones
+            </Button>
+            {selected.some((member) => member.isActive) && (
+              <Button size="sm" variant="secondary" onClick={askBulkDeactivate}>
+                <UserX className="h-[15px] w-[15px]" />
+                Desactivar
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
+              Limpiar selección
+            </Button>
+          </div>
+        )}
+
+        <ListPanel
+          toolbar={
+            <>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por nombre o correo…"
+                className="w-[240px]"
+              />
+
+              <Select
+                size="sm"
+                className="w-[220px]"
+                aria-label="Filtrar por departamento"
+                value={String(departmentId)}
+                onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+                options={[
+                  { value: "todos", label: "Todos los departamentos" },
+                  ...departments.map((department) => ({
+                    value: String(department.id),
+                    label: department.name,
+                  })),
+                ]}
+              />
+
+              <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+              {filters.map(({ key, label, countKey }) => (
+                <FilterChip
+                  key={key}
+                  label={label}
+                  count={counts?.[countKey] ?? 0}
+                  active={filter === key}
+                  onClick={() => setFilter(key)}
+                />
+              ))}
+            </>
+          }
+          footer={
+            data !== null && (
+              <Pagination
+                page={data.page}
+                pageSize={data.pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="colaboradores"
+              />
+            )
+          }
+        >
+          {data === null ? (
+            error === null && <TableSkeleton rows={pageSize} columns={8} />
+          ) : rows.length === 0 ? (
+            <p className="py-14 text-center text-[13.5px] text-faint">
+              {unfiltered
+                ? "Todavía no hay personal registrado."
+                : "Ningún colaborador coincide con este filtro o búsqueda."}
+            </p>
+          ) : (
+            <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+              <DataTable>
               <thead>
                 <HeadRow>
+                  {isAdmin && (
+                    <Th className="w-9">
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        disabled={selectableRows.length === 0}
+                        onChange={toggleAllOnPage}
+                        aria-label={
+                          allPageSelected
+                            ? "Quitar la selección de esta página"
+                            : "Seleccionar todos los colaboradores de esta página"
+                        }
+                        className="h-4 w-4 rounded-edge border-line-strong accent-brand-red
+                          disabled:cursor-not-allowed disabled:opacity-40"
+                      />
+                    </Th>
+                  )}
+                  {/* Sin cabecera ordenable: el servidor no ordena por id. */}
+                  <Th className="w-20">ID</Th>
                   {columns.map(({ key, label }) => (
                     <Th
                       key={key}
@@ -274,6 +483,24 @@ export function StaffPage() {
               <tbody>
                 {rows.map((member) => (
                   <Row key={member.id} busy={busyId === member.id}>
+                    {isAdmin && (
+                      <Td>
+                        {/* La propia fila no lleva casilla. El hueco se deja
+                            vacío en vez de poner una casilla deshabilitada:
+                            una casilla apagada invita a preguntarse por qué, y
+                            la respuesta —«sos vos»— ya la da la fila. */}
+                        {canManage(member) && (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(member.id)}
+                            onChange={() => toggleSelection(member.id)}
+                            aria-label={`Seleccionar a ${fullName(member)}`}
+                            className="h-4 w-4 rounded-edge border-line-strong accent-brand-red"
+                          />
+                        )}
+                      </Td>
+                    )}
+                    <Td className="text-[12.5px] tabular-nums text-faint">#{member.id}</Td>
                     <Td>
                       {/* El nombre no enlazaba a nada: la ficha del colaborador y
                           toda su pestana de Accesos existian como ruta pero no
@@ -290,10 +517,10 @@ export function StaffPage() {
                         </span>
                       </Link>
                     </Td>
-                    <Td className="text-[12.5px] text-brand-gray">{member.email}</Td>
                     <Td className="text-[12.5px] text-brand-gray">
                       {departmentName(member.primaryDepartmentId)}
                     </Td>
+                    <Td className="text-[12.5px] text-brand-gray">{member.email}</Td>
                     <Td>
                       {member.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
                     </Td>
@@ -349,26 +576,9 @@ export function StaffPage() {
                 ))}
               </tbody>
             </DataTable>
-
-            {rows.length === 0 && (
-              <p className="py-14 text-center text-[13.5px] text-faint">
-                {unfiltered
-                  ? "Todavía no hay personal registrado."
-                  : "Ningún colaborador coincide con este filtro o búsqueda."}
-              </p>
-            )}
-
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="colaboradores"
-            />
-          </div>
-        )}
+            </div>
+          )}
+        </ListPanel>
       </div>
 
       {confirmation && (

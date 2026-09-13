@@ -241,6 +241,24 @@ export function Sidebar() {
         .filter((group) => !group.children || group.children.length > 0),
     [can],
   );
+
+  /**
+   * Los grupos repartidos en sus secciones, en el orden en que aparecen.
+   *
+   * Se arma acá y no al pintar porque una tarjeta necesita saber cuántos hijos
+   * tiene antes de abrirse. Además, una sección que el filtro de permisos dejó
+   * sin un solo grupo desaparece entera: sin esto quedaría una tarjeta vacía
+   * con su rótulo encima, anunciando un bloque que no existe.
+   */
+  const sections = useMemo(() => {
+    const out: { section: NavGroup["section"]; groups: typeof visibleGroups }[] = [];
+    for (const group of visibleGroups) {
+      const last = out[out.length - 1];
+      if (last && last.section === group.section) last.groups.push(group);
+      else out.push({ section: group.section, groups: [group] });
+    }
+    return out;
+  }, [visibleGroups]);
   const { pathname } = useLocation();
   const [preferCollapsed, setPreferCollapsed] = useState(readCollapsed);
 
@@ -499,13 +517,23 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`flex h-screen shrink-0 flex-col border-r border-line/80 bg-white select-none
-        transition-[width] duration-200 ease-out ${collapsed ? "w-[68px]" : "w-60"}`}
+      /*
+       * El carril NO es una superficie: es fondo, y deja ver el lienzo.
+       *
+       * Las superficies son los bloques que lleva encima —el logotipo, cada
+       * seccion del menu y la ficha de usuario—, cada uno su propio panel
+       * blanco. Es la diferencia entre una pared pintada de blanco con
+       * separadores adentro, y varias tarjetas apoyadas sobre una pared gris:
+       * lo segundo agrupa por superficie en vez de por linea, y por eso el
+       * menu se lee como bloques y no como una lista larga.
+       */
+      className={`flex h-screen shrink-0 flex-col gap-2.5 p-2.5 select-none
+        transition-[width] duration-200 ease-out ${collapsed ? "w-[76px]" : "w-[248px]"}`}
     >
       {/* 1. Cabecera superior: Logotipo y control de contracción */}
       <div
-        className={`flex h-16 shrink-0 items-center border-b border-line-soft transition-all duration-200 ${
-          collapsed ? "flex-col justify-center gap-1.5 px-2 py-2" : "justify-between px-4"
+        className={`flex shrink-0 items-center rounded-card border border-line bg-white shadow-card transition-all duration-200 ${
+          collapsed ? "flex-col justify-center gap-1.5 px-2 py-2.5" : "h-14 justify-between px-3.5"
         }`}
       >
         {!collapsed ? (
@@ -559,25 +587,28 @@ export function Sidebar() {
           sola lista larga y cuesta ver donde termina uno y empieza el otro.
           4 px es el primer paso de la escala; el doble ya separaba de mas y
           obligaba a desplazar la barra. */}
-      <nav
-        className={`flex flex-1 flex-col overflow-y-auto overflow-x-hidden py-2 ${
-          collapsed ? "items-center gap-1 px-2" : "gap-1 px-3"
-        }`}
-      >
-        {visibleGroups.map((group, index) => (
-          <div key={`sec-${group.label}`} className="contents">
-            {/* El encabezado se pinta cuando cambia la seccion, no una vez por
-                bloque: asi el filtro puede vaciar un bloque entero y su titulo
-                se va con el, en vez de quedar colgado sobre nada. */}
-            {!collapsed && group.section !== visibleGroups[index - 1]?.section && (
+      <nav className="flex flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden">
+        {/* Las secciones se arman antes de pintar y no al vuelo comparando con
+            el grupo anterior: una tarjeta necesita saber cuantos hijos tiene
+            ANTES de abrirse, y una seccion que el filtro dejo vacia no debe
+            dibujar una tarjeta hueca con un rotulo encima. */}
+        {sections.map(({ section, groups }) => (
+          <div key={section}>
+            {!collapsed && (
               <p
-                className={`px-3 pb-1 font-heading text-[10px] font-semibold uppercase
-                  tracking-[0.08em] text-faint ${index === 0 ? "pt-1" : "pt-4"}`}
+                className="px-1.5 pb-1.5 font-heading text-[9.5px] font-medium uppercase
+                  tracking-[0.07em] text-faint"
               >
-                {group.section}
+                {section}
               </p>
             )}
-            {renderGroup(group)}
+            <div
+              className={`flex flex-col rounded-card border border-line bg-white shadow-card ${
+                collapsed ? "items-center gap-1 p-1.5" : "gap-0.5 p-1.5"
+              }`}
+            >
+              {groups.map(renderGroup)}
+            </div>
           </div>
         ))}
       </nav>
@@ -648,7 +679,7 @@ export function Sidebar() {
       )}
 
       {/* 5. Pie de Tarjeta de Usuario y Menú Desplegable */}
-      <div className="shrink-0 border-t border-line p-2.5" ref={menuRef}>
+      <div className={`shrink-0 rounded-card border border-line bg-white shadow-card p-2`} ref={menuRef}>
         <div className="relative">
           {/* Menú flotante de perfil */}
           {menuOpen && (

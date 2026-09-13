@@ -8,10 +8,11 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -87,7 +88,6 @@ export function MailboxesSection() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  const isFirstLoad = data === null && error === null;
   // Sin criterio activo, una pagina vacia significa catalogo vacio; con
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
@@ -187,38 +187,6 @@ export function MailboxesSection() {
         )
       }
     >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={(value) => changeCriteria(() => setSearch(value))}
-          placeholder="Buscar por correo o nombre…"
-          className="w-[240px]"
-        />
-
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-          <FilterChip
-            label="Todos"
-            count={counts?.all ?? 0}
-            active={chip === "todos"}
-            onClick={() => changeCriteria(() => setChip("todos"))}
-          />
-          <FilterChip
-            label="Activos"
-            count={counts?.active ?? 0}
-            active={chip === "activos"}
-            onClick={() => changeCriteria(() => setChip("activos"))}
-          />
-          <FilterChip
-            label="Inactivos"
-            count={counts?.inactive ?? 0}
-            active={chip === "inactivos"}
-            onClick={() => changeCriteria(() => setChip("inactivos"))}
-          />
-        </ChipGroup>
-      </div>
-
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {departmentsRef.failed && (
@@ -236,115 +204,150 @@ export function MailboxesSection() {
         </div>
       )}
 
-      {isFirstLoad ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      ) : data === null ? null : rows.length === 0 ? (
-        <p className="py-14 text-center text-[13.5px] text-faint">
-          {isFiltering
-            ? "Ningún buzón coincide con este filtro o búsqueda."
-            : "Todavía no hay ningún buzón configurado."}
-        </p>
-      ) : (
-        <div className={staleClass(isStale)}>
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Buzón</Th>
-                <Th>Proveedor</Th>
-                <Th>Departamento</Th>
-                <Th>Última sincronización</Th>
-                <Th>Estado</Th>
-                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+      <ListPanel
+        toolbar={
+          <>
+            <SearchInput
+              value={search}
+              onChange={(value) => changeCriteria(() => setSearch(value))}
+              placeholder="Buscar por correo o nombre…"
+              className="w-[240px]"
+            />
 
-            <tbody>
-              {rows.map((mailbox) => (
-                <Row key={mailbox.id} busy={busyId === mailbox.id}>
-                  <Td>
-                    <span className="flex flex-col gap-0.5">
-                      <span className="text-[12.5px] font-medium leading-tight text-ink">
-                        {mailbox.displayName}
-                      </span>
-                      <span className="text-[11px] leading-tight text-faint">{mailbox.address}</span>
-                    </span>
-                  </Td>
-                  <Td>
-                    <Badge>{providerLabel(mailbox.provider)}</Badge>
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">
-                    {departmentName(mailbox.departmentId)}
-                  </Td>
-                  <Td className="text-[12.5px] tabular-nums text-brand-gray">
-                    {mailbox.lastSyncedAt ? (
-                      syncFormat.format(new Date(mailbox.lastSyncedAt))
-                    ) : (
-                      <span className="text-faint">Nunca</span>
-                    )}
-                  </Td>
-                  <Td>
-                    <StatusDot active={mailbox.isActive} />
-                  </Td>
-                  {canWrite && (
+            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
+              <FilterChip
+                label="Todos"
+                count={counts?.all ?? 0}
+                active={chip === "todos"}
+                onClick={() => changeCriteria(() => setChip("todos"))}
+              />
+              <FilterChip
+                label="Activos"
+                count={counts?.active ?? 0}
+                active={chip === "activos"}
+                onClick={() => changeCriteria(() => setChip("activos"))}
+              />
+              <FilterChip
+                label="Inactivos"
+                count={counts?.inactive ?? 0}
+                active={chip === "inactivos"}
+                onClick={() => changeCriteria(() => setChip("inactivos"))}
+              />
+            </ChipGroup>
+          </>
+        }
+        footer={
+          data !== null &&
+          data.total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={(next) => changeCriteria(() => setPage(next))}
+              onPageSizeChange={(size) => changeCriteria(() => setPageSize(size))}
+              noun="buzones"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={6} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {isFiltering
+              ? "Ningún buzón coincide con este filtro o búsqueda."
+              : "Todavía no hay ningún buzón configurado."}
+          </p>
+        ) : (
+          <div className={staleClass(isStale)}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Buzón</Th>
+                  <Th>Proveedor</Th>
+                  <Th>Departamento</Th>
+                  <Th>Última sincronización</Th>
+                  <Th>Estado</Th>
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+
+              <tbody>
+                {rows.map((mailbox) => (
+                  <Row key={mailbox.id} busy={busyId === mailbox.id}>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Probar conexión de ${mailbox.displayName}`}
-                          icon={
-                            testingId === mailbox.id
-                              ? TestingRing
-                              : testResult?.id === mailbox.id
-                                ? testResult.result.ok
-                                  ? CheckCircle2
-                                  : XCircle
-                                : Plug
-                          }
-                          onClick={() => handleTest(mailbox)}
-                          disabled={testingId === mailbox.id || busyId === mailbox.id}
-                        />
-                        <RowAction
-                          label={`Editar ${mailbox.displayName}`}
-                          icon={Pencil}
-                          onClick={() => {
-                            setTestResult(null);
-                            setModal(mailbox);
-                          }}
-                          disabled={busyId === mailbox.id}
-                        />
-                        <RowAction
-                          label={
-                            mailbox.isActive
-                              ? `Desactivar ${mailbox.displayName}`
-                              : `Reactivar ${mailbox.displayName}`
-                          }
-                          icon={Power}
-                          onClick={() => askToggle(mailbox)}
-                          disabled={busyId === mailbox.id}
-                        />
-                      </div>
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-[12.5px] font-medium leading-tight text-ink">
+                          {mailbox.displayName}
+                        </span>
+                        <span className="text-[11px] leading-tight text-faint">{mailbox.address}</span>
+                      </span>
                     </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-        </div>
-      )}
-
-      {data !== null && data.total > 0 && (
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={data.total}
-          totalPages={data.totalPages}
-          onPageChange={(next) => changeCriteria(() => setPage(next))}
-          onPageSizeChange={(size) => changeCriteria(() => setPageSize(size))}
-          noun="buzones"
-        />
-      )}
-
+                    <Td>
+                      <Badge>{providerLabel(mailbox.provider)}</Badge>
+                    </Td>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      {departmentName(mailbox.departmentId)}
+                    </Td>
+                    <Td className="text-[12.5px] tabular-nums text-brand-gray">
+                      {mailbox.lastSyncedAt ? (
+                        syncFormat.format(new Date(mailbox.lastSyncedAt))
+                      ) : (
+                        <span className="text-faint">Nunca</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <StatusDot active={mailbox.isActive} />
+                    </Td>
+                    {canWrite && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Probar conexión de ${mailbox.displayName}`}
+                            icon={
+                              testingId === mailbox.id
+                                ? TestingRing
+                                : testResult?.id === mailbox.id
+                                  ? testResult.result.ok
+                                    ? CheckCircle2
+                                    : XCircle
+                                  : Plug
+                            }
+                            onClick={() => handleTest(mailbox)}
+                            disabled={testingId === mailbox.id || busyId === mailbox.id}
+                          />
+                          <RowAction
+                            label={`Editar ${mailbox.displayName}`}
+                            icon={Pencil}
+                            onClick={() => {
+                              setTestResult(null);
+                              setModal(mailbox);
+                            }}
+                            disabled={busyId === mailbox.id}
+                          />
+                          <RowAction
+                            label={
+                              mailbox.isActive
+                                ? `Desactivar ${mailbox.displayName}`
+                                : `Reactivar ${mailbox.displayName}`
+                            }
+                            icon={Power}
+                            onClick={() => askToggle(mailbox)}
+                            disabled={busyId === mailbox.id}
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
+      </ListPanel>
 
       {modal !== null && (
         <MailboxModal

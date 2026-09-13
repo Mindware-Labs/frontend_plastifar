@@ -5,10 +5,11 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -50,7 +51,6 @@ export function ProductLinesSection() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  const isFirstLoad = data === null && error === null;
   // Sin criterio activo, una pagina vacia significa catalogo vacio; con
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
@@ -109,109 +109,112 @@ export function ProductLinesSection() {
         )
       }
     >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar por nombre o código…"
-          className="w-[240px]"
-        />
-
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-          <FilterChip
-            label="Todas"
-            count={counts?.all ?? 0}
-            active={chip === "todas"}
-            onClick={() => setChip("todas")}
-          />
-          <FilterChip
-            label="Activas"
-            count={counts?.active ?? 0}
-            active={chip === "activas"}
-            onClick={() => setChip("activas")}
-          />
-          <FilterChip
-            label="Inactivas"
-            count={counts?.inactive ?? 0}
-            active={chip === "inactivas"}
-            onClick={() => setChip("inactivas")}
-          />
-        </ChipGroup>
-      </div>
-
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
-      {isFirstLoad ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      ) : data === null ? null : rows.length === 0 ? (
-        <p className="py-14 text-center text-[13.5px] text-faint">
-          {isFiltering
-            ? "Ninguna línea coincide con este filtro o búsqueda."
-            : "Todavía no hay ninguna línea de producto configurada."}
-        </p>
-      ) : (
-        <div className={staleClass(isStale)}>
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Código</Th>
-                <Th>Línea</Th>
-                <Th>Estado</Th>
-                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+      <ListPanel
+        toolbar={
+          <>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre o código…"
+              className="w-[240px]"
+            />
 
-            <tbody>
-              {rows.map((line) => (
-                <Row key={line.id} busy={busyId === line.id}>
-                  <Td>
-                    <span className="font-mono text-[12px] text-brand-gray">{line.code}</span>
-                  </Td>
-                  <Td className="text-[12.5px] font-medium text-ink">{line.name}</Td>
-                  <Td>
-                    <StatusDot active={line.isActive} />
-                  </Td>
-                  {canWrite && (
+            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
+              <FilterChip
+                label="Todas"
+                count={counts?.all ?? 0}
+                active={chip === "todas"}
+                onClick={() => setChip("todas")}
+              />
+              <FilterChip
+                label="Activas"
+                count={counts?.active ?? 0}
+                active={chip === "activas"}
+                onClick={() => setChip("activas")}
+              />
+              <FilterChip
+                label="Inactivas"
+                count={counts?.inactive ?? 0}
+                active={chip === "inactivas"}
+                onClick={() => setChip("inactivas")}
+              />
+            </ChipGroup>
+          </>
+        }
+        footer={
+          data !== null &&
+          data.total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="líneas"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={4} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {isFiltering
+              ? "Ninguna línea coincide con este filtro o búsqueda."
+              : "Todavía no hay ninguna línea de producto configurada."}
+          </p>
+        ) : (
+          <div className={staleClass(isStale)}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Código</Th>
+                  <Th>Línea</Th>
+                  <Th>Estado</Th>
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+
+              <tbody>
+                {rows.map((line) => (
+                  <Row key={line.id} busy={busyId === line.id}>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Editar ${line.name}`}
-                          icon={Pencil}
-                          onClick={() => setModal(line)}
-                          disabled={busyId === line.id}
-                        />
-                        <RowAction
-                          label={line.isActive ? `Desactivar ${line.name}` : `Reactivar ${line.name}`}
-                          icon={Power}
-                          onClick={() => askToggle(line)}
-                          disabled={busyId === line.id}
-                        />
-                      </div>
+                      <span className="font-mono text-[12px] text-brand-gray">{line.code}</span>
                     </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-        </div>
-      )}
-
-      {data !== null && data.total > 0 && (
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={data.total}
-          totalPages={data.totalPages}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          noun="líneas"
-        />
-      )}
-
+                    <Td className="text-[12.5px] font-medium text-ink">{line.name}</Td>
+                    <Td>
+                      <StatusDot active={line.isActive} />
+                    </Td>
+                    {canWrite && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Editar ${line.name}`}
+                            icon={Pencil}
+                            onClick={() => setModal(line)}
+                            disabled={busyId === line.id}
+                          />
+                          <RowAction
+                            label={line.isActive ? `Desactivar ${line.name}` : `Reactivar ${line.name}`}
+                            icon={Power}
+                            onClick={() => askToggle(line)}
+                            disabled={busyId === line.id}
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
+      </ListPanel>
 
       {modal !== null && (
         <ProductLineModal

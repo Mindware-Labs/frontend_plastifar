@@ -14,12 +14,13 @@ import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicke
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { LookupSelect } from "../../components/ui/LookupSelect";
 import { Select } from "../../components/ui/Select";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -282,82 +283,6 @@ export function ClientsPage() {
         }
       />
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          // La seccion 7.3 regla 7 mete tambien el nombre y el correo del
-          // contacto en la misma caja; sin decirlo, nadie encuentra esa mitad.
-          placeholder="Buscar por nombre, código, RNC o contacto…"
-          className="w-[240px]"
-        />
-
-        <Select
-          size="sm"
-          className="w-[200px]"
-          aria-label="Filtrar por territorio"
-          value={territoryId}
-          onChange={setTerritoryId}
-          options={[
-            { value: "todos", label: "Todos los territorios" },
-            ...territories.map((territory) => ({ value: String(territory.id), label: territory.name })),
-          ]}
-        />
-
-        {/* Buscador contra el servidor: el personal crece sin tope y un
-            desplegable precargado dejaba fuera a quien no cupiera. */}
-        <LookupSelect
-          size="sm"
-          className="w-[200px]"
-          aria-label="Filtrar por vendedor"
-          placeholder="Todos los vendedores"
-          searchPlaceholder="Buscar vendedor…"
-          clearLabel="Todos los vendedores"
-          value={salesRepId === "todos" ? "" : salesRepId}
-          selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
-          resolveSelectedLabel={resolveStaffLabel}
-          search={searchActiveStaff}
-          onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
-        />
-
-        <Select
-          size="sm"
-          className="w-[200px]"
-          aria-label="Filtrar por tipo"
-          value={type}
-          onChange={setType}
-          options={[
-            { value: "todos", label: "Todos los tipos" },
-            { value: "Distribuidor", label: "Distribuidor" },
-            { value: "Mayorista", label: "Mayorista" },
-            { value: "Detallista", label: "Detallista" },
-            { value: "Institucional", label: "Institucional" },
-          ]}
-        />
-
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-        {/* Antes de la primera respuesta las pastillas van en esqueleto, no en
-            cero: un cero es una afirmacion, y todavia no se sabe nada. */}
-        {counts === undefined
-          ? chips.map(({ key }) => (
-              <span key={key} aria-hidden className="h-8 w-[104px] animate-pulse rounded-full bg-fill" />
-            ))
-          : chips.map(({ key, label, countKey }) => (
-              <FilterChip
-                key={key}
-                label={label}
-                count={counts[countKey]}
-                active={chip === key}
-                onClick={() => setChip(key)}
-              />
-            ))}
-
-        <div className="ml-auto">
-          <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
-        </div>
-      </div>
-
       {/* El reintento va en linea con su aviso, no debajo: apilados en columna
           eran dos bloques de dos alturas cada uno empujando la tabla. */}
       {referenceError !== null && (
@@ -397,21 +322,111 @@ export function ClientsPage() {
 
       {/* Un error de carga no deja el spinner girando debajo: la primera version
           mostraba el aviso y seguia fingiendo que la tabla estaba en camino. */}
-      {data === null ? (
-        error === null && (
-          <div className="flex justify-center py-16">
-            <Spinner />
+      {/* Criterios, tabla y pie en UNA sola superficie. La barra se dibuja
+          tambien mientras carga: perder el buscador durante el spinner es
+          perder el control justo cuando alguien esta esperando. */}
+      <ListPanel
+        toolbar={
+          <>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            // La seccion 7.3 regla 7 mete tambien el nombre y el correo del
+            // contacto en la misma caja; sin decirlo, nadie encuentra esa mitad.
+            placeholder="Buscar por nombre, código, RNC o contacto…"
+            className="w-[240px]"
+          />
+
+          <Select
+            size="sm"
+            className="w-[200px]"
+            aria-label="Filtrar por territorio"
+            value={territoryId}
+            onChange={setTerritoryId}
+            options={[
+              { value: "todos", label: "Todos los territorios" },
+              ...territories.map((territory) => ({ value: String(territory.id), label: territory.name })),
+            ]}
+          />
+
+          {/* Buscador contra el servidor: el personal crece sin tope y un
+              desplegable precargado dejaba fuera a quien no cupiera. */}
+          <LookupSelect
+            size="sm"
+            className="w-[200px]"
+            aria-label="Filtrar por vendedor"
+            placeholder="Todos los vendedores"
+            searchPlaceholder="Buscar vendedor…"
+            clearLabel="Todos los vendedores"
+            value={salesRepId === "todos" ? "" : salesRepId}
+            selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
+            resolveSelectedLabel={resolveStaffLabel}
+            search={searchActiveStaff}
+            onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
+          />
+
+          <Select
+            size="sm"
+            className="w-[200px]"
+            aria-label="Filtrar por tipo"
+            value={type}
+            onChange={setType}
+            options={[
+              { value: "todos", label: "Todos los tipos" },
+              { value: "Distribuidor", label: "Distribuidor" },
+              { value: "Mayorista", label: "Mayorista" },
+              { value: "Detallista", label: "Detallista" },
+              { value: "Institucional", label: "Institucional" },
+            ]}
+          />
+
+          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+          {/* Antes de la primera respuesta las pastillas van en esqueleto, no en
+              cero: un cero es una afirmacion, y todavia no se sabe nada. */}
+          {counts === undefined
+            ? chips.map(({ key }) => (
+                <span key={key} aria-hidden className="h-8 w-[104px] animate-pulse rounded-full bg-fill" />
+              ))
+            : chips.map(({ key, label, countKey }) => (
+                <FilterChip
+                  key={key}
+                  label={label}
+                  count={counts[countKey]}
+                  active={chip === key}
+                  onClick={() => setChip(key)}
+                />
+              ))}
+
+          <div className="ml-auto">
+            <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
           </div>
-        )
-      ) : (
-        <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-          {rows.length === 0 ? (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {unfiltered
-                ? "Todavía no hay clientes registrados."
-                : "Ningún cliente coincide con este filtro o búsqueda."}
-            </p>
-          ) : (
+          </>
+        }
+        footer={
+          data !== null && (
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="clientes"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={9} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {unfiltered
+              ? "Todavía no hay clientes registrados."
+              : "Ningún cliente coincide con este filtro o búsqueda."}
+          </p>
+        ) : (
+          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
             <DataTable>
               <thead>
                 <HeadRow>
@@ -540,19 +555,9 @@ export function ClientsPage() {
                 ))}
               </tbody>
             </DataTable>
-          )}
-
-          <Pagination
-            page={data.page}
-            pageSize={data.pageSize}
-            total={data.total}
-            totalPages={data.totalPages}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            noun="clientes"
-          />
-        </div>
-      )}
+          </div>
+        )}
+      </ListPanel>
 
       {modal !== null && (
         <ClientModal

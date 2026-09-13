@@ -39,6 +39,28 @@ export function series(seed: number, n: number, min: number, max: number): numbe
   return Array.from({ length: n }, () => Math.round(min + rnd() * (max - min)));
 }
 
+/**
+ * La contraparte de una serie de entradas: lo que se cerró cada día.
+ *
+ * No es una serie independiente sino una DERIVADA de la de entradas, y a
+ * propósito: en una operación real, cerrados y entrados están correlacionados
+ * —el mismo día ocupado entra y sale trabajo— y dos series aleatorias sueltas
+ * se cruzarían de forma que ningún equipo reconocería.
+ *
+ * `drift` es cuánto se queda corto el cierre respecto de la entrada. Positivo
+ * significa que entra más de lo que sale, o sea que la cola crece: es
+ * coherente con los indicadores de arriba, que muestran atraso subiendo.
+ */
+export function derivedSeries(
+  base: number[],
+  seed: number,
+  drift: number,
+  jitter: number,
+): number[] {
+  const rnd = mulberry32(seed);
+  return base.map((v) => Math.max(0, Math.round(v - drift + (rnd() - 0.5) * jitter)));
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Ventanas de tiempo                                                         */
 /* -------------------------------------------------------------------------- */
@@ -79,7 +101,15 @@ export const RANGES: Record<string, RangeConfig> = {
   },
   "30 días": {
     count: 28,
-    max: 1000,
+    /*
+     * El techo estaba en 1000 con una serie que nunca pasa de 780: una quinta
+     * parte del alto de la grafica era aire reservado para valores que no
+     * existen, y por eso las barras se veian chicas aunque la tarjeta creciera.
+     * 800 deja holgura para un pico sin regalar la escala, y ademas parte en
+     * cuartos limpios: 800 / 600 / 400 / 200 / 0. Con 840 el eje quedaba en
+     * 630 y 210, que son numeros que nadie usa para leer una escala.
+     */
+    max: 800,
     seed: 33,
     band: [420, 780],
     ticks: [[3, "1-7"], [10, "8-15"], [17, "16-22"], [24, "23-30"]],
@@ -211,4 +241,38 @@ export const TICKETS: Ticket[] = [
   { id: "TCK-2836", customer: "Distribuidora Corripio", subject: "Nunca llegó la confirmación del pedido", channel: "WhatsApp", priority: "Media", status: "Abierto", agentId: 2, mins: 7 },
   { id: "TCK-2835", customer: "Almacenes Unidos", subject: "Lo transfirieron tres veces", channel: "Chat web", priority: "Alta", status: "Vencido", agentId: 5, mins: 62 },
   { id: "TCK-2834", customer: "Bravo Supermercados", subject: "Actualizar la cuenta de cobro", channel: "Presencial", priority: "Baja", status: "En espera", agentId: 4, mins: 149 },
+];
+
+/* -------------------------------------------------------------------------- */
+/*  Estados por antigüedad — GET /api/tickets → agrupado por estado y edad      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Cuántos tickets hay en cada estado, repartidos por cuánto llevan ahí.
+ *
+ * El reparto por estado a secas ya lo muestra «Cumplimiento de plazo», así que
+ * repetirlo sería una tarjeta gastada en algo que ya está. Lo que ninguna otra
+ * caja del tablero contesta es DÓNDE SE ATASCAN: un estado con pocos tickets
+ * pero todos viejos es un cuello de botella, y uno con muchos pero frescos es
+ * simplemente un día ocupado. Sin la edad, los dos se ven igual.
+ *
+ * Los tres tramos están ordenados de menor a mayor: es una escala, no
+ * categorías, y por eso se pintan con un solo tono en tres claridades.
+ */
+export interface StateAging {
+  state: string;
+  /** Menos de 24 horas en este estado. */
+  fresh: number;
+  /** Entre uno y tres días. */
+  aging: number;
+  /** Más de tres días. Acá vive el atasco. */
+  stale: number;
+}
+
+export const STATE_AGING: StateAging[] = [
+  { state: "Abierto", fresh: 78, aging: 41, stale: 18 },
+  { state: "En progreso", fresh: 34, aging: 52, stale: 23 },
+  { state: "En espera del cliente", fresh: 9, aging: 11, stale: 8 },
+  { state: "En verificación", fresh: 12, aging: 7, stale: 14 },
+  { state: "Escalado", fresh: 3, aging: 6, stale: 11 },
 ];

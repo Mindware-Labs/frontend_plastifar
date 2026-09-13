@@ -137,12 +137,12 @@ export function Select({
           alignItems: "center",
           gap: 6,
           height: 32,
-          padding: "0 12px",
+          padding: "0 14px",
           ...T.label,
           color: C.body,
           background: C.card,
           border: `1px solid ${open ? C.hairHover : C.hair}`,
-          borderRadius: 8,
+          borderRadius: 999,
           fontFamily: FONT,
           cursor: "pointer",
           whiteSpace: "nowrap",
@@ -301,11 +301,23 @@ export function Delta({ value, invert = false }: { value: number; invert?: boole
 /**
  * Cabecera de tarjeta.
  *
- * `hint` no es decoración: es la línea que dice QUÉ se está viendo y QUÉ se
- * puede hacer con ello. Sin ella, una tarjeta es un volcado de datos.
+ * ------------------------------------------------------------------
+ * `hint` SIGUE EXISTIENDO, PERO YA NO OCUPA ALTO
+ * ------------------------------------------------------------------
+ * Era una línea de dos renglones bajo cada título —unos 34 px por tarjeta— y
+ * ese alto se lo estaba comiendo a las gráficas. Se quitó de la vista por
+ * pedido, pero NO del documento: cuatro de los siete textos no describen, sino
+ * que enseñan una acción («click en un estado para filtrar», «pasa el cursor
+ * por una barra»). Borrarlos dejaría paneles que responden al click sin que
+ * nada lo anuncie.
+ *
+ * Queda como nombre accesible de la tarjeta: quien usa lector de pantalla lo
+ * sigue oyendo, y para quien ve, la interactividad la anuncian el cursor y el
+ * hover, que ya existen. Devolverlo a la vista es borrar una clase.
  *
  * Regla para tarjetas futuras: si no podés escribir esa línea, la tarjeta
- * probablemente no debería existir. Escribila antes de maquetar.
+ * probablemente no debería existir. Escribila antes de maquetar, aunque hoy no
+ * se pinte.
  */
 export function CardHead({
   title,
@@ -323,14 +335,14 @@ export function CardHead({
         alignItems: "flex-start",
         justifyContent: "space-between",
         gap: S.md,
-        paddingBottom: S.md,
+        paddingBottom: S.sm,
         marginBottom: S.md,
         borderBottom: `1px solid ${C.hair2}`,
       }}
     >
       <div style={{ minWidth: 0 }}>
         <h2 style={{ ...T.cardTitle, color: C.ink, margin: 0 }}>{title}</h2>
-        {hint && <p style={{ ...T.cardHint, color: C.soft, marginTop: 3 }}>{hint}</p>}
+        {hint && <p className="cx-sr">{hint}</p>}
       </div>
       {right && (
         <div style={{ display: "flex", alignItems: "center", gap: S.sm, flexShrink: 0 }}>

@@ -1,117 +1,146 @@
-import { COUNTS, QUALITY, RANGES, series } from "../mockData";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ClipboardCheck,
+  Clock,
+  Inbox,
+  Minus,
+  PauseCircle,
+  type LucideIcon,
+} from "lucide-react";
+import { COUNTS, QUALITY } from "../mockData";
 import { useApplyFilter, type DashboardFilter } from "../filters";
-import { C, CARD_RADIUS, FONT, NUM, S, T, hueFor, n } from "../styles";
+import { C, FONT, NUM, R, S, T, hueFor, n, type Role } from "../styles";
 
 /**
  * La fila de cifras.
  *
- * ------------------------------------------------------------------
- * TARJETAS SEPARADAS, CROMO NEUTRO
- * ------------------------------------------------------------------
- * Seis tarjetas con su propio borde. Lo que NO vuelve es el filete de color de
- * 4 px: aquello era decoración disfrazada de dato, porque el tono no codificaba
- * nada. El borde y el fondo se quedan neutros.
+ * ==================================================================
+ * LA ANATOMÍA ES LA DE LA REFERENCIA
+ * ==================================================================
+ * Cinco piezas por tarjeta, en este orden y sin agregar ninguna:
  *
- * La única excepción es «Fuera de plazo»: fondo tintado y cifra en rojo, porque
- * ahí el color sí dice algo. Si llega a cero, la tarjeta se vuelve neutra como
- * las demás — un acento de alarma permanente deja de ser una alarma.
+ *   1. Un filete de acento de 3 px en el borde izquierdo. Es lo que hace que
+ *      cinco tarjetas se lean como un CONJUNTO en vez de cinco cajas sueltas.
+ *   2. Un icono dentro de un cuadro tintado del mismo tono, muy lavado.
+ *   3. El rótulo en versalita diminuta y trackeada, al lado del icono.
+ *   4. La cifra, con su variación en la misma línea base.
+ *   5. El calificador debajo: contra qué se lee esa cifra.
  *
- * ------------------------------------------------------------------
- * LA SPARKLINE SANGRA AL BORDE
- * ------------------------------------------------------------------
- * `preserveAspectRatio="none"` y márgenes negativos que cancelan el relleno de
- * la tarjeta. Que toque los tres bordes es lo que la hace ver deliberada;
- * flotando con aire alrededor se lee como un adorno que sobró.
+ * El calificador es la pieza que más trabaja y la que casi siempre se omite.
+ * Una cifra sola obliga a preguntar «¿comparado con qué?»; ahí está la
+ * respuesta, sin un clic de por medio.
+ *
+ * ==================================================================
+ * CINCO EN UNA FILA
+ * ==================================================================
+ * Con seis no entraban: cada tarjeta quedaba en unos 190 px y el bloque de la
+ * derecha se partía. Al sacar «Cierre promedio» —que medía HCA y no la cola de
+ * tickets, o sea otra cosa que las demás— quedan cinco, con unos 216 px cada
+ * una, y ahí la anatomía entra completa.
+ *
+ * Ayuda que la cifra bajara a 20 px y que la variación sea una píldora compacta:
+ * el mismo bloque que antes no cabía, ahora sí.
+ *
+ * ==================================================================
+ * EL ACENTO NO ES DECORACIÓN
+ * ==================================================================
+ * El filete y el círculo toman el tono del ROL, no un verde de marca repetido
+ * seis veces. Un acento idéntico en las seis tarjetas es pintura; el tono del
+ * rol es la misma información que ya llevan las pastillas de la tabla de abajo.
  */
 
-const PAD_X = 14;
-const PAD_Y = 12;
-
-/* -------------------------------------------------------------------------- */
+interface Kpi {
+  label: string;
+  role: Role;
+  icon: LucideIcon;
+  value: string;
+  /** La magnitud de la variación, SIN signo: el signo lo dice la flecha. */
+  breakdown: string;
+  /** Calificador: contra qué se lee. */
+  qualifier: string;
+  /** Cuánto se movió contra ayer. El signo decide la dirección. */
+  change: number;
+  /**
+   * Hacia dónde es MEJOR que se mueva esta cifra.
+   *
+   * Las seis son medidas de atraso o de espera, así que en las seis bajar es
+   * bueno. Queda escrito por KPI y no asumido, porque un indicador futuro
+   * —«cerrados en el día»— sería al revés, y ahí el color diría lo contrario
+   * de lo que pasa.
+   */
+  betterWhen: "lower" | "higher";
+  filter: DashboardFilter;
+}
 
 /**
- * Sparkline a sangre.
+ * La variación, en píldora.
  *
- * `viewBox` de 100×30 con `preserveAspectRatio="none"`: el trazo se estira a lo
- * ancho sin importar cuánto mida la tarjeta. El precio es que la pendiente no es
- * comparable entre tarjetas de distinto ancho — no importa: acá dice «la forma
- * de las últimas diez lecturas», no una tasa. `vectorEffect` mantiene el grosor
- * en 1,5 px aunque el eje X se estire.
+ * ------------------------------------------------------------------
+ * POR QUÉ HAY FLECHA Y NO UN SIGNO
+ * ------------------------------------------------------------------
+ * Acá conviven DOS hechos distintos: hacia dónde se movió la cifra, y si eso
+ * es buena o mala noticia. No son lo mismo — en «Abiertos», bajar es bueno —
+ * así que cada uno necesita su propia señal.
+ *
+ * Antes los dos viajaban encima del mismo carácter: un «−3» pintado de verde.
+ * El signo decía «bajó», el color decía «bien», y como el ojo lee el menos como
+ * algo negativo, los dos parecían contradecirse. La lógica estaba bien y la
+ * lectura estaba mal, que a los efectos es lo mismo que estar mal.
+ *
+ * Ahora la FLECHA dice la dirección y el COLOR dice el veredicto. Una flecha
+ * hacia abajo sobre verde se lee sin esfuerzo: «bajó, y eso está bien».
  */
-function Sparkline({
-  data,
-  tone,
-  opacity = 1,
-}: {
-  data: number[];
-  tone: string;
-  opacity?: number;
-}) {
-  const W = 100;
-  const H = 30;
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const d = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * W;
-      const y = H - ((v - min) / (max - min || 1)) * (H - 6) - 3;
-      return `${i ? "L" : "M"} ${x} ${y}`;
-    })
-    .join(" ");
+function Change({ kpi }: { kpi: Kpi }) {
+  const flat = kpi.change === 0;
+  const rising = kpi.change > 0;
+  const good = kpi.betterWhen === "lower" ? !rising : rising;
+  const hue = hueFor(good ? "cumplido" : "vencido");
+
+  const Arrow = flat ? Minus : rising ? ArrowUp : ArrowDown;
+  const fg = flat ? C.soft : hue.color;
+  const bg = flat ? C.chip : hue.tint;
 
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      aria-hidden
+    <span
+      aria-label={`${flat ? "sin cambios" : rising ? "sube" : "baja"} contra ayer`}
       style={{
-        display: "block",
-        marginTop: "auto",
-        marginLeft: -PAD_X,
-        marginBottom: -PAD_Y,
-        width: `calc(100% + ${PAD_X * 2}px)`,
-        height: 30,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        padding: "2px 7px 2px 5px",
+        borderRadius: 999,
+        background: bg,
+        color: fg,
+        ...T.caption,
+        ...NUM,
+        fontSize: 10.5,
+        fontWeight: 600,
+        whiteSpace: "nowrap",
       }}
     >
-      <path
-        d={d}
-        className={opacity === 1 ? "cx-spark" : undefined}
-        fill="none"
-        stroke={tone}
-        strokeOpacity={opacity}
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
+      <Arrow size={11} strokeWidth={2.5} aria-hidden />
+      {kpi.breakdown}
+    </span>
   );
 }
 
 /* -------------------------------------------------------------------------- */
 
-interface Kpi {
-  label: string;
-  value: string;
-  /** Variación contra ayer, ya redactada. */
-  change: string;
-  /** Qué peso tiene sobre el total. */
-  weight: string;
-  spark: number[];
-  filter: DashboardFilter;
-}
-
-function KpiCard({ kpi, lead = false }: { kpi: Kpi; lead?: boolean }) {
+function KpiCard({ kpi }: { kpi: Kpi }) {
   const applyFilter = useApplyFilter();
-  const bad = hueFor("vencido");
-  /* El acento existe sólo mientras haya algo fuera de plazo. */
-  const alert = lead && COUNTS.overdue > 0;
+  const hue = hueFor(kpi.role);
+  const Icon = kpi.icon;
 
   return (
-    <div
-      className="cx-card cx-hover"
-      style={{ background: alert ? bad.tint : C.card, borderRadius: CARD_RADIUS }}
-    >
+    <div className="cx-card cx-hover" style={{ display: "flex" }}>
+      {/* El filete de acento es un div, no un `border-left`: un borde de un
+          solo lado contra un radio se corta en las esquinas y deja dos
+          muescas. Como hermano del contenido, el radio de la tarjeta lo
+          recorta limpio. */}
+      <span aria-hidden style={{ width: 3, flexShrink: 0, background: hue.color }} />
+
       <button
         type="button"
         className="cx-link"
@@ -120,25 +149,43 @@ function KpiCard({ kpi, lead = false }: { kpi: Kpi; lead?: boolean }) {
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 6,
+          gap: 7,
           width: "100%",
-          height: "100%",
           minWidth: 0,
-          padding: `${PAD_Y}px ${PAD_X}px`,
+          padding: "11px 13px",
           border: "none",
           background: "transparent",
           textAlign: "left",
           fontFamily: FONT,
           cursor: "pointer",
-          overflow: "hidden",
         }}
       >
-        <span style={{ display: "flex", justifyContent: "space-between", gap: S.sm }}>
+        {/* Icono y rótulo en la primera línea, no en columnas.
+            Con cinco tarjetas en una fila cada una queda en unos 206 px, y ahí
+            el bloque secundario NO puede ir al costado: medido en pantalla,
+            «Fuera de plazo» pedía 87 px de rótulo y le quedaban 40. Apilado,
+            el rótulo recupera el ancho entero de la tarjeta. Es geometría, no
+            preferencia. */}
+        <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, width: "100%" }}>
+          <span
+            aria-hidden
+            style={{
+              width: 24,
+              height: 24,
+              flexShrink: 0,
+              borderRadius: R.control,
+              background: hue.tint,
+              color: hue.color,
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <Icon size={13} strokeWidth={2} />
+          </span>
           <span
             style={{
-              ...T.label,
-              color: alert ? bad.color : C.body,
-              fontWeight: alert ? 600 : 500,
+              ...T.micro,
+              color: C.soft,
               minWidth: 0,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -147,17 +194,13 @@ function KpiCard({ kpi, lead = false }: { kpi: Kpi; lead?: boolean }) {
           >
             {kpi.label}
           </span>
-          <span style={{ ...T.caption, ...NUM, color: C.soft, flexShrink: 0 }}>{kpi.change}</span>
         </span>
 
-        <span
-          style={{
-            ...(lead ? T.figureXl : T.figure),
-            ...NUM,
-            color: alert ? bad.color : C.ink,
-          }}
-        >
-          {kpi.value}
+        {/* Cifra y variación comparten línea base: cuánto hay y hacia dónde va
+            son el mismo hecho leído dos veces. */}
+        <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+          <span style={{ ...T.figure, ...NUM, fontSize: 24, color: C.ink }}>{kpi.value}</span>
+          <Change kpi={kpi} />
         </span>
 
         <span
@@ -165,19 +208,14 @@ function KpiCard({ kpi, lead = false }: { kpi: Kpi; lead?: boolean }) {
             ...T.caption,
             ...NUM,
             color: C.soft,
+            maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}
         >
-          {kpi.weight}
+          {kpi.qualifier}
         </span>
-
-        <Sparkline
-          data={kpi.spark}
-          tone={alert ? bad.color : C.faintMark}
-          opacity={alert ? 0.55 : 1}
-        />
       </button>
     </div>
   );
@@ -185,61 +223,65 @@ function KpiCard({ kpi, lead = false }: { kpi: Kpi; lead?: boolean }) {
 
 /* -------------------------------------------------------------------------- */
 
-export function KpiRow({ range }: { range: string }) {
-  const cfg = RANGES[range];
-  const mk = (seed: number) => series(cfg.seed + seed, 10, 20, 90);
+export function KpiRow() {
   const live = COUNTS.open + COUNTS.upcoming + COUNTS.overdue + COUNTS.waitingOnClient;
   const pct = (v: number) => (live === 0 ? "—" : `${Math.round((v / live) * 100)}% de los vivos`);
 
-  const lead: Kpi = {
-    label: COUNTS.overdue > 0 ? "Fuera de plazo" : "Todo al día",
-    value: n(COUNTS.overdue),
-    change: COUNTS.overdue > 0 ? "+4 que ayer" : "sin cambios",
-    weight: pct(COUNTS.overdue),
-    spark: mk(1),
-    filter: { kind: "estado", value: "vencidos", label: "los tickets vencidos" },
-  };
-
-  const rest: Kpi[] = [
+  const kpis: Kpi[] = [
+    {
+      label: "Fuera de plazo",
+      role: "vencido",
+      icon: AlertTriangle,
+      value: n(COUNTS.overdue),
+      breakdown: "4",
+      change: 4,
+      betterWhen: "lower",
+      qualifier: pct(COUNTS.overdue),
+      filter: { kind: "estado", value: "vencidos", label: "los tickets vencidos" },
+    },
     {
       label: "Por vencer",
+      role: "porVencer",
+      icon: Clock,
       value: n(COUNTS.upcoming),
-      change: "+6 que ayer",
-      weight: pct(COUNTS.upcoming),
-      spark: mk(2),
+      breakdown: "6",
+      change: 6,
+      betterWhen: "lower",
+      qualifier: pct(COUNTS.upcoming),
       filter: { kind: "estado", value: "por-vencer", label: "los tickets por vencer" },
     },
     {
       label: "Abiertos",
+      role: "abierto",
+      icon: Inbox,
       value: n(COUNTS.open),
-      change: "−3 que ayer",
-      weight: pct(COUNTS.open),
-      spark: mk(3),
+      breakdown: "3",
+      change: -3,
+      betterWhen: "lower",
+      qualifier: pct(COUNTS.open),
       filter: { kind: "estado", value: "abiertos", label: "los tickets abiertos" },
     },
     {
       label: "En espera",
+      role: "espera",
+      icon: PauseCircle,
       value: n(COUNTS.waitingOnClient),
-      change: "+2 que ayer",
-      weight: "del cliente",
-      spark: mk(4),
+      breakdown: "2",
+      change: 2,
+      betterWhen: "lower",
+      qualifier: "del cliente",
       filter: { kind: "estado", value: "espera", label: "los tickets en espera del cliente" },
     },
     {
       label: "HCA abiertas",
+      role: "hca",
+      icon: ClipboardCheck,
       value: n(QUALITY.openNow),
-      change: "−2 que ayer",
-      weight: `${n(QUALITY.overdueNow)} vencidas`,
-      spark: mk(5),
+      breakdown: "2",
+      change: -2,
+      betterWhen: "lower",
+      qualifier: `${n(QUALITY.overdueNow)} vencidas`,
       filter: { kind: "hca", value: "abiertas", label: "las HCA abiertas" },
-    },
-    {
-      label: "Cierre promedio",
-      value: `${n(QUALITY.averageClosureDays, 1)} d`,
-      change: "−0,6 d",
-      weight: "por HCA",
-      spark: mk(6),
-      filter: { kind: "hca", value: "cerradas", label: "las HCA cerradas" },
     },
   ];
 
@@ -248,13 +290,12 @@ export function KpiRow({ range }: { range: string }) {
       className="cx-kpis"
       style={{
         display: "grid",
-        gridTemplateColumns: "1.35fr repeat(5, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
         gap: S.md,
         alignItems: "stretch",
       }}
     >
-      <KpiCard kpi={lead} lead />
-      {rest.map((kpi) => (
+      {kpis.map((kpi) => (
         <KpiCard key={kpi.label} kpi={kpi} />
       ))}
     </div>

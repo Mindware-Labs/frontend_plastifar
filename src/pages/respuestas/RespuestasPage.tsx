@@ -7,9 +7,10 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useAuth } from "../../context/useAuth";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse } from "../../types/api";
@@ -88,31 +89,40 @@ export function RespuestasPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <SearchInput value={search} onChange={setSearch} placeholder="Buscar por título o texto…" className="w-[260px]" />
-
-          <button
-            type="button"
-            onClick={() => setHelpOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-edge border border-line bg-white px-3 py-1.5 text-[12px] font-medium text-brand-gray transition-[background-color,border-color,color] hover:border-line-strong hover:bg-canvas hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20 shadow-2xs"
-          >
-            <HelpCircle className="h-3.5 w-3.5 text-brand-red" />
-            <span>¿Para qué sirve?</span>
-          </button>
-        </div>
-
         {error && (
           <div className="mb-3">
             <Alert variant="error">{error}</Alert>
           </div>
         )}
 
-        {items === null ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
-        ) : (
-          <>
+        <ListPanel
+          toolbar={
+            <>
+              <SearchInput value={search} onChange={setSearch} placeholder="Buscar por título o texto…" className="w-[260px]" />
+
+              <div className="ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setHelpOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-edge border border-line bg-white px-3 py-1.5 text-[12px] font-medium text-brand-gray transition-[background-color,border-color,color] hover:border-line-strong hover:bg-canvas hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20 shadow-2xs"
+                >
+                  <HelpCircle className="h-3.5 w-3.5 text-brand-red" />
+                  <span>¿Para qué sirve?</span>
+                </button>
+              </div>
+            </>
+          }
+        >
+          {items === null ? (
+            error === null && <TableSkeleton rows={8} columns={5} />
+          ) : rows.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-14 text-center">
+              <MessageSquareText className="h-6 w-6 text-faint" />
+              <p className="text-[13.5px] text-faint">
+                {term ? "Ninguna respuesta coincide con la búsqueda." : "Todavía no hay respuestas guardadas."}
+              </p>
+            </div>
+          ) : (
             <DataTable>
               <thead>
                 <HeadRow>
@@ -144,17 +154,8 @@ export function RespuestasPage() {
                 ))}
               </tbody>
             </DataTable>
-
-            {rows.length === 0 && (
-              <div className="flex flex-col items-center gap-2 py-14 text-center">
-                <MessageSquareText className="h-6 w-6 text-faint" />
-                <p className="text-[13.5px] text-faint">
-                  {term ? "Ninguna respuesta coincide con la búsqueda." : "Todavía no hay respuestas guardadas."}
-                </p>
-              </div>
-            )}
-          </>
-        )}
+          )}
+        </ListPanel>
       </div>
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}

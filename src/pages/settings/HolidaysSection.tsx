@@ -6,11 +6,12 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -106,7 +107,6 @@ export function HolidaysSection() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  const isFirstLoad = data === null && error === null;
   // Sin criterio activo, una pagina vacia significa calendario vacio; con
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
@@ -178,50 +178,6 @@ export function HolidaysSection() {
         )
       }
     >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar por nombre…"
-          className="w-[240px]"
-        />
-
-        <Select
-          size="sm"
-          className="w-[200px]"
-          aria-label="Filtrar por año"
-          value={year}
-          onChange={setYear}
-          options={[
-            { value: "todos", label: "Todos los años" },
-            ...years.map((value) => ({ value, label: value })),
-          ]}
-        />
-
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-          <FilterChip
-            label="Todos"
-            count={counts?.all ?? 0}
-            active={chip === "todos"}
-            onClick={() => setChip("todos")}
-          />
-          <FilterChip
-            label="Activos"
-            count={counts?.active ?? 0}
-            active={chip === "activos"}
-            onClick={() => setChip("activos")}
-          />
-          <FilterChip
-            label="Inactivos"
-            count={counts?.inactive ?? 0}
-            active={chip === "inactivos"}
-            onClick={() => setChip("inactivos")}
-          />
-        </ChipGroup>
-      </div>
-
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {policiesRef.failed && (
@@ -231,106 +187,153 @@ export function HolidaysSection() {
         />
       )}
 
-      {isFirstLoad ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      ) : data === null ? null : rows.length === 0 ? (
-        <p className="py-14 text-center text-[13.5px] text-faint">
-          {isFiltering
-            ? "Ningún día coincide con este filtro o búsqueda."
-            : "Todavía no hay ningún día no laborable registrado."}
-        </p>
-      ) : (
-        <div className={staleClass(isStale)}>
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Fecha</Th>
-                <Th>Día</Th>
-                <Th>Motivo del cierre</Th>
-                <Th>Mueve vencimientos</Th>
-                <Th>Estado</Th>
-                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+      <ListPanel
+        toolbar={
+          <>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre…"
+              className="w-[240px]"
+            />
 
-            <tbody>
-              {rows.map((holiday) => (
-                <Row key={holiday.id} busy={busyId === holiday.id}>
-                  <Td className="text-[12.5px] font-medium tabular-nums text-ink">
-                    {dateFormat.format(asLocalDate(holiday.date))}
-                  </Td>
-                  <Td className="text-[12.5px] capitalize text-brand-gray">
-                    {dayFormat.format(asLocalDate(holiday.date))}
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">{holiday.name}</Td>
-                  <Td className="text-[12.5px] tabular-nums text-brand-gray">
-                    {(() => {
-                      const moved = movedPolicies(holiday);
-                      if (!holiday.isActive) return <span className="text-faint">—</span>;
-                      if (moved.length === 0) {
-                        return (
-                          <span className="text-faint">
-                            Ninguna · cae{" "}
-                            <span className="capitalize">
-                              {dayFormat.format(asLocalDate(holiday.date))}
+            <Select
+              size="sm"
+              className="w-[200px]"
+              aria-label="Filtrar por año"
+              value={year}
+              onChange={setYear}
+              options={[
+                { value: "todos", label: "Todos los años" },
+                ...years.map((value) => ({ value, label: value })),
+              ]}
+            />
+
+            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
+              <FilterChip
+                label="Todos"
+                count={counts?.all ?? 0}
+                active={chip === "todos"}
+                onClick={() => setChip("todos")}
+              />
+              <FilterChip
+                label="Activos"
+                count={counts?.active ?? 0}
+                active={chip === "activos"}
+                onClick={() => setChip("activos")}
+              />
+              <FilterChip
+                label="Inactivos"
+                count={counts?.inactive ?? 0}
+                active={chip === "inactivos"}
+                onClick={() => setChip("inactivos")}
+              />
+            </ChipGroup>
+          </>
+        }
+        footer={
+          data !== null &&
+          data.total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="días"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={6} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {isFiltering
+              ? "Ningún día coincide con este filtro o búsqueda."
+              : "Todavía no hay ningún día no laborable registrado."}
+          </p>
+        ) : (
+          <div className={staleClass(isStale)}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Fecha</Th>
+                  <Th>Día</Th>
+                  <Th>Motivo del cierre</Th>
+                  <Th>Mueve vencimientos</Th>
+                  <Th>Estado</Th>
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+
+              <tbody>
+                {rows.map((holiday) => (
+                  <Row key={holiday.id} busy={busyId === holiday.id}>
+                    <Td className="text-[12.5px] font-medium tabular-nums text-ink">
+                      {dateFormat.format(asLocalDate(holiday.date))}
+                    </Td>
+                    <Td className="text-[12.5px] capitalize text-brand-gray">
+                      {dayFormat.format(asLocalDate(holiday.date))}
+                    </Td>
+                    <Td className="text-[12.5px] text-brand-gray">{holiday.name}</Td>
+                    <Td className="text-[12.5px] tabular-nums text-brand-gray">
+                      {(() => {
+                        const moved = movedPolicies(holiday);
+                        if (!holiday.isActive) return <span className="text-faint">—</span>;
+                        if (moved.length === 0) {
+                          return (
+                            <span className="text-faint">
+                              Ninguna · cae{" "}
+                              <span className="capitalize">
+                                {dayFormat.format(asLocalDate(holiday.date))}
+                              </span>
                             </span>
+                          );
+                        }
+                        return (
+                          <span>
+                            {moved.length}{" "}
+                            {moved.length === 1 ? "política de jornada" : "políticas de jornada"}
                           </span>
                         );
-                      }
-                      return (
-                        <span>
-                          {moved.length}{" "}
-                          {moved.length === 1 ? "política de jornada" : "políticas de jornada"}
-                        </span>
-                      );
-                    })()}
-                  </Td>
-                  <Td>
-                    <StatusDot active={holiday.isActive} />
-                  </Td>
-                  {canWrite && (
-                    <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Editar ${holiday.name}`}
-                          icon={Pencil}
-                          onClick={() => setModal(holiday)}
-                          disabled={busyId === holiday.id}
-                        />
-                        <RowAction
-                          label={
-                            holiday.isActive
-                              ? `Desactivar ${holiday.name}`
-                              : `Reactivar ${holiday.name}`
-                          }
-                          icon={Power}
-                          onClick={() => askToggle(holiday)}
-                          disabled={busyId === holiday.id}
-                        />
-                      </div>
+                      })()}
                     </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-        </div>
-      )}
-
-      {data !== null && data.total > 0 && (
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={data.total}
-          totalPages={data.totalPages}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          noun="días"
-        />
-      )}
-
+                    <Td>
+                      <StatusDot active={holiday.isActive} />
+                    </Td>
+                    {canWrite && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Editar ${holiday.name}`}
+                            icon={Pencil}
+                            onClick={() => setModal(holiday)}
+                            disabled={busyId === holiday.id}
+                          />
+                          <RowAction
+                            label={
+                              holiday.isActive
+                                ? `Desactivar ${holiday.name}`
+                                : `Reactivar ${holiday.name}`
+                            }
+                            icon={Power}
+                            onClick={() => askToggle(holiday)}
+                            disabled={busyId === holiday.id}
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
+      </ListPanel>
 
       {modal !== null && (
         <HolidayModal

@@ -305,98 +305,103 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
             </div>
           )}
 
-          {staff.accesses.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-[13.5px] text-faint">
-                Todavía no tiene acceso a ningún departamento: entra al sistema pero no ve nada.
-              </p>
-              {canManageAccess && matrix !== null && (
-                <div className="mt-3 flex justify-center">
-                  <Button size="sm" onClick={() => setModal("nuevo")}>
-                    <Plus className="h-[15px] w-[15px]" />
-                    Otorgar el primero
-                  </Button>
-                </div>
-              )}
-            </div>
-          ) : (
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Departamento</Th>
-                <Th>Rol</Th>
-                <Th>Principal</Th>
-                <Th>Otorgado por</Th>
-                <Th>Desde</Th>
-                <Th className="w-24 text-right">Acciones</Th>
-              </HeadRow>
-            </thead>
+          {/* Tabla sin criterios ni paginacion: no es el patron de listado de
+              ListPanel, pero sigue siendo contenido sustantivo, asi que va en
+              un panel simple sobre el lienzo. */}
+          <section className="rounded-card border border-line bg-white p-5 shadow-card">
+            {staff.accesses.length === 0 ? (
+              <div className="py-12 text-center">
+                <p className="text-[13.5px] text-faint">
+                  Todavía no tiene acceso a ningún departamento: entra al sistema pero no ve nada.
+                </p>
+                {canManageAccess && matrix !== null && (
+                  <div className="mt-3 flex justify-center">
+                    <Button size="sm" onClick={() => setModal("nuevo")}>
+                      <Plus className="h-[15px] w-[15px]" />
+                      Otorgar el primero
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Departamento</Th>
+                  <Th>Rol</Th>
+                  <Th>Principal</Th>
+                  <Th>Otorgado por</Th>
+                  <Th>Desde</Th>
+                  <Th className="w-24 text-right">Acciones</Th>
+                </HeadRow>
+              </thead>
 
-            <tbody>
-              {staff.accesses.map((access) => (
-                <Row key={access.departmentId} busy={busyDepartmentId === access.departmentId}>
-                  <Td className="text-[13px] font-medium text-ink">{access.departmentName}</Td>
-                  <Td>
-                    <Badge>{access.roleName}</Badge>
-                  </Td>
-                  <Td>
-                    {access.isPrimary ? (
-                      // Gris, no rojo: marcar el registro designado no es ni la accion
-                      // primaria ni el estado activo, los dos unicos usos del 185 C.
-                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
-                        <Star aria-hidden className="h-3.5 w-3.5 fill-brand-gray text-brand-gray" />
-                        Principal
-                      </span>
-                    ) : !canWrite ? (
-                      <span className="text-[12.5px] text-faint">—</span>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="-mx-3.5"
-                        onClick={() => makePrimary(access)}
-                        disabled={busyDepartmentId === access.departmentId}
-                      >
-                        Hacer principal
-                      </Button>
-                    )}
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">{access.grantedByName ?? "—"}</Td>
-                  <Td className="text-[12.5px] text-brand-gray">{formatDate(access.grantedAt)}</Td>
-                  <Td>
-                    <div className="flex items-center justify-end gap-1">
-                      {!canWrite && <span className="text-[12.5px] text-faint">—</span>}
-                      {/* Cambiar el rol necesita la lista de roles; revocar no. */}
-                      {canManageAccess && matrix !== null && (
-                        <RowAction
-                          label={`Cambiar el rol en ${access.departmentName}`}
-                          icon={Pencil}
-                          onClick={() => setModal(access)}
+              <tbody>
+                {staff.accesses.map((access) => (
+                  <Row key={access.departmentId} busy={busyDepartmentId === access.departmentId}>
+                    <Td className="text-[13px] font-medium text-ink">{access.departmentName}</Td>
+                    <Td>
+                      <Badge>{access.roleName}</Badge>
+                    </Td>
+                    <Td>
+                      {access.isPrimary ? (
+                        // Gris, no rojo: marcar el registro designado no es ni la accion
+                        // primaria ni el estado activo, los dos unicos usos del 185 C.
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
+                          <Star aria-hidden className="h-3.5 w-3.5 fill-brand-gray text-brand-gray" />
+                          Principal
+                        </span>
+                      ) : !canWrite ? (
+                        <span className="text-[12.5px] text-faint">—</span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="-mx-3.5"
+                          onClick={() => makePrimary(access)}
                           disabled={busyDepartmentId === access.departmentId}
-                        />
+                        >
+                          Hacer principal
+                        </Button>
                       )}
-                      {canWrite && (
-                        <>
+                    </Td>
+                    <Td className="text-[12.5px] text-brand-gray">{access.grantedByName ?? "—"}</Td>
+                    <Td className="text-[12.5px] text-brand-gray">{formatDate(access.grantedAt)}</Td>
+                    <Td>
+                      <div className="flex items-center justify-end gap-1">
+                        {!canWrite && <span className="text-[12.5px] text-faint">—</span>}
+                        {/* Cambiar el rol necesita la lista de roles; revocar no. */}
+                        {canManageAccess && matrix !== null && (
                           <RowAction
-                            label={
-                              access.isPrimary
-                                ? "El acceso principal no se revoca: marca otro como principal primero"
-                                : `Revocar el acceso a ${access.departmentName}`
-                            }
-                            icon={Trash2}
-                            onClick={() => askRevoke(access)}
-                            disabled={access.isPrimary || busyDepartmentId === access.departmentId}
-                            danger
+                            label={`Cambiar el rol en ${access.departmentName}`}
+                            icon={Pencil}
+                            onClick={() => setModal(access)}
+                            disabled={busyDepartmentId === access.departmentId}
                           />
-                        </>
-                      )}
-                    </div>
-                  </Td>
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-          )}
+                        )}
+                        {canWrite && (
+                          <>
+                            <RowAction
+                              label={
+                                access.isPrimary
+                                  ? "El acceso principal no se revoca: marca otro como principal primero"
+                                  : `Revocar el acceso a ${access.departmentName}`
+                              }
+                              icon={Trash2}
+                              onClick={() => askRevoke(access)}
+                              disabled={access.isPrimary || busyDepartmentId === access.departmentId}
+                              danger
+                            />
+                          </>
+                        )}
+                      </div>
+                    </Td>
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+            )}
+          </section>
 
           {/* Cabecera de grupo, no un titulo de pagina: la rampa solo tiene
               versalita de 10 px para nombrar un bloque dentro de una vista. */}
@@ -409,53 +414,55 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
             rol en la matriz.
           </p>
 
-          {effective.length === 0 ? (
-            // Una lista derivada se queda vacia por dos motivos distintos, y la
-            // accion que corresponde a cada uno tambien lo es: otorgar un acceso,
-            // o revisar los permisos de los roles ya otorgados.
-            <p className="py-12 text-center text-[13.5px] text-faint">
-              {staff.accesses.length === 0
-                ? "Sin accesos no hay permisos: hoy esta persona no puede hacer nada dentro del panel."
-                : "Tiene accesos, pero ninguno de sus roles concede todavía un permiso: revisa esos roles en la matriz."}
-            </p>
-          ) : (
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th className="sm:w-[360px]">Puede</Th>
-                <Th className="sm:w-[160px]">Módulo</Th>
-                <Th>Dónde aplica</Th>
-              </HeadRow>
-            </thead>
+          <section className="rounded-card border border-line bg-white p-5 shadow-card">
+            {effective.length === 0 ? (
+              // Una lista derivada se queda vacia por dos motivos distintos, y la
+              // accion que corresponde a cada uno tambien lo es: otorgar un acceso,
+              // o revisar los permisos de los roles ya otorgados.
+              <p className="py-12 text-center text-[13.5px] text-faint">
+                {staff.accesses.length === 0
+                  ? "Sin accesos no hay permisos: hoy esta persona no puede hacer nada dentro del panel."
+                  : "Tiene accesos, pero ninguno de sus roles concede todavía un permiso: revisa esos roles en la matriz."}
+              </p>
+            ) : (
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th className="sm:w-[360px]">Puede</Th>
+                  <Th className="sm:w-[160px]">Módulo</Th>
+                  <Th>Dónde aplica</Th>
+                </HeadRow>
+              </thead>
 
-            <tbody>
-              {effective.map(({ permission, module, departments, scope }) => (
-                <Row key={permission.key}>
-                  <Td>
-                    <span className="flex flex-col gap-0.5">
-                      <span className="text-[13px] font-medium leading-tight text-ink">
-                        {permission.label}
+              <tbody>
+                {effective.map(({ permission, module, departments, scope }) => (
+                  <Row key={permission.key}>
+                    <Td>
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-[13px] font-medium leading-tight text-ink">
+                          {permission.label}
+                        </span>
+                        <span className="font-mono text-[10.5px] leading-tight text-faint">
+                          {permission.key}
+                        </span>
                       </span>
-                      <span className="font-mono text-[10.5px] leading-tight text-faint">
-                        {permission.key}
-                      </span>
-                    </span>
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">{module}</Td>
-                  <Td className="text-[12.5px] text-brand-gray">
-                    {scope === "todos" ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Badge tone="green">Todos los departamentos</Badge>
-                      </span>
-                    ) : (
-                      departments.join(", ")
-                    )}
-                  </Td>
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-          )}
+                    </Td>
+                    <Td className="text-[12.5px] text-brand-gray">{module}</Td>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      {scope === "todos" ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Badge tone="green">Todos los departamentos</Badge>
+                        </span>
+                      ) : (
+                        departments.join(", ")
+                      )}
+                    </Td>
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+            )}
+          </section>
         </>
       )}
 

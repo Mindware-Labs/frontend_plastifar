@@ -8,11 +8,12 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -85,7 +86,6 @@ export function TopicsSection() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  const isFirstLoad = data === null && error === null;
   // Sin criterio activo, una pagina vacia significa catalogo vacio; con
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
@@ -204,53 +204,6 @@ export function TopicsSection() {
         )
       }
     >
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar motivo…"
-          className="w-[240px]"
-        />
-
-        <Select
-          size="sm"
-          className="w-[220px]"
-          aria-label="Filtrar por departamento"
-          value={departmentId}
-          onChange={setDepartmentId}
-          options={[
-            { value: "todos", label: "Todos los departamentos" },
-            ...departments.map((department) => ({
-              value: String(department.id),
-              label: department.name,
-            })),
-          ]}
-        />
-
-        <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-        <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-          <FilterChip
-            label="Todos"
-            count={counts?.all ?? 0}
-            active={chip === "todos"}
-            onClick={() => setChip("todos")}
-          />
-          <FilterChip
-            label="Activos"
-            count={counts?.active ?? 0}
-            active={chip === "activos"}
-            onClick={() => setChip("activos")}
-          />
-          <FilterChip
-            label="Inactivos"
-            count={counts?.inactive ?? 0}
-            active={chip === "inactivos"}
-            onClick={() => setChip("inactivos")}
-          />
-        </ChipGroup>
-      </div>
-
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {(departmentsRef.failed || policiesRef.failed) && (
@@ -263,132 +216,182 @@ export function TopicsSection() {
         />
       )}
 
-      {isFirstLoad ? (
-        <div className="flex justify-center py-16">
-          <Spinner />
-        </div>
-      ) : data === null ? null : rows.length === 0 ? (
-        <p className="py-14 text-center text-[13.5px] text-faint">
-          {isFiltering
-            ? "Ningún motivo coincide con este filtro o búsqueda."
-            : "Todavía no hay ningún motivo configurado."}
-        </p>
-      ) : (
-        <div className={staleClass(isStale)}>
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Motivo</Th>
-                <Th>Departamento</Th>
-                <Th>Prioridad</Th>
-                <Th>Política de SLA</Th>
-                <Th>Línea de producto</Th>
-                <Th>Estado</Th>
-                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+      <ListPanel
+        toolbar={
+          <>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar motivo…"
+              className="w-[240px]"
+            />
 
-            <tbody>
-              {rows.map((topic) => {
-                const policy = policyFor(topic);
-                const parent = parentName(topic);
-                const isChild = topic.parentId !== null;
+            <Select
+              size="sm"
+              className="w-[220px]"
+              aria-label="Filtrar por departamento"
+              value={departmentId}
+              onChange={setDepartmentId}
+              options={[
+                { value: "todos", label: "Todos los departamentos" },
+                ...departments.map((department) => ({
+                  value: String(department.id),
+                  label: department.name,
+                })),
+              ]}
+            />
 
-                return (
-                  <Row key={topic.id} busy={busyId === topic.id}>
-                    <Td>
-                      <span className="flex items-center gap-2">
-                        {isChild && (
-                          <CornerDownRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-faint" />
-                        )}
-                        <span className="flex flex-col gap-0.5">
-                          <span className="text-[12.5px] font-medium leading-tight text-ink">
-                            {topic.name}
-                          </span>
-                          {isChild && parent !== null && (
-                            <span className="text-[11px] leading-tight text-faint">en {parent}</span>
-                          )}
-                        </span>
-                      </span>
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      {departmentName(topic.defaultDepartmentId)}
-                    </Td>
-                    <Td>
-                      <Badge tone={priorityTone[topic.defaultPriority]}>
-                        {topic.defaultPriority}
-                      </Badge>
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      {policy ? (
-                        <span className="flex flex-col gap-0.5">
-                          <span className="leading-tight">{policy.policy.name}</span>
-                          {policy.inherited && (
-                            <span className="text-[11px] leading-tight text-faint">
-                              heredada de {topic.defaultPriority.toLowerCase()}
-                            </span>
-                          )}
-                        </span>
-                      ) : policies.length === 0 ? (
-                        // Sin el catalogo de politicas no se sabe cual aplica;
-                        // el ambar afirmaria que no hay ninguna.
-                        <span className="text-faint">—</span>
-                      ) : (
-                        <span className="text-warn">
-                          Sin política para {topic.defaultPriority.toLowerCase()}
-                        </span>
-                      )}
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      {topic.requiresProductLine ? (
-                        "Obligatoria"
-                      ) : (
-                        <span className="text-faint">—</span>
-                      )}
-                    </Td>
-                    <Td>
-                      <StatusDot active={topic.isActive} />
-                    </Td>
-                    {canWrite && (
+            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
+              <FilterChip
+                label="Todos"
+                count={counts?.all ?? 0}
+                active={chip === "todos"}
+                onClick={() => setChip("todos")}
+              />
+              <FilterChip
+                label="Activos"
+                count={counts?.active ?? 0}
+                active={chip === "activos"}
+                onClick={() => setChip("activos")}
+              />
+              <FilterChip
+                label="Inactivos"
+                count={counts?.inactive ?? 0}
+                active={chip === "inactivos"}
+                onClick={() => setChip("inactivos")}
+              />
+            </ChipGroup>
+          </>
+        }
+        footer={
+          data !== null &&
+          data.total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="motivos"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={7} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {isFiltering
+              ? "Ningún motivo coincide con este filtro o búsqueda."
+              : "Todavía no hay ningún motivo configurado."}
+          </p>
+        ) : (
+          <div className={staleClass(isStale)}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Motivo</Th>
+                  <Th>Departamento</Th>
+                  <Th>Prioridad</Th>
+                  <Th>Política de SLA</Th>
+                  <Th>Línea de producto</Th>
+                  <Th>Estado</Th>
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+
+              <tbody>
+                {rows.map((topic) => {
+                  const policy = policyFor(topic);
+                  const parent = parentName(topic);
+                  const isChild = topic.parentId !== null;
+
+                  return (
+                    <Row key={topic.id} busy={busyId === topic.id}>
                       <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar ${topic.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(topic)}
-                            disabled={busyId === topic.id}
-                          />
-                          <RowAction
-                            label={
-                              topic.isActive ? `Desactivar ${topic.name}` : `Reactivar ${topic.name}`
-                            }
-                            icon={Power}
-                            onClick={() => askToggle(topic)}
-                            disabled={busyId === topic.id}
-                          />
-                        </div>
+                        <span className="flex items-center gap-2">
+                          {isChild && (
+                            <CornerDownRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-faint" />
+                          )}
+                          <span className="flex flex-col gap-0.5">
+                            <span className="text-[12.5px] font-medium leading-tight text-ink">
+                              {topic.name}
+                            </span>
+                            {isChild && parent !== null && (
+                              <span className="text-[11px] leading-tight text-faint">en {parent}</span>
+                            )}
+                          </span>
+                        </span>
                       </Td>
-                    )}
-                  </Row>
-                );
-              })}
-            </tbody>
-          </DataTable>
-        </div>
-      )}
-
-      {data !== null && data.total > 0 && (
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={data.total}
-          totalPages={data.totalPages}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          noun="motivos"
-        />
-      )}
-
+                      <Td className="text-[12.5px] text-brand-gray">
+                        {departmentName(topic.defaultDepartmentId)}
+                      </Td>
+                      <Td>
+                        <Badge tone={priorityTone[topic.defaultPriority]}>
+                          {topic.defaultPriority}
+                        </Badge>
+                      </Td>
+                      <Td className="text-[12.5px] text-brand-gray">
+                        {policy ? (
+                          <span className="flex flex-col gap-0.5">
+                            <span className="leading-tight">{policy.policy.name}</span>
+                            {policy.inherited && (
+                              <span className="text-[11px] leading-tight text-faint">
+                                heredada de {topic.defaultPriority.toLowerCase()}
+                              </span>
+                            )}
+                          </span>
+                        ) : policies.length === 0 ? (
+                          // Sin el catalogo de politicas no se sabe cual aplica;
+                          // el ambar afirmaria que no hay ninguna.
+                          <span className="text-faint">—</span>
+                        ) : (
+                          <span className="text-warn">
+                            Sin política para {topic.defaultPriority.toLowerCase()}
+                          </span>
+                        )}
+                      </Td>
+                      <Td className="text-[12.5px] text-brand-gray">
+                        {topic.requiresProductLine ? (
+                          "Obligatoria"
+                        ) : (
+                          <span className="text-faint">—</span>
+                        )}
+                      </Td>
+                      <Td>
+                        <StatusDot active={topic.isActive} />
+                      </Td>
+                      {canWrite && (
+                        <Td>
+                          <div className="flex items-center justify-end gap-1">
+                            <RowAction
+                              label={`Editar ${topic.name}`}
+                              icon={Pencil}
+                              onClick={() => setModal(topic)}
+                              disabled={busyId === topic.id}
+                            />
+                            <RowAction
+                              label={
+                                topic.isActive ? `Desactivar ${topic.name}` : `Reactivar ${topic.name}`
+                              }
+                              icon={Power}
+                              onClick={() => askToggle(topic)}
+                              disabled={busyId === topic.id}
+                            />
+                          </div>
+                        </Td>
+                      )}
+                    </Row>
+                  );
+                })}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
+      </ListPanel>
 
       {modal !== null && (
         <TopicModal

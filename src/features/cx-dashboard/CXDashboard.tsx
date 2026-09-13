@@ -4,7 +4,7 @@ import { AgentPerformance } from "./components/AgentPerformance";
 import { CallDetails } from "./components/CallDetails";
 import { KpiRow } from "./components/KpiRow";
 import { RecentTickets } from "./components/RecentTickets";
-import { ResponseTime } from "./components/ResponseTime";
+import { TicketByState } from "./components/TicketByState";
 import { TicketByCategory } from "./components/TicketByCategory";
 import { TicketByStage } from "./components/TicketByStage";
 import { TicketTrend } from "./components/TicketTrend";
@@ -13,15 +13,16 @@ import { S } from "./styles";
 import { usePageChrome } from "../../layouts/usePageChrome";
 
 /**
- * Tablero de operación — dirección «filete de acento».
+ * Tablero de operación.
  *
  * ------------------------------------------------------------------
- * SIN CAPAS, SIN SOMBRAS
+ * LIENZO TINTADO, SUPERFICIE BLANCA
  * ------------------------------------------------------------------
- * Fondo blanco. El lienzo gris y todas las sombras se fueron: sobre blanco una
- * sombra no separa nada, sólo ensucia. La separación la hace el borde de la
- * tarjeta, y la identidad la hace el filete de 4 px que cada una lleva arriba
- * en el tono de su rol.
+ * Referencia: Center Quest (`public/image.png`). El fondo de página es un gris
+ * muy claro y las tarjetas son blanco puro; esa diferencia mínima es lo que las
+ * hace flotar sin necesitar una sombra pesada. Sobre blanco no había nada que
+ * separar y por eso la versión anterior no llevaba sombra — sobre este lienzo
+ * sí la hay, y trabaja.
  *
  * ------------------------------------------------------------------
  * LA VENTANA NO SE ELIGE
@@ -51,12 +52,14 @@ const WIDE: CSSProperties = {
   alignItems: "start",
 };
 
-const PAIR: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0,1fr))",
-  gap: S.md,
-  alignItems: "start",
-};
+/*
+ * UNA sola costura vertical en toda la pagina.
+ *
+ * Las bandas 2 y 3 partian en 1,85/1 y la banda 5 en 1/1, asi que el corte
+ * entre columna izquierda y derecha se movia casi doscientos pixeles al llegar
+ * abajo. Tres franjas alineadas y una cuarta corrida se lee como un error de
+ * maquetacion, no como una decision.
+ */
 
 export function CXDashboard({ query }: { query?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -82,6 +85,7 @@ export function CXDashboard({ query }: { query?: string }) {
           cortado contra el borde del scroll. */}
       <div
         ref={scrollRef}
+        className="cx-scroll"
         style={{
           flex: 1,
           minHeight: 0,
@@ -95,26 +99,33 @@ export function CXDashboard({ query }: { query?: string }) {
           gap: S.xl,
         }}
       >
-        {/* 1 — LO URGENTE, Y EL CONTEXTO. */}
-        <KpiRow range={RANGE} />
+        {/* 1 — LO URGENTE, Y EL CONTEXTO.
+            `plf-band` escalona la entrada de las cinco bandas. Arranca desde
+            un estado ya visible y se corta a los 180 ms: en una superficie de
+            operacion el movimiento acompania la carga, nunca la hace esperar. */}
+        <div className="plf-band">
+          <KpiRow />
+        </div>
 
         {/* 2 — CÓMO VIENE + SI ESTAMOS EN PLAZO. */}
-        <div className="cx-pair" style={WIDE}>
+        <div className="cx-pair plf-band" style={WIDE}>
           <TicketTrend range={RANGE} />
           <TicketByStage />
         </div>
 
-        {/* 3 — SI CONTESTAMOS A TIEMPO + POR QUÉ ENTRA EL TRABAJO. */}
-        <div className="cx-pair" style={WIDE}>
-          <ResponseTime />
+        {/* 3 — DÓNDE ESTÁ PARADO EL TRABAJO + POR QUÉ ENTRA. */}
+        <div className="cx-pair plf-band" style={WIDE}>
+          <TicketByState />
           <TicketByCategory />
         </div>
 
         {/* 4 — LA COLA. El único panel desde el que se actúa: ancho completo. */}
-        <RecentTickets query={query} />
+        <div className="plf-band">
+          <RecentTickets query={query} />
+        </div>
 
         {/* 5 — POR DÓNDE ENTRA Y DE QUIÉN ES. */}
-        <div className="cx-pair" style={PAIR}>
+        <div className="cx-pair plf-band" style={WIDE}>
           <CallDetails />
           <AgentPerformance />
         </div>

@@ -36,7 +36,13 @@ function Shell() {
   return (
     <>
       <InboxAlerts />
-      <div className="flex h-screen bg-white">
+      {/* El lienzo ya no empieza en el area de contenido: lo lleva el shell
+          entero, y el carril lateral y la barra superior flotan encima como
+          dos superficies blancas mas. Con el shell en blanco, esas dos piezas
+          no eran superficies —eran el fondo— y por eso la pagina se partia en
+          dos mundos: cromo plano arriba y a la izquierda, tarjetas flotando en
+          el resto. */}
+      <div className="flex h-screen bg-canvas">
         <Sidebar />
 
         {/* `overflow-hidden` sigue siendo a proposito: cada pagina decide su
@@ -52,7 +58,10 @@ function Shell() {
           <BreadcrumbLabelContext.Provider value={setDynamicLabel}>
             <AppBar />
 
-            <div className="flex min-h-0 flex-1 flex-col px-4 pt-5 lg:px-8 lg:pt-6">
+            {/* El lienzo tintado. Las superficies de trabajo —tablas, paneles,
+                tarjetas— flotan encima en blanco. Esa diferencia minima de
+                valor es lo que las despega sin necesitar una sombra pesada. */}
+            <div className="flex min-h-0 flex-1 flex-col px-3 pt-3 lg:px-4 lg:pt-4">
               <Outlet />
             </div>
           </BreadcrumbLabelContext.Provider>
