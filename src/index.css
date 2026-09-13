@@ -27,7 +27,13 @@
      usa --color-muted para superficies claras (fondo de pastillas/avatares),
      un concepto distinto a este gris de texto. */
   --color-subtle: #63636d;
-  --color-faint: #71717a;
+  /* 4.8:1 contra BLANCO, que es contra lo que se valido... y el panel dejo de
+     tener fondo blanco. Sobre el lienzo tintado (#f3f5f7) caia a 4.42:1 y sobre
+     `fill` a 4.28: por debajo del piso de 4.5 que este mismo sistema declara, y
+     justo en el token que visten TODAS las versalitas y cabeceras de columna.
+     Medido en pantalla, no estimado. #6d6d76 pasa en las tres superficies
+     (blanco 5.12, lienzo 4.69, fill 4.54). */
+  --color-faint: #6d6d76;
   --color-fill: #f1f1f3;
   /* Ambar de apoyo: solo estados intermedios en pantalla (fuerza media,
      prioridad alta). No es un color institucional. 5.4:1 sobre blanco. */

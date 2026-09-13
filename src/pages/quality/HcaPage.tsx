@@ -349,7 +349,7 @@ export function HcaPage() {
                       </span>
                       {sheet.status !== "Cerrada" && (
                         <>
-                          <span aria-hidden className="px-1.5 text-line-strong">·</span>
+                          <span aria-hidden className="px-1.5 text-faint">·</span>
                           <span
                             className={`text-[11.5px] ${
                               overdue ? "font-medium text-brand-red-dark" : "text-faint"
