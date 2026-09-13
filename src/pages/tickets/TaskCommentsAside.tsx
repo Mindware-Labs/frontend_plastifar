@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from "react";
 import { ticketsApi } from "../../api/tickets";
 import { openOverlay } from "../../hooks/overlayStack";
 import { Avatar } from "../../components/ui/Avatar";
-import { Button } from "../../components/ui/Button";
 import { formatDateTime } from "../../lib/format";
 import type { TicketTaskCommentResponse, TicketTaskResponse } from "../../types/api";
 
@@ -74,6 +73,9 @@ export function TaskCommentsAside({
       });
       onCommentAdded(task.id, newComment);
       setCommentText("");
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al enviar el comentario.");
     } finally {
@@ -181,28 +183,32 @@ export function TaskCommentsAside({
                 <Avatar
                   name={currentStaffName ?? "Usuario"}
                   seed={currentStaffId}
-                  size={20}
+                  size={18}
                 />
               </div>
               <textarea
                 ref={textareaRef}
-                rows={2}
+                rows={1}
                 placeholder="Escribe un comentario..."
                 value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
+                onChange={(e) => {
+                  setCommentText(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 96)}px`;
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     void handleSendComment();
                   }
                 }}
-                className="w-full resize-none bg-transparent text-[12px] leading-relaxed text-zinc-800 outline-none placeholder:text-zinc-400"
+                className="w-full resize-none bg-transparent text-[12px] leading-snug text-zinc-800 outline-none placeholder:text-zinc-400 min-h-[20px] max-h-[96px] py-0"
               />
             </div>
 
-            <div className="mt-2 flex items-center justify-between border-t border-zinc-100 pt-2 text-[10.5px]">
+            <div className="mt-1.5 flex items-center justify-between border-t border-zinc-100 pt-1.5 text-[10.5px]">
               <span className="text-zinc-400 flex items-center gap-1">
-                <kbd className="rounded border border-zinc-200 bg-zinc-50 px-1 py-0.5 font-mono text-[9px] text-zinc-500">
+                <kbd className="rounded border border-zinc-200 bg-zinc-50 px-1 py-0.2 font-mono text-[9px] text-zinc-500">
                   Enter
                 </kbd>
                 para enviar
@@ -212,32 +218,36 @@ export function TaskCommentsAside({
                 {commentText.trim() && (
                   <button
                     type="button"
-                    onClick={() => setCommentText("")}
-                    className="h-6.5 rounded-md px-2 text-[10.5px] font-medium text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setCommentText("");
+                      if (textareaRef.current) {
+                        textareaRef.current.style.height = "auto";
+                      }
+                    }}
+                    className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors cursor-pointer"
                   >
                     Limpiar
                   </button>
                 )}
 
-                <Button
+                <button
                   type="button"
-                  size="sm"
                   disabled={!commentText.trim() || isSending}
                   onClick={() => void handleSendComment()}
-                  className="h-7 px-2.5 text-[11.5px]"
+                  className="inline-flex items-center gap-1 rounded-md bg-brand-red px-2 py-0.5 text-[11px] font-semibold text-white shadow-2xs transition-all hover:bg-brand-red-dark active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isSending ? (
                     <>
-                      <Loader2 className="size-3 animate-spin mr-1" />
+                      <Loader2 className="size-3 animate-spin" />
                       <span>Enviando...</span>
                     </>
                   ) : (
                     <>
-                      <Send className="size-3 mr-1" />
+                      <Send className="size-2.5 stroke-[2.5]" />
                       <span>Comentar</span>
                     </>
                   )}
-                </Button>
+                </button>
               </div>
             </div>
           </div>

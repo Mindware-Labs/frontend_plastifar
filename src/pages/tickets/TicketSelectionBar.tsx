@@ -44,7 +44,7 @@ export function TicketSelectionBar({
       />
 
       <div className="ml-2.5 flex items-center gap-1.5">
-        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-brand-red px-1.5 font-heading text-[10.5px] font-bold leading-none tabular-nums text-white">
+        <span className="inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-[5px] bg-brand-red px-1 font-heading text-[10.5px] font-bold leading-none tabular-nums text-white">
           {count}
         </span>
         <span className="text-[12.5px] font-semibold text-zinc-800">

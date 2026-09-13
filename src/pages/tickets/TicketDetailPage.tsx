@@ -258,9 +258,15 @@ export function TicketDetailPage() {
     if (!ticketId) return;
     const seq = ++refreshSeq.current;
     try {
-      const data = await ticketsApi.getById(ticketId);
+      const [ticketData, tasksData] = await Promise.all([
+        ticketsApi.getById(ticketId),
+        ticketsApi.getTasks(ticketId).catch(() => null),
+      ]);
       if (seq !== refreshSeq.current) return;
-      setTicket(data);
+      setTicket(ticketData);
+      if (tasksData) {
+        setTasksCount(tasksData.length);
+      }
     } catch (err) {
       if (seq !== refreshSeq.current) return;
       setError(
@@ -275,11 +281,16 @@ export function TicketDetailPage() {
     if (!ticketId) return;
     let active = true;
 
-    ticketsApi
-      .getById(ticketId)
-      .then((data) => {
+    Promise.all([
+      ticketsApi.getById(ticketId),
+      ticketsApi.getTasks(ticketId).catch(() => null),
+    ])
+      .then(([ticketData, tasksData]) => {
         if (!active) return;
-        setTicket(data);
+        setTicket(ticketData);
+        if (tasksData) {
+          setTasksCount(tasksData.length);
+        }
         setError(null);
       })
       .catch((err: unknown) => {
@@ -820,7 +831,7 @@ export function TicketDetailPage() {
               </div>
             )}
 
-            {activeTab === "tareas" && (
+            <div className={activeTab === "tareas" ? "block" : "hidden"}>
               <TicketTasksTab
                 ticketId={ticket.id}
                 isClosed={isClosed}
@@ -831,7 +842,7 @@ export function TicketDetailPage() {
                 onToggleTaskComments={handleToggleTaskComments}
                 latestAddedComment={latestAddedComment}
               />
-            )}
+            </div>
 
             {activeTab === "notas" && (
               <div className="mt-3.5 space-y-2.5">
