@@ -171,6 +171,48 @@ input:-webkit-autofill:focus {
   transition: background-color 9999s ease-out 0s;
 }
 
+/* ------------------------------------------------------------------
+   LO QUE SE PUEDE PULSAR LO DICE EL PUNTERO
+   ------------------------------------------------------------------
+   Tailwind v3 aplicaba `cursor: pointer` a todo `button` desde su Preflight.
+   La v4 lo quito para alinearse con el comportamiento nativo del navegador, y
+   como ningun primitivo de la casa lo declaraba, el panel entero se quedo sin
+   el. Medido sobre once rutas: 69 controles pulsables con el cursor de una
+   flecha normal —incluidos «Nuevo ticket», «Nueva HCA», «Nueva solicitud» y
+   «Generar reporte»—.
+
+   No es un detalle estetico. El puntero es la promesa mas barata que hace una
+   interfaz: dice «esto responde» antes de que nadie se arriesgue a hacer clic.
+   Sin el, cada boton primario del sistema parecia una etiqueta pintada.
+
+   Se arregla en un sitio y no en sesenta y nueve, porque el fallo es uno solo.
+   Lo deshabilitado va aparte: un puntero de «prohibido» dice que existe pero
+   ahora no, que es informacion distinta de no decir nada. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="option"],
+  [role="menuitem"],
+  [role="menuitemradio"],
+  [role="tab"],
+  summary,
+  label[for],
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"],
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
+  }
+}
+
 /* --- Movimiento --- */
 
 @keyframes plf-float {
