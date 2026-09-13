@@ -17,6 +17,7 @@ import {
 import { Modal } from "../../components/ui/Modal";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import { CLIENT_TYPES, type Client } from "../../types/clients";
+import { FormSection } from "../../components/ui/FormSection";
 import { fieldForServerError, type FieldRule } from "./serverFieldErrors";
 
 /**
@@ -158,6 +159,9 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
       <form id="client-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
         {formError && <Alert variant="error">{formError}</Alert>}
 
+        {/* Los mismos cuatro bloques con los que se LEE la ficha. Ver y crear
+            hablaban idiomas distintos sobre el mismo objeto. */}
+        <FormSection title="Identificación">
         <div className="grid grid-cols-2 gap-3">
           <TextField
             label="Código"
@@ -184,7 +188,9 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
           error={errors.name?.message}
           {...register("name")}
         />
+        </FormSection>
 
+        <FormSection title="Clasificación comercial" hint="Quién lo atiende y desde dónde.">
         <div className="grid grid-cols-2 gap-3">
           <Controller
             name="type"
@@ -247,7 +253,9 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
             />
           )}
         />
+        </FormSection>
 
+        <FormSection title="Contacto">
         <div className="grid grid-cols-2 gap-3">
           <TextField
             label="Teléfono"
@@ -273,7 +281,9 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
           error={errors.address?.message}
           {...register("address")}
         />
+        </FormSection>
 
+        <FormSection title="Uso interno" hint="No se comparte con el cliente.">
         {/* Por el componente compartido, no a mano: es el que trae id,
             aria-describedby, aria-invalid y —sobre todo— el hueco donde se
             imprime el tope de 1000 caracteres que declara el esquema. */}
@@ -283,6 +293,7 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
           error={errors.notes?.message}
           {...register("notes")}
         />
+        </FormSection>
 
         {isEdit && (
           <CheckboxField

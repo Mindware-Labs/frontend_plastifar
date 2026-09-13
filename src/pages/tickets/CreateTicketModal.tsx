@@ -434,10 +434,10 @@ export function CreateTicketModal({
               </div>
 
               {/* Clasificación: Motivo, Departamento y Responsable */}
-              <div className="space-y-3.5 rounded-edge border border-line-soft bg-canvas/40 p-4">
+              <div className="space-y-3.5 border-t border-line-soft pt-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="flex items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink">
-                    <Tag className="h-3.5 w-3.5 text-brand-red" />
+                  <h4 className="flex items-center gap-1.5 font-heading text-[10px] font-semibold uppercase tracking-[0.07em] text-faint">
+                    <Tag className="h-3 w-3 text-faint" />
                     Clasificación y enrutamiento
                   </h4>
                   <span className="text-[10.5px] text-faint">Opcional</span>
@@ -536,9 +536,9 @@ export function CreateTicketModal({
               </div>
 
               {/* Prioridad, debajo de clasificación y enrutamiento */}
-              <div className="space-y-3 rounded-edge border border-line-soft bg-canvas/40 p-4">
-                <h4 className="flex items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink">
-                  <Flag className="h-3.5 w-3.5 text-brand-red" />
+              <div className="space-y-3 border-t border-line-soft pt-4">
+                <h4 className="flex items-center gap-1.5 font-heading text-[10px] font-semibold uppercase tracking-[0.07em] text-faint">
+                  <Flag className="h-3 w-3 text-faint" />
                   Nivel de prioridad
                 </h4>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -567,10 +567,10 @@ export function CreateTicketModal({
               </div>
 
               {/* Vinculación de Cliente & Contacto */}
-              <div className="space-y-3 rounded-edge border border-line-soft bg-canvas/40 p-4">
+              <div className="space-y-3 border-t border-line-soft pt-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="flex items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink">
-                    <Building2 className="h-3.5 w-3.5 text-brand-red" />
+                  <h4 className="flex items-center gap-1.5 font-heading text-[10px] font-semibold uppercase tracking-[0.07em] text-faint">
+                    <Building2 className="h-3 w-3 text-faint" />
                     Cliente y contacto comercial
                   </h4>
                   {selectedClientId ? (
@@ -664,14 +664,14 @@ export function CreateTicketModal({
               </div>
 
               {/* Mensaje Inicial / Descripción */}
-              <div className="flex flex-col gap-2.5 rounded-edge border border-line-soft bg-canvas/40 p-4">
+              <div className="flex flex-col gap-2.5 border-t border-line-soft pt-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <label
                       htmlFor="ticket-initial-message"
-                      className="flex cursor-pointer items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink"
+                      className="flex cursor-pointer items-center gap-1.5 font-heading text-[10px] font-semibold uppercase tracking-[0.07em] text-faint"
                     >
-                      <MessageSquareText className="h-3.5 w-3.5 text-brand-red" />
+                      <MessageSquareText className="h-3 w-3 text-faint" />
                       {emailId ? "Mensaje inicial del ticket" : "Descripción de la incidencia"}
                     </label>
                     <p className="mt-1 text-[11.5px] leading-relaxed text-subtle">
