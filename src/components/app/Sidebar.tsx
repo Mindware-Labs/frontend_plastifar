@@ -404,7 +404,7 @@ export function Sidebar() {
               >
                 <Logo variant="color" height={23} />
               </Link>
-              <span className="rounded border border-line-soft bg-canvas px-1.5 py-0.5 font-heading text-[9px] font-bold tracking-[0.08em] text-subtle">
+              <span className="rounded-edge border border-line-soft bg-canvas px-1.5 py-0.5 font-heading text-[10px] font-bold tracking-[0.08em] text-subtle">
                 OPS
               </span>
             </div>
@@ -454,7 +454,7 @@ export function Sidebar() {
           <div key={section}>
             {!collapsed && (
               <p
-                className="px-1.5 pb-1.5 font-heading text-[9.5px] font-medium uppercase
+                className="px-1.5 pb-1.5 font-heading text-[10px] font-medium uppercase
                   tracking-[0.07em] text-faint"
               >
                 {section}
@@ -559,7 +559,7 @@ export function Sidebar() {
                     {displayName}
                   </p>
                   <p className="truncate text-[11px] text-faint leading-tight mt-0.5">{user?.email}</p>
-                  <span className="mt-1 inline-flex items-center rounded-full bg-brand-red/[0.08] px-2 py-0.2 font-heading text-[9.5px] font-bold text-brand-red tracking-wide">
+                  <span className="mt-1 inline-flex items-center rounded-full bg-brand-red/[0.08] px-2 py-0.2 font-heading text-[10px] font-bold text-brand-red tracking-wide">
                     {user?.isAdmin ? "ADMINISTRADOR" : "COLABORADOR"}
                   </span>
                 </div>
@@ -610,7 +610,7 @@ export function Sidebar() {
                   type="button"
                   role="menuitem"
                   onClick={() => logout()}
-                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] font-medium text-brand-red-dark transition-colors hover:bg-red-50/80"
+                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] font-medium text-brand-red-dark transition-colors hover:bg-brand-red/[0.06]/80"
                 >
                   <LogOut className="h-3.5 w-3.5 text-brand-red" />
                   <span>Cerrar sesión</span>

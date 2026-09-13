@@ -64,8 +64,8 @@ const PRIORITIES = [
     value: "Baja",
     label: "Baja",
     desc: "Rutinario",
-    dot: "bg-zinc-400",
-    activeClass: "border-zinc-400 bg-zinc-100 text-zinc-800 shadow-2xs font-semibold ring-1 ring-zinc-400/40",
+    dot: "bg-faint",
+    activeClass: "border-hairline-hover bg-fill text-ink shadow-2xs font-semibold ring-1 ring-hairline-hover/40",
   },
   {
     value: "Normal",
@@ -78,15 +78,15 @@ const PRIORITIES = [
     value: "Alta",
     label: "Alta",
     desc: "Prioritario",
-    dot: "bg-amber-500",
-    activeClass: "border-amber-500 bg-amber-50 text-amber-950 shadow-2xs font-semibold ring-1 ring-amber-500/40",
+    dot: "bg-warn",
+    activeClass: "border-warn bg-warn/[0.08] text-amber-950 shadow-2xs font-semibold ring-1 ring-warn/40",
   },
   {
     value: "Emergencia",
     label: "Emergencia",
     desc: "Inmediato",
     dot: "bg-brand-red",
-    activeClass: "border-brand-red bg-rose-50 text-brand-red shadow-2xs font-semibold ring-1 ring-brand-red/40",
+    activeClass: "border-brand-red bg-brand-red/[0.06] text-brand-red shadow-2xs font-semibold ring-1 ring-brand-red/40",
   },
 ] as const;
 
@@ -587,9 +587,9 @@ export function CreateTicketModal({
                 </div>
 
                 {detectedMatch && (
-                  <div className="flex items-center justify-between gap-2 rounded-edge border border-emerald-200 bg-emerald-50/60 px-3 py-1.5 text-xs text-emerald-900">
+                  <div className="flex items-center justify-between gap-2 rounded-edge border border-brand-green/30 bg-brand-green/[0.08]/60 px-3 py-1.5 text-xs text-brand-green">
                     <div className="flex min-w-0 items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-brand-green" />
                       <span className="truncate">
                         Identificado por remitente: <strong>{detectedMatch.clientName}</strong> · {detectedMatch.contactName}
                       </span>
@@ -597,7 +597,7 @@ export function CreateTicketModal({
                     <button
                       type="button"
                       onClick={handleClearClient}
-                      className="shrink-0 text-[10.5px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+                      className="shrink-0 text-[10.5px] font-semibold text-brand-green hover:underline cursor-pointer"
                     >
                       Desvincular
                     </button>
@@ -697,7 +697,7 @@ export function CreateTicketModal({
                 <textarea
                   id="ticket-initial-message"
                   placeholder="Detalles de la incidencia, antecedentes o instrucciones para el equipo que atenderá el caso…"
-                  className="w-full min-h-[96px] resize-none overflow-hidden rounded-edge border border-line bg-white px-3 py-2.5 text-[12.5px] leading-relaxed text-ink placeholder:text-zinc-400 focus:border-brand-red focus:ring-2 focus:ring-brand-red/15 focus:outline-none transition-all"
+                  className="w-full min-h-[96px] resize-none overflow-hidden rounded-edge border border-line bg-white px-3 py-2.5 text-[12.5px] leading-relaxed text-ink placeholder:text-faint focus:border-brand-red focus:ring-2 focus:ring-brand-red/15 focus:outline-none transition-all"
                   name={initialMessageField.name}
                   onChange={(event) => {
                     initialMessageField.onChange(event);

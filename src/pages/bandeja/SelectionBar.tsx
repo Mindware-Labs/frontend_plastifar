@@ -39,7 +39,7 @@ export function SelectBox({ checked, label, onToggle, className = "" }: SelectBo
         focus-visible:ring-3 focus-visible:ring-brand-red/20 ${
           checked
             ? "border-brand-red bg-brand-red text-white shadow-[0_1px_3px_rgba(228,0,43,0.3)]"
-            : "border-line-strong bg-white text-transparent hover:border-zinc-400"
+            : "border-line-strong bg-white text-transparent hover:border-hairline-hover"
         } ${className}`}
     >
       {checked === "mixed" ? (

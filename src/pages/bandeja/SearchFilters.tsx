@@ -135,7 +135,7 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
         title="Filtros"
         data-active={active > 0}
         className="relative flex h-8 w-8 items-center justify-center rounded-edge border border-line-strong
-          bg-white text-brand-gray outline-none transition-all duration-150 hover:border-zinc-400 hover:text-ink
+          bg-white text-brand-gray outline-none transition-all duration-150 hover:border-hairline-hover hover:text-ink
           active:scale-95 focus-visible:border-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/10
           data-[active=true]:border-brand-red/40 data-[active=true]:text-brand-red-dark
           aria-expanded:bg-fill aria-expanded:text-ink"

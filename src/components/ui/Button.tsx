@@ -20,8 +20,8 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "disabled:bg-line-strong disabled:text-subtle disabled:shadow-none " +
     "disabled:hover:bg-line-strong disabled:hover:shadow-none",
   secondary:
-    "border border-line-strong bg-white text-brand-gray hover:border-zinc-400 hover:bg-canvas hover:text-ink",
-  danger: "border border-brand-red bg-white text-brand-red hover:bg-red-50",
+    "border border-line-strong bg-white text-brand-gray hover:border-hairline-hover hover:bg-canvas hover:text-ink",
+  danger: "border border-brand-red bg-white text-brand-red hover:bg-brand-red/[0.06]",
   ghost: "text-brand-gray hover:bg-fill hover:text-ink",
 };
 

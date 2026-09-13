@@ -22,7 +22,7 @@ export function RowAction({ label, icon: Icon, onClick, disabled, danger }: RowA
       aria-label={label}
       className={`flex h-7 w-7 items-center justify-center rounded-edge text-subtle transition-colors
         disabled:cursor-not-allowed disabled:opacity-40 ${
-          danger ? "hover:bg-red-50 hover:text-brand-red" : "hover:bg-fill hover:text-ink"
+          danger ? "hover:bg-brand-red/[0.06] hover:text-brand-red" : "hover:bg-fill hover:text-ink"
         }`}
     >
       <Icon className="h-4 w-4" />

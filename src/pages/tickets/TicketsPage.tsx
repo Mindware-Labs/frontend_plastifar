@@ -19,7 +19,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
-import { formatDateTime, formatSlaRemaining } from "../../lib/format";
+import { formatListDateTime, formatSlaRemaining } from "../../lib/format";
 import type {
   DepartmentResponse,
   TicketCounts,
@@ -53,25 +53,28 @@ const columns: { key: SortKey; label: string }[] = [
   { key: "numero", label: "Número" },
   { key: "asunto", label: "Asunto / Motivo" },
   { key: "cliente", label: "Cliente" },
-  { key: "departamento", label: "Departamento" },
+  { key: "departamento", label: "Depto." },
   { key: "prioridad", label: "Prioridad" },
-  { key: "estado", label: "Estado" },
-  { key: "sla", label: "SLA" },
-  { key: "actividad", label: "Última actividad" },
+  /* Estado y SLA eran dos columnas para el MISMO hecho: en que situacion esta
+     el ticket. Separadas costaban 206 px de los 1085 del panel y obligaban a
+     leer dos celdas para responder una sola pregunta. Juntas, el estado nombra
+     y el plazo matiza, que es como se lee de todos modos. */
+  { key: "estado", label: "Estado / SLA" },
+  { key: "actividad", label: "Actividad" },
 ];
 
 function priorityBadgeClass(priority: string) {
   switch (priority.toLowerCase()) {
     case "emergencia":
-      return "bg-red-50 text-red-700 border-red-200 font-semibold";
+      return "bg-brand-red/[0.06] text-brand-red-dark border-brand-red/25 font-semibold";
     case "alta":
-      return "bg-amber-50 text-amber-800 border-amber-200";
+      return "bg-warn/[0.08] text-warn border-warn/35";
     case "normal":
-      return "bg-slate-50 text-slate-700 border-slate-200";
+      return "bg-canvas text-brand-gray border-line";
     case "baja":
-      return "bg-gray-50 text-gray-600 border-gray-200";
+      return "bg-canvas text-subtle border-line";
     default:
-      return "bg-slate-50 text-slate-700 border-slate-200";
+      return "bg-canvas text-brand-gray border-line";
   }
 }
 
@@ -148,7 +151,7 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
         title="Más filtros"
         data-active={activeInMenu}
         className="relative flex h-8 w-8 items-center justify-center rounded-edge border border-line-strong
-          bg-white text-brand-gray outline-none transition-all duration-150 hover:border-zinc-400 hover:text-ink
+          bg-white text-brand-gray outline-none transition-all duration-150 hover:border-hairline-hover hover:text-ink
           active:scale-95 focus-visible:border-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/10
           data-[active=true]:border-brand-red/40 data-[active=true]:text-brand-red-dark
           aria-expanded:bg-fill aria-expanded:text-ink"
@@ -579,30 +582,48 @@ export function TicketsPage() {
                         </Td>
 
                         {/* Asunto y Tema */}
-                        <Td className="max-w-[280px]">
-                          <div className="truncate text-[13px] font-medium text-ink" title={t.subject}>
-                            {t.subject}
-                          </div>
-                          <div className="text-[11.5px] text-subtle">
-                            {t.topicName || "Sin motivo"}
-                            {t.productLineName && ` · ${t.productLineName}`}
+                        {/*
+                          ANCHO FIJO, NO `max-w`.
+
+                          Las tres celdas ya traian `max-w` y `truncate` y aun asi
+                          se partian en tres lineas: en una tabla de ancho
+                          automatico el `max-w` de un `<td>` no acota nada, porque
+                          el navegador reparte segun el ancho MINIMO del contenido
+                          y `truncate` solo entra en juego una vez que ese ancho ya
+                          esta resuelto. Con diez columnas el reparto dejaba el
+                          asunto en 107 px, la fila crecia a 74 px y la tabla se
+                          iba 30 px fuera del panel. Un ancho determinado corta el
+                          circulo: la columna mide lo que se le dice y el texto
+                          sobrante se elide.
+                        */}
+                        <Td>
+                          <div className="w-[164px]">
+                            <div className="truncate text-[13px] font-medium text-ink" title={t.subject}>
+                              {t.subject}
+                            </div>
+                            <div className="truncate text-[11.5px] text-subtle">
+                              {t.topicName || "Sin motivo"}
+                              {t.productLineName && ` · ${t.productLineName}`}
+                            </div>
                           </div>
                         </Td>
 
                         {/* Cliente */}
-                        <Td className="max-w-[200px]">
-                          <div className="truncate text-[13px] font-medium text-ink" title={t.clientName || "Sin cliente"}>
-                            {t.clientName || "Sin cliente"}
-                          </div>
-                          <div className="text-[11.5px] text-subtle">
-                            {t.contactName ?? t.clientCode ?? "—"}
+                        <Td>
+                          <div className="w-[102px]">
+                            <div className="truncate text-[13px] font-medium text-ink" title={t.clientName || "Sin cliente"}>
+                              {t.clientName || "Sin cliente"}
+                            </div>
+                            <div className="truncate text-[11.5px] text-subtle">
+                              {t.contactName ?? t.clientCode ?? "—"}
+                            </div>
                           </div>
                         </Td>
 
                         {/* Departamento */}
-                        <Td className="max-w-[160px]">
+                        <Td>
                           <div
-                            className="truncate text-[12.5px] text-subtle"
+                            className="w-[96px] truncate text-[12.5px] text-subtle"
                             title={t.departmentName || "Sin departamento"}
                           >
                             {t.departmentName || "Sin departamento"}
@@ -620,9 +641,10 @@ export function TicketsPage() {
                           </span>
                         </Td>
 
-                        {/* Estado */}
+                        {/* Estado y SLA en una sola celda: el estado arriba,
+                            el plazo debajo. */}
                         <Td className="whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5">
                             <span
                               aria-hidden
                               className={`h-[7px] w-[7px] shrink-0 rounded-full ${
@@ -630,15 +652,12 @@ export function TicketsPage() {
                                   ? "bg-brand-green"
                                   : t.status === "Cancelado"
                                   ? "bg-brand-red"
-                                  : "bg-amber-400"
+                                  : "bg-warn"
                               }`}
                             />
                             <span className="text-[12px] text-ink">{t.status}</span>
                           </span>
-                        </Td>
-
-                        {/* SLA */}
-                        <Td className="whitespace-nowrap">
+                          <span className="mt-1 block">
                           {sla.tone === "overdue" ? (
                             <Badge tone="red">
                               <span className="inline-flex items-center gap-1">
@@ -658,17 +677,18 @@ export function TicketsPage() {
                           ) : (
                             <Badge tone="neutral">{sla.text}</Badge>
                           )}
+                          </span>
                         </Td>
 
                         {/* Última actividad */}
                         <Td className="whitespace-nowrap text-[12px] text-subtle">
-                          {formatDateTime(t.lastActivityAt)}
+                          {formatListDateTime(t.lastActivityAt)}
                         </Td>
 
                         {/* Asignado */}
-                        <Td className="max-w-[160px] text-[12px]">
+                        <Td className="text-[12px]">
                           {t.assignedStaffName ? (
-                            <div className="truncate font-medium text-ink" title={t.assignedStaffName}>
+                            <div className="w-[112px] truncate font-medium text-ink" title={t.assignedStaffName}>
                               {t.assignedStaffName}
                             </div>
                           ) : (
@@ -688,14 +708,14 @@ export function TicketsPage() {
 
       {/* Barra flotante de acciones en lote */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-[2px] border border-slate-700 bg-ink px-4 py-2.5 text-white shadow-2xl animate-plf-toast-in">
-          <div className="flex items-center gap-2 text-[12.5px] font-medium text-slate-200">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-[2px] border border-ink bg-ink px-4 py-2.5 text-white shadow-2xl animate-plf-toast-in">
+          <div className="flex items-center gap-2 text-[12.5px] font-medium text-line-strong">
             <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-red px-1.5 text-[10.5px] font-bold text-white">
               {selectedIds.size}
             </span>
             <span>{selectedIds.size === 1 ? "ticket seleccionado" : "tickets seleccionados"}</span>
           </div>
-          <span className="h-4 w-px bg-slate-700" />
+          <span className="h-4 w-px bg-ink" />
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -710,13 +730,13 @@ export function TicketsPage() {
               onClick={() => setBulkPriorityOpen(true)}
               className="flex items-center gap-1.5 rounded-[2px] bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-white/20 cursor-pointer"
             >
-              <Flag className="h-3.5 w-3.5 text-amber-400" />
+              <Flag className="h-3.5 w-3.5 text-warn" />
               Cambiar prioridad
             </button>
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="rounded-[2px] px-2.5 py-1.5 text-[12px] text-slate-400 transition hover:text-white cursor-pointer"
+              className="rounded-[2px] px-2.5 py-1.5 text-[12px] text-faint transition hover:text-white cursor-pointer"
             >
               Deseleccionar
             </button>

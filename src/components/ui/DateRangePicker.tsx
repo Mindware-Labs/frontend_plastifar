@@ -316,7 +316,7 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
           {WEEKDAY_NAMES.map((name) => (
             <span
               key={name}
-              className="font-heading text-[9.5px] font-semibold uppercase tracking-wider text-faint"
+              className="font-heading text-[10px] font-semibold uppercase tracking-wider text-faint"
             >
               {name}
             </span>

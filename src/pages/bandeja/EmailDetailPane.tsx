@@ -146,7 +146,7 @@ function getThreadMessageBadge(message: { direction: string; subject?: string })
   if (message.direction !== "Outbound") {
     return {
       label: "Recibido por",
-      className: "bg-zinc-100 text-zinc-700 border border-zinc-200/90",
+      className: "bg-fill text-zinc-700 border border-zinc-200/90",
     };
   }
 
