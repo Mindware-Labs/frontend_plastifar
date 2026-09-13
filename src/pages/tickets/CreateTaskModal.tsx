@@ -192,6 +192,7 @@ export function CreateTaskModal({
             }}
             placeholder="Seleccionar fecha límite..."
             headerLabel="Fecha límite"
+            align="center"
           />
         </div>
       </form>

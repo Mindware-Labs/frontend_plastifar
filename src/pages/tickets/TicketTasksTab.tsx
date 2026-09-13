@@ -12,11 +12,12 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ticketsApi } from "../../api/tickets";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { Spinner } from "../../components/ui/Spinner";
 import { Toast } from "../../components/ui/Toast";
@@ -62,10 +63,13 @@ export function TicketTasksTab({
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<TicketTaskResponse | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<TicketTaskResponse | null>(null);
   const [reopeningId, setReopeningId] = useState<number | null>(null);
 
-  // Sincronizar comentario agregado desde el panel lateral
-  useEffect(() => {
+  // El comentario agregado desde el panel lateral se funde en el render que lo trae, sin pasar por un efecto.
+  const [appliedComment, setAppliedComment] = useState(latestAddedComment);
+  if (latestAddedComment !== appliedComment) {
+    setAppliedComment(latestAddedComment);
     if (latestAddedComment) {
       setTasks((prev) =>
         prev.map((t) =>
@@ -76,34 +80,33 @@ export function TicketTasksTab({
         ),
       );
     }
-  }, [latestAddedComment]);
+  }
 
   const onTasksCountChangedRef = useRef(onTasksCountChanged);
   useEffect(() => {
     onTasksCountChangedRef.current = onTasksCountChanged;
   }, [onTasksCountChanged]);
 
-  const loadTasks = useCallback(async (isInitial = false) => {
-    try {
-      if (isInitial) {
-        setLoading(true);
-      }
-      setError(null);
-      const data = await ticketsApi.getTasks(ticketId);
-      setTasks(data);
-      onTasksCountChangedRef.current?.(data.length);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar las tareas.");
-    } finally {
-      if (isInitial) {
-        setLoading(false);
-      }
-    }
-  }, [ticketId]);
-
   useEffect(() => {
-    void loadTasks(true);
-  }, [loadTasks]);
+    let active = true;
+    ticketsApi
+      .getTasks(ticketId)
+      .then((data) => {
+        if (!active) return;
+        setTasks(data);
+        setError(null);
+        onTasksCountChangedRef.current?.(data.length);
+      })
+      .catch((err: unknown) => {
+        if (active) setError(err instanceof Error ? err.message : "Error al cargar las tareas.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [ticketId]);
 
   const handleCreateTask = async (taskData: CreateTicketTaskRequest) => {
     const created = await ticketsApi.createTask(ticketId, taskData);
@@ -128,17 +131,14 @@ export function TicketTasksTab({
     }
   };
 
-  const handleDeleteTask = async (taskId: number) => {
-    if (!confirm("¿Seguro que deseas eliminar esta tarea? Se eliminarán también sus evidencias asociadas.")) {
-      return;
-    }
-    try {
-      await ticketsApi.deleteTask(ticketId, taskId);
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      onTasksCountChanged?.(tasks.length - 1);
-    } catch (err) {
-      setToastError(err instanceof Error ? err.message : "Error al eliminar la tarea.");
-    }
+  const handleConfirmDelete = async () => {
+    if (!taskToDelete) return;
+    await ticketsApi.deleteTask(ticketId, taskToDelete.id);
+    setTasks((prev) => {
+      const next = prev.filter((t) => t.id !== taskToDelete.id);
+      onTasksCountChanged?.(next.length);
+      return next;
+    });
   };
 
 
@@ -362,7 +362,7 @@ export function TicketTasksTab({
 
                     <button
                       type="button"
-                      onClick={() => void handleDeleteTask(task.id)}
+                      onClick={() => setTaskToDelete(task)}
                       title="Eliminar tarea"
                       className="flex size-[22px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-red-600 transition-colors cursor-pointer active:scale-95"
                     >
@@ -527,6 +527,27 @@ export function TicketTasksTab({
         onClose={() => setTaskToComplete(null)}
         onComplete={handleCompleteTask}
       />
+
+      {taskToDelete && (
+        <ConfirmDialog
+          tone="danger"
+          icon={Trash2}
+          eyebrow="Tareas internas"
+          title="Eliminar tarea"
+          description={
+            <>
+              ¿Seguro que deseas eliminar la tarea{" "}
+              <strong className="font-semibold text-zinc-900">{taskToDelete.title}</strong>? Esta
+              acción no se puede deshacer y se eliminarán también sus comentarios y evidencias
+              asociadas.
+            </>
+          }
+          confirmLabel="Eliminar tarea"
+          cancelLabel="Cancelar"
+          onConfirm={handleConfirmDelete}
+          onClose={() => setTaskToDelete(null)}
+        />
+      )}
 
       <Toast message={toastError} variant="error" onDismiss={() => setToastError(null)} />
     </div>

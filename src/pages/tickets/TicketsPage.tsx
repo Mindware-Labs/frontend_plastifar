@@ -21,6 +21,7 @@ import {
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
+import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
 import { useNavigate } from "react-router-dom";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 import { departmentsApi } from "../../api/departments";
@@ -132,6 +133,7 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
   const { mounted, exiting, ref: panelRef, snap } = useDisclosureMotion<HTMLDivElement>(open);
+  const handleMenuKeyDown = useMenuKeyboard(panelRef, open);
 
   useEffect(() => {
     if (!open) return;
@@ -162,7 +164,7 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
     };
-  }, [open, snap]);
+  }, [open, snap, panelRef]);
 
   function toggle() {
     if (open) {
@@ -226,6 +228,7 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
             role="menu"
             aria-label="Más vistas de estado"
             aria-hidden={exiting}
+            onKeyDown={handleMenuKeyDown}
             style={{
               position: "fixed",
               top: anchor.top,
@@ -255,9 +258,10 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
                   onClick={() => {
                     onSelect(key);
                     setOpen(false);
+                    triggerRef.current?.focus();
                   }}
                   className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left
-                    text-[12.5px] transition-colors cursor-pointer ${
+                    text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                       isActive
                         ? "bg-zinc-100 font-semibold text-zinc-900"
                         : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-zinc-900"

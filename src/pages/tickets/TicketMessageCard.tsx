@@ -1,22 +1,23 @@
 import { AlertTriangle, Eye, FileText, Lock, Mail } from "lucide-react";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
-import { formatBytes, formatDateTime } from "../../lib/format";
+import { EmailBodyFrame } from "../../components/ui/EmailBodyFrame";
+import { DELIVERY_LABELS, formatBytes, formatDateTime } from "../../lib/format";
 import type { TicketAttachmentResponse, TicketMessageResponse } from "../../types/api";
 import { FormattedTicketBody } from "./FormattedTicketBody";
 import { originLabel } from "./ticketOrigin";
 
 type BadgeTone = "neutral" | "red" | "green" | "amber" | "slate" | "completed";
 
-/** Como terminó el correo de una respuesta. Solo lo ve el personal. */
-const deliveryLabels: Record<string, { label: string; tone: BadgeTone }> = {
-  Queued: { label: "En cola", tone: "amber" },
-  Sent: { label: "Enviado", tone: "neutral" },
-  Delivered: { label: "Entregado", tone: "green" },
-  Delayed: { label: "Demorado", tone: "amber" },
-  Bounced: { label: "No entregado", tone: "red" },
-  Complained: { label: "Marcado como spam", tone: "red" },
-  Failed: { label: "No se pudo enviar", tone: "red" },
+/** Tono de la insignia segun como terminó el correo de una respuesta. Solo lo ve el personal. */
+const deliveryTones: Record<string, BadgeTone> = {
+  Queued: "amber",
+  Sent: "neutral",
+  Delivered: "green",
+  Delayed: "amber",
+  Bounced: "red",
+  Complained: "red",
+  Failed: "red",
 };
 
 /** Lo que una etiqueta pequeña no basta para contar: advertencias críticas de entrega. */
@@ -84,11 +85,13 @@ export function TicketMessageCard({
   const isInternal = direction === "interna";
   const isOutbound = direction === "saliente";
   const deliveryKey = isOutbound ? message.deliveryStatus ?? undefined : undefined;
-  const delivery = deliveryKey ? deliveryLabels[deliveryKey] : undefined;
+  const deliveryTone = deliveryKey ? deliveryTones[deliveryKey] : undefined;
   const deliveryWarning = deliveryKey ? deliveryWarnings[deliveryKey] : undefined;
   const origin = originLabel(channel);
 
   const author = message.authorStaffName ?? message.authorContactName ?? requesterName ?? "Remitente";
+  // Lo que escribe el cliente llega como HTML ajeno: va al marco aislado; lo del personal se compone aqui.
+  const clientHtml = !isInternal && !isOutbound ? message.bodyHtml?.trim() : undefined;
   const seed = message.authorStaffId ?? message.authorContactId ?? 1;
 
   // Papel blanco con filete para todo lo que ve el cliente; ámbar solo para lo interno.
@@ -133,9 +136,9 @@ export function TicketMessageCard({
               <Badge tone="neutral">{origin.label}</Badge>
             </span>
           )}
-          {delivery && (
+          {deliveryKey && deliveryTone && (
             <span title={message.deliveryDetail ?? undefined}>
-              <Badge tone={delivery.tone}>{delivery.label}</Badge>
+              <Badge tone={deliveryTone}>{DELIVERY_LABELS[deliveryKey]}</Badge>
             </span>
           )}
           {isLatest && (
@@ -166,7 +169,11 @@ export function TicketMessageCard({
       {/* Cuerpo del mensaje */}
       <div className="px-3.5 py-3">
         <div className="text-[13px] leading-relaxed text-zinc-800">
-          <FormattedTicketBody text={message.bodyText} html={message.bodyHtml} />
+          {clientHtml ? (
+            <EmailBodyFrame html={clientHtml} title={`Mensaje de ${author}`} fit />
+          ) : (
+            <FormattedTicketBody text={message.bodyText} html={message.bodyHtml} />
+          )}
         </div>
 
         {/* Adjuntos en el mensaje */}

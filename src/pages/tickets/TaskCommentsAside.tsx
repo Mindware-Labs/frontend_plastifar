@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ticketsApi } from "../../api/tickets";
+import { openOverlay } from "../../hooks/overlayStack";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
 import { formatDateTime } from "../../lib/format";
@@ -43,15 +44,17 @@ export function TaskCommentsAside({
     commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [task.comments.length]);
 
-  // Cerrar con la tecla Escape
+  // Escape cierra el panel solo si no hay un dialogo abierto encima.
   useEffect(() => {
+    const overlay = openOverlay();
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
+      if (e.key === "Escape" && overlay.isTop()) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      overlay.close();
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [onClose]);
 
   // Enfocar el textarea al montar o al cambiar de tarea

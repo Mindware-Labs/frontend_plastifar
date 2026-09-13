@@ -1,7 +1,7 @@
 import { CornerUpLeft, MessagesSquare, Paperclip, Star } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
 import { TicketChip } from "../../components/app/TicketChip";
-import { formatEmailListDate } from "../../lib/format";
+import { DELIVERY_LABELS, formatEmailListDate, initialsFromName } from "../../lib/format";
 import type { EmailSummaryResponse } from "../../types/api";
 import { SelectBox } from "../../components/ui/SelectBox";
 
@@ -19,20 +19,11 @@ interface ConversationRowProps {
 }
 
 /** Solo lo que no es normal: en cola o fallido. Lo entregado no necesita distintivo. */
-const deliveryBadges: Record<string, { label: string; className: string }> = {
-  Queued: { label: "En cola", className: "bg-amber-50 text-amber-800 border border-amber-200" },
-  Failed: { label: "No enviado", className: "bg-red-50 text-brand-red border border-red-200" },
-  Bounced: { label: "Rebotó", className: "bg-red-50 text-brand-red border border-red-200" },
+const deliveryBadges: Record<string, string> = {
+  Queued: "bg-amber-50 text-amber-800 border border-amber-200",
+  Failed: "bg-red-50 text-brand-red border border-red-200",
+  Bounced: "bg-red-50 text-brand-red border border-red-200",
 };
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 /**
  * Fila de la lista. La casilla vive sobre el avatar, como en cualquier cliente de
@@ -98,7 +89,7 @@ export function ConversationRow({
                   group-data-[selected=true]:bg-zinc-200
                   group-data-[selected=true]:text-zinc-900"
               >
-                {initials(name)}
+                {initialsFromName(name, email.fromEmail)}
               </AvatarFallback>
             </Avatar>
           </span>
@@ -163,9 +154,9 @@ export function ConversationRow({
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
               {delivery && (
                 <span
-                  className={`rounded-full px-1.5 py-px font-heading text-[9.5px] font-bold uppercase tracking-[0.06em] ${delivery.className}`}
+                  className={`rounded-full px-1.5 py-px font-heading text-[9.5px] font-bold uppercase tracking-[0.06em] ${delivery}`}
                 >
-                  {delivery.label}
+                  {DELIVERY_LABELS[email.deliveryStatus ?? ""]}
                 </span>
               )}
               {email.messageCount > 1 && (
@@ -215,7 +206,7 @@ export function ConversationRow({
                     : "flex size-3.5 items-center justify-center rounded-full text-[8px] font-bold bg-zinc-100 text-zinc-600"
                 }
               >
-                {initials(email.assignedStaffName)}
+                {initialsFromName(email.assignedStaffName)}
               </span>
               {email.assignedStaffName.split(" ")[0]}
             </span>

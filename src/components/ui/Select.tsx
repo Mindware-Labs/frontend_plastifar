@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Search } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import {
@@ -147,12 +147,15 @@ export function Select({
     setOpen(true);
   }
 
-  function closeList(immediate = false) {
-    if (!open) return;
-    setOpen(false);
-    if (immediate) snap();
-    onBlur?.();
-  }
+  const closeList = useCallback(
+    (immediate = false) => {
+      if (!open) return;
+      setOpen(false);
+      if (immediate) snap();
+      onBlur?.();
+    },
+    [open, snap, onBlur],
+  );
 
   function commit(index: number) {
     const option = options[index];
@@ -223,7 +226,7 @@ export function Select({
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [open, onBlur]);
+  }, [open, closeList, containerRef]);
 
   // Mantiene visible la opcion activa cuando se navega con el teclado.
   // Se busca por data-option-index (no por posicion): la busqueda oculta opciones,

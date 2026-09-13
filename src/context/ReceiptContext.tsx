@@ -1,52 +1,8 @@
-import { createContext, useCallback, useRef, useState, type ReactNode } from "react";
-
-export interface ReceiptAction {
-  label: string;
-  run: () => Promise<unknown> | void;
-}
-
-export interface Receipt {
-  id: number;
-  /** Clave de fusion: "archivar" nunca se funde con "papelera". */
-  action: string;
-  kind: "done" | "failed";
-  /** El hecho, en pasado. Nunca se trunca. */
-  title: string;
-  /** El objeto sobre el que se hizo. Se trunca. */
-  detail?: string;
-  /** Solo en los que se pueden compensar; al fundirse se retira, porque solo revierte el ultimo. */
-  action2?: ReceiptAction;
-  count: number;
-}
-
-interface ReceiptInput {
-  action: string;
-  title: string;
-  detail?: string;
-  undo?: ReceiptAction;
-}
-
-interface ReceiptsValue {
-  receipts: Receipt[];
-  done: (input: ReceiptInput) => void;
-  failed: (input: ReceiptInput) => void;
-  dismiss: (id: number) => void;
-  /** Alto que otra barra reserva abajo a la derecha, para que el recibo no la tape. */
-  inset: number;
-  reserveInset: (px: number) => () => void;
-}
+import { useCallback, useRef, useState, type ReactNode } from "react";
+import { ReceiptContext, type Receipt, type ReceiptInput } from "./useReceipts";
 
 /** Dos acciones iguales seguidas se cuentan en un solo recibo en vez de apilar torres. */
 const MERGE_WINDOW = 6000;
-
-export const ReceiptContext = createContext<ReceiptsValue>({
-  receipts: [],
-  done: () => undefined,
-  failed: () => undefined,
-  dismiss: () => undefined,
-  inset: 0,
-  reserveInset: () => () => undefined,
-});
 
 export function ReceiptProvider({ children }: { children: ReactNode }) {
   const [receipts, setReceipts] = useState<Receipt[]>([]);

@@ -21,10 +21,9 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
       return text;
     }
     if (html && html.trim().length > 0) {
-      return html
-        .replace(/<br\s*[\/]?>/gi, "\n")
-        .replace(/<\/p>/gi, "\n\n")
-        .replace(/<[^>]*>?/gm, "");
+      // Los saltos de bloque se vuelven lineas antes de dejar solo el texto; el parser no ejecuta nada.
+      const withBreaks = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|tr|h[1-6])>/gi, "\n\n");
+      return new DOMParser().parseFromString(withBreaks, "text/html").body.textContent ?? "";
     }
     return "";
   }, [text, html]);
@@ -75,7 +74,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
   };
 
   const isBulletLine = (line: string) => /^[-*•–]\s+/.test(line);
-  const isNumberedLine = (line: string) => /^\d+[\.\)]\s+/.test(line);
+  const isNumberedLine = (line: string) => /^\d+[.)]\s+/.test(line);
   const isKeyValueLine = (line: string) => /^[A-Za-zÁ-ÿ0-9\s#_-]{2,30}:\s*.+$/.test(line);
 
   return (
@@ -123,7 +122,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
             <ol key={bIndex} className="my-1.5 list-decimal space-y-0.5 pl-5">
               {lines.map((l, lIndex) => (
                 <li key={lIndex} className="pl-1">
-                  {renderInline(l.replace(/^\d+[\.\)]\s+/, ""))}
+                  {renderInline(l.replace(/^\d+[.)]\s+/, ""))}
                 </li>
               ))}
             </ol>
@@ -138,7 +137,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
               <ol className="list-decimal space-y-1 pl-5">
                 {lines.slice(1).map((l, lIndex) => (
                   <li key={lIndex} className="pl-1">
-                    {renderInline(l.replace(/^\d+[\.\)]\s+/, ""))}
+                    {renderInline(l.replace(/^\d+[.)]\s+/, ""))}
                   </li>
                 ))}
               </ol>

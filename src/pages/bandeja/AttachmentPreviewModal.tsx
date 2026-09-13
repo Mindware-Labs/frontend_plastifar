@@ -77,7 +77,9 @@ export function AttachmentPreviewModal({
   // En una referencia: si entrara en las dependencias del efecto, una función nueva
   // en cada render del padre volvería a pedir el enlace sin parar.
   const loadLinkRef = useRef(loadLink);
-  loadLinkRef.current = loadLink;
+  useEffect(() => {
+    loadLinkRef.current = loadLink;
+  }, [loadLink]);
 
   // El id viaja con el enlace: al saltar de adjunto no se ve por un instante el anterior.
   const link = state.id === attachment.id ? state.link : null;
@@ -142,9 +144,13 @@ export function AttachmentPreviewModal({
 
   async function handleCopy() {
     if (!link) return;
-    await navigator.clipboard.writeText(link.url);
-    setCopiedId(attachment.id);
-    window.setTimeout(() => setCopiedId(null), 2000);
+    try {
+      await navigator.clipboard.writeText(link.url);
+      setCopiedId(attachment.id);
+      window.setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      setState((prev) => ({ ...prev, error: "No se pudo copiar el enlace: el navegador no dio acceso al portapapeles." }));
+    }
   }
 
   return createPortal(
@@ -296,6 +302,8 @@ export function AttachmentPreviewModal({
               src={link.url}
               title={attachment.fileName}
               referrerPolicy="no-referrer"
+              // El visor nativo de PDF necesita el marco sin sandbox; todo lo demas queda aislado del todo.
+              sandbox={link.contentType === "application/pdf" ? undefined : ""}
               className="h-full w-full border-0 bg-white"
             />
           ) : (

@@ -11,6 +11,8 @@ export interface TicketTopicQuery {
   search?: string;
   /** todos | activos | inactivos */
   status?: string;
+  departmentId?: number;
+  priority?: string;
 }
 
 /** Catálogo de motivos: cualquiera lo consulta, solo un administrador lo edita. */

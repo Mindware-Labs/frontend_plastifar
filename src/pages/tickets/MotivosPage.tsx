@@ -1,4 +1,24 @@
-import { Ban, CheckCircle2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
+import {
+  AlertOctagon,
+  AlertTriangle,
+  Ban,
+  Boxes,
+  Briefcase,
+  Building2,
+  CheckCircle2,
+  Clock,
+  Factory,
+  Flag,
+  LayoutGrid,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  Tag,
+  Trash2,
+  TrendingUp,
+  Wrench,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
@@ -8,7 +28,6 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -23,6 +42,7 @@ import type {
   TicketTopicResponse,
 } from "../../types/api";
 import { MotivoModal } from "./MotivoModal";
+import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 
 type StatusFilter = "todos" | "activos" | "inactivos";
 
@@ -53,6 +73,8 @@ export function MotivosPage() {
   const isAdmin = Boolean(user?.isAdmin);
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
+  const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
+  const [priority, setPriority] = useState<string>("todas");
   const [actionError, setActionError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("todos");
@@ -68,7 +90,13 @@ export function MotivosPage() {
     TicketTopicListResponse
   >({
     fetch: ticketTopicsApi.list,
-    criteria: { pageSize, search: debouncedSearch || undefined, status },
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      status,
+      departmentId: departmentId === "todos" ? undefined : departmentId,
+      priority: priority === "todas" ? undefined : priority,
+    },
     fallbackError: "No se pudieron cargar los motivos",
   });
 
@@ -132,6 +160,64 @@ export function MotivosPage() {
     });
   }
 
+  const departmentOptions: TicketFilterOption[] = [
+    {
+      value: "todos",
+      label: "Todos los departamentos",
+      icon: <LayoutGrid className="h-4 w-4 text-zinc-500" />,
+    },
+    ...departments.map((d) => {
+      const name = d.name.toLowerCase();
+      let icon = <Building2 className="h-4 w-4 text-zinc-500" />;
+      if (name.includes("almac")) {
+        icon = <Boxes className="h-4 w-4 text-amber-600" />;
+      } else if (name.includes("admin")) {
+        icon = <Briefcase className="h-4 w-4 text-blue-600" />;
+      } else if (name.includes("calidad")) {
+        icon = <ShieldCheck className="h-4 w-4 text-emerald-600" />;
+      } else if (name.includes("producc")) {
+        icon = <Factory className="h-4 w-4 text-purple-600" />;
+      } else if (name.includes("manten")) {
+        icon = <Wrench className="h-4 w-4 text-orange-600" />;
+      } else if (name.includes("ventas") || name.includes("comercial")) {
+        icon = <TrendingUp className="h-4 w-4 text-cyan-600" />;
+      }
+      return {
+        value: String(d.id),
+        label: d.name,
+        icon,
+      };
+    }),
+  ];
+
+  const priorityFilterOptions: TicketFilterOption[] = [
+    {
+      value: "todas",
+      label: "Todas las prioridades",
+      icon: <Flag className="h-4 w-4 text-zinc-500" />,
+    },
+    {
+      value: "Emergencia",
+      label: "Emergencia",
+      icon: <AlertOctagon className="h-4 w-4 text-brand-red" />,
+    },
+    {
+      value: "Alta",
+      label: "Alta",
+      icon: <AlertTriangle className="h-4 w-4 text-amber-500" />,
+    },
+    {
+      value: "Normal",
+      label: "Normal",
+      icon: <CheckCircle2 className="h-4 w-4 text-zinc-500" />,
+    },
+    {
+      value: "Baja",
+      label: "Baja",
+      icon: <Clock className="h-4 w-4 text-zinc-400" />,
+    },
+  ];
+
   return (
     <div className="flex h-full flex-col">
       <ModuleHeader
@@ -152,24 +238,80 @@ export function MotivosPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por motivo o departamento…"
-            className="w-[280px]"
-          />
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por motivo o departamento…"
+              className="w-[280px]"
+            />
+            <TicketFilterDropdown
+              title="Seleccionar departamento"
+              value={String(departmentId)}
+              onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+              options={departmentOptions}
+              defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
+              aria-label="Filtrar por departamento"
+            />
+            <TicketFilterDropdown
+              title="Seleccionar prioridad"
+              value={priority}
+              onChange={setPriority}
+              options={priorityFilterOptions}
+              defaultIcon={<Flag className="h-4 w-4 text-zinc-500" />}
+              aria-label="Filtrar por prioridad"
+            />
 
-          <div className="flex flex-wrap gap-1.5">
-            {statusFilters.map((filter) => (
-              <FilterChip
-                key={filter.key}
-                label={filter.label}
-                count={counts?.[filter.countKey] ?? 0}
-                active={status === filter.key}
-                onClick={() => setStatus(filter.key)}
-              />
-            ))}
+            {(search || departmentId !== "todos" || priority !== "todas") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setDepartmentId("todos");
+                  setPriority("todas");
+                }}
+                title="Limpiar filtros"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
+              >
+                <X className="h-3.5 w-3.5 text-zinc-400" />
+                <span>Limpiar</span>
+              </button>
+            )}
+          </div>
+
+          {/* Vistas de estado: Todos, Activos e Inactivos a la derecha */}
+          <div
+            role="group"
+            aria-label="Filtro de estado"
+            className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
+          >
+            {statusFilters.map((filter) => {
+              const isActive = status === filter.key;
+              const count = counts?.[filter.countKey] ?? 0;
+              return (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setStatus(filter.key)}
+                  aria-pressed={isActive}
+                  className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                    isActive
+                      ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+                      : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+                  }`}
+                >
+                  <span>{filter.label}</span>
+                  <span
+                    className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
+                      isActive ? "text-zinc-900" : "text-zinc-400"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -268,7 +410,7 @@ export function MotivosPage() {
               <div className="flex flex-col items-center gap-2 py-14 text-center">
                 <Tag className="h-6 w-6 text-faint" />
                 <p className="text-[13.5px] text-faint">
-                  {debouncedSearch || status !== "todos"
+                  {debouncedSearch || status !== "todos" || departmentId !== "todos" || priority !== "todas"
                     ? "Ningún motivo coincide con el filtro."
                     : "Todavía no hay motivos en el catálogo."}
                 </p>

@@ -37,12 +37,23 @@ export function formatTicketCode(ticketId: number): string {
   return `PLT-${String(ticketId).padStart(6, "0")}`;
 }
 
+/** Estado de entrega que informa el proveedor, en palabras; cada pantalla pone su color. */
+export const DELIVERY_LABELS: Record<string, string> = {
+  Queued: "En cola",
+  Sent: "Enviado",
+  Delivered: "Entregado",
+  Delayed: "Demorado",
+  Bounced: "No entregado",
+  Complained: "Marcado como spam",
+  Failed: "No se pudo enviar",
+};
+
 /**
  * Extrae el primer apellido respetando partículas compuestas comunes en español
  * y otros orígenes (ej: "De León", "De la Cruz", "Del Rosario", "De los Santos",
  * "San Martín", "Santa María", "Dos Santos", "Van der Bilt", etc.).
  */
-export function getFirstSurname(lastName?: string | null): string {
+function getFirstSurname(lastName?: string | null): string {
   if (!lastName) return "";
   const normalized = lastName.trim().replace(/\s+/g, " ");
   if (!normalized) return "";
@@ -123,6 +134,12 @@ export function formatInitials(
     return (fallbackEmail.split("@")[0] ?? "").slice(0, 2).toUpperCase() || "PF";
   }
   return "PF";
+}
+
+/** Iniciales de un nombre en una sola cadena ("Ana Pérez Gómez" -> "AP"); vale un correo como respaldo. */
+export function initialsFromName(name: string, fallbackEmail?: string | null): string {
+  const [first, ...rest] = name.trim().split(/\s+/);
+  return formatInitials(first, rest.join(" "), fallbackEmail ?? first);
 }
 
 /** Calcula el tiempo restante o vencido de un compromiso de SLA para la bandeja o detalle. */

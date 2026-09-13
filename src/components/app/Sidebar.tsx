@@ -75,8 +75,8 @@ const groups: NavGroup[] = [
     label: "Personal",
     icon: Users,
     children: [
-      { label: "Colaboradores", to: "/staff", icon: Users },
-      { label: "Roles", to: "/roles", icon: ShieldCheck },
+      { label: "Colaboradores", to: "/staff", icon: Users, adminOnly: true },
+      { label: "Roles", to: "/roles", icon: ShieldCheck, adminOnly: true },
     ],
   },
 ];

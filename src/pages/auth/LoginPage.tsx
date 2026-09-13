@@ -56,7 +56,9 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
-  const from = (location.state as { from?: string } | null)?.from ?? "/staff";
+  // Solo rutas internas: "//otro.sitio" o una URL absoluta harian de la pantalla de acceso un redirector abierto.
+  const requested = (location.state as { from?: string } | null)?.from;
+  const from = requested && requested.startsWith("/") && !requested.startsWith("//") ? requested : "/";
 
   function fail(next: Exclude<Phase, "idle">, values: FormValues, text: string) {
     setStale(values);

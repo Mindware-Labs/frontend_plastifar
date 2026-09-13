@@ -502,19 +502,6 @@ export interface TicketDetailResponse {
   source?: string;
 }
 
-export interface TicketEmailResponse {
-  id: number;
-  direction: string;
-  fromEmail: string;
-  fromName: string | null;
-  toEmails: string[];
-  subject: string;
-  bodyHtml: string | null;
-  bodyText: string | null;
-  createdAt: string;
-  attachments: EmailAttachmentResponse[];
-}
-
 export interface AssignTicketRequest {
   staffId: number | null;
   comment?: string | null;
@@ -622,30 +609,36 @@ export interface TicketAssignmentNotice {
   resolutionDueAt?: string | null;
 }
 
+/** El hub solo manda identificadores: el detalle se relee del servidor. */
 export interface TicketStatusChangeNotice {
   ticketId: number;
   ticketNumber: string;
-  oldStatus: string;
-  newStatus: string;
+  departmentId?: number | null;
+  oldStatus?: string | null;
+  newStatus?: string | null;
   actorStaffId?: number | null;
   actorName?: string | null;
 }
 
+/** El hub solo manda identificadores: el detalle se relee del servidor. */
 export interface TicketNewMessageNotice {
   ticketId: number;
   ticketNumber: string;
-  messageId: number;
-  direction: string;
+  departmentId?: number | null;
+  messageId?: number | null;
+  direction?: string | null;
   authorName?: string | null;
-  createdAt: string;
+  createdAt?: string | null;
 }
 
+/** El hub solo manda identificadores; asunto y detalle pueden faltar. */
 export interface TicketSlaNotice {
   ticketId: number;
   ticketNumber: string;
-  subject: string;
-  noticeType: "breach" | "warning";
-  details: string;
+  departmentId?: number | null;
+  subject?: string | null;
+  noticeType?: "breach" | "warning" | null;
+  details?: string | null;
   assignedStaffId?: number | null;
 }
 

@@ -1,5 +1,5 @@
 import { Check, ChevronDown } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 
@@ -61,10 +61,13 @@ export function TicketFilterDropdown({
     setIsOpen(true);
   }
 
-  function closeDropdown(immediate = false) {
-    setIsOpen(false);
-    if (immediate) snap();
-  }
+  const closeDropdown = useCallback(
+    (immediate = false) => {
+      setIsOpen(false);
+      if (immediate) snap();
+    },
+    [snap],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -96,7 +99,7 @@ export function TicketFilterDropdown({
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
     };
-  }, [isOpen]);
+  }, [isOpen, closeDropdown, panelRef]);
 
   return (
     <div className={`relative shrink-0 ${className}`}>

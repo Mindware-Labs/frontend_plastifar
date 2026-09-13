@@ -187,7 +187,7 @@ export function showTicketAssignment(notice: TicketAssignmentNotice, onOpen: () 
 
   const actor = notice.assignedByName?.trim() || "El sistema";
   const title = `${actor} te asignó el ticket ${notice.ticketNumber}`;
-  const body = `${notice.subject} · Prioridad: ${notice.priority}`;
+  const body = `${notice.subject?.trim() || `Ticket ${notice.ticketNumber}`} · Prioridad: ${notice.priority}`;
 
   try {
     const notification = new Notification(title, {
@@ -210,17 +210,21 @@ export function showTicketAssignment(notice: TicketAssignmentNotice, onOpen: () 
 /** Notificacion del sistema para alertas de SLA (por vencer o vencido). */
 export function showTicketSlaAlert(notice: TicketSlaNotice, onOpen: () => void): Notification | null {
   if (desktopState() !== "granted") return null;
+  if (!notice.noticeType && !notice.subject) return null;
 
   const isBreach = notice.noticeType === "breach";
   const title = isBreach
     ? `⚠️ SLA Incumplido: ${notice.ticketNumber}`
     : `⏳ SLA Próximo a Vencer: ${notice.ticketNumber}`;
-  const body = `${notice.subject} · ${notice.details}`;
+  // El hub ya no manda asunto ni detalle: con el numero de ticket alcanza para saber a donde ir.
+  const body = [notice.subject?.trim() || `Ticket ${notice.ticketNumber}`, notice.details?.trim()]
+    .filter(Boolean)
+    .join(" · ");
 
   try {
     const notification = new Notification(title, {
       body,
-      tag: `plf-ticket-sla-${notice.ticketId}-${notice.noticeType}`,
+      tag: `plf-ticket-sla-${notice.ticketId}-${notice.noticeType ?? "alert"}`,
       icon: "/brand/plastifar-isotipo.png",
     });
 

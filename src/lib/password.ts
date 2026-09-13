@@ -12,21 +12,27 @@ export interface PasswordRule {
   test: (value: string) => boolean;
 }
 
-export const PASSWORD_MAX_LENGTH = 128;
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 128;
 
 export const PASSWORD_RULES: PasswordRule[] = [
   {
     id: "case",
     label: "Mayúsculas y minúsculas",
-    test: (value) => /[a-z]/.test(value) && /[A-Z]/.test(value),
+    test: (value) => /\p{Lu}/u.test(value) && /\p{Ll}/u.test(value),
   },
-  { id: "number", label: "Al menos un número (0–9)", test: (value) => /[0-9]/.test(value) },
+  { id: "number", label: "Al menos un número (0–9)", test: (value) => /\p{Nd}/u.test(value) },
   {
     id: "special",
     label: "Un carácter especial",
-    test: (value) => /[^A-Za-z0-9]/.test(value),
+    // Igual que el backend: cualquier caracter que no sea letra ni digito, espacios incluidos.
+    test: (value) => /[^\p{L}\p{N}]/u.test(value),
   },
-  { id: "length", label: "Al menos 8 caracteres", test: (value) => value.length >= 8 },
+  {
+    id: "length",
+    label: `Al menos ${PASSWORD_MIN_LENGTH} caracteres`,
+    test: (value) => value.length >= PASSWORD_MIN_LENGTH && value.length <= PASSWORD_MAX_LENGTH,
+  },
 ];
 
 export type StrengthLevel = "weak" | "average" | "strong";

@@ -12,6 +12,7 @@ import {
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
+import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
 import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi, type EmailQuery } from "../../api/emails";
@@ -94,6 +95,7 @@ function EmailFilterMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
   const { mounted, exiting, ref: panelRef, snap } = useDisclosureMotion<HTMLDivElement>(open);
+  const handleMenuKeyDown = useMenuKeyboard(panelRef, open);
 
   useEffect(() => {
     if (!open) return;
@@ -124,7 +126,7 @@ function EmailFilterMenu({
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
     };
-  }, [open, snap]);
+  }, [open, snap, panelRef]);
 
   function toggle() {
     if (open) {
@@ -185,6 +187,7 @@ function EmailFilterMenu({
             role="menu"
             aria-label="Más filtros de correo"
             aria-hidden={exiting}
+            onKeyDown={handleMenuKeyDown}
             style={{
               position: "fixed",
               top: anchor.top,
@@ -214,9 +217,10 @@ function EmailFilterMenu({
                   onClick={() => {
                     onSelect(key);
                     setOpen(false);
+                    triggerRef.current?.focus();
                   }}
                   className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left
-                    text-[12.5px] transition-colors cursor-pointer ${
+                    text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                       isActive
                         ? "bg-zinc-100 font-semibold text-zinc-900"
                         : "font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900"
@@ -778,38 +782,26 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
                 {/* Llamada de atención visual si el usuario nunca ha abierto la configuración */}
                 {!hasOpenedAlerts && (
-                  <div
-                    onClick={() => {
-                      markNotificationsOpened();
-                      setEditingAlerts(true);
-                    }}
-                    className="group absolute right-0 top-full mt-2.5 z-30 w-72 cursor-pointer rounded-xl border border-brand-red/25 bg-white p-3.5 shadow-[0_10px_28px_rgba(228,0,43,0.14)] animate-in fade-in slide-in-from-top-2 duration-200 hover:border-brand-red/40 transition-all"
-                  >
+                  <div className="group absolute right-0 top-full mt-2.5 z-30 w-72 rounded-xl border border-brand-red/25 bg-white shadow-[0_10px_28px_rgba(228,0,43,0.14)] animate-in fade-in slide-in-from-top-2 duration-200 hover:border-brand-red/40 transition-all">
                     {/* Flecha indicadora hacia la campanita */}
                     <div className="absolute -top-1.5 right-3 size-3 rotate-45 border-t border-l border-brand-red/25 bg-white" />
 
-                    <div className="relative">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red">
-                            <Bell className="size-3.5" />
-                          </span>
-                          <span className="font-heading text-[12px] font-bold text-ink">
-                            ¡Activa tus avisos!
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markNotificationsOpened();
-                          }}
-                          aria-label="Cerrar sugerencia"
-                          title="Cerrar sugerencia"
-                          className="-mr-1 -mt-1 flex size-5 items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
-                        >
-                          <X className="size-3" />
-                        </button>
+                    {/* Boton de verdad: se llega con Tab y se activa con Enter, no solo con el raton. */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        markNotificationsOpened();
+                        setEditingAlerts(true);
+                      }}
+                      className="relative block w-full cursor-pointer rounded-xl p-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-red/30"
+                    >
+                      <div className="flex items-center gap-2 pr-6">
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red">
+                          <Bell className="size-3.5" />
+                        </span>
+                        <span className="font-heading text-[12px] font-bold text-ink">
+                          ¡Activa tus avisos!
+                        </span>
                       </div>
 
                       <p className="mt-1.5 text-[11.5px] leading-relaxed text-zinc-600">
@@ -820,7 +812,17 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                         <span>Configurar ahora</span>
                         <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
                       </div>
-                    </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => markNotificationsOpened()}
+                      aria-label="Cerrar sugerencia"
+                      title="Cerrar sugerencia"
+                      className="absolute right-2.5 top-2.5 flex size-5 items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
+                    >
+                      <X className="size-3" />
+                    </button>
                   </div>
                 )}
               </div>

@@ -10,7 +10,8 @@ import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes } from "../../lib/format";
 import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
 import { SendValidationButton } from "./SendValidationButton";
-import { CannedPicker, textToBlocks } from "./CannedPicker";
+import { CannedPicker } from "./CannedPicker";
+import { textToBlocks } from "./textToBlocks";
 import { RecipientInput } from "./RecipientInput";
 import { type ValidationItem } from "./sendValidation";
 

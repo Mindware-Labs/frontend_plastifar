@@ -13,6 +13,7 @@ export interface DatePickerProps {
   maxDate?: string;
   headerLabel?: string;
   className?: string;
+  align?: "start" | "center" | "end";
 }
 
 const MONTH_NAMES = [
@@ -107,6 +108,7 @@ export function DatePicker({
   maxDate,
   headerLabel = "Fecha límite",
   className = "",
+  align = "center",
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{
@@ -132,16 +134,16 @@ export function DatePicker({
 
   const todayStr = toDateString(new Date());
 
-  // Sincronizar mes visible si cambia el valor externamente
-  useEffect(() => {
-    if (value) {
-      const parsed = parseDate(value);
-      if (parsed) {
-        setViewYear(parsed.getFullYear());
-        setViewMonth(parsed.getMonth());
-      }
+  // Si el valor cambia desde fuera, el mes visible lo acompaña sin disparar efectos en cascada
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    const parsed = value ? parseDate(value) : null;
+    if (parsed) {
+      setViewYear(parsed.getFullYear());
+      setViewMonth(parsed.getMonth());
     }
-  }, [value]);
+  }
 
   function close() {
     setOpen(false);
@@ -155,8 +157,17 @@ export function DatePicker({
     const shouldDropUp = spaceBelow < PANEL_HEIGHT && rect.top > spaceBelow;
 
     let left = rect.left;
+    if (align === "center") {
+      left = rect.left + (rect.width - PANEL_WIDTH) / 2;
+    } else if (align === "end") {
+      left = rect.right - PANEL_WIDTH;
+    }
+
     if (left + PANEL_WIDTH > window.innerWidth - 12) {
       left = Math.max(12, window.innerWidth - PANEL_WIDTH - 12);
+    }
+    if (left < 12) {
+      left = 12;
     }
 
     setAnchor({

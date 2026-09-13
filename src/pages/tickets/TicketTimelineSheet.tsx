@@ -5,6 +5,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { FilterChip } from "../../components/ui/FilterChip";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
+import { openOverlay } from "../../hooks/overlayStack";
 import { formatDateTime } from "../../lib/format";
 import type {
   TicketAttachmentResponse,
@@ -49,10 +50,11 @@ export function TicketTimelineSheet({
   const [filter, setFilter] = useState<TimelineFilter>(initialFilter);
 
   useEffect(() => {
+    const overlay = openOverlay();
     closeButtonRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isExiting) requestClose();
+      if (event.key === "Escape" && !isExiting && overlay.isTop()) requestClose();
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -60,6 +62,7 @@ export function TicketTimelineSheet({
     document.body.style.overflow = "hidden";
 
     return () => {
+      overlay.close();
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = prevOverflow;
     };

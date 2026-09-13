@@ -76,6 +76,9 @@ export function InboxAlerts() {
   useEffect(
     () =>
       onTicketSlaAlert((notice) => {
+        // A todo el departamento llega solo el identificador; el aviso con detalle es para quien tiene el ticket.
+        if (!notice.noticeType && !notice.subject) return;
+
         const prefs = readPrefs();
         if (prefs.sound) playChime();
 

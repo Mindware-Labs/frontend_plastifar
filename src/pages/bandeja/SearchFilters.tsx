@@ -64,7 +64,7 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
     };
-  }, [open, close, snap]);
+  }, [open, close, snap, panelRef]);
 
   function toggle() {
     if (open) {

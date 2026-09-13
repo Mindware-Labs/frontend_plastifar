@@ -29,6 +29,12 @@ export const tokenStore = {
   getAccessToken: () => accessToken,
   getRefreshToken: () => refreshToken,
 
+  /** Relee el refresh token persistido: otra pestana pudo rotarlo antes de que llegara el evento "storage". */
+  reloadFromStorage() {
+    refreshToken = localStorage.getItem(REFRESH_KEY);
+    return refreshToken;
+  },
+
   setTokens(access: string | null, refresh: string | null) {
     accessToken = access;
     refreshToken = refresh;

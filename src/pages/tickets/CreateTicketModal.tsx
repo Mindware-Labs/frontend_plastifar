@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { z } from "zod";
 import { Building2, Check, Flag, Info, Mail, MessageSquareText, RotateCcw, Tag, X } from "lucide-react";
@@ -179,7 +179,6 @@ export function CreateTicketModal({
     handleSubmit,
     setValue,
     getValues,
-    watch,
     setError,
     formState: { errors, touchedFields, isSubmitting },
   } = useForm<FormValues>({
@@ -198,11 +197,11 @@ export function CreateTicketModal({
     },
   });
 
-  const selectedClientId = watch("clientId");
-  const selectedTopicId = watch("topicId");
-  const selectedPriority = watch("priority") || "Normal";
-  const currentSubject = watch("subject") || "";
-  const currentMessage = watch("initialMessage") || "";
+  const selectedClientId = useWatch({ control, name: "clientId" });
+  const selectedTopicId = useWatch({ control, name: "topicId" });
+  const selectedPriority = useWatch({ control, name: "priority" }) || "Normal";
+  const currentSubject = useWatch({ control, name: "subject" }) || "";
+  const currentMessage = useWatch({ control, name: "initialMessage" }) || "";
   const initialMessageField = register("initialMessage");
 
   // Se recalcula con cada cambio, incluidos los programaticos (ej. "Restaurar

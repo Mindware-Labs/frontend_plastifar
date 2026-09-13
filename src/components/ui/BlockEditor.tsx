@@ -3,7 +3,6 @@ import { es } from "@blocknote/core/locales";
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import type { PartialBlock } from "@blocknote/core";
-import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import "./BlockEditor.css";
 

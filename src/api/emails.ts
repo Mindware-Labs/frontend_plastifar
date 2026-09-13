@@ -11,8 +11,6 @@ import type {
   EmailListResponse,
   EmailThreadMessageResponse,
   EmptyTrashResponse,
-  TicketSummaryResponse,
-  CreateManualTicketRequest,
 } from "../types/api";
 
 export interface EmailQuery {
@@ -29,8 +27,6 @@ export interface EmailQuery {
   since?: string;
   until?: string;
   hasAttachments?: string;
-  /** Etiqueta exacta de la conversacion. */
-  tag?: string;
 }
 
 /** Lo que comparten respuesta, correo nuevo y reenvio. */
@@ -72,7 +68,6 @@ export const emailsApi = {
 
   markRead: (id: number) => apiRequest<void>(`/api/emails/${id}/read`, { method: "POST" }),
 
-  markUnread: (id: number) => apiRequest<void>(`/api/emails/${id}/unread`, { method: "POST" }),
 
   // Limpia el "recien asignada" de quien la abre; a nadie mas le toca verla desaparecer.
   markAssignmentSeen: (id: number) => apiRequest<void>(`/api/emails/${id}/assign/seen`, { method: "POST" }),
@@ -139,12 +134,6 @@ export const emailsApi = {
   exportConversation: (id: number) => apiBlob(`/api/emails/${id}/export`),
 
   staffOptions: () => apiRequest<StaffOptionResponse[]>("/api/staff/options"),
-
-  createTicket: (id: number, data?: CreateManualTicketRequest) =>
-    apiRequest<TicketSummaryResponse>(`/api/emails/${id}/ticket`, {
-      method: "POST",
-      body: data ? JSON.stringify(data) : undefined,
-    }),
 
   archive: (id: number) => apiRequest<void>(`/api/emails/${id}/archive`, { method: "POST" }),
 

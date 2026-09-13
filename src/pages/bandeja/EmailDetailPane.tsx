@@ -39,12 +39,16 @@ import {
   formatTicketCode,
 } from "../../lib/format";
 import type { ComposingPresence, EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
+import { EmailBodyFrame } from "../../components/ui/EmailBodyFrame";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
+import { openOverlay } from "../../hooks/overlayStack";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
+import { DELIVERY_LABELS, initialsFromName } from "../../lib/format";
 import { CreateTicketModal } from "../tickets/CreateTicketModal";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
-import { CannedPicker, textToBlocks } from "./CannedPicker";
+import { CannedPicker } from "./CannedPicker";
+import { textToBlocks } from "./textToBlocks";
 import { AssignmentControl } from "./ConversationTools";
 import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
 import { RecipientInput } from "./RecipientInput";
@@ -119,14 +123,14 @@ const toolButtonClass =
   "size-7 text-brand-gray transition-colors hover:bg-fill hover:text-ink " +
   "focus-visible:ring-brand-red/20 focus-visible:border-brand-red/30";
 
-/** Lo que informa el proveedor del envio. "Sent" no se muestra: es el estado normal. */
-const deliveryLabels: Record<string, { label: string; className: string }> = {
-  Queued: { label: "En cola", className: "text-warn" },
-  Delivered: { label: "Entregado", className: "text-brand-green" },
-  Delayed: { label: "Demorado", className: "text-warn" },
-  Bounced: { label: "No entregado", className: "text-brand-red" },
-  Complained: { label: "Marcado como spam", className: "text-brand-red" },
-  Failed: { label: "No se pudo enviar", className: "text-brand-red" },
+/** Color de cada estado de entrega. "Sent" no se muestra: es el estado normal. */
+const deliveryTone: Record<string, string> = {
+  Queued: "text-warn",
+  Delivered: "text-brand-green",
+  Delayed: "text-warn",
+  Bounced: "text-brand-red",
+  Complained: "text-brand-red",
+  Failed: "text-brand-red",
 };
 
 /** Estados que merecen un aviso al abrir el correo, no solo una etiqueta en la tira. */
@@ -242,20 +246,7 @@ function firstLine(text: string) {
   return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-/**
- * El cuerpo del correo viene de un remitente externo: nunca se inyecta con
- * dangerouslySetInnerHTML. Un iframe con sandbox vacio lo aisla por completo
- * (sin scripts, sin acceso al DOM de la app) y aun asi se ve con su formato.
- */
+/** El cuerpo del correo viene de un remitente externo: se muestra siempre via EmailBodyFrame, nunca inyectado. */
 export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, onClose }: EmailDetailPaneProps) {
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -398,13 +389,17 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
   useEffect(() => {
     if (openReplyId === null) return;
+    const overlay = openOverlay();
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpenReplyId(null);
+      if (event.key === "Escape" && overlay.isTop()) setOpenReplyId(null);
     }
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      overlay.close();
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [openReplyId]);
 
   async function handleReply() {
@@ -564,7 +559,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
       anchor.href = url;
       anchor.download = fileName ?? `conversacion-${email.id}.pdf`;
       anchor.click();
-      URL.revokeObjectURL(url);
+      // Revocar de inmediato corta la descarga en algunos navegadores: se libera pasado un minuto.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 
       receipts.done({
         action: "exportar",
@@ -842,7 +838,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
             <div className="mt-1 flex items-center gap-2">
               <Avatar className="size-7 shrink-0">
-                <AvatarFallback className="text-[10px]">{initials(displayName)}</AvatarFallback>
+                <AvatarFallback className="text-[10px]">{initialsFromName(displayName, email.fromEmail)}</AvatarFallback>
               </Avatar>
               <div className="min-w-0">
                 <p className="truncate text-[12.5px] font-semibold text-zinc-900">
@@ -1168,7 +1164,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 <Alert variant={openReply.deliveryStatus === "Queued" ? "info" : "error"}>
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span>
-                      {deliveryLabels[openReply.deliveryStatus].label}.{" "}
+                      {DELIVERY_LABELS[openReply.deliveryStatus]}.{" "}
                       {openReply.deliveryStatus === "Queued"
                         ? `Se reintentará solo. ${openReply.deliveryDetail ?? ""}`
                         : (openReply.deliveryDetail ?? "El proveedor no dio más detalle.")}
@@ -1199,12 +1195,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             )}
 
             {openReply.bodyHtml && openReply.direction === "Inbound" ? (
-              <iframe
+              <EmailBodyFrame
                 key={openReply.id}
-                sandbox=""
-                srcDoc={openReply.bodyHtml}
+                html={openReply.bodyHtml}
                 title={`Correo de ${openReply.fromEmail}`}
-                className="min-h-0 w-full flex-1 border-0 bg-white"
+                className="min-h-0 flex-1"
               />
             ) : (
               <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[13px] leading-relaxed text-ink">
@@ -1251,13 +1246,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         )}
 
         {email.bodyHtml ? (
-          <iframe
-            key={email.id}
-            sandbox=""
-            srcDoc={email.bodyHtml}
-            title="Cuerpo del correo"
-            className="min-h-0 w-full flex-1 border-0 bg-white"
-          />
+          <EmailBodyFrame key={email.id} html={email.bodyHtml} title="Cuerpo del correo" className="min-h-0 flex-1" />
         ) : email.bodyText ? (
           <pre className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap p-4 text-[13px] leading-relaxed text-ink">
             {email.bodyText}
@@ -1372,17 +1361,17 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   <span className="truncate text-[11.5px] text-subtle">
                     {firstLine(reply.bodyText)}
                   </span>
-                  {reply.deliveryStatus && deliveryLabels[reply.deliveryStatus] && (
+                  {reply.deliveryStatus && deliveryTone[reply.deliveryStatus] && (
                     <span
                       className={`ml-auto shrink-0 text-[10.5px] font-semibold
-                        ${deliveryLabels[reply.deliveryStatus].className}`}
+                        ${deliveryTone[reply.deliveryStatus]}`}
                     >
-                      {deliveryLabels[reply.deliveryStatus].label}
+                      {DELIVERY_LABELS[reply.deliveryStatus]}
                     </span>
                   )}
                   <span
                     className={`shrink-0 text-[10.5px] font-medium text-faint ${
-                      reply.deliveryStatus && deliveryLabels[reply.deliveryStatus] ? "" : "ml-auto"
+                      reply.deliveryStatus && deliveryTone[reply.deliveryStatus] ? "" : "ml-auto"
                     }`}
                   >
                     {formatEmailListDate(reply.createdAt)}

@@ -27,6 +27,7 @@ import { CheckboxField, SelectField, TextField } from "../../components/ui/Field
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
+import { openOverlay } from "../../hooks/overlayStack";
 import { useSettle } from "../../hooks/useSettle";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
@@ -251,11 +252,17 @@ export function TicketDetailPage() {
   // Que adjunto se esta mirando y con que vecinos, para poder saltar entre ellos.
   const [preview, setPreview] = useState<{ attachments: TicketAttachmentResponse[]; index: number } | null>(null);
 
+  // Varias recargas seguidas (avisos del hub, acciones propias) solo dejan pintar la ultima pedida.
+  const refreshSeq = useRef(0);
   const refreshTicket = useCallback(async () => {
     if (!ticketId) return;
+    const seq = ++refreshSeq.current;
     try {
-      setTicket(await ticketsApi.getById(ticketId));
+      const data = await ticketsApi.getById(ticketId);
+      if (seq !== refreshSeq.current) return;
+      setTicket(data);
     } catch (err) {
+      if (seq !== refreshSeq.current) return;
       setError(
         err instanceof Error
           ? err.message
@@ -292,13 +299,6 @@ export function TicketDetailPage() {
     };
   }, [ticketId]);
 
-  useEffect(() => {
-    if (!ticketId) return;
-    ticketsApi.getAssignableStaff(ticketId)
-      .then(setAssignableStaff)
-      .catch(() => {});
-  }, [ticketId]);
-
   const { onTicketsChanged, onTicketStatusChanged, onTicketNewMessage } = useEmailCounts();
 
   useEffect(() => {
@@ -315,14 +315,18 @@ export function TicketDetailPage() {
     return () => unsubs.forEach((unsub) => unsub());
   }, [ticketId, onTicketsChanged, onTicketStatusChanged, onTicketNewMessage, refreshTicket]);
 
-  // El editor tapa la pagina entera: Escape tiene que devolverte a donde estabas.
+  // El editor tapa la pagina entera: Escape tiene que devolverte a donde estabas, salvo que haya un modal encima.
   useEffect(() => {
     if (!replyOpen) return;
+    const overlay = openOverlay();
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setReplyOpen(false);
+      if (event.key === "Escape" && overlay.isTop()) setReplyOpen(false);
     }
     document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+    return () => {
+      overlay.close();
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, [replyOpen]);
 
   function pickFiles(
@@ -426,6 +430,21 @@ export function TicketDetailPage() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignableStaff, setAssignableStaff] = useState<TicketStaffOptionResponse[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
+
+  // Una sola carga para la pestana de tareas y el modal de asignacion; este solo repite si aquella fallo.
+  useEffect(() => {
+    if (!ticketId) return;
+    let active = true;
+    ticketsApi
+      .getAssignableStaff(ticketId)
+      .then((list) => {
+        if (active) setAssignableStaff(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [ticketId]);
   const [selectedStaffId, setSelectedStaffId] = useState("");
   const [assignComment, setAssignComment] = useState("");
   const [assigning, setAssigning] = useState(false);
@@ -515,6 +534,7 @@ export function TicketDetailPage() {
     setAssignComment("");
     setAssignError(null);
     setShowAssignModal(true);
+    if (assignableStaff.length > 0) return;
     try {
       setLoadingStaff(true);
       setAssignableStaff(await ticketsApi.getAssignableStaff(ticketId));

@@ -3,6 +3,7 @@ import { authApi } from "../api/auth";
 import { refreshSession } from "../api/client";
 import { staffApi } from "../api/staff";
 import { tokenStore } from "../api/tokenStore";
+import { clearAllDrafts } from "../lib/drafts";
 import { decodeAccessToken } from "../lib/jwt";
 import { AuthContext, type AuthUser } from "./useAuth";
 
@@ -116,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // vivo hasta vencer. Si la red falla igual se cierra la sesion local.
     if (refreshToken) await authApi.logout(refreshToken).catch(() => {});
 
+    clearAllDrafts();
     tokenStore.setTokens(null, null);
   }
 

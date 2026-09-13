@@ -1,7 +1,7 @@
 import { AlertTriangle, Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useReceipts } from "../../context/useReceipts";
-import type { Receipt } from "../../context/ReceiptContext";
+import type { Receipt } from "../../context/useReceipts";
 
 /** Con algo que revertir hace falta leer, decidir y llegar al boton; sin eso, basta con enterarse. */
 const WITH_ACTION = 7000;
@@ -18,6 +18,7 @@ const cardClass =
   "shadow-[0_1px_2px_-1px_rgba(27,27,29,0.06),0_12px_28px_-16px_rgba(27,27,29,0.32)]";
 
 function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () => void }) {
+  const { failed: reportFailure } = useReceipts();
   const [leaving, setLeaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const timer = useRef<number | null>(null);
@@ -91,6 +92,12 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
     try {
       await receipt.action2.run();
       setLeaving(true);
+    } catch (err) {
+      reportFailure({
+        action: receipt.action,
+        title: `No se pudo ${receipt.action2.label.toLowerCase()}`,
+        detail: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setBusy(false);
     }
