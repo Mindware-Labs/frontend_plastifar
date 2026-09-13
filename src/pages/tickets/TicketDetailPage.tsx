@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  Check,
   CheckSquare,
   Clock,
   CornerUpLeft,
@@ -22,6 +21,7 @@ import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { Tabs, TabsList, TabsTrigger } from "../../components/shadcn/tabs";
 import { Alert } from "../../components/ui/Alert";
+import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField } from "../../components/ui/Field";
@@ -30,6 +30,7 @@ import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
 import { openOverlay } from "../../hooks/overlayStack";
 import { useSettle } from "../../hooks/useSettle";
+import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
@@ -161,7 +162,15 @@ const textareaClass =
 
 const attachLabelClass =
   "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 " +
-  "text-[11.5px] font-medium text-zinc-600 shadow-2xs transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95";
+  "text-[11.5px] font-medium text-zinc-600 shadow-2xs transition-all duration-300 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95";
+
+const attachSuccessLabelClass =
+  "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 " +
+  "text-[11.5px] font-semibold text-emerald-700 shadow-2xs ring-2 ring-emerald-200/70 transition-all duration-300 active:scale-95";
+
+const attachExitingLabelClass =
+  "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/40 px-2.5 " +
+  "text-[11.5px] font-medium text-emerald-600 shadow-2xs ring-1 ring-emerald-100/50 transition-all duration-300 active:scale-95";
 
 const tabTriggerClass =
   "gap-1.5 rounded-md border border-transparent px-2.5 py-1 text-[12.5px] font-medium text-zinc-500 transition-colors duration-150 " +
@@ -174,8 +183,10 @@ const tabCountClass = "font-heading text-[10px] font-bold leading-none tabular-n
 /** Archivo elegido y aun no enviado: nombre, peso y la cruz para quitarlo. */
 function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
-    <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-zinc-50/70 px-2.5 text-[11.5px] font-medium text-zinc-800 shadow-2xs">
-      <Paperclip aria-hidden className="h-3 w-3 text-zinc-400" />
+    <span className="animate-plf-check-in inline-flex h-7 items-center gap-1.5 rounded-lg border border-emerald-200/80 bg-emerald-50/50 px-2.5 text-[11.5px] font-medium text-zinc-800 shadow-2xs">
+      <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
+        <AnimatedCheckIcon size={10} strokeWidth={3} />
+      </span>
       <span className="max-w-[180px] truncate">{file.name}</span>
       <span className="text-[10.5px] tabular-nums text-zinc-400">{formatBytes(file.size)}</span>
       <button
@@ -239,6 +250,11 @@ export function TicketDetailPage() {
   // Remontar el editor es la forma de vaciarlo: su contenido inicial no es controlado.
   const [replyEditorKey, setReplyEditorKey] = useState(0);
   const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
+  const {
+    isShowing: showReplyAttachedFeedback,
+    isExiting: replyAttachedExiting,
+    trigger: triggerReplyAttachedFeedback,
+  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [replySending, setReplySending] = useState(false);
   const [replySendError, setReplySendError] = useState<string | null>(null);
   const replyFileInputRef = useRef<HTMLInputElement>(null);
@@ -246,6 +262,11 @@ export function TicketDetailPage() {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteBody, setNoteBody] = useState("");
   const [noteAttachments, setNoteAttachments] = useState<File[]>([]);
+  const {
+    isShowing: showNoteAttachedFeedback,
+    isExiting: noteAttachedExiting,
+    trigger: triggerNoteAttachedFeedback,
+  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [noteSending, setNoteSending] = useState(false);
   const [noteSendError, setNoteSendError] = useState<string | null>(null);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
@@ -346,6 +367,7 @@ export function TicketDetailPage() {
     existing: File[],
     setFiles: (update: (prev: File[]) => File[]) => void,
     setFileError: (message: string | null) => void,
+    onSuccess?: () => void,
   ) {
     if (!input.files) return;
     const chosen = Array.from(input.files);
@@ -357,6 +379,7 @@ export function TicketDetailPage() {
     setFileError(null);
     setFiles((prev) => [...prev, ...chosen]);
     input.value = "";
+    onSuccess?.();
   }
 
   const openAttachment = (attachments: TicketAttachmentResponse[], attachmentId: number) => {
@@ -439,6 +462,11 @@ export function TicketDetailPage() {
   const [verdictOptions, setVerdictOptions] = useState<TicketVerdictOption[]>([]);
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
   const [verdictAttachments, setVerdictAttachments] = useState<File[]>([]);
+  const {
+    isShowing: showVerdictAttachedFeedback,
+    isExiting: verdictAttachedExiting,
+    trigger: triggerVerdictAttachedFeedback,
+  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const verdictFileInputRef = useRef<HTMLInputElement>(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const updateSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -446,9 +474,7 @@ export function TicketDetailPage() {
 
   useEffect(() => {
     return () => {
-      if (updateSuccessTimerRef.current) {
-        clearTimeout(updateSuccessTimerRef.current);
-      }
+      if (updateSuccessTimerRef.current) clearTimeout(updateSuccessTimerRef.current);
     };
   }, []);
 
@@ -1038,13 +1064,43 @@ export function TicketDetailPage() {
                   multiple
                   className="hidden"
                   onChange={(event) => {
-                    pickFiles(event.target, replyAttachments, setReplyAttachments, setReplySendError);
+                    pickFiles(
+                      event.target,
+                      replyAttachments,
+                      setReplyAttachments,
+                      setReplySendError,
+                      () => triggerReplyAttachedFeedback(),
+                    );
                     if (replySendError) setReplySendError(null);
                   }}
                 />
-                <label htmlFor="reply-attachment-input" className={attachLabelClass}>
-                  <Paperclip className="h-3.5 w-3.5" />
-                  Adjuntar
+                <label
+                  htmlFor="reply-attachment-input"
+                  className={
+                    showReplyAttachedFeedback
+                      ? replyAttachedExiting
+                        ? attachExitingLabelClass
+                        : attachSuccessLabelClass
+                      : attachLabelClass
+                  }
+                >
+                  {showReplyAttachedFeedback ? (
+                    <span
+                      className={`inline-flex items-center gap-1.5 ${
+                        replyAttachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+                      }`}
+                    >
+                      <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
+                        <AnimatedCheckIcon size={11} strokeWidth={3} />
+                      </span>
+                      <span>¡Adjuntado!</span>
+                    </span>
+                  ) : (
+                    <>
+                      <Paperclip className="h-3.5 w-3.5" />
+                      Adjuntar
+                    </>
+                  )}
                 </label>
                 <span className="hidden text-[11px] text-faint sm:inline">{SAVE_SHORTCUT} para enviar</span>
               </div>
@@ -1135,11 +1191,43 @@ export function TicketDetailPage() {
                 type="file"
                 multiple
                 className="hidden"
-                onChange={(event) => pickFiles(event.target, noteAttachments, setNoteAttachments, setNoteSendError)}
+                onChange={(event) =>
+                  pickFiles(
+                    event.target,
+                    noteAttachments,
+                    setNoteAttachments,
+                    setNoteSendError,
+                    () => triggerNoteAttachedFeedback(),
+                  )
+                }
               />
-              <label htmlFor="note-attachment-input" className={attachLabelClass}>
-                <Paperclip className="h-3.5 w-3.5" />
-                Adjuntar
+              <label
+                htmlFor="note-attachment-input"
+                className={
+                  showNoteAttachedFeedback
+                    ? noteAttachedExiting
+                      ? attachExitingLabelClass
+                      : attachSuccessLabelClass
+                    : attachLabelClass
+                }
+              >
+                {showNoteAttachedFeedback ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 ${
+                      noteAttachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+                    }`}
+                  >
+                    <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
+                      <AnimatedCheckIcon size={11} strokeWidth={3} />
+                    </span>
+                    <span>¡Adjuntado!</span>
+                  </span>
+                ) : (
+                  <>
+                    <Paperclip className="h-3.5 w-3.5" />
+                    Adjuntar
+                  </>
+                )}
               </label>
               <span className="text-[11px] text-faint">{SAVE_SHORTCUT} para guardar</span>
             </div>
@@ -1260,8 +1348,8 @@ export function TicketDetailPage() {
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <div className="relative mb-4 flex items-center justify-center">
                 <div className="absolute h-16 w-16 rounded-full bg-emerald-500/20 animate-ping opacity-60" />
-                <div className="animate-plf-seal-pop relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 ring-8 ring-emerald-50 shadow-xs">
-                  <Check className="h-8 w-8 text-emerald-600 stroke-[2.5]" />
+                <div className="animate-plf-check-in relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 ring-8 ring-emerald-50 shadow-xs animate-plf-check-breathe">
+                  <AnimatedCheckIcon size={32} strokeWidth={2.8} />
                 </div>
               </div>
               <h3 className="text-base font-bold text-zinc-900 font-heading">
@@ -1410,15 +1498,42 @@ export function TicketDetailPage() {
                         multiple
                         className="hidden"
                         onChange={(event) =>
-                          pickFiles(event.target, verdictAttachments, setVerdictAttachments, setTransitionError)
+                          pickFiles(
+                            event.target,
+                            verdictAttachments,
+                            setVerdictAttachments,
+                            setTransitionError,
+                            () => triggerVerdictAttachedFeedback(),
+                          )
                         }
                       />
                       <label
                         htmlFor="verdict-attachment-input"
-                        className={`${attachLabelClass} text-xs py-1 px-2.5`}
+                        className={`${
+                          showVerdictAttachedFeedback
+                            ? verdictAttachedExiting
+                              ? attachExitingLabelClass
+                              : attachSuccessLabelClass
+                            : attachLabelClass
+                        } text-xs py-1 px-2.5`}
                       >
-                        <Paperclip className="h-3.5 w-3.5" />
-                        Adjuntar archivos
+                        {showVerdictAttachedFeedback ? (
+                          <span
+                            className={`inline-flex items-center gap-1.5 ${
+                              verdictAttachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+                            }`}
+                          >
+                            <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
+                              <AnimatedCheckIcon size={11} strokeWidth={3} />
+                            </span>
+                            <span>¡Adjuntado!</span>
+                          </span>
+                        ) : (
+                          <>
+                            <Paperclip className="h-3.5 w-3.5" />
+                            Adjuntar archivos
+                          </>
+                        )}
                       </label>
                     </div>
                   </div>

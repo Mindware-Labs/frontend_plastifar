@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
+import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button as PfButton } from "../../components/ui/Button";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { useNoticeInset, useReceipts } from "../../context/useReceipts";
+import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes } from "../../lib/format";
 import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
@@ -34,6 +36,11 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const [initialBlocks, setInitialBlocks] = useState<unknown>(null);
   const [editorKey, setEditorKey] = useState(0);
   const [files, setFiles] = useState<File[]>([]);
+  const {
+    isShowing: showAttachedFeedback,
+    isExiting: attachedExiting,
+    trigger: triggerAttachedFeedback,
+  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const receipts = useReceipts();
@@ -86,6 +93,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
 
     setError(null);
     setFiles(merged);
+    triggerAttachedFeedback();
   }
 
   async function handleSend() {
@@ -285,9 +293,11 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
           {files.map((file, position) => (
             <span
               key={`${file.name}-${position}`}
-              className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-[11.5px] text-zinc-700 shadow-2xs"
+              className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-zinc-800 shadow-2xs"
             >
-              <Paperclip className="h-3 w-3 text-zinc-400" />
+              <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
+                <AnimatedCheckIcon size={10} strokeWidth={3} />
+              </span>
               <span className="max-w-[160px] truncate">{file.name}</span>
               <span className="text-zinc-400">· {formatBytes(file.size)}</span>
               <button
@@ -313,13 +323,31 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white
-            px-2.5 text-[12px] font-medium text-zinc-700 shadow-2xs outline-none
-            transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900
-            active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer"
+          className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium shadow-2xs outline-none transition-all duration-300 cursor-pointer ${
+            showAttachedFeedback
+              ? attachedExiting
+                ? "border-emerald-200 bg-emerald-50/40 text-emerald-600 ring-1 ring-emerald-100/50"
+                : "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200/70 font-semibold"
+              : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20"
+          }`}
         >
-          <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
-          Adjuntar
+          {showAttachedFeedback ? (
+            <span
+              className={`inline-flex items-center gap-1.5 ${
+                attachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+              }`}
+            >
+              <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
+                <AnimatedCheckIcon size={11} strokeWidth={3} />
+              </span>
+              <span>¡Adjuntado!</span>
+            </span>
+          ) : (
+            <>
+              <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
+              Adjuntar
+            </>
+          )}
         </button>
         <input
           ref={fileRef}

@@ -20,6 +20,7 @@ import { Link } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
+import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button as PfButton } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Spinner } from "../../components/ui/Spinner";
@@ -42,6 +43,7 @@ import type { ComposingPresence, EmailAttachmentResponse, EmailDetailResponse } 
 import { EmailBodyFrame } from "../../components/ui/EmailBodyFrame";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { openOverlay } from "../../hooks/overlayStack";
+import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { DELIVERY_LABELS, initialsFromName } from "../../lib/format";
@@ -268,6 +270,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [bccOpen, setBccOpen] = useState(false);
   const [includeAttachments, setIncludeAttachments] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
+  const {
+    isShowing: showAttachedFeedback,
+    isExiting: attachedExiting,
+    trigger: triggerAttachedFeedback,
+  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [sending, setSending] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
@@ -511,6 +518,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
     setReplyError(null);
     setFiles(merged);
+    triggerAttachedFeedback();
   }
 
   function openComposer(mode: ComposerMode) {
@@ -1039,17 +1047,19 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 {files.map((file, position) => (
                   <span
                     key={`${file.name}-${position}`}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200
-                      bg-white px-2.5 py-1 text-[11.5px] font-medium text-zinc-700 shadow-2xs"
+                    className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80
+                      bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-zinc-800 shadow-2xs"
                   >
-                    <Paperclip className="h-3 w-3 text-zinc-400" />
+                    <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
+                      <AnimatedCheckIcon size={10} strokeWidth={3} />
+                    </span>
                     <span className="max-w-[160px] truncate">{file.name}</span>
                     <span className="text-zinc-400 text-[10.5px] tabular-nums">{formatBytes(file.size)}</span>
                     <button
                       type="button"
                       onClick={() => setFiles(files.filter((_, at) => at !== position))}
                       aria-label={`Quitar ${file.name}`}
-                      className="text-zinc-400 transition-colors hover:text-brand-red ml-0.5"
+                      className="text-zinc-400 transition-colors hover:text-brand-red ml-0.5 cursor-pointer"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -1069,13 +1079,31 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white
-                  px-2.5 text-[12px] font-medium text-zinc-700 shadow-2xs outline-none
-                  transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900
-                  active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer"
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium shadow-2xs outline-none transition-all duration-300 cursor-pointer ${
+                  showAttachedFeedback
+                    ? attachedExiting
+                      ? "border-emerald-200 bg-emerald-50/40 text-emerald-600 ring-1 ring-emerald-100/50"
+                      : "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200/70 font-semibold"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20"
+                }`}
               >
-                <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
-                Adjuntar
+                {showAttachedFeedback ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 ${
+                      attachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+                    }`}
+                  >
+                    <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
+                      <AnimatedCheckIcon size={11} strokeWidth={3} />
+                    </span>
+                    <span>¡Adjuntado!</span>
+                  </span>
+                ) : (
+                  <>
+                    <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
+                    Adjuntar
+                  </>
+                )}
               </button>
               <input
                 ref={fileRef}

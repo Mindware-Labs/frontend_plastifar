@@ -299,6 +299,61 @@ input:-webkit-autofill:focus {
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
 .animate-plf-receipt-in { animation: plf-receipt-in 0.28s var(--ease-plf-spring) both; }
 .animate-plf-receipt-out { animation: plf-receipt-out 0.16s ease-in both; }
+/* Animaciones de confirmación de Check (entrada suave, desarrollo suave, salida suave) */
+@keyframes plf-check-in {
+  from {
+    opacity: 0;
+    transform: scale(0.78) translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plf-check-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.92) translateY(-3px);
+  }
+}
+
+@keyframes plf-check-breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+@keyframes plf-check-stroke {
+  0% {
+    stroke-dashoffset: 28;
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.animate-plf-check-in { animation: plf-check-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-check-out { animation: plf-check-out 0.36s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.animate-plf-check-breathe { animation: plf-check-breathe 2.2s ease-in-out infinite; }
+.animate-plf-check-stroke {
+  stroke-dasharray: 28;
+  stroke-dashoffset: 28;
+  animation: plf-check-stroke 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.06s forwards;
+}
+
 .animate-plf-spinner-rotate { animation: plf-spinner-rotate 1.4s linear infinite; }
 .animate-plf-spinner-dash { animation: plf-spinner-dash 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 .animate-plf-spinner-pulse { animation: plf-spinner-pulse 2s ease-in-out infinite; }
@@ -318,7 +373,10 @@ input:-webkit-autofill:focus {
   .animate-plf-otp-confirm,
   .animate-plf-seal-pop,
   .animate-plf-toast-progress,
-  .animate-plf-receipt-in {
+  .animate-plf-receipt-in,
+  .animate-plf-check-in,
+  .animate-plf-check-breathe,
+  .animate-plf-check-stroke {
     animation: none !important;
   }
 
@@ -326,7 +384,8 @@ input:-webkit-autofill:focus {
      y el elemento se quedaria pegado en pantalla. */
   .animate-plf-selection-out,
   .animate-plf-tabs-out,
-  .animate-plf-receipt-out {
+  .animate-plf-receipt-out,
+  .animate-plf-check-out {
     animation-duration: 1ms !important;
   }
 }

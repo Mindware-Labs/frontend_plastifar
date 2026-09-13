@@ -1,8 +1,10 @@
 import { Check, CheckCircle2, FileText, Image as ImageIcon, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
 import { useSettle } from "../../hooks/useSettle";
+import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { formatBytes } from "../../lib/format";
 import type { TicketTaskResponse } from "../../types/api";
 
@@ -26,6 +28,12 @@ export function CompleteTaskModal({
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const {
+    isShowing: showUploadFeedback,
+    isExiting: uploadExiting,
+    trigger: triggerUploadFeedback,
+  } = useUploadFeedback({ duration: 2300, exitDuration: 360 });
   const [settle, triggerSettle] = useSettle();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,6 +61,7 @@ export function CompleteTaskModal({
     }
 
     setEvidenceFiles((prev) => [...prev, ...newFiles]);
+    triggerUploadFeedback();
   };
 
   const handleRemoveFile = (index: number) => {
@@ -185,17 +194,61 @@ export function CompleteTaskModal({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-200 bg-zinc-50/50 p-4 transition-colors hover:border-brand-red/40 hover:bg-brand-red/5"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+              handleFilesSelected(e.dataTransfer.files);
+            }}
+            className={`group flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition-all duration-300 ${
+              showUploadFeedback
+                ? uploadExiting
+                  ? "border-emerald-200 bg-emerald-50/20 opacity-70 scale-[0.99]"
+                  : "border-emerald-400 bg-emerald-50/60 shadow-xs ring-2 ring-emerald-100"
+                : isDragging
+                  ? "border-brand-red bg-brand-red/5 ring-2 ring-brand-red/20 scale-[0.99]"
+                  : "border-zinc-200 bg-zinc-50/50 hover:border-brand-red/40 hover:bg-brand-red/5"
+            }`}
           >
-            <div className="flex size-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-500">
-              <Upload className="size-4" />
-            </div>
-            <p className="mt-1.5 font-heading text-[12px] font-semibold text-zinc-700">
-              Haz clic para adjuntar evidencias
-            </p>
-            <p className="text-[11px] text-zinc-400">
-              Imágenes (PNG, JPG), reportes en PDF, hojas de Excel, etc.
-            </p>
+            {showUploadFeedback ? (
+              <div
+                className={`flex flex-col items-center justify-center ${
+                  uploadExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+                }`}
+              >
+                <div className="relative flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-4 ring-emerald-50 shadow-xs animate-plf-check-breathe">
+                  <AnimatedCheckIcon size={20} strokeWidth={2.8} />
+                </div>
+                <p className="mt-2 font-heading text-[12.5px] font-bold text-emerald-700">
+                  ¡{evidenceFiles.length === 1 ? "Archivo adjuntado correctamente" : `${evidenceFiles.length} archivos adjuntados correctamente`}!
+                </p>
+                <p className="text-[11px] text-emerald-600/80">
+                  Haz clic o arrastra para añadir más si lo deseas
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center transition-opacity duration-300">
+                <div className="flex size-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-transform group-hover:scale-110">
+                  <Upload className="size-4" />
+                </div>
+                <p className="mt-1.5 font-heading text-[12px] font-semibold text-zinc-700">
+                  Haz clic para adjuntar evidencias
+                </p>
+                <p className="text-[11px] text-zinc-400">
+                  Imágenes (PNG, JPG), reportes en PDF, hojas de Excel, etc.
+                </p>
+              </div>
+            )}
           </button>
 
           {/* Lista de archivos seleccionados */}
@@ -204,9 +257,15 @@ export function CompleteTaskModal({
               {evidenceFiles.map((file, idx) => (
                 <div
                   key={`${file.name}-${idx}`}
-                  className="flex items-center justify-between gap-2 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px]"
+                  className="animate-plf-seal-pop flex items-center justify-between gap-2 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px] shadow-2xs"
                 >
                   <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-2xs animate-plf-check-in"
+                      title="Adjuntado correctamente"
+                    >
+                      <AnimatedCheckIcon size={12} strokeWidth={3} />
+                    </span>
                     {file.type.startsWith("image/") ? (
                       <ImageIcon className="size-3.5 shrink-0 text-brand-red" />
                     ) : (
