@@ -22,7 +22,6 @@ import type { DepartmentResponse } from "../../types/api";
 import type { SlaPolicy, TicketTopic } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass, useRecordCache, useReferenceData } from "./catalogState";
-import { SettingsLayout } from "./SettingsLayout";
 import { TopicModal } from "./TopicModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -192,18 +191,7 @@ export function TopicsSection() {
   }
 
   return (
-    <SettingsLayout
-      title="Motivos"
-      note="El motivo decide a qué cola entra el ticket y con qué prioridad nace. Si no tiene política de SLA propia se aplica la predeterminada de su prioridad, y esas fechas se copian al ticket al crearlo: cambiar la política después no altera los tickets ya abiertos."
-      action={
-        canWrite && (
-          <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nuevo motivo
-          </Button>
-        )
-      }
-    >
+    <>
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {(departmentsRef.failed || policiesRef.failed) && (
@@ -217,6 +205,12 @@ export function TopicsSection() {
       )}
 
       <ListPanel
+        action={canWrite && (
+          <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
+            <Plus className="h-[15px] w-[15px]" />
+            Nuevo motivo
+          </Button>
+        )}
         toolbar={
           <>
             <SearchInput
@@ -405,6 +399,6 @@ export function TopicsSection() {
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
-    </SettingsLayout>
+    </>
   );
 }

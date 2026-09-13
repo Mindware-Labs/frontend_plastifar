@@ -19,7 +19,6 @@ import { usedVariables } from "../../lib/templates";
 import type { EmailTemplate } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
-import { SettingsLayout } from "./SettingsLayout";
 import { TemplateModal } from "./TemplateModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
@@ -95,21 +94,16 @@ export function TemplatesSection() {
   }
 
   return (
-    <SettingsLayout
-      title="Plantillas"
-      note="Las variables se escriben entre llaves dobles y se sustituyen al enviar. Una variable desconocida se rechaza al guardar, no al enviar: un error de plantilla no puede descubrirse con el correo ya en camino."
-      action={
-        canWrite && (
+    <>
+      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
+
+      <ListPanel
+        action={canWrite && (
           <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
             <Plus className="h-[15px] w-[15px]" />
             Nueva plantilla
           </Button>
-        )
-      }
-    >
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
-
-      <ListPanel
+        )}
         toolbar={
           <>
             <SearchInput
@@ -252,6 +246,6 @@ export function TemplatesSection() {
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
-    </SettingsLayout>
+    </>
   );
 }

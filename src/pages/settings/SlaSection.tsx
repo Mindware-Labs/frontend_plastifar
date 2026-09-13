@@ -23,7 +23,6 @@ import { humanizeMinutes, workdayMinutes } from "../../lib/sla";
 import { PRIORITIES, type Holiday, type Priority, type SlaPolicy } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert, WarnNotice } from "./catalogSection";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
-import { SettingsLayout } from "./SettingsLayout";
 import { SlaModal } from "./SlaModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
@@ -178,18 +177,7 @@ export function SlaSection() {
   }
 
   return (
-    <SettingsLayout
-      title="Políticas de SLA"
-      note="La política se copia al ticket como dos fechas de vencimiento calculadas al crearlo, así que cambiarla no altera los tickets ya abiertos. El reloj se detiene mientras el ticket está en espera del cliente y se reanuda al volver a abierto."
-      action={
-        canWrite && (
-          <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nueva política
-          </Button>
-        )
-      }
-    >
+    <>
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {actionError && (
@@ -209,6 +197,12 @@ export function SlaSection() {
       )}
 
       <ListPanel
+        action={canWrite && (
+          <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
+            <Plus className="h-[15px] w-[15px]" />
+            Nueva política
+          </Button>
+        )}
         toolbar={
           <>
             <SearchInput
@@ -383,6 +377,6 @@ export function SlaSection() {
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
-    </SettingsLayout>
+    </>
   );
 }

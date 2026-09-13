@@ -22,7 +22,6 @@ import { providerLabel, type Mailbox } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { MailboxModal } from "./MailboxModal";
-import { SettingsLayout } from "./SettingsLayout";
 
 type ChipKey = "todos" | "activos" | "inactivos";
 type TestResult = { ok: boolean; message: string };
@@ -171,22 +170,7 @@ export function MailboxesSection() {
   }
 
   return (
-    <SettingsLayout
-      title="Buzones"
-      note="Este catálogo administra el buzón, no la lectura del correo: la ingesta que convierte un mensaje entrante en ticket es una decisión pendiente con Plastifar (sección 9.7 del plan de construcción). Probar conexión confirma que el buzón está activo y tiene su secreto configurado, sin exponer la credencial."
-      action={
-        canWrite && (
-          <Button
-            size="sm"
-            onClick={() => setModal("nuevo")}
-            disabled={busyId !== null || testingId !== null}
-          >
-            <Plus className="h-[15px] w-[15px]" />
-            Nuevo buzón
-          </Button>
-        )
-      }
-    >
+    <>
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {departmentsRef.failed && (
@@ -205,6 +189,16 @@ export function MailboxesSection() {
       )}
 
       <ListPanel
+        action={canWrite && (
+          <Button
+            size="sm"
+            onClick={() => setModal("nuevo")}
+            disabled={busyId !== null || testingId !== null}
+          >
+            <Plus className="h-[15px] w-[15px]" />
+            Nuevo buzón
+          </Button>
+        )}
         toolbar={
           <>
             <SearchInput
@@ -359,6 +353,6 @@ export function MailboxesSection() {
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
-    </SettingsLayout>
+    </>
   );
 }

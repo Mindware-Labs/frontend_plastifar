@@ -18,7 +18,6 @@ import type { ProductLine } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
 import { ProductLineModal } from "./ProductLineModal";
-import { SettingsLayout } from "./SettingsLayout";
 
 type ChipKey = "todas" | "activas" | "inactivas";
 
@@ -97,21 +96,16 @@ export function ProductLinesSection() {
   }
 
   return (
-    <SettingsLayout
-      title="Líneas de producto"
-      note="La línea de producto es obligatoria en los motivos marcados para ello, y es el eje por el que Calidad sigue las reclamaciones. Una línea con historial no se elimina: se desactiva."
-      action={
-        canWrite && (
+    <>
+      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
+
+      <ListPanel
+        action={canWrite && (
           <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
             <Plus className="h-[15px] w-[15px]" />
             Nueva línea
           </Button>
-        )
-      }
-    >
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
-
-      <ListPanel
+        )}
         toolbar={
           <>
             <SearchInput
@@ -225,6 +219,6 @@ export function ProductLinesSection() {
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
-    </SettingsLayout>
+    </>
   );
 }

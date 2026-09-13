@@ -20,7 +20,6 @@ import { WEEKDAYS, type Holiday, type SlaPolicy } from "../../types/settings";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { HolidayModal } from "./HolidayModal";
-import { SettingsLayout } from "./SettingsLayout";
 
 type ChipKey = "todos" | "activos" | "inactivos";
 
@@ -166,18 +165,7 @@ export function HolidaysSection() {
   }
 
   return (
-    <SettingsLayout
-      title="Días no laborables"
-      note="Estos días se saltan al calcular vencimientos, pero solo en las políticas con reloj de jornada: una política de reloj continuo cuenta igual un feriado que un martes."
-      action={
-        canWrite && (
-          <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nuevo día
-          </Button>
-        )
-      }
-    >
+    <>
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {policiesRef.failed && (
@@ -188,6 +176,12 @@ export function HolidaysSection() {
       )}
 
       <ListPanel
+        action={canWrite && (
+          <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
+            <Plus className="h-[15px] w-[15px]" />
+            Nuevo día
+          </Button>
+        )}
         toolbar={
           <>
             <SearchInput
@@ -344,6 +338,6 @@ export function HolidaysSection() {
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
-    </SettingsLayout>
+    </>
   );
 }

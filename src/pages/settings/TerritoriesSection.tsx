@@ -18,7 +18,6 @@ import { usePermissions } from "../../hooks/usePermissions";
 import type { Territory } from "../../types/clients";
 import { ChipGroup, LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
-import { SettingsLayout } from "./SettingsLayout";
 import { TerritoryModal } from "./TerritoryModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -102,21 +101,16 @@ export function TerritoriesSection() {
   }
 
   return (
-    <SettingsLayout
-      title="Territorios"
-      note="El territorio es obligatorio al registrar un cliente: alimenta el ranking comercial por zona y vendedor. Uno con historial no se elimina: se desactiva."
-      action={
-        canWrite && (
+    <>
+      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
+
+      <ListPanel
+        action={canWrite && (
           <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
             <Plus className="h-[15px] w-[15px]" />
             Nuevo territorio
           </Button>
-        )
-      }
-    >
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
-
-      <ListPanel
+        )}
         toolbar={
           <>
             <SearchInput
@@ -244,6 +238,6 @@ export function TerritoriesSection() {
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
-    </SettingsLayout>
+    </>
   );
 }

@@ -2,7 +2,6 @@ import { BadgeCheck, Check, Plus, X } from "lucide-react";
 import { useState } from "react";
 import {
   qualityApi,
-  type CreditCounts,
   type CreditListResponse,
   type CreditQuery,
 } from "../../api/quality";
@@ -40,21 +39,6 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
   { key: "Rechazada", label: "Rechazadas", status: "Rechazada", countKey: "rejected" },
   { key: "Aplicada", label: "Aplicadas", status: "Aplicada", countKey: "applied" },
 ];
-
-/**
- * Lo que el listado debe antes de lo que contiene: una solicitud sin decidir es
- * dinero parado, y esa es la unica cifra que mueve a quien abre esta pantalla.
- */
-function listDebt(counts: CreditCounts): string {
-  if (counts.requested === 0) {
-    return "Ninguna solicitud espera decisión.";
-  }
-  const head =
-    counts.requested === 1
-      ? "1 solicitud espera decisión"
-      : `${counts.requested} solicitudes esperan decisión`;
-  return `${head}. Nadie puede aprobar la suya propia: esas las decide otra persona.`;
-}
 
 /**
  * Por que esta fila no ofrece ninguna accion.
@@ -150,7 +134,6 @@ export function CreditRequestsPage() {
         </div>
       )}
 
-      {counts && <p className="mb-3 text-[12.5px] text-brand-gray">{listDebt(counts)}</p>}
 
       <ListPanel
         action={
