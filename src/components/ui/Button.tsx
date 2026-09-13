@@ -58,15 +58,17 @@ export function Button({
       disabled={disabled || isLoading}
       className={`relative inline-flex items-center justify-center gap-1.5 overflow-hidden rounded-lg
         font-medium tracking-normal
-        transition-all outline-none
+        transition-all duration-200 outline-none
         focus-visible:ring-2 focus-visible:ring-brand-red/25
         disabled:cursor-not-allowed disabled:opacity-50
         ${sizeClasses[size]} ${toneClass} ${className}`}
       {...props}
     >
       <span
-        className={`inline-flex items-center justify-center gap-1.5 ${layer} ${
-          showTone ? "opacity-0 -translate-y-2 motion-reduce:translate-y-0" : ""
+        className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap ${layer} ${
+          showTone
+            ? "pointer-events-none absolute inset-0 opacity-0 -translate-y-2 motion-reduce:translate-y-0"
+            : "opacity-100 translate-y-0"
         }`}
       >
         {isLoading && (
@@ -77,8 +79,11 @@ export function Button({
       {toneLabel != null && (
         <span
           aria-hidden={!showTone}
-          className={`absolute inset-0 flex items-center justify-center gap-1.5 px-3 font-semibold text-white ${layer} ${
-            showTone ? "" : "pointer-events-none opacity-0 translate-y-2 motion-reduce:translate-y-0"
+          title={typeof toneLabel === "string" ? toneLabel : undefined}
+          className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-semibold text-white ${layer} ${
+            showTone
+              ? "opacity-100 translate-y-0 max-w-[340px] truncate"
+              : "pointer-events-none absolute inset-0 opacity-0 translate-y-2 motion-reduce:translate-y-0"
           }`}
         >
           {toneLabel}

@@ -38,11 +38,25 @@ export const ticketsApi = {
       body: JSON.stringify(input),
     }),
 
-  updateStatus: (id: number, input: UpdateTicketStatusRequest) =>
-    apiRequest<UpdateTicketStatusResponse>(`/api/tickets/${id}/status`, {
+  updateStatus: (id: number, input: UpdateTicketStatusRequest | FormData) => {
+    let body: FormData;
+    if (input instanceof FormData) {
+      body = input;
+    } else {
+      body = new FormData();
+      body.append("Status", input.status);
+      if (input.reason) body.append("Reason", input.reason);
+      if (input.verdictId != null) body.append("VerdictId", String(input.verdictId));
+      if (input.notifyClient !== undefined) body.append("NotifyClient", input.notifyClient ? "true" : "false");
+      if (input.attachments) {
+        input.attachments.forEach((file) => body.append("Attachments", file));
+      }
+    }
+    return apiRequest<UpdateTicketStatusResponse>(`/api/tickets/${id}/status`, {
       method: "POST",
-      body: JSON.stringify(input),
-    }),
+      body,
+    });
+  },
 
   getAssignableStaff: (id: number) =>
     apiRequest<TicketStaffOptionResponse[]>(`/api/tickets/${id}/assignable-staff`),

@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Check,
   CheckSquare,
   Clock,
   CornerUpLeft,
@@ -15,7 +16,7 @@ import {
   Ticket as TicketIcon,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
@@ -437,6 +438,19 @@ export function TicketDetailPage() {
   const [updateNotifyClient, setUpdateNotifyClient] = useState(false);
   const [verdictOptions, setVerdictOptions] = useState<TicketVerdictOption[]>([]);
   const [loadingVerdicts, setLoadingVerdicts] = useState(false);
+  const [verdictAttachments, setVerdictAttachments] = useState<File[]>([]);
+  const verdictFileInputRef = useRef<HTMLInputElement>(null);
+  const [updateSuccess, setUpdateSuccess] = useState(false);
+  const updateSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const step2EnteredAtRef = useRef<number>(0);
+
+  useEffect(() => {
+    return () => {
+      if (updateSuccessTimerRef.current) {
+        clearTimeout(updateSuccessTimerRef.current);
+      }
+    };
+  }, []);
 
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignableStaff, setAssignableStaff] = useState<TicketStaffOptionResponse[]>([]);
@@ -468,7 +482,14 @@ export function TicketDetailPage() {
     setUpdateVerdictId("");
     setUpdateComment("");
     setUpdateNotifyClient(false);
+    setVerdictAttachments([]);
+    setUpdateSuccess(false);
+    if (updateSuccessTimerRef.current) {
+      clearTimeout(updateSuccessTimerRef.current);
+      updateSuccessTimerRef.current = null;
+    }
     setTransitionError(null);
+    step2EnteredAtRef.current = 0;
     setShowUpdateStatusModal(true);
 
     setLoadingVerdicts(true);
@@ -484,18 +505,24 @@ export function TicketDetailPage() {
     (t) => t.target === updateTargetStatus,
   )?.category;
 
-  const handleContinueUpdateStatus = () => {
+  const handleContinueUpdateStatus = (event?: React.MouseEvent) => {
+    event?.preventDefault();
     if (!updateTargetStatus) {
       setTransitionError("Selecciona una opción");
       triggerUpdateSettle();
       return;
     }
     setTransitionError(null);
+    step2EnteredAtRef.current = Date.now();
     setUpdateStep(2);
   };
 
   const handleConfirmUpdateStatus = async (event: React.FormEvent) => {
     event.preventDefault();
+    // Previene envíos accidentales disparados inmediatamente al avanzar de paso (doble clic o activación residual)
+    if (Date.now() - step2EnteredAtRef.current < 400) {
+      return;
+    }
     if (updateCategory === "cancelar" && !updateComment.trim()) {
       setTransitionError("Motivo de cancelación requerido");
       triggerUpdateSettle();
@@ -522,15 +549,29 @@ export function TicketDetailPage() {
     try {
       setTransitioning(true);
       setTransitionError(null);
-      await ticketsApi.updateStatus(ticketId, {
-        status: updateTargetStatus,
-        reason: updateComment.trim() || undefined,
-        verdictId: updateCategory === "veredicto" ? Number(updateVerdictId) : undefined,
-        notifyClient:
-          updateCategory === "cancelar" || updateCategory === "veredicto" ? updateNotifyClient : undefined,
-      });
-      setShowUpdateStatusModal(false);
+
+      const formData = new FormData();
+      formData.append("Status", updateTargetStatus);
+      if (updateComment.trim()) formData.append("Reason", updateComment.trim());
+      if (updateCategory === "veredicto" && updateVerdictId) {
+        formData.append("VerdictId", updateVerdictId);
+      }
+      if (updateCategory === "cancelar" || updateCategory === "veredicto") {
+        formData.append("NotifyClient", updateNotifyClient ? "true" : "false");
+      }
+      if (updateCategory === "veredicto" && verdictAttachments.length > 0) {
+        verdictAttachments.forEach((file) => formData.append("Attachments", file));
+      }
+
+      await ticketsApi.updateStatus(ticketId, formData);
       await refreshTicket();
+
+      setUpdateSuccess(true);
+      if (updateSuccessTimerRef.current) clearTimeout(updateSuccessTimerRef.current);
+      updateSuccessTimerRef.current = setTimeout(() => {
+        setShowUpdateStatusModal(false);
+        setUpdateSuccess(false);
+      }, 2200);
     } catch (err) {
       setTransitionError(err instanceof Error ? err.message : "Error al actualizar");
       triggerUpdateSettle();
@@ -1123,20 +1164,57 @@ export function TicketDetailPage() {
       {showUpdateStatusModal && (
         <Modal
           settle={updateSettle}
-          eyebrow={ticket.number}
-          title="Actualizar ticket"
-          description={updateStep === 1 ? "Elige qué hacer con este ticket." : "Completa los datos para confirmar."}
+          eyebrow={updateSuccess ? undefined : ticket.number}
+          title={updateSuccess ? "¡Operación exitosa!" : "Actualizar ticket"}
+          description={
+            updateSuccess
+              ? undefined
+              : updateStep === 1
+                ? "Elige qué hacer con este ticket."
+                : "Completa los datos para confirmar."
+          }
           maxWidth="max-w-md"
           onClose={() => {
-            if (!transitioning) setShowUpdateStatusModal(false);
+            if (!transitioning) {
+              if (updateSuccessTimerRef.current) {
+                clearTimeout(updateSuccessTimerRef.current);
+                updateSuccessTimerRef.current = null;
+              }
+              setShowUpdateStatusModal(false);
+              setUpdateSuccess(false);
+            }
           }}
           footer={
-            updateStep === 1 ? (
-              <>
-                <Button type="button" variant="secondary" size="sm" onClick={() => setShowUpdateStatusModal(false)}>
+            updateSuccess ? (
+              <Button
+                key="btn-status-success-close"
+                type="button"
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  if (updateSuccessTimerRef.current) {
+                    clearTimeout(updateSuccessTimerRef.current);
+                    updateSuccessTimerRef.current = null;
+                  }
+                  setShowUpdateStatusModal(false);
+                  setUpdateSuccess(false);
+                }}
+              >
+                Entendido
+              </Button>
+            ) : updateStep === 1 ? (
+              <Fragment key="status-step-1">
+                <Button
+                  key="btn-status-cancel"
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowUpdateStatusModal(false)}
+                >
                   Cancelar
                 </Button>
                 <Button
+                  key="btn-status-continue"
                   type="button"
                   size="sm"
                   disabled={!updateTargetStatus && !transitionError}
@@ -1146,19 +1224,24 @@ export function TicketDetailPage() {
                 >
                   Continuar
                 </Button>
-              </>
+              </Fragment>
             ) : (
-              <>
+              <Fragment key="status-step-2">
                 <Button
+                  key="btn-status-back"
                   type="button"
                   variant="secondary"
                   size="sm"
                   disabled={transitioning}
-                  onClick={() => setUpdateStep(1)}
+                  onClick={() => {
+                    setTransitionError(null);
+                    setUpdateStep(1);
+                  }}
                 >
                   Atrás
                 </Button>
                 <Button
+                  key="btn-status-confirm"
                   type="submit"
                   form="update-status-form"
                   size="sm"
@@ -1169,11 +1252,34 @@ export function TicketDetailPage() {
                 >
                   {updateCategory === "cancelar" ? "Cancelar ticket" : "Confirmar"}
                 </Button>
-              </>
+              </Fragment>
             )
           }
         >
-          {updateStep === 1 ? (
+          {updateSuccess ? (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <div className="relative mb-4 flex items-center justify-center">
+                <div className="absolute h-16 w-16 rounded-full bg-emerald-500/20 animate-ping opacity-60" />
+                <div className="animate-plf-seal-pop relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 ring-8 ring-emerald-50 shadow-xs">
+                  <Check className="h-8 w-8 text-emerald-600 stroke-[2.5]" />
+                </div>
+              </div>
+              <h3 className="text-base font-bold text-zinc-900 font-heading">
+                El ticket se cerró correctamente
+              </h3>
+              <p className="mt-1.5 text-xs text-zinc-500 max-w-xs leading-relaxed">
+                {updateCategory === "veredicto"
+                  ? verdictAttachments.length > 0
+                    ? `Se registró el veredicto con ${verdictAttachments.length} ${
+                        verdictAttachments.length === 1
+                          ? "archivo de evidencia adjunto"
+                          : "archivos de evidencia adjuntos"
+                      }.`
+                    : "El veredicto fue registrado exitosamente."
+                  : "El ticket ha sido actualizado correctamente."}
+              </p>
+            </div>
+          ) : updateStep === 1 ? (
             <div className="space-y-3">
               <div role="radiogroup" aria-label="Nueva situación" className="space-y-1.5">
                 {availableTransitions.map((option) => {
@@ -1186,8 +1292,21 @@ export function TicketDetailPage() {
                       role="radio"
                       aria-checked={isSelected}
                       onClick={() => {
-                        setUpdateTargetStatus(option.target);
+                        if (option.target !== updateTargetStatus) {
+                          setUpdateTargetStatus(option.target);
+                          setUpdateVerdictId("");
+                          setUpdateComment("");
+                        }
                         if (transitionError) setTransitionError(null);
+                      }}
+                      onDoubleClick={(e) => {
+                        e.preventDefault();
+                        setUpdateTargetStatus(option.target);
+                        setUpdateVerdictId("");
+                        setUpdateComment("");
+                        setTransitionError(null);
+                        step2EnteredAtRef.current = Date.now();
+                        setUpdateStep(2);
                       }}
                       className={`flex w-full items-start gap-2.5 rounded-lg border p-2.5 text-left outline-none transition-all cursor-pointer
                         focus-visible:ring-2 focus-visible:ring-brand-red/20 ${
@@ -1224,6 +1343,7 @@ export function TicketDetailPage() {
                     if (transitionError) setTransitionError(null);
                   }}
                   state={transitionError && !updateVerdictId ? "error" : "idle"}
+                  error={transitionError && !updateVerdictId ? transitionError : undefined}
                   options={verdictOptions.map((v) => ({ value: String(v.id), label: v.name }))}
                   hint={
                     !loadingVerdicts && verdictOptions.length === 0
@@ -1274,6 +1394,48 @@ export function TicketDetailPage() {
                   }`}
                 />
               </div>
+
+              {updateCategory === "veredicto" && (
+                <div className="space-y-2 pt-1 border-t border-zinc-100">
+                  <div className="flex items-center justify-between">
+                    <label className={labelClass}>
+                      Evidencias o adjuntos
+                      <span className="ml-1 font-normal text-zinc-400">(opcional)</span>
+                    </label>
+                    <div>
+                      <input
+                        ref={verdictFileInputRef}
+                        id="verdict-attachment-input"
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(event) =>
+                          pickFiles(event.target, verdictAttachments, setVerdictAttachments, setTransitionError)
+                        }
+                      />
+                      <label
+                        htmlFor="verdict-attachment-input"
+                        className={`${attachLabelClass} text-xs py-1 px-2.5`}
+                      >
+                        <Paperclip className="h-3.5 w-3.5" />
+                        Adjuntar archivos
+                      </label>
+                    </div>
+                  </div>
+
+                  {verdictAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {verdictAttachments.map((file, index) => (
+                        <PendingFile
+                          key={`${file.name}-${index}`}
+                          file={file}
+                          onRemove={() => setVerdictAttachments((prev) => prev.filter((_, i) => i !== index))}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {(updateCategory === "cancelar" || updateCategory === "veredicto") && (
                 <CheckboxField

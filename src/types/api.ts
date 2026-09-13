@@ -519,6 +519,7 @@ export interface UpdateTicketStatusRequest {
   reason?: string | null;
   verdictId?: number | null;
   notifyClient?: boolean;
+  attachments?: File[];
 }
 
 export interface UpdateTicketStatusResponse {
