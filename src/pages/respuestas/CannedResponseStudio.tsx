@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { cannedApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
 import { Alert } from "../../components/ui/Alert";
@@ -38,6 +39,7 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
   const [formError, setFormError] = useState<string | null>(null);
 
   const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -90,12 +92,15 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
     }
   }, [title, body, isEdit, item, onSaved, requestClose]);
 
-  // Cerrar con Escape y atajo para guardar
+  /* Escape, trampa de foco y bloqueo del fondo por el hook compartido: la
+     version a mano escuchaba Escape pero dejaba escapar el tabulador a la
+     pagina que el velo esta tapando. */
+  useDialogBehavior(panelRef, requestClose);
+
+  // Ctrl/Cmd+Enter para guardar sin soltar el teclado. Es propio de esta hoja
+  // —es la unica que edita— asi que no vive en el hook compartido.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && !isExiting) {
-        requestClose();
-      }
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
         handleSave();
@@ -103,7 +108,7 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isExiting, requestClose, handleSave]);
+  }, [handleSave]);
 
   return createPortal(
     <div
@@ -116,11 +121,17 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
       }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative flex h-full flex-col bg-white shadow-[0_4px_24px_rgba(27,27,29,0.18)] transition-all duration-200 ease-out ${
-          isMaximized ? "w-full" : "w-full sm:w-[740px] md:w-[790px] lg:w-[840px]"
+        /* Maximizada va a sangre a proposito —es el modo "quiero toda la
+           pantalla"—; en su tamaño normal lleva la misma superficie flotante
+           que el resto de paneles laterales. */
+        className={`relative flex flex-col bg-white transition-all duration-200 ease-out ${
+          isMaximized
+            ? "h-full w-full"
+            : "m-2.5 h-[calc(100%-1.25rem)] w-full overflow-hidden rounded-card border border-line shadow-dialog sm:w-[740px] md:w-[790px] lg:w-[840px]"
         } ${isExiting ? "animate-plf-drawer-out pointer-events-none" : "animate-plf-drawer-in"}`}
       >
         {/* Barra superior de control del Estudio */}

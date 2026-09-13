@@ -9,8 +9,9 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { Button } from "../../components/ui/Button";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatDateTime } from "../../lib/format";
@@ -48,28 +49,14 @@ export function TicketTimelineSheet({
   // Coordinar animación suave de entrada y salida sincronizada con index.css (220ms)
   const { isExiting, requestClose } = useModalAnimation(onClose, 220);
   const titleId = useId();
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [filter, setFilter] = useState<"all" | "messages" | "events">("all");
 
-  // Bloqueo de scroll de fondo y atajo de teclado Escape
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isExiting) {
-        requestClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [isExiting, requestClose]);
+  /* Por el hook compartido: escuchaba Escape y bloqueaba el scroll, pero no
+     atrapaba el foco, asi que con el tabulador se salia del panel a navegar la
+     pagina que el velo esta tapando. */
+  useDialogBehavior(panelRef, requestClose);
 
   const filteredTimeline = timeline.filter((item) => {
     if (filter === "messages") return item.kind === "message";
@@ -188,10 +175,11 @@ export function TicketTimelineSheet({
       }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[540px] md:w-[600px] ${
+        className={`relative m-2.5 flex h-[calc(100%-1.25rem)] w-full flex-col overflow-hidden rounded-card border border-line bg-white shadow-dialog sm:w-[540px] md:w-[600px] ${
           isExiting ? "animate-plf-drawer-out pointer-events-none" : "animate-plf-drawer-in"
         }`}
       >

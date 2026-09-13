@@ -10,8 +10,9 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useId, useRef } from "react";
+import { useId, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { Button } from "../../components/ui/Button";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 
@@ -24,19 +25,19 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
   const { isExiting, requestClose } = useModalAnimation(onClose, 220);
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  // Auto-focus en el botón de cerrar y escucha de tecla Escape
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && !isExiting) {
-        requestClose();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isExiting, requestClose]);
+  /*
+   * Por el hook compartido y no a mano.
+   *
+   * La version anterior escuchaba Escape y enfocaba el aspa, y ahi se quedaba:
+   * sin trampa de foco. Medido con la hoja abierta, quedaban 22 elementos
+   * enfocables FUERA del dialogo —el carril entero, los enlaces del menu— asi
+   * que con el tabulador se salia del panel y se navegaba una pagina que el
+   * velo esta tapando. `useDialogBehavior` trae ademas el bloqueo del scroll
+   * del fondo y devuelve el foco a donde estaba al cerrar.
+   */
+  useDialogBehavior(panelRef, requestClose);
 
   return createPortal(
     <div
@@ -49,10 +50,13 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
       }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] transition-all duration-200 ease-out sm:w-[600px] md:w-[650px] ${
+        /* Misma superficie que el resto de paneles laterales: separado del canto
+           por un margen y con radio completo, no un bloque de cromo a sangre. */
+        className={`relative m-2.5 flex h-[calc(100%-1.25rem)] w-full flex-col overflow-hidden rounded-card border border-line bg-white shadow-dialog transition-all duration-200 ease-out sm:w-[600px] md:w-[650px] ${
           isExiting ? "animate-plf-drawer-out pointer-events-none" : "animate-plf-drawer-in"
         }`}
       >
