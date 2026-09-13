@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-/**
- * Reglas de contrasena del panel. Unica fuente de verdad del frontend: la usan
- * el formulario de restablecer, el de cambiar contrasena y el medidor de fuerza.
- *
- * Espejo de api/Services/PasswordPolicy.cs — si cambia una, cambia la otra.
- */
+/** Reglas de validación y fortaleza de contraseñas compartidas. */
 export interface PasswordRule {
   id: string;
   label: string;

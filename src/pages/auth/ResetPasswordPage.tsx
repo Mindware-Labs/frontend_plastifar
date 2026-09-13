@@ -21,8 +21,7 @@ const codeSchema = z.object({
 });
 type CodeFormValues = z.infer<typeof codeSchema>;
 
-// Las reglas viven en lib/password.ts, junto al medidor de fuerza y a la
-// politica del servidor: un solo sitio donde cambiarlas.
+// Reglas de contraseña centralizadas en lib/password.ts.
 const passwordFormSchema = z
   .object({
     newPassword: passwordSchema,

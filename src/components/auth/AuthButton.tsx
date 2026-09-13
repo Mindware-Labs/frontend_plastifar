@@ -18,10 +18,7 @@ const toneClass: Record<AuthButtonTone, string> = {
   success: "bg-brand-green shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-brand-green disabled:hover:bg-brand-green",
 };
 
-/**
- * Botón principal de autenticación. El propio botón informa del resultado del envío:
- * cambia de relleno y de etiqueta con un fundido vertical, sin añadir avisos aparte.
- */
+/** Botón principal de autenticación con estado de carga y confirmación integrados. */
 export const AuthButton = forwardRef<HTMLButtonElement, AuthButtonProps>(function AuthButton(
   { isLoading = false, tone = "primary", toneLabel, disabled, className = "", children, ...props },
   ref,

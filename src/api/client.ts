@@ -140,8 +140,7 @@ export async function apiRequest<T>(
   allowRetry = true,
 ): Promise<T> {
   const headers = new Headers(options.headers);
-  // Solo con cuerpo JSON: en un GET este header convierte la peticion en "no simple"
-  // y obliga a un preflight CORS extra, y en un FormData pisa el separador del multipart.
+  // Solo para peticiones con cuerpo JSON (evita preflight CORS en GET y conflicto multipart en FormData).
   if (typeof options.body === "string") headers.set("Content-Type", "application/json");
 
   const accessToken = tokenStore.getAccessToken();

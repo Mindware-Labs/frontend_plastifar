@@ -1,18 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { CLOSE_EASING, OPEN_FRAME, capture, getSpringEasing, prefersReducedMotion, releaseOnFinish } from "./motion";
 
-/**
- * Apertura y cierre de un panel desplegable (select, menú, popover) con Web Animations.
- *
- * Interrumpible de verdad: cada cambio de sentido parte del estado que el panel
- * tiene pintado en ese instante, con la curva propia de ese sentido. Abrir y
- * cerrar a toda velocidad nunca salta ni acumula retraso. La apertura sigue un
- * resorte (--ease-plf-spring) y el cierre una salida corta que se percibe al momento.
- *
- * Uso: `const motion = useDisclosureMotion(open)`; se monta el panel mientras
- * `motion.mounted`, se le pasa `motion.ref`, y los hijos con `data-motion-item`
- * entran escalonados. `snap()` desmonta sin animar (scroll, resize).
- */
+/** Animaciones de apertura y cierre para paneles desplegables y popovers. */
 
 const OPEN_MS = 280;
 const CLOSE_MS = 140;

@@ -79,14 +79,7 @@ const PRIORITIES = [
 
 const FORM_ID = "create-ticket-form";
 
-/**
- * Los correos en texto plano suelen venir con saltos de linea forzados cada
- * ~70-80 caracteres (formato clasico de cliente de correo). Si se pegan tal
- * cual en el textarea, cada salto corta el parrafo aunque sobre ancho: el
- * cuadro nunca aprovecha su ancho real. Se reconstruyen los parrafos uniendo
- * lineas sueltas con espacio y conservando solo los saltos entre parrafos
- * (linea en blanco), para que el textarea vuelva a ajustar el texto solo.
- */
+/** Normaliza saltos de línea suaves en correos pegados para aprovechar el ancho. */
 function reflowPlainText(text: string): string {
   return text
     .replace(/\r\n/g, "\n")
@@ -204,8 +197,7 @@ export function CreateTicketModal({
   const currentMessage = useWatch({ control, name: "initialMessage" }) || "";
   const initialMessageField = register("initialMessage");
 
-  // Se recalcula con cada cambio, incluidos los programaticos (ej. "Restaurar
-  // texto original"), que no disparan el evento nativo "input" del textarea.
+  // Recalcula altura ante cambios manuales o programáticos del texto.
   useEffect(() => {
     autoResizeTextarea(messageTextareaRef.current);
   }, [currentMessage]);
@@ -216,8 +208,7 @@ export function CreateTicketModal({
       .then((data) => {
         setCatalogs(data);
 
-        // Si viene de un correo y no se especificó un cliente explícito,
-        // intentamos identificar si el remitente coincide con un contacto existente
+        // Coincidencia automática de cliente a partir del remitente del correo.
         if (senderEmail && !initialClientId && data.clients.length > 0) {
           const searchEmail = senderEmail.toLowerCase().trim();
           for (const client of data.clients) {
@@ -733,9 +724,7 @@ export function CreateTicketModal({
                   ref={(el) => {
                     initialMessageField.ref(el);
                     messageTextareaRef.current = el;
-                    // El textarea recien se monta cuando terminan de cargar los catalogos
-                    // (antes hay un spinner): sin esto, un mensaje largo precargado desde
-                    // el correo queda con la altura minima y el texto se corta sin aviso.
+                    // Ajuste de altura inicial tras carga diferida de catálogos.
                     autoResizeTextarea(el);
                   }}
                 />

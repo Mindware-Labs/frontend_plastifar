@@ -452,9 +452,7 @@ export function TicketDetailPage() {
     }
   };
 
-  // Cambio de estado: un dialogo para todas las transiciones validas.
-  // Para veredicto: 3 pasos (Paso 1: accion, Paso 2: veredicto y notificacion, Paso 3: comentario y evidencias).
-  // Para las demas categorias: 2 pasos (Paso 1: accion, Paso 2: motivo y confirmacion).
+  // Control de pasos de transición según la acción seleccionada.
   const [transitioning, setTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
@@ -1065,8 +1063,7 @@ export function TicketDetailPage() {
         </div>
       </div>
 
-      {/* Responder es la tarea entera, no un apendice del hilo: ocupa la pantalla.
-          Cerrar sin enviar conserva el borrador; solo se vacia al salir el correo. */}
+      {/* Vista de redacción a pantalla completa con preservación de borrador. */}
       {replyOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white">
           <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-3.5">
@@ -1319,8 +1316,7 @@ export function TicketDetailPage() {
         </Modal>
       )}
 
-      {/* Para veredicto: 3 pasos (1: accion, 2: veredicto + notificar cliente, 3: comentario + evidencias).
-          Para las demas: 2 pasos (1: accion, 2: motivo + confirmacion). */}
+      {/* Flujo de 3 pasos para veredicto y 2 pasos para otras transiciones. */}
       {showUpdateStatusModal && (
         <Modal
           settle={updateSettle}

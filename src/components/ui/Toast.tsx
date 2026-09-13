@@ -12,11 +12,7 @@ export interface ToastProps {
 
 const DEFAULT_DURATION = 5000;
 
-/**
- * Notificación flotante para errores y confirmaciones:
- * Mismo diseño y comportamiento que las alertas de autenticación (AuthToast).
- * Se monta con createPortal y z-[100] para flotar por encima de cualquier modal o panel.
- */
+/** Notificación flotante montada en portal para avisos del sistema. */
 export function Toast({
   message,
   onDismiss,

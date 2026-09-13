@@ -18,10 +18,7 @@ function splitCurrent(value: string) {
   return { head: at >= 0 ? value.slice(0, at + 1) : "", current: value.slice(at + 1).trim() };
 }
 
-/**
- * Campo de direcciones con sugerencias de contactos conocidos. Varias direcciones
- * van separadas por coma; la sugerencia completa solo la que se esta escribiendo.
- */
+/** Selector de destinatarios con autocompletado de contactos sugeridos. */
 export function RecipientInput({ value, onChange, placeholder, className = "", autoFocus, inputRef }: RecipientInputProps) {
   const [suggestions, setSuggestions] = useState<ContactResponse[]>([]);
   const [active, setActive] = useState(0);

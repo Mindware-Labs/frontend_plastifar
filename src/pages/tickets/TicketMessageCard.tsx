@@ -68,12 +68,7 @@ interface TicketMessageCardProps {
   onOpenAttachment: (attachments: TicketAttachmentResponse[], attachmentId: number) => void;
 }
 
-/**
- * Tarjeta compacta y moderna para mensajes de la conversación o notas internas:
- * - Correo inicial: Destacado con badge de origen y cabecera estructurada.
- * - Respuestas de agentes: Limpias con badge de estado de entrega.
- * - Notas internas: Tono ámbar sutil con candado privado.
- */
+/** Tarjeta para intervenciones del hilo de conversación y notas internas. */
 export function TicketMessageCard({
   message,
   channel,

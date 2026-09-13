@@ -32,11 +32,7 @@ type NewFormValues = z.infer<typeof newSchema>;
 
 type Step = "actual" | "nueva" | "listo";
 
-/**
- * Cambio de contrasena en dos pasos: primero se confirma la actual contra el
- * servidor y solo entonces se pide la nueva. Asi nadie escribe una contrasena
- * nueva para descubrir al final que la actual estaba mal.
- */
+/** Modal de cambio de contraseña en dos pasos con validación previa. */
 export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<Step>("actual");
   const [currentPassword, setCurrentPassword] = useState("");

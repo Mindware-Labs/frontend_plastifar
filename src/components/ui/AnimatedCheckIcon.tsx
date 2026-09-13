@@ -5,10 +5,7 @@ interface AnimatedCheckIconProps {
   animate?: boolean;
 }
 
-/**
- * Icono de Check con trazado caligráfico animado:
- * Entrada suave con trazado del vector, desarrollo fluido y soporte de reducción de movimiento.
- */
+/** Icono de verificación con animación de trazado vectorial continuo. */
 export function AnimatedCheckIcon({
   size = 16,
   strokeWidth = 2.5,

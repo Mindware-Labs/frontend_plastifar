@@ -4,20 +4,9 @@ export type SpinnerSize = "sm" | "md" | "lg" | "xl";
 export type SpinnerVariant = "brand" | "ring";
 
 export interface SpinnerProps {
-  /**
-   * Tamaño del spinner:
-   * - 'sm': 20 px (anillo cinético compacto sin isotipo, ideal para botones y celdas)
-   * - 'md': 40 px (predeterminado para paneles, vistas de detalle y carga de correos)
-   * - 'lg': 56 px (para vistas destacadas y modales de previsualización)
-   * - 'xl': 72 px (para splash de sesión y pantallas completas)
-   */
+  /** Tamaños disponibles del spinner cinético. */
   size?: SpinnerSize;
-  /**
-   * Variante visual:
-   * - 'brand': Anillo orbital cinético en rojo Plastifar + isotipo oficial en el centro con pulso sutil.
-   * - 'ring': Anillo cinético puro de precisión sin isotipo interior.
-   * Si no se especifica, usa 'brand' para 'md', 'lg', 'xl', y 'ring' para 'sm'.
-   */
+  /** Variantes visuales del spinner (anillo o con isotipo central). */
   variant?: SpinnerVariant;
   /** Texto explicativo opcional bajo el spinner (ej: "Cargando conversación...") */
   label?: string;
@@ -59,11 +48,7 @@ const sizeConfig: Record<
   },
 };
 
-/**
- * Spinner cinético institucional de Plastifar.
- * Combina un arco orbital continuo con estiramiento elástico en rojo corporativo
- * (Pantone 185 C) y un núcleo central con el isotipo oficial en pulsación armónica.
- */
+/** Spinner cinético institucional de Plastifar. */
 export function Spinner({
   size = "md",
   variant,

@@ -6,15 +6,7 @@ interface FormattedTicketBodyProps {
   className?: string;
 }
 
-/**
- * Renderiza el cuerpo de un mensaje o descripción de ticket de forma inteligente:
- * 1. Desenvuelve los saltos de línea suaves (soft line-breaks de ~70 caracteres propios de emails o generadores de texto)
- *    para que la prosa fluya ocupando el 100% del ancho de la tarjeta.
- * 2. Mantiene párrafos separados (doble salto de línea).
- * 3. Formatea listas con viñetas (- , * , • ) o listas numeradas (1. , 2. ).
- * 4. Preserva bloques de firma o despedida cortos.
- * 5. Convierte URLs en enlaces clickeables y soporta **negrita** e *itálica*.
- */
+/** Renderizado estructurado del cuerpo del ticket con soporte para prosa y listas. */
 export function FormattedTicketBody({ text, html, className = "" }: FormattedTicketBodyProps) {
   const content = useMemo(() => {
     if (text && text.trim().length > 0) {
@@ -184,8 +176,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
           );
         }
 
-        // Caso G: Prosa continua. Desenvuelve los saltos artificiales para que el texto
-        // ocupe fluidamente todo el ancho disponible de la tarjeta.
+        // Desenvuelve saltos artificiales para flujo continuo del texto.
         const joinedProse = lines.join(" ");
         return (
           <p key={bIndex} className="leading-relaxed">

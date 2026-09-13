@@ -4,10 +4,7 @@ const RELAY_EASING = "cubic-bezier(0.16, 1, 0.3, 1)";
 const RELAY_DELAY_MS = 220;
 const RELAY_TRAVEL_MS = 380;
 
-/**
- * Relevo del foco: un anillo sale del control de origen, recorre la tarjeta y al
- * posarse sobre el destino entrega el foco real. Cada cambio de relayKey lo lanza.
- */
+/** Relevo animado de foco entre controles de formulario. */
 export function useFocusRelay(
   relayFrom: RefObject<HTMLElement | null> | undefined,
   relayKey: number | undefined,

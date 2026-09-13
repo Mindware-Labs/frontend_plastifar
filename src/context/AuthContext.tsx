@@ -99,8 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!tokenStore.getRefreshToken()) return;
-    // refreshSession comparte una sola peticion: el doble montaje de StrictMode
-    // no dispara dos rotaciones del mismo token.
+    // Deduplica peticiones concurrentes de renovación de sesión.
     refreshSession().finally(() => setIsLoading(false));
   }, []);
 
@@ -112,9 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function logout() {
     const refreshToken = tokenStore.getRefreshToken();
 
-    // Se avisa al servidor ANTES de limpiar: al reves, la llamada salia sin
-    // credenciales, el 401 se tragaba en silencio y el refresh token seguia
-    // vivo hasta vencer. Si la red falla igual se cierra la sesion local.
+    // Notifica revocación al servidor antes de purgar estado local.
     if (refreshToken) await authApi.logout(refreshToken).catch(() => {});
 
     clearAllDrafts();

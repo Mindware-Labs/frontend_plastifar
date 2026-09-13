@@ -135,8 +135,7 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
   }
 
   function handleDateClick(dateStr: string) {
-    // Si no hay nada seleccionado, o ya había un rango completo definido:
-    // El primer clic fija un día único y permite expandir en el segundo clic
+    // Selección de rango de fechas con clic inicial y final.
     if (!since || (since && until && since !== until)) {
       onChange(dateStr, dateStr);
       setHoveredDate(null);

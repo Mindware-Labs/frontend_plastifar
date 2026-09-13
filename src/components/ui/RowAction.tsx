@@ -8,10 +8,7 @@ interface RowActionProps {
   danger?: boolean;
 }
 
-/**
- * Accion de fila visible: icono con etiqueta accesible y tooltip nativo.
- * El rojo 185 C se reserva para lo destructivo; el resto vive en gris.
- */
+/** Botón de acción por fila con tooltip nativo y soporte accesible. */
 export function RowAction({ label, icon: Icon, onClick, disabled, danger }: RowActionProps) {
   return (
     <button

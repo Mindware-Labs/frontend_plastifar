@@ -37,10 +37,7 @@ function estimateHeight(clean: string): number {
   return Math.min(640, Math.max(64, lines * 22 + 32));
 }
 
-/**
- * El cuerpo HTML viene de un remitente externo: se limpia con DOMPurify y se
- * aisla en un iframe con sandbox y CSP propia, sin scripts ni acceso a la app.
- */
+/** Marco aislado con CSP y sandbox para renderizado seguro de HTML externo. */
 export function EmailBodyFrame({ html, title, className = "", fit = false }: EmailBodyFrameProps) {
   const clean = useMemo(() => DOMPurify.sanitize(html, SANITIZE_OPTIONS), [html]);
   const srcDoc = useMemo(() => buildDocument(clean), [clean]);

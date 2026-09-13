@@ -11,11 +11,7 @@ interface AuthLayoutProps {
   settle?: boolean;
 }
 
-/**
- * Layout principal de autenticación:
- * Diseño centrado, sobrio y corporativo. Una tarjeta blanca compacta con bordes sutiles,
- * micro-sombras elegantes y el logotipo de Plastifar encabezando la vista sobre un fondo suave.
- */
+/** Layout corporativo centrado para pantallas de acceso. */
 export function AuthLayout({ title, subtitle, footer, children, settle = false }: AuthLayoutProps) {
   return (
     <div className="relative flex min-h-dvh flex-col justify-between items-center bg-[#f8f9fa] px-4 py-8 sm:py-12 overflow-hidden selection:bg-brand-red/10 selection:text-brand-red">

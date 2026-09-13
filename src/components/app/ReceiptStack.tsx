@@ -205,11 +205,7 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
   );
 }
 
-/**
- * Los recibos se anclan al area de contenido, no al viewport: asi sobreviven al
- * colapso de la barra lateral sin recalcular nada. La region viva se monta vacia
- * y permanente; insertar un nodo que ya trae aria-live se anuncia de forma dispar.
- */
+/** Región accesible permanente para notificaciones y recibos de acción. */
 export function ReceiptStack() {
   const { receipts, dismiss, inset } = useReceipts();
 

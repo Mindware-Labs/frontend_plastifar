@@ -13,11 +13,7 @@ interface Options<TQuery extends { page: number }, TData extends PagedData> {
   fallbackError: string;
 }
 
-/**
- * Listado paginado contra el servidor: consulta cuando cambian los criterios,
- * descarta respuestas que llegan tarde, conserva la pagina anterior atenuada
- * mientras carga la nueva y corrige la pagina si se queda fuera de rango.
- */
+/** Listado paginado con descarte de respuestas obsoletas y persistencia de vista. */
 export function usePagedList<TQuery extends { page: number }, TData extends PagedData>({
   fetch,
   criteria,

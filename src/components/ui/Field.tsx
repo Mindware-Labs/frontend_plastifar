@@ -3,15 +3,7 @@ import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode }
 import { controlBase, controlSizes, stateClasses, type ControlSize, type FieldState } from "./fieldStyles";
 import { Select, type SelectOption } from "./Select";
 
-/**
- * Controles de formulario del panel: misma gramatica que las tablas — etiqueta
- * en Montserrat versalita, radio de 2 px, filete gris y foco en rojo 185 C.
- *
- * El estado del campo es explicito y visible: reposo, error (borde rojo + mensaje
- * con icono) y correcto (borde verde 348 C + palomita). Nunca se pinta "correcto"
- * antes de que la persona haya tocado el campo: corregir en silencio es una cosa,
- * regañar por adelantado es otra.
- */
+/** Control de formulario con validación explícita y estilos institucionales. */
 export type { FieldState } from "./fieldStyles";
 
 interface ShellProps {

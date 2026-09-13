@@ -74,8 +74,7 @@ export function AttachmentPreviewModal({
   const [downloading, setDownloading] = useState(false);
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose);
 
-  // En una referencia: si entrara en las dependencias del efecto, una función nueva
-  // en cada render del padre volvería a pedir el enlace sin parar.
+  // Referencia para evitar solicitudes redundantes de enlace temporal.
   const loadLinkRef = useRef(loadLink);
   useEffect(() => {
     loadLinkRef.current = loadLink;

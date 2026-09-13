@@ -6,8 +6,7 @@ const focusableSelector =
 
 /** Conducta comun de los dialogos: fondo bloqueado, Escape, foco atrapado y devuelto al cerrar. */
 export function useDialogBehavior(panelRef: RefObject<HTMLElement | null>, onClose: () => void) {
-  // El efecto no debe depender de onClose: si el padre la recrea en cada render,
-  // se reiniciaria y devolveria el foco al primer campo en mitad del tecleo.
+  // Estabiliza referencias de cierre para evitar reinicios de foco.
   const closeRef = useRef(onClose);
   useEffect(() => {
     closeRef.current = onClose;

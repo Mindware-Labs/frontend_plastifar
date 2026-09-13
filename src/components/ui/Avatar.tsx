@@ -1,5 +1,4 @@
-// Paleta institucional para los avatares: negro de interfaz, gris 11 C,
-// verde 348 C y verde bio 369 C. El rojo se reserva para acciones.
+// Paleta institucional para avatares de usuario.
 const palette = ["#1b1b1d", "#515151", "#007c39", "#63a70c"];
 
 interface AvatarProps {

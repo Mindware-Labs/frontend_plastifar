@@ -28,11 +28,7 @@ function formatNoteTime(iso: string): string {
   return date.toLocaleDateString("es-419", { day: "2-digit", month: "short" });
 }
 
-/**
- * Ajusta la altura del textarea de notas según su contenido.
- * Inicia en un tamaño base de 2 líneas (~54px) y crece automáticamente
- * a medida que se agregan líneas, evitando que haga scroll interno.
- */
+/** Auto-ajuste de altura del área de texto para notas internas. */
 function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
   if (!textarea) return;
   textarea.style.height = "auto";

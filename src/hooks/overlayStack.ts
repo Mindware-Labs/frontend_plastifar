@@ -1,7 +1,4 @@
-/**
- * Pila de capas abiertas (dialogos, editores a pantalla completa): solo la de
- * arriba responde a Escape, asi un modal sobre otro no cierra los dos a la vez.
- */
+/** Gestión de pila de capas modales para tecla Escape. */
 const stack: symbol[] = [];
 
 export interface OverlayHandle {

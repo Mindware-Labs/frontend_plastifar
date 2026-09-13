@@ -8,11 +8,7 @@ interface SearchInputProps {
   className?: string;
 }
 
-/**
- * Buscador de una tabla. Vive junto a los demas criterios, no en la cabecera:
- * filtra lo que hay debajo, y un control lejos de lo que afecta se lee como si
- * buscara en toda la aplicacion.
- */
+/** Campo de búsqueda contextual para tablas y listados. */
 export function SearchInput({ value, onChange, placeholder, className = "" }: SearchInputProps) {
   const id = useId();
 

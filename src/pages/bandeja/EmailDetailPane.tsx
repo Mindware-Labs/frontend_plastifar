@@ -152,11 +152,7 @@ interface TicketsOriginPopoverProps {
   ticketId: number | null;
 }
 
-/**
- * Alerta incrustada en la barra de herramientas al lado de la papelera:
- * no ocupa espacio en el cuerpo del correo y despliega una mini modal (popover)
- * flotante con la información contextual y el acceso directo al ticket.
- */
+/** Indicador flotante en barra de herramientas con acceso al ticket vinculado. */
 function TicketsOriginPopover({ note, ticketId }: TicketsOriginPopoverProps) {
   return (
     <Popover>
@@ -610,10 +606,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
     setPreview(target);
   }
 
-  /**
-   * El servidor ya movio el correo cuando esto vuelve, asi que el recibo no promete
-   * deshacer: ofrece la accion inversa, que es otro viaje y puede fallar por su cuenta.
-   */
+  /** Acción reversible tras confirmación del servidor. */
   async function handleMove(move: MoveKind) {
     if (!email || moving) return;
     setMoving(true);

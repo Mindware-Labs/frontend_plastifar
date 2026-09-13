@@ -1,10 +1,7 @@
 import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
 
-/**
- * Tabla de datos: papel con filete, cabecera en versalitas sobre blanco y solo
- * filetes horizontales. Sin retícula vertical, las columnas se leen por alineación.
- */
+/** Tabla de datos con tipografía tabular y alineación estructurada. */
 export function DataTable({ fixed = false, children }: { fixed?: boolean; children: ReactNode }) {
   return (
     <div className={`rounded-lg border border-zinc-200 bg-white shadow-2xs overflow-hidden ${fixed ? "" : "overflow-x-auto"}`}>

@@ -25,10 +25,7 @@ const deliveryBadges: Record<string, string> = {
   Bounced: "bg-red-50 text-brand-red border border-red-200",
 };
 
-/**
- * Fila de la lista. La casilla vive sobre el avatar, como en cualquier cliente de
- * correo: aparece al pasar por encima y se queda mientras haya algo seleccionado.
- */
+/** Fila de conversación con selector de selección y estado de lectura. */
 export function ConversationRow({
   email,
   selected,

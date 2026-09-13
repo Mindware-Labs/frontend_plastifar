@@ -12,8 +12,7 @@ export function AppLayout() {
         <InboxAlerts />
         <div className="flex h-screen bg-white">
           <Sidebar />
-        {/* flex-col + overflow-hidden: cada pagina decide su propia zona de scroll,
-            en vez de que el layout adivine un alto fijo. */}
+        {/* Contenedor flexible con scroll independiente por página. */}
           {/* relative: los recibos se anclan al area de contenido, no a la ventana. */}
           <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden px-8">
             <Outlet />

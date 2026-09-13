@@ -64,10 +64,7 @@ const priorityClass: Record<string, string> = {
   Baja: "border-line-strong bg-canvas text-subtle",
 };
 
-/**
- * Catálogo de motivos. De aquí sale el departamento que el formulario de alta
- * rellena solo al elegir el motivo, así que editarlo cambia a dónde se encolan los tickets.
- */
+/** Gestión del catálogo de motivos y departamentos asociados. */
 export function MotivosPage() {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);

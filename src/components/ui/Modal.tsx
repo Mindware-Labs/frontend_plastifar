@@ -21,10 +21,7 @@ export interface ModalProps {
   settle?: boolean;
 }
 
-/**
- * Diálogo modal del panel con diseño SaaS moderno y compacto:
- * Bordes suaves rounded-xl, cabecera y pie estructurados y espaciado optimizado.
- */
+/** Diálogo modal accesible con animación fluida y soporte para reducción de movimiento. */
 export function Modal({
   title,
   eyebrow,

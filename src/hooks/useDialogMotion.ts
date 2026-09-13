@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { CLOSE_EASING, OPEN_FRAME, capture, getSpringEasing, prefersReducedMotion, releaseOnFinish } from "./motion";
 
-/**
- * Entrada y salida de un diálogo (modal centrado o sheet lateral) con su telón.
- *
- * El panel entra con el resorte del tema y sale con una retirada corta; el telón
- * funde en paralelo. `requestClose` inicia la salida y `onClose` se llama cuando
- * termina, para que el padre desmonte. Si el padre ya gobierna la salida (por
- * ejemplo con useModalAnimation) la transmite con `exiting`. Pedir el cierre a
- * mitad de la entrada retrocede desde el punto pintado, sin salto.
- */
+/** Transiciones coordinadas de entrada y salida para modales y telones. */
 
 export type DialogVariant = "modal" | "drawer";
 

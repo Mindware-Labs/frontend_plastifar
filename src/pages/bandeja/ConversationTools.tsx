@@ -207,8 +207,7 @@ export function AssignmentControl({
 
   selectOptions.push({ value: "", label: "Sin asignar" });
 
-  // Si está asignado a mí actualmente, añadimos la opción con hidden: true
-  // para que el botón de Select muestre "Asignado a mí", pero NO salga en el desplegable.
+  // Opción contextual para asignación rápida al usuario actual.
   if (mine && user) {
     selectOptions.push({
       value: String(user.staffId),

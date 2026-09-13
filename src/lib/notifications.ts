@@ -89,11 +89,7 @@ export async function requestDesktop(): Promise<DesktopState> {
   }
 }
 
-/**
- * Dos notas ascendentes sintetizadas: sin archivo que descargar ni que se pierda.
- * El contexto de audio se crea al primer uso, despues de que la persona haya
- * tocado la pagina, que es cuando el navegador permite sonar.
- */
+/** Generador de tonos de audio sintetizados para notificaciones. */
 export function playChime(force = false) {
   const now = performance.now();
   if (!force && now - lastChimeAt < CHIME_COOLDOWN) return;

@@ -1,6 +1,4 @@
-// Logotipo oficial extraido del Brandbook Plastifar 2026 (archivo original, nunca recreado).
-// Reglas aplicadas: escalado siempre proporcional, area de resguardo respetada por
-// quien lo consume, y reserva blanca de esquinas redondeadas sobre fondos saturados.
+// Logotipo oficial vectorial conforme al manual de marca Plastifar.
 
 const sources = {
   color: "/brand/plastifar-logo.png",
@@ -30,10 +28,7 @@ export function Logo({ variant = "color", height = 34, className = "" }: LogoPro
   );
 }
 
-/**
- * Version para fondos rojos, verdes o fotograficos: el brand book exige que la
- * marca viaje dentro de una reserva blanca de esquinas redondeadas.
- */
+/** Variante de logotipo sobre contenedor protector para fondos contrastados. */
 export function LogoReserve({ height = 30, className = "" }: { height?: number; className?: string }) {
   return (
     <span

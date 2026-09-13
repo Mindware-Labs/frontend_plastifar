@@ -100,11 +100,7 @@ interface Flyout {
   left: number;
 }
 
-/**
- * Contador numérico estilo Gmail:
- * - Con correos sin leer: tipografía destacada con acento de marca.
- * - Solo leídos: número fino y neutro.
- */
+/** Contador numérico para correos no leídos. */
 function FolderBadge({
   count,
   isActive,
@@ -127,12 +123,7 @@ function FolderBadge({
   );
 }
 
-/**
- * Icono de colapso/expansión de barra lateral artesanal y micro-interactivo:
- * - Marco con esquinas redondeadas continuas y grosor afinado de 1.25px.
- * - Carril izquierdo que simula la barra lateral con relieve sutil y realce rojo de marca al hacer hover.
- * - Línea divisoria y chevron interior dinámico que se desliza sutilmente en la dirección de la acción.
- */
+/** Icono interactivo de colapso y expansión de la barra lateral. */
 function SidebarToggleIcon({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <svg

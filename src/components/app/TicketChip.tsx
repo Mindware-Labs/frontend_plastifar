@@ -3,11 +3,7 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { formatTicketCode } from "../../lib/format";
 
-/**
- * El ticket de una conversación, en una sola pieza: invita a crearlo cuando no
- * existe y lleva hasta él cuando ya está. Papel y filete neutros; el rojo 185 C
- * vive solo en el sello, que se enciende al pasar el ratón.
- */
+/** Pastilla de enlace o creación rápida de ticket vinculado a una conversación. */
 
 /** thread: la conversación nació en Tickets. manual: alguien lo creó desde este correo. */
 export type TicketProvenance = "thread" | "manual";

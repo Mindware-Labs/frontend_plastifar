@@ -6,11 +6,7 @@ function items(panel: HTMLElement | null): HTMLElement[] {
   return panel ? Array.from(panel.querySelectorAll<HTMLElement>(ITEM_SELECTOR)) : [];
 }
 
-/**
- * Teclado de un panel role="menu": al abrir el foco entra en la opcion activa
- * (o la primera) y las flechas, Inicio y Fin recorren las opciones. Enter y
- * Espacio ya activan el boton enfocado por si solos.
- */
+/** Navegación por teclado para menús desplegables accesibles. */
 export function useMenuKeyboard(panelRef: RefObject<HTMLElement | null>, open: boolean) {
   useEffect(() => {
     if (!open) return;

@@ -1,4 +1,4 @@
-// Espejo de los DTOs del backend (api/api/Dtos/*.cs). Mantener sincronizado a mano.
+// Espejo de los DTOs del backend (api/api/Dtos). Mantener sincronizado a mano.
 
 export interface LoginRequest {
   email: string;

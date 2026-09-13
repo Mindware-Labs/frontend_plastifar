@@ -31,10 +31,7 @@ const statusFilters: {
   { key: "inactivos", label: "Inactivos", countKey: "inactive" },
 ];
 
-/**
- * Catálogo de veredictos. De aquí sale la lista de opciones que se ofrece al marcar
- * un ticket como solucionado en el diálogo "Actualizar ticket".
- */
+/** Gestión del catálogo de veredictos para tickets solucionados. */
 export function VeredictosPage() {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);

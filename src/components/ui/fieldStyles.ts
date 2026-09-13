@@ -1,8 +1,4 @@
-/**
- * Gramatica visual compartida por todos los controles de formulario:
- * radio de 2 px, filete gris, foco en rojo 185 C y estado explicito.
- * Vive aparte para que Field y Select no dependan uno del otro.
- */
+/** Estilos base y estados de validación compartidos para controles de formulario. */
 export type FieldState = "idle" | "error" | "valid";
 
 export const controlBase =

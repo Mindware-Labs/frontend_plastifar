@@ -10,10 +10,7 @@ import {
   showTicketSlaAlert,
 } from "../../lib/notifications";
 
-/**
- * Escucha los correos y tickets en vivo, y avisa segun las preferencias de la persona.
- * No pinta nada: vive en el layout para que el aviso llegue desde cualquier pagina.
- */
+/** Escucha eventos en vivo de correos y tickets para notificaciones. */
 export function InboxAlerts() {
   const { onInboxReceived, onInboxAssigned, onTicketAssigned, onTicketSlaAlert } = useEmailCounts();
   const navigate = useNavigate();

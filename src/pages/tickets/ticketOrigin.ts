@@ -1,7 +1,4 @@
-/**
- * Como nombrar el mensaje que abrio el caso. Vive aparte porque lo dicen dos vistas
- * —el hilo con el cliente y el historial— y tienen que decir lo mismo.
- */
+/** Identificador textual del mensaje inicial que originó el ticket. */
 export function originLabel(channel: string): { label: string; hint: string } {
   return channel.toLowerCase() === "correo"
     ? {

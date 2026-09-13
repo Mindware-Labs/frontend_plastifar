@@ -9,12 +9,7 @@ interface UseUploadFeedbackOptions {
   exitDuration?: number;
 }
 
-/**
- * Controla el ciclo completo de retroalimentación de carga con 3 fases continuas:
- * 1. Entrada suave (`entering`)
- * 2. Desarrollo suave / respiración (`active`)
- * 3. Salida suave con desvanecimiento (`exiting`) -> reposo (`idle`)
- */
+/** Control de ciclo de vida para retroalimentación visual de subida de archivos. */
 export function useUploadFeedback(options: UseUploadFeedbackOptions = {}) {
   const { duration = 2200, exitDuration = 380 } = options;
   const [phase, setPhase] = useState<UploadPhase>("idle");

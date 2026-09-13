@@ -46,8 +46,7 @@ interface Anchor {
   originX: number;
 }
 
-// El panel puede ser más ancho que su disparador, y con uno estrecho tiene que serlo:
-// la opción comparte fila con el visto de seleccionada y si no, se recorta.
+// Anchura mínima adaptada al contenido y marca de selección.
 const PANEL_MIN_WIDTH = 96;
 
 // En xs y en la variante discreta el disparador es una pastilla corta por diseño.
@@ -56,15 +55,7 @@ const PANEL_MIN_WIDTH_COMPACT_TRIGGER = 180;
 // Por debajo de esto la lista se recorre de un vistazo y el buscador solo estorba.
 const SEARCH_FROM = 9;
 
-/**
- * Desplegable propio del panel, no el del sistema operativo: el nativo no acepta
- * tipografia, radio ni color, y en cada navegador se ve distinto.
- *
- * Se comporta como un combobox real: teclado completo (flechas, Inicio/Fin,
- * Enter, Escape), buscador propio para filtrar por texto, roles ARIA y foco
- * siempre gobernado (al disparador al cerrar, al buscador al abrir).
- * El panel se dibuja en un portal para que no lo recorte el scroll de un dialogo.
- */
+/** Desplegable accesible con navegación por teclado y portal para scroll. */
 export function Select({
   value,
   onChange,
@@ -182,8 +173,7 @@ export function Select({
     setActiveIndex(firstMatch);
   }
 
-  // Al abrir, el foco entra en el panel: al buscador si lo hay, y si no a la propia
-  // lista, que es la que recoge entonces las flechas.
+  // Enfoque inicial al buscador o al primer elemento de la lista al abrir.
   useEffect(() => {
     if (!open) return;
     const id = window.setTimeout(
@@ -202,9 +192,7 @@ export function Select({
       closeList();
     }
 
-    // Reposicionar en cada scroll seria un baile: se cierra, como haria el nativo.
-    // Pero el scroll del propio listado (cuando hay muchas opciones) no cuenta:
-    // "scroll" no burbujea, mas igual llega aqui en la fase de captura.
+    // Cierre automático al detectar scroll exterior.
     function handleViewportChange(event: Event) {
       if (event.target instanceof Node && containerRef.current?.contains(event.target)) return;
       closeList(true);
@@ -228,9 +216,7 @@ export function Select({
     };
   }, [open, closeList, containerRef]);
 
-  // Mantiene visible la opcion activa cuando se navega con el teclado.
-  // Se busca por data-option-index (no por posicion): la busqueda oculta opciones,
-  // asi que el indice logico no coincide con el orden de los <li> montados.
+  // Mantiene visible la opción activa durante la navegación por teclado.
   useEffect(() => {
     if (!open || activeIndex < 0) return;
     listRef.current
