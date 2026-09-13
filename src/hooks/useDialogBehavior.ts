@@ -17,12 +17,27 @@ export function useDialogBehavior(panelRef: RefObject<HTMLElement | null>, onClo
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // El foco entra al primer campo, no al aspa: se llega a escribir de inmediato.
+    /*
+     * El foco entra al primer CAMPO, no al aspa: se llega a escribir de
+     * inmediato.
+     *
+     * `[role=combobox]` entra en la lista porque los desplegables de la casa no
+     * son un `<select>` nativo sino un boton con ese rol. Sin el, un formulario
+     * que empieza con un desplegable —«Nuevo ticket»— no encontraba ningun
+     * campo, caia al respaldo «primer boton del panel» y aterrizaba en Cerrar:
+     * se abria el dialogo para crear algo y el teclado empezaba sobre la accion
+     * de abandonarlo. Medido, no supuesto.
+     *
+     * El respaldo tambien excluye el aspa por el mismo motivo.
+     */
     const panel = panelRef.current;
     const firstField = panel?.querySelector<HTMLElement>(
-      "input:not([type='hidden']):not([data-skip-autofocus]), select, textarea",
+      "input:not([type='hidden']):not([data-skip-autofocus]), select, textarea, [role='combobox']",
     );
-    (firstField ?? panel?.querySelector<HTMLElement>("button"))?.focus();
+    const fallback = panel?.querySelector<HTMLElement>(
+      "button:not([aria-label='Cerrar']):not([data-skip-autofocus])",
+    );
+    (firstField ?? fallback ?? panel?.querySelector<HTMLElement>("button"))?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {

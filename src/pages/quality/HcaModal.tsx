@@ -18,6 +18,7 @@ import { today } from "../../lib/quality";
 import { resolveClientLabel, resolveStaffLabel, searchActiveStaff, searchClients } from "../../lib/lookups";
 import type { CorrectiveActionSheet } from "../../types/quality";
 import type { ProductLine } from "../../types/settings";
+import { FormSection } from "../../components/ui/FormSection";
 
 // Espejo de la validacion del servidor: cuando exista POST/PUT /api/quality/sheets,
 // estas mismas reglas van en el validador de C#. Si una cambia aqui, cambia alli.
@@ -138,6 +139,11 @@ export function HcaModal({
       <form id="hca-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
         {formError && <Alert variant="error">{formError}</Alert>}
 
+        {/* Los mismos tres bloques con los que se LEE la hoja —origen, plazos y
+            hallazgo—. Siete campos seguidos con el mismo peso obligan a
+            recorrerlos todos para encontrar uno, y quien acaba de leer una HCA
+            ya los agrupo asi en la cabeza. */}
+        <FormSection title="Origen" hint="A quién y a qué afecta.">
         <div className="grid grid-cols-2 gap-3">
           <Controller
             name="clientId"
@@ -182,7 +188,9 @@ export function HcaModal({
             )}
           />
         </div>
+        </FormSection>
 
+        <FormSection title="Plazos y responsable">
         <div className="grid grid-cols-2 gap-3">
           <TextField
             label="Detectada el"
@@ -222,7 +230,9 @@ export function HcaModal({
             />
           )}
         />
+        </FormSection>
 
+        <FormSection title="El hallazgo">
         <TextAreaField
           label="Qué ocurrió"
           required
@@ -250,6 +260,7 @@ export function HcaModal({
             {...register("rootCause")}
           />
         )}
+        </FormSection>
       </form>
     </Modal>
   );
