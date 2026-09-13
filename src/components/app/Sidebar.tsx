@@ -626,7 +626,7 @@ export function Sidebar() {
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             title={collapsed ? `${displayName} · ${user?.email}` : undefined}
-            className={`group flex w-full items-center rounded-edge border transition-all duration-150 outline-none ${
+            className={`group flex w-full items-center rounded-edge border transition-all duration-150 outline-none focus-visible:ring-3 focus-visible:ring-brand-red/20 ${
               menuOpen
                 ? "border-line-strong bg-fill shadow-xs ring-1 ring-line-strong"
                 : "border-transparent hover:border-line-soft hover:bg-canvas"
