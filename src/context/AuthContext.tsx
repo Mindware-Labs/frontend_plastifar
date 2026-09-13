@@ -108,14 +108,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStore.setTokens(response.accessToken, response.refreshToken);
   }
 
-  async function logout() {
+  function logout() {
     const refreshToken = tokenStore.getRefreshToken();
 
-    // Notifica revocación al servidor antes de purgar estado local.
-    if (refreshToken) await authApi.logout(refreshToken).catch(() => {});
-
+    // Limpia el estado local de inmediato para que la UI responda al instante.
     clearAllDrafts();
     tokenStore.setTokens(null, null);
+
+    // Notifica la revocación al servidor en segundo plano (sin bloquear la UI).
+    if (refreshToken) authApi.logout(refreshToken).catch(() => {});
+
+    return Promise.resolve();
   }
 
   return (
