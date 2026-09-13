@@ -213,6 +213,16 @@ input:-webkit-autofill:focus {
   }
 }
 
+/* El buscador del tablero apaga el `outline` del input —el borde lo dibuja la
+   caja de fuera, no el campo— y se quedaba sin ninguna señal de foco: quien
+   navega con teclado llegaba al buscador y no veía dónde estaba. El anillo lo
+   pinta el contenedor cuando el foco entra en cualquier parte de él, que es
+   donde de verdad se ve la caja. */
+.cx-search:focus-within {
+  border-color: color-mix(in srgb, var(--color-brand-red) 45%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand-red) 12%, transparent);
+}
+
 /* --- Movimiento --- */
 
 @keyframes plf-float {
