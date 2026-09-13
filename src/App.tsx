@@ -111,10 +111,23 @@ export default function App() {
         <Route path="/configuracion/motivos" element={<TopicsSection />} />
         <Route path="/configuracion/sla" element={<SlaSection />} />
         <Route path="/configuracion/feriados" element={<HolidaysSection />} />
-        <Route path="/configuracion/lineas" element={<ProductLinesSection />} />
         <Route path="/configuracion/plantillas" element={<TemplatesSection />} />
         <Route path="/configuracion/buzones" element={<MailboxesSection />} />
-        <Route path="/configuracion/territorios" element={<TerritoriesSection />} />
+
+        {/* Territorios y lineas de producto se mudaron al modulo que las usa:
+            el territorio es obligatorio al registrar un cliente y alimenta el
+            ranking por zona; la linea de producto es el eje por el que Calidad
+            sigue las reclamaciones. Ninguna de las dos es configuracion del
+            sistema, y en «Configuracion» solo estaban porque era el cajon. */}
+        <Route path="/clientes/territorios" element={<TerritoriesSection />} />
+        <Route path="/calidad/lineas" element={<ProductLinesSection />} />
+
+        {/* Las rutas viejas siguen respondiendo. Estan en marcadores, en
+            correos y en la memoria de quien lleva un año usando el panel;
+            moverlas sin dejar el rastro convierte una reorganizacion del menu
+            en un enlace roto. */}
+        <Route path="/configuracion/territorios" element={<Navigate to="/clientes/territorios" replace />} />
+        <Route path="/configuracion/lineas" element={<Navigate to="/calidad/lineas" replace />} />
 
         {/* El servidor ya exige reports.read en los tres endpoints; sin este
             guard la pantalla se pintaba entera y se llenaba de 403. */}

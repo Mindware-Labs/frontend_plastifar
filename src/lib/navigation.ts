@@ -18,6 +18,7 @@ import {
   Inbox,
   KeyRound,
   LayoutDashboard,
+  MapPin,
   MessageSquareText,
   Send,
   Settings,
@@ -88,12 +89,18 @@ export interface NavGroup {
  */
 export const SIDEBAR_NAV: NavGroup[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", section: "Principal" },
+  /*
+   * Tickets deja de ser un grupo. Tenia un unico hijo llamado «Bandeja», y un
+   * grupo de uno no agrupa nada: obligaba a desplegar para llegar al mismo
+   * sitio, y encima creaba dos «Bandeja» en el mismo menu —la de tickets y la
+   * de correo— que solo se distinguian por el padre que habia que abrir.
+   */
   {
     label: "Tickets",
     icon: TicketIcon,
+    to: "/tickets",
     section: "Principal",
     permission: "tickets.read",
-    children: [{ label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon }],
   },
   {
     label: "Correo",
@@ -109,6 +116,45 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
     ],
   },
+  /*
+   * EL CATALOGO VIVE DONDE SE USA.
+   *
+   * «Configuracion» habia crecido hasta siete hijos y se habia convertido en el
+   * cajon donde va lo que no se sabe donde poner. Dos de ellos no eran
+   * configuracion del sistema sino datos del negocio, y su sitio estaba en el
+   * modulo que los consume:
+   *
+   *   - Territorios alimenta el ranking comercial por zona y es obligatorio al
+   *     registrar un cliente. Lo consulta quien trabaja con clientes.
+   *   - Lineas de producto es el eje por el que Calidad sigue las
+   *     reclamaciones. Lo consulta quien trabaja con Calidad.
+   *
+   * Lo que queda en Configuracion es homogeneo: cinco catalogos que definen
+   * COMO SE COMPORTA el sistema —a que cola entra un ticket, cuando vence, que
+   * dias no cuentan, con que texto escribe y por que buzon—. Ninguno es un dato
+   * que alguien consulte mientras hace su trabajo.
+   */
+  {
+    label: "Clientes",
+    icon: Building2,
+    section: "Gestión",
+    permission: "clients.read",
+    children: [
+      { label: "Directorio", to: "/clientes", end: true, icon: Building2 },
+      { label: "Territorios", to: "/clientes/territorios", icon: MapPin },
+    ],
+  },
+  {
+    label: "Calidad",
+    icon: ClipboardCheck,
+    section: "Gestión",
+    permission: "quality.read",
+    children: [
+      { label: "HCA", to: "/calidad/hca" },
+      { label: "Solicitudes de crédito", to: "/calidad/creditos" },
+      { label: "Líneas de producto", to: "/calidad/lineas" },
+    ],
+  },
   {
     label: "Personal",
     icon: Users,
@@ -120,27 +166,6 @@ export const SIDEBAR_NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Clientes",
-    icon: Building2,
-    to: "/clientes",
-    permission: "clients.read",
-    section: "Gestión",
-  },
-  {
-    label: "Calidad",
-    icon: ClipboardCheck,
-    section: "Gestión",
-    permission: "quality.read",
-    children: [
-      { label: "HCA", to: "/calidad/hca" },
-      { label: "Solicitudes de crédito", to: "/calidad/creditos" },
-    ],
-  },
-  {
-    // Eran siete entradas, y cuatro —Operacion, SLA, Productividad y Volumen—
-    // no tenian un solo dato: cuatro de cada siete clics daban contra una pared.
-    // Ahora es una pantalla que se genera eligiendo reporte y criterios, y lo
-    // bloqueado se ve en el selector, desactivado, en vez de ocupar menu.
     label: "Reportes",
     icon: BarChart3,
     section: "Otros",
@@ -155,10 +180,8 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Motivos", to: "/configuracion/motivos" },
       { label: "SLA", to: "/configuracion/sla" },
       { label: "Días no laborables", to: "/configuracion/feriados" },
-      { label: "Líneas de producto", to: "/configuracion/lineas" },
       { label: "Plantillas", to: "/configuracion/plantillas" },
       { label: "Buzones", to: "/configuracion/buzones" },
-      { label: "Territorios", to: "/configuracion/territorios" },
     ],
   },
 ];

@@ -126,10 +126,32 @@ const detailPatterns: BreadcrumbPattern[] = [
   },
 ];
 
-// Las de ficha primero: son mas especificas (mas segmentos) y esa
-// especificidad es lo unico que importa, matchPath ya exige coincidencia
-// exacta de segmentos por patron.
-const ALL_PATTERNS: BreadcrumbPattern[] = [...detailPatterns, ...patternsFromSidebar()];
+/**
+ * Ordenados por especificidad, no por el orden en que se escribieron.
+ *
+ * Antes las de ficha iban primero, con el argumento de que tienen mas
+ * segmentos. Eso es cierto para «/clientes/:id/contactos» y falso para
+ * «/clientes/:id», que tiene exactamente los mismos que «/clientes/territorios»
+ * — y al ir antes, capturaba la palabra «territorios» como si fuera el
+ * identificador de un cliente. El breadcrumb de Territorios decia «Clientes ›
+ * Cliente», y el fallo solo aparecio cuando esa ruta existio.
+ *
+ * El criterio correcto es el que usa el propio enrutador: primero el que tiene
+ * mas segmentos y, entre iguales, el que tiene menos parametros. Una ruta
+ * escrita entera siempre gana a una que adivina.
+ */
+function segmentos(path: string): number {
+  return path.split("/").filter(Boolean).length;
+}
+
+function parametros(path: string): number {
+  return path.split("/").filter((s) => s.startsWith(":")).length;
+}
+
+const ALL_PATTERNS: BreadcrumbPattern[] = [...detailPatterns, ...patternsFromSidebar()].sort(
+  (a, b) =>
+    segmentos(b.path) - segmentos(a.path) || parametros(a.path) - parametros(b.path),
+);
 
 /**
  * Resuelve la ruta actual a su rastro de breadcrumb. `dynamicLabel` es el
