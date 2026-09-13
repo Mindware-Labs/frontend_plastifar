@@ -59,7 +59,13 @@ const columns: { key: SortKey; label: string }[] = [
      el ticket. Separadas costaban 206 px de los 1085 del panel y obligaban a
      leer dos celdas para responder una sola pregunta. Juntas, el estado nombra
      y el plazo matiza, que es como se lee de todos modos. */
-  { key: "estado", label: "Estado / SLA" },
+  /* La columna fusionada ordena por SLA, no por estado, y no es un detalle: el
+     RF-T5 del plan pide ordenar por «vencimiento de SLA», que es lo unico
+     accionable de las dos. El estado es categorico —ordenarlo alfabeticamente
+     pone «Abierto» antes que «Vencido» y no informa de nada—, mientras que el
+     plazo dice a quien hay que atender primero. Al unir las dos columnas, la
+     clave de orden se quedo en `estado` y ese orden se perdio. */
+  { key: "sla", label: "Estado / SLA" },
   { key: "actividad", label: "Actividad" },
 ];
 
