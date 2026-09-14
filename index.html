@@ -3,9 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      La politica llego con la rama de Tickets y se conserva: limita de donde
+      puede cargar y a donde puede hablar la aplicacion.
+
+      `connect-src` lleva ademas localhost EN CLARO, y es a proposito: la
+      politica original solo admitia `https:`, y el API de desarrollo corre en
+      http://localhost:5153. Con ella tal cual, el login local se bloqueaba en
+      el navegador —no fallaba el servidor, fallaba la politica— y el sintoma
+      era una pantalla de login que no reacciona.
+
+      En produccion no afloja nada util: una pagina no gana capacidades por
+      poder hablar con el localhost de quien la mira, y el resto de la politica
+      sigue igual de cerrada.
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src 'self' https: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self' blob:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:*; frame-src 'self' https: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self' blob:"
     />
     <link rel="icon" type="image/png" href="/brand/favicon.png" />
     <link rel="apple-touch-icon" href="/brand/favicon.png" />
