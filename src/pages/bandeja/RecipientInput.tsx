@@ -18,10 +18,7 @@ function splitCurrent(value: string) {
   return { head: at >= 0 ? value.slice(0, at + 1) : "", current: value.slice(at + 1).trim() };
 }
 
-/**
- * Campo de direcciones con sugerencias de contactos conocidos. Varias direcciones
- * van separadas por coma; la sugerencia completa solo la que se esta escribiendo.
- */
+/** Selector de destinatarios con autocompletado de contactos sugeridos. */
 export function RecipientInput({ value, onChange, placeholder, className = "", autoFocus, inputRef }: RecipientInputProps) {
   const [suggestions, setSuggestions] = useState<ContactResponse[]>([]);
   const [active, setActive] = useState(0);
@@ -93,14 +90,14 @@ export function RecipientInput({ value, onChange, placeholder, className = "", a
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
-        className={`w-full bg-transparent text-[12px] text-ink outline-none placeholder:text-faint ${className}`}
+        className={`w-full bg-transparent text-[12.5px] text-zinc-900 outline-none placeholder:text-zinc-400 font-medium ${className}`}
       />
 
       {open && shown.length > 0 && (
         <ul
           role="listbox"
-          className="absolute left-0 top-full z-30 mt-1 max-h-56 w-full max-w-[420px] overflow-y-auto rounded-edge
-            border border-line bg-white py-1 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.14)]"
+          className="animate-plf-toast-in absolute left-0 top-full z-30 mt-1.5 max-h-56 w-full max-w-[420px] overflow-y-auto rounded-lg
+            border border-zinc-200/90 bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
         >
           {shown.map((contact, index) => (
             <li
@@ -110,12 +107,12 @@ export function RecipientInput({ value, onChange, placeholder, className = "", a
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => pick(contact)}
               onMouseEnter={() => setActive(index)}
-              className={`flex cursor-pointer flex-col px-3 py-1.5 text-[12px] ${
-                index === active ? "bg-brand-red/[0.06] text-ink" : "text-brand-gray"
+              className={`flex cursor-pointer flex-col rounded-md px-3 py-1.5 text-[12px] transition-colors ${
+                index === active ? "bg-zinc-100 text-zinc-900" : "text-zinc-700 hover:bg-zinc-50"
               }`}
             >
-              {contact.name && <span className="font-medium text-ink">{contact.name}</span>}
-              <span className={contact.name ? "text-[11px] text-subtle" : ""}>{contact.email}</span>
+              {contact.name && <span className="font-semibold text-zinc-900">{contact.name}</span>}
+              <span className={contact.name ? "text-[11px] text-zinc-500" : "font-medium text-zinc-800"}>{contact.email}</span>
             </li>
           ))}
         </ul>

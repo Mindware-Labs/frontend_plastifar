@@ -3,14 +3,17 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
+import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button as PfButton } from "../../components/ui/Button";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { useNoticeInset, useReceipts } from "../../context/useReceipts";
+import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes } from "../../lib/format";
-import { fieldLabelClass } from "./toolbarStyles";
+import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
 import { SendValidationButton } from "./SendValidationButton";
-import { CannedPicker, textToBlocks } from "./CannedPicker";
+import { CannedPicker } from "./CannedPicker";
+import { textToBlocks } from "./textToBlocks";
 import { RecipientInput } from "./RecipientInput";
 import { type ValidationItem } from "./sendValidation";
 
@@ -33,6 +36,11 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const [initialBlocks, setInitialBlocks] = useState<unknown>(null);
   const [editorKey, setEditorKey] = useState(0);
   const [files, setFiles] = useState<File[]>([]);
+  const {
+    isShowing: showAttachedFeedback,
+    isExiting: attachedExiting,
+    trigger: triggerAttachedFeedback,
+  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const receipts = useReceipts();
@@ -85,6 +93,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
 
     setError(null);
     setFiles(merged);
+    triggerAttachedFeedback();
   }
 
   async function handleSend() {
@@ -165,24 +174,21 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         addFiles(Array.from(event.dataTransfer.files));
       }}
     >
-      <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2">
+      <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
         <PenLine className="h-3.5 w-3.5 shrink-0 text-brand-red" />
-        <span className="text-[12.5px] font-semibold text-ink">Correo nuevo</span>
+        <span className="text-[12.5px] font-semibold text-zinc-900">Correo nuevo</span>
         <button
           type="button"
           onClick={onCancel}
           aria-label="Descartar el correo"
           title="Descartar el correo"
-          className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-edge
-            text-brand-gray outline-none transition-colors hover:bg-fill hover:text-ink
-            focus-visible:ring-3 focus-visible:ring-brand-red/20"
+          className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer"
         >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
-        transition-colors focus-within:bg-canvas">
+      <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
         <span className={fieldLabelClass}>Para</span>
         <RecipientInput
           inputRef={toRef}
@@ -195,9 +201,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
             type="button"
             onClick={() => setCcOpen(true)}
             title="Agregar copia"
-            className="shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10.5px] font-bold
-              uppercase tracking-[0.08em] text-faint outline-none transition-colors
-              hover:bg-fill hover:text-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/20"
+            className={fieldToggleClass}
           >
             CC
           </button>
@@ -207,9 +211,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
             type="button"
             onClick={() => setBccOpen(true)}
             title="Agregar copia oculta"
-            className="shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10.5px] font-bold
-              uppercase tracking-[0.08em] text-faint outline-none transition-colors
-              hover:bg-fill hover:text-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/20"
+            className={fieldToggleClass}
           >
             CCO
           </button>
@@ -217,8 +219,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       </div>
 
       {ccOpen && (
-        <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
-          transition-colors focus-within:bg-canvas">
+        <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
           <span className={fieldLabelClass}>CC</span>
           <RecipientInput
             inputRef={ccRef}
@@ -234,9 +235,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
             }}
             aria-label="Quitar la copia"
             title="Quitar la copia"
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-edge text-faint
-              outline-none transition-colors hover:bg-fill hover:text-ink
-              focus-visible:ring-3 focus-visible:ring-brand-red/20"
+            className={fieldCloseClass}
           >
             <X className="h-3 w-3" />
           </button>
@@ -244,8 +243,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       )}
 
       {bccOpen && (
-        <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
-          transition-colors focus-within:bg-canvas">
+        <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
           <span className={fieldLabelClass}>CCO</span>
           <RecipientInput
             inputRef={bccRef}
@@ -261,25 +259,21 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
             }}
             aria-label="Quitar la copia oculta"
             title="Quitar la copia oculta"
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-edge text-faint
-              outline-none transition-colors hover:bg-fill hover:text-ink
-              focus-visible:ring-3 focus-visible:ring-brand-red/20"
+            className={fieldCloseClass}
           >
             <X className="h-3 w-3" />
           </button>
         </div>
       )}
 
-      <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
-        transition-colors focus-within:bg-canvas">
+      <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
         <span className={fieldLabelClass}>Asunto</span>
         <input
           ref={subjectRef}
           value={subject}
           onChange={(event) => setSubject(event.target.value)}
           placeholder="De qué se trata"
-          className="min-w-0 flex-1 bg-transparent text-[12px] font-medium text-ink outline-none
-            placeholder:font-normal placeholder:text-faint"
+          className="min-w-0 flex-1 bg-transparent text-[12.5px] font-medium text-zinc-900 outline-none placeholder:font-normal placeholder:text-zinc-400"
         />
       </div>
 
@@ -295,21 +289,22 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       </div>
 
       {files.length > 0 && (
-        <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-line px-4 py-2">
+        <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-100 px-4 py-2">
           {files.map((file, position) => (
             <span
               key={`${file.name}-${position}`}
-              className="inline-flex items-center gap-1.5 rounded-edge border border-line
-                bg-canvas px-2 py-1 text-[11.5px] text-brand-gray"
+              className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-zinc-800 shadow-2xs"
             >
-              <Paperclip className="h-3 w-3 text-faint" />
+              <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
+                <AnimatedCheckIcon size={10} strokeWidth={3} />
+              </span>
               <span className="max-w-[160px] truncate">{file.name}</span>
-              <span className="text-faint">{formatBytes(file.size)}</span>
+              <span className="text-zinc-400">· {formatBytes(file.size)}</span>
               <button
                 type="button"
                 onClick={() => setFiles(files.filter((_, at) => at !== position))}
                 aria-label={`Quitar ${file.name}`}
-                className="text-faint transition-colors hover:text-brand-red"
+                className="text-zinc-400 transition-colors hover:text-brand-red cursor-pointer"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -324,18 +319,35 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         </div>
       )}
 
-      <div className="flex shrink-0 items-center gap-2 border-t border-line px-4 py-2">
+      <div className="flex shrink-0 items-center gap-2 border-t border-zinc-100 px-4 py-2.5 bg-zinc-50/30">
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-edge border border-line bg-canvas
-            px-2 py-1 text-[11.5px] font-medium text-brand-gray outline-none
-            transition-[background-color,border-color,color]
-            hover:border-line-strong hover:bg-white hover:text-ink
-            focus-visible:ring-3 focus-visible:ring-brand-red/20"
+          className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium shadow-2xs outline-none transition-all duration-300 cursor-pointer ${
+            showAttachedFeedback
+              ? attachedExiting
+                ? "border-emerald-200 bg-emerald-50/40 text-emerald-600 ring-1 ring-emerald-100/50"
+                : "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200/70 font-semibold"
+              : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20"
+          }`}
         >
-          <Paperclip className="h-3.5 w-3.5" />
-          Adjuntar
+          {showAttachedFeedback ? (
+            <span
+              className={`inline-flex items-center gap-1.5 ${
+                attachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+              }`}
+            >
+              <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
+                <AnimatedCheckIcon size={11} strokeWidth={3} />
+              </span>
+              <span>¡Adjuntado!</span>
+            </span>
+          ) : (
+            <>
+              <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
+              Adjuntar
+            </>
+          )}
         </button>
         <input
           ref={fileRef}
@@ -348,12 +360,12 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
           }}
         />
         <CannedPicker onPick={insertCanned} />
-        <span className="truncate text-[11px] text-faint">
+        <span className="truncate text-[11px] font-medium text-zinc-400">
           Sale de la casilla de soporte, con tu nombre y tu firma.
         </span>
 
         <div className="ml-auto flex shrink-0 gap-2">
-          <PfButton variant="ghost" size="sm" className="h-7 px-3" onClick={onCancel}>
+          <PfButton variant="ghost" size="sm" className="h-8 px-3" onClick={onCancel}>
             Descartar
           </PfButton>
           <SendValidationButton
@@ -362,6 +374,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
             missingItems={missingItems}
             onSend={handleSend}
             onFocusField={handleFocusField}
+            size="md"
           />
         </div>
       </div>

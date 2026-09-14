@@ -15,6 +15,7 @@ import {
   BarChart3,
   Building2,
   ClipboardCheck,
+  Gavel,
   Inbox,
   KeyRound,
   LayoutDashboard,
@@ -24,9 +25,10 @@ import {
   Settings,
   ShieldCheck,
   Star,
+  Tag,
+  Ticket as TicketIcon,
   Trash2,
   Users,
-  Ticket as TicketIcon,
   type LucideIcon,
 } from "lucide-react";
 import type { PermissionKey } from "./permissions";
@@ -90,17 +92,25 @@ export interface NavGroup {
 export const SIDEBAR_NAV: NavGroup[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", section: "Principal" },
   /*
-   * Tickets deja de ser un grupo. Tenia un unico hijo llamado «Bandeja», y un
-   * grupo de uno no agrupa nada: obligaba a desplegar para llegar al mismo
-   * sitio, y encima creaba dos «Bandeja» en el mismo menu —la de tickets y la
-   * de correo— que solo se distinguian por el padre que habia que abrir.
+   * Tickets vuelve a ser grupo, y ahora si agrupa. Dejo de serlo cuando tenia
+   * un unico hijo llamado «Bandeja» —un grupo de uno no agrupa nada y creaba
+   * dos «Bandeja» en el mismo menu—. Con Motivos y Veredictos, que llegaron
+   * con la rama de Tickets, el despliegue vuelve a ganarse su sitio.
+   *
+   * OJO con «Motivos»: el mismo catalogo se administra tambien desde
+   * Configuracion, contra la misma entidad y con otro cliente de API. Son dos
+   * pantallas para una cosa; unificarlas es decision de producto.
    */
   {
     label: "Tickets",
     icon: TicketIcon,
-    to: "/tickets",
     section: "Principal",
     permission: "tickets.read",
+    children: [
+      { label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon },
+      { label: "Motivos", to: "/tickets/motivos", icon: Tag },
+      { label: "Veredictos", to: "/tickets/veredictos", icon: Gavel },
+    ],
   },
   {
     label: "Correo",
@@ -160,8 +170,8 @@ export const SIDEBAR_NAV: NavGroup[] = [
     icon: Users,
     section: "Gestión",
     children: [
-      { label: "Colaboradores", to: "/staff", icon: Users, permission: "staff.read" },
-      { label: "Roles", to: "/roles", icon: ShieldCheck, permission: "roles.read" },
+      { label: "Colaboradores", to: "/staff", icon: Users, permission: "staff.read", adminOnly: true },
+      { label: "Roles", to: "/roles", icon: ShieldCheck, permission: "roles.read", adminOnly: true },
       { label: "Permisos", to: "/permisos", icon: KeyRound, permission: "roles.read" },
       /*
        * EL ORGANIGRAMA VIVE CON LOS PERMISOS, NO CON LOS CATALOGOS.

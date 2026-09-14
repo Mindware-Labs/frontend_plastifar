@@ -1,32 +1,35 @@
 import { z } from "zod";
 
-/**
- * Reglas de contrasena del panel. Unica fuente de verdad del frontend: la usan
- * el formulario de restablecer, el de cambiar contrasena y el medidor de fuerza.
- *
- * Espejo de api/Services/PasswordPolicy.cs — si cambia una, cambia la otra.
- */
+/** Reglas de validación y fortaleza de contraseñas compartidas. */
 export interface PasswordRule {
   id: string;
   label: string;
   test: (value: string) => boolean;
 }
 
+const PASSWORD_MIN_LENGTH = 8;
+/** Lo exporta el modulo porque el dialogo de cambio de contrasena lo
+    muestra en su mensaje de error: el limite se dice una sola vez. */
 export const PASSWORD_MAX_LENGTH = 128;
 
 export const PASSWORD_RULES: PasswordRule[] = [
   {
     id: "case",
     label: "Mayúsculas y minúsculas",
-    test: (value) => /[a-z]/.test(value) && /[A-Z]/.test(value),
+    test: (value) => /\p{Lu}/u.test(value) && /\p{Ll}/u.test(value),
   },
-  { id: "number", label: "Al menos un número (0–9)", test: (value) => /[0-9]/.test(value) },
+  { id: "number", label: "Al menos un número (0–9)", test: (value) => /\p{Nd}/u.test(value) },
   {
     id: "special",
     label: "Un carácter especial",
-    test: (value) => /[^A-Za-z0-9]/.test(value),
+    // Igual que el backend: cualquier caracter que no sea letra ni digito, espacios incluidos.
+    test: (value) => /[^\p{L}\p{N}]/u.test(value),
   },
-  { id: "length", label: "Al menos 8 caracteres", test: (value) => value.length >= 8 },
+  {
+    id: "length",
+    label: `Al menos ${PASSWORD_MIN_LENGTH} caracteres`,
+    test: (value) => value.length >= PASSWORD_MIN_LENGTH && value.length <= PASSWORD_MAX_LENGTH,
+  },
 ];
 
 export type StrengthLevel = "weak" | "average" | "strong";

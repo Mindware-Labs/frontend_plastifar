@@ -2,14 +2,14 @@ import { HelpCircle, MessageSquareText, Pencil, Plus, Trash2 } from "lucide-reac
 import { useEffect, useState } from "react";
 import { cannedApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { TableSkeleton } from "../../components/ui/Skeleton";
+import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/useAuth";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse } from "../../types/api";
@@ -72,47 +72,47 @@ export function RespuestasPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {error && (
-          <div className="mb-3">
-            <Alert variant="error">{error}</Alert>
-          </div>
-        )}
-
-        <ListPanel
+      <ModuleHeader
+        title="Respuestas"
+        summary={
+          items
+            ? `${items.length} ${items.length === 1 ? "respuesta predefinida" : "respuestas predefinidas"} · se insertan desde el editor con "Respuestas rápidas"`
+            : "Cargando las respuestas…"
+        }
         action={
           <Button size="sm" onClick={() => setModal("nueva")}>
             <Plus className="h-[15px] w-[15px]" />
             Nueva respuesta
           </Button>
         }
-          toolbar={
-            <>
-              <SearchInput value={search} onChange={setSearch} placeholder="Buscar por título o texto…" className="w-[260px]" />
+      />
 
-              <div className="ml-auto">
-                <button
-                  type="button"
-                  onClick={() => setHelpOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-edge border border-line bg-white px-3 py-1.5 text-[12px] font-medium text-brand-gray transition-[background-color,border-color,color] hover:border-line-strong hover:bg-canvas hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20 shadow-2xs"
-                >
-                  <HelpCircle className="h-3.5 w-3.5 text-brand-red" />
-                  <span>¿Para qué sirve?</span>
-                </button>
-              </div>
-            </>
-          }
-        >
-          {items === null ? (
-            error === null && <TableSkeleton rows={8} columns={5} />
-          ) : rows.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-14 text-center">
-              <MessageSquareText className="h-6 w-6 text-faint" />
-              <p className="text-[13.5px] text-faint">
-                {term ? "Ninguna respuesta coincide con la búsqueda." : "Todavía no hay respuestas guardadas."}
-              </p>
-            </div>
-          ) : (
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <SearchInput value={search} onChange={setSearch} placeholder="Buscar por título o texto…" className="w-[260px]" />
+
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-700 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 transition-all cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-red/25"
+          >
+            <HelpCircle className="h-3.5 w-3.5 text-brand-red" />
+            <span>¿Para qué sirve?</span>
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-3">
+            <Alert variant="error">{error}</Alert>
+          </div>
+        )}
+
+        {items === null ? (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        ) : (
+          <>
             <DataTable>
               <thead>
                 <HeadRow>
@@ -144,8 +144,17 @@ export function RespuestasPage() {
                 ))}
               </tbody>
             </DataTable>
-          )}
-        </ListPanel>
+
+            {rows.length === 0 && (
+              <div className="flex flex-col items-center gap-2 py-14 text-center">
+                <MessageSquareText className="h-6 w-6 text-faint" />
+                <p className="text-[13.5px] text-faint">
+                  {term ? "Ninguna respuesta coincide con la búsqueda." : "Todavía no hay respuestas guardadas."}
+                </p>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}

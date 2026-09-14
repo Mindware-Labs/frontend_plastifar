@@ -1,10 +1,9 @@
 import { Check, ChevronDown, Search } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import {
-  controlBase,
   controlSizes,
-  stateClasses,
   type ControlSize,
   type FieldState,
 } from "./fieldStyles";
@@ -26,29 +25,37 @@ interface SelectProps {
   variant?: "default" | "subtle";
   leftIcon?: React.ReactNode;
   state?: FieldState;
-  /** Las opciones aun estan en camino: se dice eso, no "Sin opciones". */
-  loading?: boolean;
   disabled?: boolean;
+  /** Por defecto aparece solo si hay bastantes opciones que filtrar. */
+  searchable?: boolean;
   id?: string;
   className?: string;
   buttonClassName?: string;
   "aria-label"?: string;
   "aria-describedby"?: string;
-  /** Explicito cuando quien lo usa conoce la validez por otra via que `state`. */
-  "aria-invalid"?: boolean;
 }
 
 const PANEL_MAX_HEIGHT = 264;
 
-/**
- * Desplegable propio del panel, no el del sistema operativo: el nativo no acepta
- * tipografia, radio ni color, y en cada navegador se ve distinto.
- *
- * Se comporta como un combobox real: teclado completo (flechas, Inicio/Fin,
- * Enter, Escape), buscador propio para filtrar por texto, roles ARIA y foco
- * siempre gobernado (al disparador al cerrar, al buscador al abrir).
- * El panel se dibuja en un portal para que no lo recorte el scroll de un dialogo.
- */
+interface Anchor {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  /** Centro del disparador respecto al borde izquierdo del panel: de ahí brota el despliegue. */
+  originX: number;
+}
+
+// Anchura mínima adaptada al contenido y marca de selección.
+const PANEL_MIN_WIDTH = 96;
+
+// En xs y en la variante discreta el disparador es una pastilla corta por diseño.
+const PANEL_MIN_WIDTH_COMPACT_TRIGGER = 180;
+
+// Por debajo de esto la lista se recorre de un vistazo y el buscador solo estorba.
+const SEARCH_FROM = 9;
+
+/** Desplegable accesible con navegación por teclado y portal para scroll. */
 export function Select({
   value,
   onChange,
@@ -59,14 +66,13 @@ export function Select({
   variant = "default",
   leftIcon,
   state = "idle",
-  loading = false,
   disabled,
+  searchable,
   id,
   className = "",
   buttonClassName = "",
   "aria-label": ariaLabel,
   "aria-describedby": ariaDescribedBy,
-  "aria-invalid": ariaInvalid,
 }: SelectProps) {
   const generated = useId();
   const listId = `${id ?? generated}-listbox`;
@@ -74,15 +80,20 @@ export function Select({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [query, setQuery] = useState("");
-  const [anchor, setAnchor] = useState<{ left: number; width: number; top?: number; bottom?: number } | null>(null);
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const dropUp = anchor?.bottom !== undefined;
+  const { mounted, exiting, ref: containerRef, snap } = useDisclosureMotion<HTMLDivElement>(open, {
+    direction: dropUp ? "up" : "down",
+  });
 
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
+
+  const showSearch = searchable ?? options.filter((option) => !option.hidden).length >= SEARCH_FROM;
 
   /** Visible = no oculta y, si hay busqueda activa, su texto la contiene. */
   function isVisible(option: SelectOption) {
@@ -98,11 +109,20 @@ export function Select({
     const below = window.innerHeight - rect.bottom;
     const dropUp = below < PANEL_MAX_HEIGHT && rect.top > below;
 
+    const width = Math.max(
+      rect.width,
+      size === "xs" || isSubtle ? PANEL_MIN_WIDTH_COMPACT_TRIGGER : PANEL_MIN_WIDTH,
+    );
+
+    // Un panel más ancho que su disparador no puede desbordar la ventana por la derecha.
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+
     setAnchor({
-      left: rect.left,
-      width: rect.width,
+      left,
+      width,
       top: dropUp ? undefined : rect.bottom + 4,
       bottom: dropUp ? window.innerHeight - rect.top + 4 : undefined,
+      originX: rect.left + rect.width / 2 - left,
     });
   }
 
@@ -118,10 +138,15 @@ export function Select({
     setOpen(true);
   }
 
-  function closeList() {
-    setOpen(false);
-    onBlur?.();
-  }
+  const closeList = useCallback(
+    (immediate = false) => {
+      if (!open) return;
+      setOpen(false);
+      if (immediate) snap();
+      onBlur?.();
+    },
+    [open, snap, onBlur],
+  );
 
   function commit(index: number) {
     const option = options[index];
@@ -148,12 +173,15 @@ export function Select({
     setActiveIndex(firstMatch);
   }
 
-  // El buscador recibe el foco apenas se abre el panel: se escribe de inmediato.
+  // Enfoque inicial al buscador o al primer elemento de la lista al abrir.
   useEffect(() => {
     if (!open) return;
-    const id = window.setTimeout(() => searchInputRef.current?.focus(), 0);
+    const id = window.setTimeout(
+      () => (showSearch ? searchInputRef.current : listRef.current)?.focus(),
+      0,
+    );
     return () => window.clearTimeout(id);
-  }, [open]);
+  }, [open, showSearch]);
 
   useEffect(() => {
     if (!open) return;
@@ -161,26 +189,17 @@ export function Select({
     function handlePointerDown(event: PointerEvent | MouseEvent) {
       const target = event.target as Node;
       if (triggerRef.current?.contains(target) || containerRef.current?.contains(target)) return;
-      setOpen(false);
-      onBlur?.();
+      closeList();
     }
 
-    // Reposicionar en cada scroll seria un baile: se cierra, como haria el nativo.
-    //
-    // Pero el scroll DEL PROPIO PANEL no mueve el ancla. Sin esta guarda,
-    // cualquier lista que no cupiera se cerraba en el mismo instante de abrirse:
-    // al abrir, el efecto que lleva la opcion activa a la vista hace
-    // scrollIntoView, eso emite un `scroll`, y este listener —que escucha en
-    // fase de captura, o sea todos— lo leia como si se hubiera movido la pagina.
-    // Solo se notaba con muchas opciones; con seis no hay nada que desplazar.
+    // Cierre automático al detectar scroll exterior.
     function handleViewportChange(event: Event) {
       if (event.target instanceof Node && containerRef.current?.contains(event.target)) return;
-      setOpen(false);
+      closeList(true);
     }
 
     function handleWindowBlur() {
-      setOpen(false);
-      onBlur?.();
+      closeList(true);
     }
 
     document.addEventListener("pointerdown", handlePointerDown, true);
@@ -195,11 +214,9 @@ export function Select({
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [open, onBlur]);
+  }, [open, closeList, containerRef]);
 
-  // Mantiene visible la opcion activa cuando se navega con el teclado.
-  // Se busca por data-option-index (no por posicion): la busqueda oculta opciones,
-  // asi que el indice logico no coincide con el orden de los <li> montados.
+  // Mantiene visible la opción activa durante la navegación por teclado.
   useEffect(() => {
     if (!open || activeIndex < 0) return;
     listRef.current
@@ -216,7 +233,8 @@ export function Select({
     }
   }
 
-  function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+  /** Navegación del panel abierto; la usa el buscador o la lista, según cuál tenga el foco. */
+  function handleNavKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
@@ -240,9 +258,6 @@ export function Select({
         return;
       case "Escape":
         event.preventDefault();
-        // Sin detener la propagacion el mismo Escape llega al listener de
-        // documento de Modal: cerraba la lista y descartaba el formulario entero.
-        event.stopPropagation();
         closeList();
         triggerRef.current?.focus();
         return;
@@ -265,14 +280,22 @@ export function Select({
         : "pl-3 pr-2.5 gap-2";
 
   const subtleStateClasses: Record<FieldState, string> = {
-    idle: "border-line bg-canvas/70 hover:bg-canvas hover:border-line-strong text-ink shadow-2xs focus:border-brand-red/60 focus:ring-2 focus:ring-brand-red/15",
-    error: "border-brand-red/60 bg-brand-red/[0.04] text-ink focus:ring-2 focus:ring-brand-red/15",
-    valid: "border-brand-green/60 bg-brand-green/[0.03] focus:ring-2 focus:ring-brand-green/15",
+    idle: "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50 text-zinc-800 shadow-2xs focus:outline-none focus-visible:border-zinc-400 focus-visible:ring-2 focus-visible:ring-zinc-400/20",
+    error: "border-brand-red bg-brand-red/[0.02] text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/12",
+    valid: "border-brand-green/50 bg-brand-green/[0.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green/10",
   };
 
-  const triggerVariantClass = isSubtle
-    ? subtleStateClasses[resolved]
-    : `${controlBase} ${stateClasses[resolved]}`;
+  const defaultStateClasses: Record<FieldState, string> = {
+    idle: "border-zinc-200 bg-white text-zinc-800 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 focus:outline-none focus-visible:border-zinc-400 focus-visible:ring-2 focus-visible:ring-zinc-400/20",
+    error: "border-brand-red bg-brand-red/[0.02] text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/12",
+    valid: "border-brand-green/50 bg-brand-green/[0.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green/10",
+  };
+
+  const triggerVariantClass = open
+    ? "border-zinc-300 bg-zinc-50/80 text-zinc-900 shadow-2xs"
+    : isSubtle
+      ? subtleStateClasses[resolved]
+      : defaultStateClasses[resolved];
 
   const visibleCount = options.filter(isVisible).length;
 
@@ -285,21 +308,19 @@ export function Select({
         role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-controls={open ? listId : undefined}
+        aria-controls={mounted ? listId : undefined}
         aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
-        aria-invalid={ariaInvalid ?? resolved === "error"}
+        aria-invalid={resolved === "error"}
         disabled={disabled}
         onClick={() => (open ? closeList() : openList())}
         onKeyDown={handleKeyDown}
-        className={`${
-          isSubtle
-            ? "w-full rounded-edge border text-left outline-none transition-all disabled:cursor-not-allowed disabled:bg-canvas disabled:text-faint"
-            : ""
-        } ${triggerVariantClass} ${sizeClass} ${paddingClass}
+        className={`w-full rounded-lg border text-left outline-none transition-colors duration-150 cursor-pointer select-none
+          disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-400
+          ${triggerVariantClass} ${sizeClass} ${paddingClass}
           flex items-center justify-between font-medium
-          ${selected ? "text-ink" : "text-faint"} ${buttonClassName}`}
+          ${selected ? "text-zinc-900" : "text-zinc-400"} ${buttonClassName}`}
       >
         <div className="flex min-w-0 items-center gap-1.5 truncate">
           {leftIcon}
@@ -309,60 +330,68 @@ export function Select({
           aria-hidden
           className={`${
             size === "xs" ? "h-3 w-3" : "h-4 w-4"
-          } shrink-0 text-faint transition-transform ${open ? "rotate-180" : ""}`}
+          } shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+            open ? "rotate-180 text-zinc-700" : ""
+          }`}
         />
       </button>
 
-      {open &&
+      {mounted &&
         anchor &&
         createPortal(
           <>
-            <div
-              data-select-backdrop="true"
-              className="fixed inset-0 z-[70]"
-              aria-hidden="true"
-              onPointerDown={() => {
-                setOpen(false);
-                onBlur?.();
-              }}
-            />
+            {!exiting && (
+              <div
+                data-select-backdrop="true"
+                className="fixed inset-0 z-[70]"
+                aria-hidden="true"
+                onPointerDown={() => closeList()}
+              />
+            )}
             <div
               ref={containerRef}
               data-select-portal="true"
+              aria-hidden={exiting}
               style={{
                 position: "fixed",
                 left: anchor.left,
                 top: anchor.top,
                 bottom: anchor.bottom,
-                width: Math.max(anchor.width, size === "xs" || isSubtle ? 180 : anchor.width),
+                width: anchor.width,
                 maxHeight: PANEL_MAX_HEIGHT,
+                transformOrigin: `${anchor.originX}px ${dropUp ? "bottom" : "top"}`,
               }}
-              className="animate-plf-toast-in z-[80] flex flex-col overflow-hidden rounded-edge border border-line
-                bg-white shadow-[0_4px_8px_rgba(27,27,29,0.04),0_24px_48px_-20px_rgba(27,27,29,0.28)]"
+              className={`z-[80] flex flex-col overflow-hidden rounded-lg border border-zinc-200/90
+                bg-white/95 backdrop-blur-xs shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]
+                ${exiting ? "pointer-events-none" : ""}`}
             >
-              <div className="relative shrink-0 border-b border-line p-1.5">
-                <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={query}
-                  onChange={(event) => handleQueryChange(event.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  placeholder="Buscar…"
-                  aria-label="Buscar opciones"
-                  aria-controls={listId}
-                  className="w-full rounded-edge border border-line bg-canvas/60 py-1.5 pl-8 pr-2 text-[12px]
-                    text-ink outline-none transition-colors placeholder:text-faint focus:border-brand-red/40
-                    focus:bg-white focus:ring-2 focus:ring-brand-red/10"
-                />
-              </div>
+              {showSearch && (
+                <div data-motion-item className="relative shrink-0 border-b border-zinc-100 p-1.5">
+                  <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={query}
+                    onChange={(event) => handleQueryChange(event.target.value)}
+                    onKeyDown={handleNavKeyDown}
+                    placeholder="Buscar…"
+                    aria-label="Buscar opciones"
+                    aria-controls={listId}
+                    className="w-full rounded-md border border-zinc-200 bg-zinc-50/60 py-1.5 pl-8 pr-2 text-[12px]
+                      text-zinc-800 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-400
+                      focus:bg-white focus:ring-2 focus:ring-zinc-400/20"
+                  />
+                </div>
+              )}
 
               <ul
                 ref={listRef}
                 id={listId}
                 role="listbox"
                 aria-label={ariaLabel}
-                className="min-h-0 flex-1 overflow-y-auto p-1"
+                tabIndex={showSearch ? undefined : -1}
+                onKeyDown={showSearch ? undefined : handleNavKeyDown}
+                className="min-h-0 flex-1 overflow-y-auto p-1 outline-none"
               >
                 {options.map((option, index) => {
                   if (!isVisible(option)) return null;
@@ -372,6 +401,7 @@ export function Select({
                   return (
                     <li
                       key={option.value}
+                      data-motion-item
                       id={`${listId}-${index}`}
                       data-option-index={index}
                       role="option"
@@ -379,7 +409,7 @@ export function Select({
                       aria-disabled={option.disabled}
                       onMouseEnter={() => !option.disabled && setActiveIndex(index)}
                       onClick={() => commit(index)}
-                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge transition-colors ${
+                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-md transition-colors ${
                         size === "xs"
                           ? "px-2 py-1.5 text-[11.5px]"
                           : size === "sm"
@@ -387,11 +417,11 @@ export function Select({
                             : "px-2.5 py-2 text-[13px]"
                       } ${
                         option.disabled
-                          ? "cursor-not-allowed text-faint"
+                          ? "cursor-not-allowed text-zinc-300"
                           : isActive
-                            ? "bg-fill text-ink"
-                            : "text-brand-gray"
-                      } ${isSelected ? "font-semibold text-ink" : ""}`}
+                            ? "bg-zinc-100 text-zinc-900 font-medium"
+                            : "text-zinc-700 hover:bg-zinc-100/70"
+                      } ${isSelected ? "font-semibold text-zinc-900" : ""}`}
                     >
                       <span className="truncate">{option.label}</span>
                       {isSelected && (
@@ -406,11 +436,9 @@ export function Select({
                   );
                 })}
 
-                {/* Mientras la peticion esta en vuelo no hay "ninguna": todavia
-                    no se sabe. Afirmar lo contrario es mentir sobre el dato. */}
                 {visibleCount === 0 && (
                   <li className="px-2.5 py-3 text-center text-[12.5px] text-faint">
-                    {query.trim() ? "Sin resultados" : loading ? "Cargando…" : "Sin opciones"}
+                    {query.trim() ? "Sin resultados" : "Sin opciones"}
                   </li>
                 )}
               </ul>

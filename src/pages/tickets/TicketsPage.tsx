@@ -1,25 +1,40 @@
-import { Clock, Flag, Plus, SlidersHorizontal, Ticket as TicketIcon, UserCheck } from "lucide-react";
+import {
+  AlertOctagon,
+  AlertTriangle,
+  Building2,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Flag,
+  Plus,
+  SlidersHorizontal,
+  Ticket as TicketIcon,
+  X,
+} from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
+import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
+import { useNavigate } from "react-router-dom";
+import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
+import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
-import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
-import { ListPanel } from "../../components/ui/ListPanel";
 import { Modal } from "../../components/ui/Modal";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
-import { TableSkeleton } from "../../components/ui/Skeleton";
-import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { usePagedList } from "../../hooks/usePagedList";
+import { SelectBox } from "../../components/ui/SelectBox";
+import { Spinner } from "../../components/ui/Spinner";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
-import { formatListDateTime, formatSlaRemaining } from "../../lib/format";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePagedList } from "../../hooks/usePagedList";
+import { formatActivityDate, formatSlaRemaining } from "../../lib/format";
 import type {
   DepartmentResponse,
   TicketCounts,
@@ -29,13 +44,19 @@ import type {
   TicketStaffOptionResponse,
 } from "../../types/api";
 import { CreateTicketModal } from "./CreateTicketModal";
-import { departmentOptions } from "../../lib/departments";
-import { FilterPopover } from "../../components/ui/FilterPopover";
+import { AssigneeCell, PriorityCell, SlaCell, StatusCell } from "./ticketCells";
+import { TicketSelectionBar } from "./TicketSelectionBar";
 
 type TicketFilterKey = "todos" | "abiertos" | "por-vencer" | "vencidos" | "espera" | "cerrados";
 type SortKey = "numero" | "asunto" | "cliente" | "departamento" | "prioridad" | "estado" | "sla" | "actividad";
 
-const filters: { key: TicketFilterKey; label: string; countKey: keyof TicketCounts }[] = [
+interface TicketFilter {
+  key: TicketFilterKey;
+  label: string;
+  countKey: keyof TicketCounts;
+}
+
+const filters: TicketFilter[] = [
   { key: "todos", label: "Todos", countKey: "all" },
   { key: "abiertos", label: "Abiertos", countKey: "open" },
   { key: "por-vencer", label: "Por vencer", countKey: "upcoming" },
@@ -44,66 +65,69 @@ const filters: { key: TicketFilterKey; label: string; countKey: keyof TicketCoun
   { key: "cerrados", label: "Cerrados", countKey: "closed" },
 ];
 
-// Las pastillas nunca deben partirse a una segunda línea: solo se muestran fijas
-// las 3 vistas más usadas en la operación diaria; el resto vive detrás del botón
-// de filtros (mismo patrón que el ícono de filtros de la bandeja de correo).
-const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos", "vencidos"];
+// Solo dos tags visibles en la barra principal; el resto queda en el menú Más.
+const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos"];
 const primaryFilters = filters.filter((f) => PRIMARY_FILTER_KEYS.includes(f.key));
 const secondaryFilters = filters.filter((f) => !PRIMARY_FILTER_KEYS.includes(f.key));
 
-const columns: { key: SortKey; label: string }[] = [
-  { key: "numero", label: "Número" },
-  { key: "asunto", label: "Asunto / Motivo" },
-  { key: "cliente", label: "Cliente" },
-  { key: "departamento", label: "Depto." },
-  { key: "prioridad", label: "Prioridad" },
-  /* Estado y SLA eran dos columnas para el MISMO hecho: en que situacion esta
-     el ticket. Separadas costaban 206 px de los 1085 del panel y obligaban a
-     leer dos celdas para responder una sola pregunta. Juntas, el estado nombra
-     y el plazo matiza, que es como se lee de todos modos. */
-  /* La columna fusionada ordena por SLA, no por estado, y no es un detalle: el
-     RF-T5 del plan pide ordenar por «vencimiento de SLA», que es lo unico
-     accionable de las dos. El estado es categorico —ordenarlo alfabeticamente
-     pone «Abierto» antes que «Vencido» y no informa de nada—, mientras que el
-     plazo dice a quien hay que atender primero. Al unir las dos columnas, la
-     clave de orden se quedo en `estado` y ese orden se perdio. */
-  { key: "sla", label: "Estado / SLA" },
-  { key: "actividad", label: "Actividad" },
+// Tabla de anchos fijos: el asunto absorbe lo que sobra y las columnas secundarias entran por escalones.
+const columns: { key: SortKey; label: string; className: string }[] = [
+  { key: "numero", label: "Número", className: "w-[100px]" },
+  { key: "asunto", label: "Asunto", className: "" },
+  { key: "cliente", label: "Cliente", className: "hidden w-[160px] lg:table-cell" },
+  { key: "departamento", label: "Departamento", className: "hidden w-[125px] 2xl:table-cell" },
+  { key: "prioridad", label: "Prioridad", className: "hidden w-[96px] md:table-cell" },
+  { key: "estado", label: "Estado", className: "w-[115px]" },
+  { key: "sla", label: "SLA", className: "w-[110px]" },
+  { key: "actividad", label: "Actividad", className: "hidden w-[120px] xl:table-cell" },
 ];
 
-function priorityBadgeClass(priority: string) {
-  switch (priority.toLowerCase()) {
-    case "emergencia":
-      return "bg-brand-red/[0.06] text-brand-red-dark border-brand-red/25 font-semibold";
-    case "alta":
-      return "bg-warn/[0.08] text-warn border-warn/35";
-    case "normal":
-      return "bg-canvas text-brand-gray border-line";
-    case "baja":
-      return "bg-canvas text-subtle border-line";
-    default:
-      return "bg-canvas text-brand-gray border-line";
+const SELECT_COLUMN = "w-10 px-2 text-center";
+const ASSIGNED_COLUMN = "hidden w-[145px] lg:table-cell";
+
+const clientColors = [
+  "bg-sky-400",
+  "bg-teal-400",
+  "bg-indigo-500",
+  "bg-purple-500",
+  "bg-emerald-500",
+  "bg-pink-400",
+  "bg-amber-500",
+  "bg-blue-500",
+];
+
+function getClientDotColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
+  return clientColors[Math.abs(hash) % clientColors.length];
 }
+
+const priorityOptions = [
+  { value: "Emergencia", label: "Emergencia" },
+  { value: "Alta", label: "Alta" },
+  { value: "Normal", label: "Normal" },
+  { value: "Baja", label: "Baja" },
+];
 
 const STATUS_MENU_WIDTH = 224;
 
 interface TicketStatusMenuProps {
-  options: { key: TicketFilterKey; label: string; countKey: keyof TicketCounts }[];
+  options: TicketFilter[];
   activeKey: TicketFilterKey;
   counts?: TicketCounts;
   onSelect: (key: TicketFilterKey) => void;
 }
 
-/** Botón de filtros con panel flotante para las vistas de estado menos usadas
- * (mismo patrón que el ícono de filtros de la bandeja de correo). */
+/** Vistas de estado menos usadas, en un panel flotante (mismo patron que el filtro de la bandeja de correo). */
 function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatusMenuProps) {
   const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [anchor, setAnchor] = useState<{ top: number; left: number; originX: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
-  const activeInMenu = options.some((option) => option.key === activeKey);
+  const { mounted, exiting, ref: panelRef, snap } = useDisclosureMotion<HTMLDivElement>(open);
+  const handleMenuKeyDown = useMenuKeyboard(panelRef, open);
 
   useEffect(() => {
     if (!open) return;
@@ -121,6 +145,7 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
     }
     function handleViewportChange() {
       setOpen(false);
+      snap();
     }
 
     document.addEventListener("pointerdown", handlePointerDown);
@@ -133,7 +158,7 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
     };
-  }, [open]);
+  }, [open, snap, panelRef]);
 
   function toggle() {
     if (open) {
@@ -142,9 +167,14 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
     }
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setAnchor({ top: rect.bottom + 6, left: Math.max(8, rect.right - STATUS_MENU_WIDTH) });
+    const left = Math.max(8, rect.right - STATUS_MENU_WIDTH);
+    setAnchor({ top: rect.bottom + 6, left, originX: rect.left + rect.width / 2 - left });
     setOpen(true);
   }
+
+  const active = options.find((option) => option.key === activeKey);
+  const activeCount = active && counts ? counts[active.countKey] : 0;
+  const hasOverdueSecondary = (counts?.overdue ?? 0) > 0;
 
   return (
     <div className="relative shrink-0">
@@ -154,61 +184,94 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
         onClick={toggle}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        aria-label={activeInMenu ? `Más filtros (activo: ${options.find((o) => o.key === activeKey)?.label})` : "Más filtros"}
-        title="Más filtros"
-        data-active={activeInMenu}
-        className="relative flex h-8 w-8 items-center justify-center rounded-edge border border-line-strong
-          bg-white text-brand-gray outline-none transition-all duration-150 hover:border-hairline-hover hover:text-ink
-          active:scale-95 focus-visible:border-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/10
-          data-[active=true]:border-brand-red/40 data-[active=true]:text-brand-red-dark
-          aria-expanded:bg-fill aria-expanded:text-ink"
+        aria-controls={mounted ? panelId : undefined}
+        aria-label={active ? `Más vistas (activa: ${active.label})` : "Más vistas"}
+        title={active ? `Vista activa: ${active.label}` : "Más vistas"}
+        className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+          active || open
+            ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+        }`}
       >
-        <SlidersHorizontal className="h-4 w-4" />
-        {activeInMenu && (
+        <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
+        <span>{active ? active.label : "Más"}</span>
+        {active ? (
           <span
-            aria-hidden
-            className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-brand-red"
-          />
+            className={`font-heading text-[10px] font-bold leading-none tabular-nums ${
+              active.key === "vencidos" && activeCount > 0 ? "text-brand-red" : "text-zinc-900"
+            }`}
+          >
+            {activeCount}
+          </span>
+        ) : (
+          hasOverdueSecondary && (
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-red" title="Hay tickets vencidos" />
+          )
         )}
+        <ChevronDown
+          className={`h-3 w-3 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-zinc-700" : ""}`}
+        />
       </button>
 
-      {open &&
+      {mounted &&
         anchor &&
         createPortal(
           <div
             ref={panelRef}
             id={panelId}
             role="menu"
-            aria-label="Más filtros de estado"
-            style={{ position: "fixed", top: anchor.top, left: anchor.left, width: STATUS_MENU_WIDTH }}
-            className="animate-plf-popover-in z-[60] flex flex-col gap-0.5 rounded-edge border border-line/90
-              bg-white p-1.5 shadow-[0_4px_16px_-2px_rgba(27,27,29,0.08),0_12px_32px_-4px_rgba(27,27,29,0.14)]"
+            aria-label="Más vistas de estado"
+            aria-hidden={exiting}
+            onKeyDown={handleMenuKeyDown}
+            style={{
+              position: "fixed",
+              top: anchor.top,
+              left: anchor.left,
+              width: STATUS_MENU_WIDTH,
+              transformOrigin: `${anchor.originX}px top`,
+            }}
+            className={`z-[60] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
+              bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] ${
+                exiting ? "pointer-events-none" : ""
+              }`}
           >
+            <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
+              Vistas de estado
+            </div>
             {options.map(({ key, label, countKey }) => {
               const isActive = key === activeKey;
+              const count = counts?.[countKey] ?? 0;
+              const isOverdue = key === "vencidos" && count > 0;
               return (
                 <button
                   key={key}
+                  data-motion-item
                   type="button"
                   role="menuitemradio"
                   aria-checked={isActive}
                   onClick={() => {
                     onSelect(key);
                     setOpen(false);
+                    triggerRef.current?.focus();
                   }}
-                  className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge px-2.5 py-1.5
-                    text-left text-[12.5px] font-medium transition-colors ${
-                      isActive ? "bg-brand-red/[0.06] text-brand-red-dark" : "text-ink hover:bg-fill"
+                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left
+                    text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                      isActive
+                        ? "bg-zinc-100 font-semibold text-zinc-900"
+                        : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-zinc-900"
                     }`}
                 >
-                  <span>{label}</span>
+                  <span className={isOverdue ? "font-semibold text-brand-red" : ""}>{label}</span>
                   <span
-                    className={`rounded-full px-1.5 py-px text-[11px] font-semibold ${
-                      isActive ? "bg-brand-red/15 text-brand-red-dark" : "bg-fill text-subtle"
+                    className={`rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums ${
+                      isOverdue
+                        ? "bg-red-50 text-brand-red font-bold"
+                        : isActive
+                        ? "bg-zinc-200 text-zinc-900"
+                        : "bg-zinc-100 text-zinc-500"
                     }`}
                   >
-                    {counts?.[countKey] ?? 0}
+                    {count}
                   </span>
                 </button>
               );
@@ -219,62 +282,34 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
     </div>
   );
 }
+
+
+/** Bandeja de tickets: cada fila abre el detalle; marcar filas cambia la barra de criterios por la de acciones. */
 export function TicketsPage() {
   const navigate = useNavigate();
+  const receipts = useReceipts();
+  const { onTicketsChanged } = useEmailCounts();
+
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [search, setSearch] = useState("");
-  /* El estado inicial sale de la URL, igual que ya hace HcaPage. Es lo que
-     permite que el tablero enlace a `/tickets?estado=vencidos` y la bandeja
-     abra ya filtrada; sin esto, cada cifra del tablero llevaba a una lista sin
-     filtrar, que es peor que no enlazar. */
-  const [searchParams] = useSearchParams();
-  const [filter, setFilter] = useState<TicketFilterKey>(() => {
-    const requested = searchParams.get("estado");
-    return filters.some((f) => f.key === requested)
-      ? (requested as TicketFilterKey)
-      : "todos";
-  });
+  const [filter, setFilter] = useState<TicketFilterKey>("todos");
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
   const [priority, setPriority] = useState<string>("todas");
-
-  /* Los dos criterios que viven detras del boton. El numero viaja al
-     disparador: un recorte que no se ve deja leer una bandeja parcial como si
-     fuera la bandeja entera. */
-  const filtrosPuestos = (departmentId !== "todos" ? 1 : 0) + (priority !== "todas" ? 1 : 0);
-
-  /** Quita solo lo del panel; la busqueda y las pastillas no se tocan. */
-  function clearNarrowFilters() {
-    setDepartmentId("todos");
-    setPriority("todas");
-    setPage(1);
-  }
-  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
-    key: "actividad",
-    dir: "desc",
-  });
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "actividad", dir: "desc" });
   const [pageSize, setPageSize] = useState(10);
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  // Selección múltiple, acciones en lote y alta manual
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
-  const [bulkPriorityOpen, setBulkPriorityOpen] = useState(false);
-  const [bulkStaffId, setBulkStaffId] = useState<string>("");
-  const [bulkPriority, setBulkPriority] = useState<string>("Normal");
+  const [bulkModal, setBulkModal] = useState<"asignar" | "prioridad" | null>(null);
+  const [bulkStaffId, setBulkStaffId] = useState("");
+  const [bulkPriority, setBulkPriority] = useState("Normal");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
-  const [bulkFeedback, setBulkFeedback] = useState<{ variant: "success" | "error" | "info"; message: string } | null>(null);
   const [staffOptions, setStaffOptions] = useState<TicketStaffOptionResponse[]>([]);
 
   useEffect(() => {
-    departmentsApi
-      .list()
-      .then(setDepartments)
-      .catch(() => setDepartments([]));
+    departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
   }, []);
-
-  const { onTicketsChanged } = useEmailCounts();
-  const receipts = useReceipts();
 
   const { data, isStale, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
     fetch: ticketsApi.list,
@@ -290,124 +325,78 @@ export function TicketsPage() {
     fallbackError: "No se pudieron cargar los tickets",
   });
 
-  useEffect(() => {
-    return onTicketsChanged(() => {
-      refresh();
-    });
-  }, [onTicketsChanged, refresh]);
+  useEffect(() => onTicketsChanged(refresh), [onTicketsChanged, refresh]);
 
   const rows: TicketListItemResponse[] = data?.items ?? [];
   const counts = data?.counts;
+  const hasCriteria =
+    Boolean(debouncedSearch) || filter !== "todos" || departmentId !== "todos" || priority !== "todas";
 
-  const allVisibleIds = rows.map((r) => r.id);
-  const allVisibleSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedIds.has(id));
-  const someVisibleSelected = allVisibleIds.some((id) => selectedIds.has(id));
+  const visibleIds = rows.map((row) => row.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
+  const pageState: boolean | "mixed" = allVisibleSelected ? true : someVisibleSelected ? "mixed" : false;
+
+  // La barra de seleccion entra y sale animada sobre el sitio de los criterios, como en correo.
+  const isSelecting = selectedIds.size > 0;
+  const [prevSelecting, setPrevSelecting] = useState(isSelecting);
+  const [selectionExiting, setSelectionExiting] = useState(false);
+  const [criteriaExiting, setCriteriaExiting] = useState(false);
+  const [preservedCount, setPreservedCount] = useState(0);
+
+  if (isSelecting && preservedCount !== selectedIds.size) setPreservedCount(selectedIds.size);
+  if (prevSelecting !== isSelecting) {
+    setPrevSelecting(isSelecting);
+    setSelectionExiting(!isSelecting);
+    setCriteriaExiting(isSelecting);
+  }
+
+  useEffect(() => {
+    if (!selectionExiting) return;
+    const timer = setTimeout(() => setSelectionExiting(false), 180);
+    return () => clearTimeout(timer);
+  }, [selectionExiting]);
+
+  useEffect(() => {
+    if (!criteriaExiting) return;
+    const timer = setTimeout(() => setCriteriaExiting(false), 160);
+    return () => clearTimeout(timer);
+  }, [criteriaExiting]);
+
+  useEffect(() => {
+    if (!isSelecting) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && bulkModal === null) setSelectedIds(new Set());
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isSelecting, bulkModal]);
+
+  const showSelection = isSelecting || selectionExiting;
+  const showCriteria = !isSelecting || criteriaExiting;
 
   function toggleSelect(id: number) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
 
-  function toggleSelectAll() {
-    if (allVisibleSelected) {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        allVisibleIds.forEach((id) => next.delete(id));
-        return next;
-      });
-    } else {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        allVisibleIds.forEach((id) => next.add(id));
-        return next;
-      });
-    }
+  function togglePage() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      visibleIds.forEach((id) => (allVisibleSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
   }
 
-  function openBulkAssign() {
-    if (staffOptions.length === 0) {
-      ticketsApi
-        .createOptions()
-        .then((opts) => {
-          setStaffOptions(opts.assignableStaff);
-        })
-        .catch(() => {});
-    }
-    setBulkAssignOpen(true);
-  }
-
-  async function handleBulkAssignSubmit() {
-    setBulkSubmitting(true);
-    setBulkFeedback(null);
-    try {
-      const targetStaffId = bulkStaffId ? parseInt(bulkStaffId, 10) : null;
-      const res = await ticketsApi.bulkAssign({
-        ticketIds: Array.from(selectedIds),
-        staffId: targetStaffId,
-      });
-      setBulkAssignOpen(false);
-      setSelectedIds(new Set());
-      refresh();
-      if (res.updatedCount < res.totalRequested) {
-        const skipped = res.totalRequested - res.updatedCount;
-        setBulkFeedback({
-          variant: "info",
-          message: `Se reasignaron ${res.updatedCount} de ${res.totalRequested} tickets (${skipped} omitidos por estar cerrados o no autorizados).`,
-        });
-      } else {
-        setBulkFeedback({
-          variant: "success",
-          message: `Se asignaron exitosamente los ${res.updatedCount} tickets seleccionados.`,
-        });
-      }
-    } catch (err) {
-      setBulkFeedback({
-        variant: "error",
-        message: err instanceof Error ? err.message : "Error al asignar tickets en lote",
-      });
-    } finally {
-      setBulkSubmitting(false);
-    }
-  }
-
-  async function handleBulkPrioritySubmit() {
-    setBulkSubmitting(true);
-    setBulkFeedback(null);
-    try {
-      const res = await ticketsApi.bulkPriority({
-        ticketIds: Array.from(selectedIds),
-        priority: bulkPriority,
-      });
-      setBulkPriorityOpen(false);
-      setSelectedIds(new Set());
-      refresh();
-      if (res.updatedCount < res.totalRequested) {
-        const skipped = res.totalRequested - res.updatedCount;
-        setBulkFeedback({
-          variant: "info",
-          message: `Se actualizó la prioridad a '${bulkPriority}' en ${res.updatedCount} de ${res.totalRequested} tickets (${skipped} omitidos por estar cerrados).`,
-        });
-      } else {
-        setBulkFeedback({
-          variant: "success",
-          message: `Se actualizó la prioridad a '${bulkPriority}' en los ${res.updatedCount} tickets seleccionados.`,
-        });
-      }
-    } catch (err) {
-      setBulkFeedback({
-        variant: "error",
-        message: err instanceof Error ? err.message : "Error al cambiar prioridad en lote",
-      });
-    } finally {
-      setBulkSubmitting(false);
-    }
+  function clearCriteria() {
+    setSearch("");
+    setFilter("todos");
+    setDepartmentId("todos");
+    setPriority("todas");
   }
 
   function toggleSort(key: SortKey) {
@@ -416,25 +405,327 @@ export function TicketsPage() {
     );
   }
 
+  function openBulkAssign() {
+    if (staffOptions.length === 0) {
+      ticketsApi
+        .createOptions()
+        .then((opts) => setStaffOptions(opts.assignableStaff))
+        .catch(() => {});
+    }
+    setBulkModal("asignar");
+  }
+
+  async function runBulk(
+    action: "asignar-lote" | "prioridad-lote",
+    request: () => Promise<{ updatedCount: number; totalRequested: number }>,
+    title: string,
+    failedTitle: string,
+  ) {
+    setBulkSubmitting(true);
+    try {
+      const result = await request();
+      setBulkModal(null);
+      setSelectedIds(new Set());
+      refresh();
+      const skipped = result.totalRequested - result.updatedCount;
+      receipts.done({
+        action,
+        title,
+        detail:
+          skipped > 0
+            ? `${result.updatedCount} de ${result.totalRequested} · ${skipped} omitidos por estar cerrados o sin permiso`
+            : `${result.updatedCount} ${result.updatedCount === 1 ? "ticket" : "tickets"}`,
+      });
+    } catch (err) {
+      receipts.failed({
+        action,
+        title: failedTitle,
+        detail: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setBulkSubmitting(false);
+    }
+  }
+
+  const bulkIds = () => Array.from(selectedIds);
+
+  const departmentOptions = buildDepartmentFilterOptions(departments);
+
+  const priorityFilterOptions: TicketFilterOption[] = [
+    {
+      value: "todas",
+      label: "Todas las prioridades",
+      icon: <Flag className="h-4 w-4 text-zinc-500" />,
+    },
+    {
+      value: "Emergencia",
+      label: "Emergencia",
+      icon: <AlertOctagon className="h-4 w-4 text-brand-red" />,
+    },
+    {
+      value: "Alta",
+      label: "Alta",
+      icon: <AlertTriangle className="h-4 w-4 text-amber-500" />,
+    },
+    {
+      value: "Normal",
+      label: "Normal",
+      icon: <CheckCircle2 className="h-4 w-4 text-zinc-500" />,
+    },
+    {
+      value: "Baja",
+      label: "Baja",
+      icon: <Clock className="h-4 w-4 text-zinc-400" />,
+    },
+  ];
+
   return (
-    <div className="flex h-full flex-col relative">
+    <div className="flex h-full flex-col">
+      <ModuleHeader
+        title="Tickets"
+        summary={
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              {/* Total tickets */}
+              <button
+                type="button"
+                onClick={() => setFilter("todos")}
+                title="Mostrar todos los tickets"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
+                  filter === "todos"
+                    ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
+                    : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                <span className="font-semibold text-zinc-900">{counts.all}</span>
+                <span>{counts.all === 1 ? "ticket" : "tickets"}</span>
+              </button>
+
+              {/* Abiertos */}
+              {(counts.open > 0 || filter === "abiertos") && (
+                <>
+                  <span aria-hidden className="text-zinc-300">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilter("abiertos")}
+                    title="Filtrar por tickets abiertos"
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
+                      filter === "abiertos"
+                        ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
+                        : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                    }`}
+                  >
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                    <span className="font-semibold text-zinc-900">{counts.open}</span>
+                    <span>{counts.open === 1 ? "abierto" : "abiertos"}</span>
+                  </button>
+                </>
+              )}
+
+              {/* Vencidos (alerta SLA con mismo estilo de sin responder en correo) */}
+              {(counts.overdue > 0 || filter === "vencidos") && (
+                <>
+                  <span aria-hidden className="text-zinc-300">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilter("vencidos")}
+                    title="Filtrar por tickets vencidos de SLA"
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
+                      filter === "vencidos"
+                        ? "border border-red-300 bg-red-100/90 text-brand-red shadow-2xs font-bold ring-1 ring-red-300/40"
+                        : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${counts.overdue > 0 ? "bg-brand-red" : "bg-zinc-300"}`} />
+                    <span className={counts.overdue > 0 ? "font-bold text-brand-red" : "font-semibold text-zinc-800"}>
+                      {counts.overdue}
+                    </span>
+                    <span>{counts.overdue === 1 ? "vencido" : "vencidos"}</span>
+                  </button>
+                </>
+              )}
+
+              {/* En espera del cliente */}
+              {(counts.waitingOnClient > 0 || filter === "espera") && (
+                <>
+                  <span aria-hidden className="text-zinc-300">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilter("espera")}
+                    title="Filtrar por tickets en espera del cliente"
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
+                      filter === "espera"
+                        ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
+                        : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${counts.waitingOnClient > 0 ? "bg-amber-500" : "bg-zinc-300"}`} />
+                    <span className="font-semibold text-zinc-900">{counts.waitingOnClient}</span>
+                    <span>en espera</span>
+                  </button>
+                </>
+              )}
+
+              {/* Por vencer (cuando está activo) */}
+              {filter === "por-vencer" && (
+                <>
+                  <span aria-hidden className="text-zinc-300">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilter("por-vencer")}
+                    title="Filtrar por tickets por vencer"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-100/90 px-2 py-0.5 text-[11.5px] font-bold text-amber-900 shadow-2xs ring-1 ring-amber-300/40 cursor-pointer select-none active:scale-[0.98]"
+                  >
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    <span className="font-bold text-amber-900">{counts.upcoming}</span>
+                    <span>por vencer</span>
+                  </button>
+                </>
+              )}
+
+              {/* Cerrados (cuando está activo) */}
+              {filter === "cerrados" && (
+                <>
+                  <span aria-hidden className="text-zinc-300">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilter("cerrados")}
+                    title="Filtrar por tickets cerrados"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-zinc-100 px-2 py-0.5 text-[11.5px] font-semibold text-zinc-900 shadow-2xs cursor-pointer select-none active:scale-[0.98]"
+                  >
+                    <span className="font-semibold text-zinc-900">{counts.closed}</span>
+                    <span>cerrados</span>
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando los tickets…
+            </span>
+          )
+        }
+        action={
+          <Button
+            size="sm"
+            onClick={() => setCreateModalOpen(true)}
+            className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            <span>Nuevo ticket</span>
+          </Button>
+        }
+      />
+
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {bulkFeedback && (
-          <div className="mb-3">
-            <Alert variant={bulkFeedback.variant}>
-              <div className="flex items-center justify-between w-full">
-                <span>{bulkFeedback.message}</span>
-                <button
-                  type="button"
-                  onClick={() => setBulkFeedback(null)}
-                  className="ml-2 text-xs underline cursor-pointer hover:opacity-80"
-                >
-                  Cerrar
-                </button>
+        {/* Barra de herramientas en una sola línea: búsqueda y filtros a la izquierda, vistas de estado a la derecha */}
+        <div className="mb-3 grid min-h-8">
+          {showCriteria && (
+            <div
+              inert={criteriaExiting ? true : undefined}
+              className={`col-start-1 row-start-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 ${
+                criteriaExiting ? "animate-plf-tabs-out" : "animate-plf-tabs-in"
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <SearchInput
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Buscar por número, asunto o cliente…"
+                  className="w-[280px] sm:w-[300px]"
+                />
+                <TicketFilterDropdown
+                  title="Seleccionar departamento"
+                  value={String(departmentId)}
+                  onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+                  options={departmentOptions}
+                  defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
+                  aria-label="Filtrar por departamento"
+                />
+                <TicketFilterDropdown
+                  title="Seleccionar prioridad"
+                  value={priority}
+                  onChange={setPriority}
+                  options={priorityFilterOptions}
+                  defaultIcon={<Flag className="h-4 w-4 text-zinc-500" />}
+                  aria-label="Filtrar por prioridad"
+                />
+
+                {(search || departmentId !== "todos" || priority !== "todas") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setDepartmentId("todos");
+                      setPriority("todas");
+                    }}
+                    title="Limpiar filtros"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
+                  >
+                    <X className="h-3.5 w-3.5 text-zinc-400" />
+                    <span>Limpiar</span>
+                  </button>
+                )}
               </div>
-            </Alert>
-          </div>
-        )}
+
+              {/* Vistas de estado: Todos y Abiertos a la vista, el resto en Más. Un solo control segmentado. */}
+              <div
+                role="group"
+                aria-label="Vista de estado"
+                className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
+              >
+                {primaryFilters.map(({ key, label, countKey }) => {
+                  const isActive = filter === key;
+                  const count = counts?.[countKey] ?? 0;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setFilter(key)}
+                      aria-pressed={isActive}
+                      className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                        isActive
+                          ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+                          : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+                      }`}
+                    >
+                      <span>{label}</span>
+                      <span
+                        className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
+                          isActive ? "text-zinc-900" : "text-zinc-400"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+                <TicketStatusMenu
+                  options={secondaryFilters}
+                  activeKey={filter}
+                  counts={counts}
+                  onSelect={setFilter}
+                />
+              </div>
+            </div>
+          )}
+
+          {showSelection && (
+            <div className="col-start-1 row-start-1 w-full" inert={selectionExiting ? true : undefined}>
+              <TicketSelectionBar
+                count={isSelecting ? selectedIds.size : preservedCount}
+                pageState={pageState}
+                busy={bulkSubmitting}
+                isExiting={selectionExiting}
+                onTogglePage={togglePage}
+                onClear={() => setSelectedIds(new Set())}
+                onAssign={openBulkAssign}
+                onPriority={() => setBulkModal("prioridad")}
+              />
+            </div>
+          )}
+        </div>
 
         {error && (
           <div className="mb-3">
@@ -442,341 +733,181 @@ export function TicketsPage() {
           </div>
         )}
 
-        <ListPanel
-          action={
-            <Button size="sm" onClick={() => setCreateModalOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nuevo ticket
-            </Button>
-          }
-          toolbar={
-            <>
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="Buscar por número, asunto o cliente…"
-                className="min-w-[200px] flex-1"
-              />
-
-              {/* Departamento y prioridad, guardados. La bandeja ya tenia un
-                  menu para los estados secundarios; tener ademas dos
-                  desplegables sueltos repartia el filtrado en tres sitios
-                  distintos de la misma barra. */}
-              <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
-                <Select
-                size="sm"
-                className="w-[200px]"
-                aria-label="Filtrar por departamento"
-                value={String(departmentId)}
-                onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
-                options={[
-                  { value: "todos", label: "Todos los deptos." },
-                  ...departmentOptions(departments),
-                ]}
-              />
-
-                <Select
-                size="sm"
-                className="w-[200px]"
-                aria-label="Filtrar por prioridad"
-                value={priority}
-                onChange={(next) => setPriority(next)}
-                options={[
-                  { value: "todas", label: "Todas las prioridades" },
-                  { value: "Emergencia", label: "Emergencia" },
-                  { value: "Alta", label: "Alta" },
-                  { value: "Normal", label: "Normal" },
-                  { value: "Baja", label: "Baja" },
-                ]}
-              />
-              </FilterPopover>
-
-              <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-              {primaryFilters.map(({ key, label, countKey }) => (
-                <FilterChip
-                  key={key}
-                  label={label}
-                  count={counts?.[countKey] ?? 0}
-                  active={filter === key}
-                  onClick={() => setFilter(key)}
-                />
-              ))}
-
-              <TicketStatusMenu
-                options={secondaryFilters}
-                activeKey={filter}
-                counts={counts}
-                onSelect={setFilter}
-              />
-            </>
-          }
-          footer={
-            data !== null &&
-            data.total > 0 && (
-              <Pagination
-                page={data.page}
-                totalPages={data.totalPages}
-                total={data.total}
-                pageSize={data.pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                noun="tickets"
-              />
-            )
-          }
-        >
-          {data === null ? (
-            error === null && <TableSkeleton rows={pageSize} columns={10} />
-          ) : (
-            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
-              {/* Compacta: la bandeja es la única tabla que tiene que mostrar
-                  diez renglones enteros sin que el último quede bajo el pliegue.
-                  No esconde ningún dato, quita aire. */}
-              <DataTable density="compacta">
+        {!data ? (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        ) : (
+          // Atenuada mientras llega la pagina nueva: la anterior se queda para no dar un salto en blanco.
+          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <DataTable fixed>
               <thead>
                 <HeadRow>
-                  <Th className="w-10 !px-3">
-                    <input
-                      type="checkbox"
-                      aria-label="Seleccionar todos los tickets visibles"
-                      className="h-4 w-4 rounded-[2px] border-line text-brand-red focus:ring-brand-red cursor-pointer accent-brand-red"
-                      checked={allVisibleSelected}
-                      ref={(input) => {
-                        if (input) {
-                          input.indeterminate = someVisibleSelected && !allVisibleSelected;
-                        }
-                      }}
-                      onChange={toggleSelectAll}
-                    />
+                  <Th className={SELECT_COLUMN}>
+                    <div className="flex items-center justify-center">
+                      <SelectBox
+                        checked={pageState}
+                        label={pageState === true ? "Quitar la selección de esta página" : "Seleccionar toda la página"}
+                        onToggle={togglePage}
+                      />
+                    </div>
                   </Th>
-                  {columns.map(({ key, label }) => (
+                  {columns.map(({ key, label, className }) => (
                     <Th
                       key={key}
-                      sort={{
-                        dir: sort.key === key ? sort.dir : null,
-                        onToggle: () => toggleSort(key),
-                      }}
+                      className={className}
+                      sort={{ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) }}
                     >
                       {label}
                     </Th>
                   ))}
-                  <Th>Asignado</Th>
+                  <Th className={ASSIGNED_COLUMN}>Asignado</Th>
                 </HeadRow>
               </thead>
               <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={columns.length + 2} className="py-16 text-center text-subtle">
-                      <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
-                        <TicketIcon className="h-8 w-8 text-subtle/50" />
-                        <p className="text-[14px] font-medium text-ink">No se encontraron tickets</p>
-                        <p className="text-[12.5px] text-subtle">
-                          No hay registros que coincidan con los criterios de búsqueda o filtros seleccionados.
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((t) => {
-                    const sla = formatSlaRemaining(t.resolutionDueAt, Boolean(t.pausedAt));
-                    return (
-                      <Row
-                        key={t.id}
-                        onClick={() => navigate(`/tickets/${t.id}`)}
-                        className={`cursor-pointer ${selectedIds.has(t.id) ? "bg-brand-red/[0.03]" : ""}`}
-                      >
-                        {/* Selección */}
-                        <Td
-                          className="w-10 !px-3"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            aria-label={`Seleccionar ticket ${t.number}`}
-                            className="h-4 w-4 rounded-[2px] border-line text-brand-red focus:ring-brand-red cursor-pointer accent-brand-red"
-                            checked={selectedIds.has(t.id)}
-                            onChange={() => toggleSelect(t.id)}
+                {rows.map((t) => {
+                  const checked = selectedIds.has(t.id);
+                  const sla = formatSlaRemaining(t.resolutionDueAt, Boolean(t.pausedAt), t.status, t.closedAt);
+                  const activity = formatActivityDate(t.lastActivityAt);
+                  const client = t.clientName && t.clientName !== "Sin cliente" ? t.clientName : null;
+                  const clientCode = t.clientCode && t.clientCode !== "-" ? t.clientCode : null;
+                  const department =
+                    t.departmentName && t.departmentName !== "Sin departamento" ? t.departmentName : null;
+                  const open = () => navigate(`/tickets/${t.id}`);
+
+                  return (
+                    <Row
+                      key={t.id}
+                      tabIndex={0}
+                      data-checked={checked}
+                      onClick={open}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          open();
+                        }
+                      }}
+                      className="group cursor-pointer outline-none focus-visible:bg-zinc-50"
+                    >
+                      <Td className={SELECT_COLUMN}>
+                        <div className="flex items-center justify-center">
+                          <SelectBox
+                            checked={checked}
+                            label={`Seleccionar ${t.number}`}
+                            onToggle={() => toggleSelect(t.id)}
                           />
-                        </Td>
+                        </div>
+                      </Td>
 
-                        {/* Número */}
-                        <Td className="whitespace-nowrap font-mono text-[12px] font-semibold text-ink">
+                      <Td className={columns[0].className}>
+                        <span className="font-heading text-[11.5px] font-bold tabular-nums tracking-[0.01em] text-zinc-800">
                           {t.number}
-                        </Td>
+                        </span>
+                      </Td>
 
-                        {/* Asunto y Tema */}
-                        {/*
-                          ANCHO FIJO, NO `max-w`.
+                      <Td className={columns[1].className}>
+                        <div className="min-w-0">
+                          <p className="truncate text-[12.5px] font-medium text-zinc-900 leading-snug" title={t.subject}>
+                            {t.subject}
+                          </p>
+                          <p className="truncate text-[11px] text-zinc-500 font-normal leading-tight mt-0.5">
+                            {t.topicName ?? "Sin motivo"}
+                            {department && <span className="text-zinc-400 2xl:hidden"> · {department}</span>}
+                            {t.productLineName && <span className="text-zinc-400"> · {t.productLineName}</span>}
+                          </p>
+                        </div>
+                      </Td>
 
-                          Las tres celdas ya traian `max-w` y `truncate` y aun asi
-                          se partian en tres lineas: en una tabla de ancho
-                          automatico el `max-w` de un `<td>` no acota nada, porque
-                          el navegador reparte segun el ancho MINIMO del contenido
-                          y `truncate` solo entra en juego una vez que ese ancho ya
-                          esta resuelto. Con diez columnas el reparto dejaba el
-                          asunto en 107 px, la fila crecia a 74 px y la tabla se
-                          iba 30 px fuera del panel. Un ancho determinado corta el
-                          circulo: la columna mide lo que se le dice y el texto
-                          sobrante se elide.
-                        */}
-                        <Td>
-                          <div className="w-[164px]">
-                            <div
-                              className="truncate text-[13px] font-medium leading-[17px] text-ink"
-                              title={t.subject}
-                            >
-                              {t.subject}
-                            </div>
-                            <div className="truncate text-[11.5px] leading-[15px] text-subtle">
-                              {t.topicName || "Sin motivo"}
-                              {t.productLineName && ` · ${t.productLineName}`}
-                            </div>
-                          </div>
-                        </Td>
-
-                        {/* Cliente */}
-                        <Td>
-                          <div className="w-[102px]">
-                            <div
-                              className="truncate text-[13px] font-medium leading-[17px] text-ink"
-                              title={t.clientName || "Sin cliente"}
-                            >
-                              {t.clientName || "Sin cliente"}
-                            </div>
-                            <div className="truncate text-[11.5px] leading-[15px] text-subtle">
-                              {t.contactName ?? t.clientCode ?? "—"}
-                            </div>
-                          </div>
-                        </Td>
-
-                        {/* Departamento */}
-                        <Td>
-                          <div
-                            className="w-[96px] truncate text-[12.5px] text-subtle"
-                            title={t.departmentName || "Sin departamento"}
-                          >
-                            {t.departmentName || "Sin departamento"}
-                          </div>
-                        </Td>
-
-                        {/* Prioridad */}
-                        <Td className="whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center rounded px-1.5 py-0.5 text-[11px] border ${priorityBadgeClass(
-                              t.priority,
-                            )}`}
-                          >
-                            {t.priority}
-                          </span>
-                        </Td>
-
-                        {/* Estado y SLA en una sola celda: el estado arriba,
-                            el plazo debajo. */}
-                        <Td className="whitespace-nowrap">
-                          <span className="flex items-center gap-1.5">
+                      <Td className={columns[2].className}>
+                        {client ? (
+                          <div className="flex items-center gap-1.5 min-w-0" title={`${client}${clientCode ? ` (${clientCode})` : ""}`}>
                             <span
                               aria-hidden
-                              className={`h-[7px] w-[7px] shrink-0 rounded-full ${
-                                t.status === "Abierto"
-                                  ? "bg-brand-green"
-                                  : t.status === "Cancelado"
-                                  ? "bg-brand-red"
-                                  : "bg-warn"
-                              }`}
+                              className={`h-2 w-2 shrink-0 rounded-full ${getClientDotColor(client)}`}
                             />
-                            <span className="text-[12px] leading-[17px] text-ink">{t.status}</span>
-                          </span>
-                          <span className="mt-0.5 block">
-                          {sla.tone === "overdue" ? (
-                            <Badge tone="red">
-                              <span className="inline-flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {sla.text}
+                            <span className="truncate text-[12.5px] font-medium text-zinc-800">
+                              {client}
+                            </span>
+                            {clientCode && (
+                              <span className="shrink-0 text-[11px] font-normal text-zinc-400 tabular-nums">
+                                #{clientCode}
                               </span>
-                            </Badge>
-                          ) : sla.tone === "warning" ? (
-                            <Badge tone="amber">
-                              <span className="inline-flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {sla.text}
-                              </span>
-                            </Badge>
-                          ) : sla.tone === "paused" ? (
-                            <Badge tone="slate">{sla.text}</Badge>
-                          ) : (
-                            <Badge tone="neutral">{sla.text}</Badge>
-                          )}
-                          </span>
-                        </Td>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-zinc-400">—</span>
+                        )}
+                      </Td>
 
-                        {/* Última actividad */}
-                        <Td className="whitespace-nowrap text-[12px] text-subtle">
-                          {formatListDateTime(t.lastActivityAt)}
-                        </Td>
+                      <Td className={`${columns[3].className} truncate text-[12px] text-zinc-600`}>
+                        {department ?? <span className="text-zinc-300">—</span>}
+                      </Td>
 
-                        {/* Asignado */}
-                        <Td className="text-[12px]">
-                          {t.assignedStaffName ? (
-                            <div className="w-[112px] truncate font-medium text-ink" title={t.assignedStaffName}>
-                              {t.assignedStaffName}
-                            </div>
-                          ) : (
-                            <span className="text-subtle/70">Sin asignar</span>
-                          )}
-                        </Td>
-                      </Row>
-                    );
-                  })
-                )}
+                      <Td className={columns[4].className}>
+                        <PriorityCell priority={t.priority} />
+                      </Td>
+
+                      <Td className={columns[5].className}>
+                        <StatusCell status={t.status} />
+                      </Td>
+
+                      <Td className={columns[6].className}>
+                        <SlaCell sla={sla} />
+                      </Td>
+
+                      <Td className={`${columns[7].className} truncate whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500`}>
+                        <span className="truncate" title={activity.full}>{activity.compact}</span>
+                      </Td>
+
+                      <Td className={ASSIGNED_COLUMN}>
+                        <AssigneeCell id={t.assignedStaffId} name={t.assignedStaffName} />
+                      </Td>
+                    </Row>
+                  );
+                })}
               </tbody>
             </DataTable>
-            </div>
-          )}
-        </ListPanel>
+
+            {rows.length === 0 && (
+              <div className="flex flex-col items-center gap-3 py-14 text-center">
+                <span
+                  aria-hidden
+                  className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
+                >
+                  <TicketIcon className="size-4" strokeWidth={2.25} />
+                </span>
+                {hasCriteria ? (
+                  <>
+                    <p className="text-[13px] font-medium text-zinc-700">Ningún ticket coincide con estos criterios.</p>
+                    <Button variant="secondary" size="sm" onClick={clearCriteria}>
+                      Quitar filtros
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[13px] font-medium text-zinc-700">Todavía no hay tickets.</p>
+                    <p className="max-w-xs text-[12px] leading-relaxed text-zinc-400">
+                      Se crean desde un correo de la bandeja o a mano con «Nuevo ticket».
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="tickets"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Barra flotante de acciones en lote */}
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-[2px] border border-ink bg-ink px-4 py-2.5 text-white shadow-2xl animate-plf-toast-in">
-          <div className="flex items-center gap-2 text-[12.5px] font-medium text-line-strong">
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-red px-1.5 text-[10.5px] font-bold text-white">
-              {selectedIds.size}
-            </span>
-            <span>{selectedIds.size === 1 ? "ticket seleccionado" : "tickets seleccionados"}</span>
-          </div>
-          <span className="h-4 w-px bg-ink" />
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={openBulkAssign}
-              className="flex items-center gap-1.5 rounded-[2px] bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-white/20 cursor-pointer"
-            >
-              <UserCheck className="h-3.5 w-3.5 text-brand-red" />
-              Asignar en lote
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkPriorityOpen(true)}
-              className="flex items-center gap-1.5 rounded-[2px] bg-white/10 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-white/20 cursor-pointer"
-            >
-              <Flag className="h-3.5 w-3.5 text-warn" />
-              Cambiar prioridad
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="rounded-[2px] px-2.5 py-1.5 text-[12px] text-faint transition hover:text-white cursor-pointer"
-            >
-              Deseleccionar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Modal alta manual de ticket */}
       {createModalOpen && (
         <CreateTicketModal
           onClose={() => setCreateModalOpen(false)}
@@ -792,105 +923,102 @@ export function TicketsPage() {
         />
       )}
 
-      {/* Modal asignación en lote */}
-      {bulkAssignOpen && (
+      {bulkModal === "asignar" && (
         <Modal
-          eyebrow="Acciones en lote"
-          title="Asignar tickets en lote"
-          description={`Selecciona el colaborador al que deseas asignar los ${selectedIds.size} tickets seleccionados.`}
+          eyebrow="Tickets · Acciones en lote"
+          title="Asignar tickets"
+          description={`Elige quién atenderá los ${selectedIds.size} tickets seleccionados.`}
           onClose={() => {
-            if (!bulkSubmitting) setBulkAssignOpen(false);
+            if (!bulkSubmitting) setBulkModal(null);
           }}
           footer={({ requestClose }) => (
             <>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={requestClose}
-                disabled={bulkSubmitting}
-              >
+              <Button type="button" variant="secondary" onClick={requestClose} disabled={bulkSubmitting}>
                 Cancelar
               </Button>
               <Button
                 type="button"
-                onClick={handleBulkAssignSubmit}
                 isLoading={bulkSubmitting}
+                onClick={() =>
+                  runBulk(
+                    "asignar-lote",
+                    () =>
+                      ticketsApi.bulkAssign({
+                        ticketIds: bulkIds(),
+                        staffId: bulkStaffId ? Number(bulkStaffId) : null,
+                      }),
+                    bulkStaffId ? "Tickets asignados" : "Tickets sin asignar",
+                    "No se pudieron asignar",
+                  )
+                }
               >
-                Confirmar asignación
+                Asignar
               </Button>
             </>
           )}
         >
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-ink">Colaborador asignado</label>
+              <label htmlFor="bulk-staff" className="font-heading text-[11.5px] font-semibold text-faint">
+                Colaborador
+              </label>
               <Select
-                size="sm"
+                id="bulk-staff"
                 value={bulkStaffId}
-                onChange={(val) => setBulkStaffId(val)}
+                onChange={setBulkStaffId}
                 options={[
-                  { value: "", label: "— Sin asignar (desasignar) —" },
-                  ...staffOptions.map((s) => ({
-                    value: String(s.id),
-                    label: `${s.fullName} (${s.email})`,
-                  })),
+                  { value: "", label: "Sin asignar" },
+                  ...staffOptions.map((s) => ({ value: String(s.id), label: s.fullName })),
                 ]}
               />
             </div>
-            <p className="text-[12px] text-subtle leading-relaxed">
-              Se validará que el colaborador tenga acceso a los departamentos de cada ticket.
-              Los tickets resueltos o cancelados se omitirán automáticamente.
+            <p className="text-[12px] leading-relaxed text-subtle">
+              Solo se asignan los tickets de departamentos a los que esa persona tiene acceso. Los
+              solucionados o cancelados se omiten.
             </p>
           </div>
         </Modal>
       )}
 
-      {/* Modal cambio de prioridad en lote */}
-      {bulkPriorityOpen && (
+      {bulkModal === "prioridad" && (
         <Modal
-          eyebrow="Acciones en lote"
-          title="Cambiar prioridad en lote"
-          description={`Selecciona la nueva prioridad para los ${selectedIds.size} tickets seleccionados.`}
+          eyebrow="Tickets · Acciones en lote"
+          title="Cambiar prioridad"
+          description={`Nueva prioridad para los ${selectedIds.size} tickets seleccionados.`}
           onClose={() => {
-            if (!bulkSubmitting) setBulkPriorityOpen(false);
+            if (!bulkSubmitting) setBulkModal(null);
           }}
           footer={({ requestClose }) => (
             <>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={requestClose}
-                disabled={bulkSubmitting}
-              >
+              <Button type="button" variant="secondary" onClick={requestClose} disabled={bulkSubmitting}>
                 Cancelar
               </Button>
               <Button
                 type="button"
-                onClick={handleBulkPrioritySubmit}
                 isLoading={bulkSubmitting}
+                onClick={() =>
+                  runBulk(
+                    "prioridad-lote",
+                    () => ticketsApi.bulkPriority({ ticketIds: bulkIds(), priority: bulkPriority }),
+                    `Prioridad cambiada a ${bulkPriority}`,
+                    "No se pudo cambiar la prioridad",
+                  )
+                }
               >
-                Actualizar prioridad
+                Cambiar prioridad
               </Button>
             </>
           )}
         >
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-ink">Nueva prioridad</label>
-              <Select
-                size="sm"
-                value={bulkPriority}
-                onChange={(val) => setBulkPriority(val)}
-                options={[
-                  { value: "Emergencia", label: "Emergencia" },
-                  { value: "Alta", label: "Alta" },
-                  { value: "Normal", label: "Normal" },
-                  { value: "Baja", label: "Baja" },
-                ]}
-              />
+              <label htmlFor="bulk-priority" className="font-heading text-[11.5px] font-semibold text-faint">
+                Prioridad
+              </label>
+              <Select id="bulk-priority" value={bulkPriority} onChange={setBulkPriority} options={priorityOptions} />
             </div>
-            <p className="text-[12px] text-subtle leading-relaxed">
-              Se recalculará la fecha límite de SLA según la política correspondiente a la nueva prioridad.
+            <p className="text-[12px] leading-relaxed text-subtle">
+              La fecha límite de SLA se recalcula con la política de la nueva prioridad.
             </p>
           </div>
         </Modal>

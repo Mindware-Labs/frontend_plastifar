@@ -81,15 +81,23 @@ function describedBy(id: string, error?: string, hint?: ReactNode) {
   return ids.length > 0 ? ids.join(" ") : undefined;
 }
 
-interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
+interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   label: string;
   error?: string;
   hint?: ReactNode;
   state?: FieldState;
+  /**
+   * El tamano de la CASA, no el atributo `size` de HTML.
+   *
+   * Se omite el nativo a proposito: en un `<input>` es un numero —cuantos
+   * caracteres caben— y los componentes escriben `size="sm"`. Sin el `Omit`,
+   * TypeScript acepta uno y rechaza el otro segun el dia.
+   */
+  size?: ControlSize;
 }
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
-  { label, error, hint, state = "idle", id, className = "", required, ...props },
+  { label, error, hint, state = "idle", size = "md", id, className = "", required, ...props },
   ref,
 ) {
   const generated = useId();
@@ -104,7 +112,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
           id={fieldId}
           aria-invalid={resolved === "error"}
           aria-describedby={describedBy(fieldId, error, hint)}
-          className={`${controlBase} ${stateClasses[resolved]} ${controlSizes.md} px-3
+          className={`${controlBase} ${stateClasses[resolved]} ${controlSizes[size]} px-3
             placeholder:text-faint ${resolved === "valid" ? "pr-9" : ""} ${className}`}
           {...props}
         />

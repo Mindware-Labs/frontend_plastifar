@@ -3,6 +3,7 @@ import { authApi } from "../api/auth";
 import { refreshSession } from "../api/client";
 import { staffApi } from "../api/staff";
 import { tokenStore } from "../api/tokenStore";
+import { clearAllDrafts } from "../lib/drafts";
 import { decodeAccessToken } from "../lib/jwt";
 import { parseDepartmentAccess } from "../lib/permissions";
 import { AuthContext, type AuthUser } from "./useAuth";
@@ -100,8 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!tokenStore.getRefreshToken()) return;
-    // refreshSession comparte una sola peticion: el doble montaje de StrictMode
-    // no dispara dos rotaciones del mismo token.
+    // Deduplica peticiones concurrentes de renovación de sesión.
     refreshSession().finally(() => setIsLoading(false));
   }, []);
 
@@ -110,15 +110,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStore.setTokens(response.accessToken, response.refreshToken);
   }
 
-  async function logout() {
+  function logout() {
     const refreshToken = tokenStore.getRefreshToken();
 
-    // Se avisa al servidor ANTES de limpiar: al reves, la llamada salia sin
-    // credenciales, el 401 se tragaba en silencio y el refresh token seguia
-    // vivo hasta vencer. Si la red falla igual se cierra la sesion local.
-    if (refreshToken) await authApi.logout(refreshToken).catch(() => {});
-
+    // Limpia el estado local de inmediato para que la UI responda al instante.
+    clearAllDrafts();
     tokenStore.setTokens(null, null);
+
+    // Notifica la revocación al servidor en segundo plano (sin bloquear la UI).
+    if (refreshToken) authApi.logout(refreshToken).catch(() => {});
+
+    return Promise.resolve();
   }
 
   return (

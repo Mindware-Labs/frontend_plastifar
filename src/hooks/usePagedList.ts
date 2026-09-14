@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "../api/client";
 
 interface PagedData {
@@ -13,11 +13,7 @@ interface Options<TQuery extends { page: number }, TData extends PagedData> {
   fallbackError: string;
 }
 
-/**
- * Listado paginado contra el servidor: consulta cuando cambian los criterios,
- * descarta respuestas que llegan tarde, conserva la pagina anterior atenuada
- * mientras carga la nueva y corrige la pagina si se queda fuera de rango.
- */
+/** Listado paginado con descarte de respuestas obsoletas y persistencia de vista. */
 export function usePagedList<TQuery extends { page: number }, TData extends PagedData>({
   fetch,
   criteria,
@@ -71,9 +67,9 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
   if (data && data.totalPages > 0 && page > data.totalPages) setPage(data.totalPages);
 
   /** Tras cada cambio se relee la pagina: totales y contadores vienen del servidor. */
-  function refresh() {
+  const refresh = useCallback(() => {
     setReloadKey((value) => value + 1);
-  }
+  }, []);
 
   return { data, isStale, error, page, setPage, refresh };
 }

@@ -1,8 +1,9 @@
+import { API_URL } from "../lib/env";
+import { decodeAccessToken } from "../lib/jwt";
 import type { LoginResponse } from "../types/api";
 import { tokenStore } from "./tokenStore";
 
-// Sin la barra final: "…app/" + "/api/…" da "//api/…", que no coincide con ninguna ruta.
-const BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
+const BASE_URL = API_URL;
 
 export class ApiError extends Error {
   status: number;
@@ -25,10 +26,7 @@ interface ErrorBody {
   errors?: Record<string, string[]>;
 }
 
-async function doRefresh(): Promise<boolean> {
-  const refreshToken = tokenStore.getRefreshToken();
-  if (!refreshToken) return false;
-
+async function requestRefresh(refreshToken: string): Promise<boolean> {
   try {
     const response = await fetch(`${BASE_URL}/api/auth/refresh`, {
       method: "POST",
@@ -36,11 +34,14 @@ async function doRefresh(): Promise<boolean> {
       body: JSON.stringify({ refreshToken }),
     });
 
-    if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
       // Rechazo definitivo (revocado, vencido, cuenta desactivada): la sesion local ya no vale.
       tokenStore.setTokens(null, null);
       return false;
     }
+
+    // 5xx, 429 u otro tropiezo del servidor: el refresh token sigue valiendo para reintentar.
+    if (!response.ok) return false;
 
     const data = (await response.json()) as LoginResponse;
     tokenStore.setTokens(data.accessToken, data.refreshToken);
@@ -49,6 +50,32 @@ async function doRefresh(): Promise<boolean> {
     // Fallo de red: se conserva el refresh token para reintentar mas tarde.
     return false;
   }
+}
+
+async function doRefresh(): Promise<boolean> {
+  const held = tokenStore.getRefreshToken();
+  if (!held) return false;
+
+  // Sin Web Locks (navegadores viejos) cada pestana rota por su cuenta, como antes.
+  if (!("locks" in navigator)) return requestRefresh(held);
+
+  return navigator.locks.request("plf-refresh", async () => {
+    // Otra pestana pudo rotar el token mientras esperabamos el cerrojo: se adopta el suyo, nunca se reenvia el viejo.
+    const current = tokenStore.reloadFromStorage();
+    if (!current) return false;
+    if (current !== held) {
+      tokenStore.setTokens(tokenStore.getAccessToken(), current);
+      // El access token vive solo en esta pestana: si aun sirve no hace falta ir a la API.
+      if (accessTokenIsFresh(tokenStore.getAccessToken())) return true;
+    }
+    return requestRefresh(current);
+  });
+}
+
+/** Un access token con mas de 30 s de vida por delante no merece otra rotacion. */
+function accessTokenIsFresh(token: string | null): boolean {
+  const exp = token ? decodeAccessToken(token)?.exp : undefined;
+  return exp !== undefined && exp * 1000 - Date.now() > 30_000;
 }
 
 let refreshPromise: Promise<boolean> | null = null;
@@ -204,8 +231,7 @@ export async function apiRequest<T>(
   allowRetry = true,
 ): Promise<T> {
   const headers = new Headers(options.headers);
-  // Solo con cuerpo JSON: en un GET este header convierte la peticion en "no simple"
-  // y obliga a un preflight CORS extra, y en un FormData pisa el separador del multipart.
+  // Solo para peticiones con cuerpo JSON (evita preflight CORS en GET y conflicto multipart en FormData).
   if (typeof options.body === "string") headers.set("Content-Type", "application/json");
 
   const accessToken = tokenStore.getAccessToken();

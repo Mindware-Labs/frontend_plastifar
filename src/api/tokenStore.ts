@@ -1,6 +1,4 @@
-// Fuente única de verdad para los tokens de sesión. El access token vive solo en
-// memoria (nunca en localStorage: reduce la ventana de robo por XSS); el refresh
-// token se persiste para poder restaurar la sesión al recargar la página.
+// Tokens de sesión: access token en memoria y refresh token en almacenamiento persistente.
 
 const REFRESH_KEY = "plastifar.refreshToken";
 
@@ -14,9 +12,7 @@ function notify() {
   listeners.forEach((listener) => listener());
 }
 
-// Otra pestana puede rotar el refresh token o cerrar sesion. Sin escuchar el
-// evento "storage", esta pestana seguiria usando un token ya rotado y provocaria
-// una falsa alarma de reutilizacion en el servidor.
+// Sincronización entre pestañas ante rotación de token o cierre de sesión.
 window.addEventListener("storage", (event) => {
   if (event.key !== REFRESH_KEY) return;
 
@@ -28,6 +24,12 @@ window.addEventListener("storage", (event) => {
 export const tokenStore = {
   getAccessToken: () => accessToken,
   getRefreshToken: () => refreshToken,
+
+  /** Relee el refresh token persistido: otra pestana pudo rotarlo antes de que llegara el evento "storage". */
+  reloadFromStorage() {
+    refreshToken = localStorage.getItem(REFRESH_KEY);
+    return refreshToken;
+  },
 
   setTokens(access: string | null, refresh: string | null) {
     accessToken = access;
