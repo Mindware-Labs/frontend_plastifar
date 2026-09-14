@@ -12,7 +12,7 @@ import { Button } from "../../components/ui/Button";
 import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -419,19 +419,20 @@ export function ClientsPage() {
           <div className="flex w-full flex-wrap items-center gap-2">
           {/* Antes de la primera respuesta las pastillas van en esqueleto, no en
               cero: un cero es una afirmacion, y todavia no se sabe nada. */}
-          {counts === undefined
-            ? chips.map(({ key }) => (
-                <span key={key} aria-hidden className="h-8 w-[104px] animate-pulse rounded-full bg-fill" />
-              ))
-            : chips.map(({ key, label, countKey }) => (
-                <FilterChip
-                  key={key}
-                  label={label}
-                  count={counts[countKey]}
-                  active={chip === key}
-                  onClick={() => setChip(key)}
-                />
-              ))}
+          {counts === undefined ? (
+            <span aria-hidden className="h-8 w-[416px] max-w-full animate-pulse rounded-edge bg-fill" />
+          ) : (
+            <SegmentedFilter
+              aria-label="Filtrar por estado"
+              value={chip}
+              onChange={setChip}
+              items={chips.map(({ key, label, countKey }) => ({
+                key,
+                label,
+                count: counts[countKey],
+              }))}
+            />
+          )}
 
           <div className="ml-auto">
             <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
