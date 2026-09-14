@@ -68,6 +68,21 @@ Están completas en la sección 4 del plan. Las que más se rompen:
 - **Se reutilizan los componentes de `components/ui`** sin inventar variantes.
 - **Sin secretos en el repositorio.** Van en `.env`, que no se sube.
 
+## Despliegue
+
+`vercel.json` sólo contiene una regla, y conviene saber por qué está ahí antes
+de tocarla: **manda cualquier ruta a `index.html`**.
+
+Esto es una SPA. El enrutado lo hace React Router en el navegador, así que en el
+servidor no existe ningún archivo `/login` ni `/tickets`. Sin esa regla, entrar
+por la raíz funciona —la aplicación navega sola— pero **refrescar la página,
+guardar un favorito o pegar un enlace devuelve 404**. Estuvo así hasta que se
+comprobó contra el despliegue: `/` daba 200 y todo lo demás 404.
+
+No rompe los archivos estáticos: Vercel busca primero en el sistema de archivos
+y sólo aplica la reescritura cuando no encuentra nada, de modo que `/assets/*`
+se sigue sirviendo tal cual.
+
 ## Estado
 
 Entregados: Autenticación y Personal, Permisos efectivos, Clientes, Catálogos y
