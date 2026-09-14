@@ -1,13 +1,11 @@
-import { Bell, ChevronRight, Menu as MenuIcon, Plus } from "lucide-react";
+import { ChevronRight, Menu as MenuIcon, Plus } from "lucide-react";
+import { NotifyBell } from "./NotifyBell";
 import {
   Fragment,
-  useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ComponentType,
-  type ReactNode,
   type RefObject,
 } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -52,37 +50,9 @@ const NARROW_BP = 900;
  */
 const CONDENSE_AT = 40;
 
-export interface AppBarNotification {
-  id: string | number;
-  title: string;
-  meta: string;
-  tone?: "danger" | "warning" | "success" | "neutral";
-  unread?: boolean;
-  onClick?: () => void;
-}
-
 /* -------------------------------------------------------------------------- */
 /*  Hooks                                                                      */
 /* -------------------------------------------------------------------------- */
-
-function useClickOutside(onClose: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onEsc);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onEsc);
-    };
-  }, [onClose]);
-  return ref;
-}
 
 function useIsNarrow() {
   const [narrow, setNarrow] = useState(
@@ -141,29 +111,6 @@ function useCondensed(scrollRoot?: RefObject<HTMLElement | null>) {
 /* -------------------------------------------------------------------------- */
 /*  Primitivos                                                                 */
 /* -------------------------------------------------------------------------- */
-
-function Popover({ children, width = 190 }: { children: ReactNode; width?: number }) {
-  return (
-    <div
-      className="pf-menu"
-      role="menu"
-      style={{
-        position: "absolute",
-        top: 38,
-        right: 0,
-        width,
-        background: "#ffffff",
-        border: "1px solid var(--color-line)",
-        borderRadius: 10,
-        boxShadow: "0 4px 8px rgba(27,27,29,0.04), 0 24px 48px -20px rgba(27,27,29,0.28)",
-        padding: 5,
-        zIndex: 100,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 function IconButton({
   icon: Icon,
@@ -300,149 +247,12 @@ function Breadcrumbs({
 /*  Notificaciones                                                             */
 /* -------------------------------------------------------------------------- */
 
-const NOTE_TONE: Record<string, string> = {
-  danger: "var(--color-brand-red)",
-  warning: "var(--color-warn)",
-  success: "var(--color-brand-green)",
-  neutral: "var(--color-subtle)",
-};
-
-function NotificationsMenu({
-  items,
-  onMarkAllRead,
-}: {
-  items: AppBarNotification[];
-  onMarkAllRead?: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const close = useCallback(() => setOpen(false), []);
-  const ref = useClickOutside(close);
-  const unread = items.some((i) => i.unread);
-
-  return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <IconButton
-        icon={Bell}
-        label={`Notificaciones${unread ? ", hay sin leer" : ""}`}
-        onClick={() => setOpen((o) => !o)}
-        active={open}
-        dot={unread}
-      />
-      {open && (
-        <Popover width={288}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "5px 9px 9px",
-              borderBottom: "1px solid var(--color-line-soft)",
-              marginBottom: 4,
-            }}
-          >
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--color-ink)" }}>
-              Notificaciones
-            </span>
-            {onMarkAllRead && items.length > 0 && (
-              <button
-                type="button"
-                className="pf-link"
-                onClick={onMarkAllRead}
-                style={{
-                  border: "none",
-                  background: "none",
-                  fontFamily: "inherit",
-                  fontSize: 11.5,
-                  fontWeight: 700,
-                  color: "var(--color-brand-red-dark)",
-                  cursor: "pointer",
-                }}
-              >
-                Marcar todas
-              </button>
-            )}
-          </div>
-
-          {items.length === 0 ? (
-            <div style={{ padding: "20px 10px", textAlign: "center" }}>
-              <p style={{ fontSize: 12.5, fontWeight: 700, color: "var(--color-ink)" }}>
-                Todo al día
-              </p>
-              <p style={{ fontSize: 11.5, color: "var(--color-subtle)", marginTop: 3 }}>
-                Las alertas de plazo aparecerán aquí.
-              </p>
-            </div>
-          ) : (
-            items.map((n) => (
-              <button
-                type="button"
-                key={n.id}
-                className="pf-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  n.onClick?.();
-                  close();
-                }}
-                style={{
-                  display: "flex",
-                  gap: 9,
-                  width: "100%",
-                  padding: 9,
-                  border: "none",
-                  background: "transparent",
-                  borderRadius: 7,
-                  cursor: "pointer",
-                  textAlign: "left",
-                  fontFamily: "inherit",
-                }}
-              >
-                <span
-                  aria-hidden
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 99,
-                    background: NOTE_TONE[n.tone ?? "neutral"],
-                    marginTop: 5,
-                    flexShrink: 0,
-                  }}
-                />
-                <span style={{ minWidth: 0 }}>
-                  <span
-                    style={{
-                      display: "block",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "var(--color-ink)",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {n.title}
-                  </span>
-                  <span style={{ fontSize: 11, color: "var(--color-subtle)" }}>{n.meta}</span>
-                </span>
-              </button>
-            ))
-          )}
-        </Popover>
-      )}
-    </div>
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /*  La barra                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export function AppBar({
-  notifications = [],
-  onMarkAllRead,
-  onMenuClick,
-}: {
-  notifications?: AppBarNotification[];
-  onMarkAllRead?: () => void;
-  onMenuClick?: () => void;
-}) {
+export function AppBar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { chrome, dynamicLabel } = usePageChromeStore();
   const location = useLocation();
   const narrow = useIsNarrow();
@@ -547,7 +357,7 @@ export function AppBar({
         </button>
       )}
 
-      <NotificationsMenu items={notifications} onMarkAllRead={onMarkAllRead} />
+      <NotifyBell />
     </div>
   );
 }
