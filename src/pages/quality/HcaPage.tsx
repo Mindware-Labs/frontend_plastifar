@@ -14,7 +14,7 @@ import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup, CriteriaSelect } from "../../components/ui/CriteriaField";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -286,23 +286,23 @@ export function HcaPage() {
         {/* Antes de la primera respuesta no hay contadores: un «0» al lado de
             «Vencidas» es un dato, y seria falso. Se reserva el sitio y nada mas. */}
         <div className="flex w-full flex-wrap items-center gap-2">
-          {counts
-            ? CHIPS.map(({ key, label, countKey }) => (
-                <FilterChip
-                  key={key}
-                  label={label}
-                  count={counts[countKey]}
-                  active={chip === key}
-                  onClick={() => setChip(key)}
-                />
-              ))
-            : CHIPS.map(({ key }) => (
-                <span
-                  key={key}
-                  aria-hidden
-                  className="h-8 w-[104px] animate-pulse rounded-full bg-fill"
-                />
-              ))}
+          {counts ? (
+            <SegmentedFilter
+              aria-label="Filtrar por estado"
+              value={chip}
+              onChange={setChip}
+              items={CHIPS.map(({ key, label, countKey }) => ({
+                key,
+                label,
+                count: counts[countKey],
+              }))}
+            />
+          ) : (
+            <span
+              aria-hidden
+              className="h-8 w-[416px] max-w-full animate-pulse rounded-edge bg-fill"
+            />
+          )}
 
           {counts && (counts.overdue > 0 || counts.open > 0) && (
             <p className="ml-auto text-[12.5px] text-brand-gray">{listDebt(counts)}</p>
