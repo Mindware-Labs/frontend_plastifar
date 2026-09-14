@@ -743,6 +743,31 @@ export function Sidebar() {
         </div>
       </div>
 
+      {/* 5. Crédito institucional: visible solo con la barra expandida */}
+      {!collapsed && (
+        <div className="shrink-0 border-t border-zinc-100 px-3 py-2">
+          <a
+            href="https://www.cquest.do/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 text-[10.5px] text-zinc-400 transition-colors hover:text-zinc-600"
+          >
+            <span>Desarrollado por</span>
+            <img
+              src="/brand/centerquest-icon.png"
+              alt="Center Quest"
+              width={13}
+              height={13}
+              draggable={false}
+              className="select-none"
+            />
+            <span className="font-semibold text-zinc-600 hover:text-brand-red hover:underline underline-offset-2">
+              Center Quest
+            </span>
+          </a>
+        </div>
+      )}
+
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
       {editingSignature && <SignatureModal onClose={() => setEditingSignature(false)} />}
       {editingAlerts && <NotificationsModal onClose={() => setEditingAlerts(false)} />}

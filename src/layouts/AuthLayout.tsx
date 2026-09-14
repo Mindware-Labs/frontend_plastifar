@@ -32,7 +32,7 @@ export function AuthLayout({ title, subtitle, footer, children, settle = false }
         >
           {/* Cabecera con Logotipo oficial */}
           <header className="text-center">
-            <div className="flex justify-center mb-5">
+            <div className="flex justify-center mb-6">
               <Logo variant="color" height={32} />
             </div>
 
@@ -41,20 +41,20 @@ export function AuthLayout({ title, subtitle, footer, children, settle = false }
             </h1>
 
             {subtitle && (
-              <p className="mt-1.5 text-center text-[13px] text-zinc-500 leading-relaxed max-w-[32ch] mx-auto">
+              <p className="mt-2 text-center text-[13px] text-zinc-500 leading-relaxed max-w-[32ch] mx-auto">
                 {subtitle}
               </p>
             )}
           </header>
 
           {/* Formulario / Contenido */}
-          <div className="mt-6">
+          <div className="mt-7">
             {children}
           </div>
 
           {/* Pie interior de la tarjeta */}
           {footer && (
-            <div className="mt-6 pt-5 border-t border-zinc-100">
+            <div className="mt-7 pt-5 border-t border-zinc-100">
               {footer}
             </div>
           )}
@@ -62,22 +62,29 @@ export function AuthLayout({ title, subtitle, footer, children, settle = false }
       </main>
 
       {/* Pie institucional exterior */}
-      <footer className="relative z-10 mt-8 text-center animate-plf-fade">
+      <footer className="relative z-10 mt-8 flex flex-col items-center gap-2.5 text-center animate-plf-fade">
         <p className="text-[11.5px] tracking-wide text-zinc-400">
           © {new Date().getFullYear()} Plastifar, S.A. · Autopista Duarte Km. 13½
         </p>
-        <div className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] text-zinc-400">
+        <a
+          href="https://www.cquest.do/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 rounded-full border border-zinc-200/80 bg-white/70 px-3 py-1 text-[11.5px] text-zinc-500 shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-colors hover:border-zinc-300 hover:bg-white"
+        >
           <span>Desarrollado por</span>
           <img
             src="/brand/centerquest-icon.png"
             alt="Center Quest"
-            width={13}
-            height={13}
+            width={16}
+            height={16}
             draggable={false}
-            className="select-none opacity-75"
+            className="select-none"
           />
-          <span className="font-medium text-zinc-500">Center Quest</span>
-        </div>
+          <span className="font-semibold text-zinc-700 hover:text-brand-red hover:underline underline-offset-2">
+            Center Quest
+          </span>
+        </a>
       </footer>
     </div>
   );

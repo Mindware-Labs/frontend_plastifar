@@ -149,7 +149,7 @@ export function LoginPage() {
       subtitle="Panel interno de operaciones"
       settle={settle}
       footer={
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center justify-between text-[11.5px] text-zinc-500">
             <span className="flex items-center gap-1.5 font-medium text-zinc-600">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
@@ -166,7 +166,7 @@ export function LoginPage() {
         </div>
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3.5">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4.5">
         <AuthField
           label="Correo corporativo"
           placeholder="nombre@plastifar.com"

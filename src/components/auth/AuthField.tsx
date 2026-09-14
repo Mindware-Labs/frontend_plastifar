@@ -82,7 +82,7 @@ function LabelRow({ inputId, label, action, message, messageId }: LabelRowProps)
     "absolute inset-y-0 right-0 flex items-center whitespace-nowrap transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-opacity";
 
   return (
-    <div className="mb-1.5 flex h-[18px] items-center justify-between gap-2">
+    <div className="mb-2 flex h-[18px] items-center justify-between gap-2">
       <label
         htmlFor={inputId}
         className="shrink-0 text-[12px] font-semibold text-zinc-700 tracking-[-0.01em]"
