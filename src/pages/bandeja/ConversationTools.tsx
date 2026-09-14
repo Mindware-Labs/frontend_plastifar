@@ -1,4 +1,4 @@
-import { StickyNote, Trash2, UserRound } from "lucide-react";
+import { StickyNote, UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
@@ -8,10 +8,7 @@ import { Modal } from "../../components/ui/Modal";
 import { Select, type SelectOption } from "../../components/ui/Select";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
-import { formatDateTime } from "../../lib/format";
-import type { EmailNoteResponse, StaffOptionResponse } from "../../types/api";
-
-const labelClass = "font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint";
+import type { StaffOptionResponse } from "../../types/api";
 
 function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
   if (!textarea) return;
@@ -44,7 +41,7 @@ function AssignWithNoteModal({
 }: AssignWithNoteModalProps) {
   const [note, setNote] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose } = useModalAnimation();
 
   useEffect(() => {
     setTimeout(() => {
@@ -70,18 +67,18 @@ function AssignWithNoteModal({
       onRequestClose={handleCancel}
     >
       <div className="flex flex-col gap-4">
-        <div className="flex items-start gap-3 rounded-edge border border-warn/30 bg-warn/[0.07] p-3 text-[12.5px] text-ink">
-          <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
-          <div className="flex flex-col gap-0.5">
-            <p className="font-semibold text-ink">¿Deseas agregar una nota interna?</p>
-            <p className="text-[12px] leading-relaxed text-subtle">
-              Puedes agregar una indicación o contexto para que <strong>{targetStaffName}</strong> sepa qué hacer al recibir este correo. Este paso es opcional.
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200/90 bg-amber-50/70 p-3.5 text-[12.5px] shadow-2xs">
+          <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div className="flex flex-col gap-1">
+            <p className="font-heading text-[12.5px] font-bold text-amber-950">¿Deseas agregar una nota interna?</p>
+            <p className="text-[12px] leading-relaxed text-amber-900/80">
+              Puedes agregar una indicación o contexto para que <strong className="font-semibold text-amber-950">{targetStaffName}</strong> sepa qué hacer al recibir este correo. Este paso es opcional.
             </p>
           </div>
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="assign-modal-note" className="font-heading text-[11.5px] font-semibold text-faint">
+          <label htmlFor="assign-modal-note" className="font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-500">
             Nota interna (opcional)
           </label>
           <textarea
@@ -99,26 +96,26 @@ function AssignWithNoteModal({
               }
             }}
             placeholder={`Escribe una indicación o contexto para ${targetStaffName}… (Ctrl+Enter para confirmar)`}
-            rows={2}
+            rows={3}
             maxLength={4000}
-            className="w-full min-h-[64px] max-h-[220px] resize-none overflow-hidden rounded-edge border border-line
-              bg-white px-3 py-2 text-[12.5px] leading-relaxed text-ink outline-none placeholder:text-faint
-              focus-visible:border-brand-red/40"
+            className="w-full min-h-[80px] max-h-[220px] resize-none overflow-hidden rounded-lg border border-zinc-200
+              bg-white p-3 text-[12.5px] leading-relaxed text-zinc-900 shadow-2xs outline-none transition-all placeholder:text-zinc-400
+              focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20"
           />
-          <div className="flex items-center justify-between text-[10.5px] text-faint">
+          <div className="flex items-center justify-between text-[11px] text-zinc-400">
             <span>Presiona Ctrl+Enter para confirmar</span>
-            <span>{note.length}/4000</span>
+            <span className="tabular-nums font-medium">{note.length}/4000</span>
           </div>
         </div>
 
         {error && <Alert variant="error">{error}</Alert>}
       </div>
 
-      <div className="mt-6 flex justify-end gap-2 border-t border-line pt-4">
-        <Button type="button" variant="secondary" onClick={handleCancel} disabled={isSaving}>
+      <div className="mt-6 flex justify-end gap-2 border-t border-zinc-100 pt-4">
+        <Button type="button" variant="ghost" size="sm" onClick={handleCancel} disabled={isSaving}>
           Cancelar
         </Button>
-        <Button type="button" onClick={handleSubmit} isLoading={isSaving}>
+        <Button type="button" size="sm" onClick={handleSubmit} isLoading={isSaving}>
           {note.trim() ? "Asignar con nota" : "Asignar sin nota"}
         </Button>
       </div>
@@ -210,8 +207,7 @@ export function AssignmentControl({
 
   selectOptions.push({ value: "", label: "Sin asignar" });
 
-  // Si está asignado a mí actualmente, añadimos la opción con hidden: true
-  // para que el botón de Select muestre "Asignado a mí", pero NO salga en el desplegable.
+  // Opción contextual para asignación rápida al usuario actual.
   if (mine && user) {
     selectOptions.push({
       value: String(user.staffId),
@@ -234,16 +230,16 @@ export function AssignmentControl({
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <Select
-        size="xs"
+        size="sm"
         variant="subtle"
         leftIcon={
           <UserRound
-            className={`h-3 w-3 shrink-0 ${
+            className={`h-3.5 w-3.5 shrink-0 ${
               mine
                 ? "text-brand-red"
                 : assignedStaffId !== null
-                  ? "text-ink/80"
-                  : "text-faint"
+                  ? "text-zinc-700"
+                  : "text-zinc-400"
             }`}
           />
         }
@@ -272,7 +268,8 @@ export function AssignmentControl({
         placeholder="Sin asignar"
         state={error ? "error" : "idle"}
         aria-label="Asignar la conversación"
-        className="w-auto min-w-[130px] max-w-[190px]"
+        className="w-auto min-w-[130px] max-w-[200px]"
+        buttonClassName="h-8 text-[12px] px-2.5 shadow-2xs"
       />
       {error && !pendingAssignment && <span className="truncate text-[11px] text-brand-red-dark">{error}</span>}
 
@@ -292,123 +289,3 @@ export function AssignmentControl({
   );
 }
 
-interface NotesPanelProps {
-  emailId: number;
-}
-
-/** Notas internas de la conversacion: se ven aqui y en la exportacion, nunca en el correo. */
-export function NotesPanel({ emailId }: NotesPanelProps) {
-  const { user } = useAuth();
-  const [notes, setNotes] = useState<EmailNoteResponse[] | null>(null);
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    emailsApi
-      .notes(emailId)
-      .then((list) => {
-        if (!cancelled) setNotes(list);
-      })
-      .catch(() => {
-        if (!cancelled) setNotes([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [emailId]);
-
-  async function add() {
-    const body = draft.trim();
-    if (!body || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const note = await emailsApi.addNote(emailId, body);
-      setNotes([...(notes ?? []), note]);
-      setDraft("");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function remove(note: EmailNoteResponse) {
-    try {
-      await emailsApi.removeNote(note.id);
-      setNotes((notes ?? []).filter((n) => n.id !== note.id));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar la nota");
-    }
-  }
-
-  const count = notes?.length ?? 0;
-
-  return (
-    <div className="shrink-0 border-t border-line">
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-center gap-2 px-4 py-2 text-left outline-none hover:bg-canvas/70"
-      >
-        <StickyNote className="h-3.5 w-3.5 text-warn" />
-        <span className={labelClass}>Notas internas{count > 0 ? ` (${count})` : ""}</span>
-        <span className="ml-auto text-[10.5px] text-faint">{open ? "Ocultar" : "Mostrar"}</span>
-      </button>
-
-      {open && (
-        <div className="flex max-h-56 flex-col gap-2 overflow-y-auto px-4 pb-3">
-          {(notes ?? []).map((note) => (
-            <div key={note.id} className="rounded-edge border border-warn/30 bg-warn/[0.06] px-3 py-2">
-              <div className="flex items-center gap-2 text-[10.5px] text-subtle">
-                <span className="font-semibold text-ink">{note.authorName}</span>
-                <span>{formatDateTime(note.createdAt)}</span>
-                {(user?.staffId === note.staffId || user?.isAdmin) && (
-                  <button
-                    type="button"
-                    onClick={() => remove(note)}
-                    aria-label="Borrar la nota"
-                    className="ml-auto text-faint transition-colors hover:text-brand-red"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-              <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink">{note.body}</p>
-            </div>
-          ))}
-
-          <div className="flex flex-col gap-1.5">
-            <textarea
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) add();
-              }}
-              placeholder="Escribe una nota para el equipo… (Ctrl+Enter para guardar)"
-              rows={2}
-              maxLength={4000}
-              className="w-full resize-none rounded-edge border border-line bg-white px-2.5 py-1.5 text-[12px] text-ink
-                outline-none placeholder:text-faint focus-visible:border-brand-red/40"
-            />
-            {error && <span className="text-[11px] text-brand-red-dark">{error}</span>}
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={add}
-                disabled={busy || !draft.trim()}
-                className="rounded-edge bg-ink px-2.5 py-1 text-[11.5px] font-semibold text-white outline-none
-                  transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
-                Guardar nota
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

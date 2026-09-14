@@ -2,10 +2,48 @@
 
 @import "@fontsource-variable/onest";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
+/* La dependencia `shadcn` salio del proyecto: era un CLI declarado como
+   dependencia de ejecucion y ademas arrastraba esta hoja entera. Las unicas
+   variantes que los componentes usaban estan escritas debajo, a mano. */
 @import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
+
+/* Variantes de estado de Radix que antes traia shadcn/tailwind.css: solo las que usan los componentes. */
+@custom-variant data-open {
+  &:where([data-state="open"]),
+  &:where([data-open]:not([data-open="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-closed {
+  &:where([data-state="closed"]),
+  &:where([data-closed]:not([data-closed="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-disabled {
+  &:where([data-disabled="true"]),
+  &:where([data-disabled]:not([data-disabled="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-active {
+  &:where([data-state="active"]),
+  &:where([data-active]:not([data-active="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-horizontal {
+  &:where([data-orientation="horizontal"]) {
+    @slot;
+  }
+}
+@custom-variant data-vertical {
+  &:where([data-orientation="vertical"]) {
+    @slot;
+  }
+}
 
 @theme {
   /* Plastifar Brandbook 2026 — Pantone 185 C / 348 C / 369 C / Cool Gray 11 C */
@@ -110,6 +148,11 @@
      editar una sola pantalla. */
   --font-heading: "Onest Variable", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* Resorte de apertura (k=380, c=32): 84% del recorrido a mitad de tiempo, llegada con velocidad cero. */
+  --ease-plf-spring: linear(0, 0.023 4.2%, 0.081 8.3%, 0.160 12.5%, 0.251 16.7%, 0.345 20.8%, 0.438 25%, 0.526 29.2%, 0.606 33.3%, 0.678 37.5%, 0.741 41.7%, 0.795 45.8%, 0.840 50%, 0.878 54.2%, 0.909 58.3%, 0.934 62.5%, 0.953 66.7%, 0.968 70.8%, 0.979 75%, 0.987 79.2%, 0.993 83.3%, 0.996 87.5%, 0.999 91.7%, 1.000 95.8%, 1);
+  /* Curva de planeo ágil y premium: arranque inmediato con aterrizaje suave y sin lag */
+  --ease-plf-glide: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html {
@@ -559,6 +602,190 @@ input:-webkit-autofill:focus {
 /* Regla general: alcanza tambien a lo que no nombramos aqui — el `animate-spin`
    de Tailwind en los botones que cargan, y cualquier transicion o transform de
    utilidad. Sin esto solo se apagaban los fotogramas propios. */
+
+/* ==================================================================
+   ANIMACIONES DEL MODULO DE CORREO Y TICKETS (Richard)
+   ==================================================================
+   Llegaron con su rama. Conviven con las de arriba en vez de
+   reemplazarlas: en el arbol mezclado existen los componentes de los
+   dos lados, y cada juego de clases tiene quien lo use. */
+
+@keyframes plf-apple-pop {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes plf-apple-slide-backward {
+  0% {
+    opacity: 0;
+    transform: translate3d(-8px, 0, 0);
+    filter: blur(1.5px);
+  }
+  35% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+
+@keyframes plf-apple-slide-forward {
+  0% {
+    opacity: 0;
+    transform: translate3d(8px, 0, 0);
+    filter: blur(1.5px);
+  }
+  35% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+
+@keyframes plf-check-breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+@keyframes plf-check-in {
+  from {
+    opacity: 0;
+    transform: scale(0.78) translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plf-check-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.92) translateY(-3px);
+  }
+}
+
+@keyframes plf-check-stroke {
+  0% {
+    stroke-dashoffset: 28;
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes plf-header-fade {
+  0% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes plf-otp-confirm {
+  0%, 100% { transform: none; }
+  40% { transform: translateY(-3px) scale(1.06); }
+}
+
+@keyframes plf-receipt-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes plf-seal-pop {
+  from { transform: scale(0.55); }
+  to { transform: none; }
+}
+
+@keyframes plf-settle {
+  0%, 100% { transform: translateY(0); }
+  38% { transform: translateY(3px); }
+}
+
+@keyframes plf-side-panel-back {
+  0% {
+    opacity: 0;
+    transform: translateX(-16px) scale(0.988);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes plf-side-panel-in {
+  0% {
+    opacity: 0;
+    transform: translateX(20px) scale(0.988);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.animate-plf-apple-pop { animation: plf-apple-pop 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+.animate-plf-check-breathe { animation: plf-check-breathe 2.2s ease-in-out infinite; }
+.animate-plf-check-in { animation: plf-check-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-check-out { animation: plf-check-out 0.36s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.animate-plf-check-stroke {
+  stroke-dasharray: 28;
+  stroke-dashoffset: 28;
+  animation: plf-check-stroke 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.06s forwards;
+}
+
+.animate-plf-header-fade {
+  animation: plf-header-fade 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-plf-otp-confirm { animation: plf-otp-confirm 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-receipt-in { animation: plf-receipt-in 0.28s var(--ease-plf-spring) both; }
+.animate-plf-seal-pop { animation: plf-seal-pop 0.42s var(--ease-plf-spring) both; }
+.animate-plf-settle { animation: plf-settle 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-side-panel-back { animation: plf-side-panel-back 0.40s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-side-panel-in { animation: plf-side-panel-in 0.44s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-step-backward {
+  animation: plf-apple-slide-backward 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity, filter;
+}
+.animate-plf-step-forward {
+  animation: plf-apple-slide-forward 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity, filter;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -585,7 +812,20 @@ input:-webkit-autofill:focus {
   .animate-plf-shake,
   .plf-bar-fill,
   .plf-results-in,
-  .plf-stagger > * {
+  .plf-stagger > *,
+  .animate-plf-side-panel-in,
+  .animate-plf-side-panel-back,
+  .animate-plf-settle,
+  .animate-plf-otp-confirm,
+  .animate-plf-seal-pop,
+  .animate-plf-receipt-in,
+  .animate-plf-check-in,
+  .animate-plf-check-breathe,
+  .animate-plf-check-stroke,
+  .animate-plf-step-forward,
+  .animate-plf-step-backward,
+  .animate-plf-header-fade,
+  .animate-plf-apple-pop {
     animation: none !important;
   }
 
@@ -607,7 +847,8 @@ input:-webkit-autofill:focus {
   .animate-plf-receipt-out,
   .animate-plf-scrim-out,
   .animate-plf-modal-out,
-  .animate-plf-drawer-out {
+  .animate-plf-drawer-out,
+  .animate-plf-check-out {
     animation-duration: 1ms !important;
   }
 }

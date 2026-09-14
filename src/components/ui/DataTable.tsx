@@ -1,45 +1,38 @@
 import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
-import { cn } from "../../lib/utils";
 import { useInListPanel } from "./listPanelContext";
-import { DataTableDensityContext, useTableDensity, type TableDensity } from "./dataTableContext";
 
 /**
- * Tabla de listado del panel.
+ * Tabla de datos con tipografia tabular y alineacion estructurada.
  *
- * La tabla vive en un PANEL: superficie blanca con radio y sombra, flotando
- * sobre el lienzo tintado. Antes no llevaba tarjeta —«la tabla es la pagina»—
- * y eso era correcto mientras el fondo era blanco: no habia nada que separar.
- * Sobre el lienzo si lo hay, y el panel es lo que hace que la tabla se lea
- * como una superficie de trabajo y no como texto suelto sobre gris.
+ * ------------------------------------------------------------------
+ * LA SUPERFICIE SOLO SE DIBUJA UNA VEZ
+ * ------------------------------------------------------------------
+ * Dentro de un `ListPanel` la tarjeta ya la puso el panel, junto con su scroll
+ * horizontal. Volver a dibujarla aqui serian dos bordes, dos sombras y dos
+ * radios peleando por el mismo canto. Suelta —una tabla embebida en una
+ * pantalla de detalle— si se pone la suya, porque sobre el lienzo tintado
+ * quedaria texto flotando.
  *
- * Cambiarlo aca alcanza a las doce pantallas de listado a la vez, que es la
- * razon por la que este primitivo existe.
+ * Usa `rounded-card` y `shadow-card`, los mismos del panel, para que una tabla
+ * suelta y una enmarcada no se lean como dos componentes distintos.
  */
-export function DataTable({
-  children,
-  density = "comoda",
-}: {
-  children: ReactNode;
-  /** «compacta» aprieta el aire vertical. Ver dataTableContext. */
-  density?: TableDensity;
-}) {
+export function DataTable({ fixed = false, children }: { fixed?: boolean; children: ReactNode }) {
   const inPanel = useInListPanel();
   const table = (
-    <DataTableDensityContext.Provider value={density}>
-      <table className="w-full border-collapse text-left">{children}</table>
-    </DataTableDensityContext.Provider>
+    <table className={`w-full border-collapse text-left ${fixed ? "table-fixed" : ""}`}>
+      {children}
+    </table>
   );
 
-  // Dentro de un `ListPanel` la superficie ya la puso el panel, junto con su
-  // scroll horizontal. Volver a dibujarla aca serian dos bordes, dos sombras y
-  // dos radios peleando por el mismo canto.
-  if (inPanel) return table;
+  if (inPanel) return fixed ? table : <div className="overflow-x-auto">{table}</div>;
 
-  // Suelta —una tabla embebida en una pantalla de detalle— se pone su propia
-  // superficie: sobre el lienzo tintado, sin tarjeta, quedaria texto flotando.
   return (
-    <div className="overflow-x-auto rounded-card border border-line bg-white shadow-card">
+    <div
+      className={`rounded-card border border-line bg-white shadow-card ${
+        fixed ? "overflow-hidden" : "overflow-x-auto"
+      }`}
+    >
       {table}
     </div>
   );
@@ -47,7 +40,7 @@ export function DataTable({
 
 export function HeadRow({ children }: { children: ReactNode }) {
   return (
-    <tr className="border-b border-line [&>th:first-child]:pl-4 [&>th:last-child]:pr-4">
+    <tr className="border-b border-line bg-white">
       {children}
     </tr>
   );
@@ -62,32 +55,27 @@ interface ThProps extends ThHTMLAttributes<HTMLTableCellElement> {
 }
 
 export function Th({ sort, className = "", children, ...props }: ThProps) {
-  const density = useTableDensity();
   return (
     <th
       aria-sort={sort?.dir === "asc" ? "ascending" : sort?.dir === "desc" ? "descending" : undefined}
-      className={`px-3.5 ${density === "compacta" ? "py-2" : "py-2.5"} font-heading text-[10.5px] font-medium uppercase tracking-[0.06em]
-        text-faint ${className}`}
+      className={`h-9 px-3 font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none whitespace-nowrap ${
+        sort?.dir ? "text-ink" : ""
+      } ${className}`}
       {...props}
     >
       {sort ? (
         <button
           type="button"
           onClick={sort.onToggle}
-          // Repite versalita y color: un <button> reinicia `text-transform` y el
-          // color por las reglas de control de formulario, asi que sin esto la
-          // cabecera ordenable salia en caja mixta y mas oscura que sus vecinas.
-          className="group inline-flex items-center gap-1.5 rounded-edge uppercase tracking-[0.06em]
-            text-inherit outline-none transition-colors hover:text-ink
-            focus-visible:ring-3 focus-visible:ring-brand-red/25"
+          className="group inline-flex items-center gap-1.5 rounded transition-colors hover:text-ink cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25"
         >
-          {children}
+          <span>{children}</span>
           {sort.dir === null ? (
-            <ChevronsUpDown className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+            <ChevronsUpDown className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 text-faint" />
           ) : sort.dir === "asc" ? (
-            <ChevronUp className="h-3 w-3 text-brand-red" />
+            <ChevronUp className="h-3 w-3 text-ink" />
           ) : (
-            <ChevronDown className="h-3 w-3 text-brand-red" />
+            <ChevronDown className="h-3 w-3 text-ink" />
           )}
         </button>
       ) : (
@@ -98,24 +86,16 @@ export function Th({ sort, className = "", children, ...props }: ThProps) {
 }
 
 interface RowProps extends HTMLAttributes<HTMLTableRowElement> {
-  /** Atenuada mientras una accion sobre ella esta en curso. */
+  /** Atenuada mientras una acción sobre ella está en curso. */
   busy?: boolean;
-  /** Para lo puntual que el filete comun no resuelve, p.ej. `group` cuando la
-   *  fila revela sus acciones solo al pasar el mouse. */
-  className?: string;
   children: ReactNode;
 }
 
 export function Row({ busy = false, className = "", children, ...props }: RowProps) {
   return (
     <tr
-      /* `transition-colors` no alcanza a `opacity`, asi que la fila que espera al
-         servidor se apagaba de golpe: el salto a medio tono se lee como un
-         parpadeo de error, no como «esto esta en marcha». Con la opacidad
-         incluida, atenuarse ES la señal de que la accion salio. */
-      className={`border-b border-line-soft transition-[background-color,opacity] duration-150
-        last:border-0 hover:bg-fill
-        [&>td:first-child]:pl-4 [&>td:last-child]:pr-4 ${busy ? "opacity-50" : ""} ${className}`}
+      className={`border-b border-line-soft transition-colors duration-150 last:border-0 hover:bg-fill/80
+        data-[checked=true]:bg-brand-red/[0.035] hover:data-[checked=true]:bg-brand-red/[0.06] ${busy ? "opacity-50" : ""} ${className}`}
       {...props}
     >
       {children}
@@ -123,29 +103,6 @@ export function Row({ busy = false, className = "", children, ...props }: RowPro
   );
 }
 
-/**
- * Una celda.
- *
- * Declara su tamano de texto —13 px, el de la casa— porque sin el, una celda
- * que se olvide de poner el suyo hereda los 16 px del `body`. Eso paso en la
- * tabla de tickets: asunto y cliente salian a 16 px contra 11,5 y 12,5 del
- * resto de la misma fila, y no era una decision de jerarquia sino un olvido.
- *
- * Se compone con `cn` y no interpolando la clase: con dos clases de la misma
- * especificidad gana la que el compilador emitio ultima, que es impredecible.
- * `tailwind-merge` resuelve el conflicto por familia, asi que una celda que
- * pida `text-[12.5px]` lo obtiene siempre.
- */
 export function Td({ className = "", ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-  const density = useTableDensity();
-  return (
-    <td
-      className={cn(
-        "px-3.5 text-[13px]",
-        density === "compacta" ? "py-1.5" : "py-2.5",
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <td className={`px-3 py-2 text-[12.5px] align-middle ${className}`} {...props} />;
 }

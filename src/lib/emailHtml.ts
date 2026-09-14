@@ -1,8 +1,4 @@
-/**
- * Traduce los bloques del editor a HTML de correo. No vale el HTML del editor:
- * viene con clases y una hoja de estilos aparte, y Gmail borra ambas cosas.
- * Aqui todo va con estilos en linea, que es lo unico que sobrevive.
- */
+/** Convierte bloques de contenido a HTML compatible con clientes de correo. */
 
 const SANS =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";

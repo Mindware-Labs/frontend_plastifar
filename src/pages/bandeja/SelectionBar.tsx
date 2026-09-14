@@ -1,10 +1,8 @@
 import {
   Archive,
   ArchiveRestore,
-  Check,
   Mail,
   MailOpen,
-  Minus,
   Star,
   StarOff,
   Trash2,
@@ -12,48 +10,9 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/shadcn/tooltip";
+import { SelectBox } from "../../components/ui/SelectBox";
 import type { EmailBulkAction } from "../../types/api";
 import type { FolderKey } from "./BandejaPage";
-
-interface SelectBoxProps {
-  checked: boolean | "mixed";
-  label: string;
-  onToggle: (shiftKey: boolean) => void;
-  className?: string;
-}
-
-/** Casilla propia: cuadrada, de 2 px, y con el rojo 185 C solo cuando esta marcada. */
-export function SelectBox({ checked, label, onToggle, className = "" }: SelectBoxProps) {
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={(event) => {
-        event.stopPropagation();
-        onToggle(event.shiftKey);
-      }}
-      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] border outline-none
-        transition-[background-color,border-color,box-shadow,transform] duration-150 ease-out active:scale-90
-        focus-visible:ring-3 focus-visible:ring-brand-red/20 ${
-          checked
-            ? "border-brand-red bg-brand-red text-white shadow-[0_1px_3px_rgba(228,0,43,0.3)]"
-            : "border-line-strong bg-white text-transparent hover:border-hairline-hover"
-        } ${className}`}
-    >
-      {checked === "mixed" ? (
-        <Minus className="h-3 w-3 strokeWidth={3} transition-transform duration-150 scale-100" />
-      ) : (
-        <Check
-          className={`h-3 w-3 strokeWidth={3} transition-all duration-150 ${
-            checked ? "scale-100 opacity-100" : "scale-75 opacity-0"
-          }`}
-        />
-      )}
-    </button>
-  );
-}
 
 interface Tool {
   action: EmailBulkAction;
@@ -103,8 +62,9 @@ interface SelectionBarProps {
 }
 
 const toolClass =
-  "flex h-7 w-7 items-center justify-center rounded-edge outline-none transition-all duration-150 " +
-  "hover:scale-105 active:scale-95 focus-visible:ring-3 focus-visible:ring-brand-red/20 disabled:cursor-not-allowed disabled:opacity-40";
+  "flex h-6.5 w-6.5 items-center justify-center rounded-md border border-zinc-200 bg-white " +
+  "text-zinc-600 shadow-2xs outline-none transition-all duration-150 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 " +
+  "active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 disabled:cursor-not-allowed disabled:opacity-40";
 
 export function SelectionBar({
   folder,
@@ -127,9 +87,7 @@ export function SelectionBar({
       aria-label="Acciones sobre la selección"
       className={`${
         isExiting ? "animate-plf-selection-out pointer-events-none" : "animate-plf-selection-in"
-      } flex h-9 w-full items-center gap-1.5 rounded-edge border border-brand-red/30
-        bg-gradient-to-r from-brand-red/[0.07] via-brand-red/[0.04] to-brand-red/[0.07]
-        shadow-[0_1px_4px_-1px_rgba(228,0,43,0.18)] pl-2.5 pr-1`}
+      } flex h-8 w-full items-center rounded-lg border border-zinc-200 bg-zinc-50/80 shadow-2xs pl-2.5 pr-1`}
     >
       <SelectBox
         checked={pageState}
@@ -137,11 +95,16 @@ export function SelectionBar({
         onToggle={onTogglePage}
       />
 
-      <span aria-live="polite" className="ml-1 min-w-0 truncate text-[12px] font-semibold tabular-nums text-ink">
-        {count} {count === 1 ? "seleccionada" : "seleccionadas"}
-      </span>
+      <div className="ml-2 flex items-center gap-1.5 min-w-0">
+        <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-red px-1.5 text-[11px] font-bold text-white tabular-nums leading-none tracking-tight">
+          {count}
+        </span>
+        <span className="truncate font-heading text-[12px] font-semibold text-zinc-800">
+          {count === 1 ? "seleccionado" : "seleccionados"}
+        </span>
+      </div>
 
-      <div className="ml-auto flex items-center gap-0.5">
+      <div className="ml-auto flex items-center gap-1">
         {tools.map((tool, index) => (
           <Tooltip key={tool.action}>
             <TooltipTrigger asChild>
@@ -152,16 +115,18 @@ export function SelectionBar({
                 aria-label={tool.label}
                 className={`${toolClass} ${
                   tool.destructive
-                    ? "text-brand-red hover:bg-brand-red/10 hover:text-brand-red-dark"
-                    : "text-brand-gray hover:bg-white hover:text-ink"
-                } ${index === READ_TOOLS.length ? "ml-1.5 border-l border-brand-red/15 pl-1.5" : ""}`}
+                    ? "text-brand-red hover:border-red-200 hover:bg-red-50 hover:text-brand-red"
+                    : ""
+                } ${index === READ_TOOLS.length ? "ml-1" : ""}`}
               >
-                <tool.icon className="h-4 w-4" />
+                <tool.icon className="h-3.5 w-3.5" />
               </button>
             </TooltipTrigger>
             <TooltipContent>{tool.label}</TooltipContent>
           </Tooltip>
         ))}
+
+        <div className="mx-0.5 h-3.5 w-px bg-zinc-200" />
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -169,10 +134,11 @@ export function SelectionBar({
               type="button"
               disabled={isExiting}
               onClick={onClear}
-              aria-label="Quitar la selección"
-              className={`${toolClass} ml-1 text-subtle hover:bg-white hover:text-ink`}
+              aria-label="Quitar la selección (Esc)"
+              title="Quitar la selección (Esc)"
+              className="flex h-6.5 w-6.5 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-200/60 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-zinc-400/20"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Quitar la selección (Esc)</TooltipContent>

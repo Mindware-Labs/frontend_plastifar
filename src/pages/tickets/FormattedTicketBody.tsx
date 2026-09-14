@@ -6,25 +6,16 @@ interface FormattedTicketBodyProps {
   className?: string;
 }
 
-/**
- * Renderiza el cuerpo de un mensaje o descripción de ticket de forma inteligente:
- * 1. Desenvuelve los saltos de línea suaves (soft line-breaks de ~70 caracteres propios de emails o generadores de texto)
- *    para que la prosa fluya ocupando el 100% del ancho de la tarjeta.
- * 2. Mantiene párrafos separados (doble salto de línea).
- * 3. Formatea listas con viñetas (- , * , • ) o listas numeradas (1. , 2. ).
- * 4. Preserva bloques de firma o despedida cortos.
- * 5. Convierte URLs en enlaces clickeables y soporta **negrita** e *itálica*.
- */
+/** Renderizado estructurado del cuerpo del ticket con soporte para prosa y listas. */
 export function FormattedTicketBody({ text, html, className = "" }: FormattedTicketBodyProps) {
   const content = useMemo(() => {
     if (text && text.trim().length > 0) {
       return text;
     }
     if (html && html.trim().length > 0) {
-      return html
-        .replace(/<br\s*[\/]?>/gi, "\n")
-        .replace(/<\/p>/gi, "\n\n")
-        .replace(/<[^>]*>?/gm, "");
+      // Los saltos de bloque se vuelven lineas antes de dejar solo el texto; el parser no ejecuta nada.
+      const withBreaks = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|tr|h[1-6])>/gi, "\n\n");
+      return new DOMParser().parseFromString(withBreaks, "text/html").body.textContent ?? "";
     }
     return "";
   }, [text, html]);
@@ -75,11 +66,11 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
   };
 
   const isBulletLine = (line: string) => /^[-*•–]\s+/.test(line);
-  const isNumberedLine = (line: string) => /^\d+[\.\)]\s+/.test(line);
+  const isNumberedLine = (line: string) => /^\d+[.)]\s+/.test(line);
   const isKeyValueLine = (line: string) => /^[A-Za-zÁ-ÿ0-9\s#_-]{2,30}:\s*.+$/.test(line);
 
   return (
-    <div className={`w-full space-y-3 break-words leading-relaxed text-ink ${className}`}>
+    <div className={`w-full space-y-2 break-words leading-relaxed text-zinc-800 ${className}`}>
       {blocks.map((block, bIndex) => {
         const lines = block
           .split("\n")
@@ -91,7 +82,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
         // Caso A: Todas las líneas son viñetas
         if (lines.every(isBulletLine)) {
           return (
-            <ul key={bIndex} className="my-2 list-disc space-y-1 pl-5">
+            <ul key={bIndex} className="my-1.5 list-disc space-y-0.5 pl-5">
               {lines.map((l, lIndex) => (
                 <li key={lIndex} className="pl-1">
                   {renderInline(l.replace(/^[-*•–]\s+/, ""))}
@@ -120,10 +111,10 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
         // Caso C: Todas las líneas son numeradas
         if (lines.every(isNumberedLine)) {
           return (
-            <ol key={bIndex} className="my-2 list-decimal space-y-1 pl-5">
+            <ol key={bIndex} className="my-1.5 list-decimal space-y-0.5 pl-5">
               {lines.map((l, lIndex) => (
                 <li key={lIndex} className="pl-1">
-                  {renderInline(l.replace(/^\d+[\.\)]\s+/, ""))}
+                  {renderInline(l.replace(/^\d+[.)]\s+/, ""))}
                 </li>
               ))}
             </ol>
@@ -138,7 +129,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
               <ol className="list-decimal space-y-1 pl-5">
                 {lines.slice(1).map((l, lIndex) => (
                   <li key={lIndex} className="pl-1">
-                    {renderInline(l.replace(/^\d+[\.\)]\s+/, ""))}
+                    {renderInline(l.replace(/^\d+[.)]\s+/, ""))}
                   </li>
                 ))}
               </ol>
@@ -185,8 +176,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
           );
         }
 
-        // Caso G: Prosa continua. Desenvuelve los saltos artificiales para que el texto
-        // ocupe fluidamente todo el ancho disponible de la tarjeta.
+        // Desenvuelve saltos artificiales para flujo continuo del texto.
         const joinedProse = lines.join(" ");
         return (
           <p key={bIndex} className="leading-relaxed">

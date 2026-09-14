@@ -15,7 +15,9 @@ import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
 import { HcaPage } from "./pages/quality/HcaPage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { DepartmentsPage } from "./pages/departments/DepartmentsPage";
+import { MotivosPage } from "./pages/tickets/MotivosPage";
 import { RolesPage } from "./pages/roles/RolesPage";
+import { VeredictosPage } from "./pages/tickets/VeredictosPage";
 import { HolidaysSection } from "./pages/settings/HolidaysSection";
 import { MailboxesSection } from "./pages/settings/MailboxesSection";
 import { ProductLinesSection } from "./pages/settings/ProductLinesSection";
@@ -64,7 +66,13 @@ export default function App() {
             servidor va a rechazar. */}
         <Route element={<PermissionRoute permission="tickets.read"><Outlet /></PermissionRoute>}>
           <Route path="/tickets" element={<TicketsPage />} />
-          <Route path="/tickets/:id" element={<TicketDetailPage />} />
+          {/* Motivos y veredictos llegaron con la rama de Tickets. OJO: los
+            motivos tambien se administran desde /configuracion/motivos, que es
+            otra pantalla contra la misma entidad. Se conservan las dos porque
+            quedarse con una es una decision de producto, no del merge. */}
+        <Route path="/tickets/motivos" element={<MotivosPage />} />
+        <Route path="/tickets/veredictos" element={<VeredictosPage />} />
+        <Route path="/tickets/:id" element={<TicketDetailPage />} />
           <Route path="/bandeja" element={<BandejaPage folder="inbox" />} />
           <Route path="/bandeja/destacados" element={<BandejaPage folder="starred" />} />
           <Route path="/bandeja/archivados" element={<BandejaPage folder="archived" />} />

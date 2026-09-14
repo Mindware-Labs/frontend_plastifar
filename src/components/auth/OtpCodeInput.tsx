@@ -1,31 +1,40 @@
-import { useId, useRef, type ClipboardEvent, type KeyboardEvent } from "react";
+import { useId, useRef, type ClipboardEvent, type KeyboardEvent, type RefObject } from "react";
+import { RelayRing } from "./RelayRing";
+import { useFocusRelay } from "./useFocusRelay";
 
 interface OtpCodeInputProps {
   length?: number;
   value: string;
   onChange: (value: string) => void;
   error?: string;
+  /** El código no fue aceptado: los seis dígitos se marcan por igual, sin señalar ninguno. */
+  invalid?: boolean;
+  /** El código fue aceptado: los dígitos confirman en cascada y dejan de editarse. */
+  success?: boolean;
   autoFocus?: boolean;
-  /** Id del encabezado que nombra al conjunto de casillas. */
-  labelledBy?: string;
+  /** Control desde el que viaja el anillo de foco hasta los dígitos. */
+  relayFrom?: RefObject<HTMLElement | null>;
+  /** Cada cambio lanza el relevo: el anillo viaja y el primer dígito recibe el foco. */
+  relayKey?: number;
 }
 
-/**
- * Las seis casillas son un solo campo repartido. Van en un `role="group"`
- * nombrado por su encabezado: el aria-label de cada casilla dice "Digito 3 de
- * 6", pero sin el grupo nada decia de que codigo son esos seis digitos.
- */
 export function OtpCodeInput({
   length = 6,
   value,
   onChange,
   error,
+  invalid = false,
+  success = false,
   autoFocus,
-  labelledBy,
+  relayFrom,
+  relayKey,
 }: OtpCodeInputProps) {
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
   const errorId = useId();
   const digits = Array.from({ length }, (_, i) => value[i] ?? "");
+
+  // El foco queda en el primer dígito para poder reescribir, pero sin resaltarlo ni seleccionarlo.
+  const ringRef = useFocusRelay(relayFrom, relayKey, () => inputsRef.current[0]?.focus());
 
   const setDigit = (index: number, digit: string) => {
     const next = digits.slice();
@@ -67,38 +76,40 @@ export function OtpCodeInput({
 
   return (
     <div>
-      <div
-        role="group"
-        aria-labelledby={labelledBy}
-        aria-describedby={error ? errorId : undefined}
-        className="flex justify-center gap-1.5 sm:gap-2.5"
-      >
-        {digits.map((digit, index) => {
-          const stateClass = error
-            ? "border-brand-red bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]"
-            : `${digit ? "border-line-strong" : "border-line"} hover:border-hairline-hover hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_2px_6px_-1px_rgba(27,27,29,0.07)] focus:border-brand-red focus:bg-white focus:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_4px_color-mix(in_srgb,var(--color-brand-red)_8%,transparent),0_6px_16px_-8px_color-mix(in_srgb,var(--color-brand-red)_35%,transparent)]`;
+      <div className="flex justify-center">
+        <div className="relative flex gap-1.5 sm:gap-2.5">
+          {digits.map((digit, index) => {
+            const stateClass = success
+              ? "border-brand-green ring-3 ring-brand-green/10 text-brand-green animate-plf-otp-confirm"
+              : error || invalid
+                ? "border-brand-red ring-3 ring-brand-red/10"
+                : `${digit ? "border-zinc-300" : "border-zinc-200"} hover:border-zinc-300 focus:border-brand-red focus:ring-3 focus:ring-brand-red/10`;
 
-          return (
-            <input
-              key={index}
-              ref={(el) => {
-                inputsRef.current[index] = el;
-              }}
-              type="text"
-              inputMode="numeric"
-              maxLength={1}
-              autoFocus={autoFocus && index === 0}
-              value={digit}
-              onChange={(e) => handleChange(index, e.target.value)}
-              onKeyDown={(e) => handleKeyDown(index, e)}
-              onPaste={handlePaste}
-              aria-label={`Dígito ${index + 1} de ${length} del código`}
-              aria-invalid={!!error}
-              aria-describedby={error ? errorId : undefined}
-              className={`h-10 w-10 shrink-0 rounded-edge border bg-gradient-to-b from-white to-canvas/70 text-center font-heading text-base font-semibold tabular-nums text-ink caret-brand-red shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(27,27,29,0.04)] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-out sm:h-12 sm:w-12 sm:text-lg ${stateClass}`}
-            />
-          );
-        })}
+            return (
+              <input
+                key={index}
+                ref={(el) => {
+                  inputsRef.current[index] = el;
+                }}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                autoFocus={autoFocus && index === 0}
+                value={digit}
+                readOnly={success}
+                style={success ? { transitionDelay: `${index * 60}ms`, animationDelay: `${index * 60}ms` } : undefined}
+                onChange={(e) => handleChange(index, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(index, e)}
+                onPaste={handlePaste}
+                aria-label={`Dígito ${index + 1} de ${length} del código`}
+                aria-invalid={!!error || invalid}
+                aria-describedby={error ? errorId : undefined}
+                className={`h-10 w-10 shrink-0 rounded-lg border bg-white text-center font-heading text-base font-semibold tabular-nums text-ink caret-brand-red outline-none transition-[border-color,box-shadow,color] duration-150 sm:h-12 sm:w-12 sm:text-lg ${stateClass}`}
+              />
+            );
+          })}
+          <RelayRing ringRef={ringRef} className="-inset-1.5 rounded-md" />
+        </div>
       </div>
       {error && (
         <p id={errorId} className="mt-2 text-[13px] text-brand-red">

@@ -7,6 +7,7 @@ export interface NotifyPrefs {
 }
 
 const KEY = "plf.notify";
+const OPENED_KEY = "plf.notify.opened";
 const CHANGED = "plf:notify-changed";
 const DEFAULTS: NotifyPrefs = { desktop: false, sound: false };
 
@@ -35,10 +36,33 @@ export function writePrefs(next: NotifyPrefs) {
 
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
+    // Al guardar preferencias se marca como abierto
+    localStorage.setItem(OPENED_KEY, "true");
   } catch {
     // Sin almacenamiento la preferencia dura lo que dure la pestana.
   }
 
+  window.dispatchEvent(new Event(CHANGED));
+}
+
+/** Devuelve true si el usuario ya abrió o interactuó con los avisos alguna vez. */
+export function hasOpenedNotifications(): boolean {
+  try {
+    const prefs = readPrefs();
+    if (prefs.sound || prefs.desktop) return true;
+    return localStorage.getItem(OPENED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+/** Registra que el usuario ya vio/abrió la configuración de avisos. */
+export function markNotificationsOpened(): void {
+  try {
+    localStorage.setItem(OPENED_KEY, "true");
+  } catch {
+    // Sin almacenamiento local
+  }
   window.dispatchEvent(new Event(CHANGED));
 }
 
@@ -65,11 +89,7 @@ export async function requestDesktop(): Promise<DesktopState> {
   }
 }
 
-/**
- * Dos notas ascendentes sintetizadas: sin archivo que descargar ni que se pierda.
- * El contexto de audio se crea al primer uso, despues de que la persona haya
- * tocado la pagina, que es cuando el navegador permite sonar.
- */
+/** Generador de tonos de audio sintetizados para notificaciones. */
 export function playChime(force = false) {
   const now = performance.now();
   if (!force && now - lastChimeAt < CHIME_COOLDOWN) return;
@@ -163,7 +183,7 @@ export function showTicketAssignment(notice: TicketAssignmentNotice, onOpen: () 
 
   const actor = notice.assignedByName?.trim() || "El sistema";
   const title = `${actor} te asignó el ticket ${notice.ticketNumber}`;
-  const body = `${notice.subject} · Prioridad: ${notice.priority}`;
+  const body = `${notice.subject?.trim() || `Ticket ${notice.ticketNumber}`} · Prioridad: ${notice.priority}`;
 
   try {
     const notification = new Notification(title, {
@@ -186,17 +206,21 @@ export function showTicketAssignment(notice: TicketAssignmentNotice, onOpen: () 
 /** Notificacion del sistema para alertas de SLA (por vencer o vencido). */
 export function showTicketSlaAlert(notice: TicketSlaNotice, onOpen: () => void): Notification | null {
   if (desktopState() !== "granted") return null;
+  if (!notice.noticeType && !notice.subject) return null;
 
   const isBreach = notice.noticeType === "breach";
   const title = isBreach
     ? `⚠️ SLA Incumplido: ${notice.ticketNumber}`
     : `⏳ SLA Próximo a Vencer: ${notice.ticketNumber}`;
-  const body = `${notice.subject} · ${notice.details}`;
+  // El hub ya no manda asunto ni detalle: con el numero de ticket alcanza para saber a donde ir.
+  const body = [notice.subject?.trim() || `Ticket ${notice.ticketNumber}`, notice.details?.trim()]
+    .filter(Boolean)
+    .join(" · ");
 
   try {
     const notification = new Notification(title, {
       body,
-      tag: `plf-ticket-sla-${notice.ticketId}-${notice.noticeType}`,
+      tag: `plf-ticket-sla-${notice.ticketId}-${notice.noticeType ?? "alert"}`,
       icon: "/brand/plastifar-isotipo.png",
     });
 

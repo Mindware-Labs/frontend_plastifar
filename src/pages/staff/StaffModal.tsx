@@ -45,7 +45,7 @@ interface StaffModalProps {
 export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalProps) {
   const { user } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose } = useModalAnimation();
   const isEdit = staff !== undefined;
   const isSelf = isEdit && staff.id === user?.staffId;
 
@@ -58,8 +58,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
     formState: { errors, touchedFields, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    // El error aparece al salir del campo, nunca mientras se escribe por primera vez,
-    // y a partir de ahi se corrige en vivo.
+    // Validación activa tras desenfoque del campo.
     mode: "onTouched",
     defaultValues: {
       firstName: staff?.firstName ?? "",
@@ -95,8 +94,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
       onSaved(saved);
       requestClose();
     } catch (err) {
-      // El correo duplicado es un error de un campo concreto: se marca ahi,
-      // no en un aviso general que obliga a adivinar cual es.
+      // Error específico de correo duplicado asignado al campo correspondiente.
       if (err instanceof ApiError && err.status === 409) {
         setError("email", { message: err.message });
         setFocus("email");

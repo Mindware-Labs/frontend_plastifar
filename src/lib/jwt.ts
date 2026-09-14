@@ -1,6 +1,4 @@
-// Lectura de claims del JWT en el cliente, solo para efectos de UI (mostrar el
-// email, ocultar botones de admin, etc.). La autorización real siempre la valida
-// el backend — esto nunca es una barrera de seguridad por sí sola.
+// Decodificación de claims del JWT para soporte en interfaz de usuario.
 
 interface AccessTokenClaims {
   sub: string;

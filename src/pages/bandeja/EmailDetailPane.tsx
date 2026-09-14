@@ -1,6 +1,7 @@
 import {
   Archive,
   ArchiveRestore,
+  ArrowUpRight,
   CornerUpLeft,
   Download,
   Forward,
@@ -19,17 +20,19 @@ import { Link } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
+import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button as PfButton } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Spinner } from "../../components/ui/Spinner";
+import { TicketChip } from "../../components/app/TicketChip";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useNoticeInset, useReceipts } from "../../context/useReceipts";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
-import { Badge } from "../../components/shadcn/badge";
 import { Button } from "../../components/shadcn/button";
 import { Separator } from "../../components/shadcn/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/shadcn/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "../../components/shadcn/popover";
 import {
   formatBytes,
   formatDateTime,
@@ -37,17 +40,21 @@ import {
   formatTicketCode,
 } from "../../lib/format";
 import type { ComposingPresence, EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
+import { EmailBodyFrame } from "../../components/ui/EmailBodyFrame";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
+import { openOverlay } from "../../hooks/overlayStack";
+import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
+import { DELIVERY_LABELS, initialsFromName } from "../../lib/format";
 import { CreateTicketModal } from "../tickets/CreateTicketModal";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
-import { CannedPicker, textToBlocks } from "./CannedPicker";
+import { CannedPicker } from "./CannedPicker";
+import { textToBlocks } from "./textToBlocks";
 import { AssignmentControl } from "./ConversationTools";
 import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
 import { RecipientInput } from "./RecipientInput";
-import { fieldLabelClass } from "./toolbarStyles";
-import { ticketBadgeClass } from "./badgeStyles";
+import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
 import { SendValidationButton } from "./SendValidationButton";
 import { type ValidationItem } from "./sendValidation";
 
@@ -107,26 +114,25 @@ const MOVES: Record<string, MoveKind> = {
   },
 };
 
-/** Botones que abren el editor al pie: responder y reenviar. */
 const composerOpenerClass =
-  "flex w-full min-w-0 items-center justify-center gap-2 rounded-edge border border-line bg-canvas px-3 py-2 " +
-  "text-[12px] font-medium text-subtle outline-none transition-[background-color,border-color,color] " +
-  "hover:border-line-strong hover:bg-white hover:text-ink " +
-  "focus-visible:border-brand-red/40 focus-visible:ring-3 focus-visible:ring-brand-red/12";
+  "group flex h-9 w-full min-w-0 items-center justify-center gap-2 rounded-lg border border-zinc-200 " +
+  "bg-white px-3.5 text-[12.5px] font-medium text-zinc-700 shadow-2xs outline-none " +
+  "transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.99] " +
+  "focus-visible:border-zinc-400 focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer";
 
 /** Acciones de la barra: gris de texto en reposo, tinta sobre relleno al pasar. */
 const toolButtonClass =
   "size-7 text-brand-gray transition-colors hover:bg-fill hover:text-ink " +
   "focus-visible:ring-brand-red/20 focus-visible:border-brand-red/30";
 
-/** Lo que informa el proveedor del envio. "Sent" no se muestra: es el estado normal. */
-const deliveryLabels: Record<string, { label: string; className: string }> = {
-  Queued: { label: "En cola", className: "text-warn" },
-  Delivered: { label: "Entregado", className: "text-brand-green" },
-  Delayed: { label: "Demorado", className: "text-warn" },
-  Bounced: { label: "No entregado", className: "text-brand-red" },
-  Complained: { label: "Marcado como spam", className: "text-brand-red" },
-  Failed: { label: "No se pudo enviar", className: "text-brand-red" },
+/** Color de cada estado de entrega. "Sent" no se muestra: es el estado normal. */
+const deliveryTone: Record<string, string> = {
+  Queued: "text-warn",
+  Delivered: "text-brand-green",
+  Delayed: "text-warn",
+  Bounced: "text-brand-red",
+  Complained: "text-brand-red",
+  Failed: "text-brand-red",
 };
 
 /** Estados que merecen un aviso al abrir el correo, no solo una etiqueta en la tira. */
@@ -139,6 +145,71 @@ function ticketsNote(message: { direction: string; origin?: string }): string | 
   return message.direction === "Outbound"
     ? "Esta respuesta se envió desde el módulo de tickets."
     : "El cliente responde a un correo que se envió desde el módulo de tickets.";
+}
+
+interface TicketsOriginPopoverProps {
+  note: string;
+  ticketId: number | null;
+}
+
+/** Indicador flotante en barra de herramientas con acceso al ticket vinculado. */
+function TicketsOriginPopover({ note, ticketId }: TicketsOriginPopoverProps) {
+  return (
+    <Popover>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Ver información de origen del ticket"
+              className="group/origin inline-flex h-7 cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-white pl-1 pr-2.5 text-zinc-700 shadow-2xs outline-none transition-[background-color,border-color,color] duration-200 ease-out hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 focus-visible:ring-2 focus-visible:ring-brand-red/25 data-[state=open]:border-zinc-300 data-[state=open]:bg-zinc-100 data-[state=open]:shadow-none motion-reduce:transition-none"
+            >
+              <span className="flex size-5 items-center justify-center rounded-md bg-brand-red/10 text-brand-red transition-colors duration-200 group-hover/origin:bg-brand-red group-hover/origin:text-white group-data-[state=open]/origin:bg-brand-red group-data-[state=open]/origin:text-white">
+                <TicketIcon className="size-3" strokeWidth={2.25} />
+              </span>
+              <span className="font-heading text-[10px] font-bold uppercase leading-none tracking-[0.08em]">
+                Origen: Tickets
+              </span>
+            </button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Información de origen en Tickets</TooltipContent>
+      </Tooltip>
+
+      <PopoverContent align="start" sideOffset={6} className="w-80 p-3.5">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2.5 border-b border-line-soft pb-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-brand-red/20 bg-brand-red/8 text-brand-red shadow-2xs">
+              <TicketIcon className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-brand-red-dark">
+                Módulo de Tickets
+              </h4>
+              <p className="text-[11px] text-subtle">Origen del correo</p>
+            </div>
+          </div>
+
+          <p className="text-[12px] leading-relaxed text-ink">
+            {note}
+          </p>
+
+          {ticketId && (
+            <div className="border-t border-line-soft pt-2.5">
+              <Link
+                to={`/tickets/${ticketId}`}
+                className="group flex w-full items-center justify-between rounded-edge border border-brand-red/25 bg-brand-red/[0.04] px-3 py-1.5 text-xs font-semibold text-brand-red-dark shadow-2xs transition-all hover:border-brand-red hover:bg-brand-red hover:text-white cursor-pointer"
+                title="Abrir este ticket en el módulo de Tickets"
+              >
+                <span>Ver ticket {formatTicketCode(ticketId)}</span>
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </Link>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 
@@ -168,39 +239,17 @@ function getThreadMessageBadge(message: { direction: string; subject?: string })
 
 type ComposerMode = "reply" | "forward";
 
-/** Boton pequeno de la fila "Para": abre CC, CCO o pone a todos en copia. */
-const fieldToggleClass =
-  "shrink-0 rounded-edge px-1.5 py-0.5 font-heading text-[10.5px] font-bold uppercase " +
-  "tracking-[0.08em] text-faint outline-none transition-colors hover:bg-fill hover:text-brand-red " +
-  "focus-visible:ring-3 focus-visible:ring-brand-red/20";
-
-const fieldCloseClass =
-  "flex h-5 w-5 shrink-0 items-center justify-center rounded-edge text-faint outline-none " +
-  "transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20";
-
 /** Primer renglon con contenido: es el resumen que cabe en una linea de la lista. */
 function firstLine(text: string) {
   return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-/**
- * El cuerpo del correo viene de un remitente externo: nunca se inyecta con
- * dangerouslySetInnerHTML. Un iframe con sandbox vacio lo aisla por completo
- * (sin scripts, sin acceso al DOM de la app) y aun asi se ve con su formato.
- */
+/** El cuerpo del correo viene de un remitente externo: se muestra siempre via EmailBodyFrame, nunca inyectado. */
 export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, onClose }: EmailDetailPaneProps) {
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
+  const [justCreatedTicketId, setJustCreatedTicketId] = useState<number | null>(null);
   const [moving, setMoving] = useState(false);
   const [starring, setStarring] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -217,6 +266,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [bccOpen, setBccOpen] = useState(false);
   const [includeAttachments, setIncludeAttachments] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
+  const {
+    isShowing: showAttachedFeedback,
+    isExiting: attachedExiting,
+    trigger: triggerAttachedFeedback,
+  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [sending, setSending] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
@@ -338,13 +392,17 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
   useEffect(() => {
     if (openReplyId === null) return;
+    const overlay = openOverlay();
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpenReplyId(null);
+      if (event.key === "Escape" && overlay.isTop()) setOpenReplyId(null);
     }
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      overlay.close();
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [openReplyId]);
 
   async function handleReply() {
@@ -456,6 +514,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
     setReplyError(null);
     setFiles(merged);
+    triggerAttachedFeedback();
   }
 
   function openComposer(mode: ComposerMode) {
@@ -504,7 +563,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
       anchor.href = url;
       anchor.download = fileName ?? `conversacion-${email.id}.pdf`;
       anchor.click();
-      URL.revokeObjectURL(url);
+      // Revocar de inmediato corta la descarga en algunos navegadores: se libera pasado un minuto.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 
       receipts.done({
         action: "exportar",
@@ -546,10 +606,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
     setPreview(target);
   }
 
-  /**
-   * El servidor ya movio el correo cuando esto vuelve, asi que el recibo no promete
-   * deshacer: ofrece la accion inversa, que es otro viaje y puede fallar por su cuenta.
-   */
+  /** Acción reversible tras confirmación del servidor. */
   async function handleMove(move: MoveKind) {
     if (!email || moving) return;
     setMoving(true);
@@ -721,6 +778,13 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               )}
             </>
           )}
+
+          {ticketsNote(email) && !email.ticketId && (
+            <TicketsOriginPopover
+              note={ticketsNote(email)!}
+              ticketId={email.ticketId}
+            />
+          )}
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
@@ -732,21 +796,15 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             onNoteAdded={() => setNotesRefreshKey((k) => k + 1)}
           />
 
-          {email.ticketId ? (
-            <Link to={`/tickets/${email.ticketId}`} title="Ver el detalle del ticket">
-              <Badge
-                variant="secondary"
-                className={`${ticketBadgeClass} cursor-pointer transition-colors hover:bg-brand-red/15`}
-              >
-                {formatTicketCode(email.ticketId)}
-              </Badge>
-            </Link>
-          ) : (
-            <PfButton size="sm" className="h-7 px-3" onClick={() => setIsCreateTicketModalOpen(true)}>
-              <TicketIcon className="h-[15px] w-[15px]" />
-              Crear ticket
-            </PfButton>
-          )}
+          <TicketChip
+            ticketId={email.ticketId}
+            provenance={email.origin === "Tickets" ? "thread" : "manual"}
+            note={ticketsNote(email)}
+            justCreated={justCreatedTicketId !== null && justCreatedTicketId === email.ticketId}
+            onSettled={() => setJustCreatedTicketId(null)}
+            active={isCreateTicketModalOpen}
+            onCreate={() => setIsCreateTicketModalOpen(true)}
+          />
 
           <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-line" />
 
@@ -770,29 +828,28 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         </div>
       </div>
 
-      <Separator className="bg-line" />
-
+      <Separator className="bg-zinc-100" />
 
       <div className="px-4 pb-2.5 pt-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h2 className="font-heading text-[17px] font-bold leading-tight tracking-[-0.02em] text-ink">
+            <h2 className="font-heading text-[17px] font-bold leading-tight tracking-[-0.02em] text-zinc-900">
               {email.subject || "(sin asunto)"}
             </h2>
 
             <div className="mt-1 flex items-center gap-2">
               <Avatar className="size-7 shrink-0">
-                <AvatarFallback className="text-[10px]">{initials(displayName)}</AvatarFallback>
+                <AvatarFallback className="text-[10px]">{initialsFromName(displayName, email.fromEmail)}</AvatarFallback>
               </Avatar>
               <div className="min-w-0">
-                <p className="truncate text-[12.5px] font-semibold text-ink">
+                <p className="truncate text-[12.5px] font-semibold text-zinc-900">
                   {displayName}
                   {/* El nombre puede ser el propio correo: repetirlo no aporta. */}
                   {displayName !== email.fromEmail && (
-                    <span className="ml-1.5 font-normal text-subtle">{email.fromEmail}</span>
+                    <span className="ml-1.5 font-normal text-zinc-500">{email.fromEmail}</span>
                   )}
                 </p>
-                <p className="truncate text-[11px] text-faint">
+                <p className="truncate text-[11px] text-zinc-400">
                   Para: {email.toEmails.join(", ") || "—"}
                   {email.ccEmails.length > 0 && ` · CC: ${email.ccEmails.join(", ")}`}
                   {(email.bccEmails ?? []).length > 0 && ` · CCO: ${email.bccEmails.join(", ")}`}
@@ -803,15 +860,15 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
           <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
             <ConversationNotes key={notesRefreshKey} emailId={email.id} />
-            <span className="whitespace-nowrap text-[11px] font-medium text-faint">
+            <span className="whitespace-nowrap text-[11px] font-medium text-zinc-400">
               {formatDateTime(email.createdAt)}
             </span>
           </div>
         </div>
 
         {composers.length > 0 && (
-          <div className="mt-2 flex items-center gap-2 rounded-edge border border-warn/40 bg-warn/[0.08] px-2.5 py-1.5 text-[11.5px] text-ink">
-            <PencilLine className="h-3.5 w-3.5 shrink-0 text-warn" />
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200/90 bg-amber-50/70 px-2.5 py-1.5 text-[11.5px] text-amber-950 shadow-2xs">
+            <PencilLine className="h-3.5 w-3.5 shrink-0 text-amber-600" />
             <span>
               <strong className="font-semibold">{composers.map((p) => p.name).join(", ")}</strong>
               {composers.length === 1 ? " está respondiendo este correo ahora mismo." : " están respondiendo este correo ahora mismo."}
@@ -820,9 +877,10 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         )}
       </div>
 
-      <Separator className="bg-line" />
+      <Separator className="bg-zinc-100" />
 
-      <div className="relative min-h-0 flex-1">
+      {/* Columna: los avisos ocupan lo suyo y el cuerpo se queda con el resto, sin desbordar sobre el pie. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {replyOpen && (
           <div
             ref={replyContainerRef}
@@ -833,16 +891,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               addFiles(Array.from(event.dataTransfer.files));
             }}
           >
-            <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2">
+            <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
               {isForward ? (
                 <Forward className="h-3.5 w-3.5 shrink-0 text-brand-red" />
               ) : (
                 <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-brand-red" />
               )}
-              <span className="shrink-0 text-[12.5px] font-semibold text-ink">
+              <span className="shrink-0 text-[12.5px] font-semibold text-zinc-900">
                 {isForward ? "Reenviar" : "Responder"}
               </span>
-              <span className="truncate text-[11.5px] text-subtle">
+              <span className="truncate text-[11.5px] text-zinc-500">
                 {email.subject ? `${isForward ? "Fwd" : "Re"}: ${email.subject}` : "(sin asunto)"}
               </span>
               <button
@@ -850,16 +908,13 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 onClick={closeComposer}
                 aria-label="Cerrar el editor"
                 title="Cerrar el editor"
-                className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-edge
-                  text-brand-gray outline-none transition-colors hover:bg-fill hover:text-ink
-                  focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
-              transition-colors focus-within:bg-canvas">
+            <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
               <span className={fieldLabelClass}>Para</span>
               {isForward ? (
                 <RecipientInput
@@ -870,7 +925,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   autoFocus
                 />
               ) : (
-                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-zinc-900">
                   {email.fromEmail}
                 </span>
               )}
@@ -905,8 +960,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             </div>
 
             {ccOpen && (
-              <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
-                transition-colors focus-within:bg-canvas">
+              <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
                 <span className={fieldLabelClass}>CC</span>
                 <RecipientInput
                   inputRef={ccRef}
@@ -930,8 +984,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             )}
 
             {bccOpen && (
-              <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5
-                transition-colors focus-within:bg-canvas">
+              <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
                 <span className={fieldLabelClass}>CCO</span>
                 <RecipientInput
                   inputRef={bccRef}
@@ -955,13 +1008,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             )}
 
             {isForward && email.attachments.length > 0 && (
-              <label className="flex shrink-0 cursor-pointer items-center gap-2 border-b border-line px-4 py-1.5
-                text-[11.5px] text-brand-gray">
+              <label className="flex shrink-0 cursor-pointer items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-1.5 text-[12px] font-medium text-zinc-700">
                 <input
                   type="checkbox"
                   checked={includeAttachments}
                   onChange={(event) => setIncludeAttachments(event.target.checked)}
-                  className="h-3.5 w-3.5 accent-brand-red"
+                  className="h-3.5 w-3.5 accent-brand-red rounded"
                 />
                 Incluir {email.attachments.length === 1 ? "el adjunto original" : `los ${email.attachments.length} adjuntos originales`}
               </label>
@@ -984,21 +1036,23 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             </div>
 
             {files.length > 0 && (
-              <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-line px-4 py-2">
+              <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-100 px-4 py-2 bg-zinc-50/30">
                 {files.map((file, position) => (
                   <span
                     key={`${file.name}-${position}`}
-                    className="inline-flex items-center gap-1.5 rounded-edge border border-line
-                      bg-canvas px-2 py-1 text-[11.5px] text-brand-gray"
+                    className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80
+                      bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-zinc-800 shadow-2xs"
                   >
-                    <Paperclip className="h-3 w-3 text-faint" />
+                    <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
+                      <AnimatedCheckIcon size={10} strokeWidth={3} />
+                    </span>
                     <span className="max-w-[160px] truncate">{file.name}</span>
-                    <span className="text-faint">{formatBytes(file.size)}</span>
+                    <span className="text-zinc-400 text-[10.5px] tabular-nums">{formatBytes(file.size)}</span>
                     <button
                       type="button"
                       onClick={() => setFiles(files.filter((_, at) => at !== position))}
                       aria-label={`Quitar ${file.name}`}
-                      className="text-faint transition-colors hover:text-brand-red"
+                      className="text-zinc-400 transition-colors hover:text-brand-red ml-0.5 cursor-pointer"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -1014,18 +1068,35 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             )}
 
             <ComposerInset />
-            <div className="flex shrink-0 items-center gap-2 border-t border-line px-4 py-2">
+            <div className="flex shrink-0 items-center gap-2 border-t border-zinc-100 px-4 py-2.5 bg-zinc-50/30">
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="inline-flex items-center gap-1.5 rounded-edge border border-line bg-canvas
-                  px-2 py-1 text-[11.5px] font-medium text-brand-gray outline-none
-                  transition-[background-color,border-color,color]
-                  hover:border-line-strong hover:bg-white hover:text-ink
-                  focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium shadow-2xs outline-none transition-all duration-300 cursor-pointer ${
+                  showAttachedFeedback
+                    ? attachedExiting
+                      ? "border-emerald-200 bg-emerald-50/40 text-emerald-600 ring-1 ring-emerald-100/50"
+                      : "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200/70 font-semibold"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20"
+                }`}
               >
-                <Paperclip className="h-3.5 w-3.5" />
-                Adjuntar
+                {showAttachedFeedback ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 ${
+                      attachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+                    }`}
+                  >
+                    <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
+                      <AnimatedCheckIcon size={11} strokeWidth={3} />
+                    </span>
+                    <span>¡Adjuntado!</span>
+                  </span>
+                ) : (
+                  <>
+                    <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
+                    Adjuntar
+                  </>
+                )}
               </button>
               <input
                 ref={fileRef}
@@ -1038,12 +1109,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 }}
               />
               <CannedPicker onPick={insertCanned} />
-              <span className="truncate text-[11px] text-faint">
+              <span className="truncate text-[11px] font-medium text-zinc-400">
                 Hasta {MAX_FILES} archivos, 10 MB · también puedes soltarlos aquí
               </span>
 
               <div className="ml-auto flex shrink-0 gap-2">
-                <PfButton variant="ghost" size="sm" className="h-7 px-3" onClick={closeComposer}>
+                <PfButton variant="ghost" size="sm" className="h-8 px-3" onClick={closeComposer}>
                   Cancelar
                 </PfButton>
                 <SendValidationButton
@@ -1087,6 +1158,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   {(openReply.bccEmails ?? []).length > 0 && ` · CCO: ${openReply.bccEmails.join(", ")}`}
                 </p>
               </div>
+              {ticketsNote(openReply) && (
+                <TicketsOriginPopover
+                  note={ticketsNote(openReply)!}
+                  ticketId={email.ticketId}
+                />
+              )}
               <span className="shrink-0 whitespace-nowrap text-[11px] font-medium text-faint">
                 {formatDateTime(openReply.createdAt)}
               </span>
@@ -1108,7 +1185,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 <Alert variant={openReply.deliveryStatus === "Queued" ? "info" : "error"}>
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span>
-                      {deliveryLabels[openReply.deliveryStatus].label}.{" "}
+                      {DELIVERY_LABELS[openReply.deliveryStatus]}.{" "}
                       {openReply.deliveryStatus === "Queued"
                         ? `Se reintentará solo. ${openReply.deliveryDetail ?? ""}`
                         : (openReply.deliveryDetail ?? "El proveedor no dio más detalle.")}
@@ -1130,12 +1207,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               </div>
             )}
 
-            {ticketsNote(openReply) && (
-              <div className="shrink-0 border-b border-line px-4 py-2">
-                <Alert variant="info">{ticketsNote(openReply)}</Alert>
-              </div>
-            )}
-
             {openReply.direction === "Inbound" && openReply.authFailed && (
               <div className="shrink-0 border-b border-line px-4 py-2" title={openReply.authResult ?? undefined}>
                 <Alert variant="error">
@@ -1145,12 +1216,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             )}
 
             {openReply.bodyHtml && openReply.direction === "Inbound" ? (
-              <iframe
+              <EmailBodyFrame
                 key={openReply.id}
-                sandbox=""
-                srcDoc={openReply.bodyHtml}
+                html={openReply.bodyHtml}
                 title={`Correo de ${openReply.fromEmail}`}
-                className="min-h-0 w-full flex-1 border-0 bg-white"
+                className="min-h-0 flex-1"
               />
             ) : (
               <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-4 py-3 text-[13px] leading-relaxed text-ink">
@@ -1188,12 +1258,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           </div>
         )}
 
-        {ticketsNote(email) && (
-          <div className="shrink-0 px-4 pb-2 pt-2">
-            <Alert variant="info">{ticketsNote(email)}</Alert>
-          </div>
-        )}
-
         {email.direction === "Inbound" && email.authFailed && (
           <div className="shrink-0 px-4 pb-2 pt-2" title={email.authResult ?? undefined}>
             <Alert variant="error">
@@ -1203,19 +1267,13 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         )}
 
         {email.bodyHtml ? (
-          <iframe
-            key={email.id}
-            sandbox=""
-            srcDoc={email.bodyHtml}
-            title="Cuerpo del correo"
-            className="h-full w-full border-0 bg-white"
-          />
+          <EmailBodyFrame key={email.id} html={email.bodyHtml} title="Cuerpo del correo" className="min-h-0 flex-1" />
         ) : email.bodyText ? (
-          <pre className="h-full overflow-y-auto whitespace-pre-wrap p-4 text-[13px] leading-relaxed text-ink">
+          <pre className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap p-4 text-[13px] leading-relaxed text-ink">
             {email.bodyText}
           </pre>
         ) : (
-          <p className="p-4 text-[13px] text-subtle">Este correo no tiene contenido.</p>
+          <p className="min-h-0 flex-1 p-4 text-[13px] text-subtle">Este correo no tiene contenido.</p>
         )}
       </div>
 
@@ -1273,7 +1331,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       <div className="shrink-0 px-4 py-2.5">
         {others.length > 0 && (
-          <div className="mb-2 max-h-24 overflow-y-auto pr-0.5">
+          <div className="mb-2 max-h-40 overflow-y-auto pr-0.5">
             {others.map((reply) => {
               const badge = getThreadMessageBadge(reply);
               const contactName =
@@ -1312,7 +1370,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                       Tickets
                     </span>
                   )}
-                  <span className="shrink-0 text-[11.5px] font-semibold text-ink">
+                  {/* Cede antes que la fila: una direccion larga no puede empujar la hora fuera de vista. */}
+                  <span className="max-w-[45%] truncate text-[11.5px] font-semibold text-ink">
                     {contactName}
                   </span>
                   {authorNote && (
@@ -1323,17 +1382,17 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   <span className="truncate text-[11.5px] text-subtle">
                     {firstLine(reply.bodyText)}
                   </span>
-                  {reply.deliveryStatus && deliveryLabels[reply.deliveryStatus] && (
+                  {reply.deliveryStatus && deliveryTone[reply.deliveryStatus] && (
                     <span
                       className={`ml-auto shrink-0 text-[10.5px] font-semibold
-                        ${deliveryLabels[reply.deliveryStatus].className}`}
+                        ${deliveryTone[reply.deliveryStatus]}`}
                     >
-                      {deliveryLabels[reply.deliveryStatus].label}
+                      {DELIVERY_LABELS[reply.deliveryStatus]}
                     </span>
                   )}
                   <span
                     className={`shrink-0 text-[10.5px] font-medium text-faint ${
-                      reply.deliveryStatus && deliveryLabels[reply.deliveryStatus] ? "" : "ml-auto"
+                      reply.deliveryStatus && deliveryTone[reply.deliveryStatus] ? "" : "ml-auto"
                     }`}
                   >
                     {formatEmailListDate(reply.createdAt)}
@@ -1353,7 +1412,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               title={`Responder a ${email.fromName ?? email.fromEmail}`}
               className={composerOpenerClass}
             >
-              <CornerUpLeft className="h-3.5 w-3.5 text-faint" />
+              <CornerUpLeft className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
               Responder
             </button>
           )}
@@ -1363,7 +1422,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             title="Reenviar este correo a otra dirección"
             className={composerOpenerClass}
           >
-            <Forward className="h-3.5 w-3.5 text-faint" />
+            <Forward className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
             Reenviar
           </button>
         </div>
@@ -1414,7 +1473,10 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       {preview && (
         <AttachmentPreviewModal
-          emailId={preview.emailId}
+          sourceId={preview.emailId}
+          loadLink={(attachmentId, download) =>
+            emailsApi.attachmentLink(preview.emailId, attachmentId, download)
+          }
           attachments={preview.attachments}
           index={preview.index}
           onIndexChange={(index) => setPreview({ ...preview, index })}
@@ -1433,6 +1495,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           onClose={() => setIsCreateTicketModalOpen(false)}
           onCreated={(created) => {
             setEmail({ ...email, ticketId: created.id });
+            setJustCreatedTicketId(created.id);
             onTicketCreated();
             setIsCreateTicketModalOpen(false);
             receipts.done({

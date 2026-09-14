@@ -1,18 +1,19 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { openOverlay } from "./overlayStack";
 
 const focusableSelector =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Conducta comun de los dialogos: fondo bloqueado, Escape, foco atrapado y devuelto al cerrar. */
 export function useDialogBehavior(panelRef: RefObject<HTMLElement | null>, onClose: () => void) {
-  // El efecto no debe depender de onClose: si el padre la recrea en cada render,
-  // se reiniciaria y devolveria el foco al primer campo en mitad del tecleo.
+  // Estabiliza referencias de cierre para evitar reinicios de foco.
   const closeRef = useRef(onClose);
   useEffect(() => {
     closeRef.current = onClose;
   }, [onClose]);
 
   useEffect(() => {
+    const overlay = openOverlay();
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -41,7 +42,7 @@ export function useDialogBehavior(panelRef: RefObject<HTMLElement | null>, onClo
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        closeRef.current();
+        if (overlay.isTop()) closeRef.current();
         return;
       }
       if (event.key !== "Tab" || !panel) return;
@@ -64,6 +65,7 @@ export function useDialogBehavior(panelRef: RefObject<HTMLElement | null>, onClo
 
     document.addEventListener("keydown", handleKeyDown);
     return () => {
+      overlay.close();
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = originalOverflow;
       previouslyFocused?.focus();

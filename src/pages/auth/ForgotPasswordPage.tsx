@@ -2,11 +2,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Mail } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
 import { ApiError } from "../../api/client";
-import { AuthAlert } from "../../components/auth/AuthAlert";
 import { AuthButton } from "../../components/auth/AuthButton";
 import { AuthField } from "../../components/auth/AuthField";
 import { AuthToast } from "../../components/auth/AuthToast";
@@ -20,26 +19,25 @@ type FormValues = z.infer<typeof schema>;
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formError, setFormError] = useState<string | null>(null);
-  // Confirmacion en pantalla del envio. La siguiente pantalla tambien lo dice,
-  // pero si la navegacion no llega a ocurrir la persona se quedaba sin ninguna
-  // senal de que el correo salio y volvia a pulsar el boton.
-  const [sentTo, setSentTo] = useState<string | null>(null);
+  // El login manda el correo que no coincidió para no pedirlo dos veces.
+  const prefilledEmail = (location.state as { email?: string } | null)?.email ?? "";
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { email: prefilledEmail },
+  });
 
   async function onSubmit(values: FormValues) {
     setFormError(null);
     try {
       await authApi.forgotPassword(values);
-      setSentTo(values.email);
-      navigate("/reset-password", {
-        state: { email: values.email, notice: `Enviamos un código a ${values.email}` },
-      });
+      navigate("/reset-password", { state: { email: values.email } });
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Algo salió mal");
     }
@@ -51,17 +49,6 @@ export function ForgotPasswordPage() {
       subtitle="Te enviaremos un código de 6 dígitos al correo asociado a tu cuenta"
     >
       <AuthToast message={formError} onDismiss={() => setFormError(null)} />
-
-      {sentTo && (
-        <div className="mb-5">
-        <AuthAlert variant="success">
-          Enviamos un código de 6 dígitos a {sentTo}.{" "}
-          <Link to="/reset-password" state={{ email: sentTo }} className="font-semibold underline">
-            Ingresar el código
-          </Link>
-        </AuthAlert>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
         <AuthField

@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CircleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -13,6 +13,16 @@ import { PasswordField, type FieldState } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { PasswordStrength } from "../ui/PasswordStrength";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
+
+/** Mismo formato que los avisos del inicio de sesión: texto en rojo con icono, sin caja. */
+function FormError({ message }: { message: string }) {
+  return (
+    <p role="alert" className="flex items-center gap-1.5 text-[12px] font-medium text-brand-red">
+      <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      {message}
+    </p>
+  );
+}
 
 const currentSchema = z.object({
   currentPassword: z.string().min(1, "Escribe tu contraseña actual"),
@@ -32,20 +42,17 @@ type NewFormValues = z.infer<typeof newSchema>;
 
 type Step = "actual" | "nueva" | "listo";
 
-/**
- * Cambio de contrasena en dos pasos: primero se confirma la actual contra el
- * servidor y solo entonces se pide la nueva. Asi nadie escribe una contrasena
- * nueva para descubrir al final que la actual estaba mal.
- */
+/** Modal de cambio de contraseña en dos pasos con validación previa. */
 export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<Step>("actual");
   const [currentPassword, setCurrentPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  const { isExiting, requestClose } = useModalAnimation(onClose);
+  const { isExiting, requestClose } = useModalAnimation();
 
   const currentForm = useForm<CurrentFormValues>({
     resolver: zodResolver(currentSchema),
-    mode: "onTouched",
+    // Solo al enviar: el foco automático al abrir el modal no debe disparar el error de "campo vacío".
+    mode: "onSubmit",
   });
 
   const newForm = useForm<NewFormValues>({
@@ -165,7 +172,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
           noValidate
           className="flex flex-col gap-4"
         >
-          {formError && <Alert variant="error">{formError}</Alert>}
+          {formError && <FormError message={formError} />}
 
           <PasswordField
             label="Contraseña actual"
@@ -224,7 +231,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
         noValidate
         className="flex flex-col gap-4"
       >
-        {formError && <Alert variant="error">{formError}</Alert>}
+        {formError && <FormError message={formError} />}
 
         <PasswordField
           label="Nueva contraseña"

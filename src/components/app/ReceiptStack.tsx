@@ -1,7 +1,7 @@
 import { AlertTriangle, Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useReceipts } from "../../context/useReceipts";
-import type { Receipt } from "../../context/ReceiptContext";
+import type { Receipt } from "../../context/useReceipts";
 
 /** Con algo que revertir hace falta leer, decidir y llegar al boton; sin eso, basta con enterarse. */
 const WITH_ACTION = 7000;
@@ -14,10 +14,11 @@ const EXIT_FALLBACK = 200;
 const TICK = 200;
 
 const cardClass =
-  "group pointer-events-auto relative flex flex-col rounded-edge bg-white " +
+  "group pointer-events-auto relative flex flex-col rounded-lg bg-white " +
   "shadow-[0_1px_2px_-1px_rgba(27,27,29,0.06),0_12px_28px_-16px_rgba(27,27,29,0.32)]";
 
 function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () => void }) {
+  const { failed: reportFailure } = useReceipts();
   const [leaving, setLeaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const timer = useRef<number | null>(null);
@@ -91,6 +92,12 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
     try {
       await receipt.action2.run();
       setLeaving(true);
+    } catch (err) {
+      reportFailure({
+        action: receipt.action,
+        title: `No se pudo ${receipt.action2.label.toLowerCase()}`,
+        detail: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setBusy(false);
     }
@@ -107,15 +114,19 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
       onFocusCapture={hold}
       onBlurCapture={resume}
       className={`${cardClass} ${failed ? "border border-line-strong" : "border border-line"} ${
-        leaving ? "animate-plf-receipt-out" : "animate-plf-modal-in"
+        leaving ? "animate-plf-receipt-out" : "animate-plf-receipt-in"
       }`}
     >
       <div className="flex h-8 shrink-0 items-center gap-2 pl-3.5 pr-2">
-        {failed ? (
-          <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-red-dark" />
-        ) : (
-          <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-green" />
-        )}
+        {/* Sello de estado, como en el chip de ticket: verde pleno al lograrse, rojo pálido al fallar. */}
+        <span
+          aria-hidden
+          className={`flex size-4.5 shrink-0 items-center justify-center rounded-[5px] ${
+            failed ? "bg-brand-red/10 text-brand-red-dark" : "bg-brand-green text-white"
+          }`}
+        >
+          {failed ? <AlertTriangle className="size-2.5" strokeWidth={2.5} /> : <Check className="size-2.5" strokeWidth={3} />}
+        </span>
 
         <span className="font-heading text-[10px] font-bold uppercase leading-none tracking-[0.11em] text-ink">
           {failed ? "No se pudo" : "Listo"}
@@ -134,7 +145,7 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
           type="button"
           onClick={() => setLeaving(true)}
           aria-label="Cerrar el aviso"
-          className="shrink-0 rounded-edge p-1.5 text-subtle outline-none transition-colors
+          className="shrink-0 rounded-md p-1.5 text-subtle outline-none transition-colors
             hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/25"
         >
           <X className="h-3 w-3" />
@@ -181,7 +192,7 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
             type="button"
             onClick={runAction}
             disabled={busy}
-            className="h-8 shrink-0 rounded-edge px-2.5 font-heading text-[10.5px] font-bold
+            className="h-8 shrink-0 rounded-md px-2.5 font-heading text-[10.5px] font-bold
               uppercase leading-none tracking-[0.07em] text-brand-red outline-none
               transition-colors hover:bg-fill hover:text-brand-red-dark
               focus-visible:ring-3 focus-visible:ring-brand-red/25 disabled:opacity-50"
@@ -194,11 +205,7 @@ function ReceiptCard({ receipt, onDismiss }: { receipt: Receipt; onDismiss: () =
   );
 }
 
-/**
- * Los recibos se anclan al area de contenido, no al viewport: asi sobreviven al
- * colapso de la barra lateral sin recalcular nada. La region viva se monta vacia
- * y permanente; insertar un nodo que ya trae aria-live se anuncia de forma dispar.
- */
+/** Región accesible permanente para notificaciones y recibos de acción. */
 export function ReceiptStack() {
   const { receipts, dismiss, inset } = useReceipts();
 

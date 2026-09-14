@@ -1,13 +1,10 @@
-import {
-  HubConnectionBuilder,
-  HubConnectionState,
-  HttpTransportType,
-  LogLevel,
-  type HubConnection,
-} from "@microsoft/signalr";
-import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection } from "@microsoft/signalr";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { refreshSession } from "../api/client";
 import { emailsApi } from "../api/emails";
 import { tokenStore } from "../api/tokenStore";
+import { API_URL } from "../lib/env";
+import { decodeAccessToken } from "../lib/jwt";
 import type {
   ComposingPresence,
   EmailAssignment,
@@ -18,61 +15,35 @@ import type {
   TicketSlaNotice,
   TicketStatusChangeNotice,
 } from "../types/api";
+import {
+  EmailCountsContext,
+  type ArrivalListener,
+  type AssignmentListener,
+  type ComposingListener,
+  type Listener,
+  type TicketAssignmentListener,
+  type TicketNewMessageListener,
+  type TicketSlaListener,
+  type TicketStatusChangeListener,
+} from "./useEmailCounts";
 
-type Listener = () => void;
-type ArrivalListener = (arrival: InboxArrival) => void;
-type AssignmentListener = (assignment: EmailAssignment) => void;
-type ComposingListener = (presence: ComposingPresence) => void;
-type TicketAssignmentListener = (notice: TicketAssignmentNotice) => void;
-type TicketStatusChangeListener = (notice: TicketStatusChangeNotice) => void;
-type TicketNewMessageListener = (notice: TicketNewMessageNotice) => void;
-type TicketSlaListener = (notice: TicketSlaNotice) => void;
-
-interface EmailCountsValue {
-  counts: EmailFolderCounts | null;
-  refresh: () => void;
-  /** Avisos del servidor cuando la bandeja cambia. Devuelve la baja de la suscripcion. */
-  onInboxChanged: (listener: Listener) => () => void;
-  /** Correo recibido, con remitente y asunto: para sonar o avisar en el escritorio. */
-  onInboxReceived: (listener: ArrivalListener) => () => void;
-  /** Le asignaron una conversacion a esta persona: para sonar o avisar en el escritorio. */
-  onInboxAssigned: (listener: AssignmentListener) => () => void;
-  /** Otra persona empezo o dejo de escribir en una conversacion. */
-  onComposing: (listener: ComposingListener) => () => void;
-  /** Avisa al resto que se esta escribiendo (o ya no) en esta conversacion. */
-  setComposing: (emailId: number, active: boolean) => void;
-  /** Quienes estan escribiendo ahora mismo en la conversacion. */
-  whoIsComposing: (emailId: number) => Promise<ComposingPresence[]>;
-  /** Avisos del servidor cuando la bandeja de tickets cambia. */
-  onTicketsChanged: (listener: Listener) => () => void;
-  /** Aviso de ticket asignado en tiempo real. */
-  onTicketAssigned: (listener: TicketAssignmentListener) => () => void;
-  /** Aviso de cambio de estado de un ticket. */
-  onTicketStatusChanged: (listener: TicketStatusChangeListener) => () => void;
-  /** Aviso de nuevo mensaje en un ticket. */
-  onTicketNewMessage: (listener: TicketNewMessageListener) => () => void;
-  /** Alerta de SLA (vencido o por vencer). */
-  onTicketSlaAlert: (listener: TicketSlaListener) => () => void;
-}
-
-const BASE_URL = (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
 const BASE_TITLE = "Plastifar · Panel interno";
 
-export const EmailCountsContext = createContext<EmailCountsValue>({
-  counts: null,
-  refresh: () => undefined,
-  onInboxChanged: () => () => undefined,
-  onInboxReceived: () => () => undefined,
-  onInboxAssigned: () => () => undefined,
-  onComposing: () => () => undefined,
-  setComposing: () => undefined,
-  whoIsComposing: () => Promise.resolve([]),
-  onTicketsChanged: () => () => undefined,
-  onTicketAssigned: () => () => undefined,
-  onTicketStatusChanged: () => () => undefined,
-  onTicketNewMessage: () => () => undefined,
-  onTicketSlaAlert: () => () => undefined,
-});
+/** Un token a punto de vencer no sirve para negociar: se rota antes de entregarlo al hub. */
+const TOKEN_MARGIN_MS = 30_000;
+
+/** Reintentos del arranque cuando el hub no responde: 2 s que se duplican hasta 30 s. */
+const RETRY_MIN_MS = 2_000;
+const RETRY_MAX_MS = 30_000;
+
+async function freshAccessToken(): Promise<string> {
+  const current = tokenStore.getAccessToken();
+  const exp = current ? decodeAccessToken(current)?.exp : undefined;
+  const expiresSoon = exp === undefined || exp * 1000 - Date.now() < TOKEN_MARGIN_MS;
+
+  if (expiresSoon) await refreshSession();
+  return tokenStore.getAccessToken() ?? "";
+}
 
 /** Contadores del menu y canal en vivo: viven arriba porque los comparten la barra y la bandeja. */
 export function EmailCountsProvider({ children }: { children: ReactNode }) {
@@ -207,12 +178,10 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
       ticketSlaListeners.current.forEach((listener) => listener(notice));
     }
 
+    // Sin fijar transporte: si el WebSocket no pasa por el proxy, SignalR baja a SSE o long polling solo.
     const connection = new HubConnectionBuilder()
-      .withUrl(`${BASE_URL}/hubs/inbox`, {
-        accessTokenFactory: () => tokenStore.getAccessToken() ?? "",
-        transport: HttpTransportType.WebSockets,
-      })
-      .withAutomaticReconnect()
+      .withUrl(`${API_URL}/hubs/inbox`, { accessTokenFactory: freshAccessToken })
+      .withAutomaticReconnect([0, 2000, 10000, 30000, 60000])
       .configureLogging(LogLevel.Warning)
       .build();
 
@@ -231,10 +200,43 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
       announce();
       ticketChanged();
     });
+
+    let mounted = true;
+    let retryDelay = RETRY_MIN_MS;
+    let retryTimer: number | null = null;
+
+    // El arranque y cada caida definitiva (agotados los reintentos automaticos) vuelven a intentar con espera creciente.
+    function scheduleStart() {
+      if (!mounted || retryTimer !== null) return;
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null;
+        void start();
+      }, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
+    }
+
+    async function start() {
+      if (!mounted || connection.state !== HubConnectionState.Disconnected) return;
+      try {
+        await connection.start();
+        retryDelay = RETRY_MIN_MS;
+        announce();
+        ticketChanged();
+      } catch {
+        scheduleStart();
+      }
+    }
+
+    connection.onclose(() => {
+      if (mounted) scheduleStart();
+    });
+
     connectionRef.current = connection;
-    connection.start().catch(() => undefined);
+    void start();
 
     return () => {
+      mounted = false;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
       connection.off("inbox:changed", announce);
       connection.off("inbox:received", received);
       connection.off("inbox:assigned", assigned);

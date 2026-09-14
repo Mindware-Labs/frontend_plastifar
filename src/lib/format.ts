@@ -68,18 +68,24 @@ export function formatTicketCode(ticketId: number): string {
   return `PLT-${String(ticketId).padStart(6, "0")}`;
 }
 
-/**
- * Extrae el primer apellido respetando partículas compuestas comunes en español
- * y otros orígenes (ej: "De León", "De la Cruz", "Del Rosario", "De los Santos",
- * "San Martín", "Santa María", "Dos Santos", "Van der Bilt", etc.).
- */
-export function getFirstSurname(lastName?: string | null): string {
+/** Estado de entrega que informa el proveedor, en palabras; cada pantalla pone su color. */
+export const DELIVERY_LABELS: Record<string, string> = {
+  Queued: "En cola",
+  Sent: "Enviado",
+  Delivered: "Entregado",
+  Delayed: "Demorado",
+  Bounced: "No entregado",
+  Complained: "Marcado como spam",
+  Failed: "No se pudo enviar",
+};
+
+/** Extrae el primer apellido respetando partículas compuestas en español y otros orígenes. */
+function getFirstSurname(lastName?: string | null): string {
   if (!lastName) return "";
   const normalized = lastName.trim().replace(/\s+/g, " ");
   if (!normalized) return "";
 
-  // Prefijos de 3 palabras (partícula + artículo + sustantivo)
-  // Ej: "De la Cruz", "De los Santos", "De las Nieves", "Van der Bilt"
+  // Prefijos de 3 palabras (partícula + artículo + sustantivo).
   const multiParticleMatch = normalized.match(
     /^((?:de\s+(?:la|las|los)|van\s+der)\s+\S+)/i,
   );
@@ -87,8 +93,7 @@ export function getFirstSurname(lastName?: string | null): string {
     return multiParticleMatch[1];
   }
 
-  // Prefijos de 2 palabras (partícula + sustantivo)
-  // Ej: "De León", "Del Rosario", "San Martín", "Santa María", "Santo Domingo", "Da Silva", "Dos Santos", "Di Stefano", "Von Trapp", "Van Damme"
+  // Prefijos de 2 palabras (partícula + sustantivo).
   const singleParticleMatch = normalized.match(
     /^((?:de|del|san|santa|santo|da|do|dos|das|di|von|van)\s+\S+)/i,
   );
@@ -100,10 +105,7 @@ export function getFirstSurname(lastName?: string | null): string {
   return normalized.split(" ")[0] ?? "";
 }
 
-/**
- * Formatea el nombre a mostrar (primer nombre + primer apellido compuesto si aplica).
- * Ej: "Richard De León", "María De la Cruz", "Carlos Pérez".
- */
+/** Formatea nombre para visualización (primer nombre + primer apellido compuesto). */
 export function formatDisplayName(
   firstName?: string | null,
   lastName?: string | null,
@@ -128,11 +130,7 @@ export function formatDisplayName(
   return "Colaborador";
 }
 
-/**
- * Calcula las 2 iniciales representativas para el avatar de usuario.
- * Ej: "Richard" + "De León" -> "RD"
- *     "Carlos" + "Pérez" -> "CP"
- */
+/** Calcula las 2 iniciales representativas para el avatar. */
 export function formatInitials(
   firstName?: string | null,
   lastName?: string | null,
@@ -156,11 +154,39 @@ export function formatInitials(
   return "PF";
 }
 
-/** Calcula el tiempo restante o vencido de un compromiso de SLA para la bandeja. */
+/** Iniciales de un nombre en una sola cadena ("Ana Pérez Gómez" -> "AP"); vale un correo como respaldo. */
+export function initialsFromName(name: string, fallbackEmail?: string | null): string {
+  const [first, ...rest] = name.trim().split(/\s+/);
+  return formatInitials(first, rest.join(" "), fallbackEmail ?? first);
+}
+
+/** Calcula el tiempo restante o vencido de un compromiso de SLA para la bandeja o detalle. */
 export function formatSlaRemaining(
   dueAtIso: string | null,
   isPaused: boolean,
-): { text: string; tone: "overdue" | "warning" | "ok" | "paused" } {
+  status?: string | null,
+  closedAtIso?: string | null,
+): { text: string; tone: "overdue" | "warning" | "ok" | "paused" | "completed" } {
+  const normStatus = (status ?? "").toLowerCase().trim();
+  const isFinalized = ["solucionado", "solucionada", "cancelado", "cerrado"].includes(normStatus);
+
+  if (isFinalized) {
+    if (normStatus === "cancelado") {
+      return { text: "Cancelado", tone: "paused" };
+    }
+    // Si tiene compromiso de resolución y fecha de cierre, verificamos si cumplió en plazo
+    if (dueAtIso && closedAtIso) {
+      const due = new Date(dueAtIso).getTime();
+      const closed = new Date(closedAtIso).getTime();
+      if (closed <= due) {
+        return { text: "Cumplido", tone: "completed" };
+      } else {
+        return { text: "Fuera de SLA", tone: "warning" };
+      }
+    }
+    return { text: "Cumplido", tone: "completed" };
+  }
+
   if (isPaused) {
     return { text: "Pausado", tone: "paused" };
   }
@@ -186,4 +212,44 @@ export function formatSlaRemaining(
   if (diffHours < 24) return { text: `${diffHours}h restantes`, tone: diffHours <= 4 ? "warning" : "ok" };
   const diffDays = Math.floor(diffHours / 24);
   return { text: `${diffDays}d restantes`, tone: "ok" };
+}
+
+/** Formatea fecha y hora de actividad de manera compacta para tablas. */
+export function formatActivityDate(iso: string | null | undefined): { compact: string; full: string } {
+  if (!iso) return { compact: "—", full: "Sin actividad" };
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return { compact: "—", full: "Fecha inválida" };
+
+  const now = new Date();
+  const full = formatDateTime(iso);
+
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  const timeStr = date.toLocaleTimeString("es-419", { hour: "2-digit", minute: "2-digit" });
+
+  if (isToday) {
+    return { compact: `Hoy, ${timeStr}`, full };
+  }
+  if (isYesterday) {
+    return { compact: `Ayer, ${timeStr}`, full };
+  }
+
+  const isSameYear = date.getFullYear() === now.getFullYear();
+  const dateStr = date.toLocaleDateString("es-419", {
+    day: "2-digit",
+    month: "short",
+    ...(isSameYear ? {} : { year: "numeric" }),
+  });
+
+  return { compact: `${dateStr}, ${timeStr}`, full };
 }

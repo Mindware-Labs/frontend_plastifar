@@ -1,4 +1,4 @@
-// Espejo de los DTOs del backend (api/api/Dtos/*.cs). Mantener sincronizado a mano.
+// Espejo de los DTOs del backend (api/api/Dtos). Mantener sincronizado a mano.
 
 export interface LoginRequest {
   email: string;
@@ -467,6 +467,8 @@ export interface TicketMessageResponse {
   /** Como le fue al correo de esta respuesta; nulo en notas internas y mensajes del cliente. */
   deliveryStatus?: string | null;
   deliveryDetail?: string | null;
+  /** La solicitud que abrio el caso, no un mensaje mas del hilo. */
+  isOrigin?: boolean;
 }
 
 export interface TicketEventResponse {
@@ -531,22 +533,11 @@ export interface TicketDetailResponse {
   attachments: TicketAttachmentResponse[];
   requesterEmail?: string | null;
   requesterName?: string | null;
+  verdictId: number | null;
+  verdictName: string | null;
   // Campos retrocompatibles
   code?: string;
   source?: string;
-}
-
-export interface TicketEmailResponse {
-  id: number;
-  direction: string;
-  fromEmail: string;
-  fromName: string | null;
-  toEmails: string[];
-  subject: string;
-  bodyHtml: string | null;
-  bodyText: string | null;
-  createdAt: string;
-  attachments: EmailAttachmentResponse[];
 }
 
 export interface AssignTicketRequest {
@@ -564,6 +555,9 @@ export interface AssignTicketResponse {
 export interface UpdateTicketStatusRequest {
   status: string;
   reason?: string | null;
+  verdictId?: number | null;
+  notifyClient?: boolean;
+  attachments?: File[];
 }
 
 export interface UpdateTicketStatusResponse {
@@ -575,6 +569,66 @@ export interface UpdateTicketStatusResponse {
   resolvedAt: string | null;
   closedAt: string | null;
   reopenedCount: number;
+}
+
+export interface TicketTaskAttachmentResponse {
+  id: number;
+  ticketTaskId: number;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedByStaffId: number | null;
+  uploadedByStaffName: string | null;
+  createdAt: string;
+}
+
+export interface TicketTaskCommentResponse {
+  id: number;
+  ticketTaskId: number;
+  authorStaffId: number;
+  authorStaffName: string;
+  comment: string;
+  createdAt: string;
+}
+
+export interface TicketTaskResponse {
+  id: number;
+  ticketId: number;
+  title: string;
+  description: string | null;
+  status: string;
+  createdByStaffId: number;
+  createdByStaffName: string;
+  assignedStaffId: number | null;
+  assignedStaffName: string | null;
+  dueDate: string | null;
+  completedAt: string | null;
+  completedByStaffId: number | null;
+  completedByStaffName: string | null;
+  completionComment: string | null;
+  createdAt: string;
+  updatedAt: string;
+  attachments: TicketTaskAttachmentResponse[];
+  comments: TicketTaskCommentResponse[];
+}
+
+export interface CreateTicketTaskRequest {
+  title: string;
+  description?: string | null;
+  assignedStaffId?: number | null;
+  dueDate?: string | null;
+}
+
+export interface UpdateTicketTaskRequest {
+  title?: string | null;
+  description?: string | null;
+  assignedStaffId?: number | null;
+  dueDate?: string | null;
+  status?: string | null;
+}
+
+export interface CreateTicketTaskCommentRequest {
+  comment: string;
 }
 
 export interface TicketStaffOptionResponse {
@@ -594,30 +648,36 @@ export interface TicketAssignmentNotice {
   resolutionDueAt?: string | null;
 }
 
+/** El hub solo manda identificadores: el detalle se relee del servidor. */
 export interface TicketStatusChangeNotice {
   ticketId: number;
   ticketNumber: string;
-  oldStatus: string;
-  newStatus: string;
+  departmentId?: number | null;
+  oldStatus?: string | null;
+  newStatus?: string | null;
   actorStaffId?: number | null;
   actorName?: string | null;
 }
 
+/** El hub solo manda identificadores: el detalle se relee del servidor. */
 export interface TicketNewMessageNotice {
   ticketId: number;
   ticketNumber: string;
-  messageId: number;
-  direction: string;
+  departmentId?: number | null;
+  messageId?: number | null;
+  direction?: string | null;
   authorName?: string | null;
-  createdAt: string;
+  createdAt?: string | null;
 }
 
+/** El hub solo manda identificadores; asunto y detalle pueden faltar. */
 export interface TicketSlaNotice {
   ticketId: number;
   ticketNumber: string;
-  subject: string;
-  noticeType: "breach" | "warning";
-  details: string;
+  departmentId?: number | null;
+  subject?: string | null;
+  noticeType?: "breach" | "warning" | null;
+  details?: string | null;
   assignedStaffId?: number | null;
 }
 
@@ -704,3 +764,81 @@ export interface BulkActionResult {
 
 
 
+
+/** Motivo del catálogo de tickets, tal como lo lista su pantalla de administración. */
+export interface TicketTopicResponse {
+  id: number;
+  name: string;
+  defaultDepartmentId: number;
+  defaultDepartmentName: string;
+  /** Emergencia | Alta | Normal | Baja. */
+  defaultPriority: string;
+  requiresProductLine: boolean;
+  isActive: boolean;
+  /** Cuántos tickets lo usan: con uno solo ya no se puede borrar, solo desactivar. */
+  ticketCount: number;
+  updatedAt: string;
+}
+
+/** Contadores de las pastillas: los calcula la busqueda, no la pagina que se ve. */
+export interface TicketTopicCounts {
+  all: number;
+  active: number;
+  inactive: number;
+}
+
+/** Respuesta paginada del catalogo de motivos (GET /api/ticket-topics). */
+export interface TicketTopicListResponse {
+  items: TicketTopicResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: TicketTopicCounts;
+}
+
+export interface SaveTicketTopicRequest {
+  name: string;
+  defaultDepartmentId: number;
+  defaultPriority?: string;
+  requiresProductLine: boolean;
+  isActive?: boolean;
+}
+
+/** Opción de veredicto para el selector del diálogo "Actualizar ticket". */
+export interface TicketVerdictOption {
+  id: number;
+  name: string;
+}
+
+/** Veredicto del catálogo, tal como lo lista su pantalla de administración. */
+export interface TicketVerdictResponse {
+  id: number;
+  name: string;
+  isActive: boolean;
+  /** Cuántos tickets lo usan: con uno solo ya no se puede borrar, solo desactivar. */
+  ticketCount: number;
+  updatedAt: string;
+}
+
+/** Contadores de las pastillas: los calcula la busqueda, no la pagina que se ve. */
+export interface TicketVerdictCounts {
+  all: number;
+  active: number;
+  inactive: number;
+}
+
+/** Respuesta paginada del catalogo de veredictos (GET /api/ticket-verdicts). */
+export interface TicketVerdictListResponse {
+  items: TicketVerdictResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: TicketVerdictCounts;
+}
+
+export interface SaveTicketVerdictRequest {
+  name: string;
+  isActive?: boolean;
+}
