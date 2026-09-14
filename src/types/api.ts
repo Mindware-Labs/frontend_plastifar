@@ -769,10 +769,16 @@ export interface BulkActionResult {
 export interface TicketTopicResponse {
   id: number;
   name: string;
+  /** Motivo del que cuelga. El catálogo admite dos niveles, no un árbol. */
+  parentId: number | null;
+  parentName: string | null;
   defaultDepartmentId: number;
   defaultDepartmentName: string;
   /** Emergencia | Alta | Normal | Baja. */
   defaultPriority: string;
+  /** Política propia. Sin ella se aplica la predeterminada de la prioridad. */
+  slaPolicyId: number | null;
+  slaPolicyName: string | null;
   requiresProductLine: boolean;
   isActive: boolean;
   /** Cuántos tickets lo usan: con uno solo ya no se puede borrar, solo desactivar. */
@@ -799,8 +805,10 @@ export interface TicketTopicListResponse {
 
 export interface SaveTicketTopicRequest {
   name: string;
+  parentId?: number | null;
   defaultDepartmentId: number;
   defaultPriority?: string;
+  slaPolicyId?: number | null;
   requiresProductLine: boolean;
   isActive?: boolean;
 }

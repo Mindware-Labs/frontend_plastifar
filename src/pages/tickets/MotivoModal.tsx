@@ -7,6 +7,7 @@ import { CheckboxField, SelectField, TextField } from "../../components/ui/Field
 import { Modal } from "../../components/ui/Modal";
 import { useSettle } from "../../hooks/useSettle";
 import type { DepartmentResponse, TicketTopicResponse } from "../../types/api";
+import type { SlaPolicy } from "../../types/settings";
 
 const priorities = ["Emergencia", "Alta", "Normal", "Baja"];
 
@@ -14,12 +15,26 @@ interface MotivoModalProps {
   /** Sin motivo = alta. */
   topic?: TicketTopicResponse;
   departments: DepartmentResponse[];
+  /** Catálogo completo, para elegir de quién cuelga este motivo. */
+  topics: TicketTopicResponse[];
+  policies: SlaPolicy[];
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModalProps) {
+export function MotivoModal({
+  topic,
+  departments,
+  topics,
+  policies,
+  onClose,
+  onSaved,
+}: MotivoModalProps) {
   const [name, setName] = useState(topic?.name ?? "");
+  const [parentId, setParentId] = useState(topic?.parentId ? String(topic.parentId) : "");
+  const [slaPolicyId, setSlaPolicyId] = useState(
+    topic?.slaPolicyId ? String(topic.slaPolicyId) : "",
+  );
   const [departmentId, setDepartmentId] = useState(
     topic ? String(topic.defaultDepartmentId) : "",
   );
@@ -30,6 +45,19 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
   const [settle, triggerSettle] = useSettle();
 
   const ready = name.trim().length > 0 && departmentId !== "";
+
+  // Dos niveles, no un árbol: quien ya tiene padre no puede ser padre, nadie
+  // es padre de sí mismo, y quien ya tiene hijos no puede pasar a tener padre
+  // —eso crearía el tercer nivel por el otro extremo—. Es la misma regla que
+  // valida POST/PUT /api/ticket-topics, y el servidor la vuelve a comprobar.
+  const hasChildren = topic !== undefined && topics.some((c) => c.parentId === topic.id);
+  const possibleParents = hasChildren
+    ? []
+    : topics.filter((c) => c.parentId === null && c.id !== topic?.id);
+
+  // Una política desactivada no se aplica a nada: ofrecerla aquí prometería
+  // un compromiso de tiempo que el reloj del ticket nunca usaría.
+  const activePolicies = policies.filter((p) => p.isActive);
 
   async function save() {
     if (!name.trim()) {
@@ -49,8 +77,10 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
 
     const input = {
       name: name.trim(),
+      parentId: parentId === "" ? null : Number(parentId),
       defaultDepartmentId: Number(departmentId),
       defaultPriority: priority,
+      slaPolicyId: slaPolicyId === "" ? null : Number(slaPolicyId),
       requiresProductLine,
     };
 
@@ -109,6 +139,25 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
         />
 
         <SelectField
+          label="Motivo padre"
+          value={parentId}
+          onChange={(val) => {
+            setParentId(val);
+            if (error) setError(null);
+          }}
+          options={[
+            { value: "", label: "Ninguno · es de primer nivel" },
+            ...possibleParents.map((p) => ({ value: String(p.id), label: p.name })),
+          ]}
+          hint={
+            hasChildren
+              ? "Este motivo ya tiene sub-motivos, así que no puede colgar de otro."
+              : "El catálogo admite dos niveles: un motivo con padre ya no puede tener hijos."
+          }
+          disabled={hasChildren}
+        />
+
+        <SelectField
           label="Departamento que lo atiende"
           required
           value={departmentId}
@@ -131,6 +180,20 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
           }}
           options={priorities.map((p) => ({ value: p, label: p }))}
           hint="Se copia al ticket al crearlo y decide sus tiempos de SLA."
+        />
+
+        <SelectField
+          label="Política de SLA"
+          value={slaPolicyId}
+          onChange={(val) => {
+            setSlaPolicyId(val);
+            if (error) setError(null);
+          }}
+          options={[
+            { value: "", label: `La predeterminada de ${priority.toLowerCase()}` },
+            ...activePolicies.map((p) => ({ value: String(p.id), label: p.name })),
+          ]}
+          hint="Sin política propia se aplica la predeterminada de la prioridad de arriba."
         />
 
         <CheckboxField

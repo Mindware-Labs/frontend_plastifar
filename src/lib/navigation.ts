@@ -204,7 +204,6 @@ export const SIDEBAR_NAV: NavGroup[] = [
     icon: Settings,
     section: "Otros",
     children: [
-      { label: "Motivos", to: "/configuracion/motivos" },
       { label: "SLA", to: "/configuracion/sla" },
       { label: "Días no laborables", to: "/configuracion/feriados" },
       { label: "Plantillas", to: "/configuracion/plantillas" },
