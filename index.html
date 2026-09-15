@@ -13,13 +13,19 @@
       el navegador —no fallaba el servidor, fallaba la politica— y el sintoma
       era una pantalla de login que no reacciona.
 
+      Y `ws:` por la misma razon: la bandeja abre un hub de SignalR en
+      ws://localhost:5153/hubs/inbox. La politica admitia `wss:` pero no `ws:`,
+      asi que en desarrollo el hub negociaba bien por HTTP y el navegador
+      cortaba el websocket despues —"the connection was stopped during
+      negotiation"—, sin contador de correo nuevo en vivo.
+
       En produccion no afloja nada util: una pagina no gana capacidades por
       poder hablar con el localhost de quien la mira, y el resto de la politica
       sigue igual de cerrada.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:*; frame-src 'self' https: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self' blob:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; frame-src 'self' https: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; worker-src 'self' blob:"
     />
     <link rel="icon" type="image/png" href="/brand/favicon.png" />
     <link rel="apple-touch-icon" href="/brand/favicon.png" />

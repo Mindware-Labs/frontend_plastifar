@@ -1,17 +1,17 @@
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { rolesApi, type RoleQuery } from "../../api/roles";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
-import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { TableSkeleton } from "../../components/ui/Skeleton";
+import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
+import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -87,14 +87,13 @@ export function RolesPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {error && (
-          <div className="mb-3">
-            <Alert variant="error">{error}</Alert>
-          </div>
-        )}
-
-        <ListPanel
+      <ModuleHeader
+        title="Personal"
+        summary={
+          counts
+            ? `${counts.all} roles definidos · ${counts.custom} personalizados · los permisos llegan en una fase posterior`
+            : "Cargando los roles del sistema…"
+        }
         action={
           isAdmin && (
             <Button size="sm" onClick={() => setModal("nuevo")}>
@@ -103,53 +102,55 @@ export function RolesPage() {
             </Button>
           )
         }
-          toolbar={
-            <>
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="Buscar por nombre de rol…"
-                className="w-[240px]"
-              />
+      />
 
-              <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre de rol…"
+              className="w-[240px] sm:w-[260px]"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                title="Limpiar búsqueda"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
+              >
+                <X className="h-3.5 w-3.5 text-zinc-400" />
+                <span>Limpiar</span>
+              </button>
+            )}
+          </div>
 
-              {filters.map(({ key, label, countKey }) => (
-                <FilterChip
-                  key={key}
-                  label={label}
-                  count={counts?.[countKey] ?? 0}
-                  active={filter === key}
-                  onClick={() => setFilter(key)}
-                />
-              ))}
-            </>
-          }
-          footer={
-            data !== null && (
-              <Pagination
-                page={data.page}
-                pageSize={data.pageSize}
-                total={data.total}
-                totalPages={data.totalPages}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                noun="roles"
-              />
-            )
-          }
-        >
-          {data === null ? (
-            error === null && <TableSkeleton rows={pageSize} columns={4} />
-          ) : rows.length === 0 ? (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {unfiltered
-                ? "Todavía no hay roles creados."
-                : "Ningún rol coincide con este filtro o búsqueda."}
-            </p>
-          ) : (
-            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
-              <DataTable>
+          <SegmentedFilter
+            aria-label="Filtro de roles"
+            value={filter}
+            onChange={setFilter}
+            items={filters.map(({ key, label, countKey }) => ({
+              key,
+              label,
+              count: counts?.[countKey] ?? 0,
+            }))}
+          />
+        </div>
+
+        {error && (
+          <div className="mb-3">
+            <Alert variant="error">{error}</Alert>
+          </div>
+        )}
+
+        {data === null ? (
+          <div className="flex justify-center py-16">
+            <Spinner />
+          </div>
+        ) : (
+          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <DataTable>
               <thead>
                 <HeadRow>
                   <Th>Nombre</Th>
@@ -197,9 +198,26 @@ export function RolesPage() {
                 ))}
               </tbody>
             </DataTable>
-            </div>
-          )}
-        </ListPanel>
+
+            {rows.length === 0 && (
+              <p className="py-14 text-center text-[13.5px] text-faint">
+                {unfiltered
+                  ? "Todavía no hay roles creados."
+                  : "Ningún rol coincide con este filtro o búsqueda."}
+              </p>
+            )}
+
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="roles"
+            />
+          </div>
+        )}
       </div>
 
       {confirmation && (

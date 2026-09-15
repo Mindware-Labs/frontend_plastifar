@@ -15,8 +15,6 @@ import {
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
-import { fetchAllPages } from "../../api/paging";
-import { settingsApi } from "../../api/settings";
 import { ticketTopicsApi, type TicketTopicQuery } from "../../api/ticketTopics";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
@@ -38,7 +36,6 @@ import type {
   TicketTopicListResponse,
   TicketTopicResponse,
 } from "../../types/api";
-import type { SlaPolicy } from "../../types/settings";
 import { MotivoModal } from "./MotivoModal";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 
@@ -68,10 +65,6 @@ export function MotivosPage() {
   const isAdmin = Boolean(user?.isAdmin);
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
-  // El catalogo entero y las politicas activas: el desplegable de «motivo
-  // padre» no puede ofrecer solo lo que cabe en la pagina que se esta viendo.
-  const [allTopics, setAllTopics] = useState<TicketTopicResponse[]>([]);
-  const [policies, setPolicies] = useState<SlaPolicy[]>([]);
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
   const [priority, setPriority] = useState<string>("todas");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -101,22 +94,6 @@ export function MotivosPage() {
 
   useEffect(() => {
     departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
-  }, []);
-
-  // Se relee con cada refresco: crear un motivo cambia quien puede ser padre.
-  const revision = data?.total;
-  useEffect(() => {
-    fetchAllPages<TicketTopicResponse>((page, size) =>
-      ticketTopicsApi.list({ page, pageSize: size, status: "todos" }),
-    )
-      .then(setAllTopics)
-      .catch(() => setAllTopics([]));
-  }, [revision]);
-
-  useEffect(() => {
-    fetchAllPages<SlaPolicy>((page, size) => settingsApi.slaPolicies.list({ page, pageSize: size }))
-      .then(setPolicies)
-      .catch(() => setPolicies([]));
   }, []);
 
   const rows = data?.items ?? [];
@@ -308,14 +285,7 @@ export function MotivosPage() {
               <tbody>
                 {rows.map((topic) => (
                   <Row key={topic.id} busy={busyId === topic.id}>
-                    <Td className="text-[13px] font-medium text-ink">
-                      {topic.name}
-                      {topic.parentName && (
-                        <span className="block text-[11.5px] font-normal text-faint">
-                          dentro de {topic.parentName}
-                        </span>
-                      )}
-                    </Td>
+                    <Td className="text-[13px] font-medium text-ink">{topic.name}</Td>
                     <Td className="text-[12.5px] text-ink">{topic.defaultDepartmentName}</Td>
                     <Td>
                       <span
@@ -407,8 +377,6 @@ export function MotivosPage() {
         <MotivoModal
           topic={modal === "nuevo" ? undefined : modal}
           departments={departments}
-          topics={allTopics}
-          policies={policies}
           onClose={() => setModal(null)}
           onSaved={refresh}
         />

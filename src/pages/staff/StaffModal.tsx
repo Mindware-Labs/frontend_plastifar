@@ -11,7 +11,6 @@ import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { DepartmentResponse, StaffResponse } from "../../types/api";
-import { departmentOptions } from "../../lib/departments";
 
 const schema = z.object({
   firstName: z
@@ -101,14 +100,15 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
         return;
       }
 
-      const fallback = isEdit ? "No se pudo guardar el colaborador" : "No se pudo crear el colaborador";
+      const fallback = isEdit ? "No se pudo guardar el usuario" : "No se pudo crear el usuario";
       setFormError(err instanceof ApiError ? err.message : fallback);
     }
   }
 
   return (
     <Modal
-      title={isEdit ? "Editar colaborador" : "Nuevo colaborador"}
+      eyebrow="Personal"
+      title={isEdit ? "Editar colaborador" : "Agregar personal"}
       description={
         isEdit
           ? "Los cambios se aplican de inmediato. La contraseña no se toca."
@@ -181,7 +181,10 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
               onChange={field.onChange}
               onBlur={field.onBlur}
               placeholder="Selecciona un departamento"
-              options={departmentOptions(departments)}
+              options={departments.map((dept) => ({
+                value: String(dept.id),
+                label: dept.name,
+              }))}
               state={stateOf("primaryDepartmentId")}
               error={errors.primaryDepartmentId?.message}
             />

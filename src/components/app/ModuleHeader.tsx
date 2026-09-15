@@ -52,7 +52,11 @@ export function ModuleHeader({ title, summary, sections, note, action }: ModuleH
           {summary && (
             <>
               {title && <span aria-hidden className="h-3.5 w-px self-center bg-line" />}
-              <p className="text-[12.5px] text-subtle">{summary}</p>
+              {/* Un <div> y no un <p>: `summary` es un ReactNode y hay pantallas que
+                  le pasan una fila de contadores, es decir un <div>. Dentro de un
+                  <p> eso es HTML invalido y React lo reporta como error de
+                  hidratacion. */}
+              <div className="text-[12.5px] text-subtle">{summary}</div>
             </>
           )}
         </div>
