@@ -1,21 +1,17 @@
-import { useId, useRef, type ClipboardEvent, type KeyboardEvent, type RefObject } from "react";
-import { RelayRing } from "./RelayRing";
-import { useFocusRelay } from "./useFocusRelay";
+import { useEffect, useRef, type ClipboardEvent, type KeyboardEvent } from "react";
 
 interface OtpCodeInputProps {
   length?: number;
   value: string;
   onChange: (value: string) => void;
   error?: string;
-  /** El código no fue aceptado: los seis dígitos se marcan por igual, sin señalar ninguno. */
+  /** El código no fue aceptado: los seis dígitos se marcan por igual y se agitan de lado a lado. */
   invalid?: boolean;
   /** El código fue aceptado: los dígitos confirman en cascada y dejan de editarse. */
   success?: boolean;
   autoFocus?: boolean;
-  /** Control desde el que viaja el anillo de foco hasta los dígitos. */
-  relayFrom?: RefObject<HTMLElement | null>;
-  /** Cada cambio lanza el relevo: el anillo viaja y el primer dígito recibe el foco. */
-  relayKey?: number;
+  /** Clave de intento para reiniciar la animación de sacudida cada vez que falle. */
+  shakeKey?: number;
 }
 
 export function OtpCodeInput({
@@ -26,15 +22,17 @@ export function OtpCodeInput({
   invalid = false,
   success = false,
   autoFocus,
-  relayFrom,
-  relayKey,
+  shakeKey,
 }: OtpCodeInputProps) {
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
-  const errorId = useId();
   const digits = Array.from({ length }, (_, i) => value[i] ?? "");
 
-  // El foco queda en el primer dígito para poder reescribir, pero sin resaltarlo ni seleccionarlo.
-  const ringRef = useFocusRelay(relayFrom, relayKey, () => inputsRef.current[0]?.focus());
+  // Cuando el código es incorrecto, devolvemos el foco al primer dígito
+  useEffect(() => {
+    if (invalid) {
+      inputsRef.current[0]?.focus();
+    }
+  }, [invalid, shakeKey]);
 
   const setDigit = (index: number, digit: string) => {
     const next = digits.slice();
@@ -77,7 +75,10 @@ export function OtpCodeInput({
   return (
     <div>
       <div className="flex justify-center">
-        <div className="relative flex gap-1.5 sm:gap-2.5">
+        <div
+          key={shakeKey}
+          className={`flex gap-1.5 sm:gap-2.5 ${invalid ? "animate-plf-shake" : ""}`}
+        >
           {digits.map((digit, index) => {
             const stateClass = success
               ? "border-brand-green ring-3 ring-brand-green/10 text-brand-green animate-plf-otp-confirm"
@@ -103,19 +104,12 @@ export function OtpCodeInput({
                 onPaste={handlePaste}
                 aria-label={`Dígito ${index + 1} de ${length} del código`}
                 aria-invalid={!!error || invalid}
-                aria-describedby={error ? errorId : undefined}
                 className={`h-10 w-10 shrink-0 rounded-lg border bg-white text-center font-heading text-base font-semibold tabular-nums text-ink caret-brand-red outline-none transition-[border-color,box-shadow,color] duration-150 sm:h-12 sm:w-12 sm:text-lg ${stateClass}`}
               />
             );
           })}
-          <RelayRing ringRef={ringRef} className="-inset-1.5 rounded-md" />
         </div>
       </div>
-      {error && (
-        <p id={errorId} className="mt-2 text-[13px] text-brand-red">
-          {error}
-        </p>
-      )}
     </div>
   );
 }

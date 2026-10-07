@@ -78,7 +78,7 @@ export function ResetPasswordPage() {
   // Valores del último envío fallido: mientras no cambien, el botón sigue en tinta.
   const [staleCode, setStaleCode] = useState<CodeFormValues | null>(null);
   const [settle, setSettle] = useState(false);
-  const [relayKey, setRelayKey] = useState(0);
+  const [shakeKey, setShakeKey] = useState(0);
   const [announcement, setAnnouncement] = useState("");
   const verifyButtonRef = useRef<HTMLButtonElement>(null);
   const [passwordPhase, setPasswordPhase] = useState<PasswordPhase>("idle");
@@ -187,7 +187,7 @@ export function ResetPasswordPage() {
           : "Sigue incorrecto. Puedes pedir un código nuevo.",
       );
       setSettle(true);
-      setRelayKey((k) => k + 1);
+      setShakeKey((k) => k + 1);
     }
   }
 
@@ -414,41 +414,37 @@ export function ResetPasswordPage() {
                 error={fieldState.error?.message}
                 invalid={codePhase === "wrong"}
                 success={codePhase === "verified"}
-                relayFrom={verifyButtonRef}
-                relayKey={relayKey}
+                shakeKey={shakeKey}
                 autoFocus
               />
             )}
           />
 
-          <p className="mt-3 text-center text-[13px] text-zinc-500">
-            {codePhase === "wrong" && (
-              <span className="font-semibold text-ink">
-                {codeAttempt === 1 ? "Puede estar vencido" : "Sigue incorrecto"} ·{" "}
-              </span>
-            )}
-            {resendCooldown > 0 ? (
-              <>
-                Reenviar código en{" "}
-                <span className="font-medium tabular-nums text-brand-gray">
-                  {String(Math.floor(resendCooldown / 60)).padStart(2, "0")}:
-                  {String(resendCooldown % 60).padStart(2, "0")}
-                </span>
-              </>
-            ) : (
-              <>
-                {codePhase !== "wrong" && "¿No recibiste el código? "}
-                <button
-                  type="button"
-                  onClick={handleResendCode}
-                  disabled={isResending}
-                  className="rounded font-medium text-brand-red underline-offset-4 transition-colors hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isResending ? "Reenviando…" : "Reenviar código"}
-                </button>
-              </>
-            )}
-          </p>
+          <div className="mt-3 text-center text-[13px] text-zinc-500">
+            <p>
+              {resendCooldown > 0 ? (
+                <>
+                  Reenviar código en{" "}
+                  <span className="font-medium tabular-nums text-brand-gray">
+                    {String(Math.floor(resendCooldown / 60)).padStart(2, "0")}:
+                    {String(resendCooldown % 60).padStart(2, "0")}
+                  </span>
+                </>
+              ) : (
+                <>
+                  {codePhase !== "wrong" && "¿No recibiste el código? "}
+                  <button
+                    type="button"
+                    onClick={handleResendCode}
+                    disabled={isResending}
+                    className="rounded font-medium text-brand-red underline-offset-4 transition-colors hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isResending ? "Reenviando…" : "Reenviar código"}
+                  </button>
+                </>
+              )}
+            </p>
+          </div>
         </div>
 
         <AuthButton
