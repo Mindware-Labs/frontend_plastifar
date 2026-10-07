@@ -111,12 +111,18 @@ export function LoginPage() {
     emailReg.onBlur(e);
     const val = e.target.value.trim();
     if (!val) {
-      setEmailBlurError("Ingresa tu correo");
+      if (emailBlurError !== "Ingresa tu correo") {
+        setEmailBlurError("Ingresa tu correo");
+        setSettle(true);
+      }
       return;
     }
     const result = z.string().email().safeParse(val);
     if (!result.success) {
-      setEmailBlurError("Correo inválido");
+      if (emailBlurError !== "Correo inválido") {
+        setEmailBlurError("Correo inválido");
+        setSettle(true);
+      }
       return;
     }
     setEmailBlurError(null);

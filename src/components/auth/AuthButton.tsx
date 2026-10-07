@@ -34,10 +34,10 @@ export const AuthButton = forwardRef<HTMLButtonElement, AuthButtonProps>(functio
       disabled={disabled || isLoading}
       className={`relative flex h-12 w-full cursor-pointer items-center justify-center overflow-hidden
         rounded-xl font-heading text-[13.5px] sm:text-[14px] font-semibold text-white tracking-[-0.01em]
-        transition-[background-color,box-shadow,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+        transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
         active:scale-[0.99]
         focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red
-        disabled:cursor-not-allowed disabled:opacity-85 disabled:shadow-none disabled:active:scale-100
+        disabled:cursor-not-allowed disabled:active:scale-100
         motion-reduce:active:scale-100
         ${toneClass[tone]} ${className}`}
       {...props}
