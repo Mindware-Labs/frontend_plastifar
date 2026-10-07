@@ -37,14 +37,14 @@ interface AuthPasswordFieldProps
     Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {}
 
 const boxClass = (invalid: boolean) =>
-  `group relative flex h-10 w-full items-center rounded-lg border bg-white px-3 transition-all duration-150 ${
+  `group relative flex h-12 w-full items-center rounded-xl border px-3.5 transition-all duration-250 ease-out ${
     invalid
-      ? "border-brand-red ring-3 ring-brand-red/10"
-      : "border-zinc-200 hover:border-zinc-300 focus-within:border-brand-red focus-within:ring-3 focus-within:ring-brand-red/10"
+      ? "border-brand-red bg-white ring-4 ring-brand-red/10 shadow-[0_0_0_1px_rgba(228,0,43,0.1)]"
+      : "border-zinc-200/90 bg-zinc-50/50 hover:border-zinc-300 hover:bg-zinc-50/80 focus-within:border-brand-red focus-within:bg-white focus-within:ring-4 focus-within:ring-brand-red/10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
   }`;
 
 const iconClass = (invalid: boolean) =>
-  `mr-2.5 shrink-0 transition-colors ${
+  `mr-3 shrink-0 transition-colors ${
     invalid ? "text-brand-red" : "text-zinc-400 group-focus-within:text-brand-red"
   }`;
 
@@ -82,10 +82,10 @@ function LabelRow({ inputId, label, action, message, messageId }: LabelRowProps)
     "absolute inset-y-0 right-0 flex items-center whitespace-nowrap transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-opacity";
 
   return (
-    <div className="mb-2 flex h-[18px] items-center justify-between gap-2">
+    <div className="mb-2 flex min-h-[20px] items-center justify-between gap-2">
       <label
         htmlFor={inputId}
-        className="shrink-0 text-[12px] font-semibold text-zinc-700 tracking-[-0.01em]"
+        className="shrink-0 text-[13px] font-semibold text-zinc-700 tracking-[-0.01em]"
       >
         {label}
       </label>
@@ -102,7 +102,7 @@ function LabelRow({ inputId, label, action, message, messageId }: LabelRowProps)
           <span
             id={messageId}
             inert={!hasMessage}
-            className={`${layer} text-[12px] font-semibold text-ink ${
+            className={`${layer} text-[12px] font-semibold text-brand-red ${
               hasMessage ? "" : "opacity-0 translate-y-1 motion-reduce:translate-y-0"
             }`}
           >
@@ -169,7 +169,7 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(function A
           ref={inputRef}
           id={inputId}
           placeholder={placeholder ?? label}
-          className={`h-full w-full min-w-0 bg-transparent text-[13.5px] font-normal text-zinc-900 placeholder:text-zinc-400 placeholder:font-normal outline-none ${className}`}
+          className={`h-full w-full min-w-0 bg-transparent text-[14px] font-normal text-zinc-900 placeholder:text-zinc-400 placeholder:font-normal outline-none ${className}`}
           aria-invalid={isInvalid || notice != null}
           aria-describedby={error ? errorId : notice != null ? noticeId : undefined}
           {...props}
@@ -236,7 +236,7 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             id={inputId}
             type={visible ? "text" : "password"}
             placeholder={placeholder ?? label}
-            className={`h-full w-full min-w-0 bg-transparent text-[13.5px] font-normal text-zinc-900 placeholder:text-zinc-400 placeholder:font-normal outline-none ${
+            className={`h-full w-full min-w-0 bg-transparent text-[14px] font-normal text-zinc-900 placeholder:text-zinc-400 placeholder:font-normal outline-none ${
               visible ? "" : "tracking-[0.14em]"
             } ${className}`}
             aria-invalid={isInvalid || notice != null}
@@ -261,9 +261,9 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             onClick={() => setVisible((v) => !v)}
             tabIndex={-1}
             aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
-            className="ml-1 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+            className="ml-1.5 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-200/50 hover:text-zinc-700"
           >
-            {visible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
 
           <RelayRing ringRef={ringRef} />

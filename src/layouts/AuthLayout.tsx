@@ -11,50 +11,52 @@ interface AuthLayoutProps {
   settle?: boolean;
 }
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 /** Layout corporativo centrado para pantallas de acceso. */
 export function AuthLayout({ title, subtitle, footer, children, settle = false }: AuthLayoutProps) {
   return (
-    <div className="relative flex min-h-dvh flex-col justify-between items-center bg-[#f8f9fa] px-4 py-8 sm:py-12 overflow-hidden selection:bg-brand-red/10 selection:text-brand-red">
+    <div className="relative flex min-h-dvh flex-col justify-between items-center bg-[#f8f9fa] px-4 py-10 sm:py-14 overflow-hidden selection:bg-brand-red/10 selection:text-brand-red">
       {/* Fondo ambiental sutil con luz cenital tenue */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[340px] bg-[radial-gradient(ellipse_at_top,rgba(196,18,48,0.06),transparent_70%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_35%,#000_60%,transparent_100%)] opacity-55" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[380px] bg-[radial-gradient(ellipse_at_top,rgba(228,0,43,0.05),transparent_70%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#e2e4e8_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_35%,#000_60%,transparent_100%)] opacity-50" />
       </div>
 
       <div className="w-full" /> {/* Spacer top para equilibrio visual */}
 
-      {/* Tarjeta central compacta */}
-      <main className="relative z-10 w-full max-w-[396px] animate-plf-rise">
+      {/* Tarjeta central amplia y distinguida */}
+      <main className="relative z-10 w-full max-w-[440px] animate-plf-rise">
         <div
-          className={`rounded-2xl border border-zinc-200/80 bg-white p-7 sm:p-8 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_12px_32px_-4px_rgba(15,23,42,0.06)] ${
+          className={`relative rounded-2xl sm:rounded-[22px] border border-zinc-200/90 bg-white p-8 sm:p-10 shadow-[0_2px_4px_rgba(0,0,0,0.02),0_12px_28px_-6px_rgba(27,27,29,0.05),0_28px_56px_-12px_rgba(27,27,29,0.07)] overflow-hidden transition-transform duration-300 ${
             settle ? "animate-plf-settle" : ""
           }`}
         >
           {/* Cabecera con Logotipo oficial */}
           <header className="text-center">
             <div className="flex justify-center mb-6">
-              <Logo variant="color" height={32} />
+              <Logo variant="color" height={36} />
             </div>
 
-            <h1 className="font-heading text-[20px] font-bold tracking-[-0.025em] text-zinc-900 leading-tight">
+            <h1 className="font-heading text-[22px] sm:text-[23px] font-bold tracking-[-0.03em] text-zinc-900 leading-tight">
               {title}
             </h1>
 
             {subtitle && (
-              <p className="mt-2 text-center text-[13px] text-zinc-500 leading-relaxed max-w-[32ch] mx-auto">
+              <p className="mt-2 text-center text-[13.5px] text-zinc-500 font-normal leading-relaxed max-w-[34ch] mx-auto">
                 {subtitle}
               </p>
             )}
           </header>
 
           {/* Formulario / Contenido */}
-          <div className="mt-7">
+          <div className="mt-8">
             {children}
           </div>
 
           {/* Pie interior de la tarjeta */}
           {footer && (
-            <div className="mt-7 pt-5 border-t border-zinc-100">
+            <div className="mt-8 pt-6 border-t border-zinc-100">
               {footer}
             </div>
           )}
@@ -63,8 +65,8 @@ export function AuthLayout({ title, subtitle, footer, children, settle = false }
 
       {/* Pie institucional exterior */}
       <footer className="relative z-10 mt-8 flex flex-col items-center gap-2.5 text-center animate-plf-fade">
-        <p className="text-[11.5px] tracking-wide text-zinc-400">
-          © {new Date().getFullYear()} Plastifar, S.A. · Autopista Duarte Km. 13½
+        <p className="text-[12px] tracking-normal text-zinc-400">
+          © {CURRENT_YEAR} Plastifar, S.A. · Autopista Duarte Km. 13½
         </p>
         <a
           href="https://www.cquest.do/"

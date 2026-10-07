@@ -13,9 +13,10 @@ interface AuthButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const toneClass: Record<AuthButtonTone, string> = {
   primary:
-    "bg-brand-red shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.06)] hover:bg-[#b0102b] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_5px_rgba(196,18,48,0.25)] disabled:hover:bg-brand-red",
-  ink: "bg-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-ink disabled:hover:bg-ink",
-  success: "bg-brand-green shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-brand-green disabled:hover:bg-brand-green",
+    "bg-brand-red shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_4px_14px_rgba(228,0,43,0.25)] hover:bg-[#cb0026] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_6px_20px_rgba(228,0,43,0.32)] disabled:hover:bg-brand-red",
+  ink: "bg-zinc-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_8px_rgba(0,0,0,0.12)] hover:bg-zinc-900 disabled:hover:bg-zinc-800",
+  success:
+    "bg-brand-green shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_4px_14px_rgba(0,124,57,0.25)] hover:bg-[#006e32] disabled:hover:bg-brand-green",
 };
 
 /** Botón principal de autenticación con estado de carga y confirmación integrados. */
@@ -25,31 +26,31 @@ export const AuthButton = forwardRef<HTMLButtonElement, AuthButtonProps>(functio
 ) {
   const showTone = tone !== "primary" && toneLabel != null;
   const layer =
-    "absolute inset-0 flex items-center justify-center gap-2 transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-opacity";
+    "absolute inset-0 flex items-center justify-center gap-2 transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-opacity";
 
   return (
     <button
       ref={ref}
       disabled={disabled || isLoading}
-      className={`relative flex h-10 w-full cursor-pointer items-center justify-center overflow-hidden
-        rounded-lg font-heading text-[13.5px] font-semibold text-white
-        transition-[background-color,box-shadow,transform] duration-200 ease-out
+      className={`relative flex h-12 w-full cursor-pointer items-center justify-center overflow-hidden
+        rounded-xl font-heading text-[13.5px] sm:text-[14px] font-semibold text-white tracking-[-0.01em]
+        transition-[background-color,box-shadow,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
         active:scale-[0.99]
         focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red
-        disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:active:scale-100
+        disabled:cursor-not-allowed disabled:opacity-85 disabled:shadow-none disabled:active:scale-100
         motion-reduce:active:scale-100
         ${toneClass[tone]} ${className}`}
       {...props}
     >
-      <span className={`${layer} ${showTone ? "opacity-0 -translate-y-2 motion-reduce:translate-y-0" : ""}`}>
+      <span className={`${layer} ${showTone ? "opacity-0 -translate-y-1.5 pointer-events-none" : "opacity-100 translate-y-0"}`}>
         {isLoading && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
         <span>{children}</span>
       </span>
       <span
         aria-hidden={!showTone}
-        className={`${layer} ${showTone ? "" : "opacity-0 translate-y-2 motion-reduce:translate-y-0"}`}
+        className={`${layer} px-2 ${showTone ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1.5 pointer-events-none"}`}
       >
-        <span>{toneLabel}</span>
+        <span className="truncate">{toneLabel}</span>
       </span>
     </button>
   );
