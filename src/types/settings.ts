@@ -50,6 +50,32 @@ export interface ProductLine {
   isActive: boolean;
 }
 
+/** Espejo del enum `PlantCountry` del servidor, que viaja como texto. */
+export type PlantCountry = "RD" | "Guatemala";
+
+export const PLANT_COUNTRIES: { value: PlantCountry; label: string }[] = [
+  { value: "RD", label: "República Dominicana" },
+  { value: "Guatemala", label: "Guatemala" },
+];
+
+/** Planta de producción. El nombre es único dentro de su país, no en todo el catálogo. */
+export interface Plant {
+  id: number;
+  name: string;
+  country: PlantCountry;
+  managerStaffId: number | null;
+  /** Viene con la planta para pintar la columna sin pedirlo fila por fila. */
+  managerName: string | null;
+  isActive: boolean;
+}
+
+export interface SavePlantRequest {
+  name: string;
+  country: PlantCountry;
+  managerStaffId: number | null;
+  isActive: boolean;
+}
+
 /** Variables permitidas en una plantilla. Una desconocida se rechaza al guardar. */
 export const TEMPLATE_VARIABLES = [
   { key: "contacto", label: "Nombre del contacto", sample: "María Reyes" },

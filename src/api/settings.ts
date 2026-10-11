@@ -3,7 +3,10 @@ import type {
   EmailTemplate,
   Holiday,
   Mailbox,
+  Plant,
+  PlantCountry,
   ProductLine,
+  SavePlantRequest,
   SlaPolicy,
 } from "../types/settings";
 
@@ -41,6 +44,10 @@ export interface HolidayQuery extends CatalogQuery {
   year?: number;
 }
 
+export interface PlantQuery extends CatalogQuery {
+  country?: PlantCountry;
+}
+
 export const settingsApi = {
   slaPolicies: {
     list: (query: SlaQuery) =>
@@ -73,6 +80,17 @@ export const settingsApi = {
     update: (id: number, data: Omit<ProductLine, "id">) =>
       apiRequest<ProductLine>(`/api/settings/product-lines/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => apiRequest<void>(`/api/settings/product-lines/${id}`, { method: "DELETE" }),
+  },
+
+  // Sin `remove`: una planta no se elimina, se desactiva guardándola.
+  plants: {
+    list: (query: PlantQuery) =>
+      apiRequest<ListResponse<Plant>>(`/api/settings/plants${toQuery({ ...query })}`),
+    get: (id: number) => apiRequest<Plant>(`/api/settings/plants/${id}`),
+    create: (data: SavePlantRequest) =>
+      apiRequest<Plant>("/api/settings/plants", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: SavePlantRequest) =>
+      apiRequest<Plant>(`/api/settings/plants/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   },
 
   templates: {

@@ -20,6 +20,7 @@ import { RolesPage } from "./pages/roles/RolesPage";
 import { VeredictosPage } from "./pages/tickets/VeredictosPage";
 import { HolidaysSection } from "./pages/settings/HolidaysSection";
 import { MailboxesSection } from "./pages/settings/MailboxesSection";
+import { PlantsSection } from "./pages/settings/PlantsSection";
 import { ProductLinesSection } from "./pages/settings/ProductLinesSection";
 import { SlaSection } from "./pages/settings/SlaSection";
 import { TemplatesSection } from "./pages/settings/TemplatesSection";
@@ -128,6 +129,10 @@ export default function App() {
         <Route path="/configuracion/feriados" element={<HolidaysSection />} />
         <Route path="/configuracion/plantillas" element={<TemplatesSection />} />
         <Route path="/configuracion/buzones" element={<MailboxesSection />} />
+        {/* Ruta propuesta en docs/plan/00, seccion 11. Si las plantas deben
+            seguir a las lineas de producto al grupo de Calidad esta por
+            decidir en la revision cruzada. */}
+        <Route path="/configuracion/plantas" element={<PlantsSection />} />
 
         {/* Territorios y lineas de producto se mudaron al modulo que las usa:
             el territorio es obligatorio al registrar un cliente y alimenta el
