@@ -166,6 +166,18 @@ export function departmentPath(
 }
 
 /**
+ * El camino de cada departamento, por id, resuelto de una vez.
+ *
+ * Es `departmentPath` para una tabla: rotular fila a fila reconstruiría el árbol
+ * en cada una. Quien lo usa cae al nombre que mandó el servidor cuando el id no
+ * está —la lista no cargó, o trae solo lo activo y el departamento ya no lo es—:
+ * un nombre corto sigue siendo mejor que una celda vacía.
+ */
+export function departmentPaths(departments: DepartmentLike[]): Map<number, string> {
+  return new Map(buildDepartmentTree(departments).map((d) => [d.id, d.path]));
+}
+
+/**
  * Un departamento y toda su descendencia.
  *
  * Es la pieza que necesita un filtro para que «VENTAS INTERNACIONALES» traiga

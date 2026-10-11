@@ -30,6 +30,7 @@ import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
+import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
 import type {
   DepartmentResponse,
@@ -153,6 +154,8 @@ export function MotivosPage() {
   }
 
   const departmentOptions = buildDepartmentFilterOptions(departments);
+  // El camino, no el nombre: dos departamentos pueden llamarse igual.
+  const departmentPathById = departmentPaths(departments);
 
   const priorityFilterOptions: TicketFilterOption[] = [
     {
@@ -286,7 +289,9 @@ export function MotivosPage() {
                 {rows.map((topic) => (
                   <Row key={topic.id} busy={busyId === topic.id}>
                     <Td className="text-[13px] font-medium text-ink">{topic.name}</Td>
-                    <Td className="text-[12.5px] text-ink">{topic.defaultDepartmentName}</Td>
+                    <Td className="text-[12.5px] text-ink">
+                      {departmentPathById.get(topic.defaultDepartmentId) ?? topic.defaultDepartmentName}
+                    </Td>
                     <Td>
                       <span
                         className={`inline-flex items-center rounded-edge border px-1.5 py-0.5 text-[11px] font-medium ${

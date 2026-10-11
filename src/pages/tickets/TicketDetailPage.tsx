@@ -37,7 +37,7 @@ import { useSettle } from "../../hooks/useSettle";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
-import { departmentPathOptions } from "../../lib/departments";
+import { departmentPath, departmentPathOptions } from "../../lib/departments";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes, formatDateTime, formatSlaRemaining } from "../../lib/format";
 import type {
@@ -698,6 +698,17 @@ export function TicketDetailPage() {
   // Arbol entero, para rotular con el camino: el catalogo trae solo id y nombre.
   const [editDepartmentTree, setEditDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
 
+  /* Se lee al entrar y no solo al abrir el formulario: la ficha tambien rotula
+     el departamento con su camino, porque dos pueden llamarse igual. Es la misma
+     lectura que ya hacia esta pantalla, antes; si falla, el formulario la
+     reintenta al abrirse y la ficha muestra el nombre que mando el servidor. */
+  useEffect(() => {
+    departmentsApi
+      .list({ includeInactive: true })
+      .then(setEditDepartmentTree)
+      .catch(() => setEditDepartmentTree(undefined));
+  }, []);
+
   const handleOpenEditModal = async () => {
     if (!ticket) return;
     setEditSubject(ticket.subject);
@@ -1063,6 +1074,7 @@ export function TicketDetailPage() {
           ) : (
             <TicketPropertiesAside
               ticket={ticket}
+              departmentLabel={departmentPath(editDepartmentTree ?? [], ticket.departmentId)}
               sla={sla}
               canEdit={!isClosed}
               canAssign={ticket.status !== "Cancelado"}

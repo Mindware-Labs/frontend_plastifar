@@ -18,6 +18,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { usePermissions } from "../../hooks/usePermissions";
+import { departmentPaths } from "../../lib/departments";
 import type {
   DepartmentAccess,
   PermissionMatrixResponse,
@@ -129,6 +130,12 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const fullName = staff ? `${staff.firstName} ${staff.lastName}` : "";
   useDynamicBreadcrumb(staff ? fullName : null);
   const primary = staff?.accesses.find((access) => access.isPrimary) ?? null;
+  /* Dos departamentos pueden llamarse igual bajo padres distintos, así que un
+     acceso se rotula con el camino. La lista solo se carga para quien administra
+     accesos; sin ella queda el nombre que mandó el servidor. */
+  const departmentPathById = departmentPaths(departments);
+  const departmentLabel = (access: { departmentId: number; departmentName: string }) =>
+    departmentPathById.get(access.departmentId) ?? access.departmentName;
   const effective = staff?.effectivePermissions ?? [];
 
   /** RF-P2/RF-P3: el POST solo sirve para un departamento nuevo; editar uno ya
@@ -175,7 +182,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
         <>
           <strong className="font-semibold text-ink">{fullName}</strong> dejará de ver y trabajar
           los recursos de{" "}
-          <strong className="font-semibold text-ink">{access.departmentName}</strong>. Su historial
+          <strong className="font-semibold text-ink">{departmentLabel(access)}</strong>. Su historial
           en ese departamento se conserva, y puedes volver a otorgarle el acceso cuando quieras.
         </>
       ),
@@ -284,7 +291,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
 
           <DetailGroup title="Puesto">
             <DetailRow label="Departamento principal">
-              {primary ? primary.departmentName : "—"}
+              {primary ? departmentLabel(primary) : "—"}
             </DetailRow>
             <DetailRow label="Perfil">
               {staff.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
@@ -343,7 +350,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
               <tbody>
                 {staff.accesses.map((access) => (
                   <Row key={access.departmentId} busy={busyDepartmentId === access.departmentId}>
-                    <Td className="text-[13px] font-medium text-ink">{access.departmentName}</Td>
+                    <Td className="text-[13px] font-medium text-ink">{departmentLabel(access)}</Td>
                     <Td>
                       <Badge>{access.roleName}</Badge>
                     </Td>
@@ -377,7 +384,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                         {/* Cambiar el rol necesita la lista de roles; revocar no. */}
                         {canManageAccess && matrix !== null && (
                           <RowAction
-                            label={`Cambiar el rol en ${access.departmentName}`}
+                            label={`Cambiar el rol en ${departmentLabel(access)}`}
                             icon={Pencil}
                             onClick={() => setModal(access)}
                             disabled={busyDepartmentId === access.departmentId}
@@ -389,7 +396,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                               label={
                                 access.isPrimary
                                   ? "El acceso principal no se revoca: marca otro como principal primero"
-                                  : `Revocar el acceso a ${access.departmentName}`
+                                  : `Revocar el acceso a ${departmentLabel(access)}`
                               }
                               icon={Trash2}
                               onClick={() => askRevoke(access)}

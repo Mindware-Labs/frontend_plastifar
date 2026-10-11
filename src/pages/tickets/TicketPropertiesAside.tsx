@@ -90,6 +90,8 @@ function PropertyRow({
 
 interface TicketPropertiesAsideProps {
   ticket: TicketDetailResponse;
+  /** Camino completo del departamento; sin el, se muestra el nombre del ticket. */
+  departmentLabel?: string | null;
   sla: ReturnType<typeof formatSlaRemaining>;
   canEdit: boolean;
   canAssign: boolean;
@@ -103,6 +105,7 @@ interface TicketPropertiesAsideProps {
 /** Ficha compacta del ticket: panel unificado de propiedades alineado con el nuevo diseño SaaS. */
 export function TicketPropertiesAside({
   ticket,
+  departmentLabel,
   sla,
   canEdit,
   canAssign,
@@ -114,6 +117,8 @@ export function TicketPropertiesAside({
 }: TicketPropertiesAsideProps) {
   const email = ticket.contactEmail ?? ticket.requesterEmail ?? null;
   const isPaused = Boolean(ticket.pausedAt);
+  // Dos departamentos pueden llamarse igual: el camino los distingue.
+  const department = departmentLabel ?? ticket.departmentName;
 
   return (
     <aside aria-label="Datos del ticket" className={className}>
@@ -214,8 +219,8 @@ export function TicketPropertiesAside({
             </PropertyRow>
 
             <PropertyRow label="Departamento">
-              <span className="block truncate" title={ticket.departmentName ?? undefined}>
-                {ticket.departmentName ?? <span className="text-zinc-400 font-normal">—</span>}
+              <span className="block truncate" title={department ?? undefined}>
+                {department ?? <span className="text-zinc-400 font-normal">—</span>}
               </span>
             </PropertyRow>
 
