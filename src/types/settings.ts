@@ -76,6 +76,34 @@ export interface SavePlantRequest {
   isActive: boolean;
 }
 
+/** Equipo de trabajo. El nombre es único en todo el catálogo. */
+export interface Team {
+  id: number;
+  name: string;
+  /** Planta a la que pertenece; nulo cuando el equipo no es de planta. */
+  plantId: number | null;
+  /** Viene con el equipo para pintar la columna sin pedirlo fila por fila. */
+  plantName: string | null;
+  /** Todos los integrantes, estén activos o no. */
+  memberCount: number;
+  isActive: boolean;
+}
+
+export interface SaveTeamRequest {
+  name: string;
+  plantId: number | null;
+  isActive: boolean;
+}
+
+/** Integrante de un equipo. `isActive` es el de la persona, no el del equipo. */
+export interface TeamMember {
+  staffId: number;
+  name: string;
+  email: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 /** Variables permitidas en una plantilla. Una desconocida se rechaza al guardar. */
 export const TEMPLATE_VARIABLES = [
   { key: "contacto", label: "Nombre del contacto", sample: "María Reyes" },

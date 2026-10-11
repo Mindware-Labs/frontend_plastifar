@@ -209,6 +209,7 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Plantillas", to: "/configuracion/plantillas" },
       { label: "Buzones", to: "/configuracion/buzones" },
       { label: "Plantas", to: "/configuracion/plantas" },
+      { label: "Equipos", to: "/configuracion/equipos" },
     ],
   },
 ];

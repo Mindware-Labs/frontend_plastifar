@@ -7,7 +7,10 @@ import type {
   PlantCountry,
   ProductLine,
   SavePlantRequest,
+  SaveTeamRequest,
   SlaPolicy,
+  Team,
+  TeamMember,
 } from "../types/settings";
 
 interface Counts {
@@ -91,6 +94,27 @@ export const settingsApi = {
       apiRequest<Plant>("/api/settings/plants", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: SavePlantRequest) =>
       apiRequest<Plant>(`/api/settings/plants/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  },
+
+  // Sin `remove`: un equipo tampoco se elimina, se desactiva guardándolo.
+  teams: {
+    list: (query: CatalogQuery) =>
+      apiRequest<ListResponse<Team>>(`/api/settings/teams${toQuery({ ...query })}`),
+    get: (id: number) => apiRequest<Team>(`/api/settings/teams/${id}`),
+    create: (data: SaveTeamRequest) =>
+      apiRequest<Team>("/api/settings/teams", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: SaveTeamRequest) =>
+      apiRequest<Team>(`/api/settings/teams/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    members: {
+      list: (teamId: number) => apiRequest<TeamMember[]>(`/api/settings/teams/${teamId}/members`),
+      add: (teamId: number, staffId: number) =>
+        apiRequest<TeamMember>(`/api/settings/teams/${teamId}/members`, {
+          method: "POST",
+          body: JSON.stringify({ staffId }),
+        }),
+      remove: (teamId: number, staffId: number) =>
+        apiRequest<void>(`/api/settings/teams/${teamId}/members/${staffId}`, { method: "DELETE" }),
+    },
   },
 
   templates: {
