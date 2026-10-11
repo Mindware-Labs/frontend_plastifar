@@ -95,11 +95,14 @@ export interface SaveTeamRequest {
   isActive: boolean;
 }
 
-/** Integrante de un equipo. `isActive` es el de la persona, no el del equipo. */
+/**
+ * Integrante de un equipo. `isActive` es el de la persona, no el del equipo.
+ * Sin correo: la lectura de integrantes está abierta a cualquier sesión y el
+ * correo del personal lo protege `staff.read`.
+ */
 export interface TeamMember {
   staffId: number;
   name: string;
-  email: string;
   isActive: boolean;
   createdAt: string;
 }

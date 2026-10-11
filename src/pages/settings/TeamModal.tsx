@@ -305,10 +305,7 @@ function TeamMembers({ teamId, onChanged }: TeamMembersProps) {
         <ul className="flex flex-col divide-y divide-line border-y border-line">
           {members.map((member) => (
             <li key={member.staffId} className="flex items-center gap-3 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[12.5px] font-medium text-ink">{member.name}</p>
-                <p className="truncate text-[12px] text-subtle">{member.email}</p>
-              </div>
+              <p className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">{member.name}</p>
               {!member.isActive && <Badge tone="neutral">Inactivo</Badge>}
               <RowAction
                 label={`Quitar a ${member.name} del equipo`}
