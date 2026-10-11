@@ -19,37 +19,6 @@ export function formatDateTime(iso: string): string {
   });
 }
 
-/**
- * Fecha y hora para una celda de listado, recortada a lo que hace falta saber.
- *
- * `formatDateTime` escribe siempre el año —«12 sept 2026, 05:08 p.m.»— y eso
- * pedia 165 px de los 1085 del panel para un dato que, en una bandeja
- * operativa, casi nunca cambia: todo es de este año. Peor: el año ocupaba el
- * sitio del unico matiz que de verdad se consulta, que es si algo paso HOY.
- *
- * Asi que la precision sube cuanto mas reciente es el dato. Hoy: solo la hora.
- * Este año: dia y mes con hora. Mas atras: con año, porque ahi si distingue.
- */
-export function formatListDateTime(iso: string, now = new Date()): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-
-  const sameDay =
-    d.getDate() === now.getDate() &&
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear();
-
-  const time = d.toLocaleTimeString("es-419", { hour: "2-digit", minute: "2-digit" });
-  if (sameDay) return time;
-
-  const day = d.toLocaleDateString("es-419", {
-    day: "2-digit",
-    month: "short",
-    ...(d.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
-  });
-  return `${day}, ${time}`;
-}
-
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
 

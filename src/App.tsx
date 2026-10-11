@@ -24,7 +24,6 @@ import { ProductLinesSection } from "./pages/settings/ProductLinesSection";
 import { SlaSection } from "./pages/settings/SlaSection";
 import { TemplatesSection } from "./pages/settings/TemplatesSection";
 import { TerritoriesSection } from "./pages/settings/TerritoriesSection";
-import { TopicsSection } from "./pages/settings/TopicsSection";
 import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
 import { StaffPage } from "./pages/staff/StaffPage";
 import { RespuestasPage } from "./pages/respuestas/RespuestasPage";
@@ -66,10 +65,12 @@ export default function App() {
             servidor va a rechazar. */}
         <Route element={<PermissionRoute permission="tickets.read"><Outlet /></PermissionRoute>}>
           <Route path="/tickets" element={<TicketsPage />} />
-          {/* Motivos y veredictos llegaron con la rama de Tickets. OJO: los
-            motivos tambien se administran desde /configuracion/motivos, que es
-            otra pantalla contra la misma entidad. Se conservan las dos porque
-            quedarse con una es una decision de producto, no del merge. */}
+          {/* Motivos y veredictos llegaron con la rama de Tickets. Hubo un
+            tiempo en que los motivos tambien se administraban desde
+            /configuracion/motivos, contra la misma entidad y con otra mitad de
+            los campos. Quedo esta: un motivo es un concepto de tickets, no de
+            configuracion, y dos pantallas para una tabla es como se desincronizan
+            las reglas. */}
         <Route path="/tickets/motivos" element={<MotivosPage />} />
         <Route path="/tickets/veredictos" element={<VeredictosPage />} />
         <Route path="/tickets/:id" element={<TicketDetailPage />} />
@@ -122,8 +123,7 @@ export default function App() {
         {/* Configuracion no lleva guard de lectura a proposito: la seccion 8.4 del
             plan abre la lectura de catalogos a todo el personal autenticado y solo
             exige settings.write para escribir, que es lo que cada seccion ya gatea. */}
-        <Route path="/configuracion" element={<Navigate to="/configuracion/motivos" replace />} />
-        <Route path="/configuracion/motivos" element={<TopicsSection />} />
+        <Route path="/configuracion" element={<Navigate to="/configuracion/sla" replace />} />
         <Route path="/configuracion/sla" element={<SlaSection />} />
         <Route path="/configuracion/feriados" element={<HolidaysSection />} />
         <Route path="/configuracion/plantillas" element={<TemplatesSection />} />

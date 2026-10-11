@@ -18,25 +18,6 @@ export const WEEKDAYS: { key: Weekday; label: string; jsDay: number }[] = [
   { key: "D", label: "Domingo", jsDay: 0 },
 ];
 
-/** Motivo o tema del ticket. Admite un segundo nivel de detalle. */
-export interface TicketTopic {
-  id: number;
-  name: string;
-  /** Motivo padre; null en el primer nivel. */
-  parentId: number | null;
-  /** Departamento al que se encola por defecto. */
-  defaultDepartmentId: number;
-  defaultPriority: Priority;
-  /** Politica aplicable; si es null se usa la de la prioridad. */
-  slaPolicyId: number | null;
-  /** Obliga a indicar linea de producto (reclamaciones de calidad). */
-  requiresProductLine: boolean;
-  isActive: boolean;
-  /** Tickets que ya lo usan. Es null mientras la Bandeja no exista: no hay
-   *  tabla que contar, y un cero afirmaria que ninguno lo usa. */
-  ticketCount: number | null;
-}
-
 export interface SlaPolicy {
   id: number;
   name: string;

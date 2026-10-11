@@ -17,14 +17,9 @@ export function RowAction({ label, icon: Icon, onClick, disabled, danger }: RowA
       disabled={disabled}
       title={label}
       aria-label={label}
-      /* `scale-90` al pulsar y no un hundimiento: estos iconos miden 28 px y
-         viven pegados en fila, asi que un desplazamiento de 1 px se pierde
-         entre los vecinos mientras que el encogimiento se ve en el que tocaste.
-         Es el mismo acuse que la pulsacion de un boton, a la escala de un icono. */
-      className={`flex h-7 w-7 items-center justify-center rounded-edge text-subtle
-        transition-[background-color,color,transform] duration-150 active:scale-90
-        disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 ${
-          danger ? "hover:bg-brand-red/[0.06] hover:text-brand-red" : "hover:bg-fill hover:text-ink"
+      className={`flex h-7 w-7 items-center justify-center rounded-edge text-subtle transition-colors
+        disabled:cursor-not-allowed disabled:opacity-40 ${
+          danger ? "hover:bg-red-50 hover:text-brand-red" : "hover:bg-fill hover:text-ink"
         }`}
     >
       <Icon className="h-4 w-4" />

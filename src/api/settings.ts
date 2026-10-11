@@ -5,7 +5,6 @@ import type {
   Mailbox,
   ProductLine,
   SlaPolicy,
-  TicketTopic,
 } from "../types/settings";
 
 interface Counts {
@@ -33,10 +32,6 @@ export interface CatalogQuery {
   dir?: "asc" | "desc";
 }
 
-export interface TopicQuery extends CatalogQuery {
-  departmentId?: number;
-}
-
 export interface SlaQuery extends CatalogQuery {
   priority?: string;
 }
@@ -47,17 +42,6 @@ export interface HolidayQuery extends CatalogQuery {
 }
 
 export const settingsApi = {
-  topics: {
-    list: (query: TopicQuery) =>
-      apiRequest<ListResponse<TicketTopic>>(`/api/settings/topics${toQuery({ ...query })}`),
-    get: (id: number) => apiRequest<TicketTopic>(`/api/settings/topics/${id}`),
-    create: (data: Omit<TicketTopic, "id" | "ticketCount">) =>
-      apiRequest<TicketTopic>("/api/settings/topics", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: number, data: Omit<TicketTopic, "id" | "ticketCount">) =>
-      apiRequest<TicketTopic>(`/api/settings/topics/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    remove: (id: number) => apiRequest<void>(`/api/settings/topics/${id}`, { method: "DELETE" }),
-  },
-
   slaPolicies: {
     list: (query: SlaQuery) =>
       apiRequest<ListResponse<SlaPolicy>>(`/api/settings/sla-policies${toQuery({ ...query })}`),

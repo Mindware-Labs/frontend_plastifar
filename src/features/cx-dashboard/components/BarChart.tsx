@@ -95,8 +95,12 @@ export function BarChart({
   /** Borde izquierdo de la barra `s` dentro del grupo `i`. */
   const barX = (i: number, s: number) => cx(i) - groupW / 2 + s * (barW + GAP);
 
-  /* De mayor a menor. */
-  const yTicks = [1, 0.75, 0.5, 0.25, 0].map((f) => Math.round(max * f));
+  /* De mayor a menor, y sin repetidos.
+     Con un maximo chico los cuartos colapsan al redondear: para max = 2 esto
+     daba [2, 2, 1, 1, 0], es decir cinco lineas de rejilla dibujadas donde se
+     ven tres -dos pares superpuestos- y dos claves de React duplicadas. El eje
+     no puede tener el mismo valor dos veces. */
+  const yTicks = [...new Set([1, 0.75, 0.5, 0.25, 0].map((f) => Math.round(max * f)))];
 
   const tipW = series.length > 1 ? 146 : 110;
   const tipH = series.length > 1 ? 58 : 42;
