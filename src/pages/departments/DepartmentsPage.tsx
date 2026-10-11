@@ -1,6 +1,7 @@
 import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { departmentsApi } from "../../api/departments";
+import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -13,12 +14,13 @@ import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePermissions } from "../../hooks/usePermissions";
 import { buildDepartmentTree } from "../../lib/departments";
-import type { DepartmentResponse } from "../../types/api";
+import type { DepartmentResponse, DepartmentType } from "../../types/api";
 import { ChipGroup, LoadErrorAlert } from "../settings/catalogSection";
 import { useReferenceData } from "../settings/catalogState";
 import { DepartmentModal } from "./DepartmentModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
+type TypeKey = "todos" | DepartmentType;
 
 /** Sangria por nivel. Suficiente para leerse como indice, no tanto como para
  *  que el cuarto nivel empiece a media columna. */
@@ -64,6 +66,7 @@ export function DepartmentsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
+  const [typeChip, setTypeChip] = useState<TypeKey>("todos");
   const [modal, setModal] = useState<"nuevo" | DepartmentResponse | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
@@ -86,6 +89,10 @@ export function DepartmentsPage() {
       all: all.length,
       active: all.filter((d) => d.isActive).length,
       inactive: all.filter((d) => !d.isActive).length,
+      // Sin `type` el servidor es anterior al campo: cuenta como publico, que
+      // es el valor por omision del modelo.
+      publicos: all.filter((d) => (d.type ?? "Publico") === "Publico").length,
+      privados: all.filter((d) => d.type === "Privado").length,
     };
   }, [all]);
 
@@ -127,11 +134,13 @@ export function DepartmentsPage() {
     return buildDepartmentTree(all).map((d) => ({ ...d, ...subtree(d.id) }));
   }, [all]);
 
-  /** Lo que se pinta: el arbol acotado por pastilla y busqueda, con ancestros. */
+  /** Lo que se pinta: el arbol acotado por pastillas y busqueda, con ancestros.
+   *  El tipo se filtra aqui y no en el servidor por lo mismo que la busqueda:
+   *  pedir solo los privados devolveria hijos sin su padre. */
   const visible = useMemo(() => {
-    const porEstado = nodes.filter((d) =>
-      chip === "todos" ? true : chip === "activos" ? d.isActive : !d.isActive,
-    );
+    const porEstado = nodes
+      .filter((d) => (chip === "todos" ? true : chip === "activos" ? d.isActive : !d.isActive))
+      .filter((d) => typeChip === "todos" || (d.type ?? "Publico") === typeChip);
     if (debouncedSearch === "") return porEstado;
 
     const permitidos = new Set(porEstado.map((d) => d.id));
@@ -156,9 +165,9 @@ export function DepartmentsPage() {
     }
 
     return nodes.filter((d) => mostrar.has(d.id) && (permitidos.has(d.id) || mostrar.has(d.id)));
-  }, [nodes, chip, debouncedSearch]);
+  }, [nodes, chip, typeChip, debouncedSearch]);
 
-  const isFiltering = debouncedSearch !== "" || chip !== "todos";
+  const isFiltering = debouncedSearch !== "" || chip !== "todos" || typeChip !== "todos";
 
   function askToggle(department: DepartmentResponse & { inside: number; reach: number }) {
     setConfirmation({
@@ -199,6 +208,10 @@ export function DepartmentsPage() {
             name: current.name,
             parentId: current.parentId ?? null,
             isActive: !current.isActive,
+            type: current.type ?? "Publico",
+            defaultRoleId: current.defaultRoleId ?? null,
+            mailboxId: current.mailboxId ?? null,
+            managerStaffId: current.managerStaffId ?? null,
           });
           reload();
         } finally {
@@ -279,11 +292,30 @@ export function DepartmentsPage() {
                 onClick={() => setChip("inactivos")}
               />
             </ChipGroup>
+
+            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+            {/* Dos pastillas y no tres: pulsar la activa la suelta, y «Todos»
+                ya esta dicho en el grupo de al lado. */}
+            <ChipGroup label="Filtrar por tipo" ready={counts !== undefined} skeletonCount={2}>
+              <FilterChip
+                label="Públicos"
+                count={counts?.publicos ?? 0}
+                active={typeChip === "Publico"}
+                onClick={() => setTypeChip(typeChip === "Publico" ? "todos" : "Publico")}
+              />
+              <FilterChip
+                label="Privados"
+                count={counts?.privados ?? 0}
+                active={typeChip === "Privado"}
+                onClick={() => setTypeChip(typeChip === "Privado" ? "todos" : "Privado")}
+              />
+            </ChipGroup>
           </>
         }
       >
         {all === null ? (
-          !failed && <TableSkeleton rows={8} columns={5} />
+          !failed && <TableSkeleton rows={8} columns={7} />
         ) : visible.length === 0 ? (
           <p className="py-14 text-center text-[13.5px] text-faint">
             {isFiltering
@@ -297,6 +329,8 @@ export function DepartmentsPage() {
                 <Th>Departamento</Th>
                 <Th className="w-40">Colaboradores</Th>
                 <Th className="w-52">Alcance de un rol</Th>
+                <Th className="w-44">Rol del departamento</Th>
+                <Th className="w-52">Buzón</Th>
                 <Th className="w-28">Estado</Th>
                 {canWrite && <Th className="w-28 text-right">Acciones</Th>}
               </HeadRow>
@@ -347,6 +381,15 @@ export function DepartmentsPage() {
                             {d.inside} {d.inside === 1 ? "unidad" : "unidades"}
                           </span>
                         )}
+
+                        {/* Solo se marca lo privado: 31 de los 38 de la empresa
+                            son publicos, y una pastilla en cada renglon deja de
+                            señalar nada. */}
+                        {d.type === "Privado" && (
+                          <Badge tone="slate" className="ml-2">
+                            Privado
+                          </Badge>
+                        )}
                       </span>
                     </Td>
 
@@ -396,6 +439,31 @@ export function DepartmentsPage() {
                       </span>
                     </Td>
 
+                    {/* Un dato guardado, no un permiso: por eso va en gris y
+                        no con el peso de la columna de alcance. */}
+                    <Td>
+                      {d.defaultRoleName ? (
+                        <span className="whitespace-nowrap text-[12.5px] text-brand-gray">
+                          {d.defaultRoleName}
+                        </span>
+                      ) : (
+                        <span className="text-[12.5px] text-faint">Sin rol</span>
+                      )}
+                    </Td>
+
+                    <Td>
+                      {d.mailboxAddress ? (
+                        <span
+                          className="block max-w-[200px] truncate text-[12.5px] text-brand-gray"
+                          title={d.mailboxAddress}
+                        >
+                          {d.mailboxAddress}
+                        </span>
+                      ) : (
+                        <span className="text-[12.5px] text-faint">Sin buzón</span>
+                      )}
+                    </Td>
+
                     <Td>
                       <StatusDot active={d.isActive} />
                     </Td>
@@ -403,14 +471,16 @@ export function DepartmentsPage() {
                     {canWrite && (
                       <Td>
                         <div className="flex items-center justify-end gap-1">
+                          {/* El camino completo y no el nombre: «Editar ALMACEN»
+                              ya no dice cual de los dos. */}
                           <RowAction
-                            label={`Editar ${d.name}`}
+                            label={`Editar ${d.path}`}
                             icon={Pencil}
                             onClick={() => setModal(d)}
                             disabled={busyId === d.id}
                           />
                           <RowAction
-                            label={d.isActive ? `Desactivar ${d.name}` : `Reactivar ${d.name}`}
+                            label={d.isActive ? `Desactivar ${d.path}` : `Reactivar ${d.path}`}
                             icon={Power}
                             onClick={() => askToggle(d)}
                             disabled={busyId === d.id}
@@ -421,7 +491,7 @@ export function DepartmentsPage() {
                               hacer pulsar en falso. */}
                           {d.inside === 0 && propios === 0 && (
                             <RowAction
-                              label={`Eliminar ${d.name}`}
+                              label={`Eliminar ${d.path}`}
                               icon={Trash2}
                               danger
                               onClick={() => askDelete(d)}
