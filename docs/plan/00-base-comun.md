@@ -193,10 +193,13 @@ Toda esta sección es **[Propuesta]**.
    código y descripción.
 3. Cada línea de formulario guarda una copia del código y la descripción en el momento de registrarla. Cambiar
    después la descripción del producto no altera lo ya registrado.
-4. El administrador de una planta y los integrantes de un equipo deben ser personal activo. Si esa persona se
-   desactiva, la planta queda sin administrador y el equipo pierde ese integrante; ambos casos aparecen en un
-   filtro para corregirlos. Eliminar a la persona es distinto de desactivarla: mientras administre una planta,
-   la eliminación se rechaza con 409, igual que ocurre con el responsable de un departamento, para que un dato
+4. El administrador de una planta y los integrantes de un equipo deben ser personal activo en el momento de
+   asignarlos. Si esa persona se desactiva después, no se la retira: sigue figurando como administrador de la
+   planta y como integrante del equipo, señalada como inactiva, hasta que alguien la sustituya; una planta o
+   un equipo cuya referencia quedó inactiva puede seguir editándose sin tener que cambiarla. El filtro para
+   localizar plantas sin administrador activo y equipos sin integrantes activos queda pendiente de construir.
+   Eliminar a la persona es distinto de desactivarla: mientras administre una planta o integre un equipo, la
+   eliminación se rechaza con 409, igual que ocurre con el responsable de un departamento, para que un dato
    del organigrama no se vacíe en silencio.
 5. Un equipo sin integrantes activos no puede recibir asignaciones.
 6. La carga por archivo no borra: crea los códigos que no existen y actualiza la descripción de los que sí.
