@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { z } from "zod";
 import { Building2, Check, Flag, Info, Mail, MessageSquareText, RotateCcw, Tag, X } from "lucide-react";
 import { ApiError } from "../../api/client";
+import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -13,7 +14,9 @@ import { controlBase, stateClasses } from "../../components/ui/fieldStyles";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
+import { departmentPathOptions } from "../../lib/departments";
 import type {
+  DepartmentResponse,
   TicketContactOption,
   TicketCreateOptionsResponse,
   TicketSummaryResponse,
@@ -152,6 +155,7 @@ export function CreateTicketModal({
   const [catalogs, setCatalogs] = useState<TicketCreateOptionsResponse | null>(null);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
   const [catalogsError, setCatalogsError] = useState<string | null>(null);
+  const [departmentTree, setDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
   const [detectedMatch, setDetectedMatch] = useState<{ clientName: string; contactName: string } | null>(null);
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
@@ -232,6 +236,18 @@ export function CreateTicketModal({
       })
       .finally(() => setLoadingCatalogs(false));
   }, [senderEmail, initialClientId, setValue]);
+
+  /* El catálogo trae sólo los departamentos a los que la persona tiene alcance,
+     con id y nombre. El nombre ya no es único —hay un «ALMACEN» de primer nivel
+     y otro bajo PLASTIFAR CENTROAMERICA—, así que el camino se resuelve contra
+     el árbol entero, inactivos incluidos para no cortar la cadena de padres.
+     Si esta lectura falla, las opciones siguen saliendo con su nombre. */
+  useEffect(() => {
+    departmentsApi
+      .list({ includeInactive: true })
+      .then(setDepartmentTree)
+      .catch(() => setDepartmentTree(undefined));
+  }, []);
 
   // Al cambiar de cliente, poblar contactos
   const selectedClient = catalogs?.clients.find((c) => String(c.id) === selectedClientId);
@@ -482,10 +498,7 @@ export function CreateTicketModal({
                         placeholder="Aún sin departamento"
                         options={[
                           { value: "", label: "Aún sin departamento" },
-                          ...(catalogs?.departments ?? []).map((d) => ({
-                            value: String(d.id),
-                            label: d.name,
-                          })),
+                          ...departmentPathOptions(catalogs?.departments ?? [], departmentTree),
                         ]}
                       />
                     )}

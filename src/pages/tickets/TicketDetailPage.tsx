@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { Tabs, TabsList, TabsTrigger } from "../../components/shadcn/tabs";
@@ -36,9 +37,11 @@ import { useSettle } from "../../hooks/useSettle";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
+import { departmentPathOptions } from "../../lib/departments";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes, formatDateTime, formatSlaRemaining } from "../../lib/format";
 import type {
+  DepartmentResponse,
   TicketAttachmentResponse,
   TicketCreateOptionsResponse,
   TicketDetailResponse,
@@ -692,6 +695,8 @@ export function TicketDetailPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [editCatalogs, setEditCatalogs] = useState<TicketCreateOptionsResponse | null>(null);
   const [loadingEditCatalogs, setLoadingEditCatalogs] = useState(false);
+  // Arbol entero, para rotular con el camino: el catalogo trae solo id y nombre.
+  const [editDepartmentTree, setEditDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
 
   const handleOpenEditModal = async () => {
     if (!ticket) return;
@@ -702,6 +707,14 @@ export function TicketDetailPage() {
     setEditProductLineId(ticket.productLineId ?? null);
     setEditError(null);
     setShowEditModal(true);
+
+    // Si falla, las opciones salen con su nombre, como antes.
+    if (!editDepartmentTree) {
+      departmentsApi
+        .list({ includeInactive: true })
+        .then(setEditDepartmentTree)
+        .catch(() => setEditDepartmentTree(undefined));
+    }
 
     if (!editCatalogs) {
       try {
@@ -1990,7 +2003,7 @@ export function TicketDetailPage() {
                     placeholder="Sin departamento"
                     options={[
                       { value: "", label: "Sin departamento" },
-                      ...(editCatalogs?.departments ?? []).map((d) => ({ value: String(d.id), label: d.name })),
+                      ...departmentPathOptions(editCatalogs?.departments ?? [], editDepartmentTree),
                     ]}
                   />
                   <SelectField
