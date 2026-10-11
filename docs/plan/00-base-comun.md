@@ -195,7 +195,9 @@ Toda esta sección es **[Propuesta]**.
    después la descripción del producto no altera lo ya registrado.
 4. El administrador de una planta y los integrantes de un equipo deben ser personal activo. Si esa persona se
    desactiva, la planta queda sin administrador y el equipo pierde ese integrante; ambos casos aparecen en un
-   filtro para corregirlos.
+   filtro para corregirlos. Eliminar a la persona es distinto de desactivarla: mientras administre una planta,
+   la eliminación se rechaza con 409, igual que ocurre con el responsable de un departamento, para que un dato
+   del organigrama no se vacíe en silencio.
 5. Un equipo sin integrantes activos no puede recibir asignaciones.
 6. La carga por archivo no borra: crea los códigos que no existen y actualiza la descripción de los que sí.
    Informa cuántas filas creó, cuántas actualizó y cuáles rechazó, con el motivo de cada rechazo.
