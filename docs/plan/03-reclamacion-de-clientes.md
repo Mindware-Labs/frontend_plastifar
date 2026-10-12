@@ -307,7 +307,7 @@ El 409 de cierre lleva, además del mensaje, la lista `missing` con los identifi
 fila para los formularios, la carga inicial (`OrganizationSeeder`) concede `claims.read` y `claims.write` a los
 tres roles en uso, porque los agentes de ventas que llenan el formulario tienen cualquiera de los tres, y
 `claims.treat` solo a ALL ACCESS hasta que Plastifar responda la pregunta 13. La migración
-`AddCustomerClaims` aplica el mismo criterio a los roles ya guardados: lectura y escritura a quien tiene
+`AddFormModules` (consolidada en `feature/formularios`) aplica el mismo criterio a los roles ya guardados: lectura y escritura a quien tiene
 `tickets.read`, tratamiento a quien tiene `quality.write`. Es un supuesto provisional, no una regla de Plastifar.
 
 | Clave | Permite | Requiere |
@@ -368,7 +368,7 @@ Reglas espejo entre Zod y el servidor.
 - [x] La impresión muestra el código PF-FOR-034, la revisión y el número del ticket. Comprobado en el código de
       `ClaimPrintPage.tsx`; sin prueba automática, el frontend no tiene corredor de pruebas.
 - [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original. **Por revisar** en la revisión
-      cruzada; la migración `AddCustomerClaims` está escrita y no probada contra Postgres (las pruebas corren en
+      cruzada; la migración `AddFormModules` está escrita y no probada contra Postgres (las pruebas corren en
       SQLite).
 
 ## 15. Riesgos
