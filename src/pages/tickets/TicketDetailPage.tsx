@@ -942,7 +942,10 @@ export function TicketDetailPage() {
                 }
               }}
             >
-              <TabsList className="h-8 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+              {/* Con cuatro pestañas la tira ya no cabe en la columna a 1040 px:
+                  la que sobra baja a una segunda fila en vez de meterse bajo el
+                  panel lateral. A anchos normales sigue siendo una sola fila. */}
+              <TabsList className="h-auto min-h-8 max-w-full flex-wrap gap-y-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 group-data-horizontal/tabs:h-auto [&>[role=tab]]:h-[25px]">
                 <TabsTrigger value="conversacion" className={`group ${tabTriggerClass}`}>
                   <Mail aria-hidden className="size-3.5" />
                   Conversación
