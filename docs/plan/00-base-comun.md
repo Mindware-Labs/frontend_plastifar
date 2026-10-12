@@ -58,7 +58,10 @@ Ninguna. Usa `Staff` y `ProductLine`, que ya existen.
 | Línea de producto (`Code`, `Name`, `IsActive`) | Backend `api/Models/Settings.cs:99-110` y `api/Controllers/Settings/ProductLinesController.cs` (ruta `api/settings/product-lines`, :18); frontend `src/api/productLines.ts`, `src/pages/settings/ProductLinesSection.tsx`, `ProductLineModal.tsx`, servida en la ruta `/calidad/lineas` (`src/App.tsx:138`) | Construido. Es el patrón a seguir |
 | Piezas comunes de las secciones de catálogo (aviso de error con reintento, aviso ámbar, grupo de pastillas) | `src/pages/settings/catalogSection.tsx` | Construido |
 | Responsable de departamento | `api/Models/Department.cs:25` (`ManagerStaffId`) | El campo existe en el modelo, pero ningún endpoint lo lee ni lo escribe: `DepartmentResponse` y `SaveDepartmentRequest` no lo incluyen (`api/Dtos/DepartmentDtos.cs:11`, :21). Sirve como referencia de modelo para el administrador de planta, no como patrón de pantalla |
-| Producto, planta, equipo | — | **No existen.** La búsqueda de `plant`/`planta`, `team`/`equipo` y `Product` en modelos, controladores, DTO y servicios del backend, y en `src` del frontend, no arrojó ninguna entidad ni pantalla |
+| Producto | Backend `api/Models/Product.cs`, `api/Controllers/Settings/ProductsController.cs` (ruta `api/settings/products`) y `api/Services/ProductCsv.cs` (lectura del archivo de carga); frontend `src/pages/settings/ProductsSection.tsx`, `ProductModal.tsx`, `ProductImportModal.tsx` y el selector `src/components/app/ProductLookupField.tsx`, servidos en `/configuracion/productos` | Construido con este documento. El selector aún no tiene consumidor: lo usarán los formularios de 03 a 06 |
+| Planta | Backend `api/Models/Plant.cs` y `api/Controllers/Settings/PlantsController.cs` (ruta `api/settings/plants`); frontend `src/pages/settings/PlantsSection.tsx` y `PlantModal.tsx`, en `/configuracion/plantas` | Construido con este documento. Las 16 plantas de la sección 7.1 están cargadas, sin administrador |
+| Equipo e integrantes | Backend `api/Models/Team.cs`, `api/Controllers/Settings/TeamsController.cs` (ruta `api/settings/teams`) y `api/Services/TeamAssignment.cs` (regla 5); frontend `src/pages/settings/TeamsSection.tsx` y `TeamModal.tsx`, en `/configuracion/equipos` | Construido con este documento. Los 12 equipos de la sección 7.2 están cargados, sin integrantes |
+| Carga inicial de plantas y equipos | `api/Data/OrganizationSeeder.cs`, que se ejecuta con `dotnet run -- --seed-organization --actor <correo de un administrador>` | Construido. Puede repetirse: no duplica ni sobrescribe lo existente |
 
 ## 6. Modelo de datos
 
@@ -151,7 +154,9 @@ Observaciones sobre la fuente:
   PLANTAS` (fila 5) y `EQUIPO DE CONTROL DE INVENTARIO` (fila 7).
 - **[Propuesta]** Se crea un equipo por cada planta de RD, con el nombre de la planta y los agentes de la columna
   D como integrantes; y un equipo `EQUIPO DE CONTROL DE INVENTARIO` con los cuatro agentes que la fila 7 de
-  `FORMULARIOS` nombra en su columna `AGENTE`.
+  `FORMULARIOS` nombra en su columna `AGENTE`. Lo construido crea los doce equipos, cada uno enlazado a su
+  planta de RD, pero **vacíos**: los integrantes son personal y el personal aún no está cargado (documento 01).
+  Se agregan desde la pantalla de equipos cuando existan.
 
 ### 7.3 Opciones de planta del PF-FOR-034 frente a la hoja `PLANTAS`
 
@@ -196,14 +201,21 @@ Toda esta sección es **[Propuesta]**.
 4. El administrador de una planta y los integrantes de un equipo deben ser personal activo en el momento de
    asignarlos. Si esa persona se desactiva después, no se la retira: sigue figurando como administrador de la
    planta y como integrante del equipo, señalada como inactiva, hasta que alguien la sustituya; una planta o
-   un equipo cuya referencia quedó inactiva puede seguir editándose sin tener que cambiarla. El filtro para
-   localizar plantas sin administrador activo y equipos sin integrantes activos queda pendiente de construir.
+   un equipo cuya referencia quedó inactiva puede seguir editándose sin tener que cambiarla. Para localizarlos,
+   el listado de plantas tiene el filtro «Sin administrador activo» y el de equipos «Sin integrantes activos»,
+   cada uno con su contador.
    Eliminar a la persona es distinto de desactivarla: mientras administre una planta o integre un equipo, la
    eliminación se rechaza con 409, igual que ocurre con el responsable de un departamento, para que un dato
    del organigrama no se vacíe en silencio.
 5. Un equipo sin integrantes activos no puede recibir asignaciones.
-6. La carga por archivo no borra: crea los códigos que no existen y actualiza la descripción de los que sí.
-   Informa cuántas filas creó, cuántas actualizó y cuáles rechazó, con el motivo de cada rechazo.
+6. La carga por archivo no borra: crea los códigos que no existen y actualiza la descripción de los que sí;
+   de un producto existente no toca la línea, la planta ni el estado. Informa cuántas filas creó, cuántas
+   actualizó, cuántas dejó sin cambio y cuáles rechazó, con la línea y el motivo de cada rechazo (la respuesta
+   lista como máximo las 100 primeras y da el total real). Un código repetido dentro del mismo archivo se
+   rechaza a partir de su segunda aparición: vale la primera fila. Las líneas en blanco se saltan. Un archivo
+   con más de 50 000 filas de datos, o con unas comillas que no se cierran en la misma línea en que se abren,
+   se rechaza entero sin guardar nada. Todo lo aceptado entra en una sola operación, con una única entrada de
+   bitácora que resume la carga.
 
 ## 9. Requisitos funcionales
 
@@ -211,7 +223,7 @@ Toda esta sección es **[Propuesta]**.
 |---|---|
 | RF-B1 | Listado paginado de productos con búsqueda por código y descripción, filtros por línea de producto, planta y estado, y contadores por pastilla |
 | RF-B2 | Alta, edición, activación y desactivación de producto en diálogo, con validación en ambos lados |
-| RF-B3 | Carga de productos por archivo CSV, con informe de filas creadas, actualizadas y rechazadas |
+| RF-B3 | Carga de productos por archivo CSV, con informe de filas creadas, actualizadas, sin cambio y rechazadas |
 | RF-B4 | Selector de producto reutilizable, con búsqueda en servidor por código o descripción, para los formularios de 03, 04, 05 y 06 |
 | RF-B5 | Administración de plantas: listar, crear, editar, asignar administrador, activar y desactivar |
 | RF-B6 | Administración de equipos y de sus integrantes |
@@ -229,17 +241,19 @@ sin atributo de permiso queda cubierta por la política de respaldo, que exige s
 
 | Método y ruta | Descripción | Permiso |
 |---|---|---|
-| `GET /api/settings/products` | Listado paginado con filtros, orden y contadores | Autenticado |
-| `GET /api/settings/products/lookup` | Búsqueda acotada para el selector (máximo 20 resultados) | Autenticado |
-| `POST · PUT /api/settings/products` | Alta y edición | `settings.write` |
-| `POST /api/settings/products/import` | Carga por archivo | `settings.write` |
-| `POST /api/settings/products/{id}/deactivate` | Baja lógica | `settings.write` |
-| `DELETE /api/settings/products/{id}` | Borrado real si no tiene uso | `settings.write` |
-| `GET /api/settings/plants` | Listado paginado | Autenticado |
-| `POST · PUT · DELETE /api/settings/plants` | Alta, edición y baja | `settings.write` |
-| `GET /api/settings/teams` | Listado paginado con número de integrantes | Autenticado |
-| `POST · PUT · DELETE /api/settings/teams` | Alta, edición y baja | `settings.write` |
-| `GET · POST · DELETE /api/settings/teams/{id}/members` | Integrantes del equipo | Autenticado / `settings.write` |
+| `GET /api/settings/products` | Listado paginado con búsqueda, filtros `productLineId`, `plantId` y `status`, orden y contadores | Autenticado |
+| `GET /api/settings/products/lookup` | Búsqueda acotada para el selector (máximo 20 resultados, solo activos) | Autenticado |
+| `POST /api/settings/products` · `PUT /api/settings/products/{id}` | Alta y edición. La baja lógica y la reactivación van por el `PUT`, con `isActive`; no hay ruta aparte para desactivar | `settings.write` |
+| `POST /api/settings/products/import` | Carga por archivo (regla 6) | `settings.write` |
+| `DELETE /api/settings/products/{id}` | Borrado físico, solo si nada lo usa; en caso contrario 409 con el motivo | `settings.write` |
+| `GET /api/settings/plants` | Listado paginado; parámetros `country`, `status` y `manager=sin-activo` (plantas sin administrador activo) | Autenticado |
+| `POST /api/settings/plants` · `PUT /api/settings/plants/{id}` | Alta y edición; la baja lógica va por el `PUT`, con `isActive` | `settings.write` |
+| `DELETE /api/settings/plants/{id}` | Borrado físico, solo si ningún equipo ni producto la referencia; en caso contrario 409 | `settings.write` |
+| `GET /api/settings/teams` | Listado paginado con número de integrantes; parámetros `status` y `members=sin-activos` (equipos sin integrantes activos) | Autenticado |
+| `POST /api/settings/teams` · `PUT /api/settings/teams/{id}` | Alta y edición; la baja lógica va por el `PUT`, con `isActive` | `settings.write` |
+| `DELETE /api/settings/teams/{id}` | Borrado físico, solo si no tiene integrantes; en caso contrario 409 | `settings.write` |
+| `GET · POST /api/settings/teams/{id}/members` | Listar integrantes y agregar uno | Autenticado / `settings.write` |
+| `DELETE /api/settings/teams/{id}/members/{staffId}` | Quitar a un integrante | `settings.write` |
 
 ## 11. Pantallas
 
@@ -273,13 +287,16 @@ Reglas espejo entre el esquema de Zod y el servidor; cada lado indica en un come
 | `Plant.Name` | Obligatorio, de 2 a 80 caracteres; único dentro del país |
 | `Plant.Country` | Obligatorio; uno de los valores del catálogo |
 | `Team.Name` | Obligatorio, de 2 a 80 caracteres; único |
-| Archivo de carga | CSV en UTF-8, máximo 5 MB; columnas `Code` y `Name` obligatorias |
+| Archivo de carga | CSV en UTF-8 (con o sin BOM), máximo 5 MB y 50 000 filas de datos. Primera fila de cabecera con las columnas `Code` y `Name`; también se aceptan `Código` y `Descripción` o `Nombre`, sin distinguir mayúsculas ni tildes. El separador, coma o punto y coma, se deduce de la cabecera. Las demás columnas se ignoran. Un campo entre comillas debe cerrarse en la misma línea |
 
 ## 14. Criterios de aceptación
 
-- [ ] El listado de productos responde en menos de 300 ms con 10 000 productos de prueba.
+- [ ] El listado de productos responde en menos de 300 ms con 10 000 productos de prueba. **No medido:** lo
+      comprobado es que, con 10 000 productos, el listado pagina en la base y no carga la tabla.
 - [ ] El selector de producto encuentra un artículo por código parcial y por parte de la descripción.
-- [ ] Intentar eliminar un producto usado en un formulario devuelve 409 con el mensaje correcto.
+- [ ] Intentar eliminar un producto usado en un formulario devuelve 409 con el mensaje correcto. **No puede
+      probarse todavía:** ningún formulario referencia productos hasta que existan los de 03, 04 y 06; hoy todo
+      producto se considera sin uso.
 - [ ] Cargar dos veces el mismo archivo no duplica productos: la segunda carga informa cero creados.
 - [ ] Las 16 plantas de la sección 7.1 quedan cargadas con su país.
 - [ ] Un usuario sin `settings.write` no ve las acciones de alta ni de edición y recibe 403 por API directa.
