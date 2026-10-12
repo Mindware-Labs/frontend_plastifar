@@ -5,6 +5,9 @@ import { BandejaPage } from "./pages/bandeja/BandejaPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
+import { ClaimDetailPage } from "./pages/claims/ClaimDetailPage";
+import { ClaimPrintPage } from "./pages/claims/ClaimPrintPage";
+import { ClaimsPage } from "./pages/claims/ClaimsPage";
 import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
 import { ClientsPage } from "./pages/clients/ClientsPage";
 import { CXDashboard } from "./features/cx-dashboard";
@@ -123,6 +126,14 @@ export default function App() {
           <Route path="/calidad/creditos" element={<CreditRequestsPage />} />
         </Route>
 
+        {/* Reclamación de clientes, PF-FOR-034 (docs/plan/03). Clave propia:
+            la llena Ventas y la trata Calidad, y ninguna de las dos es
+            quality.read. La vista de impresión va fuera del armazón, abajo. */}
+        <Route element={<PermissionRoute permission="claims.read"><Outlet /></PermissionRoute>}>
+          <Route path="/reclamaciones" element={<ClaimsPage />} />
+          <Route path="/reclamaciones/:id" element={<ClaimDetailPage />} />
+        </Route>
+
         {/* Configuracion no lleva guard de lectura a proposito: la seccion 8.4 del
             plan abre la lectura de catalogos a todo el personal autenticado y solo
             exige settings.write para escribir, que es lo que cada seccion ya gatea. */}
@@ -180,6 +191,25 @@ export default function App() {
         {/* La raiz entra a la Bandeja, no al Dashboard: es donde la operacion
             pasa el dia (seccion 9.1). Criterio de la rama de Richard. */}
         <Route path="/" element={<Navigate to="/bandeja" replace />} />
+      </Route>
+
+      {/* Vista de impresión del PF-FOR-034 (docs/plan/03, RF-R9): con sesión
+          pero sin el armazón, para que la barra lateral no salga en el papel. */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <Outlet />
+          </ProtectedRoute>
+        }
+      >
+        <Route
+          path="/reclamaciones/:id/imprimir"
+          element={
+            <PermissionRoute permission="claims.read">
+              <ClaimPrintPage />
+            </PermissionRoute>
+          }
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

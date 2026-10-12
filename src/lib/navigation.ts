@@ -15,6 +15,7 @@ import {
   BarChart3,
   Building2,
   ClipboardCheck,
+  FileWarning,
   Gavel,
   Inbox,
   KeyRound,
@@ -164,6 +165,17 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Solicitudes de crédito", to: "/calidad/creditos" },
       { label: "Líneas de producto", to: "/calidad/lineas" },
     ],
+  },
+  /* Reclamación de clientes, PF-FOR-034 (docs/plan/03). Modulo propio y no un
+     hijo de Calidad: la llena Ventas al abrir el ticket y la trata Calidad, y
+     su clave de lectura (claims.read) no es la de Calidad (quality.read). Como
+     hijo de Calidad, quien solo registra reclamaciones no veria el grupo. */
+  {
+    label: "Reclamaciones",
+    icon: FileWarning,
+    section: "Gestión",
+    to: "/reclamaciones",
+    permission: "claims.read",
   },
   {
     label: "Personal",

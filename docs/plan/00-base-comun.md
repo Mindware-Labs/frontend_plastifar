@@ -294,9 +294,10 @@ Reglas espejo entre el esquema de Zod y el servidor; cada lado indica en un come
 - [ ] El listado de productos responde en menos de 300 ms con 10 000 productos de prueba. **No medido:** lo
       comprobado es que, con 10 000 productos, el listado pagina en la base y no carga la tabla.
 - [ ] El selector de producto encuentra un artículo por código parcial y por parte de la descripción.
-- [ ] Intentar eliminar un producto usado en un formulario devuelve 409 con el mensaje correcto. **No puede
-      probarse todavía:** ningún formulario referencia productos hasta que existan los de 03, 04 y 06; hoy todo
-      producto se considera sin uso.
+- [x] Intentar eliminar un producto usado en un formulario devuelve 409 con el mensaje correcto. Comprobado
+      con las líneas de la reclamación de clientes (03), el primer formulario que referencia productos
+      (`ClaimsControllerTests.A_product_named_in_a_claim_cannot_be_deleted_from_the_catalogue`). Los de 04 y 06
+      se suman a `ProductsController.IsInUseAsync` cuando existan.
 - [ ] Cargar dos veces el mismo archivo no duplica productos: la segunda carga informa cero creados.
 - [ ] Las 16 plantas de la sección 7.1 quedan cargadas con su país.
 - [ ] Un usuario sin `settings.write` no ve las acciones de alta ni de edición y recibe 403 por API directa.

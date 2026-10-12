@@ -37,6 +37,10 @@ export type PermissionKey =
   | "quality.read"
   | "quality.write"
   | "quality.approve"
+  // Reclamación de clientes, PF-FOR-034 (docs/plan/03, sección 12).
+  | "claims.read"
+  | "claims.write"
+  | "claims.treat"
   | "reports.read"
   | "settings.write";
 

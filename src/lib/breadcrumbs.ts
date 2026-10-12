@@ -99,6 +99,14 @@ const detailPatterns: BreadcrumbPattern[] = [
     ],
   },
   {
+    // El numero del ticket es el «Código:» de la reclamación (docs/plan/03, pregunta 3).
+    path: "/reclamaciones/:id",
+    build: (ticketNumber) => [
+      { label: "Reclamaciones", to: "/reclamaciones" },
+      { label: ticketNumber ?? "Reclamación" },
+    ],
+  },
+  {
     path: "/calidad/hca/:id/plan",
     build: (number, { id }) => [
       { label: "Calidad", to: "/calidad/hca" },

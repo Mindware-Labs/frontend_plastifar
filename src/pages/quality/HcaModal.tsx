@@ -48,6 +48,12 @@ interface HcaModalProps {
   /** Ausente = alta. */
   sheet?: CorrectiveActionSheet;
   productLines: ProductLine[];
+  /**
+   * Alta desde otro registro: la reclamación de clientes abre la HCA
+   * heredando el cliente y el ticket (docs/plan/03, RF-R7). Solo cuenta en el
+   * alta; en edición manda la hoja.
+   */
+  defaults?: { clientId: number; ticketId: number | null; description?: string };
   onClose: () => void;
   onSaved: (sheet: CorrectiveActionSheet) => void;
 }
@@ -55,6 +61,7 @@ interface HcaModalProps {
 export function HcaModal({
   sheet,
   productLines,
+  defaults,
   onClose,
   onSaved,
 }: HcaModalProps) {
@@ -70,12 +77,12 @@ export function HcaModal({
     resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
-      clientId: sheet ? String(sheet.clientId) : "",
+      clientId: sheet ? String(sheet.clientId) : defaults ? String(defaults.clientId) : "",
       productLineId: sheet ? String(sheet.productLineId) : "",
       detectedAt: sheet ? sheet.detectedAt.slice(0, 10) : today(),
       dueDate: sheet?.dueDate ?? "",
       responsibleStaffId: sheet ? String(sheet.responsibleStaffId) : "",
-      description: sheet?.description ?? "",
+      description: sheet?.description ?? defaults?.description ?? "",
       immediateAction: sheet?.immediateAction ?? "",
       rootCause: sheet?.rootCause ?? "",
     },
@@ -101,7 +108,7 @@ export function HcaModal({
       rootCause: rootCause === "" ? null : rootCause,
       responsibleStaffId: Number(values.responsibleStaffId),
       dueDate: values.dueDate,
-      ticketId: sheet?.ticketId ?? null,
+      ticketId: sheet?.ticketId ?? defaults?.ticketId ?? null,
     };
 
     try {
