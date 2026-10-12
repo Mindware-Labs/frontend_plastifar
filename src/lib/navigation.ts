@@ -234,6 +234,8 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Productos", to: "/configuracion/productos" },
       { label: "Plantas", to: "/configuracion/plantas" },
       { label: "Equipos", to: "/configuracion/equipos" },
+      { label: "Tipos de tarea", to: "/configuracion/tipos-de-tarea" },
+      { label: "Formularios", to: "/configuracion/formularios" },
     ],
   },
 ];
