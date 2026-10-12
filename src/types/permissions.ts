@@ -29,11 +29,31 @@ export type PermissionKey =
   | "roles.write"
   | "clients.read"
   | "clients.write"
+  // Tickets y tareas siguen la matriz real de Plastifar (docs/plan/01, tabla
+  // 7.4). «tickets.write» ya no existe: se repartio en create, edit y reply.
   | "tickets.read"
-  | "tickets.write"
+  | "tickets.create"
+  | "tickets.edit"
+  | "tickets.reply"
   | "tickets.assign"
   | "tickets.close"
+  | "tickets.transfer"
+  | "tickets.delete"
+  | "tickets.edit_thread"
+  | "tickets.link"
+  | "tickets.mark_answered"
+  | "tickets.merge"
+  | "tickets.refer"
+  | "tickets.release"
   | "tickets.read_all"
+  | "tasks.read"
+  | "tasks.create"
+  | "tasks.edit"
+  | "tasks.assign"
+  | "tasks.close"
+  | "tasks.comment"
+  | "tasks.delete"
+  | "tasks.transfer"
   | "quality.read"
   | "quality.write"
   | "quality.approve"
@@ -51,6 +71,12 @@ export interface Permission {
    * un rol que puede crear cosas y no puede verlas.
    */
   requires?: PermissionKey;
+  /**
+   * Falso cuando la clave esta en el catalogo para poder cargar la matriz de
+   * Plastifar entera, pero ningun endpoint la comprueba todavia. La matriz lo
+   * dice junto a la clave: concederla no habilita nada.
+   */
+  available: boolean;
 }
 
 export interface PermissionGroup {

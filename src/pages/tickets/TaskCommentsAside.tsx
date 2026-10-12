@@ -20,6 +20,8 @@ interface TaskCommentsAsideProps {
   onCommentAdded: (taskId: number, comment: TicketTaskCommentResponse) => void;
   className?: string;
   targetHeight?: number | null;
+  /** Sin tasks.comment se leen los comentarios pero no se escribe: el servidor rechazaria el envio. */
+  canComment?: boolean;
 }
 
 export function TaskCommentsAside({
@@ -31,6 +33,7 @@ export function TaskCommentsAside({
   onCommentAdded,
   className = "",
   targetHeight,
+  canComment = true,
 }: TaskCommentsAsideProps) {
   const [commentText, setCommentText] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -169,7 +172,14 @@ export function TaskCommentsAside({
           <div ref={commentsEndRef} />
         </div>
 
-        {/* Input para redactar nuevo comentario: fijo en la parte inferior */}
+        {/* Input para redactar nuevo comentario: fijo en la parte inferior.
+            Sin la clave no se pinta: ofrecer un cuadro que el servidor va a
+            rechazar con 403 es peor que no ofrecerlo. */}
+        {!canComment ? (
+          <div className="shrink-0 border-t border-zinc-100 bg-zinc-50/60 px-3 py-2.5 text-[11px] text-zinc-500">
+            Puedes leer los comentarios, pero tu rol no permite escribir en las tareas.
+          </div>
+        ) : (
         <div className="shrink-0 bg-white border-t border-zinc-100 p-3">
           {error && (
             <div className="mb-2 rounded-md bg-red-50 border border-red-200/80 p-2 text-[11px] text-red-600">
@@ -252,6 +262,7 @@ export function TaskCommentsAside({
             </div>
           </div>
         </div>
+        )}
       </div>
     </aside>
   );

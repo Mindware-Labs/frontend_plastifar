@@ -33,6 +33,7 @@ import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
 import { openOverlay } from "../../hooks/overlayStack";
+import { usePermissions } from "../../hooks/usePermissions";
 import { useSettle } from "../../hooks/useSettle";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { useAuth } from "../../context/useAuth";
@@ -217,6 +218,21 @@ export function TicketDetailPage() {
   const [error, setError] = useState<string | null>(ticketId ? null : "Identificador de ticket no válido.");
 
   const { user } = useAuth();
+
+  // Claves de la matriz de Plastifar (docs/plan/01, tabla 7.4), resueltas
+  // sobre el departamento del ticket. RF-P6: lo que el servidor rechazaria no
+  // se ofrece; la autorizacion real sigue siendo la del endpoint.
+  const { can } = usePermissions();
+  const permissionScope = ticket?.departmentId ?? undefined;
+  const canReply = can("tickets.reply", permissionScope);
+  const canEditTicket = can("tickets.edit", permissionScope);
+  const canAssignTicket = can("tickets.assign", permissionScope);
+  const canCloseTicket = can("tickets.close", permissionScope);
+  const canCreateTask = can("tasks.create", permissionScope);
+  const canCloseTask = can("tasks.close", permissionScope);
+  const canDeleteTask = can("tasks.delete", permissionScope);
+  const canCommentTask = can("tasks.comment", permissionScope);
+
   const [activeTab, setActiveTab] = useState<TicketDetailTab>("conversacion");
   const [tasksCount, setTasksCount] = useState(0);
   const [showTimeline, setShowTimeline] = useState(false);
@@ -882,6 +898,7 @@ export function TicketDetailPage() {
               <span className="tabular-nums text-subtle">{timeline.length}</span>
             </Button>
             {availableTransitions.length > 0 ? (
+              canCloseTicket && (
               <Button
                 type="button"
                 size="sm"
@@ -901,6 +918,7 @@ export function TicketDetailPage() {
                   </>
                 )}
               </Button>
+              )
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-1 text-[11.5px] font-semibold text-zinc-600 shadow-2xs">
                 <Lock className="size-3 text-zinc-400" strokeWidth={2.25} />
@@ -961,16 +979,18 @@ export function TicketDetailPage() {
                     {clientThread.length} {clientThread.length === 1 ? "mensaje" : "mensajes"}
                   </span>
                   <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setReplyOpen(true)}
-                    disabled={!recipientEmail}
-                    title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
-                  >
-                    <CornerUpLeft className="h-[14px] w-[14px]" />
-                    Responder
-                  </Button>
+                  {canReply && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setReplyOpen(true)}
+                      disabled={!recipientEmail}
+                      title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
+                    >
+                      <CornerUpLeft className="h-[14px] w-[14px]" />
+                      Responder
+                    </Button>
+                  )}
                 </div>
 
                 {clientThread.length === 0 ? (
@@ -1002,6 +1022,9 @@ export function TicketDetailPage() {
                 activeCommentsTaskId={activeCommentsTask?.id}
                 onToggleTaskComments={handleToggleTaskComments}
                 latestAddedComment={latestAddedComment}
+                canCreate={canCreateTask}
+                canClose={canCloseTask}
+                canDelete={canDeleteTask}
               />
             </div>
 
@@ -1054,6 +1077,7 @@ export function TicketDetailPage() {
                 [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Usuario"
               }
               onClose={() => setActiveCommentsTask(null)}
+              canComment={canCommentTask}
               onCommentAdded={(taskId, newComment) => {
                 setActiveCommentsTask((prev) =>
                   prev && prev.id === taskId
@@ -1076,8 +1100,8 @@ export function TicketDetailPage() {
               ticket={ticket}
               departmentLabel={departmentPath(editDepartmentTree ?? [], ticket.departmentId)}
               sla={sla}
-              canEdit={!isClosed}
-              canAssign={ticket.status !== "Cancelado"}
+              canEdit={!isClosed && canEditTicket}
+              canAssign={ticket.status !== "Cancelado" && canAssignTicket}
               onEdit={() => void handleOpenEditModal()}
               onAssign={() => void handleOpenAssignModal()}
               onOpenAttachment={openAttachment}

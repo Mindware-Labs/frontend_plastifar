@@ -10,6 +10,9 @@ interface TicketSelectionBarProps {
   onClear: () => void;
   onAssign: () => void;
   onPriority: () => void;
+  /** Sin la clave, la accion no se ofrece: el servidor la rechazaria. */
+  canAssign?: boolean;
+  canPriority?: boolean;
 }
 
 const actionButtonClass =
@@ -28,6 +31,8 @@ export function TicketSelectionBar({
   onClear,
   onAssign,
   onPriority,
+  canAssign = true,
+  canPriority = true,
 }: TicketSelectionBarProps) {
   return (
     <div
@@ -53,27 +58,31 @@ export function TicketSelectionBar({
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
-        <button
-          type="button"
-          disabled={busy || isExiting}
-          onClick={onAssign}
-          className={actionButtonClass}
-        >
-          <UserCheck aria-hidden className="h-3.5 w-3.5 text-zinc-500" />
-          Asignar
-        </button>
+        {canAssign && (
+          <button
+            type="button"
+            disabled={busy || isExiting}
+            onClick={onAssign}
+            className={actionButtonClass}
+          >
+            <UserCheck aria-hidden className="h-3.5 w-3.5 text-zinc-500" />
+            Asignar
+          </button>
+        )}
 
-        <button
-          type="button"
-          disabled={busy || isExiting}
-          onClick={onPriority}
-          className={actionButtonClass}
-        >
-          <Flag aria-hidden className="h-3.5 w-3.5 text-zinc-500" />
-          Prioridad
-        </button>
+        {canPriority && (
+          <button
+            type="button"
+            disabled={busy || isExiting}
+            onClick={onPriority}
+            className={actionButtonClass}
+          >
+            <Flag aria-hidden className="h-3.5 w-3.5 text-zinc-500" />
+            Prioridad
+          </button>
+        )}
 
-        <div className="mx-0.5 h-3.5 w-px bg-zinc-200" />
+        {(canAssign || canPriority) && <div className="mx-0.5 h-3.5 w-px bg-zinc-200" />}
 
         <button
           type="button"

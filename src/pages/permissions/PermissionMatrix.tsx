@@ -1,5 +1,6 @@
 import { Check, Lock } from "lucide-react";
 import { Fragment, useId, useMemo, useRef, useState } from "react";
+import { Badge } from "../../components/ui/Badge";
 import type { PermissionGroup, PermissionKey, RoleSummary } from "../../types/permissions";
 
 interface PermissionMatrixProps {
@@ -291,6 +292,18 @@ export function PermissionMatrix({
                               >
                                 <span className="sr-only">Sin asignar</span>
                               </span>
+                            )}
+                            {/* Clave que viene de la matriz de Plastifar pero
+                                que ningún endpoint comprueba todavía: se puede
+                                conceder para dejar la política cargada, y la
+                                pastilla avisa de que hoy no habilita nada. */}
+                            {permission.available === false && (
+                              <Badge
+                                tone="slate"
+                                title="Esta función todavía no existe en el sistema: concederla no habilita nada hasta que se construya"
+                              >
+                                No disponible
+                              </Badge>
                             )}
                           </span>
                           <span className="font-mono text-[10.5px] leading-tight text-faint">

@@ -2,6 +2,13 @@
 
 Panel interno Plastifar · Plan de construcción · Ampliación v0.1 · 11 de octubre de 2026
 
+> **Estado al 12 de octubre de 2026.** Construido: los atributos del departamento (sección 6.1), la carga de los
+> 5 roles y los 38 departamentos (sección 7.2, `OrganizationSeeder`), el catálogo completo de claves con la
+> matriz de la sección 7.4, la migración de datos de la sección 8 (reglas 1 y 2) y la comprobación de clave en
+> todos los endpoints de tickets y tareas (sección 10). Pendiente: la carga de agentes (bloqueada por las
+> preguntas 1 y 3), la baja lógica de tickets y tareas (sección 6.4, pendiente de revisión con el responsable de
+> la Bandeja) y el campo `LegacyUsername` (sección 6.2, que solo sirve para la carga de agentes).
+
 **Responsable:** Por asignar  ·  **Prioridad:** primera entrega, bloquea a 02  ·  **Tablas nuevas:** ninguna; amplía `Department` y `Staff`, y añade la baja lógica a `Ticket` y `TicketTask`
 
 Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README.md), sección 2.
@@ -68,15 +75,15 @@ El libro no tiene hojas, filas ni columnas ocultas, validaciones, comentarios ni
 | Responsable del departamento | `api/Models/Department.cs:25` (`ManagerStaffId`) | El campo existe en el modelo, pero ningún endpoint lo lee ni lo escribe: `DepartmentResponse` y `SaveDepartmentRequest` no lo incluyen (`api/Dtos/DepartmentDtos.cs:11`, :21). Solo se limpia al eliminar a la persona (`StaffController.cs:528-529`). Hay que exponerlo para cargar la columna ADMINISTRADOR |
 | Roles como filas de base de datos | `api/Models/Rol.cs:3-14` (`Name`, lista de permisos, `IsSystem`, `IsActive`); pantallas `src/pages/roles/RolesPage.tsx`, `RoleModal.tsx` | Construido. Los cinco roles se cargan como datos |
 | Rol por persona y departamento | `api/Models/StaffDepartmentAccess.cs:3-17` (`StaffId`, `DepartmentId`, `RoleId`, `IsPrimary`) | Construido |
-| Catálogo de 16 claves de permiso | `api/Security/PermissionCatalog.cs:16-44`, etiquetas en :46-82; espejo en `src/types/permissions.ts:25-41`; comprobación en `src/lib/permissions.ts:71-97`. El atributo `[RequiresPermission]` rechaza al arrancar toda clave que no esté en el catálogo (`api/Security/PermissionAuthorization.cs:74-77`) | Construido |
+| Catálogo de claves de permiso | `api/Security/PermissionCatalog.cs`; espejo en `src/types/permissions.ts`; comprobación en `src/lib/permissions.ts`. El atributo `[RequiresPermission]` rechaza al arrancar toda clave que no esté en el catálogo (`api/Security/PermissionAuthorization.cs`) | Construido con este documento: 36 claves, con el grupo «Tareas» y las de la tabla 7.4. Cada definición lleva `Available`; las de funciones inexistentes van en falso y la matriz las pinta «No disponible» (`PermissionMatrix.tsx`). `tickets.write` ya no existe |
 | Matriz de permisos | `src/pages/permissions/PermissionMatrix.tsx` y `PermissionsPage.tsx` | Construido; pinta lo que devuelve `GET /api/permissions/matrix` (`src/api/permissions.ts:9`; `PermissionsController.cs:37`) y guarda con `POST /api/permissions/matrix` (:111). `GET /api/permissions` (:30) devuelve solo el catálogo |
 | Buzón con departamento destino | `api/Models/Settings.cs:129-145` (`DepartmentId` :137, obligatorio); dirección única (`api/Data/Configurations/SettingsConfiguration.cs:130`) | Construido; un buzón apunta a un solo departamento |
 | Personal | `api/Models/Staff.cs`: nombre y apellido separados (:6-7), correo obligatorio (:8) y único (`api/Data/Configurations/StaffConfiguration.cs:18`), `PasswordHash` obligatorio (:9), `PrimaryDepartmentId` obligatorio (:11), `IsAdmin` (:16), `IsActive` (:17) y `LegacyStaffId` (:25) | Construido. **No tiene nombre de usuario** |
 | Alta de personal | `api/Controllers/StaffController.cs:165-239`: protegida con `AdminOnly` (:166), no con `staff.write`; genera una contraseña aleatoria (:188), crea el acceso principal con su rol (:194-201) y envía un correo de invitación con un código válido 24 horas (:204-226) | Construido. Edición, baja, revocación de sesiones y accesos por departamento también son `AdminOnly` (:242, :330, :354, :369, :414, :468) |
-| Roles sembrados | Solo «Operación (demostración)», en `api/Data/DevelopmentSeeder.cs:401-423`, exclusivo de desarrollo | Ninguno de los cinco roles de la fuente existe |
-| Departamentos sembrados | Ninguno; el sembrador usa los que haya y falla si no hay ninguno (`DevelopmentSeeder.cs:105-112`) | Ninguno de los 38 existe en código |
-| Comprobación de permisos en tickets | `api/Controllers/TicketsController.cs`: asignación (:1418-1419), asignación masiva (:1560-1561), prioridad masiva (:1700-1701) y cambio de estado (:1798-1799) están protegidos con `AdminOnly`; los de :1419 y :1799 llevan un TODO. Crear (:375), editar (:701) y responder (:1081) solo exigen sesión (`[Authorize]`, :14) y alcance por departamento | Ninguna clave del catálogo se consulta en ese controlador; `tickets.write`, `tickets.assign` y `tickets.close` tampoco se consultan en el frontend, donde solo figuran en el tipo `PermissionKey` |
-| Comprobación de permisos en tareas | `api/Controllers/TicketTasksController.cs:14` usa solo `[Authorize]`; el acceso se decide por el departamento del ticket, con paso libre al administrador (:38-57), y eliminar exige ser el creador o administrador (:549) | No existen claves `tasks.*` |
+| Roles sembrados | `api/Data/OrganizationSeeder.cs`, con `dotnet run -- --seed-organization --actor <correo>`; el de demostración sigue en `DevelopmentSeeder.cs`, exclusivo de desarrollo | Construido con este documento: los cinco roles de la sección 7.1, con las concesiones exactas de la tabla 7.4. Repetible: lo que existe no se toca |
+| Departamentos sembrados | `api/Data/OrganizationSeeder.cs`, mismo comando | Construido con este documento: los 38 de la sección 7.2 con tipo, rol del departamento y buzón (solo si ya existe uno con esa dirección; no se crean buzones). Sin administrador: se completa cuando se carguen los agentes |
+| Comprobación de permisos en tickets | `api/Controllers/TicketsController.cs`: el controlador exige `tickets.read`; crear → `tickets.create` sobre el departamento destino; editar → `tickets.edit`, y mover de departamento → además `tickets.transfer`; responder al cliente → `tickets.reply` (la nota interna solo exige ver); asignar y asignación masiva → `tickets.assign`; prioridad masiva → `tickets.edit`; cambio de estado, también cuando va con un mensaje → `tickets.close`. Ya no queda ningún `AdminOnly`. Frontend: `TicketsPage.tsx`, `TicketDetailPage.tsx` y `TicketSelectionBar.tsx` ocultan la acción sin la clave | Construido con este documento. Cada endpoint declara su clave con `[RequiresPermission]` («puede en algún departamento») y la vuelve a comprobar sobre el departamento del ticket; el 403 nombra la clave que falta. En lote, los tickets sin la clave se saltan y se informan |
+| Comprobación de permisos en tareas | `api/Controllers/TicketTasksController.cs`: el controlador exige `tasks.read`; crear → `tasks.create`; editar título, descripción, fecha o avance → `tasks.edit`; cambiar el responsable → `tasks.assign` (las dos entran por el mismo `PUT`); completar y reabrir → `tasks.close`; comentar → `tasks.comment`; eliminar → `tasks.delete`, ya no el creador o administrador. Frontend: `TicketTasksTab.tsx` y `TaskCommentsAside.tsx` | Construido con este documento, salvo la baja lógica: eliminar sigue siendo borrado físico hasta la revisión de la sección 6.4 |
 
 ## 6. Modelo de datos
 
@@ -334,6 +341,14 @@ Problemas de la fuente:
 - **No hay ningún permiso fuera de tickets y tareas:** nada sobre clientes, personal, roles, reportes,
   configuración, calidad ni aprobación de créditos.
 
+**Estado al 12 de octubre de 2026.** Las veinte claves existen en `PermissionCatalog.cs` y los tres roles se
+cargan con exactamente estas concesiones. Las de la columna «función inexistente» (`tickets.edit_thread`,
+`tickets.link`, `tickets.mark_answered`, `tickets.merge`, `tickets.refer`, `tickets.release`, `tasks.transfer`) y
+`tickets.delete`, cuya baja lógica aún no está construida, llevan `Available = false`: se conceden para dejar la
+política cargada y la matriz las marca «No disponible». Dos lecturas de la tabla que el código fija: la fila 13
+(«Publicado») se guarda como `tickets.release` sin que ningún endpoint la consulte, y la fila 15 (`tasks.assign`)
+gobierna el cambio de responsable de una tarea, que entra por el mismo endpoint que editar (sección 10).
+
 **[Propuesta]** Claves adicionales que la fuente no menciona pero el sistema necesita:
 
 | Clave | Permite | Razón |
@@ -356,8 +371,11 @@ Problemas de la fuente:
    **[Propuesta]** Las claves `tasks.*` son todas nuevas, de modo que ningún rol existente las tiene. Hoy
    cualquier persona con sesión y alcance sobre el departamento del ticket puede listar, crear, editar,
    completar, reabrir y comentar tareas (sección 5). Para que nadie pierda esas acciones, la misma migración
-   de datos de la regla 1 concede `tasks.read`, `tasks.create`, `tasks.edit`, `tasks.close` y `tasks.comment`
-   a todo rol existente que tenga `tickets.read`. `tasks.delete` no se concede por migración: hoy eliminar
+   de datos de la regla 1 concede `tasks.read`, `tasks.create`, `tasks.edit`, `tasks.assign`, `tasks.close` y
+   `tasks.comment` a todo rol existente que tenga `tickets.read` (`tasks.assign` va porque cambiar el
+   responsable de una tarea también era libre y ahora exige esa clave). **Construido:** migración
+   `SplitTicketsWriteAndAddTaskKeys`, SQL sobre la columna jsonb; las pruebas corren en SQLite y no la
+   ejecutan, así que se verifica en el despliegue. `tasks.delete` no se concede por migración: hoy eliminar
    una tarea exige ser su creador o administrador (`TicketTasksController.cs:549`), y al pasar a depender de
    la clave el creador que no la tenga deja de poder eliminar su propia tarea; ese cambio es deliberado, es
    lo que la matriz de la fuente dispone (fila 18, solo ALL ACCESS), y se avisa al responsable de la Bandeja.
@@ -470,8 +488,8 @@ Plastifar y del equipo (pregunta 1); hasta entonces la carga de agentes está bl
 | `POST · PUT /api/departments` | Ya existen (:78, :126); alta y edición con los campos nuevos y con `managerStaffId` | `settings.write` |
 | `POST /api/staff/import` | Carga de agentes por archivo, con informe. Su comportamiento ante las filas sin correo depende de la alternativa de la sección 8.1 | Administrador (`AdminOnly`), igual que el alta existente (`StaffController.cs:166`) |
 | `DELETE /api/tickets/{id}` (nuevo) | Baja lógica auditada del ticket, con motivo en el cuerpo. No borra la fila | `tickets.delete` |
-| Endpoints de `TicketsController` | Sustituir `AdminOnly` por la clave correspondiente: asignar (:1419) y asignación masiva (:1561) → `tickets.assign`; prioridad masiva (:1701) → `tickets.edit`; cambio de estado (:1799) → `tickets.close`. Añadir comprobación de clave donde hoy solo se exige sesión: crear (:375) → `tickets.create`; editar (:701) → `tickets.edit`; responder (:1081) → `tickets.reply` | Según la tabla 7.4 |
-| Endpoints de `TicketTasksController` | Añadir comprobación de clave: listar (:86) y enlace de adjunto (:490), crear (:109), editar (:178), completar (:263) y reabrir (:377), comentar (:433), eliminar (:535). El de eliminar pasa de borrado físico (:569) a baja lógica auditada con motivo, y deja de depender de ser el creador o administrador (:549) para depender de la clave | `tasks.read`, `tasks.create`, `tasks.edit`, `tasks.close`, `tasks.comment`, `tasks.delete` |
+| Endpoints de `TicketsController` | **Construido.** Ya no hay `AdminOnly`: asignar y asignación masiva → `tickets.assign`; prioridad masiva → `tickets.edit`; cambio de estado → `tickets.close`, también cuando el estado viaja con un mensaje. Donde solo se exigía sesión: crear → `tickets.create` sobre el departamento destino; editar → `tickets.edit`, y si cambia el departamento, además `tickets.transfer` sobre el de origen; responder al cliente → `tickets.reply`; la nota interna solo exige `tickets.read`. En lote no hay 403: los tickets sin la clave se saltan y se informan | Según la tabla 7.4 |
+| Endpoints de `TicketTasksController` | **Construido**, salvo la baja lógica. Listar y enlace de adjunto → `tasks.read`; crear → `tasks.create`; editar → `tasks.edit` para título, descripción, fecha y avance, y `tasks.assign` para el responsable (mismo `PUT`; se exige la que corresponde a lo que cambia); completar y reabrir → `tasks.close`; comentar → `tasks.comment`; eliminar → `tasks.delete`, y ya no el creador o administrador. **Pendiente:** eliminar sigue siendo borrado físico; pasa a baja lógica con motivo cuando se cierre la sección 6.4 | `tasks.read`, `tasks.create`, `tasks.edit`, `tasks.assign`, `tasks.close`, `tasks.comment`, `tasks.delete` |
 
 Los departamentos y roles iniciales entran por una migración de datos o un comando de carga, no por la
 interfaz; debe poder ejecutarse dos veces sin duplicar.
@@ -515,14 +533,22 @@ Reglas espejo entre Zod y el servidor.
 
 ## 14. Criterios de aceptación
 
-- [ ] Los 38 departamentos quedan cargados con su jerarquía de dos niveles, tipo, rol del departamento y buzón.
-- [ ] Los 5 roles existen; ALL ACCESS, EXPANDED ACCESS y LIMITED ACCESS con las concesiones de la tabla 7.4.
-- [ ] Ejecutar la carga dos veces no duplica departamentos ni roles.
+- [x] Los 38 departamentos quedan cargados con su jerarquía de dos niveles, tipo, rol del departamento y buzón.
+      El buzón solo si ya existe uno con esa dirección (`OrganizationSeederTests`).
+- [x] Los 5 roles existen; ALL ACCESS, EXPANDED ACCESS y LIMITED ACCESS con las concesiones de la tabla 7.4
+      (`OrganizationSeederTests.Roles_get_exactly_the_grants_of_the_source_matrix`).
+- [x] Ejecutar la carga dos veces no duplica departamentos ni roles.
 - [ ] Un rol que tenía `tickets.write` conserva exactamente las mismas capacidades después de la migración.
-- [ ] Un usuario con rol LIMITED ACCESS puede crear un ticket y recibe 403 al intentar responder al cliente.
-- [ ] Un usuario sin `tasks.create` recibe 403 al crear una tarea por API directa y no ve el botón.
+      **Escrito, no probado:** la migración es SQL de PostgreSQL y las pruebas corren en SQLite; se comprueba en
+      el primer despliegue contra la matriz de permisos.
+- [x] Un usuario con rol LIMITED ACCESS puede crear un ticket y recibe 403 al intentar responder al cliente
+      (`TicketsControllerTests.Internal_note_needs_only_reading_but_replying_to_the_client_needs_tickets_reply`).
+- [x] Un usuario sin `tasks.create` recibe 403 al crear una tarea por API directa y no ve el botón
+      (`TicketTasksControllerTests.Create_requires_tasks_create_in_the_tickets_department`; el botón lo oculta
+      `TicketTasksTab.tsx`).
 - [ ] Un rol que antes de la migración tenía `tickets.read` conserva, después de activar las claves, las
-      acciones sobre tareas que hoy tiene: listar, crear, editar, completar, reabrir y comentar.
+      acciones sobre tareas que hoy tiene: listar, crear, editar, asignar, completar, reabrir y comentar.
+      **Escrito, no probado:** misma razón que la migración de `tickets.write`.
 - [ ] Un ticket o una tarea eliminados no generan avisos de vencimiento ni de asignación, y no aparecen en la
       búsqueda, el tablero ni los reportes; cada consumidor de la lista de la sección 6.4 tiene su prueba.
 - [ ] La carga de agentes trata las filas sin correo según la alternativa elegida en la sección 8.1 y lo informa
@@ -531,8 +557,11 @@ Reglas espejo entre Zod y el servidor.
 - [ ] Un usuario con rol ALL ACCESS elimina un ticket indicando el motivo: el ticket deja de aparecer en
       listados y contadores, su fila sigue en la base y la bitácora registra actor, fecha y motivo.
 - [ ] Un usuario con rol EXPANDED ACCESS recibe 403 al intentar eliminar un ticket o una tarea y no ve la acción.
+      **Tareas: cumplido** (`TicketTasksControllerTests.Delete_depends_on_tasks_delete_and_no_longer_on_being_the_creator`;
+      `TicketTasksTab.tsx` oculta el icono). **Tickets: pendiente** del endpoint de baja lógica.
 - [ ] Eliminar una tarea ya no borra su fila.
-- [ ] Ningún endpoint de tickets ni de tareas queda protegido solo por la marca de administrador.
+- [x] Ningún endpoint de tickets ni de tareas queda protegido solo por la marca de administrador
+      (`TicketsControllerTests.Non_admin_with_tickets_close_can_change_the_status`).
 - [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original.
 
 ## 15. Riesgos

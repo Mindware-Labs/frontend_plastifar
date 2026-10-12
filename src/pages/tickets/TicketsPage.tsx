@@ -35,6 +35,7 @@ import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { usePermissions } from "../../hooks/usePermissions";
 import { formatActivityDate, formatSlaRemaining } from "../../lib/format";
 import type {
   DepartmentResponse,
@@ -302,6 +303,14 @@ export function TicketsPage() {
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  // RF-P6: la interfaz no ofrece lo que el servidor va a rechazar. Aqui es
+  // «puede en algun departamento»; el servidor vuelve a comprobarlo ticket a
+  // ticket y en lote salta los que no alcanza.
+  const { can } = usePermissions();
+  const canCreate = can("tickets.create");
+  const canAssign = can("tickets.assign");
+  const canEdit = can("tickets.edit");
   const [bulkModal, setBulkModal] = useState<"asignar" | "prioridad" | null>(null);
   const [bulkStaffId, setBulkStaffId] = useState("");
   const [bulkPriority, setBulkPriority] = useState("Normal");
@@ -611,14 +620,16 @@ export function TicketsPage() {
           )
         }
         action={
-          <Button
-            size="sm"
-            onClick={() => setCreateModalOpen(true)}
-            className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
-            <span>Nuevo ticket</span>
-          </Button>
+          canCreate ? (
+            <Button
+              size="sm"
+              onClick={() => setCreateModalOpen(true)}
+              className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              <span>Nuevo ticket</span>
+            </Button>
+          ) : undefined
         }
       />
 
@@ -726,6 +737,8 @@ export function TicketsPage() {
                 onClear={() => setSelectedIds(new Set())}
                 onAssign={openBulkAssign}
                 onPriority={() => setBulkModal("prioridad")}
+                canAssign={canAssign}
+                canPriority={canEdit}
               />
             </div>
           )}

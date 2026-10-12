@@ -41,6 +41,14 @@ interface TicketTasksTabProps {
   activeCommentsTaskId?: number | null;
   onToggleTaskComments?: (task: TicketTaskResponse) => void;
   latestAddedComment?: { taskId: number; comment: TicketTaskCommentResponse } | null;
+  /**
+   * Claves de tareas de la matriz de Plastifar (docs/plan/01, tabla 7.4),
+   * resueltas por quien pinta la pestana sobre el departamento del ticket.
+   * Sin la clave, la accion no se ofrece: el servidor la rechazaria con 403.
+   */
+  canCreate?: boolean;
+  canClose?: boolean;
+  canDelete?: boolean;
 }
 
 type TaskFilter = "all" | "pending" | "completed" | "mine";
@@ -54,6 +62,9 @@ export function TicketTasksTab({
   activeCommentsTaskId,
   onToggleTaskComments,
   latestAddedComment,
+  canCreate = true,
+  canClose = true,
+  canDelete = true,
 }: TicketTasksTabProps) {
   const [tasks, setTasks] = useState<TicketTaskResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,16 +192,18 @@ export function TicketTasksTab({
           ]}
         />
 
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => setShowCreateModal(true)}
-          disabled={isClosed}
-          title={isClosed ? "No se pueden crear tareas en un ticket cerrado." : undefined}
-        >
-          <Plus className="h-[14px] w-[14px]" />
-          Nueva tarea
-        </Button>
+        {canCreate && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => setShowCreateModal(true)}
+            disabled={isClosed}
+            title={isClosed ? "No se pueden crear tareas en un ticket cerrado." : undefined}
+          >
+            <Plus className="h-[14px] w-[14px]" />
+            Nueva tarea
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -321,7 +334,7 @@ export function TicketTasksTab({
 
                   {/* Acciones de la cabecera del mismo tamaño que las etiquetas */}
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {isCompleted ? (
+                    {!canClose ? null : isCompleted ? (
                       <button
                         type="button"
                         onClick={() => void handleReopenTask(task.id)}
@@ -345,14 +358,16 @@ export function TicketTasksTab({
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => setTaskToDelete(task)}
-                      title="Eliminar tarea"
-                      className="flex size-[22px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-red-600 transition-colors cursor-pointer active:scale-95"
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => setTaskToDelete(task)}
+                        title="Eliminar tarea"
+                        className="flex size-[22px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-red-600 transition-colors cursor-pointer active:scale-95"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
