@@ -69,7 +69,7 @@ export function ProductLinesSection() {
       description: line.isActive ? (
         <>
           <strong className="font-semibold text-ink">{line.name}</strong> dejará de ofrecerse al
-          abrir un ticket o una hoja de corrección. El historial que ya la referencia se conserva.
+          abrir un ticket o una HCA. El historial que ya la referencia se conserva.
         </>
       ) : (
         <>

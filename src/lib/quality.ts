@@ -122,8 +122,9 @@ export function nextStatus(sheet: CorrectiveActionSheet): {
     case "Abierta":
       return { status: "En análisis", blockedBy: null };
     case "En análisis":
-      return (sheet.rootCause ?? "").trim() === ""
-        ? { status: "En ejecución", blockedBy: "Escribe la causa raíz antes de pasar a ejecución." }
+      // docs/plan/05, regla 4: la puerta a ejecución es la lista de causas, no el texto único.
+      return sheet.causes.length === 0
+        ? { status: "En ejecución", blockedBy: "Registra al menos una causa antes de pasar a ejecución." }
         : { status: "En ejecución", blockedBy: null };
     case "En ejecución":
       return { status: "En verificación", blockedBy: null };

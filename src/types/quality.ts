@@ -17,7 +17,24 @@ export const HCA_STATUSES = [
 
 export type HcaStatus = (typeof HCA_STATUSES)[number];
 
-/** Hoja de Corrección de Acción: documenta una no conformidad y su plan. */
+/** `CAUSAS` del PF-FOR-109: varias por hoja, en orden. */
+export interface HcaCause {
+  id: number;
+  description: string;
+  position: number;
+}
+
+/** `PARTICIPANTES`: personal del sistema (con confirmación) o un nombre escrito a mano. */
+export interface HcaParticipant {
+  id: number;
+  staffId: number | null;
+  name: string;
+  acknowledgedAt: string | null;
+  /** Quien mira es esta persona y todavía no confirmó. */
+  canAcknowledge: boolean;
+}
+
+/** HCA, «Hecho, Causa y Acción» (PF-FOR-109): documenta una no conformidad, sus causas y su plan. */
 export interface CorrectiveActionSheet {
   id: number;
   /** Numero visible, secuencial y unico; nunca se reutiliza. */
@@ -31,14 +48,22 @@ export interface CorrectiveActionSheet {
   /** Obligatoria: es el eje del seguimiento por linea de producto. */
   productLineId: number;
   productLineName: string;
+  /** `Producto:` del formulario, el artículo concreto; opcional (docs/plan/05). */
+  productId: number | null;
+  productCode: string | null;
+  productName: string | null;
+  /** `Planta:`; opcional. */
+  plantId: number | null;
+  plantName: string | null;
+  /** `Elaborado por:`; nulo en las hojas anteriores al campo. */
+  createdByStaffId: number | null;
+  createdByName: string | null;
   /** Instante UTC en que se detecto la no conformidad. */
   detectedAt: string;
-  /** Que ocurrio; obligatorio desde el alta. */
+  /** `HECHO`: que ocurrio; obligatorio desde el alta. */
   description: string;
   /** Contencion aplicada de inmediato. */
   immediateAction: string | null;
-  /** Obligatoria para pasar a ejecucion. */
-  rootCause: string | null;
   /** Dueño de la HCA. */
   responsibleStaffId: number;
   responsibleName: string;
@@ -48,6 +73,8 @@ export interface CorrectiveActionSheet {
   /** Verificacion de eficacia; obligatoria para cerrar. */
   effectivenessCheckAt: string | null;
   effectivenessNotes: string | null;
+  /** `COMENTARIOS` generales. */
+  comments: string | null;
   closedAt: string | null;
   closedByStaffId: number | null;
   /** Resuelto en SQL: buscarlo en la lista de personal activo dejaba un
@@ -55,6 +82,19 @@ export interface CorrectiveActionSheet {
   closedByName: string | null;
   /** Nota de cierre: una hoja abierta por error se cierra explicandolo, no se borra. */
   closingNote: string | null;
+  createdAt: string;
+  /** Al menos una para pasar a ejecución y para cerrar (docs/plan/05, regla 4). */
+  causes: HcaCause[];
+  participants: HcaParticipant[];
+}
+
+/** Archivo de evidencia de una acción del plan. */
+export interface PlanItemAttachment {
+  id: number;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedByName: string | null;
   createdAt: string;
 }
 
@@ -78,6 +118,9 @@ export interface ActionPlanItem {
   status: PlanItemStatus;
   /** Obligatoria al anular: una accion no se borra, se anula justificando. */
   cancelReason: string | null;
+  /** `EVIDENCIAS DE LA IMPLEMENTACIÓN`: texto y archivos (docs/plan/05, RF-H4). */
+  evidenceNotes: string | null;
+  attachments: PlanItemAttachment[];
 }
 
 export const CREDIT_STATUSES = ["Solicitada", "Aprobada", "Rechazada", "Aplicada"] as const;

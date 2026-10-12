@@ -16,6 +16,7 @@ import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
 import { HcaPage } from "./pages/quality/HcaPage";
+import { HcaPrintPage } from "./pages/quality/HcaPrintPage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { DepartmentsPage } from "./pages/departments/DepartmentsPage";
 import { MotivosPage } from "./pages/tickets/MotivosPage";
@@ -193,8 +194,9 @@ export default function App() {
         <Route path="/" element={<Navigate to="/bandeja" replace />} />
       </Route>
 
-      {/* Vista de impresión del PF-FOR-034 (docs/plan/03, RF-R9): con sesión
-          pero sin el armazón, para que la barra lateral no salga en el papel. */}
+      {/* Vistas de impresión de los formularios (docs/plan/03 RF-R9, 05 RF-H10):
+          con sesión pero sin el armazón, para que la barra lateral no salga en
+          el papel. */}
       <Route
         element={
           <ProtectedRoute>
@@ -207,6 +209,14 @@ export default function App() {
           element={
             <PermissionRoute permission="claims.read">
               <ClaimPrintPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/calidad/hca/:id/imprimir"
+          element={
+            <PermissionRoute permission="quality.read">
+              <HcaPrintPage />
             </PermissionRoute>
           }
         />
