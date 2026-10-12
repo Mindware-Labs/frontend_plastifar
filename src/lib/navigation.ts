@@ -15,6 +15,7 @@ import {
   BarChart3,
   Building2,
   ClipboardCheck,
+  PackageSearch,
   Gavel,
   Inbox,
   KeyRound,
@@ -164,6 +165,16 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Solicitudes de crédito", to: "/calidad/creditos" },
       { label: "Líneas de producto", to: "/calidad/lineas" },
     ],
+  },
+  /* Investigacion de discrepancia de carga, PF-FOR-291 (docs/plan/06). Modulo
+     propio: la investiga Monitoreo y la consultan Almacen y control de
+     inventario, con su propia clave de lectura (discrepancies.read). */
+  {
+    label: "Discrepancias",
+    icon: PackageSearch,
+    section: "Gestión",
+    to: "/discrepancias",
+    permission: "discrepancies.read",
   },
   {
     label: "Personal",

@@ -37,6 +37,10 @@ export type PermissionKey =
   | "quality.read"
   | "quality.write"
   | "quality.approve"
+  // Discrepancia de carga, PF-FOR-291 (docs/plan/06, sección 12).
+  | "discrepancies.read"
+  | "discrepancies.write"
+  | "discrepancies.approve"
   | "reports.read"
   | "settings.write";
 

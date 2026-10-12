@@ -99,6 +99,13 @@ const detailPatterns: BreadcrumbPattern[] = [
     ],
   },
   {
+    path: "/discrepancias/:id",
+    build: (number) => [
+      { label: "Discrepancias", to: "/discrepancias" },
+      { label: number ?? "Investigación" },
+    ],
+  },
+  {
     path: "/calidad/hca/:id/plan",
     build: (number, { id }) => [
       { label: "Calidad", to: "/calidad/hca" },
