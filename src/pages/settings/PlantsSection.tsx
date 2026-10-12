@@ -1,6 +1,7 @@
-import { Pencil, Plus, Power } from "lucide-react";
+import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -35,6 +36,9 @@ export function PlantsSection() {
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState<PlantCountry | "todos">("todos");
   const [chip, setChip] = useState<ChipKey>("todas");
+  // Regla 4 del plan: localizar las plantas sin administrador, o con uno
+  // desactivado, para corregirlas. Es un filtro aparte del estado.
+  const [onlyWithoutManager, setOnlyWithoutManager] = useState(false);
   const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nueva" | Plant | null>(null);
@@ -51,13 +55,42 @@ export function PlantsSection() {
       search: debouncedSearch || undefined,
       country: country === "todos" ? undefined : country,
       status: chip === "todas" ? undefined : chip,
+      manager: onlyWithoutManager ? ("sin-activo" as const) : undefined,
     },
     fallbackError: "No se pudieron cargar las plantas",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  const isFiltering = debouncedSearch !== "" || chip !== "todas" || country !== "todos";
+  const isFiltering =
+    debouncedSearch !== "" || chip !== "todas" || country !== "todos" || onlyWithoutManager;
+
+  /* El servidor es quien sabe si algun equipo o producto la usa: su 409 sube al
+     dialogo con el motivo, y la salida que ofrece es desactivarla. */
+  function askDelete(plant: Plant) {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      title: "Eliminar planta",
+      description: (
+        <>
+          <strong className="font-semibold text-ink">{plant.name}</strong> se borrará del catálogo.
+          Solo es posible si ningún equipo ni producto la usa; si alguno lo hace, desactívala en su
+          lugar.
+        </>
+      ),
+      confirmLabel: "Eliminar",
+      onConfirm: async () => {
+        setBusyId(plant.id);
+        try {
+          await settingsApi.plants.remove(plant.id);
+          refresh();
+        } finally {
+          setBusyId(null);
+        }
+      },
+    });
+  }
 
   function askToggle(plant: Plant) {
     setConfirmation({
@@ -144,6 +177,17 @@ export function PlantsSection() {
                 onClick={() => setChip("inactivas")}
               />
             </ChipGroup>
+
+            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+            <ChipGroup label="Filtrar por administrador" ready={counts !== undefined} skeletonCount={1}>
+              <FilterChip
+                label="Sin administrador activo"
+                count={counts?.withoutActiveManager ?? 0}
+                active={onlyWithoutManager}
+                onClick={() => setOnlyWithoutManager((current) => !current)}
+              />
+            </ChipGroup>
           </>
         }
         footer={
@@ -178,7 +222,7 @@ export function PlantsSection() {
                   <Th>País</Th>
                   <Th>Administrador</Th>
                   <Th>Estado</Th>
-                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                  {canWrite && <Th className="w-32 text-right">Acciones</Th>}
                 </HeadRow>
               </thead>
 
@@ -190,7 +234,14 @@ export function PlantsSection() {
                       {COUNTRY_LABEL[plant.country] ?? plant.country}
                     </Td>
                     <Td className="text-[12.5px] text-subtle">
-                      {plant.managerName ?? <span className="text-faint">Sin administrador</span>}
+                      {plant.managerName === null ? (
+                        <span className="text-faint">Sin administrador</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          {plant.managerName}
+                          {plant.managerIsActive === false && <Badge tone="neutral">Inactivo</Badge>}
+                        </span>
+                      )}
                     </Td>
                     <Td>
                       <StatusDot active={plant.isActive} />
@@ -208,6 +259,13 @@ export function PlantsSection() {
                             label={plant.isActive ? `Desactivar ${plant.name}` : `Reactivar ${plant.name}`}
                             icon={Power}
                             onClick={() => askToggle(plant)}
+                            disabled={busyId === plant.id}
+                          />
+                          <RowAction
+                            label={`Eliminar ${plant.name}`}
+                            icon={Trash2}
+                            danger
+                            onClick={() => askDelete(plant)}
                             disabled={busyId === plant.id}
                           />
                         </div>

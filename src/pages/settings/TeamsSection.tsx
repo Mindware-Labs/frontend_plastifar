@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power } from "lucide-react";
+import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { Button } from "../../components/ui/Button";
@@ -29,6 +29,9 @@ export function TeamsSection() {
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
+  // Regla 4 del plan: localizar los equipos sin ningun integrante activo
+  // (vacios, o con todos desactivados). Es un filtro aparte del estado.
+  const [onlyWithoutMembers, setOnlyWithoutMembers] = useState(false);
   const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nuevo" | Team | null>(null);
@@ -44,13 +47,41 @@ export function TeamsSection() {
       pageSize,
       search: debouncedSearch || undefined,
       status: chip === "todos" ? undefined : chip,
+      members: onlyWithoutMembers ? ("sin-activos" as const) : undefined,
     },
     fallbackError: "No se pudieron cargar los equipos",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  const isFiltering = debouncedSearch !== "" || chip !== "todos";
+  const isFiltering = debouncedSearch !== "" || chip !== "todos" || onlyWithoutMembers;
+
+  /* El servidor es quien sabe si el equipo conserva integrantes: su 409 sube al
+     dialogo con el motivo, y las salidas que ofrece son quitarlos o desactivarlo. */
+  function askDelete(team: Team) {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      title: "Eliminar equipo",
+      description: (
+        <>
+          <strong className="font-semibold text-ink">{team.name}</strong> se borrará del catálogo.
+          Solo es posible si no tiene integrantes; si los tiene, quítalos antes o desactívalo en su
+          lugar.
+        </>
+      ),
+      confirmLabel: "Eliminar",
+      onConfirm: async () => {
+        setBusyId(team.id);
+        try {
+          await settingsApi.teams.remove(team.id);
+          refresh();
+        } finally {
+          setBusyId(null);
+        }
+      },
+    });
+  }
 
   function askToggle(team: Team) {
     setConfirmation({
@@ -127,6 +158,17 @@ export function TeamsSection() {
                 onClick={() => setChip("inactivos")}
               />
             </ChipGroup>
+
+            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+            <ChipGroup label="Filtrar por integrantes" ready={counts !== undefined} skeletonCount={1}>
+              <FilterChip
+                label="Sin integrantes activos"
+                count={counts?.withoutActiveMembers ?? 0}
+                active={onlyWithoutMembers}
+                onClick={() => setOnlyWithoutMembers((current) => !current)}
+              />
+            </ChipGroup>
           </>
         }
         footer={
@@ -161,7 +203,7 @@ export function TeamsSection() {
                   <Th>Planta</Th>
                   <Th>Integrantes</Th>
                   <Th>Estado</Th>
-                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                  {canWrite && <Th className="w-32 text-right">Acciones</Th>}
                 </HeadRow>
               </thead>
 
@@ -195,6 +237,13 @@ export function TeamsSection() {
                             label={team.isActive ? `Desactivar ${team.name}` : `Reactivar ${team.name}`}
                             icon={Power}
                             onClick={() => askToggle(team)}
+                            disabled={busyId === team.id}
+                          />
+                          <RowAction
+                            label={`Eliminar ${team.name}`}
+                            icon={Trash2}
+                            danger
+                            onClick={() => askDelete(team)}
                             disabled={busyId === team.id}
                           />
                         </div>

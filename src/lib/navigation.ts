@@ -208,6 +208,7 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Días no laborables", to: "/configuracion/feriados" },
       { label: "Plantillas", to: "/configuracion/plantillas" },
       { label: "Buzones", to: "/configuracion/buzones" },
+      { label: "Productos", to: "/configuracion/productos" },
       { label: "Plantas", to: "/configuracion/plantas" },
       { label: "Equipos", to: "/configuracion/equipos" },
     ],

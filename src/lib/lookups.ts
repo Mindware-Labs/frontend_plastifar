@@ -6,6 +6,7 @@
 // desaparecer en silencio.
 
 import { clientsApi } from "../api/clients";
+import { settingsApi } from "../api/settings";
 import { staffApi } from "../api/staff";
 import type { LookupResult } from "../components/ui/LookupSelect";
 
@@ -70,6 +71,37 @@ export const searchActiveStaff = searchStaff("activos");
 export async function resolveStaffLabel(value: string): Promise<string | null> {
   const person = await staffApi.getDepartmentAccess(Number(value));
   return `${person.firstName} ${person.lastName}`;
+}
+
+/**
+ * Busca productos activos por código parcial o por parte de la descripción.
+ *
+ * El servidor ya acota a veinte y ordena: primero el código exacto, luego los
+ * que empiezan por lo escrito. No devuelve el total, así que una página llena
+ * se toma como «puede haber más» y el control invita a seguir escribiendo.
+ */
+export async function searchProducts(term: string): Promise<LookupResult> {
+  const items = await settingsApi.products.lookup(term || undefined);
+
+  return {
+    options: items.map((product) => ({
+      value: String(product.id),
+      label: product.name,
+      hint: product.code,
+    })),
+    hasMore: items.length >= LOOKUP_PAGE_SIZE,
+  };
+}
+
+/**
+ * Descripción de un producto por id, para pintar lo ya seleccionado. Va contra
+ * el detalle y no contra la búsqueda: un producto que se desactivó después de
+ * elegirlo ya no sale en el selector, pero el formulario tiene que seguir
+ * nombrándolo.
+ */
+export async function resolveProductLabel(value: string): Promise<string | null> {
+  const product = await settingsApi.products.get(Number(value));
+  return `${product.code} · ${product.name}${product.isActive ? "" : " (inactivo)"}`;
 }
 
 /** Nombre de un cliente por id, para pintar lo ya seleccionado. */

@@ -67,6 +67,11 @@ export interface Plant {
   /** Viene con la planta para pintar la columna sin pedirlo fila por fila. */
   managerName: string | null;
   isActive: boolean;
+  /**
+   * El de la persona: quien se desactivó después de ser elegido sigue figurando
+   * como administrador y la tabla lo dice. Nulo cuando no hay administrador.
+   */
+  managerIsActive: boolean | null;
 }
 
 export interface SavePlantRequest {
@@ -105,6 +110,58 @@ export interface TeamMember {
   name: string;
   isActive: boolean;
   createdAt: string;
+}
+
+/** Producto: lo que se vende, se reclama o se retira. El código es único y es texto. */
+export interface Product {
+  id: number;
+  code: string;
+  /** Descripción del producto. */
+  name: string;
+  productLineId: number | null;
+  /** Viene con el producto para pintar la columna sin pedirlo fila por fila. */
+  productLineName: string | null;
+  plantId: number | null;
+  plantName: string | null;
+  /** Acompaña a la planta porque su nombre se repite entre países. */
+  plantCountry: PlantCountry | null;
+  isActive: boolean;
+}
+
+export interface SaveProductRequest {
+  code: string;
+  name: string;
+  productLineId: number | null;
+  plantId: number | null;
+  isActive: boolean;
+}
+
+/** Lo mínimo que devuelve la búsqueda del selector de producto. */
+export interface ProductLookupItem {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface ProductImportRejection {
+  /** Línea del archivo, contando la cabecera como la 1. */
+  line: number;
+  code: string | null;
+  reason: string;
+}
+
+/**
+ * Resultado de la carga por archivo. `rejections` trae como mucho las primeras
+ * cien filas rechazadas; `rejected` es el total real y `rejectionsTruncated`
+ * avisa del corte.
+ */
+export interface ProductImportResult {
+  created: number;
+  updated: number;
+  unchanged: number;
+  rejected: number;
+  rejections: ProductImportRejection[];
+  rejectionsTruncated: boolean;
 }
 
 /** Variables permitidas en una plantilla. Una desconocida se rechaza al guardar. */
