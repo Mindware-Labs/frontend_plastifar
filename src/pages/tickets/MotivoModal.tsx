@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { useSettle } from "../../hooks/useSettle";
+import { departmentPathOptions } from "../../lib/departments";
 import type { DepartmentResponse, TicketTopicResponse } from "../../types/api";
 
 const priorities = ["Emergencia", "Alta", "Normal", "Baja"];
@@ -118,7 +119,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
           }}
           state={error && !departmentId ? "error" : "idle"}
           placeholder="Elige un departamento"
-          options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
+          options={departmentPathOptions(departments)}
           hint="Al elegir este motivo en un ticket nuevo, el departamento se rellena solo con este."
         />
 

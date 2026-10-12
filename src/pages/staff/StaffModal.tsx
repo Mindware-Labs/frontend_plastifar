@@ -10,6 +10,7 @@ import { CheckboxField, SelectField, TextField, type FieldState } from "../../co
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { departmentPathOptions } from "../../lib/departments";
 import type { DepartmentResponse, StaffResponse } from "../../types/api";
 
 const schema = z.object({
@@ -181,10 +182,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
               onChange={field.onChange}
               onBlur={field.onBlur}
               placeholder="Selecciona un departamento"
-              options={departments.map((dept) => ({
-                value: String(dept.id),
-                label: dept.name,
-              }))}
+              options={departmentPathOptions(departments)}
               state={stateOf("primaryDepartmentId")}
               error={errors.primaryDepartmentId?.message}
             />

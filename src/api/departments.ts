@@ -1,6 +1,6 @@
 import { apiRequest, toQuery } from "./client";
 import { setDepartmentHierarchy } from "../lib/departments";
-import type { DepartmentResponse, SaveDepartmentRequest } from "../types/api";
+import type { DepartmentResponse, DepartmentType, SaveDepartmentRequest } from "../types/api";
 
 export const departmentsApi = {
   /**
@@ -22,10 +22,17 @@ export const departmentsApi = {
    * Son unidades de la empresa, del orden de la decena; no hay volumen que
    * paginar. El servidor documenta la misma exencion.
    */
-  list: async (options: { includeInactive?: boolean } = {}) => {
+  list: async (options: { includeInactive?: boolean; type?: DepartmentType } = {}) => {
     const departments = await apiRequest<DepartmentResponse[]>(
-      `/api/departments${toQuery({ includeInactive: options.includeInactive || undefined })}`,
+      `/api/departments${toQuery({
+        includeInactive: options.includeInactive || undefined,
+        type: options.type,
+      })}`,
     );
+
+    // Una lectura recortada por tipo no es el arbol: registrarla dejaria a
+    // `can()` sin los ancestros que quedaron fuera del filtro.
+    if (options.type !== undefined) return departments;
 
     /* Se registra SIEMPRE, y la lectura completa deja un arbol mejor que la
        recortada: un padre desactivado sigue conteniendo a sus hijos, asi que

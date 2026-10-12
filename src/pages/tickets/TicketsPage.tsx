@@ -18,6 +18,7 @@ import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
 import { useNavigate } from "react-router-dom";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
+import { departmentPaths } from "../../lib/departments";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -450,6 +451,9 @@ export function TicketsPage() {
   const bulkIds = () => Array.from(selectedIds);
 
   const departmentOptions = buildDepartmentFilterOptions(departments);
+  // Dos departamentos pueden llamarse igual bajo padres distintos: la columna
+  // rotula con el camino, como el filtro, y cae al nombre si el id no está.
+  const departmentPathById = departmentPaths(departments);
 
   const priorityFilterOptions: TicketFilterOption[] = [
     {
@@ -772,7 +776,10 @@ export function TicketsPage() {
                   const client = t.clientName && t.clientName !== "Sin cliente" ? t.clientName : null;
                   const clientCode = t.clientCode && t.clientCode !== "-" ? t.clientCode : null;
                   const department =
-                    t.departmentName && t.departmentName !== "Sin departamento" ? t.departmentName : null;
+                    t.departmentName && t.departmentName !== "Sin departamento"
+                      ? ((t.departmentId != null ? departmentPathById.get(t.departmentId) : undefined) ??
+                        t.departmentName)
+                      : null;
                   const open = () => navigate(`/tickets/${t.id}`);
 
                   return (

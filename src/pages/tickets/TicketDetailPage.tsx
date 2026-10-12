@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { Tabs, TabsList, TabsTrigger } from "../../components/shadcn/tabs";
@@ -36,9 +37,11 @@ import { useSettle } from "../../hooks/useSettle";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
+import { departmentPath, departmentPathOptions } from "../../lib/departments";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes, formatDateTime, formatSlaRemaining } from "../../lib/format";
 import type {
+  DepartmentResponse,
   TicketAttachmentResponse,
   TicketCreateOptionsResponse,
   TicketDetailResponse,
@@ -692,6 +695,19 @@ export function TicketDetailPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [editCatalogs, setEditCatalogs] = useState<TicketCreateOptionsResponse | null>(null);
   const [loadingEditCatalogs, setLoadingEditCatalogs] = useState(false);
+  // Arbol entero, para rotular con el camino: el catalogo trae solo id y nombre.
+  const [editDepartmentTree, setEditDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
+
+  /* Se lee al entrar y no solo al abrir el formulario: la ficha tambien rotula
+     el departamento con su camino, porque dos pueden llamarse igual. Es la misma
+     lectura que ya hacia esta pantalla, antes; si falla, el formulario la
+     reintenta al abrirse y la ficha muestra el nombre que mando el servidor. */
+  useEffect(() => {
+    departmentsApi
+      .list({ includeInactive: true })
+      .then(setEditDepartmentTree)
+      .catch(() => setEditDepartmentTree(undefined));
+  }, []);
 
   const handleOpenEditModal = async () => {
     if (!ticket) return;
@@ -702,6 +718,14 @@ export function TicketDetailPage() {
     setEditProductLineId(ticket.productLineId ?? null);
     setEditError(null);
     setShowEditModal(true);
+
+    // Si falla, las opciones salen con su nombre, como antes.
+    if (!editDepartmentTree) {
+      departmentsApi
+        .list({ includeInactive: true })
+        .then(setEditDepartmentTree)
+        .catch(() => setEditDepartmentTree(undefined));
+    }
 
     if (!editCatalogs) {
       try {
@@ -1050,6 +1074,7 @@ export function TicketDetailPage() {
           ) : (
             <TicketPropertiesAside
               ticket={ticket}
+              departmentLabel={departmentPath(editDepartmentTree ?? [], ticket.departmentId)}
               sla={sla}
               canEdit={!isClosed}
               canAssign={ticket.status !== "Cancelado"}
@@ -1990,7 +2015,7 @@ export function TicketDetailPage() {
                     placeholder="Sin departamento"
                     options={[
                       { value: "", label: "Sin departamento" },
-                      ...(editCatalogs?.departments ?? []).map((d) => ({ value: String(d.id), label: d.name })),
+                      ...departmentPathOptions(editCatalogs?.departments ?? [], editDepartmentTree),
                     ]}
                   />
                   <SelectField

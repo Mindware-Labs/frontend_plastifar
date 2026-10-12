@@ -23,7 +23,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
 import { StaffModal } from "./StaffModal";
-import { departmentOptions } from "../../lib/departments";
+import { departmentOptions, departmentPath } from "../../lib/departments";
 
 type FilterKey = "todos" | "activos" | "inactivos" | "administradores";
 type SortKey = "nombre" | "correo" | "departamento" | "rol" | "estado";
@@ -127,8 +127,10 @@ export function StaffPage() {
     setBulkError(null);
   }
 
+  // El camino completo: el nombre ya no es unico, y «ALMACEN» a secas no dice
+  // si es el de primer nivel o el de PLASTIFAR CENTROAMERICA.
   function departmentName(id: number) {
-    return departments.find((d) => d.id === id)?.name ?? "—";
+    return departmentPath(departments, id) ?? "—";
   }
 
   function fullName(member: StaffResponse) {

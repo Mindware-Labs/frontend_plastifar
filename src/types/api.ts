@@ -131,7 +131,31 @@ export interface DepartmentResponse {
    * por un 409 después de pulsar «Eliminar» es enterarse tarde.
    */
   staffCount?: number;
+  /**
+   * Tipo del departamento en la operación real. Se guarda y se muestra; todavía
+   * no cambia ninguna regla de visibilidad. Opcional por la misma razón que el
+   * resto: un desplegable no lo necesita.
+   */
+  type?: DepartmentType;
+  /**
+   * Rol que la operación asigna al departamento. Es un dato guardado, no un
+   * permiso: lo que cada persona puede sale del rol de su acceso.
+   */
+  defaultRoleId?: number | null;
+  defaultRoleName?: string | null;
+  mailboxId?: number | null;
+  mailboxAddress?: string | null;
+  managerStaffId?: number | null;
+  managerName?: string | null;
 }
+
+/** Espejo del enum `DepartmentType` del servidor, que viaja como texto. */
+export type DepartmentType = "Publico" | "Privado";
+
+export const DEPARTMENT_TYPES: { value: DepartmentType; label: string }[] = [
+  { value: "Publico", label: "Público" },
+  { value: "Privado", label: "Privado" },
+];
 
 /**
  * Alta o movimiento de un departamento.
@@ -145,6 +169,10 @@ export interface SaveDepartmentRequest {
   name: string;
   parentId: number | null;
   isActive: boolean;
+  type: DepartmentType;
+  defaultRoleId: number | null;
+  mailboxId: number | null;
+  managerStaffId: number | null;
 }
 
 export interface ApiMessage {

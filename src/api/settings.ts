@@ -3,8 +3,18 @@ import type {
   EmailTemplate,
   Holiday,
   Mailbox,
+  Plant,
+  PlantCountry,
+  Product,
+  ProductImportResult,
   ProductLine,
+  ProductLookupItem,
+  SavePlantRequest,
+  SaveProductRequest,
+  SaveTeamRequest,
   SlaPolicy,
+  Team,
+  TeamMember,
 } from "../types/settings";
 
 interface Counts {
@@ -41,6 +51,31 @@ export interface HolidayQuery extends CatalogQuery {
   year?: number;
 }
 
+export interface PlantQuery extends CatalogQuery {
+  country?: PlantCountry;
+  /** «sin-activo»: solo las plantas sin administrador o con uno desactivado. */
+  manager?: "sin-activo";
+}
+
+/** Los contadores de estado más el del filtro propio, que no depende de ellos. */
+type PlantListResponse = Omit<ListResponse<Plant>, "counts"> & {
+  counts: Counts & { withoutActiveManager: number };
+};
+
+export interface TeamQuery extends CatalogQuery {
+  /** «sin-activos»: solo los equipos sin ningún integrante activo. */
+  members?: "sin-activos";
+}
+
+type TeamListResponse = Omit<ListResponse<Team>, "counts"> & {
+  counts: Counts & { withoutActiveMembers: number };
+};
+
+export interface ProductQuery extends CatalogQuery {
+  productLineId?: number;
+  plantId?: number;
+}
+
 export const settingsApi = {
   slaPolicies: {
     list: (query: SlaQuery) =>
@@ -73,6 +108,67 @@ export const settingsApi = {
     update: (id: number, data: Omit<ProductLine, "id">) =>
       apiRequest<ProductLine>(`/api/settings/product-lines/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => apiRequest<void>(`/api/settings/product-lines/${id}`, { method: "DELETE" }),
+  },
+
+  // Se desactiva guardándolo; `remove` es el borrado real y el servidor lo
+  // rechaza con 409 si algún formulario ya lo nombra.
+  products: {
+    list: (query: ProductQuery) =>
+      apiRequest<ListResponse<Product>>(`/api/settings/products${toQuery({ ...query })}`),
+    /** Búsqueda acotada del selector: solo activos, como mucho veinte. */
+    lookup: (search?: string) =>
+      apiRequest<ProductLookupItem[]>(`/api/settings/products/lookup${toQuery({ search })}`),
+    get: (id: number) => apiRequest<Product>(`/api/settings/products/${id}`),
+    create: (data: SaveProductRequest) =>
+      apiRequest<Product>("/api/settings/products", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: SaveProductRequest) =>
+      apiRequest<Product>(`/api/settings/products/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => apiRequest<void>(`/api/settings/products/${id}`, { method: "DELETE" }),
+    /** Carga por archivo CSV: crea códigos nuevos y corrige descripciones; nunca borra. */
+    import: (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return apiRequest<ProductImportResult>("/api/settings/products/import", {
+        method: "POST",
+        body: form,
+      });
+    },
+  },
+
+  // Se desactiva guardándola; `remove` es el borrado real y el servidor lo
+  // rechaza con 409 si algún equipo o producto la usa.
+  plants: {
+    list: (query: PlantQuery) =>
+      apiRequest<PlantListResponse>(`/api/settings/plants${toQuery({ ...query })}`),
+    get: (id: number) => apiRequest<Plant>(`/api/settings/plants/${id}`),
+    create: (data: SavePlantRequest) =>
+      apiRequest<Plant>("/api/settings/plants", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: SavePlantRequest) =>
+      apiRequest<Plant>(`/api/settings/plants/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => apiRequest<void>(`/api/settings/plants/${id}`, { method: "DELETE" }),
+  },
+
+  // Se desactiva guardándolo; `remove` es el borrado real y el servidor lo
+  // rechaza con 409 mientras tenga integrantes.
+  teams: {
+    list: (query: TeamQuery) =>
+      apiRequest<TeamListResponse>(`/api/settings/teams${toQuery({ ...query })}`),
+    get: (id: number) => apiRequest<Team>(`/api/settings/teams/${id}`),
+    create: (data: SaveTeamRequest) =>
+      apiRequest<Team>("/api/settings/teams", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: SaveTeamRequest) =>
+      apiRequest<Team>(`/api/settings/teams/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => apiRequest<void>(`/api/settings/teams/${id}`, { method: "DELETE" }),
+    members: {
+      list: (teamId: number) => apiRequest<TeamMember[]>(`/api/settings/teams/${teamId}/members`),
+      add: (teamId: number, staffId: number) =>
+        apiRequest<TeamMember>(`/api/settings/teams/${teamId}/members`, {
+          method: "POST",
+          body: JSON.stringify({ staffId }),
+        }),
+      remove: (teamId: number, staffId: number) =>
+        apiRequest<void>(`/api/settings/teams/${teamId}/members/${staffId}`, { method: "DELETE" }),
+    },
   },
 
   templates: {

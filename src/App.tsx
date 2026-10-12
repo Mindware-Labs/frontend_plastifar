@@ -20,8 +20,11 @@ import { RolesPage } from "./pages/roles/RolesPage";
 import { VeredictosPage } from "./pages/tickets/VeredictosPage";
 import { HolidaysSection } from "./pages/settings/HolidaysSection";
 import { MailboxesSection } from "./pages/settings/MailboxesSection";
+import { PlantsSection } from "./pages/settings/PlantsSection";
 import { ProductLinesSection } from "./pages/settings/ProductLinesSection";
+import { ProductsSection } from "./pages/settings/ProductsSection";
 import { SlaSection } from "./pages/settings/SlaSection";
+import { TeamsSection } from "./pages/settings/TeamsSection";
 import { TemplatesSection } from "./pages/settings/TemplatesSection";
 import { TerritoriesSection } from "./pages/settings/TerritoriesSection";
 import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
@@ -128,6 +131,12 @@ export default function App() {
         <Route path="/configuracion/feriados" element={<HolidaysSection />} />
         <Route path="/configuracion/plantillas" element={<TemplatesSection />} />
         <Route path="/configuracion/buzones" element={<MailboxesSection />} />
+        {/* Rutas propuestas en docs/plan/00, seccion 11. Si los productos y las
+            plantas deben seguir a las lineas de producto al grupo de Calidad
+            esta por decidir en la revision cruzada. */}
+        <Route path="/configuracion/productos" element={<ProductsSection />} />
+        <Route path="/configuracion/plantas" element={<PlantsSection />} />
+        <Route path="/configuracion/equipos" element={<TeamsSection />} />
 
         {/* Territorios y lineas de producto se mudaron al modulo que las usa:
             el territorio es obligatorio al registrar un cliente y alimenta el

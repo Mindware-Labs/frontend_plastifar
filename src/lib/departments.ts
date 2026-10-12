@@ -120,6 +120,38 @@ export function departmentOptions(
 }
 
 /**
+ * Las opciones de un `Select`, rotuladas con el camino completo.
+ *
+ * La sangría de `departmentOptions` distingue a dos «ALMACEN» mientras la lista
+ * está abierta, pero el control cerrado enseña sólo la opción elegida, y ahí
+ * «ALMACEN» a secas no dice cuál de los dos es. El nombre ya no es único en
+ * toda la organización —sólo dentro de su padre—, así que donde elegir el
+ * equivocado tiene consecuencias (a qué cola va un ticket, a qué departamento
+ * entra una persona) el rótulo lleva el camino entero.
+ *
+ * `reference` es el árbol contra el que se resuelve el camino. Hace falta
+ * cuando `departments` llega recortado —el catálogo de tickets trae sólo los
+ * departamentos a los que la persona tiene alcance, sin `parentId`— porque el
+ * padre puede no estar entre lo ofrecido y aun así forma parte del nombre. Si
+ * no se pasa, el camino se resuelve con la propia lista. Lo que no aparezca en
+ * la referencia se ofrece igual, con su nombre: perder una opción es peor que
+ * mostrarla sin su camino.
+ */
+export function departmentPathOptions(
+  departments: DepartmentLike[],
+  reference: DepartmentLike[] = departments,
+): { value: string; label: string }[] {
+  const ofrecidos = new Set(departments.map((d) => d.id));
+  const arbol = buildDepartmentTree(reference);
+  const resueltos = new Set(arbol.map((d) => d.id));
+
+  return [
+    ...arbol.filter((d) => ofrecidos.has(d.id)).map((d) => ({ value: String(d.id), label: d.path })),
+    ...departments.filter((d) => !resueltos.has(d.id)).map((d) => ({ value: String(d.id), label: d.name })),
+  ];
+}
+
+/**
  * El nombre completo de un departamento, con sus padres.
  *
  * En una tabla, «Florida» a secas no dice nada: hay zonas con nombre repetible
@@ -131,6 +163,18 @@ export function departmentPath(
 ): string | null {
   if (id == null) return null;
   return buildDepartmentTree(departments).find((d) => d.id === id)?.path ?? null;
+}
+
+/**
+ * El camino de cada departamento, por id, resuelto de una vez.
+ *
+ * Es `departmentPath` para una tabla: rotular fila a fila reconstruiría el árbol
+ * en cada una. Quien lo usa cae al nombre que mandó el servidor cuando el id no
+ * está —la lista no cargó, o trae solo lo activo y el departamento ya no lo es—:
+ * un nombre corto sigue siendo mejor que una celda vacía.
+ */
+export function departmentPaths(departments: DepartmentLike[]): Map<number, string> {
+  return new Map(buildDepartmentTree(departments).map((d) => [d.id, d.path]));
 }
 
 /**

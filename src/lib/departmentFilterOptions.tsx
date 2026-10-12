@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { FilterOption } from "../components/ui/FilterDropdown";
 import type { DepartmentResponse } from "../types/api";
+import { buildDepartmentTree } from "./departments";
 
 // Resuelve el icono temático para cada departamento según su nombre.
 export function getDepartmentIcon(departmentName: string) {
@@ -46,9 +47,11 @@ export function buildDepartmentFilterOptions(
       label: allLabel,
       icon: <LayoutGrid className="h-4 w-4 text-zinc-500" />,
     },
-    ...departments.map((d) => ({
+    // En orden de arbol y con el camino completo: el nombre ya no es unico, y
+    // dos opciones «ALMACEN» seguidas no dejan elegir a sabiendas.
+    ...buildDepartmentTree(departments).map((d) => ({
       value: String(d.id),
-      label: d.name,
+      label: d.path,
       icon: getDepartmentIcon(d.name),
     })),
   ];

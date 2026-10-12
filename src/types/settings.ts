@@ -50,6 +50,120 @@ export interface ProductLine {
   isActive: boolean;
 }
 
+/** Espejo del enum `PlantCountry` del servidor, que viaja como texto. */
+export type PlantCountry = "RD" | "Guatemala";
+
+export const PLANT_COUNTRIES: { value: PlantCountry; label: string }[] = [
+  { value: "RD", label: "República Dominicana" },
+  { value: "Guatemala", label: "Guatemala" },
+];
+
+/** Planta de producción. El nombre es único dentro de su país, no en todo el catálogo. */
+export interface Plant {
+  id: number;
+  name: string;
+  country: PlantCountry;
+  managerStaffId: number | null;
+  /** Viene con la planta para pintar la columna sin pedirlo fila por fila. */
+  managerName: string | null;
+  isActive: boolean;
+  /**
+   * El de la persona: quien se desactivó después de ser elegido sigue figurando
+   * como administrador y la tabla lo dice. Nulo cuando no hay administrador.
+   */
+  managerIsActive: boolean | null;
+}
+
+export interface SavePlantRequest {
+  name: string;
+  country: PlantCountry;
+  managerStaffId: number | null;
+  isActive: boolean;
+}
+
+/** Equipo de trabajo. El nombre es único en todo el catálogo. */
+export interface Team {
+  id: number;
+  name: string;
+  /** Planta a la que pertenece; nulo cuando el equipo no es de planta. */
+  plantId: number | null;
+  /** Viene con el equipo para pintar la columna sin pedirlo fila por fila. */
+  plantName: string | null;
+  /** Todos los integrantes, estén activos o no. */
+  memberCount: number;
+  isActive: boolean;
+}
+
+export interface SaveTeamRequest {
+  name: string;
+  plantId: number | null;
+  isActive: boolean;
+}
+
+/**
+ * Integrante de un equipo. `isActive` es el de la persona, no el del equipo.
+ * Sin correo: la lectura de integrantes está abierta a cualquier sesión y el
+ * correo del personal lo protege `staff.read`.
+ */
+export interface TeamMember {
+  staffId: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+/** Producto: lo que se vende, se reclama o se retira. El código es único y es texto. */
+export interface Product {
+  id: number;
+  code: string;
+  /** Descripción del producto. */
+  name: string;
+  productLineId: number | null;
+  /** Viene con el producto para pintar la columna sin pedirlo fila por fila. */
+  productLineName: string | null;
+  plantId: number | null;
+  plantName: string | null;
+  /** Acompaña a la planta porque su nombre se repite entre países. */
+  plantCountry: PlantCountry | null;
+  isActive: boolean;
+}
+
+export interface SaveProductRequest {
+  code: string;
+  name: string;
+  productLineId: number | null;
+  plantId: number | null;
+  isActive: boolean;
+}
+
+/** Lo mínimo que devuelve la búsqueda del selector de producto. */
+export interface ProductLookupItem {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface ProductImportRejection {
+  /** Línea del archivo, contando la cabecera como la 1. */
+  line: number;
+  code: string | null;
+  reason: string;
+}
+
+/**
+ * Resultado de la carga por archivo. `rejections` trae como mucho las primeras
+ * cien filas rechazadas; `rejected` es el total real y `rejectionsTruncated`
+ * avisa del corte.
+ */
+export interface ProductImportResult {
+  created: number;
+  updated: number;
+  unchanged: number;
+  rejected: number;
+  rejections: ProductImportRejection[];
+  rejectionsTruncated: boolean;
+}
+
 /** Variables permitidas en una plantilla. Una desconocida se rechaza al guardar. */
 export const TEMPLATE_VARIABLES = [
   { key: "contacto", label: "Nombre del contacto", sample: "María Reyes" },
