@@ -3,10 +3,15 @@ import {
   ArrowRight,
   Check,
   CircleSlash,
+  FileText,
+  Paperclip,
   Pencil,
   Play,
   Plus,
+  Printer,
   ShieldCheck,
+  Trash2,
+  UserCheck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -49,7 +54,9 @@ import { CancelPlanItemModal } from "./CancelPlanItemModal";
 import { CloseSheetModal } from "./CloseSheetModal";
 import { EffectivenessModal } from "./EffectivenessModal";
 import { HcaModal } from "./HcaModal";
+import { HcaParticipantModal } from "./HcaParticipantModal";
 import { HcaStatusBadge, PlanItemStatusBadge } from "./StatusBadges";
+import { formatBytes } from "../../lib/format";
 import { TicketLink } from "./TicketLink";
 
 /** Criterios de la lista paginada del plan; `sheetId` entra para que cambiar de HCA la reinicie. */
@@ -89,6 +96,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   const [cancelling, setCancelling] = useState<ActionPlanItem | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [addingParticipant, setAddingParticipant] = useState(false);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   useDynamicBreadcrumb(sheet?.number ?? null);
@@ -291,15 +299,58 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     });
   }
 
+  /** RF-H10: la impresión con el formato del PF-FOR-109, en pestaña nueva. */
+  const printAction = (
+    <Button size="sm" variant="secondary" onClick={() => window.open(`/calidad/hca/${sheetId}/imprimir`, "_blank")}>
+      <Printer className="h-[15px] w-[15px]" />
+      Imprimir
+    </Button>
+  );
+
+  async function removeParticipant(id: number, name: string) {
+    setActionError(null);
+    try {
+      await qualityApi.participants.remove(id);
+      await reload();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : `No se pudo quitar a ${name}`);
+    }
+  }
+
+  async function acknowledgeParticipation(id: number) {
+    setActionError(null);
+    try {
+      await qualityApi.participants.acknowledge(id);
+      await reload();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo confirmar la participación");
+    }
+  }
+
+  async function openEvidence(itemId: number, attachmentId: number) {
+    setActionError(null);
+    try {
+      const link = await qualityApi.planItems.evidenceLink(itemId, attachmentId);
+      window.open(link.url, "_blank", "noopener");
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo abrir la evidencia");
+    }
+  }
+
   const primaryAction = (() => {
-    if (!canWrite || isClosed) return undefined;
+    if (!canWrite || isClosed) {
+      return section === "datos" ? printAction : undefined;
+    }
 
     if (section === "datos") {
       return (
-        <Button size="sm" onClick={() => setEditing(true)}>
-          <Pencil className="h-[15px] w-[15px]" />
-          Editar HCA
-        </Button>
+        <div className="flex items-center gap-2">
+          {printAction}
+          <Button size="sm" onClick={() => setEditing(true)}>
+            <Pencil className="h-[15px] w-[15px]" />
+            Editar HCA
+          </Button>
+        </div>
       );
     }
 
@@ -381,11 +432,25 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                 </span>
               </DetailRow>
               <DetailRow label="Responsable">{sheet.responsibleName}</DetailRow>
+              <DetailRow label="Elaborada por">
+                {sheet.createdByName ?? <span className="text-faint">Sin registrar: la hoja es anterior a este campo.</span>}
+              </DetailRow>
             </DetailGroup>
 
             <DetailGroup title="Origen" hint="A quién y a qué afecta.">
               <DetailRow label="Cliente">{sheet.clientName}</DetailRow>
               <DetailRow label="Línea de producto">{sheet.productLineName}</DetailRow>
+              <DetailRow label="Producto">
+                {sheet.productName ? (
+                  <>
+                    {sheet.productName}
+                    <span className="ml-2 font-mono text-[11.5px] text-faint">{sheet.productCode}</span>
+                  </>
+                ) : (
+                  <span className="text-faint">Sin artículo concreto</span>
+                )}
+              </DetailRow>
+              <DetailRow label="Planta">{sheet.plantName ?? <span className="text-faint">Sin planta</span>}</DetailRow>
               <DetailRow label="Ticket de origen">
                 <TicketLink number={sheet.ticketNumber} />
               </DetailRow>
@@ -409,15 +474,68 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                   <span className="text-faint">Ninguna registrada</span>
                 )}
               </DetailRow>
-              <DetailRow label="Causa raíz" wide>
-                {sheet.rootCause ? (
-                  <p className="whitespace-pre-line">{sheet.rootCause}</p>
+              <DetailRow label="Causas" wide>
+                {sheet.causes.length > 0 ? (
+                  <ol className="flex list-decimal flex-col gap-1 pl-5">
+                    {sheet.causes.map((cause) => (
+                      <li key={cause.id} className="whitespace-pre-line">
+                        {cause.description}
+                      </li>
+                    ))}
+                  </ol>
                 ) : (
                   <span className="text-faint">
-                    Sin escribir: es obligatoria para pasar a ejecución y para cerrar.
+                    Sin registrar: hace falta al menos una para pasar a ejecución y para cerrar.
                   </span>
                 )}
               </DetailRow>
+              <DetailRow label="Comentarios" wide>
+                {sheet.comments ? <p className="whitespace-pre-line">{sheet.comments}</p> : <span className="text-faint">Ninguno</span>}
+              </DetailRow>
+            </DetailGroup>
+
+            {/* RF-H5: quienes participaron en el análisis. Personal del sistema
+                confirma con un sello de fecha; la firma autógrafa va en el papel. */}
+            <DetailGroup
+              title="Participantes"
+              hint={sheet.participants.length === 0 ? "Nadie registrado todavía." : "La firma autógrafa se hace sobre la impresión."}
+            >
+              {sheet.participants.map((participant) => (
+                <DetailRow key={participant.id} label={participant.staffId ? "Personal" : "A mano"}>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span>{participant.name}</span>
+                    {participant.acknowledgedAt ? (
+                      <span className="inline-flex items-center gap-1 text-[12px] text-brand-green">
+                        <UserCheck aria-hidden className="h-3.5 w-3.5" />
+                        Confirmó el {formatDay(participant.acknowledgedAt.slice(0, 10))}
+                      </span>
+                    ) : participant.canAcknowledge ? (
+                      <Button size="sm" variant="secondary" onClick={() => void acknowledgeParticipation(participant.id)}>
+                        <UserCheck className="h-[14px] w-[14px]" />
+                        Confirmar mi participación
+                      </Button>
+                    ) : participant.staffId ? (
+                      <span className="text-[12px] text-faint">Sin confirmar</span>
+                    ) : null}
+                    {canWrite && !isClosed && (
+                      <RowAction
+                        label={`Quitar a ${participant.name}`}
+                        icon={Trash2}
+                        danger
+                        onClick={() => void removeParticipant(participant.id, participant.name)}
+                      />
+                    )}
+                  </span>
+                </DetailRow>
+              ))}
+              {canWrite && !isClosed && (
+                <DetailRow label="Agregar">
+                  <Button size="sm" variant="secondary" onClick={() => setAddingParticipant(true)}>
+                    <Plus className="h-[14px] w-[14px]" />
+                    Agregar participante
+                  </Button>
+                </DetailRow>
+              )}
             </DetailGroup>
 
             {isClosed && (
@@ -515,6 +633,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                     <Th>Comprometida</Th>
                     <Th>Cumplida</Th>
                     <Th>Estado</Th>
+                    <Th>Evidencia</Th>
                     {canWrite && !isClosed && <Th className="w-36 text-right">Acciones</Th>}
                   </HeadRow>
                 </thead>
@@ -550,14 +669,40 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
                         <Td>
                           <PlanItemStatusBadge status={item.status} overdue={itemOverdue} />
                         </Td>
+                        {/* RF-H4: evidencia de implementación. Una acción cumplida
+                            sin evidencia se señala (regla 5, pregunta 2). */}
+                        <Td className="max-w-[260px] text-[12px] text-brand-gray">
+                          {item.evidenceNotes && <p className="whitespace-pre-line">{item.evidenceNotes}</p>}
+                          {item.attachments.length > 0 && (
+                            <ul className="mt-1 flex flex-col gap-0.5">
+                              {item.attachments.map((attachment) => (
+                                <li key={attachment.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => void openEvidence(item.id, attachment.id)}
+                                    className="inline-flex max-w-full items-center gap-1 text-[12px] text-ink underline-offset-4 hover:underline"
+                                    title={`${attachment.fileName} · ${formatBytes(attachment.sizeBytes)}`}
+                                  >
+                                    <Paperclip aria-hidden className="h-3 w-3 shrink-0 text-faint" />
+                                    <span className="truncate">{attachment.fileName}</span>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {!item.evidenceNotes && item.attachments.length === 0 && (
+                            <span className={item.status === "Cumplida" ? "text-warn" : "text-faint"}>
+                              {item.status === "Cumplida" ? "Cumplida sin evidencia" : "—"}
+                            </span>
+                          )}
+                        </Td>
                         {canWrite && !isClosed && (
                           <Td>
                             <div className="flex items-center justify-end gap-1">
                               <RowAction
-                                label={`Editar la acción de ${item.responsibleName}`}
-                                icon={Pencil}
+                                label={settled ? `Completar la evidencia de ${item.responsibleName}` : `Editar la acción de ${item.responsibleName}`}
+                                icon={settled ? FileText : Pencil}
                                 onClick={() => setItemModal(item)}
-                                disabled={settled}
                               />
                               <RowAction
                                 label="Poner en curso"
@@ -745,6 +890,18 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
           onSaved={() => {
             setCancelling(null);
             void reloadAfterPlanChange();
+          }}
+        />
+      )}
+
+      {addingParticipant && (
+        <HcaParticipantModal
+          sheetId={sheet.id}
+          sheetNumber={sheet.number}
+          onClose={() => setAddingParticipant(false)}
+          onSaved={() => {
+            setAddingParticipant(false);
+            void reload();
           }}
         />
       )}

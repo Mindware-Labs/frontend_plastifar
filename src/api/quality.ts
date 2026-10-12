@@ -1,5 +1,12 @@
 import { apiRequest, toQuery } from "./client";
-import type { ActionPlanItem, CorrectiveActionSheet, CreditRequest } from "../types/quality";
+import type { AttachmentLinkResponse } from "../types/api";
+import type {
+  ActionPlanItem,
+  CorrectiveActionSheet,
+  CreditRequest,
+  HcaCause,
+  HcaParticipant,
+} from "../types/quality";
 
 export interface SheetQuery {
   page: number;
@@ -8,6 +15,9 @@ export interface SheetQuery {
   productLineId?: number;
   responsibleId?: number;
   clientId?: number;
+  /** RF-H9: filtros por planta y producto. */
+  plantId?: number;
+  productId?: number;
   /** ISO corto YYYY-MM-DD */
   from?: string;
   to?: string;
@@ -53,16 +63,26 @@ export interface SaveSheetRequest {
   detectedAt: string;
   description: string;
   immediateAction: string | null;
-  rootCause: string | null;
   responsibleStaffId: number;
   dueDate: string;
   ticketId: number | null;
+  productId: number | null;
+  plantId: number | null;
+  comments: string | null;
+  /** Reemplaza la lista entera, en orden; null la deja como está. */
+  causes: string[] | null;
 }
 
 export interface SavePlanItemRequest {
   description: string;
   responsibleStaffId: number;
   dueDate: string;
+  evidenceNotes: string | null;
+}
+
+export interface SaveParticipantRequest {
+  staffId: number | null;
+  name: string | null;
 }
 
 export interface PlanItemQuery {
@@ -208,6 +228,53 @@ export const qualityApi = {
         method: "POST",
         body: JSON.stringify({ cancelReason }),
       }),
+
+    /** RF-H4: evidencias de implementación, como multipart. El servidor devuelve la acción con sus archivos. */
+    uploadEvidence: (id: number, files: File[]) => {
+      const form = new FormData();
+      files.forEach((file) => form.append("Files", file));
+      return apiRequest<ActionPlanItem>(`/api/quality/plan-items/${id}/attachments`, {
+        method: "POST",
+        body: form,
+      });
+    },
+
+    evidenceLink: (id: number, attachmentId: number, download = false) =>
+      apiRequest<AttachmentLinkResponse>(
+        `/api/quality/plan-items/${id}/attachments/${attachmentId}${toQuery({
+          download: download ? "true" : undefined,
+        })}`,
+      ),
+
+    removeEvidence: (id: number, attachmentId: number) =>
+      apiRequest<void>(`/api/quality/plan-items/${id}/attachments/${attachmentId}`, { method: "DELETE" }),
+  },
+
+  /** RF-H3: causas de la hoja; la lista completa también viaja en la ficha. */
+  causes: {
+    add: (sheetId: number, description: string) =>
+      apiRequest<HcaCause>(`/api/quality/sheets/${sheetId}/causes`, {
+        method: "POST",
+        body: JSON.stringify({ description }),
+      }),
+    update: (id: number, description: string) =>
+      apiRequest<HcaCause>(`/api/quality/causes/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ description }),
+      }),
+    remove: (id: number) => apiRequest<void>(`/api/quality/causes/${id}`, { method: "DELETE" }),
+  },
+
+  /** RF-H5: participantes del análisis. */
+  participants: {
+    add: (sheetId: number, data: SaveParticipantRequest) =>
+      apiRequest<HcaParticipant>(`/api/quality/sheets/${sheetId}/participants`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    remove: (id: number) => apiRequest<void>(`/api/quality/participants/${id}`, { method: "DELETE" }),
+    acknowledge: (id: number) =>
+      apiRequest<HcaParticipant>(`/api/quality/participants/${id}/acknowledge`, { method: "POST" }),
   },
 
   creditRequests: {

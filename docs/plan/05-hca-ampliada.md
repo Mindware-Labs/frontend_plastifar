@@ -10,6 +10,15 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > plan original, Yordy Acosta). La conexión con las tareas del ticket toca la Bandeja (sección 9, Richard De
 > León) y se especifica en el documento 02.
 
+> **Estado (12 de octubre de 2026).** Construido en las ramas `modulo/hca-ampliada` de ambos repositorios todo
+> lo que es de Calidad: autor, planta, producto y comentarios en la hoja; lista de causas con las tres reglas
+> movidas de la causa raíz a las causas (regla 4) y la migración de datos (RF-H11); evidencias por acción, texto
+> y archivos, con `AttachmentPolicy` e `IAttachmentStorage`; participantes con confirmación; filtros por planta y
+> producto; impresión PF-FOR-109 en `/calidad/hca/{id}/imprimir`; y el nombre «Hecho, Causa y Acción» en código
+> y textos (RF-H12). **No construido, a propósito:** `TaskId` y todo lo que toca la tarea (RF-H7, RF-H8, los
+> criterios 3 y 4 de la sección 14): es la Bandeja y depende del documento 02. La migración
+> `AddHcaFormFields` está escrita y no probada contra Postgres (las pruebas corren en SQLite).
+
 ## 1. Situación y objetivo
 
 HCA significa «Hecho, Causa y Acción»: es el nombre oficial del formulario PF-FOR-109 y el que este documento
@@ -361,17 +370,24 @@ Reglas espejo entre Zod y el servidor. Las validaciones existentes de la hoja no
 ## 14. Criterios de aceptación
 
 - [ ] Una hoja existente con causa raíz muestra ese texto como su primera causa después de la migración.
-- [ ] Una hoja sin causas no puede pasar a «En ejecución», y el mensaje dice qué falta.
-- [ ] Una tarea que exige HCA no puede completarse con una hoja que no tiene causas ni acciones.
+      **Escrito, no probado:** el `INSERT` va en la migración `AddHcaFormFields` y solo corre en Postgres.
+- [x] Una hoja sin causas no puede pasar a «En ejecución», y el mensaje dice qué falta
+      (`HcaFormTests.Advancing_to_execution_needs_at_least_one_cause_and_the_message_says_so`).
+- [ ] Una tarea que exige HCA no puede completarse con una hoja que no tiene causas ni acciones. **Pendiente:**
+      es la Bandeja (documento 02).
 - [ ] Bajo el supuesto provisional de la regla 3 (pregunta 1, opción a): la misma tarea sí puede completarse con
       una hoja en «En ejecución», aunque no esté cerrada. Si Plastifar elige otra opción, este criterio se
-      sustituye.
-- [ ] Un adjunto de evidencia solo puede descargarlo quien puede ver la hoja.
-- [ ] La impresión muestra el código PF-FOR-109, el número de la hoja y el del ticket, y el logotipo de Plastifar.
-- [ ] Mientras la pregunta 10 siga abierta, las condiciones de cierre de la HCA que el código aplica hoy siguen
-      funcionando igual; no es un requisito de Plastifar, es una comprobación de que este cambio no las rompe.
-- [ ] Ningún comentario del código ni texto visible desarrolla la sigla como «Hoja de Corrección de Acción».
-- [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original.
+      sustituye. **Pendiente:** es la Bandeja (documento 02).
+- [x] Un adjunto de evidencia solo puede descargarlo quien puede ver la hoja: el enlace firmado exige
+      `quality.read` y se emite por diez minutos (`HcaFormTests.Evidence_is_stored_and_linked_and_a_settled_action_only_takes_evidence`).
+- [x] La impresión muestra el código PF-FOR-109, el número de la hoja y el del ticket, y el logotipo de Plastifar.
+      Comprobado en el código de `HcaPrintPage.tsx`; sin prueba automática, el frontend no tiene corredor.
+- [x] Mientras la pregunta 10 siga abierta, las condiciones de cierre de la HCA que el código aplica hoy siguen
+      funcionando igual (`HcaFormTests.The_closing_gate_still_needs_resolved_actions_and_effectiveness`).
+- [x] Ningún comentario del código ni texto visible desarrolla la sigla como «Hoja de Corrección de Acción».
+      Quedan solo las migraciones ya aplicadas, que no se editan.
+- [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original. **Por revisar** en la
+      revisión cruzada.
 
 ## 15. Riesgos
 
