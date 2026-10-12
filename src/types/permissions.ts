@@ -41,6 +41,10 @@ export type PermissionKey =
   | "claims.read"
   | "claims.write"
   | "claims.treat"
+  // Discrepancia de carga, PF-FOR-291 (docs/plan/06, sección 12).
+  | "discrepancies.read"
+  | "discrepancies.write"
+  | "discrepancies.approve"
   | "reports.read"
   | "settings.write";
 

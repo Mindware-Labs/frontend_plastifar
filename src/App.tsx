@@ -12,6 +12,9 @@ import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
 import { ClientsPage } from "./pages/clients/ClientsPage";
 import { CXDashboard } from "./features/cx-dashboard";
 import { DashboardPage } from "./pages/dashboard/DashboardPage";
+import { DiscrepanciesPage } from "./pages/discrepancies/DiscrepanciesPage";
+import { DiscrepancyDetailPage } from "./pages/discrepancies/DiscrepancyDetailPage";
+import { DiscrepancyPrintPage } from "./pages/discrepancies/DiscrepancyPrintPage";
 import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
@@ -135,6 +138,13 @@ export default function App() {
           <Route path="/reclamaciones/:id" element={<ClaimDetailPage />} />
         </Route>
 
+        {/* Investigación de discrepancia de carga, PF-FOR-291 (docs/plan/06).
+            Clave propia; la vista de impresión va fuera del armazón, abajo. */}
+        <Route element={<PermissionRoute permission="discrepancies.read"><Outlet /></PermissionRoute>}>
+          <Route path="/discrepancias" element={<DiscrepanciesPage />} />
+          <Route path="/discrepancias/:id" element={<DiscrepancyDetailPage />} />
+        </Route>
+
         {/* Configuracion no lleva guard de lectura a proposito: la seccion 8.4 del
             plan abre la lectura de catalogos a todo el personal autenticado y solo
             exige settings.write para escribir, que es lo que cada seccion ya gatea. */}
@@ -194,9 +204,9 @@ export default function App() {
         <Route path="/" element={<Navigate to="/bandeja" replace />} />
       </Route>
 
-      {/* Vistas de impresión de los formularios (docs/plan/03 RF-R9, 05 RF-H10):
-          con sesión pero sin el armazón, para que la barra lateral no salga en
-          el papel. */}
+      {/* Vistas de impresión de los formularios (docs/plan/03 RF-R9, 05 RF-H10,
+          06 RF-D8): con sesión pero sin el armazón, para que la barra lateral
+          no salga en el papel. */}
       <Route
         element={
           <ProtectedRoute>
@@ -217,6 +227,14 @@ export default function App() {
           element={
             <PermissionRoute permission="quality.read">
               <HcaPrintPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/discrepancias/:id/imprimir"
+          element={
+            <PermissionRoute permission="discrepancies.read">
+              <DiscrepancyPrintPage />
             </PermissionRoute>
           }
         />

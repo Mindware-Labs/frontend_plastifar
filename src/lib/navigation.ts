@@ -16,6 +16,7 @@ import {
   Building2,
   ClipboardCheck,
   FileWarning,
+  PackageSearch,
   Gavel,
   Inbox,
   KeyRound,
@@ -176,6 +177,16 @@ export const SIDEBAR_NAV: NavGroup[] = [
     section: "Gestión",
     to: "/reclamaciones",
     permission: "claims.read",
+  },
+  /* Investigacion de discrepancia de carga, PF-FOR-291 (docs/plan/06). Modulo
+     propio: la investiga Monitoreo y la consultan Almacen y control de
+     inventario, con su propia clave de lectura (discrepancies.read). */
+  {
+    label: "Discrepancias",
+    icon: PackageSearch,
+    section: "Gestión",
+    to: "/discrepancias",
+    permission: "discrepancies.read",
   },
   {
     label: "Personal",
