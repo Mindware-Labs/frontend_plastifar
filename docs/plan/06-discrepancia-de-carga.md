@@ -10,6 +10,18 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > (sección 9 del plan original, Richard De León), y se relaciona con las solicitudes de crédito del módulo de
 > Calidad (sección 10, Yordy Acosta).
 
+> **Estado (12 de octubre de 2026).** Construido en las ramas `modulo/discrepancia-carga` de ambos repositorios,
+> bajo los supuestos provisionales de la sección 16: modelo, migración con numeración propia (`DC-000001`), los
+> nueve endpoints de la sección 10, las líneas con sus reglas, los nueve puntos con el punto 9 condicionado, dar
+> por completa con la lista de lo que falta, aprobar o devolver con nota, reabrir, el aviso automático de
+> hallazgo con constancia, la solicitud de crédito desde una línea apta, el listado con la pastilla «Con hallazgo
+> de seguridad», la ficha, la impresión horizontal y las claves `discrepancies.*`. **No construido, a propósito:**
+> `TaskId` y todo lo que toca la tarea (RF-D1 «desde la tarea», RF-D4, RF-D8 «desde su tarea», pestaña del
+> ticket): es la Bandeja y depende del documento 02. Mientras tanto la investigación se crea desde el listado
+> eligiendo el ticket. Los destinatarios del aviso (pregunta 2) se leen de la configuración
+> `Discrepancies:SecurityNotifyEmails`; sin ella, el hallazgo queda en la bitácora sin aviso. La migración está
+> escrita y no probada contra Postgres.
+
 ## 1. Situación y objetivo
 
 El formulario PF-FOR-291, «Formulario de Investigación de Discrepancia de Carga», documenta la investigación que
@@ -330,16 +342,27 @@ Reglas espejo entre Zod y el servidor.
 ## 14. Criterios de aceptación
 
 - [ ] La tarea «INVESTIGACION DE MONITOREO» no puede completarse sin una investigación en estado `Completada`.
-- [ ] Con el punto 6 en positivo, el sistema exige responder el punto 9 y envía el aviso a Seguridad y Logística.
-- [ ] Con los puntos 1 a 8 en negativo, el punto 9 aparece deshabilitado y no se exige.
-- [ ] Una línea con sobrante y faltante a la vez se rechaza con el error en su campo.
-- [ ] Un usuario sin `discrepancies.approve` recibe 403 al intentar aprobar o devolver una investigación.
+      **Pendiente:** es la Bandeja (documento 02).
+- [x] Con el punto 6 en positivo, el sistema exige responder el punto 9 y envía el aviso a Seguridad y Logística
+      (`DiscrepanciesControllerTests.Completing_needs_decided_lines…` y `A_security_finding_notifies…`). El aviso
+      sale si hay destinatarios configurados; sin ellos queda en la bitácora.
+- [x] Con los puntos 1 a 8 en negativo, el punto 9 aparece deshabilitado y no se exige (misma prueba; la ficha
+      lo muestra como «No aplica» y rechaza completar si se respondió).
+- [x] Una línea con sobrante y faltante a la vez se rechaza con el error en su campo (`A_line_with_both…`; en
+      Zod el error cae en «Cantidad faltante»).
+- [x] Un usuario sin `discrepancies.approve` recibe 403 al intentar aprobar o devolver una investigación
+      (`Decision_needs_the_approve_key…`; el 403 nombra la clave).
 - [ ] Solo si Plastifar confirma la separación (pregunta 1, opción d): quien realizó la investigación recibe 409
       con mensaje claro al intentar aprobarla. Mientras la pregunta siga abierta, este criterio no aplica.
 - [ ] Un integrante del equipo de control de inventario puede abrirla e imprimirla, y no puede editarla.
-- [ ] La impresión muestra el código PF-FOR-291, la revisión, el número del ticket y el de la tarea.
-- [ ] Ningún registro de 2015 de las hojas ocultas aparece en la base ni en los datos de prueba.
-- [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original.
+      **Parcial:** con `discrepancies.read` y sin `discrepancies.write` se abre e imprime y los botones de
+      edición no aparecen; que el equipo de control de inventario la vea aunque el ticket no sea de su
+      departamento es la visibilidad propia de la sección 12, que no se construyó: sigue al ticket.
+- [x] La impresión muestra el código PF-FOR-291, la revisión y el número del ticket. El de la tarea, cuando
+      exista el vínculo (documento 02).
+- [x] Ningún registro de 2015 de las hojas ocultas aparece en la base ni en los datos de prueba: no hay semilla.
+- [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original. **Por revisar** en la
+      revisión cruzada.
 
 ## 15. Riesgos
 

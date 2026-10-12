@@ -5,14 +5,21 @@ import { BandejaPage } from "./pages/bandeja/BandejaPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
+import { ClaimDetailPage } from "./pages/claims/ClaimDetailPage";
+import { ClaimPrintPage } from "./pages/claims/ClaimPrintPage";
+import { ClaimsPage } from "./pages/claims/ClaimsPage";
 import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
 import { ClientsPage } from "./pages/clients/ClientsPage";
 import { CXDashboard } from "./features/cx-dashboard";
 import { DashboardPage } from "./pages/dashboard/DashboardPage";
+import { DiscrepanciesPage } from "./pages/discrepancies/DiscrepanciesPage";
+import { DiscrepancyDetailPage } from "./pages/discrepancies/DiscrepancyDetailPage";
+import { DiscrepancyPrintPage } from "./pages/discrepancies/DiscrepancyPrintPage";
 import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
 import { HcaPage } from "./pages/quality/HcaPage";
+import { HcaPrintPage } from "./pages/quality/HcaPrintPage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { DepartmentsPage } from "./pages/departments/DepartmentsPage";
 import { MotivosPage } from "./pages/tickets/MotivosPage";
@@ -25,6 +32,8 @@ import { ProductLinesSection } from "./pages/settings/ProductLinesSection";
 import { ProductsSection } from "./pages/settings/ProductsSection";
 import { SlaSection } from "./pages/settings/SlaSection";
 import { TeamsSection } from "./pages/settings/TeamsSection";
+import { TaskTypesSection } from "./pages/settings/TaskTypesSection";
+import { FormRoutingRulesSection } from "./pages/settings/FormRoutingRulesSection";
 import { TemplatesSection } from "./pages/settings/TemplatesSection";
 import { TerritoriesSection } from "./pages/settings/TerritoriesSection";
 import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
@@ -123,6 +132,21 @@ export default function App() {
           <Route path="/calidad/creditos" element={<CreditRequestsPage />} />
         </Route>
 
+        {/* Reclamación de clientes, PF-FOR-034 (docs/plan/03). Clave propia:
+            la llena Ventas y la trata Calidad, y ninguna de las dos es
+            quality.read. La vista de impresión va fuera del armazón, abajo. */}
+        <Route element={<PermissionRoute permission="claims.read"><Outlet /></PermissionRoute>}>
+          <Route path="/reclamaciones" element={<ClaimsPage />} />
+          <Route path="/reclamaciones/:id" element={<ClaimDetailPage />} />
+        </Route>
+
+        {/* Investigación de discrepancia de carga, PF-FOR-291 (docs/plan/06).
+            Clave propia; la vista de impresión va fuera del armazón, abajo. */}
+        <Route element={<PermissionRoute permission="discrepancies.read"><Outlet /></PermissionRoute>}>
+          <Route path="/discrepancias" element={<DiscrepanciesPage />} />
+          <Route path="/discrepancias/:id" element={<DiscrepancyDetailPage />} />
+        </Route>
+
         {/* Configuracion no lleva guard de lectura a proposito: la seccion 8.4 del
             plan abre la lectura de catalogos a todo el personal autenticado y solo
             exige settings.write para escribir, que es lo que cada seccion ya gatea. */}
@@ -137,6 +161,10 @@ export default function App() {
         <Route path="/configuracion/productos" element={<ProductsSection />} />
         <Route path="/configuracion/plantas" element={<PlantsSection />} />
         <Route path="/configuracion/equipos" element={<TeamsSection />} />
+        {/* Catalogo de tareas y enrutamiento de formularios (docs/plan/02,
+            seccion 11): la parte del documento que no toca la Bandeja. */}
+        <Route path="/configuracion/tipos-de-tarea" element={<TaskTypesSection />} />
+        <Route path="/configuracion/formularios" element={<FormRoutingRulesSection />} />
 
         {/* Territorios y lineas de producto se mudaron al modulo que las usa:
             el territorio es obligatorio al registrar un cliente y alimenta el
@@ -180,6 +208,42 @@ export default function App() {
         {/* La raiz entra a la Bandeja, no al Dashboard: es donde la operacion
             pasa el dia (seccion 9.1). Criterio de la rama de Richard. */}
         <Route path="/" element={<Navigate to="/bandeja" replace />} />
+      </Route>
+
+      {/* Vistas de impresión de los formularios (docs/plan/03 RF-R9, 05 RF-H10,
+          06 RF-D8): con sesión pero sin el armazón, para que la barra lateral
+          no salga en el papel. */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <Outlet />
+          </ProtectedRoute>
+        }
+      >
+        <Route
+          path="/reclamaciones/:id/imprimir"
+          element={
+            <PermissionRoute permission="claims.read">
+              <ClaimPrintPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/calidad/hca/:id/imprimir"
+          element={
+            <PermissionRoute permission="quality.read">
+              <HcaPrintPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/discrepancias/:id/imprimir"
+          element={
+            <PermissionRoute permission="discrepancies.read">
+              <DiscrepancyPrintPage />
+            </PermissionRoute>
+          }
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

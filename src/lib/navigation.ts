@@ -15,6 +15,8 @@ import {
   BarChart3,
   Building2,
   ClipboardCheck,
+  FileWarning,
+  PackageSearch,
   Gavel,
   Inbox,
   KeyRound,
@@ -165,6 +167,27 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Líneas de producto", to: "/calidad/lineas" },
     ],
   },
+  /* Reclamación de clientes, PF-FOR-034 (docs/plan/03). Modulo propio y no un
+     hijo de Calidad: la llena Ventas al abrir el ticket y la trata Calidad, y
+     su clave de lectura (claims.read) no es la de Calidad (quality.read). Como
+     hijo de Calidad, quien solo registra reclamaciones no veria el grupo. */
+  {
+    label: "Reclamaciones",
+    icon: FileWarning,
+    section: "Gestión",
+    to: "/reclamaciones",
+    permission: "claims.read",
+  },
+  /* Investigacion de discrepancia de carga, PF-FOR-291 (docs/plan/06). Modulo
+     propio: la investiga Monitoreo y la consultan Almacen y control de
+     inventario, con su propia clave de lectura (discrepancies.read). */
+  {
+    label: "Discrepancias",
+    icon: PackageSearch,
+    section: "Gestión",
+    to: "/discrepancias",
+    permission: "discrepancies.read",
+  },
   {
     label: "Personal",
     icon: Users,
@@ -211,6 +234,8 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Productos", to: "/configuracion/productos" },
       { label: "Plantas", to: "/configuracion/plantas" },
       { label: "Equipos", to: "/configuracion/equipos" },
+      { label: "Tipos de tarea", to: "/configuracion/tipos-de-tarea" },
+      { label: "Formularios", to: "/configuracion/formularios" },
     ],
   },
 ];

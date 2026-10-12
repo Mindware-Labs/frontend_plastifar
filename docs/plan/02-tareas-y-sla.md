@@ -11,6 +11,18 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > (`TicketTasksController`) y el proceso de vencimientos (`SlaBreachWorker`). Según la sección 3.3 del plan
 > original, esos cambios los hace el responsable de la Bandeja o se acuerdan con él antes de escribirlos.
 
+> **Estado (12 de octubre de 2026).** Construida la parte de catálogo, que no toca la Bandeja, en las ramas
+> `modulo/tareas-catalogo` de ambos repositorios: tablas `TaskType`, `TaskTypeDepartment`, `TaskTypeAssignee` y
+> `FormRoutingRule`; los endpoints `api/settings/task-types` y `api/settings/form-routing-rules` de la sección
+> 10, más `GET …/form-routing-rules/applicable?departmentId=&moment=` que resuelve las reglas subiendo por la
+> jerarquía y por los equipos de quien pregunta; la carga inicial de los 13 tipos y las reglas de 7.5 en
+> `OrganizationSeeder`; y las secciones Configuración → Tipos de tarea y Configuración → Formularios. El campo
+> `BusinessDaysOnly` admite nulo («por definir») y así se cargan los 13 tipos: ningún vencimiento se calcula
+> hasta la pregunta 1. **No construido, a propósito:** todo lo demás de este documento es la Bandeja (cambios en
+> `TicketTask`, `TicketTasksController`, `SlaBreachWorker`, listado de tareas, bloqueo de cierre, cancelación,
+> `CreateTaskModal`, `CompleteTaskModal`, `TicketTasksTab`). La migración está escrita y no probada contra
+> Postgres.
+
 ## 1. Situación y objetivo
 
 El sistema mide el tiempo de los tickets: cada ticket recibe una política de SLA según su motivo o su prioridad,
@@ -403,7 +415,9 @@ Reglas espejo entre Zod y el servidor.
 
 ## 14. Criterios de aceptación
 
-- [ ] Los 13 tipos de tarea de la sección 7.1 quedan cargados con su plazo y sus departamentos.
+- [x] Los 13 tipos de tarea de la sección 7.1 quedan cargados con su plazo y sus departamentos
+      (`OrganizationSeederTests.The_thirteen_task_types_and_the_routing_rules_are_loaded_once`). Sin
+      responsables, hasta que los agentes se carguen (documento 01), y con los días «por definir».
 - [ ] El vencimiento de una tarea sigue el criterio que Plastifar confirme en la pregunta 1. Este criterio no
       puede cerrarse antes. Como ilustración de cada opción, para una tarea de tipo «APROBACION DE CASOS DE
       CALIDAD» (1 día) creada un viernes:
@@ -415,8 +429,9 @@ Reglas espejo entre Zod y el servidor.
 - [ ] El incumplimiento de una tarea queda sellado aunque nadie abra la pantalla.
 - [ ] Bajo el supuesto provisional de la regla 3 (pregunta 11, opción a): cambiar el plazo de un tipo no modifica
       el vencimiento de las tareas ya creadas. Si Plastifar elige otra opción, este criterio se sustituye.
-- [ ] No existe ninguna política de SLA para «RESPUESTA A RECLAMACIONES» con prioridad o primera respuesta
-      inventadas: la fila se carga cuando se resuelva la pregunta 5.
+- [x] No existe ninguna política de SLA para «RESPUESTA A RECLAMACIONES» con prioridad o primera respuesta
+      inventadas: la fila se carga cuando se resuelva la pregunta 5 (la carga inicial la omite y la prueba lo
+      comprueba).
 - [ ] Un usuario sin acceso al departamento de una tarea no la ve en el listado.
 - [ ] El listado de tareas responde en menos de 300 ms con 10 000 tareas de prueba.
 - [ ] Las tareas creadas antes de este módulo siguen funcionando sin tipo.

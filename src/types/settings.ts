@@ -112,6 +112,82 @@ export interface TeamMember {
   createdAt: string;
 }
 
+/** Formularios que una tarea puede exigir (docs/plan/02). Viajan por el nombre del enum. */
+export const REQUIRED_FORMS: { value: RequiredForm; label: string }[] = [
+  { value: "Reclamacion", label: "Reclamación de clientes" },
+  { value: "RetiroMercancia", label: "Retiro de mercancía" },
+  { value: "Hca", label: "HCA" },
+  { value: "DiscrepanciaCarga", label: "Discrepancia de carga" },
+];
+export type RequiredForm = "Reclamacion" | "RetiroMercancia" | "Hca" | "DiscrepanciaCarga";
+
+export const ROUTING_MOMENTS: { value: RoutingMoment; label: string }[] = [
+  { value: "AlCrearTicket", label: "Al crear el ticket" },
+  { value: "AlCompletarTarea", label: "Al completar la tarea" },
+  { value: "ConsultaDesdeTarea", label: "Consulta desde la tarea" },
+];
+export type RoutingMoment = "AlCrearTicket" | "AlCompletarTarea" | "ConsultaDesdeTarea";
+
+/** Tipo de tarea: la columna ACCION de la hoja SLA, con su plazo. */
+export interface TaskType {
+  id: number;
+  name: string;
+  /** Plazo en días, 1 a 365. */
+  slaDays: number;
+  /** Verdadero: laborables; falso: calendario; nulo: sin decidir (pregunta 1). */
+  businessDaysOnly: boolean | null;
+  requiredForm: RequiredForm | null;
+  requiredFormLabel: string | null;
+  isActive: boolean;
+  departments: { id: number; name: string }[];
+  /** `isActive` es el de la persona. */
+  assignees: { staffId: number; name: string; isActive: boolean }[];
+}
+
+export interface SaveTaskTypeRequest {
+  name: string;
+  slaDays: number;
+  businessDaysOnly: boolean | null;
+  requiredForm: RequiredForm | null;
+  departmentIds: number[];
+  assigneeStaffIds: number[];
+  isActive: boolean;
+}
+
+/** Quién llena o consulta un formulario y en qué momento (hoja FORMULARIOS). */
+export interface FormRoutingRule {
+  id: number;
+  form: RequiredForm;
+  formLabel: string;
+  moment: RoutingMoment;
+  momentLabel: string;
+  departmentId: number | null;
+  departmentName: string | null;
+  teamId: number | null;
+  teamName: string | null;
+  /** Solo con el momento «Al completar la tarea». */
+  isBlocking: boolean;
+  isActive: boolean;
+}
+
+export interface SaveFormRoutingRuleRequest {
+  form: RequiredForm;
+  moment: RoutingMoment;
+  departmentId: number | null;
+  teamId: number | null;
+  isBlocking: boolean;
+  isActive: boolean;
+}
+
+/** Un formulario que aplica a quien pregunta desde un departamento, y por qué regla. */
+export interface ApplicableForm {
+  form: RequiredForm;
+  formLabel: string;
+  moment: RoutingMoment;
+  isBlocking: boolean;
+  source: string;
+}
+
 /** Producto: lo que se vende, se reclama o se retira. El código es único y es texto. */
 export interface Product {
   id: number;

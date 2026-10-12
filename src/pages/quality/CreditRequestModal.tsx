@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
-import { qualityApi } from "../../api/quality";
+import { qualityApi, type SaveCreditRequestRequest } from "../../api/quality";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
@@ -37,13 +37,20 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 interface CreditRequestModalProps {
+  /**
+   * Alta desde otro registro (la línea de una discrepancia de carga,
+   * docs/plan/06, regla 12): cliente y factura ya puestos, y el envío va al
+   * endpoint que deja el vínculo. Sin esto, alta manual.
+   */
+  defaults?: { clientId: number; invoiceRef: string | null; reason?: string };
+  submit?: (data: SaveCreditRequestRequest) => Promise<unknown>;
   onClose: () => void;
-  onSaved: (request: CreditRequest) => void;
+  onSaved: (request: CreditRequest | null) => void;
 }
 
 /** RF-Q7: alta de solicitud con monto, motivo y referencia de factura. Nace de
  *  un ticket cuando exista la Bandeja; hasta entonces, alta manual. */
-export function CreditRequestModal({ onClose, onSaved }: CreditRequestModalProps) {
+export function CreditRequestModal({ defaults, submit, onClose, onSaved }: CreditRequestModalProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -55,11 +62,11 @@ export function CreditRequestModal({ onClose, onSaved }: CreditRequestModalProps
     resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
-      clientId: "",
+      clientId: defaults ? String(defaults.clientId) : "",
       amount: "",
       currency: "DOP",
-      invoiceRef: "",
-      reason: "",
+      invoiceRef: defaults?.invoiceRef ?? "",
+      reason: defaults?.reason ?? "",
     },
   });
 
@@ -72,16 +79,22 @@ export function CreditRequestModal({ onClose, onSaved }: CreditRequestModalProps
     setFormError(null);
     const invoiceRef = values.invoiceRef.trim();
 
+    const request: SaveCreditRequestRequest = {
+      clientId: Number(values.clientId),
+      amount: Number(values.amount),
+      currency: values.currency,
+      reason: values.reason.trim(),
+      invoiceRef: invoiceRef === "" ? null : invoiceRef,
+      ticketId: null,
+    };
+
     try {
-      const saved = await qualityApi.creditRequests.create({
-        clientId: Number(values.clientId),
-        amount: Number(values.amount),
-        currency: values.currency,
-        reason: values.reason.trim(),
-        invoiceRef: invoiceRef === "" ? null : invoiceRef,
-        ticketId: null,
-      });
-      onSaved(saved);
+      if (submit) {
+        await submit(request);
+        onSaved(null);
+      } else {
+        onSaved(await qualityApi.creditRequests.create(request));
+      }
       onClose();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "No se pudo crear la solicitud");

@@ -10,6 +10,16 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > en el alta de tickets de la Bandeja (sección 9 del plan original, Richard De León; pantalla
 > `src/pages/tickets/CreateTicketModal.tsx`). El punto de integración debe acordarse con su responsable.
 
+> **Estado (12 de octubre de 2026).** Construido en las ramas `modulo/reclamaciones` de ambos repositorios, bajo
+> los supuestos provisionales de la sección 16: modelo, migración, los siete endpoints más `GET /api/claims/{id}`,
+> cálculo en el servidor, cierre condicionado, reapertura, listado, ficha, impresión y la pestaña «Reclamación»
+> del detalle del ticket. Lo que NO se construyó: el alta conjunta de ticket y reclamación desde
+> `CreateTicketModal.tsx` (RF-R1 tal como está escrito), porque es el punto de integración que debe acordarse
+> con el responsable de la Bandeja; mientras tanto la reclamación se registra desde la pestaña del ticket, en una
+> segunda llamada. El toque a la Bandeja se limitó a esa pestaña (`TicketDetailPage.tsx`) y a una palabra en el
+> tipo `TicketDetailTab`. Las rutas quedaron en `/reclamaciones`, no bajo `/calidad`, por la clave de lectura
+> propia (sección 12).
+
 ## 1. Situación y objetivo
 
 El formulario PF-FOR-034, «RECLAMACIONES DE CLIENTES», es el documento con el que Plastifar registra una
@@ -253,26 +263,52 @@ Cualquier otra transición se responde con 409.
 | `PUT /api/claims/{id}/treatment` | Edición de la sección IV | `claims.treat` |
 | `POST /api/claims/{id}/close` | Cierre | `claims.treat` |
 | `POST /api/claims/{id}/reopen` | Reapertura con motivo | `claims.treat` |
+| `GET /api/claims/{id}` | Ficha por identificador propio, para la ruta `/reclamaciones/{id}`. No estaba en la propuesta; se añadió al construir | `claims.read` |
 
 El alta conjunta de ticket y reclamación debe ocurrir en una sola transacción; cómo se expone (un solo endpoint
-o dos llamadas) se acuerda con el responsable de la Bandeja.
+o dos llamadas) se acuerda con el responsable de la Bandeja. **Construido:** dos llamadas. La reclamación se
+registra sobre un ticket que ya existe; el alta en una sola transacción queda para cuando se acuerde la
+integración con `CreateTicketModal.tsx`.
+
+**Construido, además de la tabla:** toda escritura exige su clave sobre el departamento del ticket, no solo «en
+algún departamento»; un ticket que no se ve responde 404; cada 403 nombra la clave que falta; `GET /api/claims`
+acota el listado a los departamentos donde se tiene `claims.read` (más los tickets sin departamento, como el
+listado de tickets); la ficha devuelve `closureConditions` y `canClose` calculados en el servidor, como la HCA.
+El 409 de cierre lleva, además del mensaje, la lista `missing` con los identificadores de lo que falta.
 
 ## 11. Pantallas
 
 - **Alta de ticket** (`CreateTicketModal.tsx`): cuando aplica la regla, el diálogo incorpora las secciones I a
-  III del formulario como un paso más.
+  III del formulario como un paso más. **No construido:** pendiente de acordar con el responsable de la Bandeja.
 - **Detalle del ticket:** pestaña «Reclamación» con las cuatro secciones. La sección IV se distingue como zona de
-  Calidad con un encabezado propio.
+  Calidad con un encabezado propio. **Construido con una variante:** la pestaña (`src/pages/claims/TicketClaimTab.tsx`)
+  muestra el resumen y el botón «Registrar reclamación», que abre el formulario de las secciones I a III
+  (`ClaimFormModal.tsx`); las cuatro secciones completas viven en la ficha propia, enlazada desde la pestaña.
+  Así la Bandeja recibe un componente cerrado y no un bloque de cuatro secciones dentro de su página.
 - **Listado de reclamaciones:** estructura estándar; columnas número de ticket, cliente, fecha, motivo, total y
-  estado.
+  estado. **Construido** en `/reclamaciones` (`ClaimsPage.tsx`), con pastillas por estado, filtros por motivo,
+  planta, cliente y rango de fechas, y orden por ticket, cliente, fecha y total. Sin botón «Nueva»: la reclamación
+  nace del ticket.
+- **Ficha** (`/reclamaciones/{id}`, `ClaimDetailPage.tsx`): las cuatro secciones, editar (I a III), tratamiento
+  (IV, solo con `claims.treat`; los demás la leen), cerrar con la lista de lo que falta, reabrir con motivo y
+  «Abrir HCA» cuando se requiere acción correctiva, que abre `HcaModal` heredando cliente y ticket (RF-R7). La
+  HCA ligada se enlaza desde la ficha y desde la pestaña del ticket; del lado de la HCA, el vínculo es el número
+  del ticket que ya muestra.
 - **Vista de impresión:** página con hoja de estilos de impresión que reproduce la distribución del PF-FOR-034,
-  sin dependencias nuevas.
+  sin dependencias nuevas. **Construida** en `/reclamaciones/{id}/imprimir` (`ClaimPrintPage.tsx`), fuera del
+  armazón de la aplicación para que la barra lateral no salga en el papel; se abre en pestaña nueva y lanza el
+  diálogo de impresión sola. Con menos de tres líneas rellena los renglones vacíos del papel; con más, sigue.
 - Componentes: `Modal`, `FormSection`, `Field`, `Select`, `LookupSelect` para el producto, `DatePicker`,
   `DetailTable` para las líneas, `DataTable`, `FilterChip`, `Pagination`, `Badge`, `ConfirmDialog`, `Alert`.
 
 ## 12. Permisos
 
-**[Propuesta]** Se añade el grupo «Reclamaciones» al catálogo.
+**[Propuesta]** Se añade el grupo «Reclamaciones» al catálogo. **Construido.** Como la hoja `PERMISOS` no tiene
+fila para los formularios, la carga inicial (`OrganizationSeeder`) concede `claims.read` y `claims.write` a los
+tres roles en uso, porque los agentes de ventas que llenan el formulario tienen cualquiera de los tres, y
+`claims.treat` solo a ALL ACCESS hasta que Plastifar responda la pregunta 13. La migración
+`AddFormModules` (consolidada en `feature/formularios`) aplica el mismo criterio a los roles ya guardados: lectura y escritura a quien tiene
+`tickets.read`, tratamiento a quien tiene `quality.write`. Es un supuesto provisional, no una regla de Plastifar.
 
 | Clave | Permite | Requiere |
 |---|---|---|
@@ -315,14 +351,25 @@ Reglas espejo entre Zod y el servidor.
 
 ## 14. Criterios de aceptación
 
-- [ ] Un ticket creado desde VENTAS LOCALES / ZONA SUR presenta el formulario de reclamación.
-- [ ] Con tres líneas, el total de la reclamación es la suma de las tres, no de las dos primeras.
-- [ ] Una línea con 100 facturados, 90 recibidos y precio 12,50 da diferencia 10 y total 125,00.
-- [ ] Un usuario sin `claims.treat` ve la sección IV en modo lectura y recibe 403 al intentar guardarla por API.
-- [ ] Marcar «Se requiere acción correctiva: Sí» impide cerrar hasta que exista una HCA ligada.
-- [ ] Intentar crear una segunda reclamación en el mismo ticket devuelve 409 con mensaje claro.
-- [ ] La impresión muestra el código PF-FOR-034, la revisión y el número del ticket.
-- [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original.
+- [ ] Un ticket creado desde VENTAS LOCALES / ZONA SUR presenta el formulario de reclamación. **Pendiente:**
+      depende de la integración con el alta de tickets (sección 11). Hoy el formulario se presenta en la pestaña
+      «Reclamación» de cualquier ticket cuyo departamento conceda `claims.write`.
+- [x] Con tres líneas, el total de la reclamación es la suma de las tres, no de las dos primeras
+      (`ClaimRulesTests`, `ClaimsControllerTests.Update_replaces_lines_and_plants_and_recomputes_the_total`).
+- [x] Una línea con 100 facturados, 90 recibidos y precio 12,50 da diferencia 10 y total 125,00
+      (`ClaimsControllerTests.Create_computes_the_lines_and_the_total_on_the_server`).
+- [x] Un usuario sin `claims.treat` ve la sección IV en modo lectura y recibe 403 al intentar guardarla por API
+      (`ClaimsControllerTests.Treatment_needs_claims_treat_and_moves_the_claim_to_in_treatment`; la pantalla
+      esconde «Tratamiento» y rotula la sección como solo lectura).
+- [x] Marcar «Se requiere acción correctiva: Sí» impide cerrar hasta que exista una HCA ligada
+      (`ClaimsControllerTests.Closing_requires_an_hca_when_corrective_action_is_required`).
+- [x] Intentar crear una segunda reclamación en el mismo ticket devuelve 409 con mensaje claro, que nombra el
+      ticket (`ClaimsControllerTests.A_second_claim_on_the_same_ticket_is_rejected_with_409`).
+- [x] La impresión muestra el código PF-FOR-034, la revisión y el número del ticket. Comprobado en el código de
+      `ClaimPrintPage.tsx`; sin prueba automática, el frontend no tiene corredor de pruebas.
+- [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original. **Por revisar** en la revisión
+      cruzada; la migración `AddFormModules` está escrita y no probada contra Postgres (las pruebas corren en
+      SQLite).
 
 ## 15. Riesgos
 

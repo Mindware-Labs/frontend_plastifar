@@ -57,6 +57,8 @@ import { TicketMessageCard } from "./TicketMessageCard";
 import { TicketPropertiesAside } from "./TicketPropertiesAside";
 import { TicketTasksTab } from "./TicketTasksTab";
 import { TicketTimelineSheet, type TicketDetailTab, type TimelineItem } from "./TicketTimelineSheet";
+import { TicketClaimTab } from "../claims/TicketClaimTab";
+import { usePermissions } from "../../hooks/usePermissions";
 
 /** El atajo se nombra con la tecla que la persona tiene delante, no con las dos. */
 const SAVE_SHORTCUT =
@@ -217,6 +219,12 @@ export function TicketDetailPage() {
   const [error, setError] = useState<string | null>(ticketId ? null : "Identificador de ticket no válido.");
 
   const { user } = useAuth();
+  // Reclamación de clientes (docs/plan/03): la pestaña se ve con claims.read y
+  // se registra con claims.write sobre el departamento del ticket.
+  const { can } = usePermissions();
+  const canReadClaim = can("claims.read", ticket?.departmentId ?? undefined);
+  const canCreateClaim = can("claims.write", ticket?.departmentId ?? undefined);
+  const [hasClaim, setHasClaim] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<TicketDetailTab>("conversacion");
   const [tasksCount, setTasksCount] = useState(0);
   const [showTimeline, setShowTimeline] = useState(false);
@@ -934,7 +942,10 @@ export function TicketDetailPage() {
                 }
               }}
             >
-              <TabsList className="h-8 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+              {/* Con cuatro pestañas la tira ya no cabe en la columna a 1040 px:
+                  la que sobra baja a una segunda fila en vez de meterse bajo el
+                  panel lateral. A anchos normales sigue siendo una sola fila. */}
+              <TabsList className="h-auto min-h-8 max-w-full flex-wrap gap-y-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 group-data-horizontal/tabs:h-auto [&>[role=tab]]:h-[25px]">
                 <TabsTrigger value="conversacion" className={`group ${tabTriggerClass}`}>
                   <Mail aria-hidden className="size-3.5" />
                   Conversación
@@ -950,8 +961,27 @@ export function TicketDetailPage() {
                   Notas internas
                   <span className={tabCountClass}>{internalNotes.length}</span>
                 </TabsTrigger>
+                {canReadClaim && (
+                  <TabsTrigger value="reclamacion" className={`group ${tabTriggerClass}`}>
+                    <FileText aria-hidden className="size-3.5" />
+                    Reclamación
+                    <span className={tabCountClass}>{hasClaim === null ? "" : hasClaim ? 1 : 0}</span>
+                  </TabsTrigger>
+                )}
               </TabsList>
             </Tabs>
+
+            {canReadClaim && (
+              <div className={activeTab === "reclamacion" ? "block" : "hidden"}>
+                <TicketClaimTab
+                  ticketId={ticket.id}
+                  ticketNumber={ticket.number}
+                  clientName={ticket.clientName}
+                  canCreate={canCreateClaim}
+                  onClaimChanged={(claim) => setHasClaim(claim !== null)}
+                />
+              </div>
+            )}
 
             {activeTab === "conversacion" && (
               <div className="mt-3.5 space-y-2.5">

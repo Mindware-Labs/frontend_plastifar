@@ -95,7 +95,22 @@ const detailPatterns: BreadcrumbPattern[] = [
     build: (number) => [
       { label: "Calidad", to: "/calidad/hca" },
       { label: "HCA", to: "/calidad/hca" },
-      { label: number ?? "Hoja de corrección" },
+      { label: number ?? "HCA" },
+    ],
+  },
+  {
+    // El numero del ticket es el «Código:» de la reclamación (docs/plan/03, pregunta 3).
+    path: "/reclamaciones/:id",
+    build: (ticketNumber) => [
+      { label: "Reclamaciones", to: "/reclamaciones" },
+      { label: ticketNumber ?? "Reclamación" },
+    ],
+  },
+  {
+    path: "/discrepancias/:id",
+    build: (number) => [
+      { label: "Discrepancias", to: "/discrepancias" },
+      { label: number ?? "Investigación" },
     ],
   },
   {
@@ -103,7 +118,7 @@ const detailPatterns: BreadcrumbPattern[] = [
     build: (number, { id }) => [
       { label: "Calidad", to: "/calidad/hca" },
       { label: "HCA", to: "/calidad/hca" },
-      { label: number ?? "Hoja de corrección", to: `/calidad/hca/${id}` },
+      { label: number ?? "HCA", to: `/calidad/hca/${id}` },
       { label: "Plan de acción" },
     ],
   },
@@ -112,7 +127,7 @@ const detailPatterns: BreadcrumbPattern[] = [
     build: (number, { id }) => [
       { label: "Calidad", to: "/calidad/hca" },
       { label: "HCA", to: "/calidad/hca" },
-      { label: number ?? "Hoja de corrección", to: `/calidad/hca/${id}` },
+      { label: number ?? "HCA", to: `/calidad/hca/${id}` },
       { label: "Cierre" },
     ],
   },

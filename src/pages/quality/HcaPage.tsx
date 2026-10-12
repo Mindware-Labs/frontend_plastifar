@@ -25,12 +25,15 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import {
   resolveClientLabel,
+  resolveProductLabel,
   resolveStaffLabel,
   searchActiveStaff,
   searchClients,
+  searchProducts,
 } from "../../lib/lookups";
 import { describeDueShort, formatDay, isSheetOverdue } from "../../lib/quality";
-import type { ProductLine } from "../../types/settings";
+import { settingsApi } from "../../api/settings";
+import type { Plant, ProductLine } from "../../types/settings";
 import { HcaModal } from "./HcaModal";
 import { HcaStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
@@ -72,9 +75,13 @@ export function HcaPage() {
   const canWrite = can("quality.write");
 
   const [productLines, setProductLines] = useState<ProductLine[]>([]);
+  const [plants, setPlants] = useState<Plant[]>([]);
 
   const [search, setSearch] = useState("");
   const [productLineId, setProductLineId] = useState("todas");
+  // RF-H9 (docs/plan/05): planta y producto concreto.
+  const [plantId, setPlantId] = useState("todas");
+  const [productId, setProductId] = useState("");
   const [responsibleId, setResponsibleId] = useState("todos");
   const [clientId, setClientId] = useState("todos");
   const [from, setFrom] = useState("");
@@ -103,12 +110,18 @@ export function HcaPage() {
     fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize }))
       .then(setProductLines)
       .catch(() => setProductLines([]));
+    // Las plantas tambien son catalogo acotado.
+    fetchAllPages<Plant>((page, pageSize) => settingsApi.plants.list({ page, pageSize }))
+      .then(setPlants)
+      .catch(() => setPlants([]));
   }, []);
 
   const criteria: Omit<SheetQuery, "page"> = {
     pageSize,
     search: debouncedSearch || undefined,
     productLineId: productLineId === "todas" ? undefined : Number(productLineId),
+    plantId: plantId === "todas" ? undefined : Number(plantId),
+    productId: productId === "" ? undefined : Number(productId),
     responsibleId: responsibleId === "todos" ? undefined : Number(responsibleId),
     clientId: clientId === "todos" ? undefined : Number(clientId),
     from: from || undefined,
@@ -129,6 +142,8 @@ export function HcaPage() {
   const unfiltered =
     chip === "todas" &&
     productLineId === "todas" &&
+    plantId === "todas" &&
+    productId === "" &&
     responsibleId === "todos" &&
     clientId === "todos" &&
     from === "" &&
@@ -140,6 +155,8 @@ export function HcaPage() {
      lee una tabla recortada creyendo que es la tabla entera. */
   const filtrosPuestos =
     (productLineId !== "todas" ? 1 : 0) +
+    (plantId !== "todas" ? 1 : 0) +
+    (productId !== "" ? 1 : 0) +
     (responsibleId !== "todos" ? 1 : 0) +
     (clientId !== "todos" ? 1 : 0) +
     (from !== "" || to !== "" ? 1 : 0);
@@ -147,6 +164,8 @@ export function HcaPage() {
   /** Quita solo lo del panel; la busqueda y las pastillas siguen donde estaban. */
   function clearNarrowFilters() {
     setProductLineId("todas");
+    setPlantId("todas");
+    setProductId("");
     setResponsibleId("todos");
     setClientId("todos");
     setFrom("");
@@ -158,6 +177,8 @@ export function HcaPage() {
   function clearFilters() {
     setSearch("");
     setProductLineId("todas");
+    setPlantId("todas");
+    setProductId("");
     setResponsibleId("todos");
     setClientId("todos");
     setFrom("");
@@ -220,6 +241,31 @@ export function HcaPage() {
             { value: "todas", label: "Todas las líneas" },
             ...productLines.map((line) => ({ value: String(line.id), label: line.name })),
           ]}
+        />
+
+        <CriteriaSelect
+          label="Planta"
+          ariaLabel="Filtrar por planta"
+          value={plantId}
+          onChange={setPlantId}
+          width="w-[160px]"
+          options={[
+            { value: "todas", label: "Todas las plantas" },
+            ...plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
+          ]}
+        />
+
+        <CriteriaLookup
+          label="Producto"
+          ariaLabel="Filtrar por producto"
+          width="w-[200px]"
+          placeholder="Todos los productos"
+          searchPlaceholder="Código o descripción…"
+          clearLabel="Todos los productos"
+          value={productId}
+          onChange={(value) => setProductId(value)}
+          search={searchProducts}
+          resolveSelectedLabel={resolveProductLabel}
         />
 
         <CriteriaLookup
