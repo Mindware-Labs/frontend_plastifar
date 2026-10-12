@@ -1,6 +1,8 @@
 import { apiRequest, toQuery } from "./client";
 import type {
+  ApplicableForm,
   EmailTemplate,
+  FormRoutingRule,
   Holiday,
   Mailbox,
   Plant,
@@ -9,10 +11,14 @@ import type {
   ProductImportResult,
   ProductLine,
   ProductLookupItem,
+  RoutingMoment,
+  SaveFormRoutingRuleRequest,
   SavePlantRequest,
   SaveProductRequest,
+  SaveTaskTypeRequest,
   SaveTeamRequest,
   SlaPolicy,
+  TaskType,
   Team,
   TeamMember,
 } from "../types/settings";
@@ -74,6 +80,17 @@ type TeamListResponse = Omit<ListResponse<Team>, "counts"> & {
 export interface ProductQuery extends CatalogQuery {
   productLineId?: number;
   plantId?: number;
+}
+
+export interface TaskTypeQuery extends CatalogQuery {
+  departmentId?: number;
+  /** Nombre del enum: Reclamacion, RetiroMercancia, Hca, DiscrepanciaCarga */
+  form?: string;
+}
+
+export interface FormRoutingRuleQuery extends CatalogQuery {
+  form?: string;
+  moment?: string;
 }
 
 export const settingsApi = {
@@ -169,6 +186,34 @@ export const settingsApi = {
       remove: (teamId: number, staffId: number) =>
         apiRequest<void>(`/api/settings/teams/${teamId}/members/${staffId}`, { method: "DELETE" }),
     },
+  },
+
+  // Tipos de tarea (docs/plan/02, RF-S1). Se desactiva guardándolo; `remove`
+  // es el borrado real, posible mientras ninguna tarea lo nombre.
+  taskTypes: {
+    list: (query: TaskTypeQuery) =>
+      apiRequest<ListResponse<TaskType>>(`/api/settings/task-types${toQuery({ ...query })}`),
+    get: (id: number) => apiRequest<TaskType>(`/api/settings/task-types/${id}`),
+    create: (data: SaveTaskTypeRequest) =>
+      apiRequest<TaskType>("/api/settings/task-types", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: SaveTaskTypeRequest) =>
+      apiRequest<TaskType>(`/api/settings/task-types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => apiRequest<void>(`/api/settings/task-types/${id}`, { method: "DELETE" }),
+  },
+
+  // Reglas de enrutamiento de formularios (docs/plan/02, RF-S8).
+  formRoutingRules: {
+    list: (query: FormRoutingRuleQuery) =>
+      apiRequest<ListResponse<FormRoutingRule>>(`/api/settings/form-routing-rules${toQuery({ ...query })}`),
+    get: (id: number) => apiRequest<FormRoutingRule>(`/api/settings/form-routing-rules/${id}`),
+    create: (data: SaveFormRoutingRuleRequest) =>
+      apiRequest<FormRoutingRule>("/api/settings/form-routing-rules", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: SaveFormRoutingRuleRequest) =>
+      apiRequest<FormRoutingRule>(`/api/settings/form-routing-rules/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => apiRequest<void>(`/api/settings/form-routing-rules/${id}`, { method: "DELETE" }),
+    /** Qué formularios tocan a quien pregunta desde ese departamento, en ese momento. */
+    applicable: (departmentId: number, moment?: RoutingMoment) =>
+      apiRequest<ApplicableForm[]>(`/api/settings/form-routing-rules/applicable${toQuery({ departmentId, moment })}`),
   },
 
   templates: {
