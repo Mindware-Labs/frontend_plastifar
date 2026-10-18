@@ -36,6 +36,19 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+// Comienzos literales de los 409 de StaffController que son de un campo: si
+// allí cambian, cambian aquí. Cualquier otro 409 —el del último administrador,
+// o el de «inténtalo de nuevo» de un interbloqueo— va arriba del formulario.
+const EMAIL_CONFLICT_PREFIX = "Ya existe un staff con ese correo";
+const LEGACY_USERNAME_CONFLICT_PREFIX = "Ese usuario del sistema anterior";
+
+/** El campo al que pertenece un 409, o null si no es de ninguno. */
+function conflictField(message: string): "email" | "legacyUsername" | null {
+  if (message.startsWith(LEGACY_USERNAME_CONFLICT_PREFIX)) return "legacyUsername";
+  if (message.startsWith(EMAIL_CONFLICT_PREFIX)) return "email";
+  return null;
+}
+
 interface StaffModalProps {
   departments: DepartmentResponse[];
   /** Presente = edicion; ausente = alta. */
@@ -100,13 +113,14 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
       onSaved(saved);
       requestClose();
     } catch (err) {
-      // El 409 es de correo o de usuario heredado repetido; va al campo que
+      // El 409 de correo o de usuario heredado repetido va al campo que
       // corresponde. El servidor solo manda `message`, así que se distingue por
-      // su texto (StaffController.LegacyUsernameTakenMessage).
-      if (err instanceof ApiError && err.status === 409) {
-        const field = err.message.startsWith("Ese usuario del sistema anterior")
-          ? "legacyUsername"
-          : "email";
+      // su texto. El del último administrador (StaffController.LastAdminMessage)
+      // no es de ningún campo: nace de desmarcar «Administrador» o «Activo», y
+      // va arriba del formulario, como cualquier 409 que no se reconozca.
+      const field =
+        err instanceof ApiError && err.status === 409 ? conflictField(err.message) : null;
+      if (field !== null && err instanceof ApiError) {
         setError(field, { message: err.message });
         setFocus(field);
         return;

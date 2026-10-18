@@ -44,8 +44,13 @@ function formatDate(value: string | null) {
 
 export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const { id } = useParams();
-  const { can } = usePermissions();
-  const canWrite = can("staff.write");
+  const { can, isAdmin } = usePermissions();
+  /**
+   * Las escrituras del personal son solo de administrador (AdminOnly en
+   * StaffController, como el listado en StaffPage). Con staff.write la ficha
+   * pintaba «Editar» y «Otorgar acceso» a quien el servidor responde 403.
+   */
+  const canWrite = isAdmin;
   /**
    * Otorgar o cambiar un acceso necesita la lista de roles, y esa lista sale de
    * GET /api/permissions/matrix, que exige roles.read. La ruta solo exige
