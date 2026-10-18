@@ -16,6 +16,7 @@ import {
   Building2,
   ClipboardCheck,
   FileWarning,
+  PackageMinus,
   PackageSearch,
   Gavel,
   Inbox,
@@ -187,6 +188,16 @@ export const SIDEBAR_NAV: NavGroup[] = [
     section: "Gestión",
     to: "/discrepancias",
     permission: "discrepancies.read",
+  },
+  /* Solicitud de retiro de mercancia, PF-FOR-068 (docs/plan/04). Modulo
+     propio: la solicita Ventas Locales y la registra Almacen, con su propia
+     clave de lectura (withdrawals.read). */
+  {
+    label: "Retiros",
+    icon: PackageMinus,
+    section: "Gestión",
+    to: "/retiros",
+    permission: "withdrawals.read",
   },
   {
     label: "Personal",

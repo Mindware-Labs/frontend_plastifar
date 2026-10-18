@@ -45,6 +45,10 @@ export type PermissionKey =
   | "discrepancies.read"
   | "discrepancies.write"
   | "discrepancies.approve"
+  // Retiro de mercancía, PF-FOR-068 (docs/plan/04, sección 12).
+  | "withdrawals.read"
+  | "withdrawals.write"
+  | "withdrawals.approve"
   | "reports.read"
   | "settings.write";
 

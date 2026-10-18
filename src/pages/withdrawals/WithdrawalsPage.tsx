@@ -1,0 +1,267 @@
+import { Plus } from "lucide-react";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { withdrawalsApi, type WithdrawalCounts, type WithdrawalListResponse, type WithdrawalQuery } from "../../api/withdrawals";
+import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
+import { ControlInput } from "../../components/ui/ControlInput";
+import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
+import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { FilterChip } from "../../components/ui/FilterChip";
+import { FilterPopover } from "../../components/ui/FilterPopover";
+import { ListPanel } from "../../components/ui/ListPanel";
+import { Pagination } from "../../components/ui/Pagination";
+import { SearchInput } from "../../components/ui/SearchInput";
+import { Select } from "../../components/ui/Select";
+import { TableSkeleton } from "../../components/ui/Skeleton";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePagedList } from "../../hooks/usePagedList";
+import { usePermissions } from "../../hooks/usePermissions";
+import { resolveClientLabel, resolveStaffLabel, searchClients, searchStaff } from "../../lib/lookups";
+import { formatAmount, formatDay } from "../../lib/quality";
+import { WITHDRAWAL_REASONS, type WithdrawalStatus } from "../../types/withdrawals";
+import { WithdrawalFormModal } from "./WithdrawalFormModal";
+import { WithdrawalStatusBadge } from "./WithdrawalStatusBadge";
+
+type ChipKey = "todas" | WithdrawalStatus;
+type SortKey = "fecha" | "numero" | "cliente" | "valor";
+
+const CHIPS: { key: ChipKey; label: string; status?: string; countKey: keyof WithdrawalCounts }[] = [
+  { key: "todas", label: "Todas", countKey: "all" },
+  { key: "Solicitado", label: "Solicitadas", status: "Solicitado", countKey: "requested" },
+  { key: "Aprobado", label: "Aprobadas", status: "Aprobado", countKey: "approved" },
+  { key: "Retirado", label: "Retiradas", status: "Retirado", countKey: "withdrawn" },
+  { key: "Rechazado", label: "Rechazadas", status: "Rechazado", countKey: "rejected" },
+  { key: "Cancelado", label: "Canceladas", status: "Cancelado", countKey: "cancelled" },
+];
+
+const REASON_OPTIONS = [{ value: "", label: "Todos los motivos" }, ...WITHDRAWAL_REASONS.map((value) => ({ value, label: value }))];
+
+/** Vendedores en el filtro: activos e inactivos, porque una solicitud vieja puede ser de alguien que ya no está. */
+const searchSellers = searchStaff();
+
+/**
+ * RF-W6: listado paginado con pastillas por estado y filtros por cliente,
+ * vendedor, motivo y fechas. Es también el punto de alta mientras la
+ * integración con el alta del ticket (RF-W1, docs/plan/02) siga diferida.
+ */
+export function WithdrawalsPage() {
+  const navigate = useNavigate();
+  const { can } = usePermissions();
+  const canWrite = can("withdrawals.write");
+
+  const [search, setSearch] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [sellerId, setSellerId] = useState("");
+  const [reason, setReason] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [chip, setChip] = useState<ChipKey>("todas");
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "fecha", dir: "desc" });
+  const [pageSize, setPageSize] = useState(10);
+  const [creating, setCreating] = useState(false);
+
+  const debouncedSearch = useDebouncedValue(search).trim();
+
+  const criteria: Omit<WithdrawalQuery, "page"> = {
+    pageSize,
+    search: debouncedSearch || undefined,
+    clientId: clientId === "" ? undefined : Number(clientId),
+    requestedByStaffId: sellerId === "" ? undefined : Number(sellerId),
+    reason: reason || undefined,
+    from: from || undefined,
+    to: to || undefined,
+    status: CHIPS.find((c) => c.key === chip)?.status,
+    sort: sort.key,
+    dir: sort.dir,
+  };
+
+  const { data, isStale, error, setPage, refresh } = usePagedList<WithdrawalQuery, WithdrawalListResponse>({
+    fetch: withdrawalsApi.list,
+    criteria,
+    fallbackError: "No se pudieron cargar las solicitudes de retiro. Vuelve a intentarlo.",
+  });
+
+  const rows = data?.items ?? [];
+  const counts = data?.counts;
+  const filtrosPuestos = [clientId, sellerId, reason, from, to].filter((value) => value !== "").length;
+  const unfiltered = chip === "todas" && filtrosPuestos === 0 && !debouncedSearch;
+
+  function clearNarrowFilters() {
+    setClientId("");
+    setSellerId("");
+    setReason("");
+    setFrom("");
+    setTo("");
+    setPage(1);
+  }
+
+  function toggleSort(key: SortKey) {
+    setSort((current) => (current.key === key ? { key, dir: current.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  }
+
+  const sortOf = (key: SortKey) => ({ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) });
+
+  return (
+    <div>
+      {error && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="min-w-[240px] flex-1">
+            <Alert variant="error">{error}</Alert>
+          </div>
+          <Button size="sm" variant="secondary" onClick={refresh}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
+      <ListPanel
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva solicitud
+            </Button>
+          )
+        }
+        toolbar={
+          <>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Número, ticket, cliente o producto…"
+              className="w-[300px]"
+            />
+
+            <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
+              <CriteriaLookup
+                label="Cliente"
+                ariaLabel="Filtrar por cliente"
+                width="w-[220px]"
+                placeholder="Todos los clientes"
+                searchPlaceholder="Buscar cliente…"
+                clearLabel="Todos los clientes"
+                value={clientId}
+                onChange={setClientId}
+                search={searchClients}
+                resolveSelectedLabel={resolveClientLabel}
+              />
+              <CriteriaLookup
+                label="Vendedor"
+                ariaLabel="Filtrar por vendedor"
+                width="w-[200px]"
+                placeholder="Todos los vendedores"
+                searchPlaceholder="Buscar colaborador…"
+                clearLabel="Todos los vendedores"
+                value={sellerId}
+                onChange={setSellerId}
+                search={searchSellers}
+                resolveSelectedLabel={resolveStaffLabel}
+              />
+              <CriteriaField label="Motivo" htmlFor="retiro-motivo">
+                <Select id="retiro-motivo" value={reason} onChange={setReason} options={REASON_OPTIONS} className="w-[170px]" />
+              </CriteriaField>
+              <CriteriaField label="Desde" htmlFor="retiro-desde">
+                <ControlInput id="retiro-desde" type="date" className="w-[150px]" value={from} onChange={(event) => setFrom(event.target.value)} />
+              </CriteriaField>
+              <CriteriaField label="Hasta" htmlFor="retiro-hasta">
+                <ControlInput id="retiro-hasta" type="date" className="w-[150px]" value={to} onChange={(event) => setTo(event.target.value)} />
+              </CriteriaField>
+            </FilterPopover>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {counts
+                ? CHIPS.map(({ key, label, countKey }) => (
+                    <FilterChip key={key} label={label} count={counts[countKey]} active={chip === key} onClick={() => setChip(key)} />
+                  ))
+                : CHIPS.map(({ key }) => <span key={key} aria-hidden className="h-8 w-[110px] animate-pulse rounded-full bg-fill" />)}
+            </div>
+          </>
+        }
+        footer={
+          data !== null && (
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="solicitudes"
+              nounSingular="solicitud"
+            />
+          )
+        }
+      >
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={7} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {unfiltered ? "Todavía no hay solicitudes de retiro registradas." : "Ninguna solicitud coincide con este filtro o búsqueda."}
+          </p>
+        ) : (
+          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th sort={sortOf("numero")}>Número</Th>
+                  <Th sort={sortOf("cliente")}>Cliente</Th>
+                  <Th sort={sortOf("fecha")}>Fecha</Th>
+                  <Th>Motivo</Th>
+                  <Th>Vendedor</Th>
+                  <Th sort={sortOf("valor")} className="text-right">
+                    Valor
+                  </Th>
+                  <Th>Estado</Th>
+                </HeadRow>
+              </thead>
+              <tbody>
+                {rows.map((item) => (
+                  <Row key={item.id} className="cursor-pointer" onClick={() => navigate(`/retiros/${item.id}`)}>
+                    <Td>
+                      <Link
+                        to={`/retiros/${item.id}`}
+                        onClick={(event) => event.stopPropagation()}
+                        className="whitespace-nowrap font-mono text-[12px] font-medium text-ink hover:text-brand-red"
+                      >
+                        {item.number}
+                      </Link>
+                      <span className="block font-mono text-[11px] text-faint">{item.ticketNumber}</span>
+                    </Td>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      <span title={item.clientName} className="block max-w-[200px] truncate">
+                        {item.clientName}
+                      </span>
+                    </Td>
+                    <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">{formatDay(item.requestDate)}</Td>
+                    <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
+                      {item.reason}
+                      {item.errorOrigin && <span className="block text-[11.5px] text-faint">Error de {item.errorOrigin.toLowerCase()}</span>}
+                    </Td>
+                    <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{item.requestedByName}</Td>
+                    <Td className="whitespace-nowrap text-right text-[12.5px] tabular-nums text-ink">
+                      {item.currency ? formatAmount(item.totalValue, item.currency) : <span className="text-faint">—</span>}
+                    </Td>
+                    <Td>
+                      <WithdrawalStatusBadge status={item.status} />
+                    </Td>
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
+      </ListPanel>
+
+      {creating && (
+        <WithdrawalFormModal
+          onClose={() => setCreating(false)}
+          onSaved={(detail) => {
+            setCreating(false);
+            navigate(`/retiros/${detail.withdrawal.id}`);
+          }}
+        />
+      )}
+    </div>
+  );
+}

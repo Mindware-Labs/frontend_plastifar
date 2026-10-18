@@ -114,6 +114,14 @@ const detailPatterns: BreadcrumbPattern[] = [
     ],
   },
   {
+    // La impresión vive fuera del layout y no lleva breadcrumb, como las de sus hermanos.
+    path: "/retiros/:id",
+    build: (number) => [
+      { label: "Retiros", to: "/retiros" },
+      { label: number ?? "Solicitud de retiro" },
+    ],
+  },
+  {
     path: "/calidad/hca/:id/plan",
     build: (number, { id }) => [
       { label: "Calidad", to: "/calidad/hca" },

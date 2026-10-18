@@ -105,7 +105,15 @@ export function DiscrepancyDetailPage() {
           <div className="min-w-[240px] flex-1">
             <Alert variant="error">{error}</Alert>
           </div>
-          <Button size="sm" variant="secondary" onClick={() => setAttempt((value) => value + 1)}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              // Sin limpiar el error, la pantalla de error se queda aunque la recarga funcione.
+              setError(null);
+              setAttempt((value) => value + 1);
+            }}
+          >
             Reintentar
           </Button>
         </div>

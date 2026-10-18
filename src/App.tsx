@@ -15,6 +15,9 @@ import { DashboardPage } from "./pages/dashboard/DashboardPage";
 import { DiscrepanciesPage } from "./pages/discrepancies/DiscrepanciesPage";
 import { DiscrepancyDetailPage } from "./pages/discrepancies/DiscrepancyDetailPage";
 import { DiscrepancyPrintPage } from "./pages/discrepancies/DiscrepancyPrintPage";
+import { WithdrawalDetailPage } from "./pages/withdrawals/WithdrawalDetailPage";
+import { WithdrawalPrintPage } from "./pages/withdrawals/WithdrawalPrintPage";
+import { WithdrawalsPage } from "./pages/withdrawals/WithdrawalsPage";
 import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
@@ -147,6 +150,13 @@ export default function App() {
           <Route path="/discrepancias/:id" element={<DiscrepancyDetailPage />} />
         </Route>
 
+        {/* Solicitud de retiro de mercancía, PF-FOR-068 (docs/plan/04). Clave
+            propia; la vista de impresión va fuera del armazón, abajo. */}
+        <Route element={<PermissionRoute permission="withdrawals.read"><Outlet /></PermissionRoute>}>
+          <Route path="/retiros" element={<WithdrawalsPage />} />
+          <Route path="/retiros/:id" element={<WithdrawalDetailPage />} />
+        </Route>
+
         {/* Configuracion no lleva guard de lectura a proposito: la seccion 8.4 del
             plan abre la lectura de catalogos a todo el personal autenticado y solo
             exige settings.write para escribir, que es lo que cada seccion ya gatea. */}
@@ -241,6 +251,14 @@ export default function App() {
           element={
             <PermissionRoute permission="discrepancies.read">
               <DiscrepancyPrintPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/retiros/:id/imprimir"
+          element={
+            <PermissionRoute permission="withdrawals.read">
+              <WithdrawalPrintPage />
             </PermissionRoute>
           }
         />
