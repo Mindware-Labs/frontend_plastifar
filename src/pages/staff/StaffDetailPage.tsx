@@ -287,6 +287,13 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
             </DetailRow>
             <DetailRow label="Correo">{staff.email}</DetailRow>
             <DetailRow label="Extensión">{staff.phoneExt ?? "—"}</DetailRow>
+            {/* RF-O9: solo cuando existe. Es un dato heredado para emparejar la
+                carga, no un usuario con el que se inicie sesión. */}
+            {staff.legacyUsername && (
+              <DetailRow label="Usuario anterior">
+                <span className="font-mono text-[12px]">{staff.legacyUsername}</span>
+              </DetailRow>
+            )}
           </DetailGroup>
 
           <DetailGroup title="Puesto">

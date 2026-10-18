@@ -1,6 +1,12 @@
 import { Check, Lock } from "lucide-react";
 import { Fragment, useId, useMemo, useRef, useState } from "react";
+import { Badge } from "../../components/ui/Badge";
+import { Tooltip } from "../../components/ui/Tooltip";
 import type { PermissionGroup, PermissionKey, RoleSummary } from "../../types/permissions";
+
+/** RF-O5: lo que se le dice a quien pasa por una clave reservada. */
+const RESERVED_EXPLANATION =
+  "Esta función todavía no existe en el sistema. Puedes conceder el permiso por adelantado: no tendrá efecto hasta que se construya.";
 
 interface PermissionMatrixProps {
   groups: PermissionGroup[];
@@ -140,10 +146,15 @@ export function PermissionMatrix({
   }
 
   /** Que hace —o por que no hace nada— la celda que se esta mirando. */
-  function explain(role: RoleSummary, granted: boolean) {
+  function explain(role: RoleSummary, granted: boolean, reserved: boolean) {
     if (showsLock(role)) return "Concede el catálogo completo y no se edita: es un rol del sistema";
     if (isLocked(role)) return "Es un rol del sistema: su lista de permisos no se edita";
     if (readOnly) return "Modo consulta: para cambiar esta celda necesitas el permiso roles.write";
+    if (reserved) {
+      return granted
+        ? "Quitar este permiso. Su función todavía no existe"
+        : "Conceder por adelantado: su función todavía no existe y no tendrá efecto hasta entonces";
+    }
     return granted ? "Quitar este permiso" : "Conceder este permiso";
   }
 
@@ -292,6 +303,14 @@ export function PermissionMatrix({
                                 <span className="sr-only">Sin asignar</span>
                               </span>
                             )}
+                            {/* RF-O5: la clave existe para cargar la matriz de la
+                                fuente, pero ningún endpoint la comprueba. Se puede
+                                conceder; la pastilla avisa de que aún no hace nada. */}
+                            {permission.reserved && (
+                              <Tooltip content={RESERVED_EXPLANATION}>
+                                <Badge tone="slate">Función no disponible</Badge>
+                              </Tooltip>
+                            )}
                           </span>
                           <span className="font-mono text-[10.5px] leading-tight text-faint">
                             {permission.key}
@@ -304,7 +323,7 @@ export function PermissionMatrix({
                         const changed = hasChanged(role, permission.key);
                         const locked = isLocked(role) || readOnly;
                         const isColumnActive = crosshair.column === role.id;
-                        const explanation = explain(role, granted);
+                        const explanation = explain(role, granted, permission.reserved);
                         const describedBy = locked
                           ? `${hintId}-${role.id}-${permission.key}`
                           : undefined;

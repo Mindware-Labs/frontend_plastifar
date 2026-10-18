@@ -27,6 +27,9 @@ const schema = z.object({
     .email("Formato de correo inválido, revisa el @ y el dominio")
     .max(120, "Máximo 120 caracteres"),
   primaryDepartmentId: z.string().min(1, "Elige el departamento al que pertenece"),
+  // Espejo de StaffController (docs/plan/01, sección 13): opcional, hasta 40
+  // caracteres, único. Se guarda tal como se escribe; vacío es «sin dato».
+  legacyUsername: z.string().trim().max(40, "Máximo 40 caracteres"),
   isAdmin: z.boolean(),
   isActive: z.boolean(),
 });
@@ -65,6 +68,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
       lastName: staff?.lastName ?? "",
       email: staff?.email ?? "",
       primaryDepartmentId: staff ? String(staff.primaryDepartmentId) : "",
+      legacyUsername: staff?.legacyUsername ?? "",
       isAdmin: staff?.isAdmin ?? false,
       isActive: staff?.isActive ?? true,
     },
@@ -79,25 +83,32 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
   async function onSubmit(values: FormValues) {
     setFormError(null);
     const primaryDepartmentId = Number(values.primaryDepartmentId);
+    const legacyUsername = values.legacyUsername === "" ? null : values.legacyUsername;
 
     try {
       const saved = isEdit
-        ? await staffApi.update(staff.id, { ...values, primaryDepartmentId })
+        ? await staffApi.update(staff.id, { ...values, primaryDepartmentId, legacyUsername })
         : await staffApi.create({
             firstName: values.firstName,
             lastName: values.lastName,
             email: values.email,
             primaryDepartmentId,
             isAdmin: values.isAdmin,
+            legacyUsername,
           });
 
       onSaved(saved);
       requestClose();
     } catch (err) {
-      // Error específico de correo duplicado asignado al campo correspondiente.
+      // El 409 es de correo o de usuario heredado repetido; va al campo que
+      // corresponde. El servidor solo manda `message`, así que se distingue por
+      // su texto (StaffController.LegacyUsernameTakenMessage).
       if (err instanceof ApiError && err.status === 409) {
-        setError("email", { message: err.message });
-        setFocus("email");
+        const field = err.message.startsWith("Ese usuario del sistema anterior")
+          ? "legacyUsername"
+          : "email";
+        setError(field, { message: err.message });
+        setFocus(field);
         return;
       }
 
@@ -168,6 +179,16 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
               : "A esta dirección llega el código de activación."
           }
           {...register("email")}
+        />
+
+        <TextField
+          label="Usuario en el sistema anterior"
+          placeholder="jperez"
+          autoComplete="off"
+          state={stateOf("legacyUsername")}
+          error={errors.legacyUsername?.message}
+          hint="Opcional. Sirve para emparejar la carga de agentes; no se usa para iniciar sesión."
+          {...register("legacyUsername")}
         />
 
         <Controller

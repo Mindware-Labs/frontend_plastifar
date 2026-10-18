@@ -34,6 +34,15 @@ export type PermissionKey =
   | "tickets.assign"
   | "tickets.close"
   | "tickets.read_all"
+  // Reservadas: la función todavía no existe y nada las comprueba (docs/plan/01,
+  // sección 8 regla 7). Se pueden conceder por adelantado; `reserved` lo dice.
+  | "tickets.edit_thread"
+  | "tickets.link"
+  | "tickets.mark_answered"
+  | "tickets.merge"
+  | "tickets.refer"
+  | "tickets.release"
+  | "tickets.transfer"
   | "quality.read"
   | "quality.write"
   | "quality.approve"
@@ -63,6 +72,12 @@ export interface Permission {
    * un rol que puede crear cosas y no puede verlas.
    */
   requires?: PermissionKey;
+  /**
+   * La función que habilita todavía no existe (RF-O5). Se concede igual —para
+   * cargar la matriz de la fuente por adelantado—, pero ningún endpoint la
+   * comprueba: la matriz lo señala con «Función no disponible».
+   */
+  reserved: boolean;
 }
 
 export interface PermissionGroup {
@@ -129,6 +144,8 @@ export interface StaffDetail {
   isActive: boolean;
   lastLoginAt: string | null;
   accesses: DepartmentAccess[];
+  /** Usuario en el sistema anterior, si lo tiene (RF-O9). No sirve para entrar. */
+  legacyUsername: string | null;
   /**
    * Verdadero cuando es el ultimo administrador activo: el sistema no puede
    * quedarse sin ninguno, asi que degradarlo o desactivarlo se bloquea.
