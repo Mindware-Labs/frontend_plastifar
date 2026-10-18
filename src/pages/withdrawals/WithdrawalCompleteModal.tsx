@@ -10,6 +10,7 @@ import { TextField } from "../../components/ui/Field";
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { formatQuantity } from "../../lib/claims";
+import { MAX_LINE_INPUT } from "../../lib/withdrawals";
 import type { MerchandiseWithdrawal, WithdrawalDetail } from "../../types/withdrawals";
 
 // Espejo de WithdrawalRules.ValidateComplete (sección 13).
@@ -26,6 +27,7 @@ const schema = z.object({
         .string()
         .trim()
         .refine((value) => value !== "" && !Number.isNaN(Number(value)) && Number(value) >= 0, "Número de cero en adelante")
+        .refine((value) => !(Number(value) > MAX_LINE_INPUT), "Máximo mil millones")
         .refine((value) => value === "" || Number((Number(value) * 100).toFixed(6)) % 1 === 0, "Hasta dos decimales"),
     }),
   ),

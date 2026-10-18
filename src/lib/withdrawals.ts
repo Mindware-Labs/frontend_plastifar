@@ -15,26 +15,50 @@ import { formatAmount } from "./quality";
 export const MAX_WITHDRAWAL_AMOUNT = 999_999_999_999.99;
 
 /**
+ * Tope de cantidad solicitada, cantidad retirada y precio unitario por línea.
+ * Espejo de `WithdrawalRules.MaxLineInput` en el servidor.
+ */
+export const MAX_LINE_INPUT = 1_000_000_000;
+
+/** La cantidad se escala a centésimas (2 decimales). */
+const QUANTITY_SCALE = 100;
+/** El precio se escala a diezmilésimas (4 decimales). */
+const PRICE_SCALE = 10_000;
+/** Producto en millonésimas (100 × 10 000) a céntimos: divide por 10 000. */
+const MILLIONTHS_PER_CENT = 10_000n;
+/** Media unidad del divisor anterior, para redondear alejándose de cero. */
+const HALF_CENT_IN_MILLIONTHS = MILLIONTHS_PER_CENT / 2n;
+
+/**
  * Cantidad (hasta 2 decimales) por precio (hasta 4), redondeado a céntimos
  * alejándose de cero como `MidpointRounding.AwayFromZero` en el servidor.
  *
  * Se calcula en enteros escalados con BigInt: cantidad en centésimas y precio
  * en diezmilésimas dan el producto en millonésimas, exacto. En coma flotante
- * 2.5 × 0.01 es 0.024999…, y redondear eso daría 0.02 donde el servidor
- * guarda 0.03.
+ * algunos valores con medio céntimo quedan apenas por debajo: 1.005 es en
+ * realidad 1.00499999999999989…, y `Math.round(1.005 * 100) / 100` da 1.00
+ * donde el servidor guarda 1.01. (2.5 × 0.01, en cambio, da 0.025000…001 y
+ * redondea bien: no sirve de ejemplo.)
  */
 function lineCents(quantity: number, unitPrice: number): bigint {
-  const millionths = BigInt(Math.round(quantity * 100)) * BigInt(Math.round(unitPrice * 10_000));
+  const millionths =
+    BigInt(Math.round(quantity * QUANTITY_SCALE)) * BigInt(Math.round(unitPrice * PRICE_SCALE));
   const negative = millionths < 0n;
   const magnitude = negative ? -millionths : millionths;
-  const cents = (magnitude + 5_000n) / 10_000n;
+  const cents = (magnitude + HALF_CENT_IN_MILLIONTHS) / MILLIONTHS_PER_CENT;
   return negative ? -cents : cents;
+}
+
+/** Dentro de lo que el formulario admite y el escalado representa sin perder exactitud. */
+function isLineInput(value: number): boolean {
+  return Number.isFinite(value) && Math.abs(value) <= MAX_LINE_INPUT;
 }
 
 export function computeLineValue(quantity: number | null, unitPrice: number | null): number | null {
   if (unitPrice === null) return null;
-  // BigInt no admite NaN ni Infinity; un número así lo rechaza el esquema.
-  if (!Number.isFinite(unitPrice) || !Number.isFinite(quantity ?? 0)) return null;
+  // Fuera de rango no se calcula: el esquema ya muestra el error del campo, y
+  // escalar un número enorme daría Infinity, que BigInt no admite.
+  if (!isLineInput(unitPrice) || !isLineInput(quantity ?? 0)) return null;
   return Number(lineCents(quantity ?? 0, unitPrice)) / 100;
 }
 

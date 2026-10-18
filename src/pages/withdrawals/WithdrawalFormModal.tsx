@@ -15,7 +15,7 @@ import { RowAction } from "../../components/ui/RowAction";
 import { toNumberOrNull } from "../../lib/claims";
 import { resolveTicketLabel, searchTickets } from "../../lib/discrepancies";
 import { today } from "../../lib/quality";
-import { computeLineValue, computeTotal, formatWithdrawalAmount, MAX_WITHDRAWAL_AMOUNT } from "../../lib/withdrawals";
+import { computeLineValue, computeTotal, formatWithdrawalAmount, MAX_LINE_INPUT, MAX_WITHDRAWAL_AMOUNT } from "../../lib/withdrawals";
 import {
   WITHDRAWAL_CURRENCIES,
   WITHDRAWAL_ERROR_ORIGINS,
@@ -36,6 +36,7 @@ const lineSchema = z.object({
     .string()
     .trim()
     .refine((value) => value !== "" && !Number.isNaN(Number(value)) && Number(value) > 0, "Mayor que cero")
+    .refine((value) => !(Number(value) > MAX_LINE_INPUT), "Máximo mil millones")
     .refine(decimals(2), "Hasta dos decimales"),
   quantityUnit: z.string().trim().min(1, "Indica la unidad").max(10, "Máximo 10 caracteres"),
   packDetail: z.string().trim().max(20, "Máximo 20 caracteres"),
@@ -43,6 +44,7 @@ const lineSchema = z.object({
     .string()
     .trim()
     .refine((value) => value === "" || (!Number.isNaN(Number(value)) && Number(value) >= 0), "Número de cero en adelante")
+    .refine((value) => value === "" || !(Number(value) > MAX_LINE_INPUT), "Máximo mil millones")
     .refine(decimals(4), "Hasta cuatro decimales"),
 });
 
@@ -193,7 +195,9 @@ export function WithdrawalFormModal({ withdrawal, onClose, onSaved, onConflict }
       onClose();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && onConflict) {
-        onConflict(err.message);
+        // El diálogo se cierra y la ficha se recarga: lo escrito se pierde, y
+        // el aviso tiene que decirlo además del motivo del servidor.
+        onConflict(`Tus cambios no se guardaron. ${err.message}`);
         onClose();
         return;
       }
