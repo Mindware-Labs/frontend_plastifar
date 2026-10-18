@@ -191,12 +191,12 @@ const tabCountClass = "font-heading text-[10px] font-bold leading-none tabular-n
 /** Archivo elegido y aun no enviado: nombre, peso y la cruz para quitarlo. */
 function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
-    <span className="animate-plf-check-in inline-flex h-7 items-center gap-1.5 rounded-lg border border-emerald-200/80 bg-emerald-50/50 px-2.5 text-[11.5px] font-medium text-zinc-800 shadow-2xs">
+    <span className="animate-plf-check-in inline-flex h-7 items-center gap-1.5 rounded-lg border border-emerald-200/80 bg-emerald-50/50 px-2.5 text-[11.5px] font-medium text-emerald-950 shadow-2xs">
       <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
         <AnimatedCheckIcon size={10} strokeWidth={3} />
       </span>
       <span className="max-w-[180px] truncate">{file.name}</span>
-      <span className="text-[10.5px] tabular-nums text-zinc-400">{formatBytes(file.size)}</span>
+      <span className="text-[10.5px] tabular-nums text-emerald-700">{formatBytes(file.size)}</span>
       <button
         type="button"
         onClick={onRemove}
