@@ -51,7 +51,7 @@ function Shell() {
             {/* El lienzo tintado. Las superficies de trabajo —tablas, paneles,
                 tarjetas— flotan encima en blanco. Esa diferencia minima de
                 valor es lo que las despega sin necesitar una sombra pesada. */}
-            <div className="flex min-h-0 flex-1 flex-col px-3 pt-3 lg:px-4 lg:pt-4">
+            <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 lg:px-4 lg:pb-3.5">
               <Outlet />
             </div>
           </BreadcrumbLabelContext.Provider>

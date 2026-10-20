@@ -40,10 +40,14 @@ export function ModuleHeader({
   const hasHeading = title !== undefined || summary !== undefined;
 
   return (
-    <div className={`mb-3.5 border-b border-zinc-200/80 py-3.5 ${className}`}>
-      <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+    <div
+      className={`shrink-0 border-b border-zinc-200/80 -mx-3 lg:-mx-4 px-3 lg:px-4 mb-3 ${
+        note ? "min-h-14 py-2" : "h-14"
+      } ${className}`}
+    >
+      <div className="flex h-full flex-wrap items-center justify-between gap-x-4 gap-y-1">
         {hasHeading ? (
-          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
+          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1">
             {title && (
               <div className="flex items-center gap-2">
                 <h1 className="font-heading text-[20px] font-bold leading-none tracking-[-0.02em] text-zinc-900">
@@ -65,18 +69,18 @@ export function ModuleHeader({
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex h-full flex-wrap items-center gap-3">
           {sections && sections.length > 0 && (
-            <nav aria-label="Secciones de la ficha" className="-mb-3.5 flex items-center gap-1 self-end">
+            <nav aria-label="Secciones de la ficha" className="flex h-full items-center gap-1 self-stretch">
               {sections.map((section) => (
                 <NavLink
                   key={section.to}
                   to={section.to}
                   end
                   className={({ isActive }) =>
-                    `border-b-2 px-2.5 pb-3 text-[12.5px] font-medium transition-colors ` +
+                    `flex h-full items-center border-b-2 px-2.5 text-[12.5px] font-medium transition-colors -mb-px ` +
                     (isActive
-                      ? "border-brand-red text-ink"
+                      ? "border-brand-red text-ink font-semibold"
                       : "border-transparent text-subtle hover:text-ink")
                   }
                 >
@@ -91,7 +95,7 @@ export function ModuleHeader({
       </div>
 
       {note && (
-        <p className="mt-2 max-w-[72ch] text-[12.5px] leading-relaxed text-subtle">{note}</p>
+        <p className="mt-1 max-w-[72ch] text-[12.5px] leading-relaxed text-subtle">{note}</p>
       )}
     </div>
   );
