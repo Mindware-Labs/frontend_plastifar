@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import { ListPanelContext } from "./listPanelContext";
 
 /**
@@ -14,9 +14,7 @@ import { ListPanelContext } from "./listPanelContext";
  * esas filas. Un filtro fuera del panel parece aplicar a la pantalla; dentro
  * del panel se lee, correctamente, como que aplica a esta tabla.
  *
- * Además cierra la figura. Con la barra y el pie afuera, la tarjeta empezaba y
- * terminaba en cortes arbitrarios; acá el panel abre con sus criterios y cierra
- * con su conteo, que es la misma anatomía de la referencia.
+ * La barra de criterios va dentro de la tarjeta; el pie (paginacion o conteo) va FUERA, debajo de ella, igual en todas las vistas.
  *
  * ------------------------------------------------------------------
  * TRES ZONAS, DOS FILETES
@@ -67,9 +65,10 @@ export function ListPanel({
         {/* El scroll horizontal vive acá y no en la tabla: así la cabecera y el
             pie se quedan quietos cuando una tabla ancha se desplaza. */}
         <div className="overflow-x-auto">{children}</div>
-
-        {footer && <div className="border-t border-line px-4">{footer}</div>}
       </section>
+
+      {/* El pie va FUERA de la tarjeta, sobre el fondo de la pagina: asi la paginacion se ve igual en todas las vistas. */}
+      {footer}
     </ListPanelContext.Provider>
   );
 }

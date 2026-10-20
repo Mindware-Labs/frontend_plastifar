@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Search } from "lucide-react";
+﻿import { Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
@@ -28,6 +28,8 @@ interface SelectProps {
   disabled?: boolean;
   /** Por defecto aparece solo si hay bastantes opciones que filtrar. */
   searchable?: boolean;
+  /** El panel mide lo mismo que el disparador, sin el minimo que se aplica a los compactos. */
+  matchTriggerWidth?: boolean;
   id?: string;
   className?: string;
   buttonClassName?: string;
@@ -68,6 +70,7 @@ export function Select({
   state = "idle",
   disabled,
   searchable,
+  matchTriggerWidth = false,
   id,
   className = "",
   buttonClassName = "",
@@ -109,10 +112,12 @@ export function Select({
     const below = window.innerHeight - rect.bottom;
     const dropUp = below < PANEL_MAX_HEIGHT && rect.top > below;
 
-    const width = Math.max(
-      rect.width,
-      size === "xs" || isSubtle ? PANEL_MIN_WIDTH_COMPACT_TRIGGER : PANEL_MIN_WIDTH,
-    );
+    const width = matchTriggerWidth
+      ? rect.width
+      : Math.max(
+          rect.width,
+          size === "xs" || isSubtle ? PANEL_MIN_WIDTH_COMPACT_TRIGGER : PANEL_MIN_WIDTH,
+        );
 
     // Un panel más ancho que su disparador no puede desbordar la ventana por la derecha.
     const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
@@ -409,7 +414,7 @@ export function Select({
                       aria-disabled={option.disabled}
                       onMouseEnter={() => !option.disabled && setActiveIndex(index)}
                       onClick={() => commit(index)}
-                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-md transition-colors ${
+                      className={`flex cursor-pointer items-center ${matchTriggerWidth ? "justify-center" : "justify-between"} gap-2 rounded-md transition-colors ${
                         size === "xs"
                           ? "px-2 py-1.5 text-[11.5px]"
                           : size === "sm"
@@ -421,10 +426,10 @@ export function Select({
                           : isActive
                             ? "bg-zinc-100 text-zinc-900 font-medium"
                             : "text-zinc-700 hover:bg-zinc-100/70"
-                      } ${isSelected ? "font-semibold text-zinc-900" : ""}`}
+                      } ${isSelected ? (matchTriggerWidth ? "font-semibold text-brand-red" : "font-semibold text-zinc-900") : ""}`}
                     >
                       <span className="truncate">{option.label}</span>
-                      {isSelected && (
+                      {isSelected && !matchTriggerWidth && (
                         <Check
                           aria-hidden
                           className={`${
