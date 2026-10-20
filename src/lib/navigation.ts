@@ -94,6 +94,20 @@ export interface NavGroup {
  */
 export const SIDEBAR_NAV: NavGroup[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", section: "Principal" },
+  {
+    label: "Correo",
+    icon: Inbox,
+    section: "Principal",
+    permission: "tickets.read",
+    children: [
+      { label: "Bandeja", to: "/bandeja", end: true, folder: "inbox", icon: Inbox },
+      { label: "Destacados", to: "/bandeja/destacados", folder: "starred", icon: Star },
+      { label: "Enviados", to: "/bandeja/enviados", folder: "sent", icon: Send },
+      { label: "Archivados", to: "/bandeja/archivados", folder: "archived", icon: Archive },
+      { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
+      { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
+    ],
+  },
   /*
    * Tickets vuelve a ser grupo, y ahora si agrupa. Dejo de serlo cuando tenia
    * un unico hijo llamado «Bandeja» —un grupo de uno no agrupa nada y creaba
@@ -113,20 +127,6 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon },
       { label: "Motivos", to: "/tickets/motivos", icon: Tag },
       { label: "Veredictos", to: "/tickets/veredictos", icon: Gavel },
-    ],
-  },
-  {
-    label: "Correo",
-    icon: Inbox,
-    section: "Principal",
-    permission: "tickets.read",
-    children: [
-      { label: "Bandeja", to: "/bandeja", end: true, folder: "inbox", icon: Inbox },
-      { label: "Destacados", to: "/bandeja/destacados", folder: "starred", icon: Star },
-      { label: "Enviados", to: "/bandeja/enviados", folder: "sent", icon: Send },
-      { label: "Archivados", to: "/bandeja/archivados", folder: "archived", icon: Archive },
-      { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
-      { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
     ],
   },
   /*

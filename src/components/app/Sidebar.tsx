@@ -3,21 +3,34 @@ import {
   ChevronDown,
   KeyRound,
   LogOut,
-  PanelLeft,
   PenLine,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { useHasOpenedNotifications } from "../../hooks/useNotifyPrefs";
 import { usePermissions } from "../../hooks/usePermissions";
+import { formatDisplayName, formatInitials } from "../../lib/format";
 import { SIDEBAR_NAV, type NavGroup } from "../../lib/navigation";
 import { Logo } from "../Logo";
-import { formatDisplayName, formatInitials } from "../../lib/format";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { NotificationsModal } from "./NotificationsModal";
 import { SignatureModal } from "./SignatureModal";
+
+/** Marca roja al borde de la barra junto a lo activo: crece con el resorte y se apaga al cambiar de ruta. */
+function ActiveMark({ active, className = "" }: { active: boolean; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-red transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+        active ? "scale-y-100" : "scale-y-0"
+      } ${className}`}
+    />
+  );
+}
 
 /** Panel de hijos anclado al icono: se posiciona fijo para que el riel no lo recorte. */
 interface Flyout {
@@ -26,11 +39,7 @@ interface Flyout {
   left: number;
 }
 
-/**
- * Contador numérico estilo Gmail:
- * - Con correos sin leer: tipografía destacada con acento de marca.
- * - Solo leídos: número fino y neutro.
- */
+/** Contador numérico para correos no leídos. */
 function FolderBadge({
   count,
   isActive,
@@ -42,8 +51,10 @@ function FolderBadge({
 
   return (
     <span
-      className={`ml-auto shrink-0 font-heading text-[12px] font-bold tabular-nums transition-colors ${
-        isActive ? "text-brand-red-dark" : "text-ink"
+      className={`ml-auto shrink-0 rounded-md px-1.5 py-0.5 font-heading text-[10px] font-bold leading-none tabular-nums transition-colors duration-200 ${
+        isActive
+          ? "bg-brand-red/10 text-brand-red"
+          : "bg-zinc-100 text-zinc-600 group-hover:bg-zinc-200/70 group-hover:text-zinc-900"
       }`}
     >
       {count.unread > 99 ? "99+" : count.unread}
@@ -51,13 +62,71 @@ function FolderBadge({
   );
 }
 
-const linkBase =
-  "flex items-center gap-2.5 rounded-edge px-3 py-2 text-[13px] font-medium transition-colors";
-const linkInactive = "text-brand-gray hover:bg-fill hover:text-ink";
-const linkActive = "bg-brand-red/8 font-semibold text-brand-red-dark";
-
-/** Icono suelto de la barra contraida. */
-const railBase = "flex h-9 w-9 shrink-0 items-center justify-center rounded-edge transition-colors";
+/** Icono interactivo de colapso y expansión de la barra lateral. */
+function SidebarToggleIcon({ collapsed = false }: { collapsed?: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="shrink-0"
+      aria-hidden="true"
+    >
+      {/* Marco perimetral */}
+      <rect
+        x="1.75"
+        y="2.25"
+        width="14.5"
+        height="13.5"
+        rx="2.75"
+        className="stroke-current"
+        strokeWidth="1.25"
+      />
+      {/* Carril del panel lateral con realce interactivo */}
+      <rect
+        x="2.5"
+        y="3"
+        width="3.75"
+        height="12"
+        rx="1.75"
+        className={`transition-colors duration-200 ${
+          collapsed
+            ? "fill-zinc-200/80"
+            : "fill-zinc-200/60 group-hover:fill-brand-red/20"
+        }`}
+      />
+      {/* Línea divisoria del carril */}
+      <line
+        x1="6.75"
+        y1="2.25"
+        x2="6.75"
+        y2="15.75"
+        className="stroke-current"
+        strokeWidth="1.2"
+      />
+      {/* Chevron de acción dinámico con animación táctil al hover */}
+      {collapsed ? (
+        <path
+          d="M9.75 6.5L12.25 9L9.75 11.5"
+          className="stroke-current transition-transform duration-200 ease-out group-hover:translate-x-0.5"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ) : (
+        <path
+          d="M12.25 6.5L9.75 9L12.25 11.5"
+          className="stroke-current transition-transform duration-200 ease-out group-hover:-translate-x-0.5"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
+  );
+}
 
 const collapsedKey = "plf.sidebar-collapsed";
 
@@ -94,19 +163,16 @@ export function Sidebar() {
         .filter((group) => !group.permission || can(group.permission))
         .map((group) => ({
           ...group,
-          children: group.children?.filter((child) => !child.permission || can(child.permission)),
+          children: group.children?.filter(
+            (child) => (!child.permission || can(child.permission)) && (!child.adminOnly || user?.isAdmin),
+          ),
         }))
         .filter((group) => !group.children || group.children.length > 0),
-    [can],
+    [can, user?.isAdmin],
   );
 
   /**
    * Los grupos repartidos en sus secciones, en el orden en que aparecen.
-   *
-   * Se arma acá y no al pintar porque una tarjeta necesita saber cuántos hijos
-   * tiene antes de abrirse. Además, una sección que el filtro de permisos dejó
-   * sin un solo grupo desaparece entera: sin esto quedaría una tarjeta vacía
-   * con su rótulo encima, anunciando un bloque que no existe.
    */
   const sections = useMemo(() => {
     const out: { section: NavGroup["section"]; groups: typeof visibleGroups }[] = [];
@@ -117,42 +183,30 @@ export function Sidebar() {
     }
     return out;
   }, [visibleGroups]);
+
   const { pathname } = useLocation();
   const [preferCollapsed, setPreferCollapsed] = useState(readCollapsed);
 
-  /**
-   * Bajo `lg` la barra se pliega al riel, se prefiera o no.
-   *
-   * Expandida ocupa 240 px, y en un telefono de 390 px eso es el 62 % de la
-   * pantalla: el contenido quedaba en una columna de 150 px donde una tabla no
-   * cabe y un parrafo se parte en veinte lineas. No es un defecto de una
-   * pantalla, es de todas. El riel de 68 px ya existia con sus paneles
-   * emergentes; lo unico que faltaba era que se activara solo.
-   */
+  /** Bajo `lg` la barra se pliega al riel, se prefiera o no. */
   const isNarrow = useIsMobile(1023);
   const collapsed = preferCollapsed || isNarrow;
-
-  /** El boton solo cambia la preferencia; bajo `lg` no hay nada que expandir. */
   const setCollapsed = setPreferCollapsed;
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [editingSignature, setEditingSignature] = useState(false);
   const [editingAlerts, setEditingAlerts] = useState(false);
+  const hasOpenedAlerts = useHasOpenedNotifications();
+
+  // El contenido del desplegable sobrevive al cierre para que la salida tenga qué animar.
   const [flyout, setFlyout] = useState<Flyout | null>(null);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
   /** Solo los grupos que la persona abrio o cerro a mano; el resto sale de la ruta. */
   const [manualOpen, setManualOpen] = useState<Record<string, boolean>>({});
   const menuRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<number | null>(null);
-
-  /**
-   * El buscador FILTRA el menu de verdad; no es un adorno.
-   *
-   * Un campo que no hace nada es peor que no tenerlo: promete una capacidad y
-   * la incumple en el primer intento. Con siete modulos y veinte sub-secciones,
-   * escribir "terri" y quedarse con Territorios ahorra abrir Configuracion y
-   * recorrerla.
-   */
-
+  const menuMotion = useDisclosureMotion<HTMLDivElement>(menuOpen, { direction: "up" });
+  const flyoutMotion = useDisclosureMotion<HTMLDivElement>(collapsed && flyoutOpen);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -176,7 +230,7 @@ export function Sidebar() {
     if (!flyout) return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setFlyout(null);
+      if (event.key === "Escape") setFlyoutOpen(false);
     }
 
     document.addEventListener("keydown", handleKeyDown);
@@ -195,19 +249,21 @@ export function Sidebar() {
     cancelClose();
     const rect = anchor.getBoundingClientRect();
     setFlyout({ group, top: rect.top - 6, left: rect.right + 8 });
+    setFlyoutOpen(true);
   }
 
   /** Retardo corto: da tiempo a cruzar el hueco entre el icono y el panel. */
   function scheduleClose() {
     cancelClose();
-    closeTimer.current = window.setTimeout(() => setFlyout(null), 140);
+    closeTimer.current = window.setTimeout(() => setFlyoutOpen(false), 140);
   }
 
   function toggleCollapsed() {
     const next = !collapsed;
     setCollapsed(next);
     setMenuOpen(false);
-    setFlyout(null);
+    setFlyoutOpen(false);
+    flyoutMotion.snap();
     try {
       localStorage.setItem(collapsedKey, next ? "1" : "0");
     } catch {
@@ -221,16 +277,6 @@ export function Sidebar() {
     return targets.some((to) => pathname === to || pathname.startsWith(`${to}/`));
   }
 
-  /**
-   * Un grupo abierto se deriva de la ruta, no de un efecto: entrar a
-   * /calidad/hca abre Calidad sin que nadie lo pulse. El mapa solo guarda las
-   * veces que la persona contradijo esa regla a mano, y esa decision manda
-   * mientras dure la sesion.
-   *
-   * Derivado y no efectuado a proposito: con un useEffect que "abriera al
-   * navegar", el grupo se reabriria solo cada vez que la ruta cambia, pisando
-   * al que lo cerro hace un segundo.
-   */
   function isGroupOpen(group: NavGroup) {
     return manualOpen[group.label] ?? isGroupActive(group);
   }
@@ -239,131 +285,131 @@ export function Sidebar() {
     setManualOpen((current) => ({ ...current, [group.label]: !isGroupOpen(group) }));
   }
 
-  /**
-   * Cuerpo de un modulo del menu. Es una funcion y no JSX en linea porque el
-   * listado ahora intercala encabezados de seccion: sin extraerlo, cada rama
-   * del `map` habria que duplicarla dentro del bloque del encabezado.
-   */
-  function renderGroup(group: NavGroup) {
-    return collapsed ? (
-            <Link
-              key={group.label}
-              to={group.to ?? group.children![0].to}
-              aria-label={group.label}
-              onMouseEnter={(event) => openFlyout(group, event.currentTarget)}
-              onMouseLeave={scheduleClose}
-              onFocus={(event) => openFlyout(group, event.currentTarget)}
-              onBlur={scheduleClose}
-              className={`${railBase} relative ${isGroupActive(group) ? linkActive : linkInactive}`}
-            >
-              <group.icon className="h-[18px] w-[18px]" />
-              {/* Contraida no hay sitio para cifras: un punto avisa que hay algo sin leer. */}
-              {group.label === "Correo" && pendingMail > 0 && (
-                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-brand-red" />
-              )}
-            </Link>
-          ) : group.children ? (
-            (() => {
-              const open = isGroupOpen(group);
-              const panelId = `nav-${group.label.toLowerCase().replace(/\s+/g, "-")}`;
-              const active = isGroupActive(group);
+  function renderExpandedGroup(group: NavGroup) {
+    if (group.children) {
+      const open = isGroupOpen(group);
+      const panelId = `nav-${group.label.toLowerCase().replace(/\s+/g, "-")}`;
+      const active = isGroupActive(group);
 
-              return (
-                <div key={group.label}>
-                  {/* Boton, no encabezado: el grupo se abre y se cierra, y quien
-                      navega con teclado necesita alcanzarlo y saber su estado. */}
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(group)}
-                    aria-expanded={open}
-                    aria-controls={panelId}
-                    className={`${linkBase} w-full border-l-2 ${
-                      active && !open
-                        ? "border-brand-red bg-brand-red/[0.04] font-semibold text-ink"
-                        : "border-transparent text-brand-gray hover:bg-fill hover:text-ink"
-                    }`}
-                  >
-                    <group.icon className="h-[17px] w-[17px] shrink-0" />
-                    <span className="truncate">{group.label}</span>
-                    {group.label === "Correo" && pendingMail > 0 && !open && (
-                      <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red" />
-                    )}
-                    <ChevronDown
-                      aria-hidden
-                      className={`ml-auto h-3.5 w-3.5 shrink-0 text-faint transition-transform
-                        duration-150 ${open ? "rotate-180" : ""}`}
-                    />
-                  </button>
+      return (
+        <div key={group.label} className="flex flex-col">
+          <button
+            type="button"
+            onClick={() => toggleGroup(group)}
+            aria-expanded={open}
+            aria-controls={panelId}
+            className={`group relative flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+              active && !open
+                ? "bg-zinc-100 text-zinc-900 font-semibold"
+                : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
+            }`}
+          >
+            <ActiveMark active={active && !open} className="-left-2" />
+            <group.icon
+              strokeWidth={active ? 2.25 : 2}
+              className={`h-4 w-4 shrink-0 transition-colors ${
+                active ? "text-zinc-900" : "text-zinc-400 group-hover:text-zinc-700"
+              }`}
+            />
+            <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>
+            {!open && group.label === "Correo" && pendingMail > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand-red px-1.5 font-heading text-[9.5px] font-bold text-white shadow-2xs">
+                {pendingMail > 99 ? "99+" : pendingMail}
+              </span>
+            )}
+            <ChevronDown
+              aria-hidden
+              className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring group-hover:text-zinc-600 motion-reduce:transition-none ${
+                open ? "rotate-180" : "rotate-0"
+              }`}
+            />
+          </button>
 
-                  {/* Filete a la izquierda de los hijos: es lo que dice "esto
-                      cuelga de aquello" sin recuadrar ni tintar nada. */}
-                  {/* El sublistado respira arriba y abajo para no quedar pegado
-                      al modulo de al lado; el filete arranca bajo el icono. */}
-                  {open && (
-                    <div
-                      id={panelId}
-                      className="mb-1 ml-[19px] mt-1 flex flex-col gap-0.5 border-l border-line pl-2.5"
+          {/* Opciones con animación suave de colapso */}
+          <div
+            id={panelId}
+            className={`grid transition-[grid-template-rows,opacity] duration-280 ease-plf-spring motion-reduce:transition-none ${
+              open
+                ? "grid-rows-[1fr] opacity-100"
+                : "grid-rows-[0fr] opacity-0 pointer-events-none"
+            }`}
+          >
+            <div className="overflow-hidden">
+              <div className="mb-1 ml-[17px] mt-0.5 flex flex-col gap-0.5 border-l border-zinc-200/80 pl-2">
+                {visibleChildren(group).map((child) => {
+                  const hasUnread = Boolean(child.folder && counts && counts[child.folder]?.unread > 0);
+                  return (
+                    <NavLink
+                      key={child.to}
+                      to={child.to}
+                      end={child.end}
+                      className={({ isActive }) =>
+                        `group relative flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                          isActive
+                            ? "bg-zinc-100 text-zinc-900 font-semibold"
+                            : hasUnread
+                            ? "text-zinc-900 font-semibold hover:bg-zinc-100/70"
+                            : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
+                        }`
+                      }
                     >
-                      {visibleChildren(group).map((child) => (
-                        <NavLink
-                          key={child.to}
-                          to={child.to}
-                          end={child.end}
-                          // `subtle` y no `muted`: tras la fusion, `muted` paso
-                          // a ser una superficie clara —lo dice el propio
-                          // index.css— y como color de texto dejaba los hijos
-                          // casi blancos sobre blanco. El gris de texto que
-                          // cumple 5.9:1 es `subtle`.
-                          className={({ isActive }) =>
-                            `group/child flex h-8 items-center gap-2.5 rounded-edge px-2.5
-                             text-[12.5px] transition-colors ${
-                               isActive
-                                 ? "font-semibold text-brand-red-dark"
-                                 : "text-subtle hover:bg-fill hover:text-ink"
-                             }`
-                          }
-                        >
-                          {({ isActive }) => (
-                            <>
-                              {child.icon && (
-                                <child.icon
-                                  aria-hidden
-                                  className={`h-3.5 w-3.5 shrink-0 ${
-                                    isActive ? "text-brand-red" : "text-faint"
-                                  }`}
-                                />
-                              )}
-                              <span className="truncate">{child.label}</span>
-                              {child.folder && counts && (
-                                <FolderBadge count={counts[child.folder]} isActive={isActive} />
-                              )}
-                            </>
+                      {({ isActive }) => (
+                        <>
+                          <ActiveMark active={isActive} className="-left-[9.5px]" />
+                          {child.icon && (
+                            <child.icon
+                              aria-hidden
+                              strokeWidth={isActive ? 2.25 : 2}
+                              className={`h-3.5 w-3.5 shrink-0 transition-colors ${
+                                isActive
+                                  ? "text-zinc-900"
+                                  : hasUnread
+                                  ? "text-zinc-800"
+                                  : "text-zinc-400 group-hover:text-zinc-700"
+                              }`}
+                            />
                           )}
-                        </NavLink>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()
-          ) : (
-            // Mismo filete de 2 px que el grupo desplegable, transparente en
-            // reposo: sin el, un modulo sin hijos queda dos pixeles corrido
-            // respecto a los que si lo tienen.
-            <NavLink
-              key={group.to}
-              to={group.to!}
-              className={({ isActive }) =>
-                `${linkBase} border-l-2 ${
-                  isActive
-                    ? "border-brand-red bg-brand-red/[0.04] font-semibold text-ink"
-                    : "border-transparent text-brand-gray hover:bg-fill hover:text-ink"
-                }`
-              }
-            >
-              <group.icon className="h-[17px] w-[17px] shrink-0" />
-              <span className="truncate">{group.label}</span>
-            </NavLink>
+                          <span className="min-w-0 flex-1 truncate">{child.label}</span>
+                          {child.folder && counts && (
+                            <FolderBadge count={counts[child.folder]} isActive={isActive} />
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <NavLink
+        key={group.to}
+        to={group.to!}
+        className={({ isActive }) =>
+          `group relative flex h-[34px] items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+            isActive
+              ? "bg-zinc-100 text-zinc-900 font-semibold"
+              : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
+          }`
+        }
+      >
+        {({ isActive }) => (
+          <>
+            <ActiveMark active={isActive} className="-left-2" />
+            <group.icon
+              strokeWidth={isActive ? 2.25 : 2}
+              className={`h-4 w-4 shrink-0 transition-colors ${
+                isActive ? "text-zinc-900" : "text-zinc-400 group-hover:text-zinc-700"
+              }`}
+            />
+            <span className="min-w-0 flex-1 truncate">{group.label}</span>
+          </>
+        )}
+      </NavLink>
     );
   }
 
@@ -375,118 +421,146 @@ export function Sidebar() {
 
   return (
     <aside
-      /*
-       * El carril NO es una superficie: es fondo, y deja ver el lienzo.
-       *
-       * Las superficies son los bloques que lleva encima —el logotipo, cada
-       * seccion del menu y la ficha de usuario—, cada uno su propio panel
-       * blanco. Es la diferencia entre una pared pintada de blanco con
-       * separadores adentro, y varias tarjetas apoyadas sobre una pared gris:
-       * lo segundo agrupa por superficie en vez de por linea, y por eso el
-       * menu se lee como bloques y no como una lista larga.
-       */
-      className={`flex h-screen shrink-0 flex-col gap-2.5 p-2.5 select-none
-        transition-[width] duration-200 ease-out ${collapsed ? "w-[76px]" : "w-[248px]"}`}
+      className={`relative flex h-screen shrink-0 flex-col border-r border-zinc-200/80 bg-white select-none will-change-[width]
+        transition-[width] duration-[230ms] ease-plf-glide motion-reduce:transition-none ${collapsed ? "w-[68px]" : "w-60"}`}
     >
-      {/* 1. Cabecera superior: Logotipo y control de contracción */}
-      <div
-        className={`flex shrink-0 items-center rounded-card border border-line bg-white shadow-card transition-all duration-200 ${
-          collapsed ? "flex-col justify-center gap-1.5 px-2 py-2.5" : "h-14 justify-between px-3.5"
-        }`}
-      >
-        {!collapsed ? (
-          <>
-            <div className="flex items-center gap-2.5">
-              <Link
-                to="/bandeja"
-                className="transition-opacity hover:opacity-85 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 rounded-edge"
-                title="Plastifar · Ir a Bandeja"
-              >
-                <Logo variant="color" height={23} />
-              </Link>
-              <span className="rounded-edge border border-line-soft bg-canvas px-1.5 py-0.5 font-heading text-[10px] font-bold tracking-[0.08em] text-subtle">
-                OPS
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              aria-label="Contraer la barra lateral"
-              title="Contraer barra lateral"
-              className="flex h-7 w-7 items-center justify-center rounded-edge text-subtle transition-all duration-150 hover:bg-canvas hover:text-ink active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 outline-none"
-            >
-              <PanelLeft className="h-4 w-4" />
-            </button>
-          </>
-        ) : (
-          <div className="flex flex-col items-center gap-1.5">
-            <Link
-              to="/bandeja"
-              className="group flex h-9 w-9 items-center justify-center rounded-edge border border-line-soft bg-canvas transition-all hover:border-brand-red/30 hover:shadow-xs active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
-              title="Plastifar · Ir a Bandeja"
-            >
-              <Logo variant="isotipo" height={22} />
-            </Link>
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              aria-label="Expandir la barra lateral"
-              title="Expandir barra lateral"
-              className="flex h-5 w-5 items-center justify-center rounded-edge text-faint transition-all hover:bg-canvas hover:text-ink active:scale-95"
-            >
-              <PanelLeft className="h-3.5 w-3.5 rotate-180" />
-            </button>
-          </div>
-        )}
+      {/* 1. Cabecera superior: altura fija elegante (h-14) con cross-fade ágil */}
+      <div className="relative flex h-14 shrink-0 items-center border-b border-zinc-200/80 px-3 overflow-hidden">
+        {/* Versión expandida */}
+        <div
+          className={`flex w-full items-center justify-between transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
+            collapsed ? "opacity-0 pointer-events-none -translate-x-3" : "opacity-100 translate-x-0"
+          }`}
+        >
+          <Link
+            to="/bandeja"
+            className="group flex items-center pl-1 transition-opacity hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 rounded-lg py-1"
+            title="Plastifar · Ir a Bandeja"
+          >
+            <Logo
+              variant="color"
+              height={24}
+              className="transition-transform duration-150 group-hover:scale-[1.01]"
+            />
+          </Link>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="Contraer la barra lateral"
+            title="Contraer barra lateral"
+            className="group flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition-colors duration-150 hover:bg-zinc-100 hover:text-zinc-800 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer motion-reduce:active:scale-100"
+          >
+            <SidebarToggleIcon collapsed={false} />
+          </button>
+        </div>
+
+        {/* Versión contraída */}
+        <div
+          className={`absolute inset-0 flex items-center justify-center gap-1.5 px-2 transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
+            collapsed ? "opacity-100 pointer-events-auto scale-100" : "opacity-0 pointer-events-none scale-95"
+          }`}
+        >
+          <Link
+            to="/bandeja"
+            className="flex size-7 items-center justify-center rounded-lg transition-opacity hover:opacity-90 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+            title="Plastifar · Ir a Bandeja"
+          >
+            <Logo variant="isotipo" height={22} />
+          </Link>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="Expandir la barra lateral"
+            title="Expandir barra lateral"
+            className="group flex size-7 items-center justify-center rounded-lg text-zinc-400 transition-colors duration-150 hover:bg-zinc-100 hover:text-zinc-800 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer motion-reduce:active:scale-100"
+          >
+            <SidebarToggleIcon collapsed={true} />
+          </button>
+        </div>
       </div>
 
-
-      {/* Aire entre modulos: sin el, siete grupos y sus hijos se leen como una
-          sola lista larga y cuesta ver donde termina uno y empieza el otro.
-          4 px es el primer paso de la escala; el doble ya separaba de mas y
-          obligaba a desplazar la barra. */}
-      <nav className="flex flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden">
-        {/* Las secciones se arman antes de pintar y no al vuelo comparando con
-            el grupo anterior: una tarjeta necesita saber cuantos hijos tiene
-            ANTES de abrirse, y una seccion que el filtro dejo vacia no debe
-            dibujar una tarjeta hueca con un rotulo encima. */}
-        {sections.map(({ section, groups }) => (
-          <div key={section}>
-            {!collapsed && (
-              <p
-                className="px-1.5 pb-1.5 font-heading text-[10px] font-medium uppercase
-                  tracking-[0.07em] text-faint"
+      {/* 2. Árbol de Navegación Principal con transición suave y ágil */}
+      <nav className="no-scrollbar relative flex-1 overflow-y-auto overflow-x-hidden">
+        {/* Modo Riel (Contraído) */}
+        <div
+          className={`flex flex-col items-center gap-2 p-2 transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
+            collapsed
+              ? "opacity-100 pointer-events-auto scale-100"
+              : "opacity-0 pointer-events-none scale-95 absolute inset-x-0 top-0"
+          }`}
+        >
+          {visibleGroups.map((group) => (
+            <div key={group.label} className="relative">
+              <Link
+                to={group.to ?? group.children![0].to}
+                aria-label={group.label}
+                onMouseEnter={(event) => openFlyout(group, event.currentTarget)}
+                onMouseLeave={scheduleClose}
+                onFocus={(event) => openFlyout(group, event.currentTarget)}
+                onBlur={scheduleClose}
+                className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                  isGroupActive(group)
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 active:scale-95 motion-reduce:active:scale-100"
+                }`}
               >
+                <ActiveMark active={isGroupActive(group)} className="-left-4" />
+                <group.icon className="h-4.5 w-4.5" strokeWidth={isGroupActive(group) ? 2.25 : 2} />
+
+                {/* Badge con aviso de pendientes en modo contraído */}
+                {group.label === "Correo" && pendingMail > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand-red px-1 font-heading text-[9.5px] font-bold text-white shadow-[0_2px_6px_rgba(228,0,43,0.5)]">
+                    {pendingMail > 99 ? "99+" : pendingMail}
+                  </span>
+                )}
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        {/* Modo Extendido (Expandido) */}
+        <div
+          className={`w-full space-y-4 p-2 transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
+            collapsed
+              ? "opacity-0 pointer-events-none -translate-x-3 absolute inset-x-0 top-0"
+              : "opacity-100 pointer-events-auto translate-x-0"
+          }`}
+        >
+          {sections.map(({ section, groups }) => (
+            <div key={section} className="flex flex-col">
+              <p className="px-2.5 pb-1 font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
                 {section}
               </p>
-            )}
-            <div
-              className={`flex flex-col rounded-card border border-line bg-white shadow-card ${
-                collapsed ? "items-center gap-1 p-1.5" : "gap-0.5 p-1.5"
-              }`}
-            >
-              {groups.map(renderGroup)}
+              <div className="flex flex-col gap-0.5">
+                {groups.map(renderExpandedGroup)}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </nav>
 
-      {/* Panel emergente del riel contraido: es lo unico que deja llegar a los
-          hijos de un grupo cuando la barra esta plegada. */}
-      {collapsed && flyout && (
+      {/* 3. Flyout en Modo Contraído */}
+      {collapsed && flyoutMotion.mounted && flyout && (
         <div
+          ref={flyoutMotion.ref}
+          aria-hidden={flyoutMotion.exiting}
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
-          style={{ top: flyout.top, left: flyout.left }}
-          className="animate-plf-toast-in fixed z-40 w-[210px] rounded-edge border border-line bg-white p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.14),0_2px_6px_rgba(27,27,29,0.04)]"
+          style={{ top: flyout.top, left: flyout.left, transformOrigin: "0 24px" }}
+          className={`fixed z-40 w-[200px] rounded-xl border border-zinc-200/90 bg-white p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.12),0_2px_6px_rgba(27,27,29,0.04)] ${
+            flyoutMotion.exiting ? "pointer-events-none" : ""
+          }`}
         >
-          <div className="flex items-center justify-between border-b border-line-soft px-2.5 pb-2 pt-1.5">
-            <span className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-subtle">
-              <flyout.group.icon className="h-3.5 w-3.5 text-brand-gray" />
+          <div
+            data-motion-item
+            className="flex items-center justify-between border-b border-zinc-100 px-2.5 pb-2 pt-1"
+          >
+            <span className="flex items-center gap-2 font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
+              <flyout.group.icon className="h-3.5 w-3.5 text-zinc-400" />
               {flyout.group.label}
             </span>
             {flyout.group.label === "Correo" && pendingMail > 0 && (
-              <span className="rounded-full bg-brand-red/10 px-1.5 py-0.2 font-heading text-[10px] font-bold text-brand-red">
+              <span className="rounded-full bg-zinc-100 px-1.5 py-0.2 font-heading text-[10px] font-bold text-zinc-700">
                 {pendingMail}
               </span>
             )}
@@ -499,29 +573,30 @@ export function Sidebar() {
                   key={child.to}
                   to={child.to}
                   end={child.end}
-                  onClick={() => setFlyout(null)}
+                  data-motion-item
+                  onClick={() => setFlyoutOpen(false)}
                   className={({ isActive }) =>
-                    `group flex h-[32px] items-center gap-3 rounded-md px-2.5 text-[12.5px] transition-colors ${
+                    `group flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-colors focus-visible:ring-2 focus-visible:ring-brand-red/25 outline-none ${
                       isActive
-                        ? "bg-brand-red/[0.08] text-brand-red-dark font-bold"
+                        ? "bg-zinc-100 text-zinc-900 font-semibold"
                         : hasUnread
-                        ? "font-bold text-ink hover:bg-fill"
-                        : "font-medium text-brand-gray hover:bg-fill hover:text-ink"
+                        ? "text-zinc-900 font-semibold hover:bg-zinc-100/70"
+                        : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
                       {child.icon && (
-                      <child.icon
-                        className={`h-4 w-4 shrink-0 transition-colors ${
-                          isActive
-                            ? "text-brand-red"
-                            : hasUnread
-                            ? "text-brand-gray"
-                            : "text-faint group-hover:text-brand-gray"
-                        }`}
-                      />
+                        <child.icon
+                          className={`h-4 w-4 shrink-0 transition-colors ${
+                            isActive
+                              ? "text-zinc-900"
+                              : hasUnread
+                              ? "text-zinc-800"
+                              : "text-zinc-400 group-hover:text-zinc-700"
+                          }`}
+                        />
                       )}
                       <span className="truncate flex-1">{child.label}</span>
                       {child.folder && counts && (
@@ -536,30 +611,37 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* 5. Pie de Tarjeta de Usuario y Menú Desplegable */}
-      <div className={`shrink-0 rounded-card border border-line bg-white shadow-card p-2`} ref={menuRef}>
+      {/* 4. Pie de Tarjeta de Usuario y Menú Desplegable */}
+      <div className="shrink-0 border-t border-zinc-200/80 p-2" ref={menuRef}>
         <div className="relative">
           {/* Menú flotante de perfil */}
-          {menuOpen && (
+          {menuMotion.mounted && (
             <div
+              ref={menuMotion.ref}
               role="menu"
-              className="animate-plf-toast-in absolute bottom-[calc(100%+8px)] left-0 z-30 w-full min-w-[240px] rounded-edge border border-line bg-white p-1.5 shadow-[0_12px_32px_-6px_rgba(27,27,29,0.16),0_2px_8px_rgba(27,27,29,0.06)]"
+              aria-hidden={menuMotion.exiting}
+              style={{ transformOrigin: collapsed ? "0 24px" : "24px bottom" }}
+              className={`absolute z-30 rounded-xl border border-zinc-200/90 bg-white p-1.5 shadow-[0_12px_32px_-6px_rgba(27,27,29,0.14),0_2px_8px_rgba(27,27,29,0.04)] ${
+                collapsed
+                  ? "left-[calc(100%+8px)] bottom-0 w-56"
+                  : "left-0 right-0 bottom-[calc(100%+8px)] w-full"
+              } ${menuMotion.exiting ? "pointer-events-none" : ""}`}
             >
               {/* Encabezado del usuario */}
-              <div className="mb-1.5 flex items-center gap-2.5 border-b border-line-soft p-2">
-                <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink font-heading text-[12px] font-bold text-white shadow-xs">
+              <div data-motion-item className="mb-1 flex items-center gap-2.5 border-b border-zinc-100 p-2">
+                <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 font-heading text-[11.5px] font-bold text-white shadow-xs">
                   {initials}
                   <span
                     aria-hidden
-                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-brand-green"
+                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500"
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-heading text-[13px] font-bold text-ink leading-tight">
+                  <p className="truncate font-heading text-[12.5px] font-semibold text-zinc-900 leading-tight">
                     {displayName}
                   </p>
-                  <p className="truncate text-[11px] text-faint leading-tight mt-0.5">{user?.email}</p>
-                  <span className="mt-1 inline-flex items-center rounded-full bg-brand-red/[0.08] px-2 py-0.2 font-heading text-[10px] font-bold text-brand-red tracking-wide">
+                  <p className="truncate text-[11px] text-zinc-400 leading-tight mt-0.5">{user?.email}</p>
+                  <span className="mt-1 inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 font-heading text-[9.5px] font-semibold text-zinc-600 tracking-wide">
                     {user?.isAdmin ? "ADMINISTRADOR" : "COLABORADOR"}
                   </span>
                 </div>
@@ -574,9 +656,10 @@ export function Sidebar() {
                     setMenuOpen(false);
                     setEditingSignature(true);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] text-[#3e3e44] transition-colors hover:bg-canvas hover:text-ink"
+                  data-motion-item
+                  className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium text-zinc-700 transition-colors outline-none hover:bg-zinc-100 hover:text-zinc-900 focus-visible:bg-zinc-100 focus-visible:text-zinc-900"
                 >
-                  <PenLine className="h-3.5 w-3.5 text-subtle" />
+                  <PenLine className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
                   <span>Tu firma de correo</span>
                 </button>
                 <button
@@ -586,10 +669,16 @@ export function Sidebar() {
                     setMenuOpen(false);
                     setEditingAlerts(true);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] text-[#3e3e44] transition-colors hover:bg-canvas hover:text-ink"
+                  data-motion-item
+                  className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium text-zinc-700 transition-colors outline-none hover:bg-zinc-100 hover:text-zinc-900 focus-visible:bg-zinc-100 focus-visible:text-zinc-900"
                 >
-                  <Bell className="h-3.5 w-3.5 text-subtle" />
-                  <span>Avisos y notificaciones</span>
+                  <Bell className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
+                  <span>Avisos</span>
+                  {!hasOpenedAlerts && (
+                    <span className="ml-auto rounded-full bg-brand-red/10 px-1.5 py-0.5 font-heading text-[9.5px] font-bold text-brand-red">
+                      Nuevo
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -598,69 +687,99 @@ export function Sidebar() {
                     setMenuOpen(false);
                     setChangingPassword(true);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] text-[#3e3e44] transition-colors hover:bg-canvas hover:text-ink"
+                  data-motion-item
+                  className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium text-zinc-700 transition-colors outline-none hover:bg-zinc-100 hover:text-zinc-900 focus-visible:bg-zinc-100 focus-visible:text-zinc-900"
                 >
-                  <KeyRound className="h-3.5 w-3.5 text-subtle" />
+                  <KeyRound className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
                   <span>Cambiar contraseña</span>
                 </button>
 
-                <div className="my-1 border-t border-line-soft" />
+                <div className="my-1 border-t border-zinc-100" />
 
                 <button
                   type="button"
                   role="menuitem"
                   onClick={() => logout()}
-                  className="flex w-full items-center gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] font-medium text-brand-red-dark transition-colors hover:bg-brand-red/[0.06]/80"
+                  data-motion-item
+                  className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium text-brand-red-dark transition-colors outline-none hover:bg-brand-red/[0.06] focus-visible:bg-brand-red/[0.06]"
                 >
-                  <LogOut className="h-3.5 w-3.5 text-brand-red" />
+                  <LogOut className="h-3.5 w-3.5 text-brand-red transition-colors" />
                   <span>Cerrar sesión</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Gatillo del perfil */}
+          {/* Gatillo del perfil con transición ultra fluida */}
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             title={collapsed ? `${displayName} · ${user?.email}` : undefined}
-            className={`group flex w-full items-center rounded-edge border transition-all duration-150 outline-none focus-visible:ring-3 focus-visible:ring-brand-red/20 ${
+            className={`group flex w-full items-center rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer ${
               menuOpen
-                ? "border-line-strong bg-fill shadow-xs ring-1 ring-line-strong"
-                : "border-transparent hover:border-line-soft hover:bg-canvas"
-            } ${collapsed ? "justify-center p-1.5" : "gap-2.5 p-1.5"}`}
+                ? "bg-zinc-100 text-zinc-900"
+                : "hover:bg-zinc-100/80 text-zinc-700"
+            } ${collapsed ? "justify-center p-1.5" : "p-1.5"}`}
           >
             {/* Avatar circular con aro y presencia en línea */}
-            <div className="relative flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-ink font-heading text-[11.5px] font-bold text-white shadow-xs transition-transform group-hover:scale-105">
+            <div className="relative flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-zinc-900 font-heading text-[11px] font-bold text-white shadow-xs">
               {initials}
               <span
                 aria-hidden
-                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-brand-green"
+                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500"
               />
             </div>
 
-            {!collapsed && (
-              <>
-                <div className="min-w-0 flex-1 text-left">
-                  <span className="block truncate font-heading text-[12.5px] font-bold leading-tight text-ink">
-                    {displayName}
-                  </span>
-                  <span className="block truncate text-[10.5px] leading-tight text-faint mt-0.5">
-                    {user?.isAdmin ? "Administrador" : "Staff"}
-                  </span>
-                </div>
-                <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-faint transition-transform duration-200 ${
-                    menuOpen ? "rotate-180 text-ink" : "group-hover:text-subtle"
-                  }`}
-                />
-              </>
-            )}
+            {/* Contenedor del nombre y chevron con transición continua y rápida */}
+            <div
+              className={`flex min-w-0 flex-1 items-center justify-between transition-all duration-[200ms] ease-plf-glide motion-reduce:transition-none overflow-hidden ${
+                collapsed ? "max-w-0 opacity-0 pointer-events-none" : "max-w-[160px] opacity-100 pl-2.5"
+              }`}
+            >
+              <div className="min-w-0 flex-1 text-left">
+                <span className="block truncate font-heading text-[12.5px] font-semibold leading-tight text-zinc-800">
+                  {displayName}
+                </span>
+                <span className="block truncate text-[11px] leading-tight text-zinc-400 mt-0.5 font-normal">
+                  {user?.isAdmin ? "Administrador" : "Staff"}
+                </span>
+              </div>
+              <ChevronDown
+                className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+                  menuOpen ? "rotate-180 text-zinc-800" : "group-hover:text-zinc-600"
+                }`}
+              />
+            </div>
           </button>
         </div>
       </div>
+
+      {/* 5. Crédito institucional: visible solo con la barra expandida */}
+      {!collapsed && (
+        <div className="shrink-0 border-t border-zinc-100 px-3 py-2">
+          <a
+            href="https://www.cquest.do/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 text-[10.5px] text-zinc-400 transition-colors hover:text-zinc-600"
+          >
+            <span>Desarrollado por</span>
+            <img
+              src="/brand/centerquest-icon.png"
+              alt="Center Quest"
+              width={13}
+              height={13}
+              draggable={false}
+              className="select-none"
+            />
+            <span className="font-semibold text-zinc-600 hover:text-brand-red hover:underline underline-offset-2">
+              Center Quest
+            </span>
+          </a>
+        </div>
+      )}
 
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
       {editingSignature && <SignatureModal onClose={() => setEditingSignature(false)} />}
@@ -668,3 +787,4 @@ export function Sidebar() {
     </aside>
   );
 }
+

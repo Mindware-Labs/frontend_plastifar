@@ -1,5 +1,4 @@
 import { Outlet } from "react-router-dom";
-import { AppBar } from "../components/app/AppBar";
 import { InboxAlerts } from "../components/app/InboxAlerts";
 import { Sidebar } from "../components/app/Sidebar";
 import { ReceiptStack } from "../components/app/ReceiptStack";
@@ -46,18 +45,9 @@ function Shell() {
         <Sidebar />
 
         {/* `overflow-hidden` sigue siendo a proposito: cada pagina decide su
-            propia zona de scroll en vez de que el layout adivine un alto fijo.
-
-            La barra va ARRIBA de esa zona, no dentro: por estar encima del
-            elemento que scrollea se queda quieta por construccion, sin
-            `position: sticky` y sin que ninguna pantalla ceda el scroll.
-
-            El padding que antes vivia aca bajo al div de contenido: la barra va
-            a sangre, borde a borde. */}
+            propia zona de scroll en vez de que el layout adivine un alto fijo. */}
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           <BreadcrumbLabelContext.Provider value={setDynamicLabel}>
-            <AppBar />
-
             {/* El lienzo tintado. Las superficies de trabajo —tablas, paneles,
                 tarjetas— flotan encima en blanco. Esa diferencia minima de
                 valor es lo que las despega sin necesitar una sombra pesada. */}
