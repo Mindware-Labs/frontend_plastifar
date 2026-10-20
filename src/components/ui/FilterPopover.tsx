@@ -172,10 +172,10 @@ export function FilterPopover({
         data-active={count > 0}
         className="flex h-8 items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5
           text-[12.5px] font-medium text-brand-gray outline-none transition-all duration-150
-          hover:border-hairline-hover hover:text-ink active:scale-[0.97]
+          hover:border-brand-red/50 hover:bg-red-50/40 hover:text-brand-red active:scale-[0.97]
           focus-visible:border-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/10
           data-[active=true]:border-brand-red/40 data-[active=true]:text-brand-red-dark
-          aria-expanded:bg-fill aria-expanded:text-ink"
+          aria-expanded:border-brand-red aria-expanded:bg-red-50 aria-expanded:text-brand-red aria-expanded:ring-2 aria-expanded:ring-brand-red/15"
       >
         <SlidersHorizontal className="h-3.5 w-3.5" />
         {label}

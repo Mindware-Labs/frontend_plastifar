@@ -112,13 +112,15 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
         aria-label={active > 0 ? `Filtros (${active} activos)` : "Filtros"}
         title={active > 0 ? `Filtros avanzados (${active} activos)` : "Filtros avanzados"}
         data-active={active > 0}
-        className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 ${
-          active > 0
-            ? "border border-zinc-300 bg-zinc-100 text-zinc-900 font-semibold"
-            : "border border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+        className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-2xs transition-all duration-150 outline-none select-none cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/30 ${
+          open
+            ? "border-brand-red bg-red-50 text-brand-red ring-2 ring-brand-red/20 shadow-xs font-semibold hover:bg-red-100/90 hover:border-brand-red hover:text-brand-red"
+            : active > 0
+            ? "border-brand-red/50 bg-red-50/70 text-brand-red font-semibold shadow-2xs hover:bg-red-100 hover:border-brand-red"
+            : "border-zinc-200 bg-white text-zinc-600 hover:border-brand-red/50 hover:bg-red-50/40 hover:text-brand-red hover:shadow-2xs"
         }`}
       >
-        <SlidersHorizontal className="h-3.5 w-3.5" />
+        <SlidersHorizontal className={`h-3.5 w-3.5 transition-transform duration-150 ${open ? "scale-105" : ""}`} />
         {active > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[9.5px] font-bold text-white shadow-2xs tabular-nums">
             {active}
