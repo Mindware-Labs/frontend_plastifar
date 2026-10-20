@@ -94,7 +94,7 @@ export const AVATAR = ["#3D4557", "#2F5FD0", "#0E7886", "#6247B5", "#6E7583"] as
 
 export const C = {
   /** El lienzo. Sobre esto flotan las tarjetas. */
-  page: "#F3F5F7",
+  page: "#F8F9FA",
   /** La superficie de trabajo. */
   card: "#FFFFFF",
   /**

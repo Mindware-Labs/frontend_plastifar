@@ -56,9 +56,9 @@
 
   /* Neutros de interfaz (no institucionales: soporte de pantalla) */
   --color-ink: #23232b;
-  --color-canvas: #f3f5f7;
+  --color-canvas: #f8f9fa;
   --color-line: #eaeaef;
-  --color-line-soft: #f3f3f7;
+  --color-line-soft: #f2f3f5;
   --color-line-strong: #e3e3e9;
   /* Los dos grises de texto secundario cumplen 4.5:1 sobre blanco: 5.9:1 el
      apagado y 4.8:1 el tenue. Se llama "subtle" y no "muted" porque shadcn ya
