@@ -1,6 +1,7 @@
 import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -128,6 +129,23 @@ export function TaskTypesSection() {
 
   return (
     <>
+      <ModuleHeader
+        title="Tipos de tarea"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "tipo de tarea" : "tipos de tarea"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"}`
+            : "Cargando el catálogo de tipos de tarea…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nuevo tipo
+            </Button>
+          )
+        }
+      />
+
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {undecided && (
@@ -140,14 +158,6 @@ export function TaskTypesSection() {
       )}
 
       <ListPanel
-        action={
-          canWrite && (
-            <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nuevo tipo
-            </Button>
-          )
-        }
         toolbar={
           <>
             <SearchInput value={search} onChange={setSearch} placeholder="Buscar tipo de tarea…" className="w-[240px]" />

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import "./dashboard.css";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { AgentPerformance } from "./components/AgentPerformance";
 import { CallDetails } from "./components/CallDetails";
 import { KpiRow } from "./components/KpiRow";
@@ -109,6 +110,7 @@ export function CXDashboard({ query }: { query?: string }) {
   if (error !== null) {
     return (
       <div className="cxhub" style={{ padding: "2px 3px" }}>
+        <ModuleHeader title="Dashboard" summary="Tablero de operaciones" />
         <LoadErrorAlert message={error} onRetry={() => setReloadKey((k) => k + 1)} />
       </div>
     );
@@ -121,6 +123,7 @@ export function CXDashboard({ query }: { query?: string }) {
   if (data === null) {
     return (
       <div className="cxhub" style={{ padding: "2px 3px" }}>
+        <ModuleHeader title="Dashboard" summary="Cargando el tablero de operaciones…" />
         <TableSkeleton rows={10} columns={4} />
       </div>
     );
@@ -129,6 +132,10 @@ export function CXDashboard({ query }: { query?: string }) {
   return (
     <DashboardContext.Provider value={data}>
     <div className="cxhub" style={{ display: "flex", flexDirection: "column", height: "100%", minWidth: 0 }}>
+      <ModuleHeader
+        title="Dashboard"
+        summary={`${data.counts.live} tickets vivos · ${data.counts.overdue} fuera de plazo · últimos ${DIAS} días`}
+      />
       {/* `minHeight: 0` es lo que permite que un hijo flex baje de la altura de
           su contenido; sin eso la caja crece y el overflow nunca se activa. El
           relleno lateral de 3 px le da sitio al anillo de foco, que si no queda

@@ -1,6 +1,7 @@
 import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -128,15 +129,26 @@ export function PlantsSection() {
 
   return (
     <>
+      <ModuleHeader
+        title="Plantas"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "planta" : "plantas"} · ${counts.active} ${counts.active === 1 ? "activa" : "activas"}`
+            : "Cargando las plantas configuradas…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva planta
+            </Button>
+          )
+        }
+      />
+
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
-        action={canWrite && (
-          <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nueva planta
-          </Button>
-        )}
         toolbar={
           <>
             <SearchInput

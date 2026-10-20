@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { ApiError } from "../../api/client";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker } from "../../components/ui/ColumnPicker";
@@ -277,6 +278,36 @@ export function PermissionsPage() {
 
   return (
     <div>
+      <ModuleHeader
+        title="Permisos"
+        summary={
+          matrix
+            ? `${catalog.length} permisos · ${matrix.roles.length} roles · ${
+                counts.sinAsignar === 0
+                  ? "todos asignados"
+                  : `${counts.sinAsignar} sin asignar a ningún rol`
+              }`
+            : "Cargando el catálogo de permisos…"
+        }
+        action={
+          canWrite && dirtyCells > 0 && (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setConfirmingDiscard(true)}
+                disabled={isSaving}
+              >
+                Descartar
+              </Button>
+              <Button size="sm" onClick={save} isLoading={isSaving}>
+                {`Guardar ${dirtyCells} ${dirtyCells === 1 ? "cambio" : "cambios"}`}
+              </Button>
+            </div>
+          )
+        }
+      />
+
       {/* La matriz es la unica pantalla del panel que vivia a la intemperie: la
           cabecera blanca, las bandas de modulo grises y las filas blancas se
           apilaban sin nada que las contuviera, asi que se leian como tres capas

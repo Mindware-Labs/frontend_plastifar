@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -178,6 +179,23 @@ export function SlaSection() {
 
   return (
     <>
+      <ModuleHeader
+        title="Políticas de SLA"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "política" : "políticas"} · ${counts.active} ${counts.active === 1 ? "activa" : "activas"} · ${4 - uncovered.length} de 4 prioridades cubiertas`
+            : "Cargando las políticas de SLA…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva política
+            </Button>
+          )
+        }
+      />
+
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {actionError && (
@@ -197,12 +215,6 @@ export function SlaSection() {
       )}
 
       <ListPanel
-        action={canWrite && (
-          <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nueva política
-          </Button>
-        )}
         toolbar={
           <>
             <SearchInput

@@ -215,7 +215,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     // persona sin saber donde esta, y el aviso trae la salida.
     return (
       <div>
-        <ModuleHeader sections={sections} />
+        <ModuleHeader title="HCA" sections={sections} />
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-[240px] flex-1">
             <Alert variant="error">{error}</Alert>
@@ -401,7 +401,12 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
        secciones y su accion se acotan a la medida de la hoja. Un boton a 210 px
        del borde derecho del panel que gobierna deja de leerse como suyo. */
     <div className={section === "datos" ? "max-w-[880px]" : undefined}>
-      <ModuleHeader sections={sections} action={primaryAction} />
+      <ModuleHeader
+        title={sheet.number}
+        summary={`${sheet.clientName} · ${sheet.productLineName}`}
+        sections={sections}
+        action={primaryAction}
+      />
 
       {actionError && (
         <div className="mb-3">

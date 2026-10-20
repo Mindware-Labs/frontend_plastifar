@@ -2,6 +2,7 @@ import { CheckCircle2, Pencil, Plug, Plus, Power, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -175,6 +176,27 @@ export function MailboxesSection() {
 
   return (
     <>
+      <ModuleHeader
+        title="Buzones"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "buzón" : "buzones"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"}`
+            : "Cargando los buzones configurados…"
+        }
+        action={
+          canWrite && (
+            <Button
+              size="sm"
+              onClick={() => setModal("nuevo")}
+              disabled={busyId !== null || testingId !== null}
+            >
+              <Plus className="h-[15px] w-[15px]" />
+              Nuevo buzón
+            </Button>
+          )
+        }
+      />
+
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {departmentsRef.failed && (
@@ -193,16 +215,6 @@ export function MailboxesSection() {
       )}
 
       <ListPanel
-        action={canWrite && (
-          <Button
-            size="sm"
-            onClick={() => setModal("nuevo")}
-            disabled={busyId !== null || testingId !== null}
-          >
-            <Plus className="h-[15px] w-[15px]" />
-            Nuevo buzón
-          </Button>
-        )}
         toolbar={
           <>
             <SearchInput

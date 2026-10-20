@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { withdrawalsApi, type WithdrawalCounts, type WithdrawalListResponse, type WithdrawalQuery } from "../../api/withdrawals";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ControlInput } from "../../components/ui/ControlInput";
@@ -104,6 +105,23 @@ export function WithdrawalsPage() {
 
   return (
     <div>
+      <ModuleHeader
+        title="Retiros"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "solicitud" : "solicitudes"} · ${counts.requested} ${counts.requested === 1 ? "solicitada" : "solicitadas"} · ${counts.approved} ${counts.approved === 1 ? "aprobada" : "aprobadas"}`
+            : "Cargando las solicitudes de retiro de mercancía…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva solicitud
+            </Button>
+          )
+        }
+      />
+
       {error && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="min-w-[240px] flex-1">
@@ -116,14 +134,6 @@ export function WithdrawalsPage() {
       )}
 
       <ListPanel
-        action={
-          canWrite && (
-            <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nueva solicitud
-            </Button>
-          )
-        }
         toolbar={
           <>
             <SearchInput

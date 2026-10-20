@@ -1,6 +1,7 @@
 import { Pencil, Plus, Power } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -97,15 +98,26 @@ export function ProductLinesSection() {
 
   return (
     <>
+      <ModuleHeader
+        title="Líneas de producto"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "línea" : "líneas"} · ${counts.active} ${counts.active === 1 ? "activa" : "activas"} · eje por el que Calidad sigue las reclamaciones`
+            : "Cargando las líneas de producto…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva línea
+            </Button>
+          )
+        }
+      />
+
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
-        action={canWrite && (
-          <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nueva línea
-          </Button>
-        )}
         toolbar={
           <>
             <SearchInput

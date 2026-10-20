@@ -2,6 +2,7 @@ import { FileUp, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -158,6 +159,34 @@ export function ProductsSection() {
 
   return (
     <>
+      <ModuleHeader
+        title="Productos"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "producto" : "productos"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"}`
+            : "Cargando el catálogo de productos…"
+        }
+        action={
+          canWrite && (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setIsImporting(true)}
+                disabled={busyId !== null}
+              >
+                <FileUp className="h-[15px] w-[15px]" />
+                Cargar archivo
+              </Button>
+              <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
+                <Plus className="h-[15px] w-[15px]" />
+                Nuevo producto
+              </Button>
+            </div>
+          )
+        }
+      />
+
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
       {referencesFailed && (
         <LoadErrorAlert
@@ -170,23 +199,6 @@ export function ProductsSection() {
       )}
 
       <ListPanel
-        action={canWrite && (
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setIsImporting(true)}
-              disabled={busyId !== null}
-            >
-              <FileUp className="h-[15px] w-[15px]" />
-              Cargar archivo
-            </Button>
-            <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nuevo producto
-            </Button>
-          </div>
-        )}
         toolbar={
           <>
             <SearchInput

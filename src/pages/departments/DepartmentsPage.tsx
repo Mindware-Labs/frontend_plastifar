@@ -1,6 +1,7 @@
 import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { departmentsApi } from "../../api/departments";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -248,11 +249,13 @@ export function DepartmentsPage() {
 
   return (
     <>
-      {failed && (
-        <LoadErrorAlert message="No se pudieron cargar los departamentos" onRetry={reload} />
-      )}
-
-      <ListPanel
+      <ModuleHeader
+        title="Departamentos"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "departamento" : "departamentos"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"} · ${counts.publicos} ${counts.publicos === 1 ? "público" : "públicos"}`
+            : "Cargando el organigrama de departamentos…"
+        }
         action={
           canWrite && (
             <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
@@ -261,6 +264,13 @@ export function DepartmentsPage() {
             </Button>
           )
         }
+      />
+
+      {failed && (
+        <LoadErrorAlert message="No se pudieron cargar los departamentos" onRetry={reload} />
+      )}
+
+      <ListPanel
         toolbar={
           <>
             <SearchInput

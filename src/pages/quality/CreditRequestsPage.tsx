@@ -5,6 +5,7 @@ import {
   type CreditListResponse,
   type CreditQuery,
 } from "../../api/quality";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
@@ -134,6 +135,22 @@ export function CreditRequestsPage() {
 
   return (
     <div>
+      <ModuleHeader
+        title="Solicitudes de crédito"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "solicitud" : "solicitudes"} · ${counts.requested} ${counts.requested === 1 ? "pendiente de decisión" : "pendientes de decisión"} · ${counts.approved} ${counts.approved === 1 ? "aprobada" : "aprobadas"}`
+            : "Cargando las solicitudes de crédito…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva solicitud
+            </Button>
+          )
+        }
+      />
 
       {error && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -148,14 +165,6 @@ export function CreditRequestsPage() {
 
 
       <ListPanel
-        action={
-          canWrite && (
-            <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nueva solicitud
-            </Button>
-          )
-        }
         toolbar={
           <>
         {/* Sin rótulo: el placeholder ya dice qué busca. */}

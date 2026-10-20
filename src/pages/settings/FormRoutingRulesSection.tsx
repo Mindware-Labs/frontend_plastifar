@@ -1,6 +1,7 @@
 import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -114,9 +115,13 @@ export function FormRoutingRulesSection() {
 
   return (
     <>
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
-
-      <ListPanel
+      <ModuleHeader
+        title="Formularios"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "regla de enrutamiento" : "reglas de enrutamiento"} · ${counts.active} ${counts.active === 1 ? "activa" : "activas"}`
+            : "Cargando las reglas de enrutamiento de formularios…"
+        }
         action={
           canWrite && (
             <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
@@ -125,6 +130,11 @@ export function FormRoutingRulesSection() {
             </Button>
           )
         }
+      />
+
+      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
+
+      <ListPanel
         toolbar={
           <>
             <Select

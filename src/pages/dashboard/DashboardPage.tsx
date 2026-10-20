@@ -11,6 +11,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { reportsApi, type ClientsReport, type QualityReport } from "../../api/reports";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Board, KpiRow, PeriodTabs, RefreshButton, type KpiItem } from "./board";
@@ -292,13 +293,20 @@ export function DashboardPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Cabecera de modulo: filete y controles a la derecha, nada mas. El
-          nombre de la pantalla lo dice la miga de la TopBar — repetirlo aqui
-          seria el mismo hecho dos veces, que es la regla del panel. */}
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-b border-line pb-3">
-        <PeriodTabs options={PERIODS} value={period} onChange={setPeriod} />
-        <RefreshButton onClick={load} busy={isLoading} />
-      </div>
+      <ModuleHeader
+        title="Dashboard de calidad"
+        summary={
+          quality && clients
+            ? `${formatInteger(quality.openedInRange)} HCA abiertas · ${formatInteger(quality.closedInRange)} cerradas · ${formatInteger(clients.active)} clientes activos`
+            : "Cargando métricas de calidad…"
+        }
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <PeriodTabs options={PERIODS} value={period} onChange={setPeriod} />
+            <RefreshButton onClick={load} busy={isLoading} />
+          </div>
+        }
+      />
 
       {/* EL SCROLL DE LA PAGINA VIVE ACA. `AppLayout` pone `overflow-hidden` en
           `main` a proposito: cada pantalla declara su propia zona de scroll. Sin

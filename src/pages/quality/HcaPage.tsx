@@ -9,6 +9,7 @@ import {
   type SheetListResponse,
   type SheetQuery,
 } from "../../api/quality";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
@@ -195,6 +196,23 @@ export function HcaPage() {
 
   return (
     <div>
+      <ModuleHeader
+        title="HCA"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "hoja" : "hojas"} · ${counts.open} ${counts.open === 1 ? "abierta" : "abiertas"} · ${counts.overdue} ${counts.overdue === 1 ? "vencida" : "vencidas"}`
+            : "Cargando las hojas de corrección y acción…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setModalOpen(true)}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva HCA
+            </Button>
+          )
+        }
+      />
+
       {error && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="min-w-[240px] flex-1">
@@ -318,15 +336,6 @@ export function HcaPage() {
           </CriteriaField>
         </div>
         </FilterPopover>
-
-        {canWrite && (
-          <div className="ml-auto">
-            <Button size="sm" onClick={() => setModalOpen(true)}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nueva HCA
-            </Button>
-          </div>
-        )}
         </div>
 
         {/* Antes de la primera respuesta no hay contadores: un «0» al lado de

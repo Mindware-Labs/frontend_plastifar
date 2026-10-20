@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { claimsApi, type ClaimListResponse, type ClaimQuery } from "../../api/claims";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ControlInput } from "../../components/ui/ControlInput";
@@ -114,6 +115,15 @@ export function ClaimsPage() {
 
   return (
     <div>
+      <ModuleHeader
+        title="Reclamaciones"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "reclamación" : "reclamaciones"} · ${counts.registered} ${counts.registered === 1 ? "registrada" : "registradas"} · ${counts.inTreatment} en tratamiento`
+            : "Cargando las reclamaciones de clientes…"
+        }
+      />
+
       {error && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="min-w-[240px] flex-1">

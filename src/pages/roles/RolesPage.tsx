@@ -88,7 +88,7 @@ export function RolesPage() {
   return (
     <div className="flex h-full flex-col">
       <ModuleHeader
-        title="Personal"
+        title="Roles"
         summary={
           counts
             ? `${counts.all} roles definidos · ${counts.custom} personalizados · los permisos llegan en una fase posterior`

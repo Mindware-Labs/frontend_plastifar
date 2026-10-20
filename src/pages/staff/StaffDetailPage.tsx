@@ -214,7 +214,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   if (error !== null && staff === null) {
     return (
       <div>
-        <ModuleHeader sections={sections} />
+        <ModuleHeader title="Colaborador" sections={sections} />
         <div className="flex flex-col items-start gap-2">
           <Alert variant="error">{error}</Alert>
           <Button size="sm" variant="secondary" onClick={() => void load()}>
@@ -240,6 +240,8 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
        nombra no separa nada. «Accesos» es una matriz y se queda a todo el ancho. */
     <div className={section === "datos" ? "max-w-[880px]" : undefined}>
       <ModuleHeader
+        title={fullName}
+        summary={`${staff.email} · ${primary ? primary.departmentName : "Sin departamento principal"}`}
         sections={sections}
         action={
           section === "accesos" && canManageAccess && matrix !== null && (

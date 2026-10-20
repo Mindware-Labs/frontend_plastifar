@@ -1,6 +1,7 @@
 import { Pencil, Plus, Power } from "lucide-react";
 import { useState } from "react";
 import { territoriesApi, type TerritoryQuery } from "../../api/territories";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -102,15 +103,26 @@ export function TerritoriesSection() {
 
   return (
     <>
+      <ModuleHeader
+        title="Territorios"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "territorio" : "territorios"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"} · obligatorios al registrar un cliente`
+            : "Cargando los territorios…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nuevo territorio
+            </Button>
+          )
+        }
+      />
+
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
-        action={canWrite && (
-          <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nuevo territorio
-          </Button>
-        )}
         toolbar={
           <>
             <SearchInput

@@ -254,7 +254,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   if (error !== null && client === null) {
     return (
       <div>
-        <ModuleHeader sections={sections} />
+        <ModuleHeader title="Cliente" sections={sections} />
         <div className="flex flex-col items-start gap-2">
           <Alert variant="error">{error}</Alert>
           <Button size="sm" variant="secondary" onClick={() => void loadRecord()}>
@@ -282,6 +282,8 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
        Historial son tablas y se quedan a todo el ancho. */
     <div className={section === "datos" ? "max-w-[880px]" : undefined}>
       <ModuleHeader
+        title={client.name}
+        summary={`${client.code} · ${territoryName(client.territoryId)}`}
         sections={sections}
         action={
           canWrite &&

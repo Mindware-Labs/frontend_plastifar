@@ -1,6 +1,7 @@
 import { Pencil, Plus, Power } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -95,15 +96,26 @@ export function TemplatesSection() {
 
   return (
     <>
+      <ModuleHeader
+        title="Plantillas"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "plantilla" : "plantillas"} · ${counts.active} ${counts.active === 1 ? "activa" : "activas"} · variables con llaves dobles`
+            : "Cargando las plantillas de correo…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva plantilla
+            </Button>
+          )
+        }
+      />
+
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
-        action={canWrite && (
-          <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nueva plantilla
-          </Button>
-        )}
         toolbar={
           <>
             <SearchInput

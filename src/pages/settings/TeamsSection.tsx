@@ -1,6 +1,7 @@
 import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -118,15 +119,26 @@ export function TeamsSection() {
 
   return (
     <>
+      <ModuleHeader
+        title="Equipos"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "equipo" : "equipos"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"}`
+            : "Cargando los equipos de trabajo…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nuevo equipo
+            </Button>
+          )
+        }
+      />
+
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
-        action={canWrite && (
-          <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nuevo equipo
-          </Button>
-        )}
         toolbar={
           <>
             <SearchInput

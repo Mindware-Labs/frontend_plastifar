@@ -2,6 +2,7 @@ import { CalendarOff, Pencil, Plus, Power } from "lucide-react";
 import { useState } from "react";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -166,6 +167,23 @@ export function HolidaysSection() {
 
   return (
     <>
+      <ModuleHeader
+        title="Días no laborables"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "día registrado" : "días registrados"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"} · se saltan en políticas con reloj de jornada`
+            : "Cargando el calendario de días no laborables…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nuevo día
+            </Button>
+          )
+        }
+      />
+
       {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       {policiesRef.failed && (
@@ -176,12 +194,6 @@ export function HolidaysSection() {
       )}
 
       <ListPanel
-        action={canWrite && (
-          <Button size="sm" onClick={() => setModal("nuevo")} disabled={busyId !== null}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nuevo día
-          </Button>
-        )}
         toolbar={
           <>
             <SearchInput

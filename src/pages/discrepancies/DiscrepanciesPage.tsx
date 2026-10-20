@@ -2,6 +2,7 @@ import { Plus, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { discrepanciesApi, type DiscrepancyListResponse, type DiscrepancyQuery } from "../../api/discrepancies";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ControlInput } from "../../components/ui/ControlInput";
@@ -93,6 +94,23 @@ export function DiscrepanciesPage() {
 
   return (
     <div>
+      <ModuleHeader
+        title="Discrepancias"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "investigación" : "investigaciones"} · ${counts.investigating} en investigación · ${counts.withFinding} con hallazgo de seguridad`
+            : "Cargando las investigaciones de discrepancia…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva investigación
+            </Button>
+          )
+        }
+      />
+
       {error && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="min-w-[240px] flex-1">
@@ -105,14 +123,6 @@ export function DiscrepanciesPage() {
       )}
 
       <ListPanel
-        action={
-          canWrite && (
-            <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nueva investigación
-            </Button>
-          )
-        }
         toolbar={
           <>
             <SearchInput

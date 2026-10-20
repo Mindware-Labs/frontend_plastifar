@@ -5,6 +5,7 @@ import { clientsApi, type ClientQuery } from "../../api/clients";
 import { fetchAllPages } from "../../api/paging";
 import { staffApi } from "../../api/staff";
 import { territoriesApi } from "../../api/territories";
+import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
@@ -298,6 +299,22 @@ export function ClientsPage() {
 
   return (
     <div>
+      <ModuleHeader
+        title="Clientes"
+        summary={
+          counts
+            ? `${counts.all} ${counts.all === 1 ? "cliente" : "clientes"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"} · ${counts.withoutSalesRep} sin vendedor`
+            : "Cargando el directorio de clientes…"
+        }
+        action={
+          canWrite && (
+            <Button size="sm" onClick={() => setModal("nuevo")}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nuevo cliente
+            </Button>
+          )
+        }
+      />
 
       {/* El reintento va en linea con su aviso, no debajo: apilados en columna
           eran dos bloques de dos alturas cada uno empujando la tabla. */}
@@ -405,15 +422,6 @@ export function ClientsPage() {
             ]}
           />
           </FilterPopover>
-
-          {canWrite && (
-            <div className="ml-auto">
-              <Button size="sm" onClick={() => setModal("nuevo")}>
-                <Plus className="h-[15px] w-[15px]" />
-                Nuevo cliente
-              </Button>
-            </div>
-          )}
           </div>
 
           <div className="flex w-full flex-wrap items-center gap-2">

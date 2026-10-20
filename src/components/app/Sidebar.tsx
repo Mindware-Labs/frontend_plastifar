@@ -51,10 +51,10 @@ function FolderBadge({
 
   return (
     <span
-      className={`ml-auto shrink-0 rounded-md px-1.5 py-0.5 font-heading text-[10px] font-bold leading-none tabular-nums transition-colors duration-200 ${
+      className={`ml-auto inline-flex h-[18px] min-w-[20px] shrink-0 items-center justify-center rounded-full px-1.5 font-heading text-[10.5px] font-bold leading-none tabular-nums transition-all duration-200 ${
         isActive
-          ? "bg-brand-red/10 text-brand-red"
-          : "bg-zinc-100 text-zinc-600 group-hover:bg-zinc-200/70 group-hover:text-zinc-900"
+          ? "bg-brand-red text-white shadow-[0_1px_4px_rgba(228,0,43,0.28)]"
+          : "bg-zinc-100 text-zinc-600 ring-1 ring-inset ring-zinc-200/80 group-hover:bg-zinc-200/75 group-hover:text-zinc-900"
       }`}
     >
       {count.unread > 99 ? "99+" : count.unread}
@@ -290,6 +290,7 @@ export function Sidebar() {
       const open = isGroupOpen(group);
       const panelId = `nav-${group.label.toLowerCase().replace(/\s+/g, "-")}`;
       const active = isGroupActive(group);
+      const children = visibleChildren(group);
 
       return (
         <div key={group.label} className="flex flex-col">
@@ -298,34 +299,44 @@ export function Sidebar() {
             onClick={() => toggleGroup(group)}
             aria-expanded={open}
             aria-controls={panelId}
-            className={`group relative flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+            className={`group relative flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-all duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
               active && !open
-                ? "bg-zinc-100 text-zinc-900 font-semibold"
+                ? "bg-zinc-100/90 text-zinc-950 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(24,24,27,0.04)] ring-1 ring-zinc-900/[0.05]"
+                : active && open
+                ? "text-zinc-950 font-semibold hover:bg-zinc-100/60"
+                : open
+                ? "text-zinc-800 font-medium hover:bg-zinc-100/60"
                 : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
             }`}
           >
             <ActiveMark active={active && !open} className="-left-2" />
             <group.icon
-              strokeWidth={active ? 2.25 : 2}
-              className={`h-4 w-4 shrink-0 transition-colors ${
-                active ? "text-zinc-900" : "text-zinc-400 group-hover:text-zinc-700"
+              strokeWidth={active || open ? 2.2 : 1.9}
+              className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
+                active && !open
+                  ? "text-brand-red"
+                  : active || open
+                  ? "text-zinc-900"
+                  : "text-zinc-400 group-hover:text-zinc-700"
               }`}
             />
             <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>
             {!open && group.label === "Correo" && pendingMail > 0 && (
-              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand-red px-1.5 font-heading text-[9.5px] font-bold text-white shadow-2xs">
+              <span className="flex h-[18px] min-w-[20px] items-center justify-center rounded-full bg-brand-red px-1.5 font-heading text-[10px] font-bold text-white shadow-[0_1px_4px_rgba(228,0,43,0.28)]">
                 {pendingMail > 99 ? "99+" : pendingMail}
               </span>
             )}
             <ChevronDown
               aria-hidden
-              className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring group-hover:text-zinc-600 motion-reduce:transition-none ${
-                open ? "rotate-180" : "rotate-0"
+              className={`h-3.5 w-3.5 shrink-0 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+                open
+                  ? "rotate-180 text-zinc-600"
+                  : "rotate-0 text-zinc-400 group-hover:text-zinc-600"
               }`}
             />
           </button>
 
-          {/* Opciones con animación suave de colapso */}
+          {/* Sub-opciones conectadas a la familia mediante árbol curvo */}
           <div
             id={panelId}
             className={`grid transition-[grid-template-rows,opacity] duration-280 ease-plf-spring motion-reduce:transition-none ${
@@ -335,37 +346,61 @@ export function Sidebar() {
             }`}
           >
             <div className="overflow-hidden">
-              <div className="mb-1 ml-[17px] mt-0.5 flex flex-col gap-0.5 border-l border-zinc-200/80 pl-2">
-                {visibleChildren(group).map((child) => {
+              <div className="relative mb-1.5 mt-0.5 flex flex-col gap-0.5 pl-[26px]">
+                {/* Tronco vertical continuo de la familia: nace bajo el icono padre y entrega en el codo del último hijo */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute -top-0.5 bottom-[22px] left-[17.5px] w-px bg-zinc-200/90"
+                />
+
+                {children.map((child) => {
                   const hasUnread = Boolean(child.folder && counts && counts[child.folder]?.unread > 0);
+
                   return (
                     <NavLink
                       key={child.to}
                       to={child.to}
                       end={child.end}
                       className={({ isActive }) =>
-                        `group relative flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                        `group relative flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-all duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                           isActive
-                            ? "bg-zinc-100 text-zinc-900 font-semibold"
+                            ? "bg-zinc-100/95 text-zinc-950 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_1px_2px_rgba(24,24,27,0.04)] ring-1 ring-zinc-900/[0.06]"
                             : hasUnread
-                            ? "text-zinc-900 font-semibold hover:bg-zinc-100/70"
-                            : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
+                            ? "text-zinc-900 font-semibold hover:bg-zinc-100/65"
+                            : "text-zinc-600 font-medium hover:bg-zinc-100/65 hover:text-zinc-900"
                         }`
                       }
                     >
                       {({ isActive }) => (
                         <>
-                          <ActiveMark active={isActive} className="-left-[9.5px]" />
+                          {/* Codo curvo que une cada opción con el tronco de su familia */}
+                          <span
+                            aria-hidden
+                            className={`pointer-events-none absolute -left-[8.5px] top-0 z-10 h-1/2 w-[8.5px] rounded-bl-[7px] border-b border-l transition-colors duration-150 ${
+                              isActive
+                                ? "border-brand-red/55"
+                                : "border-zinc-200/90 group-hover:border-zinc-300"
+                            }`}
+                          />
+
+                          {/* Cápsula activa sobre la unión de la opción */}
+                          <span
+                            aria-hidden
+                            className={`pointer-events-none absolute -left-[1.5px] top-1/2 z-20 h-3.5 w-[2.5px] -translate-y-1/2 rounded-full bg-brand-red shadow-[0_0_6px_rgba(228,0,43,0.35)] transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+                              isActive ? "scale-y-100" : "scale-y-0"
+                            }`}
+                          />
+
                           {child.icon && (
                             <child.icon
                               aria-hidden
-                              strokeWidth={isActive ? 2.25 : 2}
-                              className={`h-3.5 w-3.5 shrink-0 transition-colors ${
+                              strokeWidth={isActive ? 2.2 : 1.9}
+                              className={`h-3.5 w-3.5 shrink-0 transition-colors duration-150 ${
                                 isActive
-                                  ? "text-zinc-900"
+                                  ? "text-brand-red"
                                   : hasUnread
                                   ? "text-zinc-800"
-                                  : "text-zinc-400 group-hover:text-zinc-700"
+                                  : "text-zinc-400 group-hover:text-zinc-600"
                               }`}
                             />
                           )}
@@ -390,9 +425,9 @@ export function Sidebar() {
         key={group.to}
         to={group.to!}
         className={({ isActive }) =>
-          `group relative flex h-[34px] items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+          `group relative flex h-[34px] items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-all duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
             isActive
-              ? "bg-zinc-100 text-zinc-900 font-semibold"
+              ? "bg-zinc-100/95 text-zinc-950 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_1px_2px_rgba(24,24,27,0.04)] ring-1 ring-zinc-900/[0.06]"
               : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
           }`
         }
@@ -401,9 +436,9 @@ export function Sidebar() {
           <>
             <ActiveMark active={isActive} className="-left-2" />
             <group.icon
-              strokeWidth={isActive ? 2.25 : 2}
-              className={`h-4 w-4 shrink-0 transition-colors ${
-                isActive ? "text-zinc-900" : "text-zinc-400 group-hover:text-zinc-700"
+              strokeWidth={isActive ? 2.2 : 1.9}
+              className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
+                isActive ? "text-brand-red" : "text-zinc-400 group-hover:text-zinc-700"
               }`}
             />
             <span className="min-w-0 flex-1 truncate">{group.label}</span>
@@ -500,12 +535,17 @@ export function Sidebar() {
                 onBlur={scheduleClose}
                 className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                   isGroupActive(group)
-                    ? "bg-zinc-100 text-zinc-900"
+                    ? "bg-zinc-100/95 text-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_1px_2px_rgba(24,24,27,0.04)] ring-1 ring-zinc-900/[0.06]"
                     : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 active:scale-95 motion-reduce:active:scale-100"
                 }`}
               >
                 <ActiveMark active={isGroupActive(group)} className="-left-4" />
-                <group.icon className="h-4.5 w-4.5" strokeWidth={isGroupActive(group) ? 2.25 : 2} />
+                <group.icon
+                  className={`h-4.5 w-4.5 transition-colors ${
+                    isGroupActive(group) ? "text-brand-red" : ""
+                  }`}
+                  strokeWidth={isGroupActive(group) ? 2.2 : 1.95}
+                />
 
                 {/* Badge con aviso de pendientes en modo contraído */}
                 {group.label === "Correo" && pendingMail > 0 && (
@@ -547,7 +587,7 @@ export function Sidebar() {
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
           style={{ top: flyout.top, left: flyout.left, transformOrigin: "0 24px" }}
-          className={`fixed z-40 w-[200px] rounded-xl border border-zinc-200/90 bg-white p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.12),0_2px_6px_rgba(27,27,29,0.04)] ${
+          className={`fixed z-40 w-[210px] rounded-xl border border-zinc-200/90 bg-white p-1.5 shadow-[0_8px_24px_-4px_rgba(27,27,29,0.12),0_2px_6px_rgba(27,27,29,0.04)] ${
             flyoutMotion.exiting ? "pointer-events-none" : ""
           }`}
         >
@@ -560,7 +600,7 @@ export function Sidebar() {
               {flyout.group.label}
             </span>
             {flyout.group.label === "Correo" && pendingMail > 0 && (
-              <span className="rounded-full bg-zinc-100 px-1.5 py-0.2 font-heading text-[10px] font-bold text-zinc-700">
+              <span className="rounded-full bg-brand-red/10 px-1.5 py-0.5 font-heading text-[10px] font-bold leading-none text-brand-red">
                 {pendingMail}
               </span>
             )}
@@ -576,9 +616,9 @@ export function Sidebar() {
                   data-motion-item
                   onClick={() => setFlyoutOpen(false)}
                   className={({ isActive }) =>
-                    `group flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-colors focus-visible:ring-2 focus-visible:ring-brand-red/25 outline-none ${
+                    `group relative flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-brand-red/25 outline-none ${
                       isActive
-                        ? "bg-zinc-100 text-zinc-900 font-semibold"
+                        ? "bg-zinc-100/95 text-zinc-950 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_1px_2px_rgba(24,24,27,0.04)] ring-1 ring-zinc-900/[0.06]"
                         : hasUnread
                         ? "text-zinc-900 font-semibold hover:bg-zinc-100/70"
                         : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
@@ -589,9 +629,10 @@ export function Sidebar() {
                     <>
                       {child.icon && (
                         <child.icon
+                          strokeWidth={isActive ? 2.2 : 1.9}
                           className={`h-4 w-4 shrink-0 transition-colors ${
                             isActive
-                              ? "text-zinc-900"
+                              ? "text-brand-red"
                               : hasUnread
                               ? "text-zinc-800"
                               : "text-zinc-400 group-hover:text-zinc-700"
