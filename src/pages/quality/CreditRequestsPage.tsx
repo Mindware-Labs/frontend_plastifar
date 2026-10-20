@@ -12,7 +12,7 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -138,9 +138,78 @@ export function CreditRequestsPage() {
       <ModuleHeader
         title="Solicitudes de crédito"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "solicitud" : "solicitudes"} · ${counts.requested} ${counts.requested === 1 ? "pendiente de decisión" : "pendientes de decisión"} · ${counts.approved} ${counts.approved === 1 ? "aprobada" : "aprobadas"}`
-            : "Cargando las solicitudes de crédito…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "solicitud" : "solicitudes"}
+                count={counts.all}
+                active={chip === "todas"}
+                onClick={() => {
+                  setChip("todas");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todas las solicitudes de crédito"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.requested === 1 ? "solicitada" : "solicitadas"}
+                count={counts.requested}
+                active={chip === "Solicitada"}
+                onClick={() => {
+                  setChip("Solicitada");
+                  setPage(1);
+                }}
+                tone="amber"
+                dot
+                title="Filtrar por solicitudes pendientes de decisión"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.approved === 1 ? "aprobada" : "aprobadas"}
+                count={counts.approved}
+                active={chip === "Aprobada"}
+                onClick={() => {
+                  setChip("Aprobada");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por solicitudes aprobadas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.rejected === 1 ? "rechazada" : "rechazadas"}
+                count={counts.rejected}
+                active={chip === "Rechazada"}
+                onClick={() => {
+                  setChip("Rechazada");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por solicitudes rechazadas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.applied === 1 ? "aplicada" : "aplicadas"}
+                count={counts.applied}
+                active={chip === "Aplicada"}
+                onClick={() => {
+                  setChip("Aplicada");
+                  setPage(1);
+                }}
+                tone="blue"
+                dot
+                title="Filtrar por solicitudes aplicadas"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando las solicitudes de crédito…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -206,29 +275,7 @@ export function CreditRequestsPage() {
           />
           </CriteriaField>
         </FilterPopover>
-
-        {/* Antes de la primera respuesta no hay contadores: un «0» junto a
-            «Solicitadas» es un dato, y seria falso. Se reserva el sitio. */}
-        <div className="flex flex-wrap items-center gap-2">
-          {counts
-            ? CHIPS.map(({ key, label, countKey }) => (
-                <FilterChip
-                  key={key}
-                  label={label}
-                  count={counts[countKey]}
-                  active={chip === key}
-                  onClick={() => setChip(key)}
-                />
-              ))
-            : CHIPS.map(({ key }) => (
-                <span
-                  key={key}
-                  aria-hidden
-                  className="h-8 w-[110px] animate-pulse rounded-full bg-fill"
-                />
-              ))}
-        </div>
-          </>
+      </>
         }
         footer={
           data !== null && (

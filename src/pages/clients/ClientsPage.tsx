@@ -13,7 +13,7 @@ import { Button } from "../../components/ui/Button";
 import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -63,15 +63,6 @@ const chipToStatus: Record<ChipKey, string | undefined> = {
   inactivos: "inactivos",
   sinVendedor: "sinvendedor",
 };
-
-// Declarativas como en Personal y Roles: una sola fuente para etiqueta y
-// contador es lo que evita que los numeros se desalineen al agregar una pastilla.
-const chips: { key: ChipKey; label: string; countKey: keyof ClientListResponse["counts"] }[] = [
-  { key: "todos", label: "Todos", countKey: "all" },
-  { key: "activos", label: "Activos", countKey: "active" },
-  { key: "inactivos", label: "Inactivos", countKey: "inactive" },
-  { key: "sinVendedor", label: "Sin vendedor", countKey: "withoutSalesRep" },
-];
 
 export function ClientsPage() {
   const navigate = useNavigate();
@@ -302,9 +293,53 @@ export function ClientsPage() {
       <ModuleHeader
         title="Clientes"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "cliente" : "clientes"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"} · ${counts.withoutSalesRep} sin vendedor`
-            : "Cargando el directorio de clientes…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "cliente" : "clientes"}
+                count={counts.all}
+                active={chip === "todos"}
+                onClick={() => { setChip("todos"); setPage(1); }}
+                tone="neutral"
+                title="Mostrar todos los clientes"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={chip === "activos"}
+                onClick={() => { setChip("activos"); setPage(1); }}
+                tone="emerald"
+                dot
+                title="Filtrar por clientes activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                count={counts.inactive}
+                active={chip === "inactivos"}
+                onClick={() => { setChip("inactivos"); setPage(1); }}
+                tone="red"
+                dot
+                title="Filtrar por clientes inactivos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="sin vendedor"
+                count={counts.withoutSalesRep}
+                active={chip === "sinVendedor"}
+                onClick={() => { setChip("sinVendedor"); setPage(1); }}
+                tone="amber"
+                dot
+                title="Filtrar por clientes sin vendedor asignado"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando el directorio de clientes…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -360,93 +395,61 @@ export function ClientsPage() {
           perder el control justo cuando alguien esta esperando. */}
       <ListPanel
         toolbar={
-          <>
-          {/* Dos renglones explicitos: arriba lo que BUSCA y la accion
-              principal; abajo lo que RECORTA. Sueltos en una sola fila que
-              envuelve, la pastilla activa terminaba al final del renglon de
-              los selectores, lejos de sus hermanas. */}
-          <div className="flex w-full flex-wrap items-center gap-2">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            // La seccion 7.3 regla 7 mete tambien el nombre y el correo del
-            // contacto en la misma caja; sin decirlo, nadie encuentra esa mitad.
-            placeholder="Buscar por nombre, código, RNC o contacto…"
-            className="w-[240px]"
-          />
-
-          {/* Territorio, vendedor y tipo, guardados. Eran tres desplegables
-              siempre a la vista que empujaban las pastillas a un segundo
-              renglón; se usan al buscar un recorte concreto, no al abrir. */}
-          <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
-            <Select
-            size="sm"
-            className="w-[200px]"
-            aria-label="Filtrar por territorio"
-            value={territoryId}
-            onChange={setTerritoryId}
-            options={[
-              { value: "todos", label: "Todos los territorios" },
-              ...territories.map((territory) => ({ value: String(territory.id), label: territory.name })),
-            ]}
-          />
-
-          {/* Buscador contra el servidor: el personal crece sin tope y un
-              desplegable precargado dejaba fuera a quien no cupiera. */}
-            <LookupSelect
-            size="sm"
-            className="w-[200px]"
-            aria-label="Filtrar por vendedor"
-            placeholder="Todos los vendedores"
-            searchPlaceholder="Buscar vendedor…"
-            clearLabel="Todos los vendedores"
-            value={salesRepId === "todos" ? "" : salesRepId}
-            selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
-            resolveSelectedLabel={resolveStaffLabel}
-            search={searchActiveStaff}
-            onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
-          />
-
-            <Select
-            size="sm"
-            className="w-[200px]"
-            aria-label="Filtrar por tipo"
-            value={type}
-            onChange={setType}
-            options={[
-              { value: "todos", label: "Todos los tipos" },
-              { value: "Distribuidor", label: "Distribuidor" },
-              { value: "Mayorista", label: "Mayorista" },
-              { value: "Detallista", label: "Detallista" },
-              { value: "Institucional", label: "Institucional" },
-            ]}
-          />
-          </FilterPopover>
-          </div>
-
-          <div className="flex w-full flex-wrap items-center gap-2">
-          {/* Antes de la primera respuesta las pastillas van en esqueleto, no en
-              cero: un cero es una afirmacion, y todavia no se sabe nada. */}
-          {counts === undefined ? (
-            <span aria-hidden className="h-8 w-[416px] max-w-full animate-pulse rounded-edge bg-fill" />
-          ) : (
-            <SegmentedFilter
-              aria-label="Filtrar por estado"
-              value={chip}
-              onChange={setChip}
-              items={chips.map(({ key, label, countKey }) => ({
-                key,
-                label,
-                count: counts[countKey],
-              }))}
+          <div className="flex w-full items-center gap-2">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre, código, RNC o contacto…"
+              className="w-[260px]"
             />
-          )}
 
-          <div className="ml-auto">
-            <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
+            <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
+              <Select
+                size="sm"
+                className="w-[200px]"
+                aria-label="Filtrar por territorio"
+                value={territoryId}
+                onChange={setTerritoryId}
+                options={[
+                  { value: "todos", label: "Todos los territorios" },
+                  ...territories.map((territory) => ({ value: String(territory.id), label: territory.name })),
+                ]}
+              />
+
+              <LookupSelect
+                size="sm"
+                className="w-[200px]"
+                aria-label="Filtrar por vendedor"
+                placeholder="Todos los vendedores"
+                searchPlaceholder="Buscar vendedor…"
+                clearLabel="Todos los vendedores"
+                value={salesRepId === "todos" ? "" : salesRepId}
+                selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
+                resolveSelectedLabel={resolveStaffLabel}
+                search={searchActiveStaff}
+                onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
+              />
+
+              <Select
+                size="sm"
+                className="w-[200px]"
+                aria-label="Filtrar por tipo"
+                value={type}
+                onChange={setType}
+                options={[
+                  { value: "todos", label: "Todos los tipos" },
+                  { value: "Distribuidor", label: "Distribuidor" },
+                  { value: "Mayorista", label: "Mayorista" },
+                  { value: "Detallista", label: "Detallista" },
+                  { value: "Institucional", label: "Institucional" },
+                ]}
+              />
+            </FilterPopover>
+
+            <div className="ml-auto">
+              <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
+            </div>
           </div>
-          </div>
-          </>
         }
         footer={
           data !== null && (

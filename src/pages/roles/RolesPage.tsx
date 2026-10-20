@@ -10,7 +10,7 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
@@ -20,13 +20,6 @@ import type { RoleListResponse, RoleResponse } from "../../types/api";
 import { RoleModal } from "./RoleModal";
 
 type FilterKey = "todos" | "activos" | "sistema" | "personalizados";
-
-const filters: { key: FilterKey; label: string; countKey: keyof RoleListResponse["counts"] }[] = [
-  { key: "todos", label: "Todos", countKey: "all" },
-  { key: "activos", label: "Activos", countKey: "active" },
-  { key: "sistema", label: "Del sistema", countKey: "system" },
-  { key: "personalizados", label: "Personalizados", countKey: "custom" },
-];
 
 export function RolesPage() {
   const { user } = useAuth();
@@ -90,9 +83,65 @@ export function RolesPage() {
       <ModuleHeader
         title="Roles"
         summary={
-          counts
-            ? `${counts.all} roles definidos · ${counts.custom} personalizados · los permisos llegan en una fase posterior`
-            : "Cargando los roles del sistema…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "rol" : "roles"}
+                count={counts.all}
+                active={filter === "todos"}
+                onClick={() => {
+                  setFilter("todos");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todos los roles"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={filter === "activos"}
+                onClick={() => {
+                  setFilter("activos");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por roles activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="del sistema"
+                count={counts.system}
+                active={filter === "sistema"}
+                onClick={() => {
+                  setFilter("sistema");
+                  setPage(1);
+                }}
+                tone="blue"
+                dot
+                title="Filtrar por roles del sistema"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="personalizados"
+                count={counts.custom}
+                active={filter === "personalizados"}
+                onClick={() => {
+                  setFilter("personalizados");
+                  setPage(1);
+                }}
+                tone="amber"
+                dot
+                title="Filtrar por roles personalizados"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando los roles del sistema…
+            </span>
+          )
         }
         action={
           isAdmin && (
@@ -125,17 +174,6 @@ export function RolesPage() {
               </button>
             )}
           </div>
-
-          <SegmentedFilter
-            aria-label="Filtro de roles"
-            value={filter}
-            onChange={setFilter}
-            items={filters.map(({ key, label, countKey }) => ({
-              key,
-              label,
-              count: counts?.[countKey] ?? 0,
-            }))}
-          />
         </div>
 
         {error && (

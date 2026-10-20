@@ -6,7 +6,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -16,7 +16,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePermissions } from "../../hooks/usePermissions";
 import { buildDepartmentTree } from "../../lib/departments";
 import type { DepartmentResponse, DepartmentType } from "../../types/api";
-import { ChipGroup, LoadErrorAlert } from "../settings/catalogSection";
+import { LoadErrorAlert } from "../settings/catalogSection";
 import { useReferenceData } from "../settings/catalogState";
 import { DepartmentModal } from "./DepartmentModal";
 
@@ -252,9 +252,66 @@ export function DepartmentsPage() {
       <ModuleHeader
         title="Departamentos"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "departamento" : "departamentos"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"} · ${counts.publicos} ${counts.publicos === 1 ? "público" : "públicos"}`
-            : "Cargando el organigrama de departamentos…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "departamento" : "departamentos"}
+                count={counts.all}
+                active={chip === "todos" && typeChip === "todos"}
+                onClick={() => {
+                  setChip("todos");
+                  setTypeChip("todos");
+                }}
+                tone="neutral"
+                title="Mostrar todos los departamentos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={chip === "activos"}
+                onClick={() => setChip("activos")}
+                tone="emerald"
+                dot
+                title="Filtrar por departamentos activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                count={counts.inactive}
+                active={chip === "inactivos"}
+                onClick={() => setChip("inactivos")}
+                tone="red"
+                dot
+                title="Filtrar por departamentos inactivos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.publicos === 1 ? "público" : "públicos"}
+                count={counts.publicos}
+                active={typeChip === "Publico"}
+                onClick={() => setTypeChip(typeChip === "Publico" ? "todos" : "Publico")}
+                tone="blue"
+                dot
+                title="Filtrar por departamentos públicos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.privados === 1 ? "privado" : "privados"}
+                count={counts.privados}
+                active={typeChip === "Privado"}
+                onClick={() => setTypeChip(typeChip === "Privado" ? "todos" : "Privado")}
+                tone="amber"
+                dot
+                title="Filtrar por departamentos privados"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando el organigrama de departamentos…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -272,56 +329,12 @@ export function DepartmentsPage() {
 
       <ListPanel
         toolbar={
-          <>
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar por nombre o camino…"
-              className="w-[240px]"
-            />
-
-            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-              <FilterChip
-                label="Todos"
-                count={counts?.all ?? 0}
-                active={chip === "todos"}
-                onClick={() => setChip("todos")}
-              />
-              <FilterChip
-                label="Activos"
-                count={counts?.active ?? 0}
-                active={chip === "activos"}
-                onClick={() => setChip("activos")}
-              />
-              <FilterChip
-                label="Inactivos"
-                count={counts?.inactive ?? 0}
-                active={chip === "inactivos"}
-                onClick={() => setChip("inactivos")}
-              />
-            </ChipGroup>
-
-            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-            {/* Dos pastillas y no tres: pulsar la activa la suelta, y «Todos»
-                ya esta dicho en el grupo de al lado. */}
-            <ChipGroup label="Filtrar por tipo" ready={counts !== undefined} skeletonCount={2}>
-              <FilterChip
-                label="Públicos"
-                count={counts?.publicos ?? 0}
-                active={typeChip === "Publico"}
-                onClick={() => setTypeChip(typeChip === "Publico" ? "todos" : "Publico")}
-              />
-              <FilterChip
-                label="Privados"
-                count={counts?.privados ?? 0}
-                active={typeChip === "Privado"}
-                onClick={() => setTypeChip(typeChip === "Privado" ? "todos" : "Privado")}
-              />
-            </ChipGroup>
-          </>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar por nombre o camino…"
+            className="w-[260px]"
+          />
         }
       >
         {all === null ? (

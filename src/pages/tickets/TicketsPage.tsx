@@ -22,6 +22,7 @@ import { departmentPaths } from "../../lib/departments";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
@@ -490,116 +491,86 @@ export function TicketsPage() {
         summary={
           counts ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              {/* Total tickets */}
-              <button
-                type="button"
+              <HeaderTag
+                label={counts.all === 1 ? "ticket" : "tickets"}
+                count={counts.all}
+                active={filter === "todos"}
                 onClick={() => setFilter("todos")}
+                tone="neutral"
                 title="Mostrar todos los tickets"
-                className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                  filter === "todos"
-                    ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
-                    : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                }`}
-              >
-                <span className="font-semibold text-zinc-900">{counts.all}</span>
-                <span>{counts.all === 1 ? "ticket" : "tickets"}</span>
-              </button>
+              />
 
-              {/* Abiertos */}
               {(counts.open > 0 || filter === "abiertos") && (
                 <>
                   <span aria-hidden className="text-zinc-300">·</span>
-                  <button
-                    type="button"
+                  <HeaderTag
+                    label={counts.open === 1 ? "abierto" : "abiertos"}
+                    count={counts.open}
+                    active={filter === "abiertos"}
                     onClick={() => setFilter("abiertos")}
+                    tone="emerald"
+                    dot
                     title="Filtrar por tickets abiertos"
-                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                      filter === "abiertos"
-                        ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
-                        : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                    }`}
-                  >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                    <span className="font-semibold text-zinc-900">{counts.open}</span>
-                    <span>{counts.open === 1 ? "abierto" : "abiertos"}</span>
-                  </button>
+                  />
                 </>
               )}
 
-              {/* Vencidos (alerta SLA con mismo estilo de sin responder en correo) */}
               {(counts.overdue > 0 || filter === "vencidos") && (
                 <>
                   <span aria-hidden className="text-zinc-300">·</span>
-                  <button
-                    type="button"
+                  <HeaderTag
+                    label={counts.overdue === 1 ? "vencido" : "vencidos"}
+                    count={counts.overdue}
+                    active={filter === "vencidos"}
                     onClick={() => setFilter("vencidos")}
+                    tone="red"
+                    dot
                     title="Filtrar por tickets vencidos de SLA"
-                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                      filter === "vencidos"
-                        ? "border border-red-300 bg-red-100/90 text-brand-red shadow-2xs font-bold ring-1 ring-red-300/40"
-                        : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                    }`}
-                  >
-                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${counts.overdue > 0 ? "bg-brand-red" : "bg-zinc-300"}`} />
-                    <span className={counts.overdue > 0 ? "font-bold text-brand-red" : "font-semibold text-zinc-800"}>
-                      {counts.overdue}
-                    </span>
-                    <span>{counts.overdue === 1 ? "vencido" : "vencidos"}</span>
-                  </button>
+                  />
                 </>
               )}
 
-              {/* En espera del cliente */}
               {(counts.waitingOnClient > 0 || filter === "espera") && (
                 <>
                   <span aria-hidden className="text-zinc-300">·</span>
-                  <button
-                    type="button"
+                  <HeaderTag
+                    label="en espera"
+                    count={counts.waitingOnClient}
+                    active={filter === "espera"}
                     onClick={() => setFilter("espera")}
+                    tone="amber"
+                    dot
                     title="Filtrar por tickets en espera del cliente"
-                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                      filter === "espera"
-                        ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
-                        : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                    }`}
-                  >
-                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${counts.waitingOnClient > 0 ? "bg-amber-500" : "bg-zinc-300"}`} />
-                    <span className="font-semibold text-zinc-900">{counts.waitingOnClient}</span>
-                    <span>en espera</span>
-                  </button>
+                  />
                 </>
               )}
 
-              {/* Por vencer (cuando está activo) */}
               {filter === "por-vencer" && (
                 <>
                   <span aria-hidden className="text-zinc-300">·</span>
-                  <button
-                    type="button"
+                  <HeaderTag
+                    label="por vencer"
+                    count={counts.upcoming}
+                    active={filter === "por-vencer"}
                     onClick={() => setFilter("por-vencer")}
+                    tone="amber"
+                    dot
                     title="Filtrar por tickets por vencer"
-                    className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-100/90 px-2 py-0.5 text-[11.5px] font-bold text-amber-900 shadow-2xs ring-1 ring-amber-300/40 cursor-pointer select-none active:scale-[0.98]"
-                  >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                    <span className="font-bold text-amber-900">{counts.upcoming}</span>
-                    <span>por vencer</span>
-                  </button>
+                  />
                 </>
               )}
 
-              {/* Cerrados (cuando está activo) */}
               {filter === "cerrados" && (
                 <>
                   <span aria-hidden className="text-zinc-300">·</span>
-                  <button
-                    type="button"
+                  <HeaderTag
+                    label="cerrados"
+                    count={counts.closed}
+                    active={filter === "cerrados"}
                     onClick={() => setFilter("cerrados")}
+                    tone="neutral"
                     title="Filtrar por tickets cerrados"
-                    className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-zinc-100 px-2 py-0.5 text-[11.5px] font-semibold text-zinc-900 shadow-2xs cursor-pointer select-none active:scale-[0.98]"
-                  >
-                    <span className="font-semibold text-zinc-900">{counts.closed}</span>
-                    <span>cerrados</span>
-                  </button>
+                  />
                 </>
               )}
             </div>

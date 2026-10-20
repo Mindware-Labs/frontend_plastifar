@@ -17,6 +17,7 @@ import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi, type EmailQuery } from "../../api/emails";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { NotificationsModal } from "../../components/app/NotificationsModal";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -640,82 +641,59 @@ export function BandejaPage({ folder }: BandejaPageProps) {
           summary={
             data ? (
               <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-                {/* Total correos en carpeta */}
-                <button
-                  type="button"
+                <HeaderTag
+                  label={folderTotal === 1 ? "conversación" : "conversaciones"}
+                  count={folderTotal}
+                  active={ticketFilter === "todos"}
                   onClick={() => setTicketFilter("todos")}
+                  tone="neutral"
                   title={`Mostrar todos los correos de ${meta.title}`}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                    ticketFilter === "todos"
-                      ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
-                      : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                  }`}
-                >
-                  <span className="font-semibold text-zinc-900">{folderTotal}</span>
-                  <span>{folderTotal === 1 ? "conversación" : "conversaciones"}</span>
-                </button>
+                />
 
-                {/* No leídos (con pulso verde animado) */}
                 {folderUnread > 0 && (
                   <>
                     <span aria-hidden className="text-zinc-300">·</span>
-                    <span
+                    <HeaderTag
+                      label="sin leer"
+                      count={folderUnread}
+                      active={false}
+                      onClick={() => setTicketFilter("todos")}
+                      tone="emerald"
+                      dot
+                      dotPulse
                       title={`${folderUnread} correos sin leer`}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11.5px] font-semibold text-emerald-800 shadow-2xs"
-                    >
-                      <span className="relative flex h-2 w-2 shrink-0">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                      </span>
-                      <span className="font-semibold text-zinc-900">{folderUnread}</span>
-                      <span>sin leer</span>
-                    </span>
+                    />
                   </>
                 )}
 
-                {/* En bandeja: Sin responder */}
                 {folder === "inbox" && (data.counts.unanswered > 0 || ticketFilter === "sin-responder") && (
                   <>
                     <span aria-hidden className="text-zinc-300">·</span>
-                    <button
-                      type="button"
+                    <HeaderTag
+                      label="sin responder"
+                      count={data.counts.unanswered}
+                      active={ticketFilter === "sin-responder"}
                       onClick={() => setTicketFilter("sin-responder")}
+                      tone="red"
+                      dot
                       title="Filtrar por correos sin responder"
-                      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                        ticketFilter === "sin-responder"
-                          ? "border border-red-300 bg-red-100/90 text-brand-red shadow-2xs font-bold ring-1 ring-red-300/40"
-                          : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                      }`}
-                    >
-                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${data.counts.unanswered > 0 ? "bg-brand-red" : "bg-zinc-300"}`} />
-                      <span className={data.counts.unanswered > 0 ? "font-bold text-brand-red" : "font-semibold text-zinc-800"}>
-                        {data.counts.unanswered}
-                      </span>
-                      <span>sin responder</span>
-                    </button>
+                    />
                   </>
                 )}
 
-                {/* En bandeja: Míos o Asignados sin ver */}
                 {folder === "inbox" && (Boolean(counts?.assignedUnseen) || ticketFilter === "mios") && (
                   <>
                     <span aria-hidden className="text-zinc-300">·</span>
-                    <button
-                      type="button"
+                    <HeaderTag
+                      label="míos"
+                      count={data.counts.mine}
+                      active={ticketFilter === "mios"}
                       onClick={() => setTicketFilter("mios")}
+                      tone="blue"
+                      dot
+                      dotPulse={Boolean(counts?.assignedUnseen)}
                       title="Filtrar por mis conversaciones asignadas"
-                      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-all cursor-pointer select-none active:scale-[0.98] ${
-                        ticketFilter === "mios"
-                          ? "border border-zinc-300 bg-zinc-100 text-zinc-900 shadow-2xs font-semibold"
-                          : "border border-zinc-200/80 bg-white text-zinc-600 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
-                      }`}
-                    >
-                      {Boolean(counts?.assignedUnseen) && (
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red shadow-[0_0_6px_rgba(228,0,43,0.5)]" />
-                      )}
-                      <span className="font-semibold text-zinc-900">{data.counts.mine}</span>
-                      <span>míos</span>
-                    </button>
+                    />
                   </>
                 )}
               </div>

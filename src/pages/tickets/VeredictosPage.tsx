@@ -10,7 +10,7 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
@@ -21,16 +21,6 @@ import type { TicketVerdictListResponse, TicketVerdictResponse } from "../../typ
 import { VeredictoModal } from "./VeredictoModal";
 
 type StatusFilter = "todos" | "activos" | "inactivos";
-
-const statusFilters: {
-  key: StatusFilter;
-  label: string;
-  countKey: keyof TicketVerdictListResponse["counts"];
-}[] = [
-  { key: "todos", label: "Todos", countKey: "all" },
-  { key: "activos", label: "Activos", countKey: "active" },
-  { key: "inactivos", label: "Inactivos", countKey: "inactive" },
-];
 
 /** Gestión del catálogo de veredictos para tickets solucionados. */
 export function VeredictosPage() {
@@ -117,9 +107,52 @@ export function VeredictosPage() {
       <ModuleHeader
         title="Veredictos"
         summary={
-          data
-            ? `${data.total} ${data.total === 1 ? "veredicto" : "veredictos"} · las opciones para marcar un ticket como solucionado`
-            : "Cargando los veredictos…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "veredicto" : "veredictos"}
+                count={counts.all}
+                active={status === "todos"}
+                onClick={() => {
+                  setStatus("todos");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todos los veredictos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={status === "activos"}
+                onClick={() => {
+                  setStatus("activos");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por veredictos activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                count={counts.inactive}
+                active={status === "inactivos"}
+                onClick={() => {
+                  setStatus("inactivos");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por veredictos inactivos"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando los veredictos…
+            </span>
+          )
         }
         action={
           isAdmin && (
@@ -152,17 +185,6 @@ export function VeredictosPage() {
               </button>
             )}
           </div>
-
-          <SegmentedFilter
-            aria-label="Filtro de veredictos"
-            value={status}
-            onChange={setStatus}
-            items={statusFilters.map((f) => ({
-              key: f.key,
-              label: f.label,
-              count: counts?.[f.countKey] ?? 0,
-            }))}
-          />
         </div>
 
         {(error || actionError) && (

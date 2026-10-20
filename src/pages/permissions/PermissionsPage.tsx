@@ -9,7 +9,7 @@ import { Button } from "../../components/ui/Button";
 import { ColumnPicker } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { CriteriaField, CriteriaSelect } from "../../components/ui/CriteriaField";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -281,13 +281,43 @@ export function PermissionsPage() {
       <ModuleHeader
         title="Permisos"
         summary={
-          matrix
-            ? `${catalog.length} permisos · ${matrix.roles.length} roles · ${
-                counts.sinAsignar === 0
-                  ? "todos asignados"
-                  : `${counts.sinAsignar} sin asignar a ningún rol`
-              }`
-            : "Cargando el catálogo de permisos…"
+          matrix ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={catalog.length === 1 ? "permiso" : "permisos"}
+                count={counts.todos}
+                active={chip === "todos"}
+                onClick={() => setChip("todos")}
+                tone="neutral"
+                title="Mostrar todos los permisos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="sin asignar"
+                count={counts.sinAsignar}
+                active={chip === "sinAsignar"}
+                onClick={() => setChip("sinAsignar")}
+                tone={counts.sinAsignar > 0 ? "amber" : "neutral"}
+                dot={counts.sinAsignar > 0}
+                title="Filtrar por permisos no asignados a ningún rol"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="con cambios"
+                count={counts.conCambios}
+                active={chip === "conCambios"}
+                onClick={() => setChip("conCambios")}
+                tone={counts.conCambios > 0 ? "blue" : "neutral"}
+                dot={counts.conCambios > 0}
+                title="Filtrar por permisos modificados sin guardar"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando el catálogo de permisos…
+            </span>
+          )
         }
         action={
           canWrite && dirtyCells > 0 && (
@@ -338,29 +368,6 @@ export function PermissionsPage() {
             ...(matrix?.groups ?? []).map((group) => ({ value: group.module, label: group.module })),
           ]}
         />
-
-        <span aria-hidden className="mx-1 mb-1.5 h-5 w-px bg-line" />
-
-        <div className="flex flex-wrap items-center gap-2 pb-0.5">
-          <FilterChip
-            label="Todos"
-            count={counts.todos}
-            active={chip === "todos"}
-            onClick={() => setChip("todos")}
-          />
-          <FilterChip
-            label="Sin asignar"
-            count={counts.sinAsignar}
-            active={chip === "sinAsignar"}
-            onClick={() => setChip("sinAsignar")}
-          />
-          <FilterChip
-            label="Con cambios"
-            count={counts.conCambios}
-            active={chip === "conCambios"}
-            onClick={() => setChip("conCambios")}
-          />
-        </div>
 
         <div className="ml-auto pb-0.5">
           <ColumnPicker

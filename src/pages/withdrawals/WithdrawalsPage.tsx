@@ -8,7 +8,7 @@ import { Button } from "../../components/ui/Button";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { FilterPopover } from "../../components/ui/FilterPopover";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -108,9 +108,90 @@ export function WithdrawalsPage() {
       <ModuleHeader
         title="Retiros"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "solicitud" : "solicitudes"} · ${counts.requested} ${counts.requested === 1 ? "solicitada" : "solicitadas"} · ${counts.approved} ${counts.approved === 1 ? "aprobada" : "aprobadas"}`
-            : "Cargando las solicitudes de retiro de mercancía…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "solicitud" : "solicitudes"}
+                count={counts.all}
+                active={chip === "todas"}
+                onClick={() => {
+                  setChip("todas");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todas las solicitudes de retiro"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.requested === 1 ? "solicitada" : "solicitadas"}
+                count={counts.requested}
+                active={chip === "Solicitado"}
+                onClick={() => {
+                  setChip("Solicitado");
+                  setPage(1);
+                }}
+                tone="amber"
+                dot
+                title="Filtrar por solicitudes pendientes"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.approved === 1 ? "aprobada" : "aprobadas"}
+                count={counts.approved}
+                active={chip === "Aprobado"}
+                onClick={() => {
+                  setChip("Aprobado");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por solicitudes aprobadas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.withdrawn === 1 ? "retirada" : "retiradas"}
+                count={counts.withdrawn}
+                active={chip === "Retirado"}
+                onClick={() => {
+                  setChip("Retirado");
+                  setPage(1);
+                }}
+                tone="blue"
+                dot
+                title="Filtrar por mercancía retirada"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.rejected === 1 ? "rechazada" : "rechazadas"}
+                count={counts.rejected}
+                active={chip === "Rechazado"}
+                onClick={() => {
+                  setChip("Rechazado");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por solicitudes rechazadas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.cancelled === 1 ? "cancelada" : "canceladas"}
+                count={counts.cancelled}
+                active={chip === "Cancelado"}
+                onClick={() => {
+                  setChip("Cancelado");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Filtrar por solicitudes canceladas"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando las solicitudes de retiro de mercancía…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -178,14 +259,6 @@ export function WithdrawalsPage() {
                 <ControlInput id="retiro-hasta" type="date" className="w-[150px]" value={to} onChange={(event) => setTo(event.target.value)} />
               </CriteriaField>
             </FilterPopover>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {counts
-                ? CHIPS.map(({ key, label, countKey }) => (
-                    <FilterChip key={key} label={label} count={counts[countKey]} active={chip === key} onClick={() => setChip(key)} />
-                  ))
-                : CHIPS.map(({ key }) => <span key={key} aria-hidden className="h-8 w-[110px] animate-pulse rounded-full bg-fill" />)}
-            </div>
           </>
         }
         footer={

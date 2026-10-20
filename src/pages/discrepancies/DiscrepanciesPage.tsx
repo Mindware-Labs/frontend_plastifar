@@ -8,7 +8,7 @@ import { Button } from "../../components/ui/Button";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { FilterPopover } from "../../components/ui/FilterPopover";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -97,9 +97,91 @@ export function DiscrepanciesPage() {
       <ModuleHeader
         title="Discrepancias"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "investigación" : "investigaciones"} · ${counts.investigating} en investigación · ${counts.withFinding} con hallazgo de seguridad`
-            : "Cargando las investigaciones de discrepancia…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "investigación" : "investigaciones"}
+                count={counts.all}
+                active={chip === "todas"}
+                onClick={() => {
+                  setChip("todas");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todas las investigaciones de discrepancia"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="en investigación"
+                count={counts.investigating}
+                active={chip === "En investigación"}
+                onClick={() => {
+                  setChip("En investigación");
+                  setPage(1);
+                }}
+                tone="amber"
+                dot
+                title="Filtrar por investigaciones en curso"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.completed === 1 ? "completada" : "completadas"}
+                count={counts.completed}
+                active={chip === "Completada"}
+                onClick={() => {
+                  setChip("Completada");
+                  setPage(1);
+                }}
+                tone="blue"
+                dot
+                title="Filtrar por investigaciones completadas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.approved === 1 ? "aprobada" : "aprobadas"}
+                count={counts.approved}
+                active={chip === "Aprobada"}
+                onClick={() => {
+                  setChip("Aprobada");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por investigaciones aprobadas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.returned === 1 ? "devuelta" : "devueltas"}
+                count={counts.returned}
+                active={chip === "Devuelta"}
+                onClick={() => {
+                  setChip("Devuelta");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por investigaciones devueltas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="hallazgo de seguridad"
+                count={counts.withFinding}
+                active={chip === "hallazgo"}
+                onClick={() => {
+                  setChip("hallazgo");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por discrepancias con hallazgo de seguridad"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando las investigaciones de discrepancia…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -161,14 +243,6 @@ export function DiscrepanciesPage() {
                 <ControlInput id="discrepancia-hasta" type="date" className="w-[150px]" value={to} onChange={(event) => setTo(event.target.value)} />
               </CriteriaField>
             </FilterPopover>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {counts
-                ? CHIPS.map(({ key, label, countKey }) => (
-                    <FilterChip key={key} label={label} count={counts[countKey]} active={chip === key} onClick={() => setChip(key)} />
-                  ))
-                : CHIPS.map(({ key }) => <span key={key} aria-hidden className="h-8 w-[110px] animate-pulse rounded-full bg-fill" />)}
-            </div>
           </>
         }
         footer={

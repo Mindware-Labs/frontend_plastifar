@@ -15,7 +15,7 @@ import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup, CriteriaSelect } from "../../components/ui/CriteriaField";
-import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -199,9 +199,66 @@ export function HcaPage() {
       <ModuleHeader
         title="HCA"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "hoja" : "hojas"} · ${counts.open} ${counts.open === 1 ? "abierta" : "abiertas"} · ${counts.overdue} ${counts.overdue === 1 ? "vencida" : "vencidas"}`
-            : "Cargando las hojas de corrección y acción…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "hoja" : "hojas"}
+                count={counts.all}
+                active={chip === "todas"}
+                onClick={() => {
+                  setChip("todas");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todas las hojas de corrección y acción"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.open === 1 ? "abierta" : "abiertas"}
+                count={counts.open}
+                active={chip === "abiertas"}
+                onClick={() => {
+                  setChip("abiertas");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por HCA abiertas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.overdue === 1 ? "vencida" : "vencidas"}
+                count={counts.overdue}
+                active={chip === "vencidas"}
+                onClick={() => {
+                  setChip("vencidas");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                dotPulse
+                title="Filtrar por HCA vencidas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.closed === 1 ? "cerrada" : "cerradas"}
+                count={counts.closed}
+                active={chip === "cerradas"}
+                onClick={() => {
+                  setChip("cerradas");
+                  setPage(1);
+                }}
+                tone="blue"
+                dot
+                title="Filtrar por HCA cerradas"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando las hojas de corrección y acción…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -226,22 +283,13 @@ export function HcaPage() {
 
       <ListPanel
         toolbar={
-          <>
-          {/* Dos renglones: arriba los criterios y la accion principal; abajo
-              las pastillas y la deuda que resumen. El boton y esa frase vivian
-              sueltos sobre el lienzo, gastando dos renglones enteros para no
-              pertenecer a nada. */}
-          <div className="flex w-full flex-wrap items-end gap-2">
-        {/* Sin rótulo. Con los demás criterios detrás del botón, «BUSCAR» era la
-            única versalita de la barra y flotaba sola sobre un campo que ya dice
-            qué busca en su propio texto de ayuda. Una etiqueta que repite el
-            placeholder cobra un renglón entero para no añadir nada. */}
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Número, cliente o descripción…"
-          className="w-[230px]"
-        />
+          <div className="flex w-full flex-wrap items-center gap-2">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Número, cliente o descripción…"
+              className="w-[230px]"
+            />
 
         {/* Los cuatro criterios de acotacion, guardados hasta que hacen falta.
             De los siete que tenia esta barra, quien abre la pantalla usa el
@@ -335,35 +383,12 @@ export function HcaPage() {
             />
           </CriteriaField>
         </div>
-        </FilterPopover>
-        </div>
+            </FilterPopover>
 
-        {/* Antes de la primera respuesta no hay contadores: un «0» al lado de
-            «Vencidas» es un dato, y seria falso. Se reserva el sitio y nada mas. */}
-        <div className="flex w-full flex-wrap items-center gap-2">
-          {counts ? (
-            <SegmentedFilter
-              aria-label="Filtrar por estado"
-              value={chip}
-              onChange={setChip}
-              items={CHIPS.map(({ key, label, countKey }) => ({
-                key,
-                label,
-                count: counts[countKey],
-              }))}
-            />
-          ) : (
-            <span
-              aria-hidden
-              className="h-8 w-[416px] max-w-full animate-pulse rounded-edge bg-fill"
-            />
-          )}
-
-          {counts && (counts.overdue > 0 || counts.open > 0) && (
-            <p className="ml-auto text-[12.5px] text-brand-gray">{listDebt(counts)}</p>
-          )}
-        </div>
-          </>
+            {counts && (counts.overdue > 0 || counts.open > 0) && (
+              <p className="ml-auto text-[12.5px] text-brand-gray">{listDebt(counts)}</p>
+            )}
+          </div>
         }
         footer={
           data !== null && (

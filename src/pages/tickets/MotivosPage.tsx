@@ -24,7 +24,7 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -41,16 +41,6 @@ import { MotivoModal } from "./MotivoModal";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 
 type StatusFilter = "todos" | "activos" | "inactivos";
-
-const statusFilters: {
-  key: StatusFilter;
-  label: string;
-  countKey: keyof TicketTopicListResponse["counts"];
-}[] = [
-  { key: "todos", label: "Todos", countKey: "all" },
-  { key: "activos", label: "Activos", countKey: "active" },
-  { key: "inactivos", label: "Inactivos", countKey: "inactive" },
-];
 
 /** El tono no decora: dice cuánta prisa mete cada motivo en el SLA del ticket. */
 const priorityClass: Record<string, string> = {
@@ -190,9 +180,52 @@ export function MotivosPage() {
       <ModuleHeader
         title="Motivos"
         summary={
-          data
-            ? `${data.total} ${data.total === 1 ? "motivo" : "motivos"} · cada uno decide a qué departamento se encola el ticket`
-            : "Cargando los motivos…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "motivo" : "motivos"}
+                count={counts.all}
+                active={status === "todos"}
+                onClick={() => {
+                  setStatus("todos");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todos los motivos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={status === "activos"}
+                onClick={() => {
+                  setStatus("activos");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por motivos activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                count={counts.inactive}
+                active={status === "inactivos"}
+                onClick={() => {
+                  setStatus("inactivos");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por motivos inactivos"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando los motivos…
+            </span>
+          )
         }
         action={
           isAdmin && (
@@ -246,17 +279,6 @@ export function MotivosPage() {
               </button>
             )}
           </div>
-
-          <SegmentedFilter
-            aria-label="Filtro de estado"
-            value={status}
-            onChange={setStatus}
-            items={statusFilters.map((filter) => ({
-              key: filter.key,
-              label: filter.label,
-              count: counts?.[filter.countKey] ?? 0,
-            }))}
-          />
         </div>
 
         {(error || actionError) && (

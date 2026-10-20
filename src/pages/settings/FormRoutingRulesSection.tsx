@@ -6,7 +6,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -16,7 +16,7 @@ import { StatusDot } from "../../components/ui/StatusDot";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { REQUIRED_FORMS, ROUTING_MOMENTS, type FormRoutingRule } from "../../types/settings";
-import { ChipGroup, LoadErrorAlert } from "./catalogSection";
+import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
 import { FormRoutingRuleModal } from "./FormRoutingRuleModal";
 
@@ -118,9 +118,52 @@ export function FormRoutingRulesSection() {
       <ModuleHeader
         title="Formularios"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "regla de enrutamiento" : "reglas de enrutamiento"} · ${counts.active} ${counts.active === 1 ? "activa" : "activas"}`
-            : "Cargando las reglas de enrutamiento de formularios…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "regla" : "reglas"}
+                count={counts.all}
+                active={chip === "todas"}
+                onClick={() => {
+                  setChip("todas");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todas las reglas de enrutamiento"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activa" : "activas"}
+                count={counts.active}
+                active={chip === "activas"}
+                onClick={() => {
+                  setChip("activas");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por reglas activas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactiva" : "inactivas"}
+                count={counts.inactive}
+                active={chip === "inactivas"}
+                onClick={() => {
+                  setChip("inactivas");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por reglas inactivas"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando las reglas de enrutamiento de formularios…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -153,14 +196,6 @@ export function FormRoutingRulesSection() {
               onChange={setMoment}
               options={[{ value: "todos", label: "Cualquier momento" }, ...ROUTING_MOMENTS]}
             />
-
-            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-              <FilterChip label="Todas" count={counts?.all ?? 0} active={chip === "todas"} onClick={() => setChip("todas")} />
-              <FilterChip label="Activas" count={counts?.active ?? 0} active={chip === "activas"} onClick={() => setChip("activas")} />
-              <FilterChip label="Inactivas" count={counts?.inactive ?? 0} active={chip === "inactivas"} onClick={() => setChip("inactivas")} />
-            </ChipGroup>
           </>
         }
         footer={

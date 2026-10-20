@@ -9,7 +9,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -22,7 +22,7 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { humanizeMinutes, workdayMinutes } from "../../lib/sla";
 import { PRIORITIES, type Holiday, type Priority, type SlaPolicy } from "../../types/settings";
-import { ChipGroup, LoadErrorAlert, WarnNotice } from "./catalogSection";
+import { LoadErrorAlert, WarnNotice } from "./catalogSection";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { SlaModal } from "./SlaModal";
 
@@ -182,9 +182,56 @@ export function SlaSection() {
       <ModuleHeader
         title="Políticas de SLA"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "política" : "políticas"} · ${counts.active} ${counts.active === 1 ? "activa" : "activas"} · ${4 - uncovered.length} de 4 prioridades cubiertas`
-            : "Cargando las políticas de SLA…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "política" : "políticas"}
+                count={counts.all}
+                active={chip === "todas"}
+                onClick={() => {
+                  setChip("todas");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todas las políticas de SLA"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activa" : "activas"}
+                count={counts.active}
+                active={chip === "activas"}
+                onClick={() => {
+                  setChip("activas");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por políticas activas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactiva" : "inactivas"}
+                count={counts.inactive}
+                active={chip === "inactivas"}
+                onClick={() => {
+                  setChip("inactivas");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por políticas inactivas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <span className="text-[12px] text-zinc-500 font-medium">
+                {4 - uncovered.length} de 4 prioridades cubiertas
+              </span>
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando las políticas de SLA…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -235,29 +282,6 @@ export function SlaSection() {
                 ...PRIORITIES.map((value) => ({ value, label: value })),
               ]}
             />
-
-            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-              <FilterChip
-                label="Todas"
-                count={counts?.all ?? 0}
-                active={chip === "todas"}
-                onClick={() => setChip("todas")}
-              />
-              <FilterChip
-                label="Activas"
-                count={counts?.active ?? 0}
-                active={chip === "activas"}
-                onClick={() => setChip("activas")}
-              />
-              <FilterChip
-                label="Inactivas"
-                count={counts?.inactive ?? 0}
-                active={chip === "inactivas"}
-                onClick={() => setChip("inactivas")}
-              />
-            </ChipGroup>
           </>
         }
         footer={

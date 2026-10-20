@@ -5,7 +5,7 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -16,7 +16,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { Team } from "../../types/settings";
-import { ChipGroup, LoadErrorAlert } from "./catalogSection";
+import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
 import { TeamModal } from "./TeamModal";
 
@@ -122,9 +122,66 @@ export function TeamsSection() {
       <ModuleHeader
         title="Equipos"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "equipo" : "equipos"} · ${counts.active} ${counts.active === 1 ? "activo" : "activos"}`
-            : "Cargando los equipos de trabajo…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "equipo" : "equipos"}
+                count={counts.all}
+                active={chip === "todos" && !onlyWithoutMembers}
+                onClick={() => {
+                  setChip("todos");
+                  setOnlyWithoutMembers(false);
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todos los equipos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={chip === "activos"}
+                onClick={() => {
+                  setChip("activos");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por equipos activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                count={counts.inactive}
+                active={chip === "inactivos"}
+                onClick={() => {
+                  setChip("inactivos");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por equipos inactivos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="sin integrantes"
+                count={counts.withoutActiveMembers}
+                active={onlyWithoutMembers}
+                onClick={() => {
+                  setOnlyWithoutMembers((current) => !current);
+                  setPage(1);
+                }}
+                tone="amber"
+                dot
+                title="Filtrar por equipos sin integrantes activos"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando los equipos de trabajo…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -140,48 +197,12 @@ export function TeamsSection() {
 
       <ListPanel
         toolbar={
-          <>
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar equipo…"
-              className="w-[240px]"
-            />
-
-            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-              <FilterChip
-                label="Todos"
-                count={counts?.all ?? 0}
-                active={chip === "todos"}
-                onClick={() => setChip("todos")}
-              />
-              <FilterChip
-                label="Activos"
-                count={counts?.active ?? 0}
-                active={chip === "activos"}
-                onClick={() => setChip("activos")}
-              />
-              <FilterChip
-                label="Inactivos"
-                count={counts?.inactive ?? 0}
-                active={chip === "inactivos"}
-                onClick={() => setChip("inactivos")}
-              />
-            </ChipGroup>
-
-            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-            <ChipGroup label="Filtrar por integrantes" ready={counts !== undefined} skeletonCount={1}>
-              <FilterChip
-                label="Sin integrantes activos"
-                count={counts?.withoutActiveMembers ?? 0}
-                active={onlyWithoutMembers}
-                onClick={() => setOnlyWithoutMembers((current) => !current)}
-              />
-            </ChipGroup>
-          </>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar equipo…"
+            className="w-[260px]"
+          />
         }
         footer={
           data !== null &&

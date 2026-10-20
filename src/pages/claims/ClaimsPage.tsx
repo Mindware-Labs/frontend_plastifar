@@ -10,7 +10,7 @@ import { Button } from "../../components/ui/Button";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup, CriteriaSelect } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { FilterPopover } from "../../components/ui/FilterPopover";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -118,9 +118,65 @@ export function ClaimsPage() {
       <ModuleHeader
         title="Reclamaciones"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "reclamación" : "reclamaciones"} · ${counts.registered} ${counts.registered === 1 ? "registrada" : "registradas"} · ${counts.inTreatment} en tratamiento`
-            : "Cargando las reclamaciones de clientes…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "reclamación" : "reclamaciones"}
+                count={counts.all}
+                active={chip === "todas"}
+                onClick={() => {
+                  setChip("todas");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todas las reclamaciones"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.registered === 1 ? "registrada" : "registradas"}
+                count={counts.registered}
+                active={chip === "Registrada"}
+                onClick={() => {
+                  setChip("Registrada");
+                  setPage(1);
+                }}
+                tone="blue"
+                dot
+                title="Filtrar por reclamaciones registradas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="en tratamiento"
+                count={counts.inTreatment}
+                active={chip === "En tratamiento"}
+                onClick={() => {
+                  setChip("En tratamiento");
+                  setPage(1);
+                }}
+                tone="amber"
+                dot
+                title="Filtrar por reclamaciones en tratamiento"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.closed === 1 ? "cerrada" : "cerradas"}
+                count={counts.closed}
+                active={chip === "Cerrada"}
+                onClick={() => {
+                  setChip("Cerrada");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por reclamaciones cerradas"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando las reclamaciones de clientes…
+            </span>
+          )
         }
       />
 
@@ -197,22 +253,6 @@ export function ClaimsPage() {
                 />
               </CriteriaField>
             </FilterPopover>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {counts
-                ? CHIPS.map(({ key, label, countKey }) => (
-                    <FilterChip
-                      key={key}
-                      label={label}
-                      count={counts[countKey]}
-                      active={chip === key}
-                      onClick={() => setChip(key)}
-                    />
-                  ))
-                : CHIPS.map(({ key }) => (
-                    <span key={key} aria-hidden className="h-8 w-[110px] animate-pulse rounded-full bg-fill" />
-                  ))}
-            </div>
           </>
         }
         footer={

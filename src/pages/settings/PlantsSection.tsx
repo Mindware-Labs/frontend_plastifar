@@ -6,7 +6,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -18,7 +18,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { PLANT_COUNTRIES, type Plant, type PlantCountry } from "../../types/settings";
-import { ChipGroup, LoadErrorAlert } from "./catalogSection";
+import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
 import { PlantModal } from "./PlantModal";
 
@@ -132,9 +132,66 @@ export function PlantsSection() {
       <ModuleHeader
         title="Plantas"
         summary={
-          counts
-            ? `${counts.all} ${counts.all === 1 ? "planta" : "plantas"} · ${counts.active} ${counts.active === 1 ? "activa" : "activas"}`
-            : "Cargando las plantas configuradas…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "planta" : "plantas"}
+                count={counts.all}
+                active={chip === "todas" && !onlyWithoutManager}
+                onClick={() => {
+                  setChip("todas");
+                  setOnlyWithoutManager(false);
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todas las plantas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activa" : "activas"}
+                count={counts.active}
+                active={chip === "activas"}
+                onClick={() => {
+                  setChip("activas");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por plantas activas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactiva" : "inactivas"}
+                count={counts.inactive}
+                active={chip === "inactivas"}
+                onClick={() => {
+                  setChip("inactivas");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por plantas inactivas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="sin administrador"
+                count={counts.withoutActiveManager}
+                active={onlyWithoutManager}
+                onClick={() => {
+                  setOnlyWithoutManager((current) => !current);
+                  setPage(1);
+                }}
+                tone="amber"
+                dot
+                title="Filtrar por plantas sin administrador activo"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando las plantas configuradas…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -166,40 +223,6 @@ export function PlantsSection() {
               onChange={(value) => setCountry(value as PlantCountry | "todos")}
               options={[{ value: "todos", label: "Todos los países" }, ...PLANT_COUNTRIES]}
             />
-
-            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-            <ChipGroup label="Filtrar por estado" ready={counts !== undefined}>
-              <FilterChip
-                label="Todas"
-                count={counts?.all ?? 0}
-                active={chip === "todas"}
-                onClick={() => setChip("todas")}
-              />
-              <FilterChip
-                label="Activas"
-                count={counts?.active ?? 0}
-                active={chip === "activas"}
-                onClick={() => setChip("activas")}
-              />
-              <FilterChip
-                label="Inactivas"
-                count={counts?.inactive ?? 0}
-                active={chip === "inactivas"}
-                onClick={() => setChip("inactivas")}
-              />
-            </ChipGroup>
-
-            <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-            <ChipGroup label="Filtrar por administrador" ready={counts !== undefined} skeletonCount={1}>
-              <FilterChip
-                label="Sin administrador activo"
-                count={counts?.withoutActiveManager ?? 0}
-                active={onlyWithoutManager}
-                onClick={() => setOnlyWithoutManager((current) => !current)}
-              />
-            </ChipGroup>
           </>
         }
         footer={

@@ -10,7 +10,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { FilterChip } from "../../components/ui/FilterChip";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -28,13 +28,6 @@ import { departmentOptions, departmentPath } from "../../lib/departments";
 
 type FilterKey = "todos" | "activos" | "inactivos" | "administradores";
 type SortKey = "nombre" | "correo" | "departamento" | "rol" | "estado";
-
-const filters: { key: FilterKey; label: string; countKey: keyof StaffListResponse["counts"] }[] = [
-  { key: "todos", label: "Todos", countKey: "all" },
-  { key: "activos", label: "Activos", countKey: "active" },
-  { key: "inactivos", label: "Inactivos", countKey: "inactive" },
-  { key: "administradores", label: "Administradores", countKey: "admins" },
-];
 
 /**
  * Orden de columnas: quién, dónde, cómo se le escribe, qué puede hacer, si opera.
@@ -346,9 +339,65 @@ export function StaffPage() {
       <ModuleHeader
         title="Personal"
         summary={
-          counts
-            ? `${counts.all} colaboradores · ${counts.active} activos · ${counts.admins} con permisos de administrador`
-            : "Cargando el personal con acceso al sistema…"
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "colaborador" : "colaboradores"}
+                count={counts.all}
+                active={filter === "todos"}
+                onClick={() => {
+                  setFilter("todos");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todos los colaboradores"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={filter === "activos"}
+                onClick={() => {
+                  setFilter("activos");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por colaboradores activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                count={counts.inactive}
+                active={filter === "inactivos"}
+                onClick={() => {
+                  setFilter("inactivos");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por colaboradores inactivos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label="administradores"
+                count={counts.admins}
+                active={filter === "administradores"}
+                onClick={() => {
+                  setFilter("administradores");
+                  setPage(1);
+                }}
+                tone="blue"
+                dot
+                title="Filtrar por colaboradores con permisos de administrador"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando el personal con acceso al sistema…
+            </span>
+          )
         }
         action={
           isAdmin && (
@@ -418,18 +467,6 @@ export function StaffPage() {
                   ...departmentOptions(departments),
                 ]}
               />
-
-              <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-
-              {filters.map(({ key, label, countKey }) => (
-                <FilterChip
-                  key={key}
-                  label={label}
-                  count={counts?.[countKey] ?? 0}
-                  active={filter === key}
-                  onClick={() => setFilter(key)}
-                />
-              ))}
             </>
           }
           footer={
