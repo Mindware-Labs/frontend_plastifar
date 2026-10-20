@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { KeyRound, Lock, Mail, ShieldCheck } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { CircleAlert, Lock, Mail, ShieldCheck } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -17,18 +17,16 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-/** idle: listo para enviar. El resto describe por qué no prosperó el último envío. */
 type Phase = "idle" | "mismatch" | "deactivated" | "limited" | "failed";
 
 const toneLabels: Record<Exclude<Phase, "idle">, string> = {
-  mismatch: "No coinciden",
+  mismatch: "Contraseña o correo incorrecto",
   deactivated: "Cuenta desactivada",
   limited: "Demasiados intentos",
   failed: "No se pudo entrar",
 };
 
 const SETTLE_MS = 340;
-const RAMP_AFTER_ATTEMPTS = 3;
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -39,8 +37,8 @@ export function LoginPage() {
   const [settle, setSettle] = useState(false);
   const [relayKey, setRelayKey] = useState(0);
   const [announcement, setAnnouncement] = useState("");
-  // Valores del último envío fallido: mientras no cambien, el botón sigue en tinta.
   const [stale, setStale] = useState<FormValues | null>(null);
+  const [emailBlurError, setEmailBlurError] = useState<string | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -56,7 +54,6 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
-  // Solo rutas internas: "//otro.sitio" o una URL absoluta harian de la pantalla de acceso un redirector abierto.
   const requested = (location.state as { from?: string } | null)?.from;
   const from = requested && requested.startsWith("/") && !requested.startsWith("//") ? requested : "/";
 
@@ -94,7 +91,7 @@ export function LoginPage() {
         "mismatch",
         values,
         next === 1
-          ? "Correo y contraseña no coinciden. Estás en el campo Contraseña."
+          ? "Correo y contraseña no coinciden. Por favor verifica tus credenciales."
           : "Sigue sin coincidir. Puedes recuperar la contraseña desde el enlace.",
       );
       setSettle(true);
@@ -102,7 +99,6 @@ export function LoginPage() {
     }
   }
 
-  /** Al primer cambio respecto al envío fallido el botón recupera el rojo. */
   function recharge() {
     if (phase === "idle" || !stale) return;
     const { email, password } = getValues();
@@ -111,37 +107,62 @@ export function LoginPage() {
     setAnnouncement("");
   }
 
+  function handleEmailBlur(e: React.FocusEvent<HTMLInputElement>) {
+    emailReg.onBlur(e);
+    const val = e.target.value.trim();
+    if (!val) {
+      if (emailBlurError !== "Ingresa tu correo") {
+        setEmailBlurError("Ingresa tu correo");
+        setSettle(true);
+      }
+      return;
+    }
+    const result = z.string().email().safeParse(val);
+    if (!result.success) {
+      if (emailBlurError !== "Correo inválido") {
+        setEmailBlurError("Correo inválido");
+        setSettle(true);
+      }
+      return;
+    }
+    setEmailBlurError(null);
+  }
+
+  function handleEmailChange(e: React.ChangeEvent<HTMLInputElement>) {
+    emailReg.onChange(e);
+    const val = e.target.value.trim();
+
+    // Si ya teníamos el mensaje de correo inválido activo:
+    if (emailBlurError) {
+      const result = z.string().email().safeParse(val);
+      if (result.success) {
+        // En cuanto lo que escribe sea un correo válido, se quita el error y vuelve a 'Iniciar sesión'
+        setEmailBlurError(null);
+      } else {
+        // Si aún no es válido, se mantiene el mensaje correspondiente
+        setEmailBlurError(val ? "Correo inválido" : "Ingresa tu correo");
+      }
+    }
+    recharge();
+  }
+
   const emailReg = register("email");
   const passwordReg = register("password");
   const staleEmail = stale?.email ?? "";
 
-  function recoverLink(label: string) {
-    return (
-      <Link
-        to="/forgot-password"
-        state={{ email: staleEmail }}
-        className="ml-1 font-semibold text-brand-red hover:underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red rounded"
-      >
-        {label}
-      </Link>
-    );
-  }
+  let buttonTone: "primary" | "ink" = "primary";
+  let buttonToneLabel: React.ReactNode = undefined;
+  let isButtonDisabled = false;
 
-  let passwordNotice: ReactNode;
-  if (phase === "mismatch") {
-    passwordNotice =
-      attempt === 1 ? (
-        <>No coinciden ·{recoverLink("¿La olvidaste?")}</>
-      ) : (
-        <>Sigue sin coincidir ·{recoverLink("Recuperar")}</>
-      );
-  } else if (phase === "limited") {
-    passwordNotice = <>Por seguridad ·{recoverLink("Recuperar")}</>;
-  } else if (phase === "failed") {
-    passwordNotice = "Revisa tu conexión";
+  if (emailBlurError) {
+    buttonTone = "ink";
+    buttonToneLabel = emailBlurError;
+    isButtonDisabled = true;
+  } else if (phase !== "idle") {
+    buttonTone = "ink";
+    buttonToneLabel = toneLabels[phase];
+    isButtonDisabled = false;
   }
-
-  const emailNotice = phase === "deactivated" ? "Habla con tu administrador" : undefined;
 
   return (
     <AuthLayout
@@ -150,23 +171,58 @@ export function LoginPage() {
       settle={settle}
       footer={
         <div className="space-y-4">
-          <div className="flex items-center justify-between text-[11.5px] text-zinc-500">
+          <div className="flex items-center justify-between text-[12px] text-zinc-500">
             <span className="flex items-center gap-1.5 font-medium text-zinc-600">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              Acceso seguro
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              Acceso seguro SSL
             </span>
-            <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-medium text-zinc-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               Uso interno
             </span>
           </div>
-          <p className="text-center text-[12px] leading-relaxed text-zinc-500">
+          <p className="text-center text-[12.5px] leading-relaxed text-zinc-500">
             ¿Aún no tienes acceso?{" "}
             <span className="font-semibold text-zinc-800">Solicítalo a tu administrador.</span>
           </p>
         </div>
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4.5">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5 sm:gap-5.5">
+        {phase === "limited" && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/90 bg-amber-50/80 p-3.5 text-[13px] text-amber-900 animate-plf-rise">
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+            <div className="flex-1 leading-snug">
+              <span>Demasiados intentos de acceso.</span> Por seguridad, espera unos minutos o{" "}
+              <Link
+                to="/forgot-password"
+                state={{ email: staleEmail }}
+                className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800"
+              >
+                recupera tu contraseña
+              </Link>.
+            </div>
+          </div>
+        )}
+
+        {phase === "deactivated" && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-red-200/90 bg-red-50/80 p-3.5 text-[13px] text-red-900 animate-plf-rise">
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-brand-red" aria-hidden />
+            <div className="flex-1 leading-snug">
+              Esta cuenta ha sido desactivada. Solicita su reactivación al administrador de sistemas.
+            </div>
+          </div>
+        )}
+
+        {phase === "failed" && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-red-200/90 bg-red-50/80 p-3.5 text-[13px] text-red-900 animate-plf-rise">
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-brand-red" aria-hidden />
+            <div className="flex-1 leading-snug">
+              No se pudo conectar con el servidor. Revisa tu conexión a la red e inténtalo de nuevo.
+            </div>
+          </div>
+        )}
+
         <AuthField
           label="Correo corporativo"
           placeholder="nombre@plastifar.com"
@@ -174,29 +230,26 @@ export function LoginPage() {
           inputMode="email"
           autoComplete="username"
           autoFocus
-          icon={<Mail className="h-4 w-4" />}
-          error={errors.email?.message}
-          notice={emailNotice}
+          icon={<Mail className="h-[18px] w-[18px]" />}
+          hasError={Boolean(emailBlurError)}
           {...emailReg}
-          onChange={(e) => {
-            emailReg.onChange(e);
-            recharge();
-          }}
+          onChange={handleEmailChange}
+          onBlur={handleEmailBlur}
         />
 
         <AuthPasswordField
           label="Contraseña"
           placeholder="••••••••"
           autoComplete="current-password"
-          icon={<Lock className="h-4 w-4" />}
+          icon={<Lock className="h-[18px] w-[18px]" />}
           error={errors.password?.message}
-          notice={passwordNotice}
           relayFrom={buttonRef}
           relayKey={relayKey}
           action={
             <Link
               to="/forgot-password"
-              className="text-[12px] font-medium text-zinc-500 transition-colors hover:text-brand-red hover:underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red rounded"
+              state={{ email: staleEmail || getValues("email") }}
+              className="text-[12.5px] font-medium text-zinc-500 transition-colors hover:text-brand-red hover:underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red rounded"
             >
               ¿Olvidaste tu contraseña?
             </Link>
@@ -211,26 +264,14 @@ export function LoginPage() {
         <AuthButton
           ref={buttonRef}
           type="submit"
+          disabled={isButtonDisabled}
           isLoading={isSubmitting}
-          tone={phase === "idle" ? "primary" : "ink"}
-          toneLabel={phase === "idle" ? undefined : toneLabels[phase]}
-          className="mt-2"
+          tone={buttonTone}
+          toneLabel={buttonToneLabel}
+          className="mt-2.5 sm:mt-3"
         >
-          {isSubmitting ? "Iniciando sesión…" : "Entrar al panel"}
+          {isSubmitting ? "Iniciando sesión…" : "Iniciar sesión"}
         </AuthButton>
-
-        {/* Rampa de salida: el único elemento que se añade, y solo tras varios intentos. */}
-        {attempt >= RAMP_AFTER_ATTEMPTS && (
-          <Link
-            to="/forgot-password"
-            state={{ email: staleEmail }}
-            className="animate-plf-rise flex h-[38px] items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white text-[12.5px] font-medium text-zinc-900 transition-colors hover:border-zinc-300 hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
-          >
-            <KeyRound className="h-3.5 w-3.5 text-zinc-500" aria-hidden />
-            Recuperar contraseña
-            <span className="truncate font-normal text-zinc-500">· {staleEmail}</span>
-          </Link>
-        )}
 
         <p role="status" aria-live="polite" className="sr-only">
           {announcement}
