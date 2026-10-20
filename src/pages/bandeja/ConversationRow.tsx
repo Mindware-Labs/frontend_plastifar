@@ -107,10 +107,7 @@ export function ConversationRow({
           >
             {name}
           </span>
-          <div className="ml-auto flex shrink-0 items-center gap-1">
-            <span className="text-[11px] font-medium text-zinc-400">
-              {formatEmailListDate(email.createdAt)}
-            </span>
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
             {onToggleStar && (
               <button
                 type="button"
@@ -119,19 +116,22 @@ export function ConversationRow({
                   e.stopPropagation();
                   onToggleStar();
                 }}
-                className={`flex size-4 items-center justify-center rounded outline-none transition-all focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                className={`items-center justify-center rounded outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer ${
                   email.starred
-                    ? "text-amber-500 hover:text-amber-600 opacity-100"
-                    : "text-zinc-300 opacity-0 group-hover:opacity-100 hover:text-amber-500"
+                    ? "flex size-4 text-amber-500 hover:text-amber-600 hover:scale-110 active:scale-95"
+                    : "hidden group-hover:flex group-focus-within:flex focus-visible:flex size-4 text-zinc-300 hover:text-amber-500 hover:scale-110 active:scale-95 animate-in fade-in zoom-in-75 duration-150"
                 }`}
               >
                 <Star
-                  className={`size-3.5 transition-transform active:scale-90 ${
+                  className={`size-3.5 transition-transform ${
                     email.starred ? "fill-amber-400 text-amber-500" : ""
                   }`}
                 />
               </button>
             )}
+            <span className="text-[11px] font-medium text-zinc-400 tabular-nums">
+              {formatEmailListDate(email.createdAt)}
+            </span>
           </div>
         </div>
 
