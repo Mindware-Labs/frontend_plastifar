@@ -28,6 +28,7 @@ import {
   type ContactListResponse,
   type ContactQuery,
 } from "../../api/clients";
+import { ticketsApi } from "../../api/tickets";
 import { fetchAllPages } from "../../api/paging";
 import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -49,9 +50,11 @@ import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import { formatPhoneNumber } from "../../lib/format";
+import { formatDateTime, formatPhoneNumber, formatTicketCode } from "../../lib/format";
 import { resolveStaffLabel } from "../../lib/lookups";
+import type { TicketListResponse, TicketQuery } from "../../types/api";
 import type { Client, Contact, Territory } from "../../types/clients";
+import { PriorityCell, StatusCell } from "../tickets/ticketCells";
 import { ClientModal } from "./ClientModal";
 import { ContactModal } from "./ContactModal";
 
@@ -122,11 +125,17 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const [contactChip, setContactChip] = useState<ContactChipKey>("todos");
   const [contactPageSize, setContactPageSize] = useState(10);
 
+  const [ticketSearch, setTicketSearch] = useState("");
+  const [ticketChip, setTicketChip] = useState<"todos" | "abiertos" | "cerrados">("todos");
+  const [ticketPageSize, setTicketPageSize] = useState(10);
+
   const clientId = Number(id);
   useDynamicBreadcrumb(client?.name ?? null);
 
   const debouncedContactSearch = useDebouncedValue(contactSearch).trim();
+  const debouncedTicketSearch = useDebouncedValue(ticketSearch).trim();
 
+  // Pestaña de Contactos
   const {
     data: contactPage,
     isStale: contactsStale,
@@ -143,10 +152,32 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     fallbackError: "No se pudieron cargar los contactos",
   });
 
+  // Pestaña de Historial de Tickets
+  const {
+    data: ticketPage,
+    isStale: ticketsStale,
+    error: ticketsError,
+    setPage: setTicketPage,
+    refresh: refreshTickets,
+  } = usePagedList<TicketQuery, TicketListResponse>({
+    fetch: (query) => ticketsApi.list(query),
+    criteria: {
+      clientId,
+      pageSize: ticketPageSize,
+      search: debouncedTicketSearch || undefined,
+      status: ticketChip === "abiertos" ? "abiertos" : ticketChip === "cerrados" ? "cerrados" : undefined,
+    },
+    fallbackError: "No se pudieron cargar los tickets del cliente",
+  });
+
   const contactRows = contactPage?.items ?? [];
   const contactCounts = contactPage?.counts;
   const contactsUnfiltered = contactChip === "todos" && !debouncedContactSearch;
   const totalContacts = contactCounts?.all ?? client?.contactCount ?? 0;
+
+  const ticketRows = ticketPage?.items ?? [];
+  const ticketCounts = ticketPage?.counts;
+  const totalTickets = ticketCounts?.all ?? ticketPage?.total ?? client?.ticketCount ?? 0;
 
   function reload() {
     return clientsApi.get(clientId).then(({ client: loaded, contacts }) => {
@@ -293,7 +324,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const sections = [
     { label: "Datos", to: `/clientes/${id}` },
     { label: `Contactos (${totalContacts})`, to: `/clientes/${id}/contactos` },
-    { label: `Historial de tickets (${client?.ticketCount ?? 0})`, to: `/clientes/${id}/historial` },
+    { label: `Historial de tickets (${totalTickets})`, to: `/clientes/${id}/historial` },
   ];
 
   if (error !== null && client === null) {
@@ -326,6 +357,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* Cabecera uniforme que se mantiene IDÉNTICA en todos los tabs */}
       <ModuleHeader
         backTo="/clientes"
         backLabel="Volver al directorio de clientes"
@@ -357,18 +389,18 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
         }
         sections={sections}
         action={
-          canWrite &&
-          (section === "datos" ? (
-            <Button size="sm" onClick={() => setEditingClient(true)}>
-              <Pencil className="h-[15px] w-[15px]" />
-              Editar cliente
-            </Button>
-          ) : section === "contactos" ? (
-            <Button size="sm" onClick={() => setContactModal("nuevo")}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nuevo contacto
-            </Button>
-          ) : undefined)
+          canWrite && (
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setEditingClient(true)}>
+                <Pencil className="h-[15px] w-[15px]" />
+                Editar cliente
+              </Button>
+              <Button size="sm" onClick={() => setContactModal("nuevo")}>
+                <Plus className="h-[15px] w-[15px]" />
+                Nuevo contacto
+              </Button>
+            </div>
+          )
         }
       />
 
@@ -725,7 +757,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                         className="p-2.5 rounded-lg bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-100 transition-colors block"
                       >
                         <div className="font-heading text-[18px] font-bold text-zinc-900 tabular-nums">
-                          {client.ticketCount}
+                          {totalTickets}
                         </div>
                         <div className="text-[11px] font-medium text-zinc-500 mt-0.5">
                           Tickets
@@ -964,25 +996,165 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
           )}
 
           {section === "historial" && (
-            <div className="rounded-card border border-line bg-white p-12 text-center shadow-card max-w-xl mx-auto my-6">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 mb-3">
-                <Ticket className="h-6 w-6" />
-              </div>
-              <h3 className="font-heading text-[15px] font-bold text-zinc-900 mb-1">
-                Historial de tickets del cliente
-              </h3>
-              <p className="text-[12.5px] text-zinc-500 max-w-sm mx-auto leading-relaxed">
-                Aquí se registrará la trazabilidad completa de tickets asociados a <strong className="font-semibold text-zinc-800">{client.name}</strong> en cuanto se creen tickets en la plataforma.
-              </p>
-              <div className="mt-4 flex justify-center">
-                <Link
-                  to={`/clientes/${id}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-zinc-700 hover:text-zinc-900 rounded-md border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors shadow-2xs"
-                >
-                  Volver a datos del cliente
-                </Link>
-              </div>
-            </div>
+            <>
+              {ticketsError !== null && (
+                <div className="mb-3 flex items-start gap-3">
+                  <Alert variant="error">{ticketsError}</Alert>
+                  <Button size="sm" variant="secondary" onClick={refreshTickets}>
+                    Reintentar
+                  </Button>
+                </div>
+              )}
+
+              <ListPanel
+                toolbar={
+                  <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <SearchInput
+                        value={ticketSearch}
+                        onChange={setTicketSearch}
+                        placeholder="Buscar por número o asunto…"
+                        className="w-[240px]"
+                      />
+                      {ticketSearch && (
+                        <ClearFiltersButton
+                          onClick={() => setTicketSearch("")}
+                          title="Limpiar búsqueda"
+                        />
+                      )}
+                    </div>
+
+                    <div
+                      role="group"
+                      aria-label="Filtro de tickets"
+                      className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
+                    >
+                      {[
+                        { key: "todos" as const, label: "Todos", count: ticketCounts?.all ?? totalTickets },
+                        { key: "abiertos" as const, label: "Abiertos", count: ticketCounts?.open ?? 0 },
+                        { key: "cerrados" as const, label: "Cerrados", count: (ticketCounts?.all ?? totalTickets) - (ticketCounts?.open ?? 0) },
+                      ].map(({ key, label, count }) => {
+                        const isActive = ticketChip === key;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setTicketChip(key)}
+                            aria-pressed={isActive}
+                            className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                              isActive
+                                ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+                                : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+                            }`}
+                          >
+                            <span>{label}</span>
+                            <span
+                              className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
+                                isActive ? "text-zinc-900" : "text-zinc-400"
+                              }`}
+                            >
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                }
+                footer={
+                  ticketPage !== null && (
+                    <Pagination
+                      page={ticketPage.page}
+                      pageSize={ticketPage.pageSize}
+                      total={ticketPage.total}
+                      totalPages={ticketPage.totalPages}
+                      onPageChange={setTicketPage}
+                      onPageSizeChange={setTicketPageSize}
+                      noun="tickets"
+                    />
+                  )
+                }
+              >
+                {ticketPage === null ? (
+                  ticketsError === null && <TableSkeleton rows={ticketPageSize} columns={7} />
+                ) : ticketRows.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 mb-2.5">
+                      <Ticket className="h-5 w-5" />
+                    </div>
+                    <p className="text-[13px] font-medium text-zinc-700">
+                      {ticketSearch || ticketChip !== "todos"
+                        ? "Ningún ticket coincide con este filtro o búsqueda."
+                        : "Este cliente todavía no tiene tickets registrados."}
+                    </p>
+                    <p className="text-[12px] text-zinc-400 mt-0.5">
+                      Los tickets registrados para este cliente aparecerán automáticamente aquí.
+                    </p>
+                  </div>
+                ) : (
+                  <div className={`transition-opacity ${ticketsStale ? "opacity-60" : ""}`}>
+                    <DataTable>
+                      <thead>
+                        <HeadRow>
+                          <Th className="w-28">Número</Th>
+                          <Th>Asunto</Th>
+                          <Th className="w-28">Prioridad</Th>
+                          <Th className="w-32">Estado</Th>
+                          <Th>Departamento</Th>
+                          <Th>Asignado a</Th>
+                          <Th className="w-36 text-right">Creado</Th>
+                        </HeadRow>
+                      </thead>
+
+                      <tbody>
+                        {ticketRows.map((ticket) => (
+                          <Row key={ticket.id}>
+                            <Td className="font-mono text-[12.5px] font-semibold text-zinc-900 tabular-nums">
+                              <Link
+                                to={`/tickets/${ticket.id}`}
+                                className="text-brand-red hover:underline"
+                              >
+                                {ticket.number || formatTicketCode(ticket.id)}
+                              </Link>
+                            </Td>
+                            <Td className="text-[13px] text-zinc-900 font-medium">
+                              <Link
+                                to={`/tickets/${ticket.id}`}
+                                className="hover:text-brand-red transition-colors line-clamp-1"
+                              >
+                                {ticket.subject}
+                              </Link>
+                              {ticket.topicName && (
+                                <span className="text-[11px] text-zinc-400 block font-normal">
+                                  {ticket.topicName}
+                                </span>
+                              )}
+                            </Td>
+                            <Td>
+                              <PriorityCell priority={ticket.priority} />
+                            </Td>
+                            <Td>
+                              <StatusCell status={ticket.status} />
+                            </Td>
+                            <Td className="text-[12.5px] text-zinc-600">
+                              {ticket.departmentName ?? "—"}
+                            </Td>
+                            <Td className="text-[12.5px] text-zinc-600">
+                              {ticket.assignedStaffName ?? (
+                                <span className="text-zinc-400">Sin asignar</span>
+                              )}
+                            </Td>
+                            <Td className="text-[12px] text-zinc-500 text-right tabular-nums">
+                              {formatDateTime(ticket.createdAt)}
+                            </Td>
+                          </Row>
+                        ))}
+                      </tbody>
+                    </DataTable>
+                  </div>
+                )}
+              </ListPanel>
+            </>
           )}
         </div>
       </div>
