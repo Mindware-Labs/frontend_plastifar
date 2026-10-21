@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
@@ -8,6 +8,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { formatPhoneNumber } from "../../lib/format";
 import type { Contact } from "../../types/clients";
 import { fieldForServerError, type FieldRule } from "./serverFieldErrors";
 
@@ -17,11 +18,30 @@ import { fieldForServerError, type FieldRule } from "./serverFieldErrors";
  * dentro del mismo cliente — es la llave de la futura ingesta por correo
  * (seccion 7.3) —, telefono hasta 30 y cargo hasta 80.
  */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+const PHONE_CHARS_REGEX = /^[0-9+\s\-().extx]+$/i;
+
 const schema = z.object({
   firstName: z.string().trim().min(2, "Al menos 2 caracteres").max(80, "Máximo 80 caracteres"),
   lastName: z.string().trim().min(2, "Al menos 2 caracteres").max(80, "Máximo 80 caracteres"),
-  email: z.string().trim().max(120, "Máximo 120 caracteres").email("Formato de correo inválido, revisa el @ y el dominio").or(z.literal("")),
-  phone: z.string().trim().max(30, "Máximo 30 caracteres"),
+  email: z
+    .string()
+    .trim()
+    .max(120, "Máximo 120 caracteres")
+    .refine(
+      (val) => !val || EMAIL_REGEX.test(val),
+      "Correo electrónico inválido",
+    ),
+  phone: z
+    .string()
+    .trim()
+    .max(30, "Máximo 30 caracteres")
+    .refine((val) => {
+      if (!val) return true;
+      if (!PHONE_CHARS_REGEX.test(val)) return false;
+      const digits = val.replace(/\D/g, "");
+      return digits.length >= 10 && digits.length <= 15;
+    }, "Teléfono inválido (mín. 10 dígitos)"),
   position: z.string().trim().max(80, "Máximo 80 caracteres"),
   isPrimary: z.boolean(),
   isActive: z.boolean(),
@@ -37,7 +57,7 @@ type FormValues = z.infer<typeof schema>;
 const fieldRules: FieldRule<keyof FormValues>[] = [
   { field: "email", matches: ["correo"] },
   { field: "lastName", matches: ["apellido"] },
-  { field: "phone", matches: ["telefono"] },
+  { field: "phone", matches: ["telefono", "teléfono"] },
   { field: "position", matches: ["cargo"] },
   { field: "firstName", matches: ["nombre"] },
 ];
@@ -55,6 +75,7 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
+    control,
     register,
     handleSubmit,
     setError,
@@ -67,7 +88,7 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
       firstName: contact?.firstName ?? "",
       lastName: contact?.lastName ?? "",
       email: contact?.email ?? "",
-      phone: contact?.phone ?? "",
+      phone: contact?.phone ? formatPhoneNumber(contact.phone) : "",
       position: contact?.position ?? "",
       isPrimary: contact?.isPrimary ?? isFirst,
       isActive: contact?.isActive ?? true,
@@ -167,12 +188,22 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
         />
 
         <div className="grid grid-cols-2 gap-3">
-          <TextField
-            label="Teléfono"
-            placeholder="Opcional"
-            state={stateOf("phone")}
-            error={errors.phone?.message}
-            {...register("phone")}
+          <Controller
+            name="phone"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                type="tel"
+                label="Teléfono"
+                placeholder="Ej. 809-555-0123"
+                name={field.name}
+                value={field.value}
+                onChange={(e) => field.onChange(formatPhoneNumber(e.target.value))}
+                onBlur={field.onBlur}
+                state={stateOf("phone")}
+                error={errors.phone?.message}
+              />
+            )}
           />
           <TextField
             label="Cargo"

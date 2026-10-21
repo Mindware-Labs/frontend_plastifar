@@ -82,7 +82,7 @@ export interface ClientDetailResponse {
 }
 
 export interface SaveClientRequest {
-  code: string;
+  code?: string;
   name: string;
   taxId: string | null;
   type: ClientType;

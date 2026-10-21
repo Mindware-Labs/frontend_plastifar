@@ -26,7 +26,8 @@ import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
+import { useReceipts } from "../../context/useReceipts";
+import { resolveStaffLabel, resolveTerritoryLabel, searchActiveStaff, searchTerritories } from "../../lib/lookups";
 import type { Client, ClientListResponse, Territory } from "../../types/clients";
 import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
 import { ClientModal } from "./ClientModal";
@@ -40,7 +41,7 @@ type ChipKey = "todos" | "activos" | "inactivos" | "sinVendedor";
  * clicable para tipo, vendedor ni contactos: el servidor ignoraria el parametro
  * y la tabla se quedaria igual despues de pulsarla, que es peor que no poder.
  */
-type SortKey = "nombre" | "codigo" | "territorio" | "estado";
+type SortKey = "nombre" | "codigo" | "territorio" | "estado" | "fecha";
 
 const COLUMNS: ColumnOption[] = [
   { id: "cliente", label: "Cliente", locked: true },
@@ -66,6 +67,7 @@ const chipToStatus: Record<ChipKey, string | undefined> = {
 export function ClientsPage() {
   const navigate = useNavigate();
   const { can } = usePermissions();
+  const receipts = useReceipts();
   const canWrite = can("clients.write");
 
   const [territories, setTerritories] = useState<Territory[]>([]);
@@ -80,7 +82,7 @@ export function ClientsPage() {
   const [salesRepId, setSalesRepId] = useState("todos");
   const [type, setType] = useState("todos");
   const [chip, setChip] = useState<ChipKey>("todos");
-  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "nombre", dir: "asc" });
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "fecha", dir: "desc" });
   const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nuevo" | Client | null>(null);
@@ -212,6 +214,11 @@ export function ClientsPage() {
     return territories.find((territory) => territory.id === id)?.name ?? "—";
   }
 
+  function territoryLookupLabel(id: number | null) {
+    if (id === null) return null;
+    return territories.find((territory) => territory.id === id)?.name ?? null;
+  }
+
   function repName(id: number | null) {
     if (id === null) return null;
     return salesReps.find((rep) => rep.id === id)?.name ?? null;
@@ -276,9 +283,31 @@ export function ClientsPage() {
       ),
       confirmLabel: client.isActive ? "Desactivar" : "Reactivar",
       onConfirm: () =>
-        runOnRow(client.id, () =>
-          client.isActive ? clientsApi.deactivate(client.id) : clientsApi.activate(client.id),
-        ),
+        runOnRow(client.id, async () => {
+          try {
+            if (client.isActive) {
+              await clientsApi.deactivate(client.id);
+              receipts.done({
+                action: "desactivar-cliente",
+                title: "Cliente desactivado",
+                detail: `${client.name} ya no recibirá tickets nuevos`,
+              });
+            } else {
+              await clientsApi.activate(client.id);
+              receipts.done({
+                action: "reactivar-cliente",
+                title: "Cliente reactivado",
+                detail: `${client.name} habilitado nuevamente`,
+              });
+            }
+          } catch (err) {
+            receipts.failed({
+              action: "toggle-cliente",
+              title: client.isActive ? "No se pudo desactivar el cliente" : "No se pudo reactivar el cliente",
+              detail: err instanceof Error ? err.message : undefined,
+            });
+          }
+        }),
     });
   }
 
@@ -296,7 +325,23 @@ export function ClientsPage() {
         </>
       ),
       confirmLabel: "Eliminar",
-      onConfirm: () => runOnRow(client.id, () => clientsApi.remove(client.id)),
+      onConfirm: () =>
+        runOnRow(client.id, async () => {
+          try {
+            await clientsApi.remove(client.id);
+            receipts.done({
+              action: "eliminar-cliente",
+              title: "Cliente eliminado",
+              detail: `${client.name} (${client.code})`,
+            });
+          } catch (err) {
+            receipts.failed({
+              action: "eliminar-cliente",
+              title: "No se pudo eliminar el cliente",
+              detail: err instanceof Error ? err.message : undefined,
+            });
+          }
+        }),
     });
   }
 
@@ -416,16 +461,17 @@ export function ClientsPage() {
               className="w-[260px]"
             />
 
-            <FilterDropdown
+            <LookupFilterDropdown
               title="Seleccionar territorio"
               aria-label="Filtrar por territorio"
-              value={territoryId}
-              onChange={setTerritoryId}
+              placeholder="Todos los territorios"
+              searchPlaceholder="Buscar territorio…"
               defaultIcon={<MapPin className="h-3.5 w-3.5 text-zinc-500" />}
-              options={[
-                { value: "todos", label: "Todos los territorios" },
-                ...territories.map((territory) => ({ value: String(territory.id), label: territory.name })),
-              ]}
+              value={territoryId === "todos" ? "" : territoryId}
+              selectedLabel={territoryId === "todos" ? null : territoryLookupLabel(Number(territoryId))}
+              resolveSelectedLabel={resolveTerritoryLabel}
+              search={searchTerritories}
+              onChange={(value) => setTerritoryId(value === "" ? "todos" : value)}
             />
 
             <LookupFilterDropdown
@@ -661,7 +707,15 @@ export function ClientsPage() {
           client={modal === "nuevo" ? undefined : modal}
           territories={territories}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(savedClient) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-cliente" : "crear-cliente",
+              title: isEdit ? "Cliente actualizado" : "Cliente creado exitosamente",
+              detail: `${savedClient.name} (${savedClient.code})`,
+            });
+            refresh();
+          }}
         />
       )}
 
@@ -669,7 +723,14 @@ export function ClientsPage() {
         <ReassignSalesRepModal
           client={reassigning}
           onClose={() => setReassigning(null)}
-          onSaved={refresh}
+          onSaved={() => {
+            receipts.done({
+              action: "reasignar-vendedor",
+              title: "Vendedor reasignado",
+              detail: `Se actualizó el vendedor de ${reassigning.name}`,
+            });
+            refresh();
+          }}
         />
       )}
 
@@ -678,6 +739,12 @@ export function ClientsPage() {
           clients={selected}
           onClose={() => setBulkReassigning(false)}
           onSaved={() => {
+            const count = selected.length;
+            receipts.done({
+              action: "reasignar-vendedor-lote",
+              title: "Vendedores reasignados",
+              detail: `${count} ${count === 1 ? "cliente actualizado" : "clientes actualizados"}`,
+            });
             setSelectedIds([]);
             refresh();
           }}

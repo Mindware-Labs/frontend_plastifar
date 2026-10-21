@@ -53,10 +53,11 @@ function FieldShell({ id, label, error, hint, required, children }: ShellProps) 
       {error && (
         <p
           id={`${id}-error`}
-          className="animate-plf-shake flex items-start gap-1.5 text-[11.5px] font-medium text-brand-red-dark"
+          title={typeof error === "string" ? error : undefined}
+          className="animate-plf-shake flex items-center gap-1.5 text-[11px] font-medium text-brand-red-dark leading-none truncate"
         >
-          <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
-          {error}
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{error}</span>
         </p>
       )}
       {/* La pista sobrevive al error: describe la regla, y es justo cuando el
@@ -189,6 +190,7 @@ interface SelectFieldProps {
   size?: ControlSize;
   required?: boolean;
   disabled?: boolean;
+  searchable?: boolean;
   id?: string;
   name?: string;
 }
@@ -207,6 +209,7 @@ export function SelectField({
   size = "md",
   required,
   disabled,
+  searchable,
   id,
   name,
 }: SelectFieldProps) {
@@ -226,6 +229,7 @@ export function SelectField({
         size={size}
         state={resolved}
         disabled={disabled}
+        searchable={searchable}
         aria-invalid={resolved === "error"}
         aria-describedby={describedBy(fieldId, error, hint)}
       />

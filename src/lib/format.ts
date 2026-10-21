@@ -222,3 +222,30 @@ export function formatActivityDate(iso: string | null | undefined): { compact: s
 
   return { compact: `${dateStr}, ${timeStr}`, full };
 }
+
+/**
+ * Formatea un número de teléfono con guiones automáticamente (estándar dominicano / NANP: 809-555-0123).
+ */
+export function formatPhoneNumber(value: string): string {
+  if (!value) return "";
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+
+  let prefix = "";
+  let core = digits;
+  if (core.length > 10 && core.startsWith("1")) {
+    prefix = "1-";
+    core = core.slice(1);
+  }
+
+  if (core.length <= 3) {
+    return prefix + core;
+  }
+  if (core.length <= 6) {
+    return `${prefix}${core.slice(0, 3)}-${core.slice(3)}`;
+  }
+  if (core.length <= 10) {
+    return `${prefix}${core.slice(0, 3)}-${core.slice(3, 6)}-${core.slice(6)}`;
+  }
+  return `${prefix}${core.slice(0, 3)}-${core.slice(3, 6)}-${core.slice(6, 10)} ext. ${core.slice(10, 16)}`;
+}

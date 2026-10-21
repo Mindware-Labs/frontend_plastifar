@@ -27,6 +27,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
+import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -60,6 +61,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const { id } = useParams();
   const { can } = usePermissions();
   const canWrite = can("clients.write");
+  const receipts = useReceipts();
 
   const [client, setClient] = useState<Client | null>(null);
   const [territories, setTerritories] = useState<Territory[]>([]);
@@ -194,9 +196,20 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     setError(null);
     try {
       await clientsApi.contacts.makePrimary(contact.id);
+      receipts.done({
+        action: "contacto-principal",
+        title: "Contacto principal actualizado",
+        detail: `${contact.firstName} ${contact.lastName} es ahora el contacto principal`,
+      });
       await refreshAfterContactChange();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo marcar como principal");
+      const msg = err instanceof ApiError ? err.message : "No se pudo marcar como principal";
+      setError(msg);
+      receipts.failed({
+        action: "contacto-principal",
+        title: "No se pudo cambiar el contacto principal",
+        detail: msg,
+      });
     } finally {
       setBusyContactId(null);
     }
@@ -235,7 +248,18 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
             isPrimary: contact.isPrimary,
             isActive: !contact.isActive,
           });
+          receipts.done({
+            action: "toggle-contacto",
+            title: contact.isActive ? "Contacto desactivado" : "Contacto reactivado",
+            detail: `${contact.firstName} ${contact.lastName}`,
+          });
           await refreshAfterContactChange();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-contacto",
+            title: contact.isActive ? "No se pudo desactivar el contacto" : "No se pudo reactivar el contacto",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyContactId(null);
         }
@@ -575,7 +599,14 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
           client={client}
           territories={territories}
           onClose={() => setEditingClient(false)}
-          onSaved={setClient}
+          onSaved={(updated) => {
+            setClient(updated);
+            receipts.done({
+              action: "editar-cliente",
+              title: "Cliente actualizado",
+              detail: `${updated.name} (${updated.code})`,
+            });
+          }}
         />
       )}
 
@@ -585,7 +616,15 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
           contact={contactModal === "nuevo" ? undefined : contactModal}
           isFirst={totalContacts === 0}
           onClose={() => setContactModal(null)}
-          onSaved={() => void refreshAfterContactChange()}
+          onSaved={(savedContact) => {
+            const isEdit = contactModal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-contacto" : "crear-contacto",
+              title: isEdit ? "Contacto actualizado" : "Contacto agregado exitosamente",
+              detail: `${savedContact.firstName} ${savedContact.lastName}`,
+            });
+            void refreshAfterContactChange();
+          }}
         />
       )}
 

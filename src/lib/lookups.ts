@@ -8,6 +8,7 @@
 import { clientsApi } from "../api/clients";
 import { settingsApi } from "../api/settings";
 import { staffApi } from "../api/staff";
+import { territoriesApi } from "../api/territories";
 import type { LookupResult } from "../components/ui/LookupSelect";
 
 /**
@@ -108,4 +109,28 @@ export async function resolveProductLabel(value: string): Promise<string | null>
 export async function resolveClientLabel(value: string): Promise<string | null> {
   const { client } = await clientsApi.get(Number(value));
   return client.name;
+}
+
+/** Busca territorios por nombre o código. */
+export async function searchTerritories(term: string): Promise<LookupResult> {
+  const { items, total } = await territoriesApi.list({
+    page: 1,
+    pageSize: LOOKUP_PAGE_SIZE,
+    search: term || undefined,
+  });
+
+  return {
+    options: items.map((territory) => ({
+      value: String(territory.id),
+      label: territory.name,
+      hint: territory.code,
+    })),
+    hasMore: total > items.length,
+  };
+}
+
+/** Nombre de un territorio por id, para pintar lo ya seleccionado. */
+export async function resolveTerritoryLabel(value: string): Promise<string | null> {
+  const territory = await territoriesApi.get(Number(value));
+  return territory.name;
 }
