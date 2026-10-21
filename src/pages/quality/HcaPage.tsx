@@ -1,4 +1,4 @@
-import { Building2, Factory, Layers, Package, Plus, UserCheck } from "lucide-react";
+import { Factory, Layers, Package, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { fetchAllPages } from "../../api/paging";
@@ -15,7 +15,6 @@ import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import {
   ClearFiltersButton,
-  DateRangeFilterDropdown,
   FilterDropdown,
   LookupFilterDropdown,
 } from "../../components/ui/FilterDropdown";
@@ -28,17 +27,11 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import {
-  resolveClientLabel,
-  resolveProductLabel,
-  resolveStaffLabel,
-  searchActiveStaff,
-  searchClients,
-  searchProducts,
-} from "../../lib/lookups";
+import { resolveProductLabel, searchProducts } from "../../lib/lookups";
 import { describeDueShort, formatDay, isSheetOverdue } from "../../lib/quality";
 import { settingsApi } from "../../api/settings";
 import type { Plant, ProductLine } from "../../types/settings";
+import { HcaFilterPopover } from "./HcaFilterPopover";
 import { HcaModal } from "./HcaModal";
 import { HcaStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
@@ -300,6 +293,8 @@ export function HcaPage() {
               value={productLineId}
               onChange={setProductLineId}
               defaultIcon={<Layers className="h-3.5 w-3.5 text-zinc-500" />}
+              searchable
+              searchPlaceholder="Buscar línea…"
               options={[
                 { value: "todas", label: "Todas las líneas" },
                 ...productLines.map((line) => ({ value: String(line.id), label: line.name })),
@@ -312,6 +307,8 @@ export function HcaPage() {
               value={plantId}
               onChange={setPlantId}
               defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
+              searchable
+              searchPlaceholder="Buscar planta…"
               options={[
                 { value: "todas", label: "Todas las plantas" },
                 ...plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
@@ -330,37 +327,23 @@ export function HcaPage() {
               resolveSelectedLabel={resolveProductLabel}
             />
 
-            <LookupFilterDropdown
-              title="Seleccionar responsable"
-              aria-label="Filtrar por responsable"
-              placeholder="Todos los responsables"
-              searchPlaceholder="Buscar responsable…"
-              defaultIcon={<UserCheck className="h-3.5 w-3.5 text-zinc-500" />}
-              value={responsibleId === "todos" ? "" : responsibleId}
-              onChange={(value) => setResponsibleId(value === "" ? "todos" : value)}
-              search={searchActiveStaff}
-              resolveSelectedLabel={resolveStaffLabel}
-            />
-
-            <LookupFilterDropdown
-              title="Seleccionar cliente"
-              aria-label="Filtrar por cliente"
-              placeholder="Todos los clientes"
-              searchPlaceholder="Buscar cliente…"
-              defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
-              value={clientId === "todos" ? "" : clientId}
-              onChange={(value) => setClientId(value === "" ? "todos" : value)}
-              search={searchClients}
-              resolveSelectedLabel={resolveClientLabel}
-            />
-
-            <DateRangeFilterDropdown
+            <HcaFilterPopover
+              responsibleId={responsibleId}
+              onResponsibleChange={setResponsibleId}
+              clientId={clientId}
+              onClientChange={setClientId}
               from={from}
               to={to}
-              onFromChange={setFrom}
-              onToChange={setTo}
-              title="Detectada entre fechas"
-              aria-label="Filtrar por fecha de detección"
+              onDateChange={(since, until) => {
+                setFrom(since);
+                setTo(until);
+              }}
+              onClear={() => {
+                setResponsibleId("todos");
+                setClientId("todos");
+                setFrom("");
+                setTo("");
+              }}
             />
 
             {(search || filtrosPuestos > 0) && (

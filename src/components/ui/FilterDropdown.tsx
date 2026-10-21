@@ -11,7 +11,7 @@ export interface FilterOption {
   icon?: ReactNode;
 }
 
-interface FilterDropdownProps {
+export interface FilterDropdownProps {
   value: string;
   onChange: (value: string) => void;
   options: FilterOption[];
@@ -19,6 +19,8 @@ interface FilterDropdownProps {
   defaultIcon?: ReactNode;
   "aria-label"?: string;
   className?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }
 
 interface Anchor {
@@ -53,8 +55,11 @@ export function FilterDropdown({
   defaultIcon,
   "aria-label": ariaLabel,
   className = "",
+  searchable = false,
+  searchPlaceholder = "Buscar…",
 }: FilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -62,11 +67,16 @@ export function FilterDropdown({
 
   const activeOption = options.find((opt) => opt.value === value) ?? options[0];
 
+  const filteredOptions =
+    searchable && searchTerm.trim()
+      ? options.filter((opt) => opt.label.toLowerCase().includes(searchTerm.trim().toLowerCase()))
+      : options;
+
   function openDropdown() {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    const width = Math.max(rect.width, PANEL_MIN_WIDTH);
+    const width = Math.max(rect.width, searchable ? 240 : PANEL_MIN_WIDTH);
     const left = Math.max(
       VIEWPORT_GUTTER,
       Math.min(rect.left, window.innerWidth - width - VIEWPORT_GUTTER),
@@ -74,11 +84,13 @@ export function FilterDropdown({
 
     setAnchor({ top: rect.bottom + 6, left, width, originX: rect.left + rect.width / 2 - left });
     setIsOpen(true);
+    setSearchTerm("");
   }
 
   const closeDropdown = useCallback(
     (immediate = false) => {
       setIsOpen(false);
+      setSearchTerm("");
       if (immediate) snap();
     },
     [snap],
@@ -150,6 +162,7 @@ export function FilterDropdown({
             ref={panelRef}
             id={panelId}
             role="listbox"
+            data-dropdown-portal="true"
             aria-label={ariaLabel ?? title}
             aria-hidden={exiting}
             style={{
@@ -169,38 +182,75 @@ export function FilterDropdown({
                 {title}
               </div>
             )}
-            <div className="max-h-[280px] overflow-y-auto flex flex-col gap-0.5">
-              {options.map((option) => {
-                const isSelected = option.value === value;
-                return (
-                  <button
-                    key={option.value}
-                    data-motion-item
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    onClick={() => {
-                      onChange(option.value);
-                      closeDropdown();
-                      triggerRef.current?.focus();
+            {searchable && (
+              <div className="border-b border-zinc-100 p-1 mb-0.5">
+                <div className="relative flex items-center">
+                  <Search className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-zinc-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder={searchPlaceholder}
+                    className="w-full rounded-md border border-zinc-200 bg-zinc-50/70 py-1 pl-7 pr-6 text-[12px] text-zinc-900 placeholder:text-zinc-400 outline-none focus:border-brand-red focus:bg-white focus:ring-1 focus:ring-brand-red/20 transition-all"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        closeDropdown();
+                        triggerRef.current?.focus();
+                      }
+                      e.stopPropagation();
                     }}
-                    className={`group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px]
-                      transition-colors duration-100 ease-out cursor-pointer select-none ${
-                        isSelected
-                          ? "bg-zinc-100 font-semibold text-zinc-900"
-                          : "font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 active:bg-zinc-100/70"
-                      }`}
-                  >
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500 group-hover:text-zinc-900">
-                      {option.icon ?? defaultIcon}
-                    </span>
-                    <span className="flex-1 truncate">{option.label}</span>
-                    {isSelected && (
-                      <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-red" />
-                    )}
-                  </button>
-                );
-              })}
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-1.5 flex h-4 w-4 items-center justify-center rounded text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="max-h-[280px] overflow-y-auto flex flex-col gap-0.5">
+              {filteredOptions.length === 0 ? (
+                <div className="px-3 py-3 text-center text-[12px] text-zinc-400">
+                  No se encontraron resultados
+                </div>
+              ) : (
+                filteredOptions.map((option) => {
+                  const isSelected = option.value === value;
+                  return (
+                    <button
+                      key={option.value}
+                      data-motion-item
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => {
+                        onChange(option.value);
+                        closeDropdown();
+                        triggerRef.current?.focus();
+                      }}
+                      className={`group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px]
+                        transition-colors duration-100 ease-out cursor-pointer select-none ${
+                          isSelected
+                            ? "bg-zinc-100 font-semibold text-zinc-900"
+                            : "font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 active:bg-zinc-100/70"
+                        }`}
+                    >
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500 group-hover:text-zinc-900">
+                        {option.icon ?? defaultIcon}
+                      </span>
+                      <span className="flex-1 truncate">{option.label}</span>
+                      {isSelected && (
+                        <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-red" />
+                      )}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>,
           document.body,
@@ -404,6 +454,7 @@ export function LookupFilterDropdown({
             ref={panelRef}
             id={panelId}
             role="listbox"
+            data-dropdown-portal="true"
             aria-label={ariaLabel ?? title ?? placeholder}
             aria-hidden={exiting}
             style={{

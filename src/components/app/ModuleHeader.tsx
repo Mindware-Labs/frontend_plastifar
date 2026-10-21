@@ -95,10 +95,10 @@ export function ModuleHeader({
                   to={section.to}
                   end
                   className={({ isActive }) =>
-                    `flex h-full items-center border-b-2 px-2.5 text-[12.5px] font-medium transition-colors -mb-px ` +
+                    `flex h-full items-center border-b-2 px-2.5 text-[12.5px] font-medium transition-all duration-200 ease-out -mb-px ` +
                     (isActive
-                      ? "border-brand-red text-ink font-semibold"
-                      : "border-transparent text-subtle hover:text-ink")
+                      ? "border-brand-red text-zinc-900 font-semibold"
+                      : "border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300/80")
                   }
                 >
                   {section.label}

@@ -439,6 +439,17 @@ input:-webkit-autofill:focus {
   }
 }
 
+@keyframes plf-apple-tab-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 @keyframes plf-popover-in {
   from {
     opacity: 0;
@@ -505,6 +516,7 @@ input:-webkit-autofill:focus {
 .animate-plf-selection-in { animation: plf-selection-bar-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-selection-out { animation: plf-selection-bar-out 0.18s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-tabs-in { animation: plf-tabs-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-apple-tab { animation: plf-apple-tab-enter 0.20s cubic-bezier(0.16, 1, 0.3, 1); will-change: transform, opacity; }
 .animate-plf-tabs-out { animation: plf-tabs-fade-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
 .animate-plf-popover-in { animation: plf-popover-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-popover-out { animation: plf-popover-out 0.16s cubic-bezier(0.2, 0, 0, 1) both; }
@@ -805,6 +817,7 @@ input:-webkit-autofill:focus {
   .animate-plf-toast-in,
   .animate-plf-selection-in,
   .animate-plf-tabs-in,
+  .animate-plf-apple-tab,
   .animate-plf-popover-in,
   .animate-plf-scrim-in,
   .animate-plf-modal-in,

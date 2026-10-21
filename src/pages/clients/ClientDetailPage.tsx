@@ -1,8 +1,10 @@
 import {
   ArrowRight,
+  Ban,
   Boxes,
   Building2,
   Check,
+  CheckCircle2,
   Copy,
   FileText,
   Landmark,
@@ -11,7 +13,6 @@ import {
   Pencil,
   Phone,
   Plus,
-  Power,
   Star,
   Store,
   Ticket,
@@ -270,11 +271,12 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   }
 
   function askDeactivateContact(contact: Contact) {
+    const willDeactivate = contact.isActive;
     setConfirmation({
       tone: "warn",
-      icon: Power,
-      title: contact.isActive ? "Desactivar contacto" : "Reactivar contacto",
-      description: contact.isActive ? (
+      icon: willDeactivate ? Ban : CheckCircle2,
+      title: willDeactivate ? "Desactivar contacto" : "Reactivar contacto",
+      description: willDeactivate ? (
         <>
           <strong className="font-semibold text-ink">
             {contact.firstName} {contact.lastName}
@@ -289,7 +291,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
           vuelve a estar disponible para este cliente.
         </>
       ),
-      confirmLabel: contact.isActive ? "Desactivar" : "Reactivar",
+      confirmLabel: willDeactivate ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
         setBusyContactId(contact.id);
         try {
@@ -425,7 +427,9 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
             </div>
           )}
 
-          {section === "datos" && (
+          {/* Animación de entrada fluida estilo Apple */}
+          <div key={section} className="animate-plf-apple-tab">
+            {section === "datos" && (
             <div className="space-y-3.5">
               {/* 1. Métrica rápida compacta */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -978,9 +982,10 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                                           ? `Desactivar a ${contact.firstName}`
                                           : `Reactivar a ${contact.firstName}`
                                     }
-                                    icon={Power}
+                                    icon={contact.isActive ? Ban : CheckCircle2}
                                     onClick={() => askDeactivateContact(contact)}
                                     disabled={(contact.isPrimary && contact.isActive) || busyContactId === contact.id}
+                                    danger={contact.isActive && !contact.isPrimary}
                                   />
                                 </div>
                               </Td>
@@ -1156,6 +1161,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
               </ListPanel>
             </>
           )}
+          </div>
         </div>
       </div>
 

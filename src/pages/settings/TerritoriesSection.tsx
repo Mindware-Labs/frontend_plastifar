@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power } from "lucide-react";
+import { Ban, CheckCircle2, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { territoriesApi, type TerritoryQuery } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -14,6 +14,7 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -31,6 +32,7 @@ export function TerritoriesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
+  const receipts = useReceipts();
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [search, setSearch] = useState("");
@@ -65,11 +67,12 @@ export function TerritoriesSection() {
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
 
   function askToggle(territory: Territory) {
+    const willDeactivate = territory.isActive;
     setConfirmation({
       tone: "warn",
-      icon: Power,
-      title: territory.isActive ? "Desactivar territorio" : "Reactivar territorio",
-      description: territory.isActive ? (
+      icon: willDeactivate ? Ban : CheckCircle2,
+      title: willDeactivate ? "Desactivar territorio" : "Reactivar territorio",
+      description: willDeactivate ? (
         <>
           <strong className="font-semibold text-ink">{territory.name}</strong> dejará de ofrecerse al
           registrar un cliente. {territory.clientCount}{" "}
@@ -84,17 +87,29 @@ export function TerritoriesSection() {
           disponible al registrar un cliente.
         </>
       ),
-      confirmLabel: territory.isActive ? "Desactivar" : "Reactivar",
+      confirmLabel: willDeactivate ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
         setBusyId(territory.id);
         try {
           const current = await freshCopy(territoriesApi.get, territory);
+          const nextActive = !current.isActive;
           await territoriesApi.update(current.id, {
             code: current.code,
             name: current.name,
-            isActive: !current.isActive,
+            isActive: nextActive,
+          });
+          receipts.done({
+            action: nextActive ? "reactivar-territorio" : "desactivar-territorio",
+            title: nextActive ? "Territorio reactivado" : "Territorio desactivado",
+            detail: `${current.name} (${current.code})`,
           });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-territorio",
+            title: willDeactivate ? "No se pudo desactivar el territorio" : "No se pudo reactivar el territorio",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -248,9 +263,10 @@ export function TerritoriesSection() {
                                 ? `Desactivar ${territory.name}`
                                 : `Reactivar ${territory.name}`
                             }
-                            icon={Power}
+                            icon={territory.isActive ? Ban : CheckCircle2}
                             onClick={() => askToggle(territory)}
                             disabled={busyId === territory.id}
+                            danger={territory.isActive}
                           />
                         </div>
                       </Td>
@@ -267,7 +283,15 @@ export function TerritoriesSection() {
         <TerritoryModal
           territory={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(saved) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-territorio" : "crear-territorio",
+              title: isEdit ? "Territorio actualizado" : "Territorio creado exitosamente",
+              detail: `${saved.name} (${saved.code})`,
+            });
+            refresh();
+          }}
         />
       )}
 

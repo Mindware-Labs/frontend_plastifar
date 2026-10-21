@@ -1,4 +1,4 @@
-import { Building2, MapPin, Pencil, Plus, Power, Trash2, UserCheck, UserCog, Users } from "lucide-react";
+import { Ban, Building2, CheckCircle2, MapPin, Pencil, Plus, Trash2, UserCheck, UserCog, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { clientsApi, type ClientQuery } from "../../api/clients";
@@ -266,11 +266,12 @@ export function ClientsPage() {
   }
 
   function askToggle(client: Client) {
+    const willDeactivate = client.isActive;
     setConfirmation({
       tone: "warn",
-      icon: Power,
-      title: client.isActive ? "Desactivar cliente" : "Reactivar cliente",
-      description: client.isActive ? (
+      icon: willDeactivate ? Ban : CheckCircle2,
+      title: willDeactivate ? "Desactivar cliente" : "Reactivar cliente",
+      description: willDeactivate ? (
         <>
           <strong className="font-semibold text-ink">{client.name}</strong> deja de poder recibir
           tickets nuevos. Su historial se conserva.
@@ -281,7 +282,7 @@ export function ClientsPage() {
           tickets nuevos.
         </>
       ),
-      confirmLabel: client.isActive ? "Desactivar" : "Reactivar",
+      confirmLabel: willDeactivate ? "Desactivar" : "Reactivar",
       onConfirm: () =>
         runOnRow(client.id, async () => {
           try {
@@ -679,9 +680,10 @@ export function ClientsPage() {
                           />
                           <RowAction
                             label={client.isActive ? `Desactivar ${client.name}` : `Reactivar ${client.name}`}
-                            icon={Power}
+                            icon={client.isActive ? Ban : CheckCircle2}
                             onClick={() => askToggle(client)}
                             disabled={busyId === client.id}
+                            danger={client.isActive}
                           />
                           <RowAction
                             label={`Eliminar ${client.name}`}
