@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/Button";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { FilterPopover } from "../../components/ui/FilterPopover";
 import { ListPanel } from "../../components/ui/ListPanel";
@@ -259,6 +260,15 @@ export function WithdrawalsPage() {
                 <ControlInput id="retiro-hasta" type="date" className="w-[150px]" value={to} onChange={(event) => setTo(event.target.value)} />
               </CriteriaField>
             </FilterPopover>
+
+            {(search || filtrosPuestos > 0) && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setSearch("");
+                  clearNarrowFilters();
+                }}
+              />
+            )}
           </>
         }
         footer={

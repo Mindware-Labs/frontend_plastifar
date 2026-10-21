@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Clock, FileSpreadsheet, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -6,11 +6,11 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
-import { Select } from "../../components/ui/Select";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -180,22 +180,30 @@ export function FormRoutingRulesSection() {
       <ListPanel
         toolbar={
           <>
-            <Select
-              size="sm"
-              className="w-[220px]"
+            <FilterDropdown
+              title="Seleccionar formulario"
               aria-label="Filtrar por formulario"
               value={form}
               onChange={setForm}
+              defaultIcon={<FileSpreadsheet className="h-3.5 w-3.5 text-zinc-500" />}
               options={[{ value: "todos", label: "Todos los formularios" }, ...REQUIRED_FORMS]}
             />
-            <Select
-              size="sm"
-              className="w-[220px]"
+            <FilterDropdown
+              title="Seleccionar momento"
               aria-label="Filtrar por momento"
               value={moment}
               onChange={setMoment}
+              defaultIcon={<Clock className="h-3.5 w-3.5 text-zinc-500" />}
               options={[{ value: "todos", label: "Cualquier momento" }, ...ROUTING_MOMENTS]}
             />
+            {(form !== "todos" || moment !== "todos") && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setForm("todos");
+                  setMoment("todos");
+                }}
+              />
+            )}
           </>
         }
         footer={

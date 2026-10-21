@@ -330,11 +330,9 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
             </div>
           )}
 
-          {/* Tabla sin criterios ni paginacion: no es el patron de listado de
-              ListPanel, pero sigue siendo contenido sustantivo, asi que va en
-              un panel simple sobre el lienzo. */}
-          <section className="rounded-card border border-line bg-white p-5 shadow-card">
-            {staff.accesses.length === 0 ? (
+          {/* Tabla sin criterios ni paginacion: DataTable ya provee el contenedor de tarjeta blanca. */}
+          {staff.accesses.length === 0 ? (
+            <section className="rounded-card border border-line bg-white p-5 shadow-card">
               <div className="py-12 text-center">
                 <p className="text-[13.5px] text-faint">
                   Todavía no tiene acceso a ningún departamento: entra al sistema pero no ve nada.
@@ -348,7 +346,8 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                   </div>
                 )}
               </div>
-            ) : (
+            </section>
+          ) : (
             <DataTable>
               <thead>
                 <HeadRow>
@@ -425,8 +424,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                 ))}
               </tbody>
             </DataTable>
-            )}
-          </section>
+          )}
 
           {/* Cabecera de grupo, no un titulo de pagina: la rampa solo tiene
               versalita de 10 px para nombrar un bloque dentro de una vista. */}
@@ -439,17 +437,18 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
             rol en la matriz.
           </p>
 
-          <section className="rounded-card border border-line bg-white p-5 shadow-card">
-            {effective.length === 0 ? (
-              // Una lista derivada se queda vacia por dos motivos distintos, y la
-              // accion que corresponde a cada uno tambien lo es: otorgar un acceso,
-              // o revisar los permisos de los roles ya otorgados.
+          {effective.length === 0 ? (
+            <section className="rounded-card border border-line bg-white p-5 shadow-card">
+              {/* Una lista derivada se queda vacia por dos motivos distintos, y la
+                  accion que corresponde a cada uno tambien lo es: otorgar un acceso,
+                  o revisar los permisos de los roles ya otorgados. */}
               <p className="py-12 text-center text-[13.5px] text-faint">
                 {staff.accesses.length === 0
                   ? "Sin accesos no hay permisos: hoy esta persona no puede hacer nada dentro del panel."
                   : "Tiene accesos, pero ninguno de sus roles concede todavía un permiso: revisa esos roles en la matriz."}
               </p>
-            ) : (
+            </section>
+          ) : (
             <DataTable>
               <thead>
                 <HeadRow>
@@ -486,8 +485,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                 ))}
               </tbody>
             </DataTable>
-            )}
-          </section>
+          )}
         </>
       )}
 

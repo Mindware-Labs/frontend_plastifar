@@ -412,7 +412,7 @@ export function DashboardPage() {
                 title="Detalle por territorio"
                 hint="Participación y actividad de cada zona."
                 className="min-h-[340px] xl:col-span-7"
-                bodyClassName="overflow-y-auto"
+                bodyClassName="!p-0 overflow-y-auto"
                 actions={
                   <span className="flex items-center gap-1.5 text-[11.5px] text-faint">
                     <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />

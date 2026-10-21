@@ -1,4 +1,4 @@
-import { CalendarOff, Pencil, Plus, Power } from "lucide-react";
+import { Calendar, CalendarOff, Pencil, Plus, Power } from "lucide-react";
 import { useState } from "react";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
@@ -6,11 +6,11 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Select } from "../../components/ui/Select";
 import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
@@ -246,17 +246,26 @@ export function HolidaysSection() {
               className="w-[240px]"
             />
 
-            <Select
-              size="sm"
-              className="w-[200px]"
+            <FilterDropdown
+              title="Seleccionar año"
               aria-label="Filtrar por año"
               value={year}
               onChange={setYear}
+              defaultIcon={<Calendar className="h-3.5 w-3.5 text-zinc-500" />}
               options={[
                 { value: "todos", label: "Todos los años" },
                 ...years.map((value) => ({ value, label: value })),
               ]}
             />
+
+            {(search || year !== "todos") && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setSearch("");
+                  setYear("todos");
+                }}
+              />
+            )}
           </>
         }
         footer={

@@ -425,66 +425,64 @@ export function DiscrepancyDetailPage() {
 
 function LinesTable({ lines, canCredit, onCredit }: { lines: DiscrepancyLine[]; canCredit: boolean; onCredit: (line: DiscrepancyLine) => void }) {
   return (
-    <div className="overflow-x-auto rounded-edge border border-line">
-      <DataTable>
-        <thead>
-          <HeadRow>
-            <Th>Factura</Th>
-            <Th># Reclamo</Th>
-            <Th>Cliente</Th>
-            <Th>Producto</Th>
-            <Th className="text-right">Sobrante</Th>
-            <Th className="text-right">Faltante</Th>
-            <Th>Nota de crédito</Th>
-            <Th>Despachador</Th>
-            <Th>Supervisor</Th>
-          </HeadRow>
-        </thead>
-        <tbody>
-          {lines.map((line) => (
-            <Row key={line.id}>
-              <Td className="whitespace-nowrap font-mono text-[12px]">{line.invoiceRef}</Td>
-              <Td className="whitespace-nowrap font-mono text-[12px] text-brand-gray">{line.claimRef ?? "—"}</Td>
-              <Td className="text-[12.5px] text-brand-gray">
-                <span className="block max-w-[160px] truncate" title={line.clientName}>
-                  {line.clientName}
+    <DataTable className="overflow-x-auto">
+      <thead>
+        <HeadRow>
+          <Th>Factura</Th>
+          <Th># Reclamo</Th>
+          <Th>Cliente</Th>
+          <Th>Producto</Th>
+          <Th className="text-right">Sobrante</Th>
+          <Th className="text-right">Faltante</Th>
+          <Th>Nota de crédito</Th>
+          <Th>Despachador</Th>
+          <Th>Supervisor</Th>
+        </HeadRow>
+      </thead>
+      <tbody>
+        {lines.map((line) => (
+          <Row key={line.id}>
+            <Td className="whitespace-nowrap font-mono text-[12px]">{line.invoiceRef}</Td>
+            <Td className="whitespace-nowrap font-mono text-[12px] text-brand-gray">{line.claimRef ?? "—"}</Td>
+            <Td className="text-[12.5px] text-brand-gray">
+              <span className="block max-w-[160px] truncate" title={line.clientName}>
+                {line.clientName}
+              </span>
+            </Td>
+            <Td>
+              <span className="block text-[12.5px] text-ink">{line.productName}</span>
+              <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
+            </Td>
+            <Td className="text-right tabular-nums">{line.surplusQuantity > 0 ? formatQuantity(line.surplusQuantity) : "—"}</Td>
+            <Td className="text-right tabular-nums">{line.shortageQuantity > 0 ? formatQuantity(line.shortageQuantity) : "—"}</Td>
+            <Td className="text-[12.5px]">
+              {line.qualifiesForCreditNote === null ? (
+                <span className="text-warn">Sin decidir</span>
+              ) : line.qualifiesForCreditNote ? (
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-brand-green">Sí</span>
+                  {line.creditRequestNumber ? (
+                    <Link to="/calidad/creditos" className="font-mono text-[11.5px] text-ink hover:text-brand-red">
+                      {line.creditRequestNumber}
+                    </Link>
+                  ) : canCredit ? (
+                    <Button size="sm" variant="ghost" onClick={() => onCredit(line)}>
+                      <CreditCard className="h-[14px] w-[14px]" />
+                      Solicitar crédito
+                    </Button>
+                  ) : null}
+                  {line.creditNoteNumber && <span className="font-mono text-[11.5px] text-faint">NC {line.creditNoteNumber}</span>}
                 </span>
-              </Td>
-              <Td>
-                <span className="block text-[12.5px] text-ink">{line.productName}</span>
-                <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
-              </Td>
-              <Td className="text-right tabular-nums">{line.surplusQuantity > 0 ? formatQuantity(line.surplusQuantity) : "—"}</Td>
-              <Td className="text-right tabular-nums">{line.shortageQuantity > 0 ? formatQuantity(line.shortageQuantity) : "—"}</Td>
-              <Td className="text-[12.5px]">
-                {line.qualifiesForCreditNote === null ? (
-                  <span className="text-warn">Sin decidir</span>
-                ) : line.qualifiesForCreditNote ? (
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-brand-green">Sí</span>
-                    {line.creditRequestNumber ? (
-                      <Link to="/calidad/creditos" className="font-mono text-[11.5px] text-ink hover:text-brand-red">
-                        {line.creditRequestNumber}
-                      </Link>
-                    ) : canCredit ? (
-                      <Button size="sm" variant="ghost" onClick={() => onCredit(line)}>
-                        <CreditCard className="h-[14px] w-[14px]" />
-                        Solicitar crédito
-                      </Button>
-                    ) : null}
-                    {line.creditNoteNumber && <span className="font-mono text-[11.5px] text-faint">NC {line.creditNoteNumber}</span>}
-                  </span>
-                ) : (
-                  <span className="text-faint">No</span>
-                )}
-              </Td>
-              <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{line.dispatcherName}</Td>
-              <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{line.supervisorName ?? "—"}</Td>
-            </Row>
-          ))}
-        </tbody>
-      </DataTable>
-    </div>
+              ) : (
+                <span className="text-faint">No</span>
+              )}
+            </Td>
+            <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{line.dispatcherName}</Td>
+            <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{line.supervisorName ?? "—"}</Td>
+          </Row>
+        ))}
+      </tbody>
+    </DataTable>
   );
 }
 

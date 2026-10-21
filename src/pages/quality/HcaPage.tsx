@@ -15,6 +15,7 @@ import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup, CriteriaSelect } from "../../components/ui/CriteriaField";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
@@ -384,6 +385,15 @@ export function HcaPage() {
           </CriteriaField>
         </div>
             </FilterPopover>
+
+            {(search || filtrosPuestos > 0) && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setSearch("");
+                  clearNarrowFilters();
+                }}
+              />
+            )}
 
             {counts && (counts.overdue > 0 || counts.open > 0) && (
               <p className="ml-auto text-[12.5px] text-brand-gray">{listDebt(counts)}</p>

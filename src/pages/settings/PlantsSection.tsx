@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Globe, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -6,12 +6,12 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Select } from "../../components/ui/Select";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -215,14 +215,23 @@ export function PlantsSection() {
               className="w-[240px]"
             />
 
-            <Select
-              size="sm"
-              className="w-[200px]"
+            <FilterDropdown
+              title="Seleccionar país"
               aria-label="Filtrar por país"
               value={country}
               onChange={(value) => setCountry(value as PlantCountry | "todos")}
+              defaultIcon={<Globe className="h-3.5 w-3.5 text-zinc-500" />}
               options={[{ value: "todos", label: "Todos los países" }, ...PLANT_COUNTRIES]}
             />
+
+            {(search || country !== "todos") && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setSearch("");
+                  setCountry("todos");
+                }}
+              />
+            )}
           </>
         }
         footer={

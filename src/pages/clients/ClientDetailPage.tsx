@@ -19,6 +19,7 @@ import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/Conf
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
 import { FilterChip } from "../../components/ui/FilterChip";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -380,38 +381,46 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
           <ListPanel
             toolbar={
-              <>
-                <SearchInput
-                  value={contactSearch}
-                  onChange={setContactSearch}
-                  // Las tres columnas que busca el servidor; nombrarlas evita
-                  // intentar por cargo o telefono y creer que no hay resultados.
-                  placeholder="Buscar por nombre, apellido o correo…"
-                  className="w-[240px]"
-                />
-
-                <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+              <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <SearchInput
+                    value={contactSearch}
+                    onChange={setContactSearch}
+                    // Las tres columnas que busca el servidor; nombrarlas evita
+                    // intentar por cargo o telefono y creer que no hay resultados.
+                    placeholder="Buscar por nombre, apellido o correo…"
+                    className="w-[240px]"
+                  />
+                  {contactSearch && (
+                    <ClearFiltersButton
+                      onClick={() => setContactSearch("")}
+                      title="Limpiar búsqueda"
+                    />
+                  )}
+                </div>
 
                 {/* Antes de la primera respuesta las pastillas van en esqueleto, no
                     en cero: un cero es una afirmacion, y todavia no se sabe nada. */}
-                {contactCounts === undefined
-                  ? contactChips.map(({ key }) => (
-                      <span
-                        key={key}
-                        aria-hidden
-                        className="h-8 w-[104px] animate-pulse rounded-full bg-fill"
-                      />
-                    ))
-                  : contactChips.map(({ key, label, countKey }) => (
-                      <FilterChip
-                        key={key}
-                        label={label}
-                        count={contactCounts[countKey]}
-                        active={contactChip === key}
-                        onClick={() => setContactChip(key)}
-                      />
-                    ))}
-              </>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {contactCounts === undefined
+                    ? contactChips.map(({ key }) => (
+                        <span
+                          key={key}
+                          aria-hidden
+                          className="h-8 w-[104px] animate-pulse rounded-full bg-fill"
+                        />
+                      ))
+                    : contactChips.map(({ key, label, countKey }) => (
+                        <FilterChip
+                          key={key}
+                          label={label}
+                          count={contactCounts[countKey]}
+                          active={contactChip === key}
+                          onClick={() => setContactChip(key)}
+                        />
+                      ))}
+                </div>
+              </div>
             }
             footer={
               contactPage !== null && (

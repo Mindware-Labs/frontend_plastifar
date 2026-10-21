@@ -750,50 +750,48 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
 
             {/* Condicion y estado son dos columnas, no una lista: asi se ve de un
                 vistazo cuantas faltan sin leer las tres entradas enteras. */}
-            <div className="rounded-card border border-line bg-white p-5 shadow-card">
-              <DataTable>
-                <thead>
-                  <HeadRow>
-                    <Th>Condición</Th>
-                    <Th>Estado</Th>
-                  </HeadRow>
-                </thead>
-                <tbody>
-                  {conditions.map((condition) => (
-                    <Row key={condition.id}>
-                      <Td className="w-[300px] py-3 align-top text-[13px] font-medium text-ink">
-                        {condition.label}
-                      </Td>
-                      <Td className="py-3 align-top">
-                        <span className="flex items-start gap-2">
-                          <span
-                            aria-hidden
-                            className={`mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-edge ${
-                              condition.met
-                                ? "bg-brand-green/10 text-brand-green"
-                                : "bg-warn/10 text-warn"
-                            }`}
-                          >
-                            {condition.met ? (
-                              <Check className="h-3.5 w-3.5" />
-                            ) : (
-                              <AlertTriangle className="h-3.5 w-3.5" />
-                            )}
-                          </span>
-                          <span
-                            className={`max-w-[76ch] text-[12.5px] leading-relaxed ${
-                              condition.met ? "text-brand-green" : "text-warn"
-                            }`}
-                          >
-                            {condition.met ? "Cumplida" : `Falta: ${condition.missing}`}
-                          </span>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Condición</Th>
+                  <Th>Estado</Th>
+                </HeadRow>
+              </thead>
+              <tbody>
+                {conditions.map((condition) => (
+                  <Row key={condition.id}>
+                    <Td className="w-[300px] py-3 align-top text-[13px] font-medium text-ink">
+                      {condition.label}
+                    </Td>
+                    <Td className="py-3 align-top">
+                      <span className="flex items-start gap-2">
+                        <span
+                          aria-hidden
+                          className={`mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-edge ${
+                            condition.met
+                              ? "bg-brand-green/10 text-brand-green"
+                              : "bg-warn/10 text-warn"
+                          }`}
+                        >
+                          {condition.met ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                          )}
                         </span>
-                      </Td>
-                    </Row>
-                  ))}
-                </tbody>
-              </DataTable>
-            </div>
+                        <span
+                          className={`max-w-[76ch] text-[12.5px] leading-relaxed ${
+                            condition.met ? "text-brand-green" : "text-warn"
+                          }`}
+                        >
+                          {condition.met ? "Cumplida" : `Falta: ${condition.missing}`}
+                        </span>
+                      </span>
+                    </Td>
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
           </section>
 
           <section>

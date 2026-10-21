@@ -7,6 +7,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
@@ -89,7 +90,10 @@ export function RespuestasPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <SearchInput value={search} onChange={setSearch} placeholder="Buscar por título o texto…" className="w-[260px]" />
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput value={search} onChange={setSearch} placeholder="Buscar por título o texto…" className="w-[260px]" />
+            {search && <ClearFiltersButton onClick={() => setSearch("")} title="Limpiar búsqueda" />}
+          </div>
 
           <button
             type="button"

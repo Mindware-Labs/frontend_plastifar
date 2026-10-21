@@ -390,43 +390,41 @@ export function ClaimDetailPage() {
 
 function LinesTable({ claim }: { claim: CustomerClaim }) {
   return (
-    <div className="overflow-x-auto rounded-edge border border-line">
-      <DataTable>
-        <thead>
-          <HeadRow>
-            <Th>Producto</Th>
-            <Th className="text-right">Compradas</Th>
-            <Th className="text-right">Defectuosas</Th>
-            <Th className="text-right">Facturados</Th>
-            <Th className="text-right">Recibidos</Th>
-            <Th className="text-right">Dif.</Th>
-            <Th className="text-right">Precio</Th>
-            <Th className="text-right">Total</Th>
-          </HeadRow>
-        </thead>
-        <tbody>
-          {claim.lines.map((line) => (
-            <Row key={line.id}>
-              <Td>
-                <span className="block text-[12.5px] text-ink">{line.productName}</span>
-                <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
-              </Td>
-              <Td className="text-right tabular-nums">{formatQuantity(line.unitsPurchased)}</Td>
-              <Td className="text-right tabular-nums">{formatQuantity(line.defectiveQuantity)}</Td>
-              <Td className="text-right tabular-nums">{formatQuantity(line.invoicedQuantity)}</Td>
-              <Td className="text-right tabular-nums">{formatQuantity(line.receivedQuantity)}</Td>
-              <Td className={`text-right tabular-nums ${line.difference < 0 ? "text-warn" : ""}`}>
-                {formatQuantity(line.difference)}
-              </Td>
-              <Td className="text-right tabular-nums">{formatPrice(line.unitPrice)}</Td>
-              <Td className="text-right font-medium tabular-nums text-ink">
-                {claim.currency ? formatAmount(line.lineTotal, claim.currency) : formatQuantity(line.lineTotal)}
-              </Td>
-            </Row>
-          ))}
-        </tbody>
-      </DataTable>
-    </div>
+    <DataTable className="overflow-x-auto">
+      <thead>
+        <HeadRow>
+          <Th>Producto</Th>
+          <Th className="text-right">Compradas</Th>
+          <Th className="text-right">Defectuosas</Th>
+          <Th className="text-right">Facturados</Th>
+          <Th className="text-right">Recibidos</Th>
+          <Th className="text-right">Dif.</Th>
+          <Th className="text-right">Precio</Th>
+          <Th className="text-right">Total</Th>
+        </HeadRow>
+      </thead>
+      <tbody>
+        {claim.lines.map((line) => (
+          <Row key={line.id}>
+            <Td>
+              <span className="block text-[12.5px] text-ink">{line.productName}</span>
+              <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
+            </Td>
+            <Td className="text-right tabular-nums">{formatQuantity(line.unitsPurchased)}</Td>
+            <Td className="text-right tabular-nums">{formatQuantity(line.defectiveQuantity)}</Td>
+            <Td className="text-right tabular-nums">{formatQuantity(line.invoicedQuantity)}</Td>
+            <Td className="text-right tabular-nums">{formatQuantity(line.receivedQuantity)}</Td>
+            <Td className={`text-right tabular-nums ${line.difference < 0 ? "text-warn" : ""}`}>
+              {formatQuantity(line.difference)}
+            </Td>
+            <Td className="text-right tabular-nums">{formatPrice(line.unitPrice)}</Td>
+            <Td className="text-right font-medium tabular-nums text-ink">
+              {claim.currency ? formatAmount(line.lineTotal, claim.currency) : formatQuantity(line.lineTotal)}
+            </Td>
+          </Row>
+        ))}
+      </tbody>
+    </DataTable>
   );
 }
 

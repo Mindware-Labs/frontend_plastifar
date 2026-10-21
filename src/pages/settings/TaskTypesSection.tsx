@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { FileSpreadsheet, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -6,12 +6,12 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Select } from "../../components/ui/Select";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { Tooltip } from "../../components/ui/Tooltip";
@@ -205,14 +205,23 @@ export function TaskTypesSection() {
           <>
             <SearchInput value={search} onChange={setSearch} placeholder="Buscar tipo de tarea…" className="w-[240px]" />
 
-            <Select
-              size="sm"
-              className="w-[220px]"
+            <FilterDropdown
+              title="Seleccionar formulario exigido"
               aria-label="Filtrar por formulario exigido"
               value={form}
               onChange={setForm}
+              defaultIcon={<FileSpreadsheet className="h-3.5 w-3.5 text-zinc-500" />}
               options={[{ value: "todos", label: "Cualquier formulario" }, ...REQUIRED_FORMS]}
             />
+
+            {(search || form !== "todos") && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setSearch("");
+                  setForm("todos");
+                }}
+              />
+            )}
           </>
         }
         footer={

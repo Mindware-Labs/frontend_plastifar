@@ -90,7 +90,7 @@ export function TerritoriesTable({ report }: { report: ClientsReport }) {
   }
 
   return (
-    <DataTable>
+    <DataTable bare>
       <thead>
         <HeadRow>
           {HEADS.map((head) => (

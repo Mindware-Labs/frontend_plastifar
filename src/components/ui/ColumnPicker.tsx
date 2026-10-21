@@ -145,17 +145,17 @@ export function ColumnPicker({ columns, visible, onChange, label = "Columnas" }:
           event.preventDefault();
           openPanel();
         }}
-        className={`inline-flex h-8 items-center gap-[7px] rounded-edge border px-3 text-[12.5px] font-medium
-          transition-colors outline-none focus-visible:ring-3 focus-visible:ring-brand-red/20 ${
-            hiddenCount > 0
-              ? "border-line-strong bg-canvas text-ink"
-              : "border-line bg-white text-brand-gray hover:border-line-strong hover:text-ink"
+        className={`group inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] font-medium shadow-2xs
+          transition-colors duration-150 outline-none cursor-pointer select-none focus-visible:ring-3 focus-visible:ring-brand-red/20 ${
+            hiddenCount > 0 || open
+              ? "border-zinc-300 bg-zinc-50/80 text-zinc-900"
+              : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
           }`}
       >
-        <Columns3 aria-hidden className="h-4 w-4 text-faint" />
+        <Columns3 aria-hidden className="h-3.5 w-3.5 text-zinc-500 group-hover:text-zinc-800" />
         {label}
         {hiddenCount > 0 && (
-          <span className="rounded-full bg-fill px-1.5 py-px text-[11px] font-semibold text-subtle">
+          <span className="rounded-full bg-zinc-100 px-1.5 py-px text-[11px] font-semibold tabular-nums text-zinc-700">
             {hideable.length - hiddenCount}/{hideable.length}
           </span>
         )}
@@ -168,10 +168,10 @@ export function ColumnPicker({ columns, visible, onChange, label = "Columnas" }:
             ref={panelRef}
             id={id}
             style={{ position: "fixed", right: anchor.right, top: anchor.top, maxHeight: PANEL_MAX_HEIGHT }}
-            className="animate-plf-toast-in z-[60] w-[248px] overflow-y-auto rounded-edge border border-line bg-white p-1
-              shadow-panel"
+            className="animate-plf-toast-in z-[60] w-[248px] overflow-y-auto rounded-lg border border-zinc-200/90 bg-white p-1
+              shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
           >
-            <p className="px-2.5 pb-1.5 pt-2 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+            <p className="px-2.5 pb-1.5 pt-1.5 text-[11px] font-medium text-zinc-400">
               Columnas visibles
             </p>
 
@@ -192,13 +192,13 @@ export function ColumnPicker({ columns, visible, onChange, label = "Columnas" }:
                     disabled={column.locked}
                     onKeyDown={(event) => handleMenuKeyDown(event, index)}
                     onClick={() => toggle(column.id)}
-                    className="flex w-full items-center justify-between gap-2 rounded-edge px-2.5 py-2 text-left
-                      text-[13px] text-brand-gray outline-none transition-colors
-                      hover:bg-fill hover:text-ink focus-visible:bg-fill focus-visible:text-ink
-                      disabled:cursor-not-allowed disabled:text-faint disabled:hover:bg-transparent"
+                    className="flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left
+                      text-[12.5px] font-medium text-zinc-700 outline-none transition-colors cursor-pointer
+                      hover:bg-zinc-50 hover:text-zinc-900 focus-visible:bg-zinc-50 focus-visible:text-zinc-900
+                      disabled:cursor-not-allowed disabled:text-zinc-400 disabled:hover:bg-transparent"
                   >
                     <span className="truncate">{column.label}</span>
-                    {isVisible && <Check aria-hidden className="h-4 w-4 shrink-0 text-brand-red" />}
+                    {isVisible && <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-red" />}
                   </button>
                 );
               })}

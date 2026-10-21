@@ -10,6 +10,7 @@ import { Button } from "../../components/ui/Button";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup, CriteriaSelect } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { FilterPopover } from "../../components/ui/FilterPopover";
 import { ListPanel } from "../../components/ui/ListPanel";
@@ -253,6 +254,15 @@ export function ClaimsPage() {
                 />
               </CriteriaField>
             </FilterPopover>
+
+            {(search || filtrosPuestos > 0) && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setSearch("");
+                  clearNarrowFilters();
+                }}
+              />
+            )}
           </>
         }
         footer={

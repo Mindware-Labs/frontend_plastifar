@@ -5,6 +5,7 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
@@ -162,12 +163,15 @@ export function ProductLinesSection() {
 
       <ListPanel
         toolbar={
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por nombre o código…"
-            className="w-[260px]"
-          />
+          <>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre o código…"
+              className="w-[260px]"
+            />
+            {search && <ClearFiltersButton onClick={() => setSearch("")} title="Limpiar búsqueda" />}
+          </>
         }
         footer={
           data !== null &&

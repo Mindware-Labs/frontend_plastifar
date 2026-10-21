@@ -1,4 +1,4 @@
-import { FileUp, Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Factory, FileUp, Layers, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
@@ -6,12 +6,12 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Select } from "../../components/ui/Select";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -251,12 +251,12 @@ export function ProductsSection() {
               className="w-[260px]"
             />
 
-            <Select
-              size="sm"
-              className="w-[220px]"
+            <FilterDropdown
+              title="Seleccionar planta"
               aria-label="Filtrar por planta"
               value={plantId}
               onChange={setPlantId}
+              defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
               options={[
                 { value: TODOS, label: "Todas las plantas" },
                 ...plantsRef.data.map((plant) => ({
@@ -266,17 +266,27 @@ export function ProductsSection() {
               ]}
             />
 
-            <Select
-              size="sm"
-              className="w-[190px]"
+            <FilterDropdown
+              title="Seleccionar línea de producto"
               aria-label="Filtrar por línea de producto"
               value={productLineId}
               onChange={setProductLineId}
+              defaultIcon={<Layers className="h-3.5 w-3.5 text-zinc-500" />}
               options={[
                 { value: TODOS, label: "Todas las líneas" },
                 ...linesRef.data.map((line) => ({ value: String(line.id), label: line.name })),
               ]}
             />
+
+            {(search || plantId !== TODOS || productLineId !== TODOS) && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setSearch("");
+                  setPlantId(TODOS);
+                  setProductLineId(TODOS);
+                }}
+              />
+            )}
           </>
         }
         footer={

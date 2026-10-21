@@ -12,6 +12,7 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { ControlInput } from "../../components/ui/ControlInput";
 import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -275,6 +276,15 @@ export function CreditRequestsPage() {
           />
           </CriteriaField>
         </FilterPopover>
+
+        {(search || filtrosPuestos > 0) && (
+          <ClearFiltersButton
+            onClick={() => {
+              setSearch("");
+              clearNarrowFilters();
+            }}
+          />
+        )}
       </>
         }
         footer={

@@ -1,4 +1,4 @@
-import { Check, Lock } from "lucide-react";
+import { Check, Layers, Lock } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
@@ -8,7 +8,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { CriteriaField, CriteriaSelect } from "../../components/ui/CriteriaField";
+import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
@@ -338,6 +338,50 @@ export function PermissionsPage() {
         }
       />
 
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar permiso…"
+            className="w-[240px]"
+          />
+
+          <FilterDropdown
+            title="Seleccionar módulo"
+            aria-label="Filtrar por módulo"
+            value={module}
+            onChange={setModule}
+            defaultIcon={<Layers className="h-3.5 w-3.5 text-zinc-500" />}
+            options={[
+              { value: "todos", label: "Todos los módulos" },
+              ...(matrix?.groups ?? []).map((group) => ({ value: group.module, label: group.module })),
+            ]}
+          />
+
+          {(search || module !== "todos") && (
+            <ClearFiltersButton
+              onClick={() => {
+                setSearch("");
+                setModule("todos");
+              }}
+            />
+          )}
+        </div>
+
+        <ColumnPicker
+          columns={(matrix?.roles ?? []).map((role) => ({ id: String(role.id), label: role.name }))}
+          visible={visibleRoles}
+          // Una columna de permisos sin ningun rol enfrente no cruza nada: se
+          // conserva siempre al menos un rol a la vista.
+          onChange={(next) => {
+            if (next.length === 0) return;
+            setVisibleRoles(next);
+          }}
+          label="Mostrar roles"
+        />
+      </div>
+
       {/* La matriz es la unica pantalla del panel que vivia a la intemperie: la
           cabecera blanca, las bandas de modulo grises y las filas blancas se
           apilaban sin nada que las contuviera, asi que se leian como tres capas
@@ -347,43 +391,6 @@ export function PermissionsPage() {
           con cabecera y columna congeladas, y meterla dentro de otro contenedor
           con scroll despega justamente eso. */}
       <section className="overflow-hidden rounded-card border border-line bg-white shadow-card">
-      <div className="flex flex-wrap items-end gap-2 border-b border-line px-4 py-3">
-        <CriteriaField label="Buscar">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar permiso…"
-            className="w-[240px]"
-          />
-        </CriteriaField>
-
-        <CriteriaSelect
-          label="Módulo"
-          ariaLabel="Filtrar por módulo"
-          value={module}
-          onChange={setModule}
-          width="w-[200px]"
-          options={[
-            { value: "todos", label: "Todos los módulos" },
-            ...(matrix?.groups ?? []).map((group) => ({ value: group.module, label: group.module })),
-          ]}
-        />
-
-        <div className="ml-auto pb-0.5">
-          <ColumnPicker
-            columns={(matrix?.roles ?? []).map((role) => ({ id: String(role.id), label: role.name }))}
-            visible={visibleRoles}
-            // Una columna de permisos sin ningun rol enfrente no cruza nada: se
-            // conserva siempre al menos un rol a la vista.
-            onChange={(next) => {
-              if (next.length === 0) return;
-              setVisibleRoles(next);
-            }}
-            label="Mostrar roles"
-          />
-        </div>
-      </div>
-
       <div className="px-4 pt-3">
 
       {error && (

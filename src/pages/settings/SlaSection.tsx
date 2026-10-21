@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power, Star } from "lucide-react";
+import { Flag, Pencil, Plus, Power, Star } from "lucide-react";
 import { useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
@@ -9,11 +9,11 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Select } from "../../components/ui/Select";
 import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
@@ -271,17 +271,26 @@ export function SlaSection() {
               className="w-[240px]"
             />
 
-            <Select
-              size="sm"
-              className="w-[200px]"
+            <FilterDropdown
+              title="Seleccionar prioridad"
               aria-label="Filtrar por prioridad"
               value={priority}
               onChange={(value) => setPriority(value as Priority | "todas")}
+              defaultIcon={<Flag className="h-3.5 w-3.5 text-zinc-500" />}
               options={[
                 { value: "todas", label: "Todas las prioridades" },
                 ...PRIORITIES.map((value) => ({ value, label: value })),
               ]}
             />
+
+            {(search || priority !== "todas") && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setSearch("");
+                  setPriority("todas");
+                }}
+              />
+            )}
           </>
         }
         footer={

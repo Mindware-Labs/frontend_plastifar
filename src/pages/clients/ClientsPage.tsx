@@ -13,12 +13,14 @@ import { Button } from "../../components/ui/Button";
 import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { SelectBox } from "../../components/ui/SelectBox";
 import { LookupSelect } from "../../components/ui/LookupSelect";
 import { Select } from "../../components/ui/Select";
 import { TableSkeleton } from "../../components/ui/Skeleton";
@@ -220,6 +222,19 @@ export function ClientsPage() {
 
   const selected = rows.filter((client) => selectedIds.includes(client.id));
   const allPageSelected = rows.length > 0 && rows.every((client) => selectedIds.includes(client.id));
+  const somePageSelected = rows.some((client) => selectedIds.includes(client.id));
+  const pageState: boolean | "mixed" = allPageSelected ? true : somePageSelected ? "mixed" : false;
+
+  useEffect(() => {
+    if (selected.length === 0) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !bulkReassigning && modal === null && reassigning === null && confirmation === null) {
+        setSelectedIds([]);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [selected.length, bulkReassigning, modal, reassigning, confirmation]);
 
   function toggleSelection(id: number) {
     setSelectedIds((previous) =>
@@ -371,29 +386,30 @@ export function ClientsPage() {
         </div>
       )}
 
-      {canWrite && selected.length > 0 && (
-        // Hairline, sin tinte ni recuadro: la barra de seleccion es estructura,
-        // y en este sistema la estructura es un filete de 1 px.
-        <div className="mb-3 flex flex-wrap items-center gap-3 border-y border-line py-2">
-          <span className="text-[12.5px] font-medium tabular-nums text-ink">
-            {selected.length} {selected.length === 1 ? "cliente seleccionado" : "clientes seleccionados"}
-          </span>
-          <Button size="sm" variant="secondary" onClick={() => setBulkReassigning(true)}>
-            <UserCog className="h-[15px] w-[15px]" />
-            Reasignar vendedor
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
-            Limpiar selección
-          </Button>
-        </div>
-      )}
-
       {/* Un error de carga no deja el spinner girando debajo: la primera version
           mostraba el aviso y seguia fingiendo que la tabla estaba en camino. */}
       {/* Criterios, tabla y pie en UNA sola superficie. La barra se dibuja
           tambien mientras carga: perder el buscador durante el spinner es
           perder el control justo cuando alguien esta esperando. */}
       <ListPanel
+        selection={
+          canWrite
+            ? {
+                count: selected.length,
+                pageState,
+                onTogglePage: toggleAllOnPage,
+                onClear: () => setSelectedIds([]),
+                actions: [
+                  {
+                    key: "reassign",
+                    label: "Reasignar vendedor",
+                    icon: <UserCog aria-hidden className="h-3.5 w-3.5 text-zinc-500" />,
+                    onClick: () => setBulkReassigning(true),
+                  },
+                ],
+              }
+            : undefined
+        }
         toolbar={
           <div className="flex w-full items-center gap-2">
             <SearchInput
@@ -446,6 +462,15 @@ export function ClientsPage() {
               />
             </FilterPopover>
 
+            {(search || filtrosPuestos > 0) && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setSearch("");
+                  clearNarrowFilters();
+                }}
+              />
+            )}
+
             <div className="ml-auto">
               <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
             </div>
@@ -482,18 +507,18 @@ export function ClientsPage() {
               <thead>
                 <HeadRow>
                   {canWrite && (
-                    <Th className="w-9">
-                      <input
-                        type="checkbox"
-                        checked={allPageSelected}
-                        onChange={toggleAllOnPage}
-                        aria-label={
-                          allPageSelected
-                            ? "Quitar la selección de esta página"
-                            : "Seleccionar todos los clientes de esta página"
-                        }
-                        className="h-4 w-4 rounded-edge border-line-strong accent-brand-red"
-                      />
+                    <Th className="w-10 px-2 text-center">
+                      <div className="flex items-center justify-center">
+                        <SelectBox
+                          checked={pageState}
+                          label={
+                            pageState === true
+                              ? "Quitar la selección de esta página"
+                              : "Seleccionar todos los clientes de esta página"
+                          }
+                          onToggle={toggleAllOnPage}
+                        />
+                      </div>
                     </Th>
                   )}
                   <Th sort={sortProps("nombre")}>Cliente</Th>
@@ -508,7 +533,9 @@ export function ClientsPage() {
               </thead>
 
               <tbody>
-                {rows.map((client) => (
+                {rows.map((client) => {
+                  const checked = selectedIds.includes(client.id);
+                  return (
                   /* La fila entera lleva al detalle, como en la bandeja de
                      tickets. El resaltado al pasar por encima ya prometia que
                      la fila respondia; sin esto, la promesa obligaba a acertarle
@@ -518,18 +545,19 @@ export function ClientsPage() {
                   <Row
                     key={client.id}
                     busy={busyId === client.id}
+                    data-checked={checked}
                     onClick={() => navigate(`/clientes/${client.id}`)}
                     className="cursor-pointer"
                   >
                     {canWrite && (
-                      <Td onClick={(event) => event.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(client.id)}
-                          onChange={() => toggleSelection(client.id)}
-                          aria-label={`Seleccionar ${client.name}`}
-                          className="h-4 w-4 rounded-edge border-line-strong accent-brand-red"
-                        />
+                      <Td className="w-10 px-2 text-center" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex items-center justify-center">
+                          <SelectBox
+                            checked={checked}
+                            label={`Seleccionar ${client.name}`}
+                            onToggle={() => toggleSelection(client.id)}
+                          />
+                        </div>
                       </Td>
                     )}
                     <Td>
@@ -626,7 +654,8 @@ export function ClientsPage() {
                       </Td>
                     )}
                   </Row>
-                ))}
+                  );
+                })}
               </tbody>
             </DataTable>
           </div>

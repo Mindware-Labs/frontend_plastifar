@@ -170,14 +170,14 @@ export function FilterPopover({
         aria-controls={open ? panelId : undefined}
         aria-label={count > 0 ? `${label}: ${count} aplicados` : label}
         data-active={count > 0}
-        className="flex h-8 items-center gap-1.5 rounded-edge border border-line-strong bg-white px-2.5
-          text-[12.5px] font-medium text-brand-gray outline-none transition-all duration-150
-          hover:border-brand-red/50 hover:bg-red-50/40 hover:text-brand-red active:scale-[0.97]
+        className="group inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5
+          text-[12.5px] font-medium text-zinc-700 shadow-2xs outline-none transition-colors duration-150 cursor-pointer select-none
+          hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.98]
           focus-visible:border-brand-red focus-visible:ring-3 focus-visible:ring-brand-red/10
           data-[active=true]:border-brand-red/40 data-[active=true]:text-brand-red-dark
-          aria-expanded:border-brand-red aria-expanded:bg-red-50 aria-expanded:text-brand-red aria-expanded:ring-2 aria-expanded:ring-brand-red/15"
+          aria-expanded:border-zinc-300 aria-expanded:bg-zinc-50/80 aria-expanded:text-zinc-900"
       >
-        <SlidersHorizontal className="h-3.5 w-3.5" />
+        <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-500 group-hover:text-zinc-800" />
         {label}
         {/* La cifra, no un punto: «hay filtros» obliga a abrir para saber
             cuántos; «2» ya lo dice desde fuera. */}

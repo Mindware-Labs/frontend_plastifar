@@ -1,4 +1,4 @@
-import { LogOut, Pencil, Plus, Trash2, UserCheck, UserX } from "lucide-react";
+import { Building2, LogOut, Pencil, Plus, Trash2, UserCheck, UserX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
@@ -10,21 +10,23 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Select } from "../../components/ui/Select";
+import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
 import { StaffModal } from "./StaffModal";
-import { departmentOptions, departmentPath } from "../../lib/departments";
+import { departmentPath } from "../../lib/departments";
 
 type FilterKey = "todos" | "activos" | "inactivos" | "administradores";
 type SortKey = "nombre" | "correo" | "departamento" | "rol" | "estado";
@@ -155,6 +157,19 @@ export function StaffPage() {
   const selected = selectableRows.filter((member) => selectedIds.includes(member.id));
   const allPageSelected =
     selectableRows.length > 0 && selectableRows.every((member) => selectedIds.includes(member.id));
+  const somePageSelected = selectableRows.some((member) => selectedIds.includes(member.id));
+  const pageState: boolean | "mixed" = allPageSelected ? true : somePageSelected ? "mixed" : false;
+
+  useEffect(() => {
+    if (selected.length === 0) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && modal === null && confirmation === null) {
+        setSelectedIds([]);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [selected.length, modal, confirmation]);
 
   function toggleSelection(id: number) {
     setSelectedIds((previous) =>
@@ -422,31 +437,36 @@ export function StaffPage() {
           </div>
         )}
 
-        {/* Barra de selección: filete arriba y abajo, sin tinte ni recuadro.
-            En este sistema la estructura es una línea de 1 px, no una caja. */}
-        {selected.length > 0 && (
-          <div className="mb-3 flex flex-wrap items-center gap-3 border-y border-line py-2">
-            <span className="text-[12.5px] font-medium tabular-nums text-ink">
-              {selected.length}{" "}
-              {selected.length === 1 ? "colaborador seleccionado" : "colaboradores seleccionados"}
-            </span>
-            <Button size="sm" variant="secondary" onClick={askBulkRevokeSessions}>
-              <LogOut className="h-[15px] w-[15px]" />
-              Cerrar sesiones
-            </Button>
-            {selected.some((member) => member.isActive) && (
-              <Button size="sm" variant="secondary" onClick={askBulkDeactivate}>
-                <UserX className="h-[15px] w-[15px]" />
-                Desactivar
-              </Button>
-            )}
-            <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
-              Limpiar selección
-            </Button>
-          </div>
-        )}
-
         <ListPanel
+          selection={
+            isAdmin
+              ? {
+                  count: selected.length,
+                  pageState,
+                  busy: busyId !== null,
+                  onTogglePage: toggleAllOnPage,
+                  onClear: () => setSelectedIds([]),
+                  actions: [
+                    {
+                      key: "revoke",
+                      label: "Cerrar sesiones",
+                      icon: <LogOut aria-hidden className="h-3.5 w-3.5 text-zinc-500" />,
+                      onClick: askBulkRevokeSessions,
+                    },
+                    ...(selected.some((member) => member.isActive)
+                      ? [
+                          {
+                            key: "deactivate",
+                            label: "Desactivar",
+                            icon: <UserX aria-hidden className="h-3.5 w-3.5 text-zinc-500" />,
+                            onClick: askBulkDeactivate,
+                          },
+                        ]
+                      : []),
+                  ],
+                }
+              : undefined
+          }
           toolbar={
             <>
               <SearchInput
@@ -456,17 +476,23 @@ export function StaffPage() {
                 className="w-[240px]"
               />
 
-              <Select
-                size="sm"
-                className="w-[220px]"
+              <FilterDropdown
+                title="Seleccionar departamento"
                 aria-label="Filtrar por departamento"
                 value={String(departmentId)}
                 onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
-                options={[
-                  { value: "todos", label: "Todos los departamentos" },
-                  ...departmentOptions(departments),
-                ]}
+                options={buildDepartmentFilterOptions(departments)}
+                defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
               />
+
+              {(search || departmentId !== "todos") && (
+                <ClearFiltersButton
+                  onClick={() => {
+                    setSearch("");
+                    setDepartmentId("todos");
+                  }}
+                />
+              )}
             </>
           }
           footer={
@@ -500,20 +526,18 @@ export function StaffPage() {
               <thead>
                 <HeadRow>
                   {isAdmin && (
-                    <Th className="w-9">
-                      <input
-                        type="checkbox"
-                        checked={allPageSelected}
-                        disabled={selectableRows.length === 0}
-                        onChange={toggleAllOnPage}
-                        aria-label={
-                          allPageSelected
-                            ? "Quitar la selección de esta página"
-                            : "Seleccionar todos los colaboradores de esta página"
-                        }
-                        className="h-4 w-4 rounded-edge border-line-strong accent-brand-red
-                          disabled:cursor-not-allowed disabled:opacity-40"
-                      />
+                    <Th className="w-10 px-2 text-center">
+                      <div className="flex items-center justify-center">
+                        <SelectBox
+                          checked={pageState}
+                          label={
+                            pageState === true
+                              ? "Quitar la selección de esta página"
+                              : "Seleccionar todos los colaboradores de esta página"
+                          }
+                          onToggle={toggleAllOnPage}
+                        />
+                      </div>
                     </Th>
                   )}
                   {/* Sin cabecera ordenable: el servidor no ordena por id. */}
@@ -531,7 +555,9 @@ export function StaffPage() {
               </thead>
 
               <tbody>
-                {rows.map((member) => (
+                {rows.map((member) => {
+                  const checked = selectedIds.includes(member.id);
+                  return (
                   /* La fila entera lleva al detalle, como en la bandeja de
                      tickets. El resaltado al pasar por encima ya prometia que
                      la fila respondia; sin esto, la promesa obligaba a acertarle
@@ -541,23 +567,24 @@ export function StaffPage() {
                   <Row
                     key={member.id}
                     busy={busyId === member.id}
+                    data-checked={checked}
                     onClick={() => navigate(`/staff/${member.id}`)}
                     className="cursor-pointer"
                   >
                     {isAdmin && (
-                      <Td>
+                      <Td className="w-10 px-2 text-center" onClick={(event) => event.stopPropagation()}>
                         {/* La propia fila no lleva casilla. El hueco se deja
                             vacío en vez de poner una casilla deshabilitada:
                             una casilla apagada invita a preguntarse por qué, y
                             la respuesta —«sos vos»— ya la da la fila. */}
                         {canManage(member) && (
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(member.id)}
-                            onChange={() => toggleSelection(member.id)}
-                            aria-label={`Seleccionar a ${fullName(member)}`}
-                            className="h-4 w-4 rounded-edge border-line-strong accent-brand-red"
-                          />
+                          <div className="flex items-center justify-center">
+                            <SelectBox
+                              checked={checked}
+                              label={`Seleccionar a ${fullName(member)}`}
+                              onToggle={() => toggleSelection(member.id)}
+                            />
+                          </div>
                         )}
                       </Td>
                     )}
@@ -634,7 +661,8 @@ export function StaffPage() {
                       </Td>
                     )}
                   </Row>
-                ))}
+                  );
+                })}
               </tbody>
             </DataTable>
             </div>

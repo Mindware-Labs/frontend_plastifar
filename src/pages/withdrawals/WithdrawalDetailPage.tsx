@@ -293,44 +293,42 @@ export function WithdrawalDetailPage() {
 
 function LinesTable({ lines, currency, withdrawn }: { lines: WithdrawalLine[]; currency: string | null; withdrawn: boolean }) {
   return (
-    <div className="overflow-x-auto rounded-edge border border-line">
-      <DataTable>
-        <thead>
-          <HeadRow>
-            <Th>Producto</Th>
-            <Th className="text-right">Cantidad</Th>
-            <Th>Empaque</Th>
-            <Th className="text-right">Precio unitario</Th>
-            <Th className="text-right">Valor</Th>
-            {withdrawn && <Th className="text-right">Recogido</Th>}
-            {withdrawn && <Th className="text-right">Diferencia</Th>}
-          </HeadRow>
-        </thead>
-        <tbody>
-          {lines.map((line) => (
-            <Row key={line.id}>
-              <Td>
-                <span className="block text-[12.5px] text-ink">{line.productName}</span>
-                <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
+    <DataTable className="overflow-x-auto">
+      <thead>
+        <HeadRow>
+          <Th>Producto</Th>
+          <Th className="text-right">Cantidad</Th>
+          <Th>Empaque</Th>
+          <Th className="text-right">Precio unitario</Th>
+          <Th className="text-right">Valor</Th>
+          {withdrawn && <Th className="text-right">Recogido</Th>}
+          {withdrawn && <Th className="text-right">Diferencia</Th>}
+        </HeadRow>
+      </thead>
+      <tbody>
+        {lines.map((line) => (
+          <Row key={line.id}>
+            <Td>
+              <span className="block text-[12.5px] text-ink">{line.productName}</span>
+              <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
+            </Td>
+            <Td className="whitespace-nowrap text-right tabular-nums">
+              {formatQuantity(line.quantity)} <span className="text-faint">{line.quantityUnit}</span>
+            </Td>
+            <Td className="font-mono text-[12px] text-brand-gray">{line.packDetail ?? "—"}</Td>
+            <Td className="text-right tabular-nums">{formatPrice(line.unitPrice)}</Td>
+            <Td className="text-right tabular-nums">
+              {line.lineValue === null || currency === null ? "—" : formatAmount(line.lineValue, currency)}
+            </Td>
+            {withdrawn && <Td className="text-right tabular-nums">{formatQuantity(line.withdrawnQuantity)}</Td>}
+            {withdrawn && (
+              <Td className={`text-right tabular-nums ${line.difference ? "font-semibold text-warn" : "text-faint"}`}>
+                {line.difference ? formatQuantity(line.difference) : "0"}
               </Td>
-              <Td className="whitespace-nowrap text-right tabular-nums">
-                {formatQuantity(line.quantity)} <span className="text-faint">{line.quantityUnit}</span>
-              </Td>
-              <Td className="font-mono text-[12px] text-brand-gray">{line.packDetail ?? "—"}</Td>
-              <Td className="text-right tabular-nums">{formatPrice(line.unitPrice)}</Td>
-              <Td className="text-right tabular-nums">
-                {line.lineValue === null || currency === null ? "—" : formatAmount(line.lineValue, currency)}
-              </Td>
-              {withdrawn && <Td className="text-right tabular-nums">{formatQuantity(line.withdrawnQuantity)}</Td>}
-              {withdrawn && (
-                <Td className={`text-right tabular-nums ${line.difference ? "font-semibold text-warn" : "text-faint"}`}>
-                  {line.difference ? formatQuantity(line.difference) : "0"}
-                </Td>
-              )}
-            </Row>
-          ))}
-        </tbody>
-      </DataTable>
-    </div>
+            )}
+          </Row>
+        ))}
+      </tbody>
+    </DataTable>
   );
 }

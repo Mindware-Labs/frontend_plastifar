@@ -17,7 +17,17 @@ import { useInListPanel } from "./listPanelContext";
  * Usa `rounded-card` y `shadow-card`, los mismos del panel, para que una tabla
  * suelta y una enmarcada no se lean como dos componentes distintos.
  */
-export function DataTable({ fixed = false, children }: { fixed?: boolean; children: ReactNode }) {
+export function DataTable({
+  fixed = false,
+  bare = false,
+  className = "",
+  children,
+}: {
+  fixed?: boolean;
+  bare?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
   const inPanel = useInListPanel();
   const table = (
     <table className={`w-full border-collapse text-left ${fixed ? "table-fixed" : ""}`}>
@@ -25,13 +35,19 @@ export function DataTable({ fixed = false, children }: { fixed?: boolean; childr
     </table>
   );
 
-  if (inPanel) return fixed ? table : <div className="overflow-x-auto">{table}</div>;
+  if (inPanel || bare) {
+    return fixed && !className ? (
+      table
+    ) : (
+      <div className={`${fixed ? "" : "overflow-x-auto"} ${className}`.trim()}>{table}</div>
+    );
+  }
 
   return (
     <div
       className={`rounded-card border border-line bg-white shadow-card ${
         fixed ? "overflow-hidden" : "overflow-x-auto"
-      }`}
+      } ${className}`.trim()}
     >
       {table}
     </div>

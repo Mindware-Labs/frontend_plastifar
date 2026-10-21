@@ -6,6 +6,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
@@ -160,12 +161,15 @@ export function TemplatesSection() {
 
       <ListPanel
         toolbar={
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por nombre, clave o asunto…"
-            className="w-[260px]"
-          />
+          <>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nombre, clave o asunto…"
+              className="w-[260px]"
+            />
+            {search && <ClearFiltersButton onClick={() => setSearch("")} title="Limpiar búsqueda" />}
+          </>
         }
         footer={
           data !== null &&

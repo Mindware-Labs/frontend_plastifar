@@ -90,17 +90,17 @@ function MonthTable({ data, criteria }: { data: QualityReport; criteria: ReportC
         <tr className="border-t border-line">
           <th
             scope="row"
-            className="py-2.5 pl-0 pr-3.5 text-left text-[12.5px] font-medium text-ink"
+            className="px-3 py-2 text-left text-[12.5px] font-medium text-ink"
           >
             Total del período
           </th>
-          <td className="px-3.5 py-2.5 text-right text-[12.5px] font-medium tabular-nums text-ink">
+          <td className="px-3 py-2 text-right text-[12.5px] font-medium tabular-nums text-ink">
             {data.byMonth.reduce((sum, e) => sum + e.opened, 0)}
           </td>
-          <td className="px-3.5 py-2.5 text-right text-[12.5px] font-medium tabular-nums text-ink">
+          <td className="px-3 py-2 text-right text-[12.5px] font-medium tabular-nums text-ink">
             {data.byMonth.reduce((sum, e) => sum + e.closed, 0)}
           </td>
-          <td className="py-2.5 pl-3.5 pr-0 text-right text-[12.5px] font-medium tabular-nums text-ink">
+          <td className="px-3 py-2 text-right text-[12.5px] font-medium tabular-nums text-ink">
             {data.byMonth.reduce((sum, e) => sum + e.opened - e.closed, 0)}
           </td>
         </tr>
@@ -213,14 +213,14 @@ export function QualityResult({
               <tr className="border-t border-line">
                 <th
                   scope="row"
-                  className="py-2.5 pl-0 pr-3.5 text-left text-[12.5px] font-medium text-ink"
+                  className="px-3 py-2 text-left text-[12.5px] font-medium text-ink"
                 >
                   Total de notas
                 </th>
-                <td className="px-3.5 py-2.5 text-right text-[12.5px] font-medium tabular-nums text-ink">
+                <td className="px-3 py-2 text-right text-[12.5px] font-medium tabular-nums text-ink">
                   {data.credits.count}
                 </td>
-                <td className="py-2.5 pl-3.5 pr-0 text-right text-[12px] text-faint">
+                <td className="px-3 py-2 text-right text-[12px] text-faint">
                   {data.credits.byCurrency.length === 1
                     ? "en una moneda"
                     : `en ${data.credits.byCurrency.length} monedas`}
