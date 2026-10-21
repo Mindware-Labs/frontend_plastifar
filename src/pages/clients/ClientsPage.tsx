@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power, Trash2, UserCog, Users } from "lucide-react";
+import { Building2, MapPin, Pencil, Plus, Power, Trash2, UserCheck, UserCog, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { clientsApi, type ClientQuery } from "../../api/clients";
@@ -13,7 +13,7 @@ import { Button } from "../../components/ui/Button";
 import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
+import { ClearFiltersButton, FilterDropdown, LookupFilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
@@ -21,8 +21,6 @@ import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
-import { LookupSelect } from "../../components/ui/LookupSelect";
-import { Select } from "../../components/ui/Select";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -33,7 +31,6 @@ import type { Client, ClientListResponse, Territory } from "../../types/clients"
 import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
 import { ClientModal } from "./ClientModal";
 import { ReassignSalesRepModal } from "./ReassignSalesRepModal";
-import { FilterPopover } from "../../components/ui/FilterPopover";
 
 type ChipKey = "todos" | "activos" | "inactivos" | "sinVendedor";
 
@@ -411,7 +408,7 @@ export function ClientsPage() {
             : undefined
         }
         toolbar={
-          <div className="flex w-full items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2">
             <SearchInput
               value={search}
               onChange={setSearch}
@@ -419,48 +416,45 @@ export function ClientsPage() {
               className="w-[260px]"
             />
 
-            <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
-              <Select
-                size="sm"
-                className="w-[200px]"
-                aria-label="Filtrar por territorio"
-                value={territoryId}
-                onChange={setTerritoryId}
-                options={[
-                  { value: "todos", label: "Todos los territorios" },
-                  ...territories.map((territory) => ({ value: String(territory.id), label: territory.name })),
-                ]}
-              />
+            <FilterDropdown
+              title="Seleccionar territorio"
+              aria-label="Filtrar por territorio"
+              value={territoryId}
+              onChange={setTerritoryId}
+              defaultIcon={<MapPin className="h-3.5 w-3.5 text-zinc-500" />}
+              options={[
+                { value: "todos", label: "Todos los territorios" },
+                ...territories.map((territory) => ({ value: String(territory.id), label: territory.name })),
+              ]}
+            />
 
-              <LookupSelect
-                size="sm"
-                className="w-[200px]"
-                aria-label="Filtrar por vendedor"
-                placeholder="Todos los vendedores"
-                searchPlaceholder="Buscar vendedor…"
-                clearLabel="Todos los vendedores"
-                value={salesRepId === "todos" ? "" : salesRepId}
-                selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
-                resolveSelectedLabel={resolveStaffLabel}
-                search={searchActiveStaff}
-                onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
-              />
+            <LookupFilterDropdown
+              title="Seleccionar vendedor"
+              aria-label="Filtrar por vendedor"
+              placeholder="Todos los vendedores"
+              searchPlaceholder="Buscar vendedor…"
+              defaultIcon={<UserCheck className="h-3.5 w-3.5 text-zinc-500" />}
+              value={salesRepId === "todos" ? "" : salesRepId}
+              selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
+              resolveSelectedLabel={resolveStaffLabel}
+              search={searchActiveStaff}
+              onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
+            />
 
-              <Select
-                size="sm"
-                className="w-[200px]"
-                aria-label="Filtrar por tipo"
-                value={type}
-                onChange={setType}
-                options={[
-                  { value: "todos", label: "Todos los tipos" },
-                  { value: "Distribuidor", label: "Distribuidor" },
-                  { value: "Mayorista", label: "Mayorista" },
-                  { value: "Detallista", label: "Detallista" },
-                  { value: "Institucional", label: "Institucional" },
-                ]}
-              />
-            </FilterPopover>
+            <FilterDropdown
+              title="Seleccionar tipo"
+              aria-label="Filtrar por tipo"
+              value={type}
+              onChange={setType}
+              defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
+              options={[
+                { value: "todos", label: "Todos los tipos" },
+                { value: "Distribuidor", label: "Distribuidor" },
+                { value: "Mayorista", label: "Mayorista" },
+                { value: "Detallista", label: "Detallista" },
+                { value: "Institucional", label: "Institucional" },
+              ]}
+            />
 
             {(search || filtrosPuestos > 0) && (
               <ClearFiltersButton

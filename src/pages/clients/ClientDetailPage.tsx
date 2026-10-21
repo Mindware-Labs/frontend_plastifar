@@ -18,7 +18,6 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
-import { FilterChip } from "../../components/ui/FilterChip";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -401,25 +400,50 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
                 {/* Antes de la primera respuesta las pastillas van en esqueleto, no
                     en cero: un cero es una afirmacion, y todavia no se sabe nada. */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {contactCounts === undefined
-                    ? contactChips.map(({ key }) => (
-                        <span
+                {contactCounts === undefined ? (
+                  <div className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+                    {contactChips.map(({ key }) => (
+                      <span
+                        key={key}
+                        aria-hidden
+                        className="h-7 w-[88px] animate-pulse rounded-md bg-zinc-200/60"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    role="group"
+                    aria-label="Vista de estado"
+                    className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
+                  >
+                    {contactChips.map(({ key, label, countKey }) => {
+                      const isActive = contactChip === key;
+                      const count = contactCounts[countKey];
+                      return (
+                        <button
                           key={key}
-                          aria-hidden
-                          className="h-8 w-[104px] animate-pulse rounded-full bg-fill"
-                        />
-                      ))
-                    : contactChips.map(({ key, label, countKey }) => (
-                        <FilterChip
-                          key={key}
-                          label={label}
-                          count={contactCounts[countKey]}
-                          active={contactChip === key}
+                          type="button"
                           onClick={() => setContactChip(key)}
-                        />
-                      ))}
-                </div>
+                          aria-pressed={isActive}
+                          className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                            isActive
+                              ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+                              : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+                          }`}
+                        >
+                          <span>{label}</span>
+                          <span
+                            className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
+                              isActive ? "text-zinc-900" : "text-zinc-400"
+                            }`}
+                          >
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             }
             footer={

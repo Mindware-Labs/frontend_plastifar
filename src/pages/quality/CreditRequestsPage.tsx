@@ -1,4 +1,4 @@
-import { BadgeCheck, Check, Plus, X } from "lucide-react";
+import { BadgeCheck, Building2, Check, DollarSign, Plus, X } from "lucide-react";
 import { useState } from "react";
 import {
   qualityApi,
@@ -9,10 +9,12 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { ControlInput } from "../../components/ui/ControlInput";
-import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
+import {
+  ClearFiltersButton,
+  InputFilterDropdown,
+  LookupFilterDropdown,
+} from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -31,7 +33,6 @@ import { CreditDecisionModal } from "./CreditDecisionModal";
 import { CreditRequestModal } from "./CreditRequestModal";
 import { CreditStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
-import { FilterPopover } from "../../components/ui/FilterPopover";
 
 type ChipKey = "todas" | CreditStatus;
 
@@ -245,37 +246,32 @@ export function CreditRequestsPage() {
           className="w-[260px]"
         />
 
-        {/* Cliente y monto minimo, guardados. La barra tenia nueve controles en
-            tres renglones y 119 px; los dos que se esconden se usan cuando se
-            busca una solicitud concreta, no al abrir la pantalla. */}
-        <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
-          <CriteriaLookup
-          label="Cliente"
-          ariaLabel="Filtrar por cliente"
-          width="w-[220px]"
+        <LookupFilterDropdown
+          title="Seleccionar cliente"
+          aria-label="Filtrar por cliente"
           placeholder="Todos los clientes"
           searchPlaceholder="Buscar cliente…"
-          clearLabel="Todos los clientes"
+          defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
           value={clientId === "todos" ? "" : clientId}
           onChange={(value) => setClientId(value === "" ? "todos" : value)}
           search={searchClients}
           resolveSelectedLabel={resolveClientLabel}
         />
 
-          <CriteriaField label="Monto desde" htmlFor="credito-monto">
-          <ControlInput
-            id="credito-monto"
-            type="number"
-            min="0"
-            step="100"
-            inputMode="decimal"
-            placeholder="0"
-            className="w-[130px]"
-            value={minAmount}
-            onChange={(event) => setMinAmount(event.target.value)}
-          />
-          </CriteriaField>
-        </FilterPopover>
+        <InputFilterDropdown
+          title="Monto mínimo"
+          aria-label="Filtrar por monto mínimo"
+          placeholder="Cualquier monto"
+          inputPlaceholder="0"
+          type="number"
+          min="0"
+          step="100"
+          inputMode="decimal"
+          defaultIcon={<DollarSign className="h-3.5 w-3.5 text-zinc-500" />}
+          value={minAmount}
+          onChange={setMinAmount}
+          formatActiveLabel={(val) => `Desde ${val}`}
+        />
 
         {(search || filtrosPuestos > 0) && (
           <ClearFiltersButton

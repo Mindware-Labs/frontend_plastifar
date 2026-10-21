@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Building2, Factory, Layers, Package, Plus, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { fetchAllPages } from "../../api/paging";
@@ -13,9 +13,12 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { ControlInput } from "../../components/ui/ControlInput";
-import { CriteriaField, CriteriaLookup, CriteriaSelect } from "../../components/ui/CriteriaField";
-import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
+import {
+  ClearFiltersButton,
+  DateRangeFilterDropdown,
+  FilterDropdown,
+  LookupFilterDropdown,
+} from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
@@ -39,7 +42,6 @@ import type { Plant, ProductLine } from "../../types/settings";
 import { HcaModal } from "./HcaModal";
 import { HcaStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
-import { FilterPopover } from "../../components/ui/FilterPopover";
 
 type ChipKey = "todas" | "abiertas" | "vencidas" | "cerradas";
 /** Solo lo que el servidor sabe ordenar (SheetQuery.sort). */
@@ -292,99 +294,74 @@ export function HcaPage() {
               className="w-[230px]"
             />
 
-        {/* Los cuatro criterios de acotacion, guardados hasta que hacen falta.
-            De los siete que tenia esta barra, quien abre la pantalla usa el
-            buscador y las pastillas; linea, responsable, cliente y el rango de
-            fechas se tocan cuando se busca algo concreto. Tenerlos desplegados
-            cobraba 119 px a la tabla, que es lo unico que se vino a leer. */}
-        <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
-          <CriteriaSelect
-          label="Línea"
-          ariaLabel="Filtrar por línea de producto"
-          value={productLineId}
-          onChange={setProductLineId}
-          width="w-[160px]"
-          options={[
-            { value: "todas", label: "Todas las líneas" },
-            ...productLines.map((line) => ({ value: String(line.id), label: line.name })),
-          ]}
-        />
-
-        <CriteriaSelect
-          label="Planta"
-          ariaLabel="Filtrar por planta"
-          value={plantId}
-          onChange={setPlantId}
-          width="w-[160px]"
-          options={[
-            { value: "todas", label: "Todas las plantas" },
-            ...plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
-          ]}
-        />
-
-        <CriteriaLookup
-          label="Producto"
-          ariaLabel="Filtrar por producto"
-          width="w-[200px]"
-          placeholder="Todos los productos"
-          searchPlaceholder="Código o descripción…"
-          clearLabel="Todos los productos"
-          value={productId}
-          onChange={(value) => setProductId(value)}
-          search={searchProducts}
-          resolveSelectedLabel={resolveProductLabel}
-        />
-
-        <CriteriaLookup
-          label="Responsable"
-          ariaLabel="Filtrar por responsable"
-          width="w-[170px]"
-          placeholder="Todos los responsables"
-          searchPlaceholder="Buscar responsable…"
-          clearLabel="Todos los responsables"
-          value={responsibleId === "todos" ? "" : responsibleId}
-          onChange={(value) => setResponsibleId(value === "" ? "todos" : value)}
-          search={searchActiveStaff}
-          resolveSelectedLabel={resolveStaffLabel}
-        />
-
-        <CriteriaLookup
-          label="Cliente"
-          ariaLabel="Filtrar por cliente"
-          width="w-[200px]"
-          placeholder="Todos los clientes"
-          searchPlaceholder="Buscar cliente…"
-          clearLabel="Todos los clientes"
-          value={clientId === "todos" ? "" : clientId}
-          onChange={(value) => setClientId(value === "" ? "todos" : value)}
-          search={searchClients}
-          resolveSelectedLabel={resolveClientLabel}
-        />
-
-        <div className="flex items-end gap-2">
-          <CriteriaField label="Detectada desde" htmlFor="hca-desde">
-            <ControlInput
-              id="hca-desde"
-              type="date"
-              className="w-[140px]"
-              value={from}
-              max={to === "" ? undefined : to}
-              onChange={(event) => setFrom(event.target.value)}
+            <FilterDropdown
+              title="Seleccionar línea"
+              aria-label="Filtrar por línea de producto"
+              value={productLineId}
+              onChange={setProductLineId}
+              defaultIcon={<Layers className="h-3.5 w-3.5 text-zinc-500" />}
+              options={[
+                { value: "todas", label: "Todas las líneas" },
+                ...productLines.map((line) => ({ value: String(line.id), label: line.name })),
+              ]}
             />
-          </CriteriaField>
 
-          <CriteriaField label="Hasta" htmlFor="hca-hasta">
-            <ControlInput
-              id="hca-hasta"
-              type="date"
-              className="w-[140px]"
-              value={to}
-              min={from === "" ? undefined : from}
-              onChange={(event) => setTo(event.target.value)}
+            <FilterDropdown
+              title="Seleccionar planta"
+              aria-label="Filtrar por planta"
+              value={plantId}
+              onChange={setPlantId}
+              defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
+              options={[
+                { value: "todas", label: "Todas las plantas" },
+                ...plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
+              ]}
             />
-          </CriteriaField>
-        </div>
-            </FilterPopover>
+
+            <LookupFilterDropdown
+              title="Seleccionar producto"
+              aria-label="Filtrar por producto"
+              placeholder="Todos los productos"
+              searchPlaceholder="Código o descripción…"
+              defaultIcon={<Package className="h-3.5 w-3.5 text-zinc-500" />}
+              value={productId}
+              onChange={(value) => setProductId(value)}
+              search={searchProducts}
+              resolveSelectedLabel={resolveProductLabel}
+            />
+
+            <LookupFilterDropdown
+              title="Seleccionar responsable"
+              aria-label="Filtrar por responsable"
+              placeholder="Todos los responsables"
+              searchPlaceholder="Buscar responsable…"
+              defaultIcon={<UserCheck className="h-3.5 w-3.5 text-zinc-500" />}
+              value={responsibleId === "todos" ? "" : responsibleId}
+              onChange={(value) => setResponsibleId(value === "" ? "todos" : value)}
+              search={searchActiveStaff}
+              resolveSelectedLabel={resolveStaffLabel}
+            />
+
+            <LookupFilterDropdown
+              title="Seleccionar cliente"
+              aria-label="Filtrar por cliente"
+              placeholder="Todos los clientes"
+              searchPlaceholder="Buscar cliente…"
+              defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
+              value={clientId === "todos" ? "" : clientId}
+              onChange={(value) => setClientId(value === "" ? "todos" : value)}
+              search={searchClients}
+              resolveSelectedLabel={resolveClientLabel}
+            />
+
+            <DateRangeFilterDropdown
+              from={from}
+              to={to}
+              onFromChange={setFrom}
+              onToChange={setTo}
+              title="Detectada entre fechas"
+              aria-label="Filtrar por fecha de detección"
+            />
 
             {(search || filtrosPuestos > 0) && (
               <ClearFiltersButton

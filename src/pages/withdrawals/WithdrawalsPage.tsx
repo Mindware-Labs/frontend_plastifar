@@ -1,20 +1,21 @@
-import { Plus } from "lucide-react";
+import { Building2, Plus, Tag, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { withdrawalsApi, type WithdrawalCounts, type WithdrawalListResponse, type WithdrawalQuery } from "../../api/withdrawals";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { ControlInput } from "../../components/ui/ControlInput";
-import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
+import {
+  ClearFiltersButton,
+  DateRangeFilterDropdown,
+  FilterDropdown,
+  LookupFilterDropdown,
+} from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { FilterPopover } from "../../components/ui/FilterPopover";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Select } from "../../components/ui/Select";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -225,41 +226,46 @@ export function WithdrawalsPage() {
               className="w-[300px]"
             />
 
-            <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
-              <CriteriaLookup
-                label="Cliente"
-                ariaLabel="Filtrar por cliente"
-                width="w-[220px]"
-                placeholder="Todos los clientes"
-                searchPlaceholder="Buscar cliente…"
-                clearLabel="Todos los clientes"
-                value={clientId}
-                onChange={setClientId}
-                search={searchClients}
-                resolveSelectedLabel={resolveClientLabel}
-              />
-              <CriteriaLookup
-                label="Vendedor"
-                ariaLabel="Filtrar por vendedor"
-                width="w-[200px]"
-                placeholder="Todos los vendedores"
-                searchPlaceholder="Buscar colaborador…"
-                clearLabel="Todos los vendedores"
-                value={sellerId}
-                onChange={setSellerId}
-                search={searchSellers}
-                resolveSelectedLabel={resolveStaffLabel}
-              />
-              <CriteriaField label="Motivo" htmlFor="retiro-motivo">
-                <Select id="retiro-motivo" value={reason} onChange={setReason} options={REASON_OPTIONS} className="w-[170px]" />
-              </CriteriaField>
-              <CriteriaField label="Desde" htmlFor="retiro-desde">
-                <ControlInput id="retiro-desde" type="date" className="w-[150px]" value={from} onChange={(event) => setFrom(event.target.value)} />
-              </CriteriaField>
-              <CriteriaField label="Hasta" htmlFor="retiro-hasta">
-                <ControlInput id="retiro-hasta" type="date" className="w-[150px]" value={to} onChange={(event) => setTo(event.target.value)} />
-              </CriteriaField>
-            </FilterPopover>
+            <LookupFilterDropdown
+              title="Seleccionar cliente"
+              aria-label="Filtrar por cliente"
+              placeholder="Todos los clientes"
+              searchPlaceholder="Buscar cliente…"
+              defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
+              value={clientId}
+              onChange={setClientId}
+              search={searchClients}
+              resolveSelectedLabel={resolveClientLabel}
+            />
+
+            <LookupFilterDropdown
+              title="Seleccionar vendedor"
+              aria-label="Filtrar por vendedor"
+              placeholder="Todos los vendedores"
+              searchPlaceholder="Buscar colaborador…"
+              defaultIcon={<UserCheck className="h-3.5 w-3.5 text-zinc-500" />}
+              value={sellerId}
+              onChange={setSellerId}
+              search={searchSellers}
+              resolveSelectedLabel={resolveStaffLabel}
+            />
+
+            <FilterDropdown
+              title="Seleccionar motivo"
+              aria-label="Filtrar por motivo"
+              value={reason}
+              onChange={setReason}
+              defaultIcon={<Tag className="h-3.5 w-3.5 text-zinc-500" />}
+              options={REASON_OPTIONS}
+            />
+
+            <DateRangeFilterDropdown
+              from={from}
+              to={to}
+              onFromChange={setFrom}
+              onToChange={setTo}
+              aria-label="Filtrar por fecha"
+            />
 
             {(search || filtrosPuestos > 0) && (
               <ClearFiltersButton

@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Lock, Pencil, Plus, Power, Trash2, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -6,7 +6,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
+import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
@@ -337,7 +337,27 @@ export function DepartmentsPage() {
               placeholder="Buscar por nombre o camino…"
               className="w-[260px]"
             />
-            {search && <ClearFiltersButton onClick={() => setSearch("")} title="Limpiar búsqueda" />}
+            <FilterDropdown
+              title="Seleccionar tipo"
+              aria-label="Filtrar por tipo de departamento"
+              value={typeChip}
+              onChange={(next) => setTypeChip(next as TypeKey)}
+              defaultIcon={<Users className="h-3.5 w-3.5 text-zinc-500" />}
+              options={[
+                { value: "todos", label: "Todos los tipos", icon: <Users className="h-4 w-4 text-zinc-500" /> },
+                { value: "Publico", label: "Públicos", icon: <Users className="h-4 w-4 text-blue-600" /> },
+                { value: "Privado", label: "Privados", icon: <Lock className="h-4 w-4 text-amber-600" /> },
+              ]}
+            />
+            {(search || typeChip !== "todos" || chip !== "todos") && (
+              <ClearFiltersButton
+                onClick={() => {
+                  setSearch("");
+                  setTypeChip("todos");
+                  setChip("todos");
+                }}
+              />
+            )}
           </>
         }
       >

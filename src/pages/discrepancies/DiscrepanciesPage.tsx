@@ -1,16 +1,18 @@
-import { Plus, ShieldAlert } from "lucide-react";
+import { Building2, Plus, ShieldAlert, Truck } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { discrepanciesApi, type DiscrepancyListResponse, type DiscrepancyQuery } from "../../api/discrepancies";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { ControlInput } from "../../components/ui/ControlInput";
-import { CriteriaField, CriteriaLookup } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
+import {
+  ClearFiltersButton,
+  DateRangeFilterDropdown,
+  InputFilterDropdown,
+  LookupFilterDropdown,
+} from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { FilterPopover } from "../../components/ui/FilterPopover";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -215,35 +217,36 @@ export function DiscrepanciesPage() {
               className="w-[300px]"
             />
 
-            <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
-              <CriteriaLookup
-                label="Cliente"
-                ariaLabel="Filtrar por cliente"
-                width="w-[220px]"
-                placeholder="Todos los clientes"
-                searchPlaceholder="Buscar cliente…"
-                clearLabel="Todos los clientes"
-                value={clientId === "todos" ? "" : clientId}
-                onChange={(value) => setClientId(value === "" ? "todos" : value)}
-                search={searchClients}
-                resolveSelectedLabel={resolveClientLabel}
-              />
-              <CriteriaField label="Despachador" htmlFor="discrepancia-despachador">
-                <ControlInput
-                  id="discrepancia-despachador"
-                  placeholder="Nombre"
-                  className="w-[170px]"
-                  value={dispatcher}
-                  onChange={(event) => setDispatcher(event.target.value)}
-                />
-              </CriteriaField>
-              <CriteriaField label="Desde" htmlFor="discrepancia-desde">
-                <ControlInput id="discrepancia-desde" type="date" className="w-[150px]" value={from} onChange={(event) => setFrom(event.target.value)} />
-              </CriteriaField>
-              <CriteriaField label="Hasta" htmlFor="discrepancia-hasta">
-                <ControlInput id="discrepancia-hasta" type="date" className="w-[150px]" value={to} onChange={(event) => setTo(event.target.value)} />
-              </CriteriaField>
-            </FilterPopover>
+            <LookupFilterDropdown
+              title="Seleccionar cliente"
+              aria-label="Filtrar por cliente"
+              placeholder="Todos los clientes"
+              searchPlaceholder="Buscar cliente…"
+              defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
+              value={clientId === "todos" ? "" : clientId}
+              onChange={(value) => setClientId(value === "" ? "todos" : value)}
+              search={searchClients}
+              resolveSelectedLabel={resolveClientLabel}
+            />
+
+            <InputFilterDropdown
+              title="Filtrar por despachador"
+              aria-label="Filtrar por despachador"
+              placeholder="Todos los despachadores"
+              inputPlaceholder="Nombre del despachador…"
+              defaultIcon={<Truck className="h-3.5 w-3.5 text-zinc-500" />}
+              value={dispatcher}
+              onChange={setDispatcher}
+              formatActiveLabel={(val) => `Despachador: ${val}`}
+            />
+
+            <DateRangeFilterDropdown
+              from={from}
+              to={to}
+              onFromChange={setFrom}
+              onToChange={setTo}
+              aria-label="Filtrar por fecha"
+            />
 
             {(search || filtrosPuestos > 0) && (
               <ClearFiltersButton

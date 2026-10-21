@@ -1,4 +1,4 @@
-import { ClipboardList, FileText } from "lucide-react";
+import { Building2, ClipboardList, Factory, FileText, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { claimsApi, type ClaimListResponse, type ClaimQuery } from "../../api/claims";
@@ -7,12 +7,14 @@ import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { ControlInput } from "../../components/ui/ControlInput";
-import { CriteriaField, CriteriaLookup, CriteriaSelect } from "../../components/ui/CriteriaField";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
+import {
+  ClearFiltersButton,
+  DateRangeFilterDropdown,
+  FilterDropdown,
+  LookupFilterDropdown,
+} from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { FilterPopover } from "../../components/ui/FilterPopover";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -202,58 +204,49 @@ export function ClaimsPage() {
               className="w-[280px]"
             />
 
-            <FilterPopover count={filtrosPuestos} onClear={clearNarrowFilters}>
-              <CriteriaSelect
-                label="Motivo"
-                ariaLabel="Filtrar por motivo del reclamo"
-                value={reason}
-                onChange={setReason}
-                options={[
-                  { value: "todos", label: "Todos los motivos" },
-                  ...CLAIM_REASONS.map((value) => ({ value, label: value })),
-                ]}
-              />
-              <CriteriaSelect
-                label="Planta"
-                ariaLabel="Filtrar por planta involucrada"
-                value={plantId}
-                onChange={setPlantId}
-                options={[
-                  { value: "todas", label: "Todas las plantas" },
-                  ...plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
-                ]}
-              />
-              <CriteriaLookup
-                label="Cliente"
-                ariaLabel="Filtrar por cliente"
-                width="w-[220px]"
-                placeholder="Todos los clientes"
-                searchPlaceholder="Buscar cliente…"
-                clearLabel="Todos los clientes"
-                value={clientId === "todos" ? "" : clientId}
-                onChange={(value) => setClientId(value === "" ? "todos" : value)}
-                search={searchClients}
-                resolveSelectedLabel={resolveClientLabel}
-              />
-              <CriteriaField label="Desde" htmlFor="reclamacion-desde">
-                <ControlInput
-                  id="reclamacion-desde"
-                  type="date"
-                  className="w-[150px]"
-                  value={from}
-                  onChange={(event) => setFrom(event.target.value)}
-                />
-              </CriteriaField>
-              <CriteriaField label="Hasta" htmlFor="reclamacion-hasta">
-                <ControlInput
-                  id="reclamacion-hasta"
-                  type="date"
-                  className="w-[150px]"
-                  value={to}
-                  onChange={(event) => setTo(event.target.value)}
-                />
-              </CriteriaField>
-            </FilterPopover>
+            <FilterDropdown
+              title="Seleccionar motivo"
+              aria-label="Filtrar por motivo del reclamo"
+              value={reason}
+              onChange={setReason}
+              defaultIcon={<Tag className="h-3.5 w-3.5 text-zinc-500" />}
+              options={[
+                { value: "todos", label: "Todos los motivos" },
+                ...CLAIM_REASONS.map((value) => ({ value, label: value })),
+              ]}
+            />
+
+            <FilterDropdown
+              title="Seleccionar planta"
+              aria-label="Filtrar por planta involucrada"
+              value={plantId}
+              onChange={setPlantId}
+              defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
+              options={[
+                { value: "todas", label: "Todas las plantas" },
+                ...plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
+              ]}
+            />
+
+            <LookupFilterDropdown
+              title="Seleccionar cliente"
+              aria-label="Filtrar por cliente"
+              placeholder="Todos los clientes"
+              searchPlaceholder="Buscar cliente…"
+              defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
+              value={clientId === "todos" ? "" : clientId}
+              onChange={(value) => setClientId(value === "" ? "todos" : value)}
+              search={searchClients}
+              resolveSelectedLabel={resolveClientLabel}
+            />
+
+            <DateRangeFilterDropdown
+              from={from}
+              to={to}
+              onFromChange={setFrom}
+              onToChange={setTo}
+              aria-label="Filtrar por fecha"
+            />
 
             {(search || filtrosPuestos > 0) && (
               <ClearFiltersButton
