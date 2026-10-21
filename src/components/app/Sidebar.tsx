@@ -5,7 +5,7 @@ import {
   LogOut,
   PenLine,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
@@ -353,11 +353,21 @@ export function Sidebar() {
                   className="pointer-events-none absolute -top-0.5 bottom-[22px] left-[17.5px] w-px bg-zinc-200/90"
                 />
 
-                {children.map((child) => {
+                {children.map((child, index) => {
                   const hasUnread = Boolean(child.folder && counts && counts[child.folder]?.unread > 0);
+                  const prevChild = index > 0 ? children[index - 1] : null;
+                  const showSubgroup = Boolean(child.subgroup && child.subgroup !== prevChild?.subgroup);
 
                   return (
-                    <NavLink
+                    <Fragment key={child.to}>
+                      {showSubgroup && (
+                        <div className="relative pt-3 pb-1 pl-1.5 select-none">
+                          <p className="font-heading text-[9.5px] font-bold uppercase tracking-[0.09em] text-zinc-400">
+                            {child.subgroup}
+                          </p>
+                        </div>
+                      )}
+                      <NavLink
                       key={child.to}
                       to={child.to}
                       end={child.end}
@@ -411,6 +421,7 @@ export function Sidebar() {
                         </>
                       )}
                     </NavLink>
+                    </Fragment>
                   );
                 })}
               </div>
@@ -606,10 +617,21 @@ export function Sidebar() {
             )}
           </div>
           <div className="mt-1 flex flex-col gap-0.5">
-            {visibleChildren(flyout.group).map((child) => {
+            {visibleChildren(flyout.group).map((child, index, all) => {
               const hasUnread = Boolean(child.folder && counts && counts[child.folder]?.unread > 0);
+              const prevChild = index > 0 ? all[index - 1] : null;
+              const showSubgroup = Boolean(child.subgroup && child.subgroup !== prevChild?.subgroup);
+
               return (
-                <NavLink
+                <Fragment key={child.to}>
+                  {showSubgroup && (
+                    <div className="pt-2 pb-1 px-2.5 select-none border-t border-zinc-100/80 mt-1">
+                      <p className="font-heading text-[9px] font-bold uppercase tracking-[0.09em] text-zinc-400">
+                        {child.subgroup}
+                      </p>
+                    </div>
+                  )}
+                  <NavLink
                   key={child.to}
                   to={child.to}
                   end={child.end}
@@ -646,6 +668,7 @@ export function Sidebar() {
                     </>
                   )}
                 </NavLink>
+                </Fragment>
               );
             })}
           </div>

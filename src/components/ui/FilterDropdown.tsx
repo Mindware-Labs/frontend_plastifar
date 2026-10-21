@@ -115,6 +115,20 @@ export function FilterDropdown({
     function handleViewportChange(event: Event) {
       const target = event.target;
       if (target instanceof Node && panelRef.current?.contains(target)) return;
+      if (
+        target instanceof Element &&
+        (target.closest("[role='dialog']") !== null || target.closest("[data-dropdown-portal]") !== null)
+      ) {
+        return;
+      }
+      if (
+        target !== document &&
+        target !== document.documentElement &&
+        target !== document.body &&
+        target !== window
+      ) {
+        return;
+      }
       closeDropdown(true);
     }
 
@@ -405,6 +419,20 @@ export function LookupFilterDropdown({
     function handleViewportChange(event: Event) {
       const target = event.target;
       if (target instanceof Node && panelRef.current?.contains(target)) return;
+      if (
+        target instanceof Element &&
+        (target.closest("[role='dialog']") !== null || target.closest("[data-dropdown-portal]") !== null)
+      ) {
+        return;
+      }
+      if (
+        target !== document &&
+        target !== document.documentElement &&
+        target !== document.body &&
+        target !== window
+      ) {
+        return;
+      }
       closeDropdown(true);
     }
 

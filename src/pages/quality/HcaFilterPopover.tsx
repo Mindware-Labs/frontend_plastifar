@@ -105,7 +105,29 @@ export function HcaFilterPopover({
 
     function handleViewportChange(event: Event) {
       const target = event.target;
+      // 1. Si el scroll ocurre dentro del modal/popover, no cerrar
       if (target instanceof Node && panelRef.current?.contains(target)) return;
+
+      // 2. Si el scroll ocurre dentro de cualquier dropdown o listbox flotante, no cerrar
+      if (
+        target instanceof Element &&
+        (target.closest("[data-dropdown-portal]") !== null ||
+          target.closest("[role='listbox']") !== null ||
+          target.closest("[data-select-portal]") !== null)
+      ) {
+        return;
+      }
+
+      // 3. Si el scroll ocurrió en un elemento interno que no sea el documento o la ventana, no cerrar
+      if (
+        target !== document &&
+        target !== document.documentElement &&
+        target !== document.body &&
+        target !== window
+      ) {
+        return;
+      }
+
       close();
       snap();
     }

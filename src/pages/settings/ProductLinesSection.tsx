@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power } from "lucide-react";
+import { Ban, CheckCircle2, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -13,6 +13,7 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -26,6 +27,7 @@ type ChipKey = "todas" | "activas" | "inactivas";
 export function ProductLinesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
+  const receipts = useReceipts();
 
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -64,11 +66,12 @@ export function ProductLinesSection() {
    * una pagina.
    */
   function askToggle(line: ProductLine) {
+    const willDeactivate = line.isActive;
     setConfirmation({
       tone: "warn",
-      icon: Power,
-      title: line.isActive ? "Desactivar línea" : "Reactivar línea",
-      description: line.isActive ? (
+      icon: willDeactivate ? Ban : CheckCircle2,
+      title: willDeactivate ? "Desactivar línea" : "Reactivar línea",
+      description: willDeactivate ? (
         <>
           <strong className="font-semibold text-ink">{line.name}</strong> dejará de ofrecerse al
           abrir un ticket o una HCA. El historial que ya la referencia se conserva.
@@ -79,17 +82,29 @@ export function ProductLinesSection() {
           en tickets y hojas de corrección.
         </>
       ),
-      confirmLabel: line.isActive ? "Desactivar" : "Reactivar",
+      confirmLabel: willDeactivate ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
         setBusyId(line.id);
         try {
           const current = await freshCopy(settingsApi.productLines.get, line);
+          const nextActive = !current.isActive;
           await settingsApi.productLines.update(current.id, {
             code: current.code,
             name: current.name,
-            isActive: !current.isActive,
+            isActive: nextActive,
+          });
+          receipts.done({
+            action: nextActive ? "reactivar-linea" : "desactivar-linea",
+            title: nextActive ? "Línea reactivada" : "Línea desactivada",
+            detail: `${current.name} (${current.code})`,
           });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-linea",
+            title: willDeactivate ? "No se pudo desactivar la línea" : "No se pudo reactivar la línea",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -229,9 +244,10 @@ export function ProductLinesSection() {
                           />
                           <RowAction
                             label={line.isActive ? `Desactivar ${line.name}` : `Reactivar ${line.name}`}
-                            icon={Power}
+                            icon={line.isActive ? Ban : CheckCircle2}
                             onClick={() => askToggle(line)}
                             disabled={busyId === line.id}
+                            danger={line.isActive}
                           />
                         </div>
                       </Td>
@@ -248,7 +264,15 @@ export function ProductLinesSection() {
         <ProductLineModal
           line={modal === "nueva" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(saved) => {
+            const isEdit = modal !== "nueva";
+            receipts.done({
+              action: isEdit ? "editar-linea" : "crear-linea",
+              title: isEdit ? "Línea actualizada" : "Línea creada exitosamente",
+              detail: `${saved.name} (${saved.code})`,
+            });
+            refresh();
+          }}
         />
       )}
 

@@ -14,6 +14,7 @@ import {
   type ControlSize,
   type FieldState,
 } from "./fieldStyles";
+import { DatePicker, type DatePickerProps } from "./DatePicker";
 import { LookupSelect, type LookupSelectProps } from "./LookupSelect";
 import { Select, type SelectOption } from "./Select";
 
@@ -272,6 +273,46 @@ export function LookupField({
         state={resolved}
         aria-invalid={resolved === "error"}
         aria-describedby={describedBy(fieldId, error, hint)}
+      />
+    </FieldShell>
+  );
+}
+
+export interface DateFieldProps extends Omit<DatePickerProps, "id"> {
+  label: string;
+  error?: string;
+  hint?: ReactNode;
+  required?: boolean;
+  state?: FieldState;
+  id?: string;
+  name?: string;
+}
+
+/**
+ * Campo de selección de fecha interactivo de Plastifar envuelto en FieldShell
+ * con soporte para validación, estado y presets rápidos.
+ */
+export function DateField({
+  label,
+  error,
+  hint,
+  required,
+  state = "idle",
+  id,
+  name,
+  ...props
+}: DateFieldProps) {
+  const generated = useId();
+  const fieldId = id ?? name ?? generated;
+  const resolved: FieldState = error ? "error" : state;
+
+  return (
+    <FieldShell id={fieldId} label={label} error={error} hint={hint} required={required}>
+      <DatePicker
+        {...props}
+        id={fieldId}
+        error={error}
+        state={resolved}
       />
     </FieldShell>
   );

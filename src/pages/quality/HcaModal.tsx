@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
@@ -11,22 +11,24 @@ import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
+  DateField,
   LookupField,
   SelectField,
   TextAreaField,
-  TextField,
   type FieldState,
 } from "../../components/ui/Field";
-import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { RowAction } from "../../components/ui/RowAction";
-import { today } from "../../lib/quality";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { resolveClientLabel, resolveStaffLabel, searchActiveStaff, searchClients } from "../../lib/lookups";
+import { today } from "../../lib/quality";
 import type { CorrectiveActionSheet } from "../../types/quality";
 import type { Plant, ProductLine } from "../../types/settings";
 
-// Espejo de la validacion del servidor de POST/PUT /api/quality/sheets
-// (CorrectiveActionSheetsController.ValidateAsync y QualityRules.ValidateCauses).
+/**
+ * Espejo de la validación del servidor de POST/PUT /api/quality/sheets
+ * (CorrectiveActionSheetsController.ValidateAsync y QualityRules.ValidateCauses).
+ */
 const schema = z
   .object({
     clientId: z.string().min(1, "Elige el cliente afectado"),
@@ -76,6 +78,17 @@ interface HcaModalProps {
   onSaved: (sheet: CorrectiveActionSheet) => void;
 }
 
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
+
 export function HcaModal({
   sheet,
   productLines,
@@ -86,6 +99,7 @@ export function HcaModal({
   const isEdit = sheet !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
   const [plants, setPlants] = useState<Plant[]>([]);
+  const { isExiting, requestClose } = useModalAnimation();
 
   // Las plantas son catálogo acotado (16 en la fuente): se recorren enteras.
   useEffect(() => {
@@ -114,7 +128,10 @@ export function HcaModal({
       responsibleStaffId: sheet ? String(sheet.responsibleStaffId) : "",
       description: sheet?.description ?? defaults?.description ?? "",
       immediateAction: sheet?.immediateAction ?? "",
-      causes: sheet && sheet.causes.length > 0 ? sheet.causes.map((cause) => ({ text: cause.description })) : [{ text: "" }],
+      causes:
+        sheet && sheet.causes.length > 0
+          ? sheet.causes.map((cause) => ({ text: cause.description }))
+          : [{ text: "" }],
       comments: sheet?.comments ?? "",
     },
   });
@@ -124,6 +141,14 @@ export function HcaModal({
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
     return touchedFields[field] ? "valid" : "idle";
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
+    // Si se presiona Ctrl+Enter o Cmd+Enter en un campo no-textarea, enviar el formulario
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit(onSubmit)();
+    }
   }
 
   /**
@@ -171,7 +196,7 @@ export function HcaModal({
         ? await qualityApi.sheets.update(sheet.id, request)
         : await qualityApi.sheets.create(request);
       onSaved(saved);
-      onClose();
+      requestClose();
     } catch (err) {
       const fallback = isEdit ? "No se pudo guardar la HCA" : "No se pudo crear la HCA";
       setFormError(err instanceof ApiError ? err.message : fallback);
@@ -181,46 +206,66 @@ export function HcaModal({
   return (
     <Modal
       title={isEdit ? `Editar ${sheet.number}` : "Nueva HCA"}
-      eyebrow="PF-FOR-109 · Hecho, Causa y Acción"
+      eyebrow={isEdit ? `HCA #${sheet.number} · PF-FOR-109` : "PF-FOR-109 · Hecho, Causa y Acción"}
       description={
         isEdit
-          ? "Una HCA no se elimina: si se abrió por error, se cierra con nota explicativa."
-          : "Documenta la no conformidad. El plan de acción y el cierre se trabajan después, desde la ficha."
+          ? "Actualiza los datos del hallazgo, plazos comprometidos o causas identificadas."
+          : "Documenta la no conformidad detectada. El plan de acción y verificación de eficacia se gestionan desde la ficha."
       }
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       maxWidth="max-w-2xl"
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="hca-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear HCA"}
-          </Button>
-        </>
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="hca-form" size="sm" isLoading={isSubmitting}>
+              {isEdit ? "Guardar cambios" : "Crear HCA"}
+            </Button>
+          </div>
+        </div>
       }
     >
-      <form id="hca-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+      <form
+        id="hca-form"
+        onSubmit={handleSubmit(onSubmit)}
+        onKeyDown={handleKeyDown}
+        noValidate
+        className="flex flex-col gap-3 text-left"
+      >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        {/* Los mismos bloques con los que se LEE la hoja —origen, plazos,
-            hecho y causas—. Siete campos seguidos con el mismo peso obligan a
-            recorrerlos todos para encontrar uno. */}
-        <FormSection title="Origen" hint="A quién y a qué afecta.">
-        <div className="grid grid-cols-2 gap-3">
+        {/* 1. Origen del hallazgo */}
+        <FormDivider title="Origen del hallazgo" />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <Controller
             name="clientId"
             control={control}
             render={({ field }) => (
               <LookupField
-                label="Cliente"
+                size="sm"
+                label="Cliente afectado"
                 required
                 name={field.name}
                 value={field.value}
                 onChange={(value) => field.onChange(value)}
                 onBlur={field.onBlur}
-                placeholder="Elige uno"
-                searchPlaceholder="Buscar cliente…"
+                placeholder="Seleccionar cliente…"
+                searchPlaceholder="Buscar por nombre o RNC…"
                 search={searchClients}
                 resolveSelectedLabel={resolveClientLabel}
                 state={stateOf("clientId")}
@@ -234,7 +279,8 @@ export function HcaModal({
             control={control}
             render={({ field }) => (
               <ProductLookupField
-                label="Producto"
+                size="sm"
+                label="Producto específico"
                 name={field.name}
                 value={field.value}
                 onChange={(value) => {
@@ -242,33 +288,34 @@ export function HcaModal({
                   void proposeLineFrom(value);
                 }}
                 onBlur={field.onBlur}
-                clearLabel="Sin producto concreto"
+                placeholder="Elige un producto (opcional)"
+                clearLabel="Sin producto específico"
                 error={errors.productId?.message}
-                hint="Opcional: el artículo concreto. Propone la línea y la planta."
+                hint="Opcional. Autopropone la línea y planta."
               />
             )}
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <Controller
             name="productLineId"
             control={control}
             render={({ field }) => (
               <SelectField
+                size="sm"
                 label="Línea de producto"
                 required
                 name={field.name}
                 value={field.value}
                 onChange={field.onChange}
                 onBlur={field.onBlur}
-                placeholder="Elige una"
+                placeholder="Seleccionar línea…"
                 options={productLines
                   .filter((line) => line.isActive || String(line.id) === field.value)
                   .map((line) => ({ value: String(line.id), label: line.name }))}
                 state={stateOf("productLineId")}
                 error={errors.productLineId?.message}
-                hint="Obligatoria: es el eje del seguimiento por línea."
               />
             )}
           />
@@ -278,42 +325,64 @@ export function HcaModal({
             control={control}
             render={({ field }) => (
               <SelectField
-                label="Planta"
+                size="sm"
+                label="Planta de fabricación"
                 name={field.name}
                 value={field.value}
                 onChange={field.onChange}
                 onBlur={field.onBlur}
-                placeholder="Sin planta"
+                placeholder="Sin planta específica"
                 options={[
-                  { value: "", label: "Sin planta" },
+                  { value: "", label: "Sin planta específica" },
                   ...plants
                     .filter((plant) => plant.isActive || String(plant.id) === field.value)
-                    .map((plant) => ({ value: String(plant.id), label: `${plant.name} · ${plant.country}` })),
+                    .map((plant) => ({
+                      value: String(plant.id),
+                      label: `${plant.name} · ${plant.country}`,
+                    })),
                 ]}
                 error={errors.plantId?.message}
               />
             )}
           />
         </div>
-        </FormSection>
 
-        <FormSection title="Plazos y responsable">
-        <div className="grid grid-cols-2 gap-3">
-          <TextField
-            label="Detectada el"
-            type="date"
-            required
-            state={stateOf("detectedAt")}
-            error={errors.detectedAt?.message}
-            {...register("detectedAt")}
+        {/* 2. Plazos y asignación */}
+        <FormDivider title="Plazos y responsable" />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <Controller
+            name="detectedAt"
+            control={control}
+            render={({ field }) => (
+              <DateField
+                label="Fecha de detección"
+                required
+                value={field.value}
+                onChange={field.onChange}
+                placeholder="Seleccionar fecha…"
+                headerLabel="Fecha de detección"
+                state={stateOf("detectedAt")}
+                error={errors.detectedAt?.message}
+              />
+            )}
           />
-          <TextField
-            label="Cierre comprometido"
-            type="date"
-            required
-            state={stateOf("dueDate")}
-            error={errors.dueDate?.message}
-            {...register("dueDate")}
+
+          <Controller
+            name="dueDate"
+            control={control}
+            render={({ field }) => (
+              <DateField
+                label="Cierre comprometido"
+                required
+                value={field.value}
+                onChange={field.onChange}
+                placeholder="Seleccionar fecha de cierre…"
+                headerLabel="Cierre comprometido"
+                state={stateOf("dueDate")}
+                error={errors.dueDate?.message}
+              />
+            )}
           />
         </div>
 
@@ -322,14 +391,15 @@ export function HcaModal({
           control={control}
           render={({ field }) => (
             <LookupField
-              label="Responsable"
+              size="sm"
+              label="Responsable de la hoja"
               required
               name={field.name}
               value={field.value}
               onChange={(value) => field.onChange(value)}
               onBlur={field.onBlur}
-              placeholder="Elige a quien responde por la hoja"
-              searchPlaceholder="Buscar responsable…"
+              placeholder="Elige a quien responde por la HCA…"
+              searchPlaceholder="Buscar por nombre o cargo…"
               search={searchActiveStaff}
               resolveSelectedLabel={resolveStaffLabel}
               state={stateOf("responsibleStaffId")}
@@ -337,72 +407,84 @@ export function HcaModal({
             />
           )}
         />
-        </FormSection>
 
-        <FormSection title="El hallazgo">
+        {/* 3. El hallazgo */}
+        <FormDivider title="Descripción del hallazgo" />
+
         <TextAreaField
-          label="Qué ocurrió"
+          label="¿Qué ocurrió? (Descripción de la no conformidad)"
           required
-          rows={4}
-          placeholder="La no conformidad, con el lote, la cantidad y el efecto en el cliente"
+          rows={3}
+          placeholder="Describe la no conformidad con detalle: lote, cantidad afectada y efecto en el cliente…"
           error={errors.description?.message}
           {...register("description")}
         />
 
         <TextAreaField
-          label="Acción inmediata"
+          label="Acción inmediata / contención"
           rows={2}
-          placeholder="Contención aplicada de inmediato, si la hubo"
+          placeholder="Medida de contención inmediata aplicada al detectar el problema (opcional)…"
           error={errors.immediateAction?.message}
           {...register("immediateAction")}
         />
-        </FormSection>
 
-        {/* Varias causas, una por renglón, como los cuatro renglones del papel
-            (docs/plan/05, pregunta 4). Al menos una para pasar a ejecución. */}
-        <FormSection title="Causas" hint="Por qué ocurrió, no qué ocurrió. Al menos una para pasar a ejecución.">
-          <div className="flex flex-col gap-2">
-            {fields.map((field, index) => (
-              <div key={field.id} className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <TextAreaField
-                    label={`Causa ${index + 1}`}
-                    rows={2}
-                    placeholder="Una causa por renglón"
-                    error={errors.causes?.[index]?.text?.message}
-                    {...register(`causes.${index}.text`)}
+        {/* 4. Causas identificadas */}
+        <FormDivider title="Causas raíz identificadas" />
+
+        <div className="flex flex-col gap-2">
+          {fields.map((field, index) => (
+            <div key={field.id} className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <TextAreaField
+                  label={`Causa raíz ${index + 1}`}
+                  rows={2}
+                  placeholder={`Describe la causa raíz ${index + 1} del hallazgo…`}
+                  error={errors.causes?.[index]?.text?.message}
+                  {...register(`causes.${index}.text`)}
+                />
+              </div>
+              {fields.length > 1 && (
+                <div className="pt-6">
+                  <RowAction
+                    label={`Quitar la causa ${index + 1}`}
+                    icon={Trash2}
+                    danger
+                    onClick={() => remove(index)}
                   />
                 </div>
-                {fields.length > 1 && (
-                  <div className="pt-6">
-                    <RowAction label={`Quitar la causa ${index + 1}`} icon={Trash2} danger onClick={() => remove(index)} />
-                  </div>
-                )}
-              </div>
-            ))}
-            {typeof errors.causes?.message === "string" && (
-              <p className="text-[12px] text-brand-red">{errors.causes.message}</p>
-            )}
-            {fields.length < 20 && (
-              <div>
-                <Button type="button" size="sm" variant="secondary" onClick={() => append({ text: "" })}>
-                  <Plus className="h-[14px] w-[14px]" />
-                  Otra causa
-                </Button>
-              </div>
-            )}
-          </div>
-        </FormSection>
+              )}
+            </div>
+          ))}
 
-        <FormSection title="Comentarios">
-          <TextAreaField
-            label="Comentarios"
-            rows={2}
-            placeholder="Opcional"
-            error={errors.comments?.message}
-            {...register("comments")}
-          />
-        </FormSection>
+          {typeof errors.causes?.message === "string" && (
+            <p className="text-[11.5px] font-medium text-brand-red">{errors.causes.message}</p>
+          )}
+
+          {fields.length < 20 && (
+            <div>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => append({ text: "" })}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Agregar otra causa
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* 5. Comentarios */}
+        <FormDivider title="Comentarios y notas" />
+
+        <TextAreaField
+          label="Comentarios u observaciones"
+          rows={2}
+          placeholder="Notas adicionales o contexto de seguimiento (opcional)…"
+          error={errors.comments?.message}
+          {...register("comments")}
+        />
       </form>
     </Modal>
   );

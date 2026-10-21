@@ -24,6 +24,7 @@ import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { TableSkeleton } from "../../components/ui/Skeleton";
+import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -54,20 +55,16 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
  */
 function listDebt(counts: SheetCounts): string {
   if (counts.overdue === 0) {
-    return counts.open === 1
-      ? "Queda 1 HCA abierta y ninguna vencida."
-      : `Quedan ${counts.open} HCA abiertas y ninguna vencida.`;
+    return `${counts.open} ${counts.open === 1 ? "abierta" : "abiertas"}`;
   }
-
-  const head =
-    counts.overdue === 1 ? "1 HCA pasó su fecha comprometida" : `${counts.overdue} HCA pasaron su fecha comprometida`;
-  return `${head}, sobre ${counts.open} ${counts.open === 1 ? "abierta" : "abiertas"}. Ninguna se cierra hasta resolver su plan y verificar la eficacia.`;
+  return `${counts.overdue} ${counts.overdue === 1 ? "vencida" : "vencidas"} sobre ${counts.open} abiertas`;
 }
 
 /** RF-Q1: listado paginado de HCA con pastillas por estado y filtros por linea
  *  de producto, responsable, cliente y rango de fechas. */
 export function HcaPage() {
   const navigate = useNavigate();
+  const receipts = useReceipts();
   const { can } = usePermissions();
   const canWrite = can("quality.write");
 
@@ -279,84 +276,88 @@ export function HcaPage() {
 
       <ListPanel
         toolbar={
-          <div className="flex w-full flex-wrap items-center gap-2">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Número, cliente o descripción…"
-              className="w-[230px]"
-            />
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Número, cliente o descripción…"
+                className="w-[210px]"
+              />
 
-            <FilterDropdown
-              title="Seleccionar línea"
-              aria-label="Filtrar por línea de producto"
-              value={productLineId}
-              onChange={setProductLineId}
-              defaultIcon={<Layers className="h-3.5 w-3.5 text-zinc-500" />}
-              searchable
-              searchPlaceholder="Buscar línea…"
-              options={[
-                { value: "todas", label: "Todas las líneas" },
-                ...productLines.map((line) => ({ value: String(line.id), label: line.name })),
-              ]}
-            />
+              <FilterDropdown
+                title="Seleccionar línea"
+                aria-label="Filtrar por línea de producto"
+                value={productLineId}
+                onChange={setProductLineId}
+                defaultIcon={<Layers className="h-3.5 w-3.5 text-zinc-500" />}
+                searchable
+                searchPlaceholder="Buscar línea…"
+                options={[
+                  { value: "todas", label: "Todas las líneas" },
+                  ...productLines.map((line) => ({ value: String(line.id), label: line.name })),
+                ]}
+              />
 
-            <FilterDropdown
-              title="Seleccionar planta"
-              aria-label="Filtrar por planta"
-              value={plantId}
-              onChange={setPlantId}
-              defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
-              searchable
-              searchPlaceholder="Buscar planta…"
-              options={[
-                { value: "todas", label: "Todas las plantas" },
-                ...plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
-              ]}
-            />
+              <FilterDropdown
+                title="Seleccionar planta"
+                aria-label="Filtrar por planta"
+                value={plantId}
+                onChange={setPlantId}
+                defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
+                searchable
+                searchPlaceholder="Buscar planta…"
+                options={[
+                  { value: "todas", label: "Todas las plantas" },
+                  ...plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
+                ]}
+              />
 
-            <LookupFilterDropdown
-              title="Seleccionar producto"
-              aria-label="Filtrar por producto"
-              placeholder="Todos los productos"
-              searchPlaceholder="Código o descripción…"
-              defaultIcon={<Package className="h-3.5 w-3.5 text-zinc-500" />}
-              value={productId}
-              onChange={(value) => setProductId(value)}
-              search={searchProducts}
-              resolveSelectedLabel={resolveProductLabel}
-            />
+              <LookupFilterDropdown
+                title="Seleccionar producto"
+                aria-label="Filtrar por producto"
+                placeholder="Todos los productos"
+                searchPlaceholder="Código o descripción…"
+                defaultIcon={<Package className="h-3.5 w-3.5 text-zinc-500" />}
+                value={productId}
+                onChange={(value) => setProductId(value)}
+                search={searchProducts}
+                resolveSelectedLabel={resolveProductLabel}
+              />
 
-            <HcaFilterPopover
-              responsibleId={responsibleId}
-              onResponsibleChange={setResponsibleId}
-              clientId={clientId}
-              onClientChange={setClientId}
-              from={from}
-              to={to}
-              onDateChange={(since, until) => {
-                setFrom(since);
-                setTo(until);
-              }}
-              onClear={() => {
-                setResponsibleId("todos");
-                setClientId("todos");
-                setFrom("");
-                setTo("");
-              }}
-            />
-
-            {(search || filtrosPuestos > 0) && (
-              <ClearFiltersButton
-                onClick={() => {
-                  setSearch("");
-                  clearNarrowFilters();
+              <HcaFilterPopover
+                responsibleId={responsibleId}
+                onResponsibleChange={setResponsibleId}
+                clientId={clientId}
+                onClientChange={setClientId}
+                from={from}
+                to={to}
+                onDateChange={(since, until) => {
+                  setFrom(since);
+                  setTo(until);
+                }}
+                onClear={() => {
+                  setResponsibleId("todos");
+                  setClientId("todos");
+                  setFrom("");
+                  setTo("");
                 }}
               />
-            )}
+
+              {(search || filtrosPuestos > 0) && (
+                <ClearFiltersButton
+                  onClick={() => {
+                    setSearch("");
+                    clearNarrowFilters();
+                  }}
+                />
+              )}
+            </div>
 
             {counts && (counts.overdue > 0 || counts.open > 0) && (
-              <p className="ml-auto text-[12.5px] text-brand-gray">{listDebt(counts)}</p>
+              <span className="hidden xl:inline-flex shrink-0 items-center text-[12px] font-medium text-brand-gray whitespace-nowrap tabular-nums">
+                {listDebt(counts)}
+              </span>
             )}
           </div>
         }
@@ -485,8 +486,13 @@ export function HcaPage() {
         <HcaModal
           productLines={productLines}
           onClose={() => setModalOpen(false)}
-          onSaved={() => {
+          onSaved={(savedSheet) => {
             setModalOpen(false);
+            receipts.done({
+              action: "crear-hca",
+              title: "HCA creada exitosamente",
+              detail: `${savedSheet.number} registrada`,
+            });
             refresh();
           }}
         />

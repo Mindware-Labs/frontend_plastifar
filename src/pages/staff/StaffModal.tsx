@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
+import { rolesApi } from "../../api/roles";
 import { staffApi } from "../../api/staff";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -11,7 +12,7 @@ import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { departmentPathOptions } from "../../lib/departments";
-import type { DepartmentResponse, StaffResponse } from "../../types/api";
+import type { DepartmentResponse, RoleResponse, StaffResponse } from "../../types/api";
 
 const schema = z.object({
   firstName: z
@@ -27,40 +28,44 @@ const schema = z.object({
     .email("Formato de correo inválido, revisa el @ y el dominio")
     .max(120, "Máximo 120 caracteres"),
   primaryDepartmentId: z.string().min(1, "Elige el departamento al que pertenece"),
-  // Espejo de StaffController (docs/plan/01, sección 13): opcional, hasta 40
-  // caracteres, único. Se guarda tal como se escribe; vacío es «sin dato».
-  legacyUsername: z.string().trim().max(40, "Máximo 40 caracteres"),
-  isAdmin: z.boolean(),
+  primaryRoleId: z.string().min(1, "Elige el rol para el colaborador"),
   isActive: z.boolean(),
 });
 
 type FormValues = z.infer<typeof schema>;
 
-// Comienzos literales de los 409 de StaffController que son de un campo: si
-// allí cambian, cambian aquí. Cualquier otro 409 —el del último administrador,
-// o el de «inténtalo de nuevo» de un interbloqueo— va arriba del formulario.
 const EMAIL_CONFLICT_PREFIX = "Ya existe un staff con ese correo";
-const LEGACY_USERNAME_CONFLICT_PREFIX = "Ese usuario del sistema anterior";
 
-/** El campo al que pertenece un 409, o null si no es de ninguno. */
-function conflictField(message: string): "email" | "legacyUsername" | null {
-  if (message.startsWith(LEGACY_USERNAME_CONFLICT_PREFIX)) return "legacyUsername";
+function conflictField(message: string): "email" | null {
   if (message.startsWith(EMAIL_CONFLICT_PREFIX)) return "email";
   return null;
 }
 
 interface StaffModalProps {
   departments: DepartmentResponse[];
-  /** Presente = edicion; ausente = alta. */
+  /** Presente = edición; ausente = alta. */
   staff?: StaffResponse;
   onClose: () => void;
   onSaved: (staff: StaffResponse) => void;
 }
 
-/** Alta y edicion de personal comparten formulario: los mismos campos, distinto destino. */
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
+
+/** Alta y edición de personal con diseño compacto siguiendo el estándar de ClientModal. */
 export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalProps) {
   const { user } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
+  const [roles, setRoles] = useState<RoleResponse[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(false);
   const { isExiting, requestClose } = useModalAnimation();
   const isEdit = staff !== undefined;
   const isSelf = isEdit && staff.id === user?.staffId;
@@ -71,53 +76,127 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
     handleSubmit,
     setError,
     setFocus,
+    setValue,
     formState: { errors, touchedFields, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    // Validación activa tras desenfoque del campo.
     mode: "onTouched",
     defaultValues: {
       firstName: staff?.firstName ?? "",
       lastName: staff?.lastName ?? "",
       email: staff?.email ?? "",
       primaryDepartmentId: staff ? String(staff.primaryDepartmentId) : "",
-      legacyUsername: staff?.legacyUsername ?? "",
-      isAdmin: staff?.isAdmin ?? false,
+      primaryRoleId: staff?.primaryRoleId ? String(staff.primaryRoleId) : "",
       isActive: staff?.isActive ?? true,
     },
   });
 
-  /** Verde solo cuando la persona ya paso por el campo y quedo bien. */
+  // Carga de catálogo de roles activos
+  useEffect(() => {
+    let mounted = true;
+    setLoadingRoles(true);
+    rolesApi
+      .list({ page: 1, pageSize: 100 })
+      .then((res) => {
+        if (mounted) setRoles(res.items);
+      })
+      .catch(() => {
+        if (mounted) setRoles([]);
+      })
+      .finally(() => {
+        if (mounted) setLoadingRoles(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // En edición, si el objeto staff no traía primaryRoleId, se consulta su acceso principal
+  useEffect(() => {
+    if (!isEdit || !staff || staff.primaryRoleId) return;
+    let mounted = true;
+    staffApi
+      .getDepartmentAccess(staff.id)
+      .then((detail) => {
+        if (!mounted) return;
+        const primary = detail.accesses.find((a) => a.isPrimary) ?? detail.accesses[0];
+        if (primary) {
+          setValue("primaryRoleId", String(primary.roleId), { shouldValidate: true });
+        }
+      })
+      .catch(() => {
+        // En caso de fallo silencioso se conserva el estado actual
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [isEdit, staff, setValue]);
+
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
     return touchedFields[field] ? "valid" : "idle";
   }
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLFormElement>) {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      void handleSubmit(onSubmit)();
+    }
+  }
+
   async function onSubmit(values: FormValues) {
     setFormError(null);
     const primaryDepartmentId = Number(values.primaryDepartmentId);
-    const legacyUsername = values.legacyUsername === "" ? null : values.legacyUsername;
+    const primaryRoleId = Number(values.primaryRoleId);
 
     try {
-      const saved = isEdit
-        ? await staffApi.update(staff.id, { ...values, primaryDepartmentId, legacyUsername })
-        : await staffApi.create({
-            firstName: values.firstName,
-            lastName: values.lastName,
-            email: values.email,
-            primaryDepartmentId,
-            isAdmin: values.isAdmin,
-            legacyUsername,
-          });
+      if (isEdit) {
+        const saved = await staffApi.update(staff.id, {
+          firstName: values.firstName,
+          lastName: values.lastName,
+          email: values.email,
+          primaryDepartmentId,
+          primaryRoleId,
+          isAdmin: staff.isAdmin,
+          isActive: values.isActive,
+          legacyUsername: staff.legacyUsername,
+        });
 
-      onSaved(saved);
+        // Asegurar que el rol asignado al departamento principal quede sincronizado
+        try {
+          await staffApi.grantDepartmentAccess(staff.id, {
+            departmentId: primaryDepartmentId,
+            roleId: primaryRoleId,
+            isPrimary: true,
+          });
+        } catch {
+          try {
+            await staffApi.updateDepartmentAccess(staff.id, primaryDepartmentId, {
+              roleId: primaryRoleId,
+              isPrimary: true,
+            });
+          } catch {
+            // Ya sincronizado en la actualización principal
+          }
+        }
+
+        onSaved(saved);
+      } else {
+        const saved = await staffApi.create({
+          firstName: values.firstName,
+          lastName: values.lastName,
+          email: values.email,
+          primaryDepartmentId,
+          primaryRoleId,
+          isAdmin: false,
+        });
+        onSaved(saved);
+      }
+
       requestClose();
     } catch (err) {
-      // El 409 de correo o de usuario heredado repetido va al campo que
-      // corresponde. El servidor solo manda `message`, así que se distingue por
-      // su texto. El del último administrador (StaffController.LastAdminMessage)
-      // no es de ningún campo: nace de desmarcar «Administrador» o «Activo», y
-      // va arriba del formulario, como cualquier 409 que no se reconozca.
       const field =
         err instanceof ApiError && err.status === 409 ? conflictField(err.message) : null;
       if (field !== null && err instanceof ApiError) {
@@ -126,39 +205,62 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
         return;
       }
 
-      const fallback = isEdit ? "No se pudo guardar el usuario" : "No se pudo crear el usuario";
+      const fallback = isEdit ? "No se pudo guardar el colaborador" : "No se pudo registrar el colaborador";
       setFormError(err instanceof ApiError ? err.message : fallback);
     }
   }
 
   return (
     <Modal
-      eyebrow="Personal"
-      title={isEdit ? "Editar colaborador" : "Agregar personal"}
+      maxWidth="max-w-xl"
+      eyebrow={isEdit ? `Colaborador #${staff.id}` : "Registro de personal"}
+      title={isEdit ? `Editar ${staff.firstName} ${staff.lastName}` : "Nuevo colaborador"}
       description={
         isEdit
-          ? "Los cambios se aplican de inmediato. La contraseña no se toca."
+          ? "Actualiza los datos personales, adscripción departamental o rol asignado."
           : "El alta es interna: no existe registro público en el sistema."
       }
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={requestClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="staff-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear usuario"}
-          </Button>
-        </>
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="staff-form" size="sm" isLoading={isSubmitting}>
+              {isEdit ? "Guardar cambios" : "Crear colaborador"}
+            </Button>
+          </div>
+        </div>
       }
     >
-      <form id="staff-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+      <form
+        id="staff-form"
+        onSubmit={handleSubmit(onSubmit)}
+        onKeyDown={handleKeyDown}
+        noValidate
+        className="flex flex-col gap-3 text-left"
+      >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <div className="grid grid-cols-2 gap-3">
+        {/* 1. IDENTIFICACIÓN */}
+        <FormDivider title="Identificación" />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <TextField
+            size="sm"
             label="Nombre"
             placeholder="Juan"
             autoComplete="given-name"
@@ -168,6 +270,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
             {...register("firstName")}
           />
           <TextField
+            size="sm"
             label="Apellido"
             placeholder="Pérez"
             autoComplete="family-name"
@@ -178,7 +281,11 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           />
         </div>
 
+        {/* 2. CUENTA Y CONTACTO */}
+        <FormDivider title="Cuenta y acceso" />
+
         <TextField
+          size="sm"
           label="Correo corporativo"
           type="email"
           inputMode="email"
@@ -189,71 +296,81 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           error={errors.email?.message}
           hint={
             isEdit
-              ? "Cambiarlo cambia también la dirección con la que inicia sesión."
-              : "A esta dirección llega el código de activación."
+              ? "Dirección con la que inicia sesión."
+              : "A esta dirección llegará el enlace de activación."
           }
           {...register("email")}
         />
 
-        <TextField
-          label="Usuario en el sistema anterior"
-          placeholder="jperez"
-          autoComplete="off"
-          state={stateOf("legacyUsername")}
-          error={errors.legacyUsername?.message}
-          hint="Opcional. Sirve para emparejar la carga de agentes; no se usa para iniciar sesión."
-          {...register("legacyUsername")}
-        />
+        {/* 3. ORGANIZACIÓN Y ROL */}
+        <FormDivider title="Organización" />
 
-        <Controller
-          name="primaryDepartmentId"
-          control={control}
-          render={({ field }) => (
-            <SelectField
-              label="Departamento"
-              required
-              name={field.name}
-              value={field.value}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
-              placeholder="Selecciona un departamento"
-              options={departmentPathOptions(departments)}
-              state={stateOf("primaryDepartmentId")}
-              error={errors.primaryDepartmentId?.message}
-            />
-          )}
-        />
-
-        <div className="flex flex-col gap-2">
-          <CheckboxField
-            label="Es administrador"
-            description="Puede dar de alta personal, editar roles y ver todos los departamentos."
-            disabled={isSelf}
-            {...register("isAdmin")}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <Controller
+            name="primaryDepartmentId"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                size="sm"
+                searchable
+                label="Departamento principal"
+                required
+                name={field.name}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                placeholder="Elige un departamento…"
+                options={departmentPathOptions(departments)}
+                state={stateOf("primaryDepartmentId")}
+                error={errors.primaryDepartmentId?.message}
+              />
+            )}
           />
 
-          {isEdit && (
+          <Controller
+            name="primaryRoleId"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                size="sm"
+                searchable
+                label="Rol asignado"
+                required
+                name={field.name}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                placeholder={loadingRoles ? "Cargando roles…" : "Elige un rol…"}
+                options={roles
+                  .filter((r) => r.isActive || String(r.id) === field.value)
+                  .map((r) => ({
+                    value: String(r.id),
+                    label: r.isActive ? r.name : `${r.name} (inactivo)`,
+                  }))}
+                state={stateOf("primaryRoleId")}
+                error={errors.primaryRoleId?.message}
+              />
+            )}
+          />
+        </div>
+
+        {/* 4. ESTADO (SOLO EN EDICIÓN) */}
+        {isEdit && (
+          <>
+            <FormDivider title="Estado" />
             <CheckboxField
-              label="Activo"
+              label="Colaborador activo"
               description="Si se desmarca, la persona deja de poder iniciar sesión."
               disabled={isSelf}
               {...register("isActive")}
             />
-          )}
-        </div>
+          </>
+        )}
 
-        {isSelf ? (
+        {isSelf && (
           <Alert variant="info">
-            Estás editando tu propio usuario: no puedes quitarte los permisos de administrador ni
-            desactivarte.
+            Estás editando tu propio usuario: no puedes desactivarte a ti mismo.
           </Alert>
-        ) : (
-          !isEdit && (
-            <p className="rounded-edge border border-dashed border-line-strong bg-canvas px-3.5 py-3 text-[11.5px] leading-relaxed text-subtle">
-              Se genera una contraseña aleatoria y se envía un código de activación de 6 dígitos al
-              correo indicado. La persona define su propia contraseña desde “Olvidé mi contraseña”.
-            </p>
-          )
         )}
       </form>
     </Modal>

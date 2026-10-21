@@ -47,6 +47,7 @@ export interface StaffResponse {
   isActive: boolean;
   /** Usuario en el sistema anterior (RF-O9). Nulo cuando no lo tiene. */
   legacyUsername: string | null;
+  primaryRoleId?: number | null;
 }
 
 /** Respuesta paginada del listado de personal (GET /api/staff). */
@@ -65,6 +66,7 @@ export interface CreateStaffRequest {
   email: string;
   primaryDepartmentId: number;
   isAdmin: boolean;
+  primaryRoleId?: number | null;
   /** Opcional; hasta 40 caracteres; único. Vacío = sin dato (docs/plan/01, sección 13). */
   legacyUsername?: string | null;
 }
@@ -76,6 +78,7 @@ export interface UpdateStaffRequest {
   primaryDepartmentId: number;
   isAdmin: boolean;
   isActive: boolean;
+  primaryRoleId?: number | null;
   legacyUsername?: string | null;
 }
 

@@ -14,6 +14,8 @@ export interface DatePickerProps {
   headerLabel?: string;
   className?: string;
   align?: "start" | "center" | "end";
+  error?: string;
+  state?: "idle" | "valid" | "error";
 }
 
 const MONTH_NAMES = [
@@ -109,6 +111,8 @@ export function DatePicker({
   headerLabel = "Fecha límite",
   className = "",
   align = "center",
+  error,
+  state = "idle",
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{
@@ -309,11 +313,13 @@ export function DatePicker({
         onClick={toggle}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className={`w-full flex items-center justify-between gap-2 rounded-md border bg-white px-3 py-1.5 text-left text-[12.5px] shadow-2xs outline-none transition-all cursor-pointer ${
-          open
+        className={`w-full flex items-center justify-between gap-2 rounded-md border bg-white px-2.5 h-8 text-left text-[12.5px] shadow-2xs outline-none transition-all cursor-pointer ${
+          error || state === "error"
+            ? "border-brand-red bg-red-50/15 ring-1 ring-brand-red/20"
+            : open
             ? "border-brand-red ring-2 ring-brand-red/10"
             : "border-zinc-200 hover:border-zinc-300 focus-visible:border-brand-red focus-visible:ring-2 focus-visible:ring-brand-red/20"
-        } ${disabled ? "cursor-not-allowed bg-zinc-50 text-zinc-400" : "text-zinc-800"}`}
+        } ${disabled ? "cursor-not-allowed bg-zinc-50 text-zinc-400" : "text-zinc-800"} ${className}`}
       >
         <span className="flex items-center gap-2 truncate">
           <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />

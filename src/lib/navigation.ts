@@ -63,6 +63,8 @@ export interface NavItem {
   permission?: PermissionKey;
   /** Solo lo ve un administrador. */
   adminOnly?: boolean;
+  /** Sub-sección explícita dentro de la familia (ej. "Incidencias y Casos", "Parámetros"). */
+  subgroup?: string;
 }
 
 export interface NavGroup {
@@ -94,6 +96,24 @@ export interface NavGroup {
  */
 export const SIDEBAR_NAV: NavGroup[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", section: "Principal" },
+  /*
+   * Tickets agrupa el flujo completo de atención al cliente e incidencias
+   * derivadas (reclamaciones, discrepancias y retiros), además de los catálogos
+   * operativos (motivos y veredictos).
+   */
+  {
+    label: "Tickets",
+    icon: TicketIcon,
+    section: "Principal",
+    children: [
+      { label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon, permission: "tickets.read" },
+      { label: "Reclamaciones", to: "/reclamaciones", icon: FileWarning, permission: "claims.read", subgroup: "Incidencias y Casos" },
+      { label: "Discrepancias", to: "/discrepancias", icon: PackageSearch, permission: "discrepancies.read", subgroup: "Incidencias y Casos" },
+      { label: "Retiros", to: "/retiros", icon: PackageMinus, permission: "withdrawals.read", subgroup: "Incidencias y Casos" },
+      { label: "Motivos", to: "/tickets/motivos", icon: Tag, permission: "tickets.read", subgroup: "Parámetros" },
+      { label: "Veredictos", to: "/tickets/veredictos", icon: Gavel, permission: "tickets.read", subgroup: "Parámetros" },
+    ],
+  },
   {
     label: "Correo",
     icon: Inbox,
@@ -106,27 +126,6 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Archivados", to: "/bandeja/archivados", folder: "archived", icon: Archive },
       { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
       { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
-    ],
-  },
-  /*
-   * Tickets vuelve a ser grupo, y ahora si agrupa. Dejo de serlo cuando tenia
-   * un unico hijo llamado «Bandeja» —un grupo de uno no agrupa nada y creaba
-   * dos «Bandeja» en el mismo menu—. Con Motivos y Veredictos, que llegaron
-   * con la rama de Tickets, el despliegue vuelve a ganarse su sitio.
-   *
-   * OJO con «Motivos»: el mismo catalogo se administra tambien desde
-   * Configuracion, contra la misma entidad y con otro cliente de API. Son dos
-   * pantallas para una cosa; unificarlas es decision de producto.
-   */
-  {
-    label: "Tickets",
-    icon: TicketIcon,
-    section: "Principal",
-    permission: "tickets.read",
-    children: [
-      { label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon },
-      { label: "Motivos", to: "/tickets/motivos", icon: Tag },
-      { label: "Veredictos", to: "/tickets/veredictos", icon: Gavel },
     ],
   },
   /*
@@ -168,62 +167,15 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Líneas de producto", to: "/calidad/lineas" },
     ],
   },
-  /* Reclamación de clientes, PF-FOR-034 (docs/plan/03). Modulo propio y no un
-     hijo de Calidad: la llena Ventas al abrir el ticket y la trata Calidad, y
-     su clave de lectura (claims.read) no es la de Calidad (quality.read). Como
-     hijo de Calidad, quien solo registra reclamaciones no veria el grupo. */
-  {
-    label: "Reclamaciones",
-    icon: FileWarning,
-    section: "Gestión",
-    to: "/reclamaciones",
-    permission: "claims.read",
-  },
-  /* Investigacion de discrepancia de carga, PF-FOR-291 (docs/plan/06). Modulo
-     propio: la investiga Monitoreo y la consultan Almacen y control de
-     inventario, con su propia clave de lectura (discrepancies.read). */
-  {
-    label: "Discrepancias",
-    icon: PackageSearch,
-    section: "Gestión",
-    to: "/discrepancias",
-    permission: "discrepancies.read",
-  },
-  /* Solicitud de retiro de mercancia, PF-FOR-068 (docs/plan/04). Modulo
-     propio: la solicita Ventas Locales y la registra Almacen, con su propia
-     clave de lectura (withdrawals.read). */
-  {
-    label: "Retiros",
-    icon: PackageMinus,
-    section: "Gestión",
-    to: "/retiros",
-    permission: "withdrawals.read",
-  },
   {
     label: "Personal",
     icon: Users,
     section: "Gestión",
     children: [
       { label: "Colaboradores", to: "/staff", icon: Users, permission: "staff.read", adminOnly: true },
+      { label: "Departamentos", to: "/departamentos", icon: Building2, permission: "settings.write" },
       { label: "Roles", to: "/roles", icon: ShieldCheck, permission: "roles.read", adminOnly: true },
       { label: "Permisos", to: "/permisos", icon: KeyRound, permission: "roles.read" },
-      /*
-       * EL ORGANIGRAMA VIVE CON LOS PERMISOS, NO CON LOS CATALOGOS.
-       *
-       * Configuracion agrupa lo que define COMO SE COMPORTA el sistema: a que
-       * cola entra un ticket, cuando vence, con que texto se responde. Un
-       * departamento no es eso. Un departamento define QUIEN PUEDE SOBRE QUE:
-       * un rol concedido en uno se ejerce tambien sobre todo lo que cuelga de
-       * el, asi que mover una unidad de sitio es una operacion de permisos.
-       *
-       * Su sitio esta junto a Colaboradores, Roles y Permisos, que son las
-       * otras tres piezas de la misma respuesta.
-       *
-       * Lleva settings.write y no roles.read porque a esta pantalla no se entra
-       * a consultar —el catalogo ya se ve en cada desplegable del panel— sino a
-       * cambiarlo.
-       */
-      { label: "Departamentos", to: "/departamentos", icon: Building2, permission: "settings.write" },
     ],
   },
   {

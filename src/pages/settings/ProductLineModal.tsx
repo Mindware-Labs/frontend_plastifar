@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { Info } from "lucide-react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
@@ -8,20 +9,25 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { ProductLine } from "../../types/settings";
 
 /**
- * Espejo de la validacion del servidor en POST/PUT /api/settings/product-lines:
- * codigo unico en mayusculas y nombre unico, ambos obligatorios.
+ * Espejo de la validación del servidor en POST/PUT /api/settings/product-lines:
+ * código único en mayúsculas y nombre único, ambos obligatorios.
  */
 const schema = z.object({
   code: z
     .string()
     .trim()
-    .min(2, "Al menos 2 caracteres")
-    .max(10, "Máximo 10 caracteres")
-    .regex(/^[A-Za-z0-9]+$/, "Solo letras y números, sin espacios"),
-  name: z.string().trim().min(2, "Al menos 2 caracteres").max(80, "Máximo 80 caracteres"),
+    .min(2, "El código debe tener al menos 2 caracteres")
+    .max(10, "El código no puede tener más de 10 caracteres")
+    .regex(/^[A-Za-z0-9_-]+$/, "Solo letras, números y guiones, sin espacios"),
+  name: z
+    .string()
+    .trim()
+    .min(2, "El nombre debe tener al menos 2 caracteres")
+    .max(80, "El nombre no puede tener más de 80 caracteres"),
   isActive: z.boolean(),
 });
 
@@ -33,9 +39,21 @@ interface ProductLineModalProps {
   onSaved: (line: ProductLine) => void;
 }
 
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-1 border-t border-zinc-100 first:border-0 first:pt-0">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
+
 export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalProps) {
   const isEdit = line !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
+  const { isExiting, requestClose } = useModalAnimation();
 
   const {
     register,
@@ -58,22 +76,29 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
     return touchedFields[field] ? "valid" : "idle";
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit(onSubmit)();
+    }
+  }
+
   async function onSubmit(values: FormValues) {
     setFormError(null);
-    const request = { code: values.code.trim().toUpperCase(), name: values.name.trim(), isActive: values.isActive };
+    const request = {
+      code: values.code.trim().toUpperCase(),
+      name: values.name.trim(),
+      isActive: values.isActive,
+    };
 
     try {
       const saved = isEdit
         ? await settingsApi.productLines.update(line.id, request)
         : await settingsApi.productLines.create(request);
       onSaved(saved);
-      onClose();
+      requestClose();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        // El API no dice que campo choca. Se busca el valor enviado dentro del
-        // mensaje —lo unico que no cambia si alguien reescribe la frase— y, si
-        // no aparece ninguno, el conflicto se muestra arriba: preferible a
-        // marcar un campo al azar.
         const message = err.message.toLowerCase();
         if (message.includes(request.code.toLowerCase())) {
           setError("code", { message: err.message });
@@ -92,36 +117,71 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
 
   return (
     <Modal
-      title={isEdit ? "Editar línea de producto" : "Nueva línea de producto"}
-      description="Es el eje por el que Calidad sigue las reclamaciones, y se exige en los motivos marcados para ello."
+      maxWidth="max-w-md"
+      eyebrow={isEdit ? `Línea #${line.id} · ${line.code}` : "Línea de producto"}
+      title={isEdit ? `Editar ${line.name}` : "Nueva línea de producto"}
+      description={
+        isEdit
+          ? "Actualiza el código o la denominación de esta línea de producto."
+          : "Define el código y nombre para clasificar artículos, HCA y reclamaciones."
+      }
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="line-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear línea"}
-          </Button>
-        </>
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="line-form" size="sm" isLoading={isSubmitting}>
+              {isEdit ? "Guardar cambios" : "Crear línea"}
+            </Button>
+          </div>
+        </div>
       }
     >
-      <form id="line-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+      <form
+        id="line-form"
+        onSubmit={handleSubmit(onSubmit)}
+        onKeyDown={handleKeyDown}
+        noValidate
+        className="flex flex-col gap-3 text-left"
+      >
         {formError && <Alert variant="error">{formError}</Alert>}
 
+        <FormDivider title="Información de la línea" />
+
         <TextField
+          size="sm"
           label="Código"
-          placeholder="Ej. BIO"
+          placeholder="Ej. BIO, RIG, IND"
           required
           state={stateOf("code")}
           error={errors.code?.message}
-          hint="Corto y estable: se guarda en mayúsculas y aparece en los reportes."
-          {...register("code")}
+          hint="En mayúsculas (2 a 10 caracteres)."
+          className="uppercase font-mono tracking-wider"
+          {...register("code", {
+            onChange: (e) => {
+              e.target.value = e.target.value.toUpperCase();
+            },
+          })}
         />
 
         <TextField
-          label="Nombre"
-          placeholder="Ej. Bio"
+          size="sm"
+          label="Nombre de la línea"
+          placeholder="Ej. Biodegradable, Rígido, Industrial"
           required
           state={stateOf("name")}
           error={errors.name?.message}
@@ -130,19 +190,23 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
 
         {isEdit && (
           <>
-            <CheckboxField
-              label="Activa"
-              description="Si se desmarca, deja de ofrecerse en tickets y hojas de corrección."
-              {...register("isActive")}
-            />
+            <FormDivider title="Estado" />
 
-            {/* El API ya no dice cuantos motivos la exigen --nunca lo supo: el
-                contador era un cero fijo-- asi que la nota se limita a lo que
-                si es cierto de cualquier linea. */}
-            <p className="rounded-edge border border-line px-3.5 py-3 text-[11.5px] leading-relaxed text-subtle">
-              Desactivarla no rompe el historial, pero deja de poder elegirse en tickets nuevos. Si
-              algún motivo la exige y es la última activa, el sistema no dejará desactivarla.
-            </p>
+            <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-2.5">
+              <CheckboxField
+                label="Línea activa"
+                description="Si se desmarca, deja de ofrecerse en productos, tickets y hojas de corrección."
+                {...register("isActive")}
+              />
+            </div>
+
+            <div className="flex items-start gap-2.5 rounded-lg border border-amber-200/70 bg-amber-50/60 p-2.5 text-[11.5px] leading-relaxed text-amber-900">
+              <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+              <div>
+                Desactivarla conserva su historial y métricas en reportes, pero no se podrá seleccionar
+                para nuevos productos o tickets.
+              </div>
+            </div>
           </>
         )}
       </form>
