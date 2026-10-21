@@ -155,6 +155,8 @@ export interface DepartmentResponse {
   mailboxAddress?: string | null;
   managerStaffId?: number | null;
   managerName?: string | null;
+  sedeId?: number | null;
+  sedeName?: string | null;
 }
 
 /** Espejo del enum `DepartmentType` del servidor, que viaja como texto. */
@@ -181,6 +183,7 @@ export interface SaveDepartmentRequest {
   defaultRoleId: number | null;
   mailboxId: number | null;
   managerStaffId: number | null;
+  sedeId?: number | null;
 }
 
 export interface ApiMessage {

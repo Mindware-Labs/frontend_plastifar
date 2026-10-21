@@ -13,6 +13,7 @@
 import {
   Archive,
   BarChart3,
+  Building,
   Building2,
   ClipboardCheck,
   FileWarning,
@@ -173,6 +174,7 @@ export const SIDEBAR_NAV: NavGroup[] = [
     section: "Gestión",
     children: [
       { label: "Colaboradores", to: "/staff", icon: Users, permission: "staff.read", adminOnly: true },
+      { label: "Sedes", to: "/sedes", icon: Building, permission: "settings.write" },
       { label: "Departamentos", to: "/departamentos", icon: Building2, permission: "settings.write" },
       { label: "Roles", to: "/roles", icon: ShieldCheck, permission: "roles.read", adminOnly: true },
       { label: "Permisos", to: "/permisos", icon: KeyRound, permission: "roles.read" },

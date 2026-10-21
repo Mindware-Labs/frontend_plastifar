@@ -25,6 +25,7 @@ import { HcaPage } from "./pages/quality/HcaPage";
 import { HcaPrintPage } from "./pages/quality/HcaPrintPage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { DepartmentsPage } from "./pages/departments/DepartmentsPage";
+import { SedesPage } from "./pages/sedes/SedesPage";
 import { MotivosPage } from "./pages/tickets/MotivosPage";
 import { RolesPage } from "./pages/roles/RolesPage";
 import { VeredictosPage } from "./pages/tickets/VeredictosPage";
@@ -118,6 +119,7 @@ export default function App() {
             como la de los demas catalogos (seccion 8.4); escribir exige
             settings.write y lo comprueba el servidor en cada endpoint. */}
         <Route path="/departamentos" element={<DepartmentsPage />} />
+        <Route path="/sedes" element={<SedesPage />} />
 
         <Route element={<PermissionRoute permission="clients.read"><Outlet /></PermissionRoute>}>
           <Route path="/clientes" element={<ClientsPage />} />

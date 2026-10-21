@@ -483,6 +483,8 @@ export function StaffPage() {
                 onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
                 options={buildDepartmentFilterOptions(departments)}
                 defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
+                searchable
+                searchPlaceholder="Buscar departamento…"
               />
 
               {(search || departmentId !== "todos") && (

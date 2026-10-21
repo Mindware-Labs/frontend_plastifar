@@ -1,6 +1,18 @@
-import { Lock, Pencil, Plus, Power, Trash2, Users } from "lucide-react";
+import {
+  Building,
+  Lock,
+  Mail,
+  Pencil,
+  Plus,
+  Power,
+  Shield,
+  Trash2,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { departmentsApi } from "../../api/departments";
+import { sedesApi } from "../../api/sedes";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -15,7 +27,6 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePermissions } from "../../hooks/usePermissions";
-import { buildDepartmentTree } from "../../lib/departments";
 import type { DepartmentResponse, DepartmentType } from "../../types/api";
 import { LoadErrorAlert } from "../settings/catalogSection";
 import { useReferenceData } from "../settings/catalogState";
@@ -24,43 +35,6 @@ import { DepartmentModal } from "./DepartmentModal";
 type ChipKey = "todos" | "activos" | "inactivos";
 type TypeKey = "todos" | DepartmentType;
 
-/** Sangria por nivel. Suficiente para leerse como indice, no tanto como para
- *  que el cuarto nivel empiece a media columna. */
-const SANGRIA = 22;
-
-/**
- * El organigrama de la empresa, y lo que cada unidad alcanza.
- *
- * ==================================================================
- * POR QUE ESTA PANTALLA NO ES UN CATALOGO MAS
- * ==================================================================
- * Los demas catalogos de Configuracion cambian COMO SE COMPORTA el sistema: a
- * que cola entra un ticket, cuando vence, con que texto se responde. Este
- * cambia QUIEN PUEDE SOBRE QUE, y por eso vive con Personal y no con ellos.
- *
- * Un rol concedido en un departamento se ejerce tambien sobre todo lo que
- * cuelga de el. Eso convierte «mover un departamento» en una operacion de
- * permisos disfrazada de reordenar un menu: arrastrar «Florida» bajo «Ventas
- * internacionales» le da a los supervisores de Ventas acceso a todo lo de
- * Florida, y nada en el resto del panel lo dice.
- *
- * Por eso cada renglon declara su ALCANCE —cuanta gente queda bajo un rol
- * concedido aqui— y no solo su nombre y su estado. Es la mitad del registro que
- * de verdad importa.
- *
- * ==================================================================
- * UN ARBOL NO SE PAGINA
- * ==================================================================
- * El resto de los listados del panel paginan en servidor, y este no. No es un
- * descuido ni una excepcion de comodidad: cortar un arbol en paginas deja hijos
- * cuyo padre quedo en la pagina anterior, y una sangria cuyo padre no esta a la
- * vista no es jerarquia, es una mentira con formato. Son unidades de la
- * empresa, del orden de la decena, y el servidor documenta la misma exencion.
- *
- * La busqueda, por lo mismo, filtra en memoria y CONSERVA LOS ANCESTROS de cada
- * coincidencia: si buscas «Florida» y su padre desaparece, la fila queda
- * sangrada bajo nada.
- */
 export function DepartmentsPage() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
@@ -69,13 +43,12 @@ export function DepartmentsPage() {
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
   const [typeChip, setTypeChip] = useState<TypeKey>("todos");
+  const [selectedSedeId, setSelectedSedeId] = useState<string>("todas");
   const [modal, setModal] = useState<"nuevo" | DepartmentResponse | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
-  // Inactivos incluidos: esta es la unica pantalla desde la que se reactiva
-  // algo, y un registro que no se ve no se puede volver a encender.
   const {
     data: all,
     failed,
@@ -85,93 +58,85 @@ export function DepartmentsPage() {
     null,
   );
 
+  const { data: sedesList } = useReferenceData(
+    () => sedesApi.list({ includeInactive: false, pageSize: 100 }),
+    null,
+  );
+
   const counts = useMemo(() => {
     if (all === null) return undefined;
     return {
       all: all.length,
       active: all.filter((d) => d.isActive).length,
       inactive: all.filter((d) => !d.isActive).length,
-      // Sin `type` el servidor es anterior al campo: cuenta como publico, que
-      // es el valor por omision del modelo.
       publicos: all.filter((d) => (d.type ?? "Publico") === "Publico").length,
       privados: all.filter((d) => d.type === "Privado").length,
     };
   }, [all]);
 
-  /**
-   * Cada departamento con su sitio en el arbol y su alcance ya resuelto.
-   *
-   * `reach` es la suma de colaboradores de el y de todo lo que cuelga de el:
-   * la respuesta a «si concedo un rol aqui, sobre cuanta gente queda».
-   */
-  const nodes = useMemo(() => {
+  // Pestañas dinámicas basadas en las Sedes registradas
+  const sedeTabs = useMemo(() => {
+    if (all === null) return [];
+    const sedes = sedesList?.items ?? [];
+    const sinSedeCount = all.filter((d) => !d.sedeId).length;
+
+    const tabs = [{ id: "todas", label: "Todas las sedes", count: all.length }];
+
+    for (const s of sedes) {
+      const count = all.filter((d) => d.sedeId === s.id).length;
+      tabs.push({
+        id: String(s.id),
+        label: s.name,
+        count,
+      });
+    }
+
+    if (sinSedeCount > 0) {
+      tabs.push({
+        id: "sin-sede",
+        label: "Sin sede asignada",
+        count: sinSedeCount,
+      });
+    }
+
+    return tabs;
+  }, [all, sedesList]);
+
+  const visible = useMemo(() => {
     if (all === null) return [];
 
-    const hijosDe = new Map<number, number[]>();
-    for (const d of all) {
-      if (d.parentId == null) continue;
-      const grupo = hijosDe.get(d.parentId);
-      if (grupo) grupo.push(d.id);
-      else hijosDe.set(d.parentId, [d.id]);
-    }
-    const staffDe = new Map(all.map((d) => [d.id, d.staffCount ?? 0]));
-
-    function subtree(id: number): { reach: number; inside: number } {
-      let reach = staffDe.get(id) ?? 0;
-      let inside = 0;
-      const vistos = new Set<number>([id]);
-      const pendientes = [...(hijosDe.get(id) ?? [])];
-      while (pendientes.length > 0) {
-        const actual = pendientes.pop() as number;
-        // Un ciclo en los datos no puede colgar la pantalla.
-        if (vistos.has(actual)) continue;
-        vistos.add(actual);
-        inside += 1;
-        reach += staffDe.get(actual) ?? 0;
-        pendientes.push(...(hijosDe.get(actual) ?? []));
-      }
-      return { reach, inside };
+    // 1. Filtrar por sede / pestaña
+    let list = all;
+    if (selectedSedeId === "sin-sede") {
+      list = list.filter((d) => !d.sedeId);
+    } else if (selectedSedeId !== "todas") {
+      const sedeIdNum = Number(selectedSedeId);
+      list = list.filter((d) => d.sedeId === sedeIdNum);
     }
 
-    return buildDepartmentTree(all).map((d) => ({ ...d, ...subtree(d.id) }));
-  }, [all]);
-
-  /** Lo que se pinta: el arbol acotado por pastillas y busqueda, con ancestros.
-   *  El tipo se filtra aqui y no en el servidor por lo mismo que la busqueda:
-   *  pedir solo los privados devolveria hijos sin su padre. */
-  const visible = useMemo(() => {
-    const porEstado = nodes
+    // 2. Filtrar por estado y tipo
+    list = list
       .filter((d) => (chip === "todos" ? true : chip === "activos" ? d.isActive : !d.isActive))
       .filter((d) => typeChip === "todos" || (d.type ?? "Publico") === typeChip);
-    if (debouncedSearch === "") return porEstado;
 
-    const permitidos = new Set(porEstado.map((d) => d.id));
-    const porId = new Map(nodes.map((d) => [d.id, d]));
-    const mostrar = new Set<number>();
-
-    for (const d of porEstado) {
-      // Se busca sobre el camino completo: «Ventas / Florida» encuentra por
-      // cualquiera de los dos, que es como la gente nombra su zona.
-      if (!d.path.toLowerCase().includes(debouncedSearch)) continue;
-      mostrar.add(d.id);
-
-      // Los ancestros entran aunque la pastilla los excluya: sin ellos la
-      // sangria de la coincidencia no cuelga de nada.
-      let padre = d.parentId;
-      let saltos = 0;
-      while (padre != null && !mostrar.has(padre) && saltos < 10) {
-        mostrar.add(padre);
-        padre = porId.get(padre)?.parentId ?? null;
-        saltos += 1;
-      }
+    // 3. Filtrar por búsqueda
+    if (debouncedSearch !== "") {
+      list = list.filter((d) => {
+        const nameMatch = d.name.toLowerCase().includes(debouncedSearch);
+        const sedeMatch = d.sedeName?.toLowerCase().includes(debouncedSearch) ?? false;
+        const mailMatch = d.mailboxAddress?.toLowerCase().includes(debouncedSearch) ?? false;
+        const managerMatch = d.managerName?.toLowerCase().includes(debouncedSearch) ?? false;
+        return nameMatch || sedeMatch || mailMatch || managerMatch;
+      });
     }
 
-    return nodes.filter((d) => mostrar.has(d.id) && (permitidos.has(d.id) || mostrar.has(d.id)));
-  }, [nodes, chip, typeChip, debouncedSearch]);
+    return list;
+  }, [all, chip, typeChip, selectedSedeId, debouncedSearch]);
 
-  const isFiltering = debouncedSearch !== "" || chip !== "todos" || typeChip !== "todos";
+  const isFiltering =
+    debouncedSearch !== "" || chip !== "todos" || typeChip !== "todos" || selectedSedeId !== "todas";
 
-  function askToggle(department: DepartmentResponse & { inside: number; reach: number }) {
+  function askToggle(department: DepartmentResponse) {
     setConfirmation({
       tone: "warn",
       icon: Power,
@@ -202,13 +167,11 @@ export function DepartmentsPage() {
       onConfirm: async () => {
         setBusyId(department.id);
         try {
-          // Se relee antes de escribir: el API no tiene activar/desactivar por
-          // separado y reenviar la copia pintada revierte lo que cambió alguien
-          // más entretanto.
           const current = await departmentsApi.get(department.id);
           await departmentsApi.update(current.id, {
             name: current.name,
             parentId: current.parentId ?? null,
+            sedeId: current.sedeId ?? null,
             isActive: !current.isActive,
             type: current.type ?? "Publico",
             defaultRoleId: current.defaultRoleId ?? null,
@@ -231,8 +194,7 @@ export function DepartmentsPage() {
       description: (
         <>
           <strong className="font-semibold text-ink">{department.name}</strong> se borra de forma
-          permanente. No tiene nada dentro ni nadie asignado, así que no queda historial que
-          conservar.
+          permanente.
         </>
       ),
       confirmLabel: "Eliminar",
@@ -249,7 +211,7 @@ export function DepartmentsPage() {
   }
 
   return (
-    <>
+    <div className="flex h-full flex-col">
       <ModuleHeader
         title="Departamentos"
         summary={
@@ -310,7 +272,7 @@ export function DepartmentsPage() {
           ) : (
             <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando el organigrama de departamentos…
+              Cargando departamentos…
             </span>
           )
         }
@@ -328,244 +290,232 @@ export function DepartmentsPage() {
         <LoadErrorAlert message="No se pudieron cargar los departamentos" onRetry={reload} />
       )}
 
-      <ListPanel
-        toolbar={
-          <>
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar por nombre o camino…"
-              className="w-[260px]"
-            />
-            <FilterDropdown
-              title="Seleccionar tipo"
-              aria-label="Filtrar por tipo de departamento"
-              value={typeChip}
-              onChange={(next) => setTypeChip(next as TypeKey)}
-              defaultIcon={<Users className="h-3.5 w-3.5 text-zinc-500" />}
-              options={[
-                { value: "todos", label: "Todos los tipos", icon: <Users className="h-4 w-4 text-zinc-500" /> },
-                { value: "Publico", label: "Públicos", icon: <Users className="h-4 w-4 text-blue-600" /> },
-                { value: "Privado", label: "Privados", icon: <Lock className="h-4 w-4 text-amber-600" /> },
-              ]}
-            />
-            {(search || typeChip !== "todos" || chip !== "todos") && (
-              <ClearFiltersButton
-                onClick={() => {
-                  setSearch("");
-                  setTypeChip("todos");
-                  setChip("todos");
-                }}
-              />
-            )}
-          </>
-        }
-      >
-        {all === null ? (
-          !failed && <TableSkeleton rows={8} columns={7} />
-        ) : visible.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
-              ? "Ningún departamento coincide con este filtro o búsqueda."
-              : "Todavía no hay ningún departamento registrado."}
-          </p>
-        ) : (
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Departamento</Th>
-                <Th className="w-40">Colaboradores</Th>
-                <Th className="w-52">Alcance de un rol</Th>
-                <Th className="w-44">Rol del departamento</Th>
-                <Th className="w-52">Buzón</Th>
-                <Th className="w-28">Estado</Th>
-                {canWrite && <Th className="w-28 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        <ListPanel
+          toolbar={
+            <div className="flex flex-wrap items-center justify-between gap-3 w-full">
+              <div className="flex flex-wrap items-center gap-2">
+                <SearchInput
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Buscar por departamento, sede o correo…"
+                  className="w-[260px] sm:w-[280px]"
+                />
+                <FilterDropdown
+                  title="Seleccionar tipo"
+                  aria-label="Filtrar por tipo de departamento"
+                  value={typeChip}
+                  onChange={(next) => setTypeChip(next as TypeKey)}
+                  defaultIcon={<Users className="h-3.5 w-3.5 text-zinc-500" />}
+                  options={[
+                    { value: "todos", label: "Todos los tipos", icon: <Users className="h-4 w-4 text-zinc-500" /> },
+                    { value: "Publico", label: "Públicos", icon: <Users className="h-4 w-4 text-blue-600" /> },
+                    { value: "Privado", label: "Privados", icon: <Lock className="h-4 w-4 text-amber-600" /> },
+                  ]}
+                />
+                {(search || typeChip !== "todos" || chip !== "todos" || selectedSedeId !== "todas") && (
+                  <ClearFiltersButton
+                    onClick={() => {
+                      setSearch("");
+                      setTypeChip("todos");
+                      setChip("todos");
+                      setSelectedSedeId("todas");
+                    }}
+                  />
+                )}
+              </div>
 
-            <tbody>
-              {visible.map((d) => {
-                const propios = d.staffCount ?? 0;
-                const heredadas = d.reach - propios;
-
-                return (
-                  <Row key={d.id} busy={busyId === d.id}>
-                    <Td>
-                      <span className="flex items-center">
-                        {d.depth > 0 && (
-                          <>
-                            <span aria-hidden style={{ width: d.depth * SANGRIA }} />
-                            {/* Codo de rama, no un filete horizontal: suelto se
-                                leia como un guion pegado al nombre —«— Almacén»,
-                                como si el guion fuera parte del nombre propio—.
-                                Con el tramo vertical ya solo puede leerse como
-                                «cuelga de lo de arriba». Alto fijo: no puede
-                                depender de la altura de la fila, que cambia. */}
-                            <span
-                              aria-hidden
-                              className="mr-2 h-3 w-2.5 shrink-0 -translate-y-1/2 rounded-bl-[3px]
-                                border-b border-l border-line-strong"
-                            />
-                          </>
-                        )}
+              {/* Segmented control para filtrar por Sede */}
+              {sedeTabs.length > 2 && (
+                <div
+                  role="tablist"
+                  aria-label="Filtrar por sede"
+                  className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 overflow-x-auto max-w-full"
+                >
+                  {sedeTabs.map((tab) => {
+                    const isActive = selectedSedeId === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        onClick={() => setSelectedSedeId(tab.id)}
+                        className={`inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                          isActive
+                            ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+                            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+                        }`}
+                      >
+                        <Building className={`h-3 w-3 ${isActive ? "text-brand-red" : "text-zinc-400"}`} />
+                        <span>{tab.label}</span>
                         <span
-                          className={
-                            d.depth === 0
-                              ? "text-[12.5px] font-semibold text-ink"
-                              : "text-[12.5px] text-ink"
-                          }
+                          className={`font-heading text-[10px] font-bold leading-none tabular-nums ${
+                            isActive ? "text-zinc-900" : "text-zinc-400"
+                          }`}
                         >
+                          {tab.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          }
+        >
+          {all === null ? (
+            !failed && <TableSkeleton rows={8} columns={7} />
+          ) : visible.length === 0 ? (
+            <p className="py-14 text-center text-[13.5px] text-faint">
+              {isFiltering
+                ? "Ningún departamento coincide con este filtro o búsqueda."
+                : "Todavía no hay ningún departamento registrado."}
+            </p>
+          ) : (
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th className="w-56">Sede</Th>
+                  <Th>Departamento</Th>
+                  <Th className="w-28">Tipo</Th>
+                  <Th className="w-56">Correo</Th>
+                  <Th className="w-56">Administrador</Th>
+                  <Th className="w-48">Permisos</Th>
+                  <Th className="w-24">Estado</Th>
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
+              <tbody>
+                {visible.map((d) => {
+                  const propios = d.staffCount ?? 0;
+
+                  return (
+                    <Row key={d.id} busy={busyId === d.id}>
+                      {/* 1. SEDE */}
+                      <Td>
+                        {d.sedeName ? (
+                          <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-zinc-800">
+                            <Building className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                            <span className="truncate">{d.sedeName}</span>
+                          </span>
+                        ) : (
+                          <span className="text-[12px] text-zinc-400 italic">Sin sede</span>
+                        )}
+                      </Td>
+
+                      {/* 2. DEPARTAMENTO */}
+                      <Td>
+                        <span className="text-[12.5px] font-semibold text-ink">
                           {d.name}
                         </span>
+                      </Td>
 
-                        {/* CUANTAS UNIDADES CUELGAN, con su unidad escrita.
-                            Vivia en la columna de alcance junto a las personas,
-                            y ahi «3 personas · 3 dentro» eran dos treses de
-                            cosas distintas sin nada que lo dijera. Cada columna
-                            habla de una sola cosa: esta, del organigrama. */}
-                        {d.inside > 0 && (
-                          <span className="ml-2 whitespace-nowrap text-[11.5px] tabular-nums text-faint">
-                            {d.inside} {d.inside === 1 ? "unidad" : "unidades"}
-                          </span>
-                        )}
-
-                        {/* Solo se marca lo privado: 31 de los 38 de la empresa
-                            son publicos, y una pastilla en cada renglon deja de
-                            señalar nada. */}
-                        {d.type === "Privado" && (
-                          <Badge tone="slate" className="ml-2">
+                      {/* 3. TIPO */}
+                      <Td>
+                        {d.type === "Privado" ? (
+                          <Badge tone="slate" className="gap-1">
+                            <Lock className="h-2.5 w-2.5" />
                             Privado
                           </Badge>
-                        )}
-                      </span>
-                    </Td>
-
-                    <Td>
-                      {propios > 0 ? (
-                        <span className="text-[12.5px] tabular-nums text-brand-gray">
-                          {propios}
-                        </span>
-                      ) : (
-                        <span className="text-[12.5px] text-faint">Ninguno</span>
-                      )}
-                    </Td>
-
-                    {/* LA COLUMNA QUE JUSTIFICA LA PANTALLA. Un rol concedido
-                        aqui no se queda aqui: baja por el arbol. Mientras el
-                        departamento sea una hoja, este numero y el anterior
-                        coinciden y no distrae; en cuanto tiene algo dentro, la
-                        diferencia es exactamente lo que se hereda. */}
-                    <Td>
-                      {/* `whitespace-nowrap`: sin esto el desglose partia en dos
-                          lineas y esa fila quedaba cuatro pixeles mas alta que
-                          las demas. Una tabla con filas de alturas distintas se
-                          lee peor aunque nadie sepa decir por que. */}
-                      <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-                        {d.reach === 0 ? (
-                          <span className="text-[12.5px] text-faint">Nadie</span>
                         ) : (
-                          <>
-                            <span className="text-[12.5px] font-medium tabular-nums text-ink">
-                              {d.reach}
-                            </span>
-                            <span className="text-[12.5px] text-brand-gray">
-                              {d.reach === 1 ? "persona" : "personas"}
-                            </span>
-                          </>
+                          <Badge tone="neutral" className="gap-1">
+                            <Users className="h-2.5 w-2.5" />
+                            Público
+                          </Badge>
                         )}
+                      </Td>
 
-                        {/* DE DONDE SALE ESE ALCANCE. Es la unica pista de que
-                            la herencia existe: un departamento sin nadie dentro
-                            que aun asi alcanza a tres personas solo tiene
-                            sentido si la fila dice que las hereda. */}
-                        {heredadas > 0 && (
-                          <span className="text-[11.5px] tabular-nums text-faint">
-                            {propios === 0 ? "· todas heredadas" : `· ${heredadas} heredadas`}
-                          </span>
-                        )}
-                      </span>
-                    </Td>
-
-                    {/* Un dato guardado, no un permiso: por eso va en gris y
-                        no con el peso de la columna de alcance. */}
-                    <Td>
-                      {d.defaultRoleName ? (
-                        <span className="whitespace-nowrap text-[12.5px] text-brand-gray">
-                          {d.defaultRoleName}
-                        </span>
-                      ) : (
-                        <span className="text-[12.5px] text-faint">Sin rol</span>
-                      )}
-                    </Td>
-
-                    <Td>
-                      {d.mailboxAddress ? (
-                        <span
-                          className="block max-w-[200px] truncate text-[12.5px] text-brand-gray"
-                          title={d.mailboxAddress}
-                        >
-                          {d.mailboxAddress}
-                        </span>
-                      ) : (
-                        <span className="text-[12.5px] text-faint">Sin buzón</span>
-                      )}
-                    </Td>
-
-                    <Td>
-                      <StatusDot active={d.isActive} />
-                    </Td>
-
-                    {canWrite && (
+                      {/* 4. CORREO / BUZÓN */}
                       <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          {/* El camino completo y no el nombre: «Editar ALMACEN»
-                              ya no dice cual de los dos. */}
-                          <RowAction
-                            label={`Editar ${d.path}`}
-                            icon={Pencil}
-                            onClick={() => setModal(d)}
-                            disabled={busyId === d.id}
-                          />
-                          <RowAction
-                            label={d.isActive ? `Desactivar ${d.path}` : `Reactivar ${d.path}`}
-                            icon={Power}
-                            onClick={() => askToggle(d)}
-                            disabled={busyId === d.id}
-                          />
-                          {/* El borrado solo aparece cuando de verdad se puede.
-                              El servidor lo rechaza si tiene hijos o gente
-                              dentro; ofrecer el boton para negarlo despues es
-                              hacer pulsar en falso. */}
-                          {d.inside === 0 && propios === 0 && (
+                        {d.mailboxAddress ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 max-w-[210px] truncate text-[12.5px] text-zinc-700"
+                            title={d.mailboxAddress}
+                          >
+                            <Mail className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                            <span className="truncate">{d.mailboxAddress}</span>
+                          </span>
+                        ) : (
+                          <span className="text-[12px] text-zinc-400 italic">Sin correo</span>
+                        )}
+                      </Td>
+
+                      {/* 5. ADMINISTRADOR / ENCARGADO */}
+                      <Td>
+                        {d.managerName ? (
+                          <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-zinc-800">
+                            <UserCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                            <span className="truncate">{d.managerName}</span>
+                          </span>
+                        ) : (
+                          <span className="text-[12px] text-zinc-400 italic">Sin administrador</span>
+                        )}
+                      </Td>
+
+                      {/* 6. PERMISOS / ROL PREDETERMINADO */}
+                      <Td>
+                        {d.defaultRoleName ? (
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-zinc-700">
+                            <Shield className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                            <span>{d.defaultRoleName}</span>
+                          </span>
+                        ) : (
+                          <span className="text-[12px] text-zinc-400 italic">Sin rol</span>
+                        )}
+                      </Td>
+
+                      {/* 7. ESTADO */}
+                      <Td>
+                        <StatusDot active={d.isActive} />
+                      </Td>
+
+                      {/* 8. ACCIONES */}
+                      {canWrite && (
+                        <Td>
+                          <div className="flex items-center justify-end gap-1">
                             <RowAction
-                              label={`Eliminar ${d.path}`}
-                              icon={Trash2}
-                              danger
-                              onClick={() => askDelete(d)}
+                              label={`Editar ${d.name}`}
+                              icon={Pencil}
+                              onClick={() => setModal(d)}
                               disabled={busyId === d.id}
                             />
-                          )}
-                        </div>
-                      </Td>
-                    )}
-                  </Row>
-                );
-              })}
-            </tbody>
-          </DataTable>
-        )}
-      </ListPanel>
+                            <RowAction
+                              label={d.isActive ? `Desactivar ${d.name}` : `Reactivar ${d.name}`}
+                              icon={Power}
+                              onClick={() => askToggle(d)}
+                              disabled={busyId === d.id}
+                            />
+                            {propios === 0 && (
+                              <RowAction
+                                label={`Eliminar ${d.name}`}
+                                icon={Trash2}
+                                danger
+                                onClick={() => askDelete(d)}
+                                disabled={busyId === d.id}
+                              />
+                            )}
+                          </div>
+                        </Td>
+                      )}
+                    </Row>
+                  );
+                })}
+              </tbody>
+            </DataTable>
+          )}
+        </ListPanel>
+      </div>
 
-      {modal !== null && all !== null && (
+      {modal !== null && (
         <DepartmentModal
           department={modal === "nuevo" ? undefined : modal}
-          all={all}
           onClose={() => setModal(null)}
           onSaved={reload}
         />
       )}
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
-    </>
+    </div>
   );
 }

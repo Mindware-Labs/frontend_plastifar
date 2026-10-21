@@ -617,6 +617,8 @@ export function TicketsPage() {
                   options={departmentOptions}
                   defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
                   aria-label="Filtrar por departamento"
+                  searchable
+                  searchPlaceholder="Buscar departamento…"
                 />
                 <TicketFilterDropdown
                   title="Seleccionar prioridad"
