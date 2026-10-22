@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
@@ -246,6 +246,7 @@ function firstLine(text: string) {
 
 /** El cuerpo del correo viene de un remitente externo: se muestra siempre via EmailBodyFrame, nunca inyectado. */
 export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, onClose }: EmailDetailPaneProps) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
@@ -1493,11 +1494,14 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           senderName={email.fromName ?? undefined}
           initialAssignedStaffId={email.assignedStaffId}
           onClose={() => setIsCreateTicketModalOpen(false)}
-          onCreated={(created) => {
+          onCreated={(created, targetUrl) => {
             setEmail({ ...email, ticketId: created.id });
             setJustCreatedTicketId(created.id);
             onTicketCreated();
             setIsCreateTicketModalOpen(false);
+            if (targetUrl) {
+              navigate(targetUrl);
+            }
             receipts.done({
               action: "crear-ticket",
               title: "Ticket creado",

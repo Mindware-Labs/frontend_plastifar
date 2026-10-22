@@ -54,9 +54,9 @@ export function ModuleHeader({
         note ? "min-h-14 py-2" : "h-14"
       } ${className}`}
     >
-      <div className="flex h-full flex-wrap items-center justify-between gap-x-4 gap-y-1">
+      <div className="flex h-full items-center justify-between gap-x-4">
         {hasHeading ? (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="flex shrink-0 items-center gap-x-3">
             {backTo && (
               <Link
                 to={backTo}
@@ -78,9 +78,7 @@ export function ModuleHeader({
             {summary && (
               <>
                 {title && <span aria-hidden className="hidden h-4 w-px bg-zinc-200/90 sm:inline-block" />}
-                {/* Un <div> y no un <p>: `summary` es un ReactNode y hay pantallas que
-                    le pasan una fila de contadores, es decir un <div>. */}
-                <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-zinc-500">
+                <div className="flex items-center gap-1.5 text-[12px] text-zinc-500">
                   {summary}
                 </div>
               </>
@@ -88,12 +86,12 @@ export function ModuleHeader({
           </div>
         ) : null}
 
-        <div className="flex h-full flex-wrap items-center gap-3">
+        <div className="flex h-full items-center gap-3">
           {sections && sections.length > 0 && (
             <nav aria-label="Secciones de la ficha" className="flex h-full items-center gap-1 self-stretch">
               {sections.map((section, idx) => {
                 const navClass = (isActive: boolean) =>
-                  `flex h-full items-center border-b-2 px-2.5 text-[12.5px] font-medium transition-all duration-200 ease-out -mb-px ` +
+                  `flex h-full items-center border-b-2 px-2.5 text-[12.5px] font-medium transition-all duration-150 ease-out -mb-px whitespace-nowrap cursor-pointer select-none ` +
                   (isActive
                     ? "border-brand-red text-zinc-900 font-semibold"
                     : "border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300/80");
@@ -116,7 +114,7 @@ export function ModuleHeader({
                     key={idx}
                     type="button"
                     onClick={section.onClick}
-                    className={`${navClass(Boolean(section.active))} bg-transparent border-t-0 border-x-0 cursor-pointer outline-none`}
+                    className={`${navClass(Boolean(section.active))} bg-transparent border-t-0 border-x-0 outline-none`}
                   >
                     {section.label}
                   </button>
@@ -125,7 +123,7 @@ export function ModuleHeader({
             </nav>
           )}
 
-          {action && <div className="flex items-center gap-2">{action}</div>}
+          {action && <div className="flex items-center gap-2 shrink-0">{action}</div>}
         </div>
       </div>
 

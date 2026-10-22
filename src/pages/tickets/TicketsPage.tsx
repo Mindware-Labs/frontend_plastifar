@@ -891,9 +891,9 @@ export function TicketsPage() {
       {createModalOpen && (
         <CreateTicketModal
           onClose={() => setCreateModalOpen(false)}
-          onCreated={(created) => {
+          onCreated={(created, targetUrl) => {
             refresh();
-            navigate(`/tickets/${created.id}`);
+            navigate(targetUrl || `/tickets/${created.id}`);
             receipts.done({
               action: "crear-ticket",
               title: "Ticket creado",

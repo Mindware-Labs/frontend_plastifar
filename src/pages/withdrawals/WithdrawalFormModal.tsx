@@ -110,6 +110,15 @@ const CURRENCY_OPTIONS = [{ value: "", label: "Sin precio" }, ...WITHDRAWAL_CURR
 interface WithdrawalFormModalProps {
   /** Ausente = alta. */
   withdrawal?: MerchandiseWithdrawal;
+  fixedTicketId?: number;
+  fixedTicketLabel?: string;
+  initialLines?: Array<{
+    productId: string;
+    quantity: string;
+    quantityUnit: string;
+    packDetail: string;
+    unitPrice: string;
+  }>;
   onClose: () => void;
   onSaved: (detail: WithdrawalDetail) => void;
   /**
@@ -130,7 +139,15 @@ interface WithdrawalFormModalProps {
  * ticket: en alta lo elige el usuario con el campo «Ticket». Integrarlo pide
  * añadir una prop que fije ese campo, en lugar de duplicar el formulario.
  */
-export function WithdrawalFormModal({ withdrawal, onClose, onSaved, onConflict }: WithdrawalFormModalProps) {
+export function WithdrawalFormModal({
+  withdrawal,
+  fixedTicketId,
+  fixedTicketLabel,
+  initialLines,
+  onClose,
+  onSaved,
+  onConflict,
+}: WithdrawalFormModalProps) {
   const isEdit = withdrawal !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -143,7 +160,7 @@ export function WithdrawalFormModal({ withdrawal, onClose, onSaved, onConflict }
     resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
-      ticketId: withdrawal ? String(withdrawal.ticketId) : "",
+      ticketId: withdrawal ? String(withdrawal.ticketId) : fixedTicketId ? String(fixedTicketId) : "",
       requestDate: withdrawal?.requestDate ?? today(),
       reason: withdrawal?.reason ?? "",
       errorOrigin: withdrawal?.errorOrigin ?? "",
@@ -157,6 +174,8 @@ export function WithdrawalFormModal({ withdrawal, onClose, onSaved, onConflict }
               packDetail: line.packDetail ?? "",
               unitPrice: line.unitPrice === null ? "" : String(line.unitPrice),
             }))
+          : initialLines && initialLines.length > 0
+          ? initialLines
           : [emptyLine()],
     },
   });
@@ -245,8 +264,8 @@ export function WithdrawalFormModal({ withdrawal, onClose, onSaved, onConflict }
                 placeholder="Elige el ticket del retiro"
                 searchPlaceholder="Número, asunto o cliente…"
                 search={searchTickets}
-                resolveSelectedLabel={resolveTicketLabel}
-                disabled={isEdit}
+                resolveSelectedLabel={fixedTicketLabel ? async () => fixedTicketLabel : resolveTicketLabel}
+                disabled={isEdit || Boolean(fixedTicketId)}
                 error={errors.ticketId?.message}
               />
             )}

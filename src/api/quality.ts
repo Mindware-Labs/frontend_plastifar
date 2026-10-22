@@ -1,4 +1,4 @@
-import { apiRequest, toQuery } from "./client";
+﻿import { apiRequest, toQuery } from "./client";
 import type { AttachmentLinkResponse } from "../types/api";
 import type {
   ActionPlanItem,
@@ -156,6 +156,9 @@ export const qualityApi = {
   sheets: {
     list: (query: SheetQuery) =>
       apiRequest<SheetListResponse>(`/api/quality/sheets${toQuery({ ...query })}`),
+
+    listByTicket: (ticketId: number) =>
+      apiRequest<CorrectiveActionSheet[]>(`/api/tickets/${ticketId}/sheets`),
 
     get: (id: number) => apiRequest<SheetDetailResponse>(`/api/quality/sheets/${id}`),
 

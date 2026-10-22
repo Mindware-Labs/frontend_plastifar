@@ -52,6 +52,7 @@ export function buildDepartmentFilterOptions(
     ...buildDepartmentTree(departments).map((d) => ({
       value: String(d.id),
       label: d.path,
+      hint: d.sedeName ?? undefined,
       icon: getDepartmentIcon(d.name),
     })),
   ];

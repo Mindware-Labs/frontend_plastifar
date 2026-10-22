@@ -47,6 +47,9 @@ export const discrepanciesApi = {
 
   get: (id: number) => apiRequest<DiscrepancyDetail>(`/api/discrepancies/${id}`),
 
+  listByTicket: (ticketId: number) =>
+    apiRequest<DiscrepancyDetail[]>(`/api/tickets/${ticketId}/discrepancies`),
+
   securityItems: () => apiRequest<SecurityItem[]>("/api/discrepancies/security-items"),
 
   create: (ticketId: number, data: SaveDiscrepancyRequest) =>

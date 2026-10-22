@@ -8,7 +8,6 @@ import { departmentsApi } from "../../api/departments";
 import { fetchAllPages } from "../../api/paging";
 import { rolesApi } from "../../api/roles";
 import { sedesApi } from "../../api/sedes";
-import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
@@ -23,7 +22,6 @@ import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import type { DepartmentResponse, RoleResponse } from "../../types/api";
 import type { Sede } from "../../types/sedes";
-import type { Mailbox } from "../../types/settings";
 import { useReferenceData } from "../settings/catalogState";
 
 const schema = z.object({
@@ -31,7 +29,6 @@ const schema = z.object({
   sedeId: z.string(),
   type: z.enum(["Publico", "Privado"], { message: "Elige si es público o privado" }),
   defaultRoleId: z.string(),
-  mailboxId: z.string(),
   managerStaffId: z.string(),
   isActive: z.boolean(),
 });
@@ -47,7 +44,6 @@ const CAMPO_POR_MENSAJE: { field: keyof FormValues; startsWith: string }[] = [
   { field: "type", startsWith: "el tipo debe" },
   { field: "sedeId", startsWith: "la sede" },
   { field: "defaultRoleId", startsWith: "el rol no existe" },
-  { field: "mailboxId", startsWith: "el buzón no existe" },
   { field: "managerStaffId", startsWith: "el responsable no existe" },
 ];
 
@@ -87,14 +83,6 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
     [],
   );
 
-  const mailboxesRef = useReferenceData<Mailbox[]>(
-    () =>
-      fetchAllPages((page, pageSize) =>
-        settingsApi.mailboxes.list({ page, pageSize }),
-      ),
-    [],
-  );
-
   const {
     register,
     control,
@@ -110,7 +98,6 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
       sedeId: department?.sedeId != null ? String(department.sedeId) : SIN_SEDE,
       type: (department?.type as "Publico" | "Privado") ?? "Publico",
       defaultRoleId: department?.defaultRoleId != null ? String(department.defaultRoleId) : NINGUNO,
-      mailboxId: department?.mailboxId != null ? String(department.mailboxId) : NINGUNO,
       managerStaffId:
         department?.managerStaffId != null ? String(department.managerStaffId) : NINGUNO,
       isActive: department?.isActive ?? true,
@@ -155,25 +142,6 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
     });
   }
 
-  const opcionesBuzon = [
-    { value: NINGUNO, label: "Sin correo" },
-    ...mailboxesRef.data
-      .filter((mailbox) => mailbox.isActive || mailbox.id === department?.mailboxId)
-      .map((mailbox) => ({
-        value: String(mailbox.id),
-        label: mailbox.isActive ? mailbox.address : `${mailbox.address} (inactivo)`,
-      })),
-  ];
-  if (
-    department?.mailboxId != null &&
-    !mailboxesRef.data.some((mailbox) => mailbox.id === department.mailboxId)
-  ) {
-    opcionesBuzon.push({
-      value: String(department.mailboxId),
-      label: department.mailboxAddress ?? `Buzón #${department.mailboxId}`,
-    });
-  }
-
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
     return touchedFields[field] ? "valid" : "idle";
@@ -195,7 +163,7 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
       isActive: values.isActive,
       type: values.type,
       defaultRoleId: values.defaultRoleId === NINGUNO ? null : Number(values.defaultRoleId),
-      mailboxId: values.mailboxId === NINGUNO ? null : Number(values.mailboxId),
+      mailboxId: null,
       managerStaffId: values.managerStaffId === NINGUNO ? null : Number(values.managerStaffId),
     };
 
@@ -307,72 +275,6 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <Controller
-            name="type"
-            control={control}
-            render={({ field }) => (
-              <div className="flex flex-col gap-1">
-                <label className="font-heading text-[11.5px] font-semibold text-faint">
-                  Tipo <span className="text-brand-red">*</span>
-                </label>
-                <div
-                  role="radiogroup"
-                  aria-label="Tipo de departamento"
-                  className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50/70 p-0.5"
-                >
-                  {[
-                    { value: "Publico", label: "Público", icon: Users },
-                    { value: "Privado", label: "Privado", icon: Lock },
-                  ].map((item) => {
-                    const isSelected = field.value === item.value;
-                    const Icon = item.icon;
-                    return (
-                      <button
-                        key={item.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={isSelected}
-                        onClick={() => field.onChange(item.value)}
-                        className={`inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] transition-all cursor-pointer select-none ${
-                          isSelected
-                            ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                            : "border border-transparent font-medium text-zinc-600 hover:text-zinc-900 hover:bg-white/50"
-                        }`}
-                      >
-                        <Icon
-                          className={`h-3 w-3 shrink-0 ${isSelected ? "text-brand-red" : "text-zinc-400"}`}
-                        />
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          />
-
-          <Controller
-            name="mailboxId"
-            control={control}
-            render={({ field }) => (
-              <SelectField
-                size="sm"
-                searchable
-                label="Correo / Buzón"
-                name={field.name}
-                value={field.value}
-                onChange={field.onChange}
-                onBlur={field.onBlur}
-                placeholder="Sin correo"
-                options={opcionesBuzon}
-                state={stateOf("mailboxId")}
-                error={errors.mailboxId?.message}
-              />
-            )}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <Controller
             name="managerStaffId"
             control={control}
             render={({ field }) => (
@@ -420,6 +322,50 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
             )}
           />
         </div>
+
+        <Controller
+          name="type"
+          control={control}
+          render={({ field }) => (
+            <div className="flex flex-col gap-1">
+              <label className="font-heading text-[11.5px] font-semibold text-faint">
+                Tipo <span className="text-brand-red">*</span>
+              </label>
+              <div
+                role="radiogroup"
+                aria-label="Tipo de departamento"
+                className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50/70 p-0.5"
+              >
+                {[
+                  { value: "Publico", label: "Público", icon: Users },
+                  { value: "Privado", label: "Privado", icon: Lock },
+                ].map((item) => {
+                  const isSelected = field.value === item.value;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => field.onChange(item.value)}
+                      className={`inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] transition-all cursor-pointer select-none ${
+                        isSelected
+                          ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+                          : "border border-transparent font-medium text-zinc-600 hover:text-zinc-900 hover:bg-white/50"
+                      }`}
+                    >
+                      <Icon
+                        className={`h-3 w-3 shrink-0 ${isSelected ? "text-brand-red" : "text-zinc-400"}`}
+                      />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        />
 
         {/* 3. ESTADO (EN EDICIÓN) */}
         {isEdit && (

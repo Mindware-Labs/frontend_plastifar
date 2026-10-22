@@ -1,4 +1,4 @@
-import { Calendar, Check, ChevronDown, Search, X } from "lucide-react";
+import { Building, Calendar, Check, ChevronDown, Search, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -8,6 +8,7 @@ import type { LookupOption, LookupResult } from "./LookupSelect";
 export interface FilterOption {
   value: string;
   label: string;
+  hint?: string;
   icon?: ReactNode;
 }
 
@@ -69,14 +70,18 @@ export function FilterDropdown({
 
   const filteredOptions =
     searchable && searchTerm.trim()
-      ? options.filter((opt) => opt.label.toLowerCase().includes(searchTerm.trim().toLowerCase()))
+      ? options.filter((opt) => {
+          const q = searchTerm.trim().toLowerCase();
+          return opt.label.toLowerCase().includes(q) || (opt.hint ? opt.hint.toLowerCase().includes(q) : false);
+        })
       : options;
 
   function openDropdown() {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    const width = Math.max(rect.width, searchable ? 240 : PANEL_MIN_WIDTH);
+    const hasHints = options.some((o) => !!o.hint);
+    const width = Math.max(rect.width, hasHints ? 280 : (searchable ? 240 : PANEL_MIN_WIDTH));
     const left = Math.max(
       VIEWPORT_GUTTER,
       Math.min(rect.left, window.innerWidth - width - VIEWPORT_GUTTER),
@@ -161,6 +166,12 @@ export function FilterDropdown({
           {activeOption?.icon ?? defaultIcon}
         </span>
         <span className="max-w-[240px] truncate whitespace-nowrap">{activeOption?.label}</span>
+        {activeOption?.hint && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-[5px] bg-zinc-100 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-600 border border-zinc-200/80">
+            <Building className="h-2.5 w-2.5 text-zinc-400" />
+            {activeOption.hint}
+          </span>
+        )}
         <ChevronDown
           aria-hidden
           className={`h-3 w-3 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
@@ -257,9 +268,17 @@ export function FilterDropdown({
                       <span className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500 group-hover:text-zinc-900">
                         {option.icon ?? defaultIcon}
                       </span>
-                      <span className="flex-1 truncate">{option.label}</span>
+                      <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                        <span className="truncate">{option.label}</span>
+                        {option.hint && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-[5px] bg-zinc-100/90 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-500 border border-zinc-200/60">
+                            <Building className="h-2.5 w-2.5 text-zinc-400" />
+                            {option.hint}
+                          </span>
+                        )}
+                      </div>
                       {isSelected && (
-                        <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-red" />
+                        <Check aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-red ml-1" />
                       )}
                     </button>
                   );

@@ -119,6 +119,18 @@ interface ClaimFormModalProps {
   clientName: string;
   /** Ausente = alta. */
   claim?: CustomerClaim;
+  initialData?: {
+    invoiceRef?: string;
+    description?: string;
+    lines?: Array<{
+      productId: string;
+      unitsPurchased?: string;
+      defectiveQuantity?: string;
+      invoicedQuantity?: string;
+      receivedQuantity?: string;
+      unitPrice?: string;
+    }>;
+  };
   onClose: () => void;
   onSaved: (detail: ClaimDetail) => void;
 }
@@ -136,6 +148,7 @@ export function ClaimFormModal({
   ticketNumber,
   clientName,
   claim,
+  initialData,
   onClose,
   onSaved,
 }: ClaimFormModalProps) {
@@ -167,12 +180,12 @@ export function ClaimFormModal({
       affectedAreas: claim?.affectedAreas ?? [],
       plantIds: claim?.plants.map((plant) => String(plant.id)) ?? [],
       productionLot: claim?.productionLot ?? "",
-      invoiceRef: claim?.invoiceRef ?? "",
+      invoiceRef: claim?.invoiceRef ?? initialData?.invoiceRef ?? "",
       poNumber: claim?.poNumber ?? "",
       unitsToReturn: numberOrEmpty(claim?.unitsToReturn ?? null),
       defectFoundDuring: claim?.defectFoundDuring ?? "",
       currency: claim?.currency ?? "DOP",
-      description: claim?.description ?? "",
+      description: claim?.description ?? initialData?.description ?? "",
       comments: claim?.comments ?? "",
       receivedAt: claim?.receivedAt ?? today(),
       firstCustomerContactAt: claim?.firstCustomerContactAt ?? "",
@@ -184,6 +197,15 @@ export function ClaimFormModal({
             invoicedQuantity: numberOrEmpty(line.invoicedQuantity),
             receivedQuantity: numberOrEmpty(line.receivedQuantity),
             unitPrice: numberOrEmpty(line.unitPrice),
+          }))
+        : initialData?.lines && initialData.lines.length > 0
+        ? initialData.lines.map((line: any) => ({
+            productId: String(line.productId),
+            unitsPurchased: line.unitsPurchased ?? "",
+            defectiveQuantity: line.defectiveQuantity ?? "",
+            invoicedQuantity: line.invoicedQuantity ?? "",
+            receivedQuantity: line.receivedQuantity ?? "",
+            unitPrice: line.unitPrice ?? "",
           }))
         : [emptyLine()],
     },

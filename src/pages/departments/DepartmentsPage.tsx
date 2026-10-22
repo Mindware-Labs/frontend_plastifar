@@ -1,7 +1,8 @@
 import {
+  Ban,
   Building,
+  CheckCircle2,
   Lock,
-  Mail,
   Pencil,
   Plus,
   Power,
@@ -21,19 +22,30 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton, FilterDropdown, type FilterOption } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
+import { Modal } from "../../components/ui/Modal";
+import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { TableSelectionBar } from "../../components/ui/TableSelectionBar";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import type { DepartmentResponse, DepartmentType } from "../../types/api";
+import type {
+  DepartmentListResponse,
+  DepartmentQuery,
+  DepartmentResponse,
+  DepartmentType,
+} from "../../types/api";
 import { LoadErrorAlert } from "../settings/catalogSection";
 import { useReferenceData } from "../settings/catalogState";
 import { DepartmentModal } from "./DepartmentModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
 type TypeKey = "todos" | DepartmentType;
+type PagedDepartmentQuery = DepartmentQuery & { page: number };
 
 export function DepartmentsPage() {
   const { can } = usePermissions();
@@ -44,35 +56,50 @@ export function DepartmentsPage() {
   const [chip, setChip] = useState<ChipKey>("todos");
   const [typeChip, setTypeChip] = useState<TypeKey>("todos");
   const [selectedSedeId, setSelectedSedeId] = useState<string>("todas");
+  const [pageSize, setPageSize] = useState(10);
   const [modal, setModal] = useState<"nuevo" | DepartmentResponse | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
-  const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
+  // Selección múltiple y acciones en lote
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkSedeModalOpen, setBulkSedeModalOpen] = useState(false);
+  const [selectedBulkSedeId, setSelectedBulkSedeId] = useState<string>("");
 
+  const debouncedSearch = useDebouncedValue(search).trim();
+
+  // Paginación real de servidor mediante usePagedList
   const {
-    data: all,
-    failed,
-    reload,
-  } = useReferenceData<DepartmentResponse[] | null>(
-    () => departmentsApi.list({ includeInactive: true }),
-    null,
-  );
+    data,
+    isStale,
+    error,
+    page,
+    setPage,
+    refresh,
+  } = usePagedList<PagedDepartmentQuery, DepartmentListResponse>({
+    fetch: departmentsApi.listPaged,
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      status: chip === "todos" ? undefined : chip,
+      sedeId:
+        selectedSedeId === "todas"
+          ? undefined
+          : selectedSedeId === "sin-sede"
+            ? -1
+            : Number(selectedSedeId),
+      type: typeChip === "todos" ? undefined : typeChip,
+      includeInactive: true,
+    },
+    fallbackError: "No se pudieron cargar los departamentos",
+  });
 
   const { data: sedesList } = useReferenceData(
     () => sedesApi.list({ includeInactive: false, pageSize: 100 }),
     null,
   );
 
-  const counts = useMemo(() => {
-    if (all === null) return undefined;
-    return {
-      all: all.length,
-      active: all.filter((d) => d.isActive).length,
-      inactive: all.filter((d) => !d.isActive).length,
-      publicos: all.filter((d) => (d.type ?? "Publico") === "Publico").length,
-      privados: all.filter((d) => d.type === "Privado").length,
-    };
-  }, [all]);
+  const counts = data?.counts;
 
   // Opciones de filtro para el selector de Sedes
   const sedeOptions = useMemo<FilterOption[]>(() => {
@@ -93,48 +120,104 @@ export function DepartmentsPage() {
       });
     }
 
-    const hasSinSede = all ? all.some((d) => !d.sedeId) : true;
-    if (hasSinSede) {
-      options.push({
-        value: "sin-sede",
-        label: "Sin sede asignada",
-        icon: <Building className="h-4 w-4 text-zinc-400" />,
-      });
-    }
+    options.push({
+      value: "sin-sede",
+      label: "Sin sede asignada",
+      icon: <Building className="h-4 w-4 text-zinc-400" />,
+    });
 
     return options;
-  }, [all, sedesList]);
+  }, [sedesList]);
 
-  const visible = useMemo(() => {
-    if (all === null) return [];
+  // Manejo de casillas de selección
+  const pageIds = useMemo(() => data?.items.map((d) => d.id) ?? [], [data?.items]);
 
-    // 1. Filtrar por sede / pestaña
-    let list = all;
-    if (selectedSedeId === "sin-sede") {
-      list = list.filter((d) => !d.sedeId);
-    } else if (selectedSedeId !== "todas") {
-      const sedeIdNum = Number(selectedSedeId);
-      list = list.filter((d) => d.sedeId === sedeIdNum);
-    }
+  const pageState: boolean | "mixed" = useMemo(() => {
+    if (pageIds.length === 0) return false;
+    const selectedCount = pageIds.filter((id) => selectedIds.has(id)).length;
+    if (selectedCount === 0) return false;
+    if (selectedCount === pageIds.length) return true;
+    return "mixed";
+  }, [pageIds, selectedIds]);
 
-    // 2. Filtrar por estado y tipo
-    list = list
-      .filter((d) => (chip === "todos" ? true : chip === "activos" ? d.isActive : !d.isActive))
-      .filter((d) => typeChip === "todos" || (d.type ?? "Publico") === typeChip);
+  const togglePage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = pageIds.every((id) => next.has(id));
+      if (allSelected) {
+        pageIds.forEach((id) => next.delete(id));
+      } else {
+        pageIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
 
-    // 3. Filtrar por búsqueda
-    if (debouncedSearch !== "") {
-      list = list.filter((d) => {
-        const nameMatch = d.name.toLowerCase().includes(debouncedSearch);
-        const sedeMatch = d.sedeName?.toLowerCase().includes(debouncedSearch) ?? false;
-        const mailMatch = d.mailboxAddress?.toLowerCase().includes(debouncedSearch) ?? false;
-        const managerMatch = d.managerName?.toLowerCase().includes(debouncedSearch) ?? false;
-        return nameMatch || sedeMatch || mailMatch || managerMatch;
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Ejecución de acciones en lote
+  async function runBulk(action: "activate" | "deactivate" | "set-sede" | "delete", sedeId?: number | null) {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      await departmentsApi.bulk({
+        ids: Array.from(selectedIds),
+        action,
+        sedeId,
       });
+      setSelectedIds(new Set());
+      refresh();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBulkBusy(false);
     }
+  }
 
-    return list;
-  }, [all, chip, typeChip, selectedSedeId, debouncedSearch]);
+  function askBulkActivate() {
+    setConfirmation({
+      icon: Power,
+      title: `Activar ${selectedIds.size} departamentos`,
+      description: `¿Deseas activar los ${selectedIds.size} departamentos seleccionados? Volverán a estar disponibles en la creación de tickets.`,
+      confirmLabel: "Activar",
+      onConfirm: async () => {
+        await runBulk("activate");
+      },
+    });
+  }
+
+  function askBulkDeactivate() {
+    setConfirmation({
+      tone: "warn",
+      icon: Power,
+      title: `Desactivar ${selectedIds.size} departamentos`,
+      description: `¿Estás seguro de que deseas desactivar los ${selectedIds.size} departamentos seleccionados? Ya no se ofrecerán al asignar tickets.`,
+      confirmLabel: "Desactivar",
+      onConfirm: async () => {
+        await runBulk("deactivate");
+      },
+    });
+  }
+
+  function askBulkDelete() {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      title: `Eliminar ${selectedIds.size} departamentos`,
+      description: `¿Estás seguro de que deseas eliminar los ${selectedIds.size} departamentos seleccionados? Sólo se eliminarán los que no tengan colaboradores asociados.`,
+      confirmLabel: "Eliminar seleccionados",
+      onConfirm: async () => {
+        await runBulk("delete");
+      },
+    });
+  }
 
   const isFiltering =
     debouncedSearch !== "" || chip !== "todos" || typeChip !== "todos" || selectedSedeId !== "todas";
@@ -181,7 +264,7 @@ export function DepartmentsPage() {
             mailboxId: current.mailboxId ?? null,
             managerStaffId: current.managerStaffId ?? null,
           });
-          reload();
+          refresh();
         } finally {
           setBusyId(null);
         }
@@ -196,8 +279,8 @@ export function DepartmentsPage() {
       title: "Eliminar departamento",
       description: (
         <>
-          <strong className="font-semibold text-ink">{department.name}</strong> se borra de forma
-          permanente.
+          Se eliminará <strong className="font-semibold text-ink">{department.name}</strong> de forma
+          definitiva. Esta acción no se puede deshacer.
         </>
       ),
       confirmLabel: "Eliminar",
@@ -205,7 +288,7 @@ export function DepartmentsPage() {
         setBusyId(department.id);
         try {
           await departmentsApi.remove(department.id);
-          reload();
+          refresh();
         } finally {
           setBusyId(null);
         }
@@ -217,7 +300,7 @@ export function DepartmentsPage() {
     <div className="flex h-full flex-col">
       <ModuleHeader
         title="Departamentos"
-        summary={
+        badge={
           counts ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
               <HeaderTag
@@ -289,203 +372,316 @@ export function DepartmentsPage() {
         }
       />
 
-      {failed && (
-        <LoadErrorAlert message="No se pudieron cargar los departamentos" onRetry={reload} />
+      {error && (
+        <LoadErrorAlert message={error} onRetry={refresh} />
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         <ListPanel
           toolbar={
-            <div className="flex flex-wrap items-center gap-2">
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="Buscar por departamento, sede o correo…"
-                className="w-[260px] sm:w-[280px]"
-              />
-              <FilterDropdown
-                title="Seleccionar tipo"
-                aria-label="Filtrar por tipo de departamento"
-                value={typeChip}
-                onChange={(next) => setTypeChip(next as TypeKey)}
-                defaultIcon={<Users className="h-3.5 w-3.5 text-zinc-500" />}
-                options={[
-                  { value: "todos", label: "Todos los tipos", icon: <Users className="h-4 w-4 text-zinc-500" /> },
-                  { value: "Publico", label: "Públicos", icon: <Users className="h-4 w-4 text-blue-600" /> },
-                  { value: "Privado", label: "Privados", icon: <Lock className="h-4 w-4 text-amber-600" /> },
-                ]}
-              />
-              <FilterDropdown
-                title="Seleccionar sede"
-                aria-label="Filtrar por sede"
-                value={selectedSedeId}
-                onChange={(next) => setSelectedSedeId(next)}
-                defaultIcon={<Building className="h-3.5 w-3.5 text-zinc-500" />}
-                options={sedeOptions}
-                searchable={sedeOptions.length > 6}
-                searchPlaceholder="Buscar sede…"
-              />
-              {(search || typeChip !== "todos" || chip !== "todos" || selectedSedeId !== "todas") && (
-                <ClearFiltersButton
-                  onClick={() => {
-                    setSearch("");
-                    setTypeChip("todos");
-                    setChip("todos");
-                    setSelectedSedeId("todas");
-                  }}
-                />
+            <div className="grid w-full">
+              {selectedIds.size > 0 ? (
+                <div className="col-start-1 row-start-1 w-full">
+                  <TableSelectionBar
+                    count={selectedIds.size}
+                    pageState={pageState}
+                    busy={bulkBusy}
+                    onTogglePage={togglePage}
+                    onClear={() => setSelectedIds(new Set())}
+                    actions={[
+                      {
+                        key: "activate",
+                        label: "Activar",
+                        icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
+                        onClick: askBulkActivate,
+                      },
+                      {
+                        key: "deactivate",
+                        label: "Desactivar",
+                        icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
+                        onClick: askBulkDeactivate,
+                      },
+                      {
+                        key: "sede",
+                        label: "Cambiar sede",
+                        icon: <Building aria-hidden className="h-3.5 w-3.5 text-zinc-500" />,
+                        onClick: () => {
+                          setSelectedBulkSedeId("");
+                          setBulkSedeModalOpen(true);
+                        },
+                      },
+                      {
+                        key: "delete",
+                        label: "Eliminar",
+                        icon: <Trash2 aria-hidden className="h-3.5 w-3.5 text-rose-600" />,
+                        onClick: askBulkDelete,
+                      },
+                    ]}
+                  />
+                </div>
+              ) : (
+                <div className="col-start-1 row-start-1 flex flex-wrap items-center gap-2">
+                  <SearchInput
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Buscar por departamento, sede o correo…"
+                    className="w-[260px] sm:w-[280px]"
+                  />
+                  <FilterDropdown
+                    title="Seleccionar tipo"
+                    aria-label="Filtrar por tipo de departamento"
+                    value={typeChip}
+                    onChange={(next) => setTypeChip(next as TypeKey)}
+                    defaultIcon={<Users className="h-3.5 w-3.5 text-zinc-500" />}
+                    options={[
+                      { value: "todos", label: "Todos los tipos", icon: <Users className="h-4 w-4 text-zinc-500" /> },
+                      { value: "Publico", label: "Públicos", icon: <Users className="h-4 w-4 text-blue-600" /> },
+                      { value: "Privado", label: "Privados", icon: <Lock className="h-4 w-4 text-amber-600" /> },
+                    ]}
+                  />
+                  <FilterDropdown
+                    title="Seleccionar sede"
+                    aria-label="Filtrar por sede"
+                    value={selectedSedeId}
+                    onChange={(next) => setSelectedSedeId(next)}
+                    defaultIcon={<Building className="h-3.5 w-3.5 text-zinc-500" />}
+                    options={sedeOptions}
+                    searchable={sedeOptions.length > 6}
+                    searchPlaceholder="Buscar sede…"
+                  />
+                  {(search || typeChip !== "todos" || chip !== "todos" || selectedSedeId !== "todas") && (
+                    <ClearFiltersButton
+                      onClick={() => {
+                        setSearch("");
+                        setTypeChip("todos");
+                        setChip("todos");
+                        setSelectedSedeId("todas");
+                      }}
+                    />
+                  )}
+                </div>
               )}
             </div>
           }
+          footer={
+            data && data.total > 0 && (
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="departamentos"
+                nounSingular="departamento"
+              />
+            )
+          }
         >
-          {all === null ? (
-            !failed && <TableSkeleton rows={8} columns={7} />
-          ) : visible.length === 0 ? (
+          {data === null ? (
+            <TableSkeleton rows={8} columns={7} />
+          ) : data.items.length === 0 ? (
             <p className="py-14 text-center text-[13.5px] text-faint">
               {isFiltering
                 ? "Ningún departamento coincide con este filtro o búsqueda."
                 : "Todavía no hay ningún departamento registrado."}
             </p>
           ) : (
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th className="w-56">Sede</Th>
-                  <Th>Departamento</Th>
-                  <Th className="w-28">Tipo</Th>
-                  <Th className="w-56">Correo</Th>
-                  <Th className="w-56">Administrador</Th>
-                  <Th className="w-48">Permisos</Th>
-                  <Th className="w-24">Estado</Th>
-                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
-              <tbody>
-                {visible.map((d) => {
-                  const propios = d.staffCount ?? 0;
+            <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+              <DataTable>
+                <thead>
+                  <HeadRow>
+                    {canWrite && (
+                      <Th className="w-10 text-center">
+                        <div className="flex items-center justify-center">
+                          <SelectBox
+                            checked={pageState}
+                            onToggle={togglePage}
+                            label={pageState === true ? "Quitar la selección de esta página" : "Seleccionar toda la página"}
+                          />
+                        </div>
+                      </Th>
+                    )}
+                    <Th className="w-48">Sede</Th>
+                    <Th className="w-1/4">Departamento</Th>
+                    <Th className="w-36 text-center">Tipo</Th>
+                    <Th className="w-1/4">Administrador</Th>
+                    <Th className="w-44">Permisos</Th>
+                    <Th className="w-24">Estado</Th>
+                    {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                  </HeadRow>
+                </thead>
+                <tbody>
+                  {data.items.map((d) => {
+                    const checked = selectedIds.has(d.id);
+                    const propios = d.staffCount ?? 0;
 
-                  return (
-                    <Row key={d.id} busy={busyId === d.id}>
-                      {/* 1. SEDE */}
-                      <Td>
-                        {d.sedeName ? (
-                          <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-zinc-800">
-                            <Building className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                            <span className="truncate">{d.sedeName}</span>
-                          </span>
-                        ) : (
-                          <span className="text-[12px] text-zinc-400 italic">Sin sede</span>
+                    return (
+                      <Row key={d.id} busy={busyId === d.id} data-checked={checked}>
+                        {/* 0. CASILLA DE SELECCIÓN */}
+                        {canWrite && (
+                          <Td className="w-10 text-center">
+                            <div className="flex items-center justify-center">
+                              <SelectBox
+                                checked={checked}
+                                onToggle={() => toggleSelect(d.id)}
+                                label={`Seleccionar ${d.name}`}
+                              />
+                            </div>
+                          </Td>
                         )}
-                      </Td>
 
-                      {/* 2. DEPARTAMENTO */}
-                      <Td>
-                        <span className="text-[12.5px] font-semibold text-ink">
-                          {d.name}
-                        </span>
-                      </Td>
-
-                      {/* 3. TIPO */}
-                      <Td>
-                        {d.type === "Privado" ? (
-                          <Badge tone="slate" className="gap-1">
-                            <Lock className="h-2.5 w-2.5" />
-                            Privado
-                          </Badge>
-                        ) : (
-                          <Badge tone="neutral" className="gap-1">
-                            <Users className="h-2.5 w-2.5" />
-                            Público
-                          </Badge>
-                        )}
-                      </Td>
-
-                      {/* 4. CORREO / BUZÓN */}
-                      <Td>
-                        {d.mailboxAddress ? (
-                          <span
-                            className="inline-flex items-center gap-1.5 max-w-[210px] truncate text-[12.5px] text-zinc-700"
-                            title={d.mailboxAddress}
-                          >
-                            <Mail className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                            <span className="truncate">{d.mailboxAddress}</span>
-                          </span>
-                        ) : (
-                          <span className="text-[12px] text-zinc-400 italic">Sin correo</span>
-                        )}
-                      </Td>
-
-                      {/* 5. ADMINISTRADOR / ENCARGADO */}
-                      <Td>
-                        {d.managerName ? (
-                          <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-zinc-800">
-                            <UserCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                            <span className="truncate">{d.managerName}</span>
-                          </span>
-                        ) : (
-                          <span className="text-[12px] text-zinc-400 italic">Sin administrador</span>
-                        )}
-                      </Td>
-
-                      {/* 6. PERMISOS / ROL PREDETERMINADO */}
-                      <Td>
-                        {d.defaultRoleName ? (
-                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-zinc-700">
-                            <Shield className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                            <span>{d.defaultRoleName}</span>
-                          </span>
-                        ) : (
-                          <span className="text-[12px] text-zinc-400 italic">Sin rol</span>
-                        )}
-                      </Td>
-
-                      {/* 7. ESTADO */}
-                      <Td>
-                        <StatusDot active={d.isActive} />
-                      </Td>
-
-                      {/* 8. ACCIONES */}
-                      {canWrite && (
+                        {/* 1. SEDE */}
                         <Td>
-                          <div className="flex items-center justify-end gap-1">
-                            <RowAction
-                              label={`Editar ${d.name}`}
-                              icon={Pencil}
-                              onClick={() => setModal(d)}
-                              disabled={busyId === d.id}
-                            />
-                            <RowAction
-                              label={d.isActive ? `Desactivar ${d.name}` : `Reactivar ${d.name}`}
-                              icon={Power}
-                              onClick={() => askToggle(d)}
-                              disabled={busyId === d.id}
-                            />
-                            {propios === 0 && (
+                          {d.sedeName ? (
+                            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-zinc-800">
+                              <Building className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                              <span className="truncate">{d.sedeName}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[12px] text-zinc-400 italic">Sin sede</span>
+                          )}
+                        </Td>
+
+                        {/* 2. DEPARTAMENTO */}
+                        <Td>
+                          <span className="text-[12.5px] font-semibold text-ink">
+                            {d.name}
+                          </span>
+                        </Td>
+
+                        {/* 3. TIPO */}
+                        <Td className="text-center">
+                          {d.type === "Privado" ? (
+                            <Badge tone="slate" className="gap-1">
+                              <Lock className="h-2.5 w-2.5" />
+                              Privado
+                            </Badge>
+                          ) : (
+                            <Badge tone="neutral" className="gap-1">
+                              <Users className="h-2.5 w-2.5" />
+                              Público
+                            </Badge>
+                          )}
+                        </Td>
+
+                        {/* 4. ADMINISTRADOR / ENCARGADO */}
+                        <Td>
+                          {d.managerName ? (
+                            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-zinc-800">
+                              <UserCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                              <span className="truncate">{d.managerName}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[12px] text-zinc-400 italic">Sin administrador</span>
+                          )}
+                        </Td>
+
+                        {/* 6. PERMISOS / ROL PREDETERMINADO */}
+                        <Td>
+                          {d.defaultRoleName ? (
+                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-zinc-700">
+                              <Shield className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                              <span>{d.defaultRoleName}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[12px] text-zinc-400 italic">Sin rol</span>
+                          )}
+                        </Td>
+
+                        {/* 7. ESTADO */}
+                        <Td>
+                          <StatusDot active={d.isActive} />
+                        </Td>
+
+                        {/* 8. ACCIONES */}
+                        {canWrite && (
+                          <Td>
+                            <div className="flex items-center justify-end gap-1">
                               <RowAction
-                                label={`Eliminar ${d.name}`}
-                                icon={Trash2}
-                                danger
-                                onClick={() => askDelete(d)}
+                                label={`Editar ${d.name}`}
+                                icon={Pencil}
+                                onClick={() => setModal(d)}
                                 disabled={busyId === d.id}
                               />
-                            )}
-                          </div>
-                        </Td>
-                      )}
-                    </Row>
-                  );
-                })}
-              </tbody>
-            </DataTable>
+                              <RowAction
+                                label={d.isActive ? `Desactivar ${d.name}` : `Reactivar ${d.name}`}
+                                icon={Power}
+                                onClick={() => askToggle(d)}
+                                disabled={busyId === d.id}
+                              />
+                              {propios === 0 && (
+                                <RowAction
+                                  label={`Eliminar ${d.name}`}
+                                  icon={Trash2}
+                                  danger
+                                  onClick={() => askDelete(d)}
+                                  disabled={busyId === d.id}
+                                />
+                              )}
+                            </div>
+                          </Td>
+                        )}
+                      </Row>
+                    );
+                  })}
+                </tbody>
+              </DataTable>
+            </div>
           )}
         </ListPanel>
       </div>
+
+      {/* Modal para cambiar sede en lote */}
+      {bulkSedeModalOpen && (
+        <Modal
+          title={`Cambiar sede (${selectedIds.size} departamentos)`}
+          description="Elige la sede a la que deseas asignar los departamentos seleccionados."
+          onClose={() => setBulkSedeModalOpen(false)}
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
+                Sede destino
+              </label>
+              <select
+                value={selectedBulkSedeId}
+                onChange={(e) => setSelectedBulkSedeId(e.target.value)}
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[13px] text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
+              >
+                <option value="">Sin sede asignada</option>
+                {sedesList?.items.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setBulkSedeModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  const sid = selectedBulkSedeId === "" ? null : Number(selectedBulkSedeId);
+                  await runBulk("set-sede", sid);
+                  setBulkSedeModalOpen(false);
+                }}
+                disabled={bulkBusy}
+              >
+                Guardar cambios
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {modal !== null && (
         <DepartmentModal
           department={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={reload}
+          onSaved={refresh}
         />
       )}
 

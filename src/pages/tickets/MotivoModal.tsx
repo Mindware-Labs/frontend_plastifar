@@ -7,7 +7,7 @@ import { ApiError } from "../../api/client";
 import { ticketTopicsApi } from "../../api/ticketTopics";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
+import { SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { departmentPathOptions } from "../../lib/departments";
@@ -33,7 +33,7 @@ const schema = z.object({
     .max(120, "Máximo 120 caracteres"),
   departmentId: z.string().min(1, "Elige un departamento"),
   priority: z.enum(["Emergencia", "Alta", "Normal", "Baja"]),
-  requiresProductLine: z.boolean(),
+  suggestedForm: z.string().nullable().optional(),
   isActive: z.boolean(),
 });
 
@@ -77,7 +77,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
       name: topic?.name ?? "",
       departmentId: topic ? String(topic.defaultDepartmentId) : "",
       priority: (topic?.defaultPriority as FormValues["priority"]) ?? "Normal",
-      requiresProductLine: topic?.requiresProductLine ?? false,
+      suggestedForm: topic?.suggestedForm ?? "",
       isActive: topic?.isActive ?? true,
     },
   });
@@ -94,7 +94,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
       name: values.name.trim(),
       defaultDepartmentId: Number(values.departmentId),
       defaultPriority: values.priority,
-      requiresProductLine: values.requiresProductLine,
+      suggestedForm: values.suggestedForm || null,
       isActive: values.isActive,
     };
 
@@ -131,8 +131,8 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
       title={isEdit ? `Editar ${topic.name}` : "Nuevo motivo"}
       description={
         isEdit
-          ? "Actualiza el motivo, departamento asignado y parámetros operativos."
-          : "El departamento que elijas aquí se asignará de forma predeterminada al crear un ticket."
+          ? "Configura la clasificación, el departamento asignado y las reglas del motivo."
+          : "Define un motivo para clasificar y enrutar los tickets en el sistema."
       }
       onClose={onClose}
       isExiting={isExiting}
@@ -175,7 +175,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
         <TextField
           size="sm"
           label="Nombre del motivo"
-          placeholder="Ej. Faltante, Defecto de impresión, Avería en transporte…"
+          placeholder="Ej. Reclamación de calidad, Devolución, Faltante de despacho…"
           required
           maxLength={120}
           state={stateOf("name")}
@@ -189,7 +189,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
           render={({ field }) => (
             <SelectField
               size="sm"
-              label="Departamento que lo atiende"
+              label="Departamento predeterminado"
               required
               searchable
               name={field.name}
@@ -200,25 +200,24 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
               options={departmentPathOptions(departments)}
               state={stateOf("departmentId")}
               error={errors.departmentId?.message}
-              hint="Al seleccionar este motivo en un ticket nuevo, se asignará a este departamento por defecto."
             />
           )}
         />
 
         {/* 2. COMPORTAMIENTO Y SLA */}
-        <FormDivider title="Comportamiento y SLA" />
+        <FormDivider title="Comportamiento y Reglas" />
 
         <Controller
           name="priority"
           control={control}
           render={({ field }) => (
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5">
               <label className="font-heading text-[11.5px] font-semibold text-faint">
-                Prioridad por defecto <span className="text-brand-red">*</span>
+                Prioridad predeterminada <span className="text-brand-red">*</span>
               </label>
               <div
                 role="radiogroup"
-                aria-label="Prioridad por defecto"
+                aria-label="Prioridad predeterminada"
                 className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-lg border border-zinc-200 bg-zinc-50/70 p-0.5"
               >
                 {PRIORITIES.map((item) => {
@@ -245,17 +244,30 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
                   );
                 })}
               </div>
-              <span className="text-[11px] text-zinc-400">
-                Se hereda automáticamente al ticket y condiciona sus tiempos objetivo de resolución.
-              </span>
             </div>
           )}
         />
 
-        <CheckboxField
-          label="Exige línea de producto"
-          description="Obliga a especificar la línea de producto al abrir tickets con este motivo (indicado para reclamaciones de calidad)."
-          {...register("requiresProductLine")}
+        <Controller
+          name="suggestedForm"
+          control={control}
+          render={({ field }) => (
+            <SelectField
+              size="sm"
+              label="Formulario sugerido (Opcional)"
+              value={field.value ?? ""}
+              onChange={(val) => field.onChange(val ? val : null)}
+              options={[
+                { value: "", label: "Ninguno (ticket estándar)" },
+                { value: "Reclamacion", label: "PF-FOR-034 · Reclamación de clientes" },
+                { value: "RetiroMercancia", label: "PF-FOR-068 · Solicitud de retiro de mercancía" },
+                { value: "DiscrepanciaCarga", label: "PF-FOR-291 · Discrepancia de carga" },
+                { value: "Hca", label: "PF-FOR-109 · Hecho, Causa y Acción (HCA)" },
+              ]}
+              state={stateOf("suggestedForm")}
+              error={errors.suggestedForm?.message}
+            />
+          )}
         />
 
         {/* 3. DISPONIBILIDAD (SI SE EDITA) */}
@@ -266,7 +278,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
               name="isActive"
               control={control}
               render={({ field }) => (
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1.5">
                   <label className="font-heading text-[11.5px] font-semibold text-faint">
                     Estado del motivo
                   </label>
@@ -312,21 +324,16 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
                       <span>Inactivo</span>
                     </button>
                   </div>
-                  <span className="text-[11px] text-zinc-400">
-                    {field.value
-                      ? "Disponible para ser seleccionado al crear o reclasificar tickets."
-                      : "Oculto para nuevas aperturas; los tickets abiertos lo conservan."}
-                  </span>
                 </div>
               )}
             />
 
             {topic.ticketCount > 0 && (
-              <Alert variant="info">
+              <p className="text-[11.5px] text-zinc-500">
                 {topic.ticketCount === 1
-                  ? "1 ticket usa este motivo actualmente. Modificar el departamento no afectará los tickets existentes."
-                  : `${topic.ticketCount} tickets usan este motivo actualmente. Modificar el departamento no afectará los tickets existentes.`}
-              </Alert>
+                  ? "1 ticket usa este motivo actualmente."
+                  : `${topic.ticketCount} tickets usan este motivo actualmente.`}
+              </p>
             )}
           </>
         )}

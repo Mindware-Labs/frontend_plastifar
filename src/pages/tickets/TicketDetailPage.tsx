@@ -26,7 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
@@ -66,7 +66,7 @@ import { FormattedTicketBody } from "./FormattedTicketBody";
 import { AttachmentChip, TicketMessageCard } from "./TicketMessageCard";
 import { TicketTasksTab } from "./TicketTasksTab";
 import { TicketTimelineSheet, type TicketDetailTab, type TimelineItem } from "./TicketTimelineSheet";
-import { TicketClaimTab } from "../claims/TicketClaimTab";
+import { TicketFormsTab } from "./TicketFormsTab";
 import { usePermissions } from "../../hooks/usePermissions";
 
 /** El atajo se nombra con la tecla que la persona tiene delante, no con las dos. */
@@ -240,13 +240,28 @@ export function TicketDetailPage() {
   const [error, setError] = useState<string | null>(ticketId ? null : "Identificador de ticket no válido.");
 
   const { user } = useAuth();
-  // Reclamación de clientes (docs/plan/03): la pestaña se ve con claims.read y
-  // se registra con claims.write sobre el departamento del ticket.
+  // Formularios empresariales del ciclo de vida del ticket (PF-FOR-034, 068, 291, 109)
   const { can } = usePermissions();
-  const canReadClaim = can("claims.read", ticket?.departmentId ?? undefined);
-  const canCreateClaim = can("claims.write", ticket?.departmentId ?? undefined);
-  const [hasClaim, setHasClaim] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<TicketDetailTab>("datos");
+  const canReadForms =
+    can("claims.read", ticket?.departmentId ?? undefined) ||
+    can("withdrawals.read") ||
+    can("discrepancies.read") ||
+    can("quality.read");
+  const [hasForms, setHasForms] = useState<boolean | null>(null);
+  const [searchParams] = useSearchParams();
+  const initialUrlTab = searchParams.get("tab") as TicketDetailTab | null;
+  const [activeTab, setActiveTab] = useState<TicketDetailTab>(
+    initialUrlTab && ["datos", "conversacion", "tareas", "notas", "formularios", "reclamacion"].includes(initialUrlTab)
+      ? initialUrlTab
+      : "datos"
+  );
+
+  useEffect(() => {
+    const tab = searchParams.get("tab") as TicketDetailTab | null;
+    if (tab && ["datos", "conversacion", "tareas", "notas", "formularios", "reclamacion"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
   const [tasksCount, setTasksCount] = useState(0);
   useDynamicBreadcrumb(ticket?.number ?? null);
   const [showTimeline, setShowTimeline] = useState(false);
@@ -756,12 +771,6 @@ export function TicketDetailPage() {
       triggerEditSettle();
       return;
     }
-    const currentTopic = editCatalogs?.topics.find((t) => t.id === editTopicId);
-    if (currentTopic?.requiresProductLine && !editProductLineId) {
-      setEditError("Línea de producto requerida");
-      triggerEditSettle();
-      return;
-    }
 
     try {
       setSavingEdit(true);
@@ -812,7 +821,6 @@ export function TicketDetailPage() {
   const isCancelado = normStatus === "cancelado";
   const isCerrado = normStatus === "cerrado";
   const isClosed = isCancelado || isCerrado;
-  const editRequiresProductLine = Boolean(editCatalogs?.topics.find((t) => t.id === editTopicId)?.requiresProductLine);
 
   const byDate = (a: { createdAt: string }, b: { createdAt: string }) =>
     new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -877,20 +885,20 @@ export function TicketDetailPage() {
         setActiveCommentsTask(null);
       },
     },
-    ...(canReadClaim
+    ...(canReadForms
       ? [
           {
             label: (
               <span className="inline-flex items-center gap-1.5">
-                Reclamación
-                {hasClaim && (
-                  <span className="size-1.5 rounded-full bg-brand-red" title="Tiene reclamación registrada" />
+                Formularios
+                {hasForms && (
+                  <span className="size-1.5 rounded-full bg-brand-red" title="Tiene formularios registrados" />
                 )}
               </span>
             ),
-            active: activeTab === "reclamacion",
+            active: activeTab === "formularios" || activeTab === "reclamacion",
             onClick: () => {
-              setActiveTab("reclamacion");
+              setActiveTab("formularios");
               setActiveCommentsTask(null);
             },
           },
@@ -917,26 +925,6 @@ export function TicketDetailPage() {
               </span>
             )}
             <PriorityCell priority={ticket.priority} />
-            <SlaCell sla={sla} />
-          </div>
-        }
-        summary={
-          <div className="flex items-center gap-1.5 text-[12px] text-zinc-500">
-            <span className="font-medium text-zinc-700 truncate max-w-[280px] lg:max-w-[400px]" title={ticket.subject}>
-              {ticket.subject}
-            </span>
-            {ticket.clientName && (
-              <>
-                <span aria-hidden className="text-zinc-300">·</span>
-                <span className="truncate max-w-[160px]">{ticket.clientName}</span>
-              </>
-            )}
-            {ticket.departmentName && (
-              <>
-                <span aria-hidden className="text-zinc-300">·</span>
-                <span className="truncate max-w-[150px]">{ticket.departmentName}</span>
-              </>
-            )}
           </div>
         }
         sections={sections}
@@ -1534,15 +1522,12 @@ export function TicketDetailPage() {
                   </div>
                 )}
 
-                {/* TAB: RECLAMACIÓN */}
-                {canReadClaim && (
-                  <div className={activeTab === "reclamacion" ? "block" : "hidden"}>
-                    <TicketClaimTab
-                      ticketId={ticket.id}
-                      ticketNumber={ticket.number}
-                      clientName={ticket.clientName}
-                      canCreate={canCreateClaim}
-                      onClaimChanged={(claim) => setHasClaim(claim !== null)}
+                {/* TAB: FORMULARIOS */}
+                {canReadForms && (
+                  <div className={activeTab === "formularios" || activeTab === "reclamacion" ? "block" : "hidden"}>
+                    <TicketFormsTab
+                      ticket={ticket}
+                      onHasFormsChanged={(has) => setHasForms(has)}
                     />
                   </div>
                 )}
@@ -2611,8 +2596,6 @@ export function TicketDetailPage() {
                     id="edit-line"
                     label="Línea de producto"
                     size="sm"
-                    required={editRequiresProductLine}
-                    state={editError && editRequiresProductLine && !editProductLineId ? "error" : "idle"}
                     value={editProductLineId !== null ? String(editProductLineId) : ""}
                     onChange={(value) => {
                       setEditProductLineId(value ? Number(value) : null);

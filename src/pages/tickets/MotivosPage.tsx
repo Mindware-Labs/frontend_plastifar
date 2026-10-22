@@ -300,7 +300,7 @@ export function MotivosPage() {
                   <Th>Motivo</Th>
                   <Th>Departamento</Th>
                   <Th>Prioridad</Th>
-                  <Th>Línea de producto</Th>
+                  <Th>Formulario sugerido</Th>
                   <Th>Tickets</Th>
                   <Th>Estado</Th>
                   <Th>Actualizado</Th>
@@ -323,8 +323,14 @@ export function MotivosPage() {
                         {topic.defaultPriority}
                       </span>
                     </Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      {topic.requiresProductLine ? "Obligatoria" : "No se pide"}
+                    <Td className="text-[12px]">
+                      {topic.suggestedFormLabel ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-zinc-100 border border-zinc-200/80 px-2 py-0.5 font-medium text-zinc-800">
+                          {topic.suggestedFormLabel}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400 font-normal">—</span>
+                      )}
                     </Td>
                     <Td className="text-[12.5px] text-subtle">{topic.ticketCount}</Td>
                     <Td>

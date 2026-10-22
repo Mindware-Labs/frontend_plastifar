@@ -1,4 +1,4 @@
-import { zodResolver } from "@hookform/resolvers/zod";
+﻿import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
@@ -83,6 +83,16 @@ interface DiscrepancyFormModalProps {
   discrepancy?: LoadDiscrepancy;
   /** Ticket fijado de antemano (alta desde un ticket concreto). */
   ticketId?: number;
+  initialData?: {
+    note?: string;
+    lines?: Array<{
+      productId: string;
+      invoiceRef?: string;
+      clientId?: string;
+      surplusQuantity?: string;
+      shortageQuantity?: string;
+    }>;
+  };
   onClose: () => void;
   onSaved: (detail: DiscrepancyDetail) => void;
 }
@@ -92,7 +102,7 @@ interface DiscrepancyFormModalProps {
  * responden en la ficha, no aquí: son nueve preguntas de una lista, no campos
  * de un formulario de alta.
  */
-export function DiscrepancyFormModal({ discrepancy, ticketId, onClose, onSaved }: DiscrepancyFormModalProps) {
+export function DiscrepancyFormModal({ discrepancy, ticketId, initialData, onClose, onSaved }: DiscrepancyFormModalProps) {
   const isEdit = discrepancy !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -106,7 +116,7 @@ export function DiscrepancyFormModal({ discrepancy, ticketId, onClose, onSaved }
     mode: "onTouched",
     defaultValues: {
       ticketId: discrepancy ? String(discrepancy.ticketId) : ticketId ? String(ticketId) : "",
-      note: discrepancy?.note ?? "",
+      note: discrepancy?.note ?? initialData?.note ?? "",
       lines: discrepancy && discrepancy.lines.length > 0
         ? discrepancy.lines.map((line) => ({
             productId: String(line.productId),
@@ -119,6 +129,15 @@ export function DiscrepancyFormModal({ discrepancy, ticketId, onClose, onSaved }
             creditNoteNumber: line.creditNoteNumber ?? "",
             dispatcherName: line.dispatcherName,
             supervisorName: line.supervisorName ?? "",
+          }))
+        : initialData?.lines && initialData.lines.length > 0
+        ? initialData.lines.map((l) => ({
+            ...emptyLine(),
+            productId: l.productId,
+            invoiceRef: l.invoiceRef ?? "",
+            clientId: l.clientId ?? "",
+            surplusQuantity: l.surplusQuantity ?? "",
+            shortageQuantity: l.shortageQuantity ?? "",
           }))
         : [emptyLine()],
     },

@@ -1,6 +1,13 @@
 import { apiRequest, toQuery } from "./client";
 import { setDepartmentHierarchy } from "../lib/departments";
-import type { DepartmentResponse, DepartmentType, SaveDepartmentRequest } from "../types/api";
+import type {
+  BulkDepartmentRequest,
+  DepartmentListResponse,
+  DepartmentQuery,
+  DepartmentResponse,
+  DepartmentType,
+  SaveDepartmentRequest,
+} from "../types/api";
 
 export const departmentsApi = {
   /**
@@ -45,6 +52,25 @@ export const departmentsApi = {
     setDepartmentHierarchy(departments);
     return departments;
   },
+
+  listPaged: (query: DepartmentQuery) =>
+    apiRequest<DepartmentListResponse>(
+      `/api/departments${toQuery({
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? 10,
+        search: query.search || undefined,
+        status: query.status,
+        sedeId: query.sedeId,
+        type: query.type,
+        includeInactive: query.includeInactive ?? true,
+      })}`,
+    ),
+
+  bulk: (data: BulkDepartmentRequest) =>
+    apiRequest<{ affected: number }>("/api/departments/bulk", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 
   /** Relectura previa a una escritura: nunca se reenvia la copia pintada. */
   get: (id: number) => apiRequest<DepartmentResponse>(`/api/departments/${id}`),

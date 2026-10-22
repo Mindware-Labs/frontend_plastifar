@@ -1,4 +1,4 @@
-﻿import { Check, ChevronDown, Search } from "lucide-react";
+﻿import { Building, Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
@@ -11,6 +11,7 @@ import {
 export interface SelectOption {
   value: string;
   label: string;
+  hint?: string;
   disabled?: boolean;
   hidden?: boolean;
 }
@@ -102,7 +103,7 @@ export function Select({
   function isVisible(option: SelectOption) {
     if (option.hidden) return false;
     const q = query.trim().toLowerCase();
-    return !q || option.label.toLowerCase().includes(q);
+    return !q || option.label.toLowerCase().includes(q) || (option.hint ? option.hint.toLowerCase().includes(q) : false);
   }
 
   function measure() {
@@ -112,11 +113,12 @@ export function Select({
     const below = window.innerHeight - rect.bottom;
     const dropUp = below < PANEL_MAX_HEIGHT && rect.top > below;
 
+    const hasHints = options.some((o) => !!o.hint);
     const width = matchTriggerWidth
       ? rect.width
       : Math.max(
           rect.width,
-          size === "xs" || isSubtle ? PANEL_MIN_WIDTH_COMPACT_TRIGGER : PANEL_MIN_WIDTH,
+          hasHints ? 280 : (size === "xs" || isSubtle ? PANEL_MIN_WIDTH_COMPACT_TRIGGER : PANEL_MIN_WIDTH),
         );
 
     // Un panel más ancho que su disparador no puede desbordar la ventana por la derecha.
@@ -173,7 +175,7 @@ export function Select({
     setQuery(next);
     const q = next.trim().toLowerCase();
     const firstMatch = options.findIndex(
-      (o) => !o.disabled && !o.hidden && (!q || o.label.toLowerCase().includes(q)),
+      (o) => !o.disabled && !o.hidden && (!q || o.label.toLowerCase().includes(q) || (o.hint ? o.hint.toLowerCase().includes(q) : false)),
     );
     setActiveIndex(firstMatch);
   }
@@ -327,9 +329,15 @@ export function Select({
           flex items-center justify-between font-medium
           ${selected ? "text-zinc-900" : "text-zinc-400"} ${buttonClassName}`}
       >
-        <div className="flex min-w-0 items-center gap-1.5 truncate">
+        <div className="flex min-w-0 flex-1 items-center gap-2 truncate">
           {leftIcon}
           <span className="truncate">{selected?.label ?? placeholder}</span>
+          {selected?.hint && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-[5px] bg-zinc-100 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-600 border border-zinc-200/80">
+              <Building className="h-2.5 w-2.5 text-zinc-400" />
+              {selected.hint}
+            </span>
+          )}
         </div>
         <ChevronDown
           aria-hidden
@@ -428,13 +436,21 @@ export function Select({
                             : "text-zinc-700 hover:bg-zinc-100/70"
                       } ${isSelected ? (matchTriggerWidth ? "font-semibold text-brand-red" : "font-semibold text-zinc-900") : ""}`}
                     >
-                      <span className="truncate">{option.label}</span>
+                      <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                        <span className="truncate">{option.label}</span>
+                        {option.hint && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-[5px] bg-zinc-100/90 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-500 border border-zinc-200/60">
+                            <Building className="h-2.5 w-2.5 text-zinc-400" />
+                            {option.hint}
+                          </span>
+                        )}
+                      </div>
                       {isSelected && !matchTriggerWidth && (
                         <Check
                           aria-hidden
                           className={`${
                             size === "xs" ? "h-3.5 w-3.5" : "h-4 w-4"
-                          } shrink-0 text-brand-red`}
+                          } shrink-0 text-brand-red ml-1`}
                         />
                       )}
                     </li>

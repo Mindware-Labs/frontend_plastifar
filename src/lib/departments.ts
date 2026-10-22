@@ -9,6 +9,8 @@ export interface DepartmentLike {
   id: number;
   name: string;
   parentId?: number | null;
+  sedeId?: number | null;
+  sedeName?: string | null;
 }
 
 /**
@@ -112,10 +114,11 @@ export function buildDepartmentTree<T extends DepartmentLike>(departments: T[]):
  */
 export function departmentOptions(
   departments: DepartmentLike[],
-): { value: string; label: string }[] {
+): { value: string; label: string; hint?: string }[] {
   return buildDepartmentTree(departments).map((d) => ({
     value: String(d.id),
     label: "    ".repeat(d.depth) + d.name,
+    hint: d.sedeName ?? undefined,
   }));
 }
 
@@ -140,14 +143,34 @@ export function departmentOptions(
 export function departmentPathOptions(
   departments: DepartmentLike[],
   reference: DepartmentLike[] = departments,
-): { value: string; label: string }[] {
+): { value: string; label: string; hint?: string }[] {
   const ofrecidos = new Set(departments.map((d) => d.id));
   const arbol = buildDepartmentTree(reference);
   const resueltos = new Set(arbol.map((d) => d.id));
 
+  const sedeMap = new Map<number, string>();
+  for (const d of reference) {
+    if (d.sedeName) sedeMap.set(d.id, d.sedeName);
+  }
+  for (const d of departments) {
+    if (d.sedeName) sedeMap.set(d.id, d.sedeName);
+  }
+
   return [
-    ...arbol.filter((d) => ofrecidos.has(d.id)).map((d) => ({ value: String(d.id), label: d.path })),
-    ...departments.filter((d) => !resueltos.has(d.id)).map((d) => ({ value: String(d.id), label: d.name })),
+    ...arbol
+      .filter((d) => ofrecidos.has(d.id))
+      .map((d) => ({
+        value: String(d.id),
+        label: d.path,
+        hint: d.sedeName ?? sedeMap.get(d.id) ?? undefined,
+      })),
+    ...departments
+      .filter((d) => !resueltos.has(d.id))
+      .map((d) => ({
+        value: String(d.id),
+        label: d.name,
+        hint: d.sedeName ?? sedeMap.get(d.id) ?? undefined,
+      })),
   ];
 }
 
@@ -162,7 +185,9 @@ export function departmentPath(
   id: number | null | undefined,
 ): string | null {
   if (id == null) return null;
-  return buildDepartmentTree(departments).find((d) => d.id === id)?.path ?? null;
+  const match = buildDepartmentTree(departments).find((d) => d.id === id);
+  if (!match) return null;
+  return match.sedeName ? `${match.path} (${match.sedeName})` : match.path;
 }
 
 /**
@@ -174,7 +199,12 @@ export function departmentPath(
  * un nombre corto sigue siendo mejor que una celda vacía.
  */
 export function departmentPaths(departments: DepartmentLike[]): Map<number, string> {
-  return new Map(buildDepartmentTree(departments).map((d) => [d.id, d.path]));
+  return new Map(
+    buildDepartmentTree(departments).map((d) => [
+      d.id,
+      d.sedeName ? `${d.path} (${d.sedeName})` : d.path,
+    ]),
+  );
 }
 
 /**

@@ -159,6 +159,39 @@ export interface DepartmentResponse {
   sedeName?: string | null;
 }
 
+export interface DepartmentCounts {
+  all: number;
+  active: number;
+  inactive: number;
+  publicos: number;
+  privados: number;
+}
+
+export interface DepartmentListResponse {
+  items: DepartmentResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: DepartmentCounts;
+}
+
+export interface DepartmentQuery {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  sedeId?: number;
+  type?: DepartmentType;
+  includeInactive?: boolean;
+}
+
+export interface BulkDepartmentRequest {
+  ids: number[];
+  action: "activate" | "deactivate" | "set-sede" | "delete";
+  sedeId?: number | null;
+}
+
 /** Espejo del enum `DepartmentType` del servidor, que viaja como texto. */
 export type DepartmentType = "Publico" | "Privado";
 
@@ -318,6 +351,10 @@ export interface TicketSummaryResponse {
   departmentId: number | null;
   createdAt: string;
   updatedAt: string;
+  topicSuggestedForm?: string | null;
+  topicSuggestedFormLabel?: string | null;
+  topicId?: number | null;
+  topicName?: string | null;
 }
 
 /** Total y sin leer de una carpeta, para los contadores del menu. */
@@ -441,6 +478,8 @@ export interface TicketListItemResponse {
   lastActivityAt: string;
   createdAt: string;
   updatedAt: string;
+  topicSuggestedForm?: string | null;
+  topicSuggestedFormLabel?: string | null;
 }
 
 export interface TicketCounts {
@@ -574,6 +613,8 @@ export interface TicketDetailResponse {
   requesterName?: string | null;
   verdictId: number | null;
   verdictName: string | null;
+  topicSuggestedForm?: string | null;
+  topicSuggestedFormLabel?: string | null;
   // Campos retrocompatibles
   code?: string;
   source?: string;
@@ -742,8 +783,9 @@ export interface TicketTopicOption {
   name: string;
   defaultDepartmentId: number;
   defaultPriority: string;
-  requiresProductLine: boolean;
   slaPolicyId: number | null;
+  suggestedForm?: string | null;
+  suggestedFormLabel?: string | null;
 }
 
 export interface TicketProductLineOption {
@@ -755,6 +797,8 @@ export interface TicketProductLineOption {
 export interface TicketDepartmentOption {
   id: number;
   name: string;
+  sedeName?: string | null;
+  parentId?: number | null;
 }
 
 export interface TicketCreateOptionsResponse {
@@ -812,7 +856,8 @@ export interface TicketTopicResponse {
   defaultDepartmentName: string;
   /** Emergencia | Alta | Normal | Baja. */
   defaultPriority: string;
-  requiresProductLine: boolean;
+  suggestedForm?: string | null;
+  suggestedFormLabel?: string | null;
   isActive: boolean;
   /** Cuántos tickets lo usan: con uno solo ya no se puede borrar, solo desactivar. */
   ticketCount: number;
@@ -840,7 +885,7 @@ export interface SaveTicketTopicRequest {
   name: string;
   defaultDepartmentId: number;
   defaultPriority?: string;
-  requiresProductLine: boolean;
+  suggestedForm?: string | null;
   isActive?: boolean;
 }
 

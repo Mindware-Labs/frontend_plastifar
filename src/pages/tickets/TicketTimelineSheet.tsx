@@ -21,7 +21,7 @@ export type TimelineItem =
   | { kind: "message"; data: TicketMessageResponse; createdAt: string }
   | { kind: "event"; data: TicketEventResponse; createdAt: string };
 
-export type TicketDetailTab = "datos" | "conversacion" | "tareas" | "notas" | "reclamacion";
+export type TicketDetailTab = "datos" | "conversacion" | "tareas" | "notas" | "formularios" | "reclamacion";
 
 type TimelineFilter = "all" | "messages" | "events";
 
