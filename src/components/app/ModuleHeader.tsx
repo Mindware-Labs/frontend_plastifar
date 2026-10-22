@@ -2,9 +2,11 @@ import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 
-interface ModuleHeaderSection {
-  label: string;
-  to: string;
+export interface ModuleHeaderSection {
+  label: ReactNode;
+  to?: string;
+  active?: boolean;
+  onClick?: () => void;
 }
 
 interface ModuleHeaderProps {
@@ -13,7 +15,7 @@ interface ModuleHeaderProps {
   /** Texto del tooltip y aria-label del botón volver. */
   backLabel?: string;
   /** Titulo de la pagina. */
-  title?: string;
+  title?: ReactNode;
   /** Badge opcional junto al titulo (p. ej. contador o tag). */
   badge?: ReactNode;
   /** Resumen en linea con el titulo, no debajo: gana altura para el contenido. */
@@ -89,21 +91,37 @@ export function ModuleHeader({
         <div className="flex h-full flex-wrap items-center gap-3">
           {sections && sections.length > 0 && (
             <nav aria-label="Secciones de la ficha" className="flex h-full items-center gap-1 self-stretch">
-              {sections.map((section) => (
-                <NavLink
-                  key={section.to}
-                  to={section.to}
-                  end
-                  className={({ isActive }) =>
-                    `flex h-full items-center border-b-2 px-2.5 text-[12.5px] font-medium transition-all duration-200 ease-out -mb-px ` +
-                    (isActive
-                      ? "border-brand-red text-zinc-900 font-semibold"
-                      : "border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300/80")
-                  }
-                >
-                  {section.label}
-                </NavLink>
-              ))}
+              {sections.map((section, idx) => {
+                const navClass = (isActive: boolean) =>
+                  `flex h-full items-center border-b-2 px-2.5 text-[12.5px] font-medium transition-all duration-200 ease-out -mb-px ` +
+                  (isActive
+                    ? "border-brand-red text-zinc-900 font-semibold"
+                    : "border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300/80");
+
+                if (section.to) {
+                  return (
+                    <NavLink
+                      key={section.to}
+                      to={section.to}
+                      end
+                      className={({ isActive }) => navClass(isActive)}
+                    >
+                      {section.label}
+                    </NavLink>
+                  );
+                }
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={section.onClick}
+                    className={`${navClass(Boolean(section.active))} bg-transparent border-t-0 border-x-0 cursor-pointer outline-none`}
+                  >
+                    {section.label}
+                  </button>
+                );
+              })}
             </nav>
           )}
 

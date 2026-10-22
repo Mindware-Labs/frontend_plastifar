@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  CheckSquare,
   Clock,
   CornerUpLeft,
   FileText,
@@ -13,7 +12,6 @@ import {
   Plus,
   RotateCcw,
   Send,
-  Ticket as TicketIcon,
   Upload,
   Workflow,
   X,
@@ -23,7 +21,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
-import { Tabs, TabsList, TabsTrigger } from "../../components/shadcn/tabs";
+import { ModuleHeader, type ModuleHeaderSection } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Badge } from "../../components/ui/Badge";
@@ -36,6 +34,7 @@ import { openOverlay } from "../../hooks/overlayStack";
 import { useSettle } from "../../hooks/useSettle";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { useAuth } from "../../context/useAuth";
+import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { departmentPath, departmentPathOptions } from "../../lib/departments";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
@@ -180,14 +179,6 @@ const attachExitingLabelClass =
   "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/40 px-2.5 " +
   "text-[11.5px] font-medium text-emerald-600 shadow-2xs ring-1 ring-emerald-100/50 transition-all duration-300 active:scale-95";
 
-const tabTriggerClass =
-  "gap-1.5 rounded-md border border-transparent px-2.5 py-1 text-[12.5px] font-medium text-zinc-500 transition-colors duration-150 " +
-  "hover:bg-white/60 hover:text-zinc-800 focus-visible:ring-2 focus-visible:ring-brand-red/25 " +
-  "data-active:border-zinc-200 data-active:bg-white data-active:font-semibold data-active:text-zinc-900 data-active:shadow-2xs";
-
-/** Cifra que acompaña a cada pestaña: voz de titular, tabular, se apaga cuando la pestaña no está activa. */
-const tabCountClass = "font-heading text-[10px] font-bold leading-none tabular-nums text-zinc-400 group-data-active:text-zinc-900";
-
 /** Archivo elegido y aun no enviado: nombre, peso y la cruz para quitarlo. */
 function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
@@ -227,6 +218,7 @@ export function TicketDetailPage() {
   const [hasClaim, setHasClaim] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<TicketDetailTab>("conversacion");
   const [tasksCount, setTasksCount] = useState(0);
+  useDynamicBreadcrumb(ticket?.number ?? null);
   const [showTimeline, setShowTimeline] = useState(false);
   const [activeCommentsTask, setActiveCommentsTask] = useState<TicketTaskResponse | null>(null);
   const [latestAddedComment, setLatestAddedComment] = useState<{
@@ -841,34 +833,57 @@ export function TicketDetailPage() {
       />
     ));
 
+  const sections: ModuleHeaderSection[] = [
+    {
+      label: `Conversación (${clientThread.length})`,
+      active: activeTab === "conversacion",
+      onClick: () => {
+        setActiveTab("conversacion");
+        setActiveCommentsTask(null);
+      },
+    },
+    {
+      label: `Tareas (${tasksCount})`,
+      active: activeTab === "tareas",
+      onClick: () => setActiveTab("tareas"),
+    },
+    {
+      label: `Notas internas (${internalNotes.length})`,
+      active: activeTab === "notas",
+      onClick: () => {
+        setActiveTab("notas");
+        setActiveCommentsTask(null);
+      },
+    },
+    ...(canReadClaim
+      ? [
+          {
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                Reclamación
+                {hasClaim && (
+                  <span className="size-1.5 rounded-full bg-brand-red" title="Tiene reclamación registrada" />
+                )}
+              </span>
+            ),
+            active: activeTab === "reclamacion",
+            onClick: () => {
+              setActiveTab("reclamacion");
+              setActiveCommentsTask(null);
+            },
+          },
+        ]
+      : []),
+  ];
+
   return (
-    // -mx-8 anula el relleno lateral del layout: la barra fija corre de borde a borde y el scroll queda en el canto.
-    <div className="-mx-3 lg:-mx-4 min-h-0 flex-1 overflow-y-auto pb-12">
-      <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center border-b border-zinc-200/80 bg-white/95 px-4 lg:px-6 backdrop-blur-xs">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-            <button
-              type="button"
-              onClick={() => navigate("/tickets")}
-              aria-label="Volver a tickets"
-              title="Volver a tickets"
-              className="-ml-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-zinc-500 outline-none
-                transition-colors hover:bg-zinc-100 hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <span className="inline-flex items-center gap-2">
-              <span
-                aria-hidden
-                className="flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
-              >
-                <TicketIcon className="size-3" strokeWidth={2.25} />
-              </span>
-              <span className="font-heading text-[11.5px] font-bold tabular-nums tracking-[0.01em] text-zinc-900">
-                {ticket.number}
-              </span>
-            </span>
-            <span aria-hidden className="h-4 w-px bg-line" />
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <ModuleHeader
+        backTo="/tickets"
+        backLabel="Volver al listado de tickets"
+        title={ticket.number}
+        badge={
+          <div className="flex items-center gap-1.5">
             <StatusCell status={ticket.status} />
             {isSolucionado && ticket.verdictName && (
               <span
@@ -882,7 +897,28 @@ export function TicketDetailPage() {
             <PriorityCell priority={ticket.priority} />
             <SlaCell sla={sla} />
           </div>
-
+        }
+        summary={
+          <div className="flex items-center gap-1.5 text-[12px] text-zinc-500">
+            <span className="font-medium text-zinc-700 truncate max-w-[280px] lg:max-w-[400px]" title={ticket.subject}>
+              {ticket.subject}
+            </span>
+            {ticket.clientName && (
+              <>
+                <span aria-hidden className="text-zinc-300">·</span>
+                <span className="truncate max-w-[160px]">{ticket.clientName}</span>
+              </>
+            )}
+            {ticket.departmentName && (
+              <>
+                <span aria-hidden className="text-zinc-300">·</span>
+                <span className="truncate max-w-[150px]">{ticket.departmentName}</span>
+              </>
+            )}
+          </div>
+        }
+        sections={sections}
+        action={
           <div className="flex items-center gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={() => setShowTimeline(true)}>
               <History className="h-[15px] w-[15px]" />
@@ -916,60 +952,25 @@ export function TicketDetailPage() {
               </span>
             )}
           </div>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="mx-auto max-w-6xl px-8 pt-5">
-        <h1 className="text-balance font-heading text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink">
-          {ticket.subject}
-        </h1>
-        <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[12px] text-zinc-500">
-          <span>Creado el {formatDateTime(ticket.createdAt)} por</span>
-          <span className="font-medium text-zinc-800">{ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}</span>
-          <span aria-hidden className="text-zinc-300">·</span>
-          <span className="font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">{ticket.channel}</span>
-        </p>
+      {/* Zona de contenido con scroll vertical asegurado */}
+      <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-8">
+        <div className="mx-auto w-full max-w-6xl">
+          <div className="pt-2">
+            <h1 className="text-balance font-heading text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink">
+              {ticket.subject}
+            </h1>
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[12px] text-zinc-500">
+              <span>Creado el {formatDateTime(ticket.createdAt)} por</span>
+              <span className="font-medium text-zinc-800">{ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}</span>
+              <span aria-hidden className="text-zinc-300">·</span>
+              <span className="font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">{ticket.channel}</span>
+            </p>
 
-        <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-start">
-          <div className="min-w-0 flex-1">
-            <Tabs
-              value={activeTab}
-              onValueChange={(value) => {
-                const nextTab = value as TicketDetailTab;
-                setActiveTab(nextTab);
-                if (nextTab !== "tareas") {
-                  setActiveCommentsTask(null);
-                }
-              }}
-            >
-              {/* Con cuatro pestañas la tira ya no cabe en la columna a 1040 px:
-                  la que sobra baja a una segunda fila en vez de meterse bajo el
-                  panel lateral. A anchos normales sigue siendo una sola fila. */}
-              <TabsList className="h-auto min-h-8 max-w-full flex-wrap gap-y-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 group-data-horizontal/tabs:h-auto [&>[role=tab]]:h-[25px]">
-                <TabsTrigger value="conversacion" className={`group ${tabTriggerClass}`}>
-                  <Mail aria-hidden className="size-3.5" />
-                  Conversación
-                  <span className={tabCountClass}>{clientThread.length}</span>
-                </TabsTrigger>
-                <TabsTrigger value="tareas" className={`group ${tabTriggerClass}`}>
-                  <CheckSquare aria-hidden className="size-3.5" />
-                  Tareas
-                  <span className={tabCountClass}>{tasksCount}</span>
-                </TabsTrigger>
-                <TabsTrigger value="notas" className={`group ${tabTriggerClass}`}>
-                  <Lock aria-hidden className="size-3.5" />
-                  Notas internas
-                  <span className={tabCountClass}>{internalNotes.length}</span>
-                </TabsTrigger>
-                {canReadClaim && (
-                  <TabsTrigger value="reclamacion" className={`group ${tabTriggerClass}`}>
-                    <FileText aria-hidden className="size-3.5" />
-                    Reclamación
-                    <span className={tabCountClass}>{hasClaim === null ? "" : hasClaim ? 1 : 0}</span>
-                  </TabsTrigger>
-                )}
-              </TabsList>
-            </Tabs>
+            <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-start">
+              <div className="min-w-0 flex-1">
 
             {canReadClaim && (
               <div className={activeTab === "reclamacion" ? "block" : "hidden"}>
@@ -1099,7 +1100,7 @@ export function TicketDetailPage() {
                 });
               }}
               targetHeight={propertiesHeight}
-              className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[350px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-16 self-start"
+              className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[350px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-2 self-start"
             />
           ) : (
             <TicketPropertiesAside
@@ -1112,11 +1113,13 @@ export function TicketDetailPage() {
               onAssign={() => void handleOpenAssignModal()}
               onOpenAttachment={openAttachment}
               innerCardRef={propertiesCardRef}
-              className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[350px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-16 self-start animate-plf-side-panel-back"
+              className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[350px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-2 self-start animate-plf-side-panel-back"
             />
           )}
         </div>
       </div>
+    </div>
+  </div>
 
       {/* Vista de redacción a pantalla completa con preservación de borrador. */}
       {replyOpen && (
