@@ -53,7 +53,15 @@ export function useDialogBehavior(panelRef: RefObject<HTMLElement | null>, onClo
       overlay.close();
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = originalOverflow;
-      previouslyFocused?.focus();
+      // Solo restaurar el foco al elemento anterior si el diálogo realmente se
+      // desmontó del DOM. En desarrollo (React StrictMode) el efecto se ejecuta
+      // dos veces: restaurar el foco sincrónicamente provoca un evento blur prematuro
+      // en el primer campo, disparando errores de validación nada más abrir la modal.
+      requestAnimationFrame(() => {
+        if (!panel || !document.contains(panel)) {
+          previouslyFocused?.focus();
+        }
+      });
     };
   }, [panelRef]);
 }

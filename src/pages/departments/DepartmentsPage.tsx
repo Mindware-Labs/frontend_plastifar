@@ -18,7 +18,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
+import { ClearFiltersButton, FilterDropdown, type FilterOption } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
@@ -74,32 +74,35 @@ export function DepartmentsPage() {
     };
   }, [all]);
 
-  // Pestañas dinámicas basadas en las Sedes registradas
-  const sedeTabs = useMemo(() => {
-    if (all === null) return [];
+  // Opciones de filtro para el selector de Sedes
+  const sedeOptions = useMemo<FilterOption[]>(() => {
     const sedes = sedesList?.items ?? [];
-    const sinSedeCount = all.filter((d) => !d.sedeId).length;
-
-    const tabs = [{ id: "todas", label: "Todas las sedes", count: all.length }];
+    const options: FilterOption[] = [
+      {
+        value: "todas",
+        label: "Todas las sedes",
+        icon: <Building className="h-4 w-4 text-zinc-500" />,
+      },
+    ];
 
     for (const s of sedes) {
-      const count = all.filter((d) => d.sedeId === s.id).length;
-      tabs.push({
-        id: String(s.id),
+      options.push({
+        value: String(s.id),
         label: s.name,
-        count,
+        icon: <Building className="h-4 w-4 text-zinc-500" />,
       });
     }
 
-    if (sinSedeCount > 0) {
-      tabs.push({
-        id: "sin-sede",
+    const hasSinSede = all ? all.some((d) => !d.sedeId) : true;
+    if (hasSinSede) {
+      options.push({
+        value: "sin-sede",
         label: "Sin sede asignada",
-        count: sinSedeCount,
+        icon: <Building className="h-4 w-4 text-zinc-400" />,
       });
     }
 
-    return tabs;
+    return options;
   }, [all, sedesList]);
 
   const visible = useMemo(() => {
@@ -293,73 +296,44 @@ export function DepartmentsPage() {
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         <ListPanel
           toolbar={
-            <div className="flex flex-wrap items-center justify-between gap-3 w-full">
-              <div className="flex flex-wrap items-center gap-2">
-                <SearchInput
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="Buscar por departamento, sede o correo…"
-                  className="w-[260px] sm:w-[280px]"
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por departamento, sede o correo…"
+                className="w-[260px] sm:w-[280px]"
+              />
+              <FilterDropdown
+                title="Seleccionar tipo"
+                aria-label="Filtrar por tipo de departamento"
+                value={typeChip}
+                onChange={(next) => setTypeChip(next as TypeKey)}
+                defaultIcon={<Users className="h-3.5 w-3.5 text-zinc-500" />}
+                options={[
+                  { value: "todos", label: "Todos los tipos", icon: <Users className="h-4 w-4 text-zinc-500" /> },
+                  { value: "Publico", label: "Públicos", icon: <Users className="h-4 w-4 text-blue-600" /> },
+                  { value: "Privado", label: "Privados", icon: <Lock className="h-4 w-4 text-amber-600" /> },
+                ]}
+              />
+              <FilterDropdown
+                title="Seleccionar sede"
+                aria-label="Filtrar por sede"
+                value={selectedSedeId}
+                onChange={(next) => setSelectedSedeId(next)}
+                defaultIcon={<Building className="h-3.5 w-3.5 text-zinc-500" />}
+                options={sedeOptions}
+                searchable={sedeOptions.length > 6}
+                searchPlaceholder="Buscar sede…"
+              />
+              {(search || typeChip !== "todos" || chip !== "todos" || selectedSedeId !== "todas") && (
+                <ClearFiltersButton
+                  onClick={() => {
+                    setSearch("");
+                    setTypeChip("todos");
+                    setChip("todos");
+                    setSelectedSedeId("todas");
+                  }}
                 />
-                <FilterDropdown
-                  title="Seleccionar tipo"
-                  aria-label="Filtrar por tipo de departamento"
-                  value={typeChip}
-                  onChange={(next) => setTypeChip(next as TypeKey)}
-                  defaultIcon={<Users className="h-3.5 w-3.5 text-zinc-500" />}
-                  options={[
-                    { value: "todos", label: "Todos los tipos", icon: <Users className="h-4 w-4 text-zinc-500" /> },
-                    { value: "Publico", label: "Públicos", icon: <Users className="h-4 w-4 text-blue-600" /> },
-                    { value: "Privado", label: "Privados", icon: <Lock className="h-4 w-4 text-amber-600" /> },
-                  ]}
-                />
-                {(search || typeChip !== "todos" || chip !== "todos" || selectedSedeId !== "todas") && (
-                  <ClearFiltersButton
-                    onClick={() => {
-                      setSearch("");
-                      setTypeChip("todos");
-                      setChip("todos");
-                      setSelectedSedeId("todas");
-                    }}
-                  />
-                )}
-              </div>
-
-              {/* Segmented control para filtrar por Sede */}
-              {sedeTabs.length > 2 && (
-                <div
-                  role="tablist"
-                  aria-label="Filtrar por sede"
-                  className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 overflow-x-auto max-w-full"
-                >
-                  {sedeTabs.map((tab) => {
-                    const isActive = selectedSedeId === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={isActive}
-                        onClick={() => setSelectedSedeId(tab.id)}
-                        className={`inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-                          isActive
-                            ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-                        }`}
-                      >
-                        <Building className={`h-3 w-3 ${isActive ? "text-brand-red" : "text-zinc-400"}`} />
-                        <span>{tab.label}</span>
-                        <span
-                          className={`font-heading text-[10px] font-bold leading-none tabular-nums ${
-                            isActive ? "text-zinc-900" : "text-zinc-400"
-                          }`}
-                        >
-                          {tab.count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
               )}
             </div>
           }
