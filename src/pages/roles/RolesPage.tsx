@@ -1,5 +1,7 @@
-import { Pencil, Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { KeyRound, Lock, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { permissionsApi } from "../../api/permissions";
 import { rolesApi, type RoleQuery } from "../../api/roles";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
@@ -7,17 +9,20 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import type { RoleListResponse, RoleResponse } from "../../types/api";
+import type { PermissionMatrixResponse } from "../../types/permissions";
+import { PermissionsView } from "../permissions/PermissionsPage";
 import { RoleModal } from "./RoleModal";
+import { RolePermissionsDrawer } from "./RolePermissionsDrawer";
 
 type FilterKey = "todos" | "activos" | "sistema" | "personalizados";
 
@@ -25,12 +30,45 @@ export function RolesPage() {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = (searchParams.get("tab") === "permisos" ? "permisos" : "roles") as
+    | "roles"
+    | "permisos";
+
+  function setTab(nextTab: "roles" | "permisos") {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (nextTab === "permisos") {
+          next.set("tab", "permisos");
+        } else {
+          next.delete("tab");
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
   const [busyId, setBusyId] = useState<number | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(
     null,
   );
   // null = cerrado, "nuevo" = alta, un RoleResponse = edicion de esa fila.
   const [modal, setModal] = useState<"nuevo" | RoleResponse | null>(null);
+
+  // Drawer lateral para ver y editar permisos del rol seleccionado
+  const [permissionDrawerRole, setPermissionDrawerRole] = useState<RoleResponse | null>(null);
+
+  // Catálogo completo de permisos en caché para el drawer
+  const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
+
+  useEffect(() => {
+    permissionsApi
+      .matrix()
+      .then(setMatrix)
+      .catch(() => {});
+  }, []);
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("todos");
@@ -65,7 +103,6 @@ export function RolesPage() {
         </>
       ),
       confirmLabel: "Eliminar",
-      // El error sube al diálogo, que lo muestra sin cerrarse.
       onConfirm: async () => {
         setBusyId(role.id);
         try {
@@ -78,10 +115,65 @@ export function RolesPage() {
     });
   }
 
+  // Selector segmentado de vista (Roles / Matriz de permisos)
+  const tabSwitcher = (
+    <div
+      role="tablist"
+      aria-label="Vistas de roles y permisos"
+      className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 shadow-2xs shrink-0"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={currentTab === "roles"}
+        onClick={() => setTab("roles")}
+        className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+          currentTab === "roles"
+            ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+        }`}
+      >
+        <ShieldCheck
+          className={`h-3.5 w-3.5 ${currentTab === "roles" ? "text-brand-red" : "text-zinc-400"}`}
+        />
+        <span>Roles</span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={currentTab === "permisos"}
+        onClick={() => setTab("permisos")}
+        className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+          currentTab === "permisos"
+            ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
+            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+        }`}
+      >
+        <KeyRound
+          className={`h-3.5 w-3.5 ${currentTab === "permisos" ? "text-brand-red" : "text-zinc-400"}`}
+        />
+        <span>Matriz de permisos</span>
+      </button>
+    </div>
+  );
+
+  // Si estamos en la pestaña de matriz de permisos, renderizamos la vista de matriz embebida
+  if (currentTab === "permisos") {
+    return (
+      <div className="flex h-full flex-col">
+        <PermissionsView
+          title="Roles y Permisos"
+          headerExtra={tabSwitcher}
+          onMatrixLoaded={setMatrix}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
       <ModuleHeader
-        title="Roles"
+        title="Roles y Permisos"
         summary={
           counts ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
@@ -96,7 +188,9 @@ export function RolesPage() {
                 tone="neutral"
                 title="Mostrar todos los roles"
               />
-              <span aria-hidden className="text-zinc-300">·</span>
+              <span aria-hidden className="text-zinc-300">
+                ·
+              </span>
               <HeaderTag
                 label={counts.active === 1 ? "activo" : "activos"}
                 count={counts.active}
@@ -109,7 +203,9 @@ export function RolesPage() {
                 dot
                 title="Filtrar por roles activos"
               />
-              <span aria-hidden className="text-zinc-300">·</span>
+              <span aria-hidden className="text-zinc-300">
+                ·
+              </span>
               <HeaderTag
                 label="del sistema"
                 count={counts.system}
@@ -122,7 +218,9 @@ export function RolesPage() {
                 dot
                 title="Filtrar por roles del sistema"
               />
-              <span aria-hidden className="text-zinc-300">·</span>
+              <span aria-hidden className="text-zinc-300">
+                ·
+              </span>
               <HeaderTag
                 label="personalizados"
                 count={counts.custom}
@@ -144,12 +242,15 @@ export function RolesPage() {
           )
         }
         action={
-          isAdmin && (
-            <Button size="sm" onClick={() => setModal("nuevo")}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nuevo rol
-            </Button>
-          )
+          <div className="flex items-center gap-2">
+            {tabSwitcher}
+            {isAdmin && (
+              <Button size="sm" onClick={() => setModal("nuevo")}>
+                <Plus className="h-[15px] w-[15px]" />
+                Nuevo rol
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -193,43 +294,88 @@ export function RolesPage() {
                 <HeadRow>
                   <Th>Nombre</Th>
                   <Th>Tipo</Th>
+                  <Th>Permisos</Th>
                   <Th>Estado</Th>
-                  {isAdmin && <Th className="w-24 text-right">Acciones</Th>}
+                  {isAdmin && <Th className="w-28 text-right">Acciones</Th>}
                 </HeadRow>
               </thead>
               <tbody>
                 {rows.map((role) => (
-                  <Row key={role.id} busy={busyId === role.id}>
-                    <Td className="text-[13px] font-medium text-ink">{role.name}</Td>
+                  <Row
+                    key={role.id}
+                    busy={busyId === role.id}
+                    onClick={() => setPermissionDrawerRole(role)}
+                    className="cursor-pointer hover:bg-zinc-50/80 transition-colors group"
+                  >
+                    <Td className="text-[13px] font-semibold text-ink group-hover:text-brand-red transition-colors">
+                      {role.name}
+                    </Td>
                     <Td>
                       {role.isSystem ? (
-                        <Badge>Sistema</Badge>
+                        <Badge tone="neutral">Sistema</Badge>
                       ) : (
                         <Badge tone="green">Personalizado</Badge>
+                      )}
+                    </Td>
+                    <Td>
+                      {role.isSystem ? (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPermissionDrawerRole(role);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/90 bg-zinc-100/80 px-2.5 py-0.5 text-[11px] font-semibold text-zinc-600 select-none cursor-pointer hover:bg-zinc-200/70 hover:border-zinc-300 transition-colors"
+                          title="Ver permisos protegidos del sistema"
+                        >
+                          <Lock className="h-3 w-3 text-zinc-400" />
+                          <span>Catálogo completo</span>
+                        </span>
+                      ) : (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPermissionDrawerRole(role);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-[11px] font-semibold text-zinc-700 hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 transition-colors select-none cursor-pointer shadow-2xs"
+                          title="Ver y configurar permisos del rol"
+                        >
+                          <KeyRound className="h-3 w-3 text-brand-red" />
+                          <span>
+                            {role.permissions.length}{" "}
+                            {role.permissions.length === 1 ? "permiso" : "permisos"}
+                          </span>
+                        </span>
                       )}
                     </Td>
                     <Td>
                       <StatusDot active={role.isActive} />
                     </Td>
                     {isAdmin && (
-                      <Td>
-                        {canManage(role) && (
-                          <div className="flex items-center justify-end gap-1">
-                            <RowAction
-                              label={`Editar el rol ${role.name}`}
-                              icon={Pencil}
-                              onClick={() => setModal(role)}
-                              disabled={busyId === role.id}
-                            />
-                            <RowAction
-                              label={`Eliminar el rol ${role.name}`}
-                              icon={Trash2}
-                              onClick={() => askDelete(role)}
-                              disabled={busyId === role.id}
-                              danger
-                            />
-                          </div>
-                        )}
+                      <Td onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Ver permisos de ${role.name}`}
+                            icon={KeyRound}
+                            onClick={() => setPermissionDrawerRole(role)}
+                          />
+                          {canManage(role) && (
+                            <>
+                              <RowAction
+                                label={`Editar datos de ${role.name}`}
+                                icon={Pencil}
+                                onClick={() => setModal(role)}
+                                disabled={busyId === role.id}
+                              />
+                              <RowAction
+                                label={`Eliminar ${role.name}`}
+                                icon={Trash2}
+                                onClick={() => askDelete(role)}
+                                disabled={busyId === role.id}
+                                danger
+                              />
+                            </>
+                          )}
+                        </div>
                       </Td>
                     )}
                   </Row>
@@ -258,15 +404,36 @@ export function RolesPage() {
         )}
       </div>
 
-      {confirmation && (
-        <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />
-      )}
+      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
 
       {modal !== null && (
         <RoleModal
           role={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(savedRole) => {
+            refresh();
+            // Si acabamos de crear un rol nuevo, abrir directamente el drawer de permisos para asignarle
+            if (modal === "nuevo") {
+              setPermissionDrawerRole(savedRole);
+            }
+          }}
+        />
+      )}
+
+      {/* Drawer lateral editorial para ver y editar permisos del rol */}
+      {permissionDrawerRole !== null && (
+        <RolePermissionsDrawer
+          role={permissionDrawerRole}
+          matrix={matrix}
+          onClose={() => setPermissionDrawerRole(null)}
+          onSaved={(_updated) => {
+            refresh();
+            setPermissionDrawerRole(null);
+          }}
+          onEditRole={(role) => {
+            setPermissionDrawerRole(null);
+            setModal(role);
+          }}
         />
       )}
     </div>

@@ -12,6 +12,7 @@ interface DrawerProps {
   /** Acciones del pie, separadas del cuerpo por un filete. */
   footer?: ReactNode;
   children: ReactNode;
+  maxWidth?: string;
 }
 
 /**
@@ -25,7 +26,15 @@ interface DrawerProps {
  * que escondia el boton de generar. El panel lateral les da altura, que es
  * justo lo que sobra en una pantalla ancha.
  */
-export function Drawer({ title, eyebrow, description, onClose, footer, children }: DrawerProps) {
+export function Drawer({
+  title,
+  eyebrow,
+  description,
+  onClose,
+  footer,
+  children,
+  maxWidth = "max-w-[460px]",
+}: DrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -52,8 +61,8 @@ export function Drawer({ title, eyebrow, description, onClose, footer, children 
 
            El `border-l` se fue con el mismo argumento que en el carril: un
            borde de un solo lado contra una esquina redondeada deja muesca. */
-        className="animate-plf-drawer-in m-2.5 flex h-[calc(100%-1.25rem)] w-full max-w-[460px]
-          flex-col overflow-hidden rounded-card border border-line bg-white shadow-dialog"
+        className={`animate-plf-drawer-in m-2.5 flex h-[calc(100%-1.25rem)] w-full ${maxWidth}
+          flex-col overflow-hidden rounded-card border border-line bg-white shadow-dialog`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 pb-4 pt-5">
           <div>

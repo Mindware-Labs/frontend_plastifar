@@ -29,7 +29,13 @@ function withoutPermission(current: PermissionKey[], key: PermissionKey) {
   return current.filter((value) => value !== key);
 }
 
-export function PermissionsPage() {
+export interface PermissionsViewProps {
+  headerExtra?: React.ReactNode;
+  title?: string;
+  onMatrixLoaded?: (matrix: PermissionMatrixResponse) => void;
+}
+
+export function PermissionsView({ headerExtra, title, onMatrixLoaded }: PermissionsViewProps = {}) {
   const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
   const [grants, setGrants] = useState<Record<number, PermissionKey[]>>({});
   const [original, setOriginal] = useState<Record<number, PermissionKey[]>>({});
@@ -71,10 +77,11 @@ export function PermissionsPage() {
         setGrants(data.grants);
         setOriginal(data.grants);
         setVisibleRoles(data.roles.map((role) => String(role.id)));
+        onMatrixLoaded?.(data);
       })
       .catch(() => setError("No se pudo cargar el catálogo de permisos. Vuelve a intentarlo."))
       .finally(() => setIsRefetching(false));
-  }, []);
+  }, [onMatrixLoaded]);
 
   useEffect(() => {
     load();
@@ -224,6 +231,7 @@ export function PermissionsPage() {
       setMatrix(fresh);
       setGrants(fresh.grants);
       setOriginal(fresh.grants);
+      onMatrixLoaded?.(fresh);
       setVisibleRoles((previous) => {
         const kept = freshIds.filter((id) => previous.includes(id));
         const added = freshIds.filter((id) => !previous.includes(id));
@@ -279,7 +287,7 @@ export function PermissionsPage() {
   return (
     <div>
       <ModuleHeader
-        title="Permisos"
+        title={title ?? "Permisos"}
         summary={
           matrix ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
@@ -320,21 +328,24 @@ export function PermissionsPage() {
           )
         }
         action={
-          canWrite && dirtyCells > 0 && (
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirmingDiscard(true)}
-                disabled={isSaving}
-              >
-                Descartar
-              </Button>
-              <Button size="sm" onClick={save} isLoading={isSaving}>
-                {`Guardar ${dirtyCells} ${dirtyCells === 1 ? "cambio" : "cambios"}`}
-              </Button>
-            </div>
-          )
+          <div className="flex items-center gap-2">
+            {headerExtra}
+            {canWrite && dirtyCells > 0 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirmingDiscard(true)}
+                  disabled={isSaving}
+                >
+                  Descartar
+                </Button>
+                <Button size="sm" onClick={save} isLoading={isSaving}>
+                  {`Guardar ${dirtyCells} ${dirtyCells === 1 ? "cambio" : "cambios"}`}
+                </Button>
+              </div>
+            )}
+          </div>
         }
       />
 
@@ -546,3 +557,5 @@ export function PermissionsPage() {
     </div>
   );
 }
+
+export const PermissionsPage = PermissionsView;

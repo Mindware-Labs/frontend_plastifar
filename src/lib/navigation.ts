@@ -21,7 +21,6 @@ import {
   PackageSearch,
   Gavel,
   Inbox,
-  KeyRound,
   LayoutDashboard,
   MapPin,
   MessageSquareText,
@@ -177,7 +176,6 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Sedes", to: "/sedes", icon: Building, permission: "settings.write" },
       { label: "Departamentos", to: "/departamentos", icon: Building2, permission: "settings.write" },
       { label: "Roles", to: "/roles", icon: ShieldCheck, permission: "roles.read", adminOnly: true },
-      { label: "Permisos", to: "/permisos", icon: KeyRound, permission: "roles.read" },
     ],
   },
   {

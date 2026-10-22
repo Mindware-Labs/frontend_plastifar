@@ -18,7 +18,6 @@ import { DiscrepancyPrintPage } from "./pages/discrepancies/DiscrepancyPrintPage
 import { WithdrawalDetailPage } from "./pages/withdrawals/WithdrawalDetailPage";
 import { WithdrawalPrintPage } from "./pages/withdrawals/WithdrawalPrintPage";
 import { WithdrawalsPage } from "./pages/withdrawals/WithdrawalsPage";
-import { PermissionsPage } from "./pages/permissions/PermissionsPage";
 import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
 import { HcaPage } from "./pages/quality/HcaPage";
@@ -111,7 +110,7 @@ export default function App() {
 
         <Route element={<PermissionRoute permission="roles.read"><Outlet /></PermissionRoute>}>
           <Route path="/roles" element={<RolesPage />} />
-          <Route path="/permisos" element={<PermissionsPage />} />
+          <Route path="/permisos" element={<Navigate to="/roles?tab=permisos" replace />} />
         </Route>
 
         {/* El organigrama decide hasta donde llega un rol, asi que se
