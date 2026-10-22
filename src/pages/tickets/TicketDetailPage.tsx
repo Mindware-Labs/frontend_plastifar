@@ -1,7 +1,12 @@
 import {
   ArrowLeft,
+  ArrowRight,
+  Building2,
+  Check,
   Clock,
+  Copy,
   CornerUpLeft,
+  Eye,
   FileText,
   Gavel,
   History,
@@ -9,15 +14,19 @@ import {
   Lock,
   Mail,
   Paperclip,
+  Phone,
+  Pencil,
   Plus,
   RotateCcw,
   Send,
+  Tag,
   Upload,
+  Users,
   Workflow,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
@@ -38,7 +47,8 @@ import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { departmentPath, departmentPathOptions } from "../../lib/departments";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
-import { formatBytes, formatDateTime, formatSlaRemaining } from "../../lib/format";
+import { formatBytes, formatDateTime, formatPhoneNumber, formatSlaRemaining } from "../../lib/format";
+import { Avatar } from "../../components/ui/Avatar";
 import type {
   DepartmentResponse,
   TicketAttachmentResponse,
@@ -52,8 +62,8 @@ import type {
 import { AttachmentPreviewModal } from "../bandeja/AttachmentPreviewModal";
 import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
 import { TaskCommentsAside } from "./TaskCommentsAside";
-import { TicketMessageCard } from "./TicketMessageCard";
-import { TicketPropertiesAside } from "./TicketPropertiesAside";
+import { FormattedTicketBody } from "./FormattedTicketBody";
+import { AttachmentChip, TicketMessageCard } from "./TicketMessageCard";
 import { TicketTasksTab } from "./TicketTasksTab";
 import { TicketTimelineSheet, type TicketDetailTab, type TimelineItem } from "./TicketTimelineSheet";
 import { TicketClaimTab } from "../claims/TicketClaimTab";
@@ -200,6 +210,26 @@ function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
   );
 }
 
+function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      type="button"
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        void navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      className="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+    >
+      {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+    </button>
+  );
+}
+
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -216,7 +246,7 @@ export function TicketDetailPage() {
   const canReadClaim = can("claims.read", ticket?.departmentId ?? undefined);
   const canCreateClaim = can("claims.write", ticket?.departmentId ?? undefined);
   const [hasClaim, setHasClaim] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<TicketDetailTab>("conversacion");
+  const [activeTab, setActiveTab] = useState<TicketDetailTab>("datos");
   const [tasksCount, setTasksCount] = useState(0);
   useDynamicBreadcrumb(ticket?.number ?? null);
   const [showTimeline, setShowTimeline] = useState(false);
@@ -229,26 +259,6 @@ export function TicketDetailPage() {
   const handleToggleTaskComments = useCallback((task: TicketTaskResponse) => {
     setActiveCommentsTask((prev) => (prev?.id === task.id ? null : task));
   }, []);
-
-  const propertiesCardRef = useRef<HTMLDivElement>(null);
-  const [propertiesHeight, setPropertiesHeight] = useState<number>(520);
-
-  useEffect(() => {
-    const el = propertiesCardRef.current;
-    if (!el) return;
-    const updateHeight = () => {
-      const h = el.offsetHeight;
-      if (h > 0) {
-        setPropertiesHeight(h);
-      }
-    };
-    updateHeight();
-    const observer = new ResizeObserver(() => {
-      updateHeight();
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [ticket]);
 
   // Respuesta al cliente: el mismo editor que la bandeja, porque lo que sale de aqui tambien es un correo.
   const [replyOpen, setReplyOpen] = useState(false);
@@ -813,9 +823,13 @@ export function TicketDetailPage() {
   ].sort(byDate);
 
   const sortedMessages = [...ticket.messages].sort(byDate);
+  const originMessage = sortedMessages.find((m) => m.isOrigin) ?? sortedMessages[0];
   const clientThread = sortedMessages.filter((m) => m.direction.toLowerCase() !== "interna");
   const internalNotes = sortedMessages.filter((m) => m.direction.toLowerCase() === "interna");
   const recipientEmail = ticket.contactEmail ?? ticket.requesterEmail ?? null;
+  const currentDepartmentPath = departmentPath(editDepartmentTree ?? [], ticket.departmentId);
+  const departmentLabel = currentDepartmentPath ?? ticket.departmentName;
+  const canAssign = ticket.status !== "Cancelado";
 
   // Se declaran aqui, con el destinatario: sendReply las lee al ejecutarse, no al definirse.
   const replyText = blocksToText(replyBlocks);
@@ -834,6 +848,14 @@ export function TicketDetailPage() {
     ));
 
   const sections: ModuleHeaderSection[] = [
+    {
+      label: "Datos",
+      active: activeTab === "datos",
+      onClick: () => {
+        setActiveTab("datos");
+        setActiveCommentsTask(null);
+      },
+    },
     {
       label: `Conversación (${clientThread.length})`,
       active: activeTab === "conversacion",
@@ -969,154 +991,688 @@ export function TicketDetailPage() {
               <span className="font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">{ticket.channel}</span>
             </p>
 
-            <div className="mt-5 flex flex-col gap-8 lg:flex-row lg:items-start">
-              <div className="min-w-0 flex-1">
-
-            {canReadClaim && (
-              <div className={activeTab === "reclamacion" ? "block" : "hidden"}>
-                <TicketClaimTab
-                  ticketId={ticket.id}
-                  ticketNumber={ticket.number}
-                  clientName={ticket.clientName}
-                  canCreate={canCreateClaim}
-                  onClaimChanged={(claim) => setHasClaim(claim !== null)}
-                />
-              </div>
-            )}
-
-            {activeTab === "conversacion" && (
-              <div className="mt-3.5 space-y-2.5">
-                {/* La accion encabeza el hilo; el editor se pide, no esta siempre puesto. */}
-                <div className="flex items-center gap-3">
-                  <span className="shrink-0 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
-                    {clientThread.length} {clientThread.length === 1 ? "mensaje" : "mensajes"}
-                  </span>
-                  <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setReplyOpen(true)}
-                    disabled={!recipientEmail}
-                    title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
-                  >
-                    <CornerUpLeft className="h-[14px] w-[14px]" />
-                    Responder
-                  </Button>
-                </div>
-
-                {clientThread.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-8 text-center">
-                    <div className="mx-auto flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red">
-                      <Mail className="size-4" strokeWidth={2.25} />
-                    </div>
-                    <p className="mt-2.5 font-heading text-[14px] font-semibold text-zinc-800">
-                      Todavía no hay conversación
-                    </p>
-                    <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
-                      Ni el cliente ha escrito ni se le ha respondido. Lo que envíes desde aquí le llegará por correo y
-                      quedará registrado en este hilo.
-                    </p>
-                  </div>
-                ) : (
-                  renderThread(clientThread)
-                )}
-              </div>
-            )}
-
-            <div className={activeTab === "tareas" ? "block" : "hidden"}>
-              <TicketTasksTab
-                ticketId={ticket.id}
-                isClosed={isClosed}
-                assignableStaff={assignableStaff}
-                currentStaffId={user?.staffId ?? 0}
-                onTasksCountChanged={setTasksCount}
-                activeCommentsTaskId={activeCommentsTask?.id}
-                onToggleTaskComments={handleToggleTaskComments}
-                latestAddedComment={latestAddedComment}
-              />
-            </div>
-
-            {activeTab === "notas" && (
-              <div className="mt-3.5 space-y-2.5">
-                {internalNotes.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-amber-200/80 bg-amber-50/20 px-6 py-8 text-center">
-                    <div className="mx-auto flex size-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                      <Lock className="size-4" strokeWidth={2.25} />
-                    </div>
-                    <p className="mt-2.5 font-heading text-[14px] font-semibold text-zinc-800">
-                      Nada anotado todavía
-                    </p>
-                    <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
-                      Aquí queda lo que el equipo necesita saber y el cliente no: cómo fue la llamada, qué se intentó
-                      ya, con quién quedó pendiente. Nunca sale por correo.
-                    </p>
-                    <Button type="button" size="sm" onClick={() => setShowNoteModal(true)} className="mt-4">
-                      <Plus className="h-[14px] w-[14px]" />
-                      Añadir nota
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
-                        <Lock className="h-3 w-3 text-amber-600" />
-                        <span>{internalNotes.length} {internalNotes.length === 1 ? "nota interna" : "notas internas"}</span>
+            <div className="mt-5">
+              {/* Animación de entrada fluida estilo Apple idéntica a la vista de clientes */}
+              <div key={activeTab} className="animate-plf-apple-tab">
+                {/* TAB: DATOS / RESUMEN */}
+                {activeTab === "datos" && (
+                  <div className="space-y-3.5">
+                    {/* 1. Métricas rápidas superiores (4 tarjetas compactas tipo SaaS) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {/* 1.1 Estado */}
+                      <div className="rounded-card border border-zinc-200/80 bg-white p-3 shadow-2xs">
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Estado</span>
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              ticket.status === "Cerrado" || ticket.status === "Solucionado"
+                                ? "bg-emerald-500"
+                                : ticket.status === "Cancelado"
+                                ? "bg-zinc-400"
+                                : ticket.pausedAt
+                                ? "bg-amber-500"
+                                : "bg-blue-500"
+                            }`}
+                          />
+                        </div>
+                        <div className="mt-1 flex items-baseline gap-2">
+                          <span className="font-heading text-[15px] font-bold text-zinc-900 truncate">
+                            {ticket.status}
+                          </span>
+                          {ticket.pausedAt ? (
+                            <span className="text-[11px] font-medium text-amber-600 truncate">
+                              Pausa ({ticket.pausedMinutes}m)
+                            </span>
+                          ) : ticket.verdictName ? (
+                            <span className="text-[11px] font-medium text-emerald-700 truncate" title={ticket.verdictName}>
+                              {ticket.verdictName}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
+
+                      {/* 1.2 Prioridad */}
+                      <div className="rounded-card border border-zinc-200/80 bg-white p-3 shadow-2xs">
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Prioridad</span>
+                          <Tag className="h-3.5 w-3.5 text-zinc-400" />
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <PriorityCell priority={ticket.priority} />
+                          <span className="text-[10px] font-heading font-semibold uppercase tracking-wider text-zinc-400">
+                            {ticket.channel}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 1.3 Compromiso SLA */}
+                      <div className="rounded-card border border-zinc-200/80 bg-white p-3 shadow-2xs">
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">SLA Resolución</span>
+                          <Clock className="h-3.5 w-3.5 text-zinc-400" />
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <SlaCell sla={sla} />
+                          {ticket.resolutionDueAt && (
+                            <span className="text-[11px] text-zinc-400 truncate tabular-nums">
+                              {formatDateTime(ticket.resolutionDueAt)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 1.4 Responsable */}
+                      <div className="rounded-card border border-zinc-200/80 bg-white p-3 shadow-2xs">
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Responsable</span>
+                          {canAssign && (
+                            <button
+                              type="button"
+                              onClick={() => void handleOpenAssignModal()}
+                              title={ticket.assignedStaffId ? "Cambiar responsable" : "Asignar responsable"}
+                              className="text-zinc-400 hover:text-zinc-700 transition-colors p-0.5 rounded hover:bg-zinc-100 cursor-pointer"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-1 flex items-center gap-2">
+                          {ticket.assignedStaffName && ticket.assignedStaffId !== null ? (
+                            <>
+                              <Avatar name={ticket.assignedStaffName} seed={ticket.assignedStaffId} size={20} />
+                              <span className="font-heading text-[13.5px] font-bold text-zinc-900 truncate">
+                                {ticket.assignedStaffName}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="font-heading text-[13.5px] font-bold text-amber-600 italic">
+                              Sin asignar
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. Grilla principal (2/3 + 1/3) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+                      {/* Columna Izquierda (lg:col-span-2) */}
+                      <div className="lg:col-span-2 space-y-3.5">
+                        {/* Card: Clasificación y Enrutamiento */}
+                        <div className="rounded-card border border-line bg-white shadow-card overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100 bg-zinc-50/50">
+                            <div className="flex items-center gap-2">
+                              <Tag className="h-4 w-4 text-zinc-500" />
+                              <h3 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
+                                Clasificación y Enrutamiento
+                              </h3>
+                            </div>
+                            {!isClosed && (
+                              <button
+                                type="button"
+                                onClick={() => void handleOpenEditModal()}
+                                className="inline-flex h-6 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 text-[11px] font-medium text-zinc-600 shadow-2xs outline-none transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/25 motion-reduce:active:scale-100"
+                              >
+                                <Pencil className="size-3 text-zinc-400" />
+                                <span>Editar clasificación</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="px-4 py-1 divide-y divide-zinc-100">
+                            <div className="flex items-center justify-between py-2 text-[12.5px]">
+                              <span className="text-zinc-500 font-medium">Asunto</span>
+                              <div className="flex items-center gap-1.5 max-w-[70%]">
+                                <span className="font-semibold text-zinc-900 text-right truncate" title={ticket.subject}>
+                                  {ticket.subject}
+                                </span>
+                                <CopyButton text={ticket.subject} label="Copiar asunto" />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between py-2 text-[12.5px]">
+                              <span className="text-zinc-500 font-medium">Código / Número</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-zinc-800 tabular-nums font-semibold">
+                                  {ticket.number}
+                                </span>
+                                <CopyButton text={ticket.number} label="Copiar código" />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between py-2 text-[12.5px]">
+                              <span className="text-zinc-500 font-medium">Departamento</span>
+                              <span className="text-zinc-800 font-medium text-right truncate max-w-[65%]" title={departmentLabel ?? undefined}>
+                                {departmentLabel ?? "—"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between py-2 text-[12.5px]">
+                              <span className="text-zinc-500 font-medium">Motivo</span>
+                              <span className="text-zinc-800 font-medium text-right truncate max-w-[65%]" title={ticket.topicName ?? undefined}>
+                                {ticket.topicName ?? "—"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between py-2 text-[12.5px]">
+                              <span className="text-zinc-500 font-medium">Línea de producto</span>
+                              <span className="text-zinc-800 font-medium text-right truncate max-w-[65%]" title={ticket.productLineName ?? undefined}>
+                                {ticket.productLineName ?? <span className="text-zinc-400 font-normal">No aplica</span>}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between py-2 text-[12.5px]">
+                              <span className="text-zinc-500 font-medium">Canal de origen</span>
+                              <span className="capitalize text-zinc-800 font-medium bg-zinc-100 border border-zinc-200/80 px-2 py-0.5 rounded text-[11.5px]">
+                                {ticket.channel}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between py-2 text-[12.5px]">
+                              <span className="text-zinc-500 font-medium">Creado por</span>
+                              <span className="text-zinc-800 font-medium">
+                                {ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}
+                                <span className="text-zinc-400 font-normal ml-1.5">({formatDateTime(ticket.createdAt)})</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card: Detalle Inicial del Caso (Mensaje de apertura) */}
+                        {originMessage && (
+                          <div className="rounded-card border border-line bg-white shadow-card overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100 bg-zinc-50/50">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-zinc-500" />
+                                <h3 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
+                                  Descripción Inicial del Caso
+                                </h3>
+                              </div>
+                              <span className="text-[11px] text-zinc-400 font-mono tabular-nums">
+                                {formatDateTime(originMessage.createdAt)}
+                              </span>
+                            </div>
+
+                            <div className="p-4 space-y-3">
+                              <div className="text-[13px] leading-relaxed text-zinc-800">
+                                <FormattedTicketBody html={originMessage.bodyHtml} text={originMessage.bodyText} />
+                              </div>
+
+                              {originMessage.attachments && originMessage.attachments.length > 0 && (
+                                <div className="pt-2 border-t border-zinc-100">
+                                  <span className="text-[10.5px] font-heading font-semibold uppercase tracking-wider text-zinc-400 block mb-2">
+                                    Adjuntos incluidos ({originMessage.attachments.length})
+                                  </span>
+                                  <div className="flex flex-wrap gap-2">
+                                    {originMessage.attachments.map((att) => (
+                                      <AttachmentChip
+                                        key={att.id}
+                                        attachment={att}
+                                        onOpen={() => openAttachment(originMessage.attachments, att.id)}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Card: Adjuntos generales del ticket */}
+                        {ticket.attachments.length > 0 && (
+                          <div className="rounded-card border border-line bg-white shadow-card overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100 bg-zinc-50/50">
+                              <div className="flex items-center gap-2">
+                                <Paperclip className="h-4 w-4 text-zinc-500" />
+                                <h3 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
+                                  Adjuntos del Ticket ({ticket.attachments.length})
+                                </h3>
+                              </div>
+                            </div>
+
+                            <div className="divide-y divide-zinc-100/80 px-4 py-1">
+                              {ticket.attachments.map((att) => (
+                                <button
+                                  key={att.id}
+                                  type="button"
+                                  onClick={() => openAttachment(ticket.attachments, att.id)}
+                                  title={`Abrir ${att.fileName}`}
+                                  className="group flex w-full cursor-pointer items-center justify-between gap-3 py-2 text-left outline-none transition-colors hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red/25"
+                                >
+                                  <div className="flex min-w-0 items-center gap-2.5">
+                                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-500 transition-colors group-hover:bg-brand-red/10 group-hover:text-brand-red">
+                                      <FileText className="size-3.5" strokeWidth={2.25} />
+                                    </span>
+                                    <span className="truncate text-[12.5px] font-medium text-zinc-700 group-hover:text-zinc-900">
+                                      {att.fileName}
+                                    </span>
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-2 font-heading text-[11px] font-bold tabular-nums text-zinc-400">
+                                    <span>{formatBytes(att.sizeBytes)}</span>
+                                    <Eye className="size-3.5 text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100" />
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Card: Observadores (si existen) */}
+                        {ticket.watchers.length > 0 && (
+                          <div className="rounded-card border border-line bg-white shadow-card overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100 bg-zinc-50/50">
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4 text-zinc-500" />
+                                <h3 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
+                                  Observadores ({ticket.watchers.length})
+                                </h3>
+                              </div>
+                            </div>
+                            <div className="p-4 flex flex-wrap gap-2">
+                              {ticket.watchers.map((watcher) => (
+                                <div
+                                  key={watcher.id}
+                                  className="inline-flex h-7 items-center gap-2 rounded-md border border-zinc-200 bg-white pl-1.5 pr-2.5 text-[12px] text-zinc-800 shadow-2xs"
+                                  title={`${watcher.staffName} (${watcher.staffEmail})`}
+                                >
+                                  <Avatar name={watcher.staffName} seed={watcher.id} size={18} />
+                                  <span className="font-medium">{watcher.staffName}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Columna Derecha (lg:col-span-1) */}
+                      <div className="space-y-3.5">
+                        {/* Card: Cliente y Contacto */}
+                        <div className="rounded-card border border-line bg-white shadow-card overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100 bg-zinc-50/50">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-4 w-4 text-zinc-500" />
+                              <h3 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
+                                Cliente y Contacto
+                              </h3>
+                            </div>
+                            {ticket.clientCode && (
+                              <span className="font-mono text-[11px] font-medium text-zinc-500 bg-white border border-zinc-200/80 px-2 py-0.5 rounded shadow-2xs tabular-nums">
+                                #{ticket.clientCode}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="p-4 space-y-3">
+                            {ticket.clientName ? (
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 font-heading text-[11px] font-bold tracking-[0.04em] text-zinc-700">
+                                    {ticket.clientName.slice(0, 2).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <span className="block truncate text-[13.5px] font-bold text-zinc-900 leading-tight" title={ticket.clientName}>
+                                      {ticket.clientName}
+                                    </span>
+                                    {ticket.clientId && (
+                                      <Link
+                                        to={`/clientes/${ticket.clientId}`}
+                                        className="inline-flex items-center gap-1 text-[11.5px] text-brand-red font-medium hover:underline mt-0.5"
+                                      >
+                                        <span>Ver ficha de cliente</span>
+                                        <ArrowRight className="size-3" />
+                                      </Link>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="py-2 text-[12.5px] text-zinc-400 italic">Sin cliente asociado</div>
+                            )}
+
+                            <div className="pt-2 border-t border-zinc-100 divide-y divide-zinc-100 text-[12.5px]">
+                              <div className="flex items-center justify-between py-2">
+                                <span className="text-zinc-500 font-medium">Contacto</span>
+                                <span className="font-semibold text-zinc-800 text-right truncate max-w-[65%]" title={ticket.contactName ?? undefined}>
+                                  {ticket.contactName ?? <span className="text-zinc-400 font-normal">Sin contacto</span>}
+                                </span>
+                              </div>
+
+                              {recipientEmail && (
+                                <div className="flex items-center justify-between py-2">
+                                  <div className="flex items-center gap-1.5 text-zinc-500 font-medium">
+                                    <Mail className="size-3 text-zinc-400" />
+                                    <span>Correo</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 max-w-[65%]">
+                                    <a
+                                      href={`mailto:${recipientEmail}`}
+                                      title={recipientEmail}
+                                      className="text-zinc-900 font-medium hover:text-brand-red truncate"
+                                    >
+                                      {recipientEmail}
+                                    </a>
+                                    <CopyButton text={recipientEmail} label="Copiar correo" />
+                                  </div>
+                                </div>
+                              )}
+
+                              {ticket.contactPhone && (
+                                <div className="flex items-center justify-between py-2">
+                                  <div className="flex items-center gap-1.5 text-zinc-500 font-medium">
+                                    <Phone className="size-3 text-zinc-400" />
+                                    <span>Teléfono</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <a
+                                      href={`tel:${ticket.contactPhone}`}
+                                      className="font-mono text-zinc-900 font-medium hover:text-brand-red tabular-nums"
+                                    >
+                                      {formatPhoneNumber(ticket.contactPhone)}
+                                    </a>
+                                    <CopyButton text={ticket.contactPhone} label="Copiar teléfono" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card: SLA y Tiempos */}
+                        <div className="rounded-card border border-line bg-white shadow-card overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100 bg-zinc-50/50">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-zinc-500" />
+                              <h3 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
+                                SLA y Tiempos
+                              </h3>
+                            </div>
+                            <SlaCell sla={sla} />
+                          </div>
+
+                          <div className="px-4 py-1 divide-y divide-zinc-100 text-[12.5px]">
+                            <div className="flex items-center justify-between py-2">
+                              <span className="text-zinc-500 font-medium">Compromiso resolución</span>
+                              <span className={`tabular-nums font-medium ${sla.tone === "overdue" ? "text-brand-red font-semibold" : "text-zinc-900"}`}>
+                                {ticket.resolutionDueAt ? formatDateTime(ticket.resolutionDueAt) : "Sin compromiso"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between py-2">
+                              <span className="text-zinc-500 font-medium">1.ª respuesta</span>
+                              {ticket.firstResponseAt ? (
+                                <span className="text-emerald-700 font-medium tabular-nums text-right truncate max-w-[60%]" title={`Lograda el ${formatDateTime(ticket.firstResponseAt)}`}>
+                                  Lograda · {formatDateTime(ticket.firstResponseAt)}
+                                </span>
+                              ) : ticket.firstResponseDueAt ? (
+                                <span className="tabular-nums text-zinc-800 text-right truncate max-w-[60%]">
+                                  Límite · {formatDateTime(ticket.firstResponseDueAt)}
+                                </span>
+                              ) : (
+                                <span className="text-zinc-400 font-normal">Pendiente</span>
+                              )}
+                            </div>
+
+                            {ticket.pausedAt && (
+                              <div className="flex items-center justify-between py-2">
+                                <span className="text-zinc-500 font-medium">En pausa desde</span>
+                                <span className="font-medium text-amber-700 tabular-nums">
+                                  {formatDateTime(ticket.pausedAt)}
+                                </span>
+                              </div>
+                            )}
+
+                            {ticket.pausedMinutes > 0 && (
+                              <div className="flex items-center justify-between py-2">
+                                <span className="text-zinc-500 font-medium">Tiempo total pausado</span>
+                                <span className="tabular-nums text-zinc-800 font-medium">{ticket.pausedMinutes} min</span>
+                              </div>
+                            )}
+
+                            {ticket.reopenedCount > 0 && (
+                              <div className="flex items-center justify-between py-2">
+                                <span className="text-zinc-500 font-medium">Reaperturas</span>
+                                <span className="font-bold tabular-nums text-amber-700">{ticket.reopenedCount}</span>
+                              </div>
+                            )}
+
+                            {ticket.resolvedAt && (
+                              <div className="flex items-center justify-between py-2">
+                                <span className="text-zinc-500 font-medium">Resuelto</span>
+                                <span className="tabular-nums text-zinc-800 font-medium">{formatDateTime(ticket.resolvedAt)}</span>
+                              </div>
+                            )}
+
+                            {ticket.verdictName && (
+                              <div className="flex items-center justify-between py-2">
+                                <span className="text-zinc-500 font-medium">Veredicto</span>
+                                <span className="font-semibold text-emerald-800 truncate max-w-[60%]" title={ticket.verdictName}>
+                                  {ticket.verdictName}
+                                </span>
+                              </div>
+                            )}
+
+                            {ticket.closedAt && (
+                              <div className="flex items-center justify-between py-2">
+                                <span className="text-zinc-500 font-medium">Cerrado definitivamente</span>
+                                <span className="tabular-nums text-zinc-800 font-medium">{formatDateTime(ticket.closedAt)}</span>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between py-2">
+                              <span className="text-zinc-500 font-medium">Última actividad</span>
+                              <span className="tabular-nums text-zinc-600 font-medium">{formatDateTime(ticket.lastActivityAt)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card: Resumen de actividad e hitos */}
+                        <div className="rounded-card border border-line bg-white shadow-card overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100 bg-zinc-50/50">
+                            <div className="flex items-center gap-2">
+                              <History className="h-4 w-4 text-zinc-500" />
+                              <h3 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
+                                Resumen de Actividad
+                              </h3>
+                            </div>
+                          </div>
+
+                          <div className="p-3.5 space-y-2.5">
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => { setActiveTab("conversacion"); setActiveCommentsTask(null); }}
+                                className="rounded-lg border border-zinc-200/80 bg-zinc-50/60 p-2 text-left hover:border-zinc-300 hover:bg-zinc-100/70 transition-colors cursor-pointer group"
+                              >
+                                <span className="text-[10px] font-heading font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-600 block">
+                                  Mensajes
+                                </span>
+                                <span className="font-heading text-[16px] font-bold text-zinc-900 tabular-nums">
+                                  {clientThread.length}
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setActiveTab("tareas")}
+                                className="rounded-lg border border-zinc-200/80 bg-zinc-50/60 p-2 text-left hover:border-zinc-300 hover:bg-zinc-100/70 transition-colors cursor-pointer group"
+                              >
+                                <span className="text-[10px] font-heading font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-600 block">
+                                  Tareas
+                                </span>
+                                <span className="font-heading text-[16px] font-bold text-zinc-900 tabular-nums">
+                                  {tasksCount}
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => { setActiveTab("notas"); setActiveCommentsTask(null); }}
+                                className="rounded-lg border border-zinc-200/80 bg-zinc-50/60 p-2 text-left hover:border-zinc-300 hover:bg-zinc-100/70 transition-colors cursor-pointer group"
+                              >
+                                <span className="text-[10px] font-heading font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-600 block">
+                                  Notas
+                                </span>
+                                <span className="font-heading text-[16px] font-bold text-zinc-900 tabular-nums">
+                                  {internalNotes.length}
+                                </span>
+                              </button>
+                            </div>
+
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setShowTimeline(true)}
+                              className="w-full justify-center"
+                            >
+                              <History className="size-3.5" />
+                              <span>Ver historial de eventos ({timeline.length})</span>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB: RECLAMACIÓN */}
+                {canReadClaim && (
+                  <div className={activeTab === "reclamacion" ? "block" : "hidden"}>
+                    <TicketClaimTab
+                      ticketId={ticket.id}
+                      ticketNumber={ticket.number}
+                      clientName={ticket.clientName}
+                      canCreate={canCreateClaim}
+                      onClaimChanged={(claim) => setHasClaim(claim !== null)}
+                    />
+                  </div>
+                )}
+
+                {/* TAB: CONVERSACIÓN */}
+                {activeTab === "conversacion" && (
+                  <div className="space-y-2.5">
+                    {/* La accion encabeza el hilo; el editor se pide, no esta siempre puesto. */}
+                    <div className="flex items-center gap-3">
+                      <span className="shrink-0 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
+                        {clientThread.length} {clientThread.length === 1 ? "mensaje" : "mensajes"}
+                      </span>
                       <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
-                      <Button type="button" size="sm" onClick={() => setShowNoteModal(true)}>
-                        <Plus className="h-[14px] w-[14px]" />
-                        Añadir nota
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => setReplyOpen(true)}
+                        disabled={!recipientEmail}
+                        title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
+                      >
+                        <CornerUpLeft className="h-[14px] w-[14px]" />
+                        Responder
                       </Button>
                     </div>
-                    {renderThread(internalNotes)}
-                  </>
+
+                    {clientThread.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-8 text-center">
+                        <div className="mx-auto flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red">
+                          <Mail className="size-4" strokeWidth={2.25} />
+                        </div>
+                        <p className="mt-2.5 font-heading text-[14px] font-semibold text-zinc-800">
+                          Todavía no hay conversación
+                        </p>
+                        <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
+                          Ni el cliente ha escrito ni se le ha respondido. Lo que envíes desde aquí le llegará por correo y
+                          quedará registrado en este hilo.
+                        </p>
+                      </div>
+                    ) : (
+                      renderThread(clientThread)
+                    )}
+                  </div>
+                )}
+
+                {/* TAB: TAREAS (con panel de comentarios integrado si está activo) */}
+                <div className={activeTab === "tareas" ? "block" : "hidden"}>
+                  <div className={activeCommentsTask ? "flex flex-col gap-6 lg:flex-row lg:items-start" : ""}>
+                    <div className="min-w-0 flex-1">
+                      <TicketTasksTab
+                        ticketId={ticket.id}
+                        isClosed={isClosed}
+                        assignableStaff={assignableStaff}
+                        currentStaffId={user?.staffId ?? 0}
+                        onTasksCountChanged={setTasksCount}
+                        activeCommentsTaskId={activeCommentsTask?.id}
+                        onToggleTaskComments={handleToggleTaskComments}
+                        latestAddedComment={latestAddedComment}
+                      />
+                    </div>
+
+                    {activeCommentsTask && (
+                      <TaskCommentsAside
+                        key={`task-comments-${activeCommentsTask.id}`}
+                        ticketId={ticket.id}
+                        task={activeCommentsTask}
+                        currentStaffId={user?.staffId ?? 0}
+                        currentStaffName={
+                          [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Usuario"
+                        }
+                        onClose={() => setActiveCommentsTask(null)}
+                        onCommentAdded={(taskId, newComment) => {
+                          setActiveCommentsTask((prev) =>
+                            prev && prev.id === taskId
+                              ? {
+                                  ...prev,
+                                  comments: [...prev.comments, newComment],
+                                }
+                              : prev,
+                          );
+                          setLatestAddedComment({
+                            taskId,
+                            comment: newComment,
+                          });
+                        }}
+                        className="w-full shrink-0 lg:w-[360px] lg:sticky lg:top-2 self-start"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* TAB: NOTAS INTERNAS */}
+                {activeTab === "notas" && (
+                  <div className="space-y-2.5">
+                    {internalNotes.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-amber-200/80 bg-amber-50/20 px-6 py-8 text-center">
+                        <div className="mx-auto flex size-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                          <Lock className="size-4" strokeWidth={2.25} />
+                        </div>
+                        <p className="mt-2.5 font-heading text-[14px] font-semibold text-zinc-800">
+                          Nada anotado todavía
+                        </p>
+                        <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
+                          Aquí queda lo que el equipo necesita saber y el cliente no: cómo fue la llamada, qué se intentó
+                          ya, con quién quedó pendiente. Nunca sale por correo.
+                        </p>
+                        <Button type="button" size="sm" onClick={() => setShowNoteModal(true)} className="mt-4">
+                          <Plus className="h-[14px] w-[14px]" />
+                          Añadir nota
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
+                            <Lock className="h-3 w-3 text-amber-600" />
+                            <span>{internalNotes.length} {internalNotes.length === 1 ? "nota interna" : "notas internas"}</span>
+                          </div>
+                          <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
+                          <Button type="button" size="sm" onClick={() => setShowNoteModal(true)}>
+                            <Plus className="h-[14px] w-[14px]" />
+                            Añadir nota
+                          </Button>
+                        </div>
+                        {renderThread(internalNotes)}
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-
-          {activeCommentsTask ? (
-            <TaskCommentsAside
-              key={`task-comments-${activeCommentsTask.id}`}
-              ticketId={ticket.id}
-              task={activeCommentsTask}
-              currentStaffId={user?.staffId ?? 0}
-              currentStaffName={
-                [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Usuario"
-              }
-              onClose={() => setActiveCommentsTask(null)}
-              onCommentAdded={(taskId, newComment) => {
-                setActiveCommentsTask((prev) =>
-                  prev && prev.id === taskId
-                    ? {
-                        ...prev,
-                        comments: [...prev.comments, newComment],
-                      }
-                    : prev,
-                );
-                setLatestAddedComment({
-                  taskId,
-                  comment: newComment,
-                });
-              }}
-              targetHeight={propertiesHeight}
-              className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[350px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-2 self-start"
-            />
-          ) : (
-            <TicketPropertiesAside
-              ticket={ticket}
-              departmentLabel={departmentPath(editDepartmentTree ?? [], ticket.departmentId)}
-              sla={sla}
-              canEdit={!isClosed}
-              canAssign={ticket.status !== "Cancelado"}
-              onEdit={() => void handleOpenEditModal()}
-              onAssign={() => void handleOpenAssignModal()}
-              onOpenAttachment={openAttachment}
-              innerCardRef={propertiesCardRef}
-              className="w-full shrink-0 border-t border-zinc-200/80 pt-6 lg:w-[350px] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0 lg:sticky lg:top-2 self-start animate-plf-side-panel-back"
-            />
-          )}
-        </div>
+            </div>
       </div>
     </div>
   </div>

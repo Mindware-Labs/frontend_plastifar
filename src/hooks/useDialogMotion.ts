@@ -20,14 +20,14 @@ interface DialogMotion {
 
 const TIMING: Record<DialogVariant, { enter: number; exit: number }> = {
   modal: { enter: 280, exit: 160 },
-  drawer: { enter: 320, exit: 200 },
+  drawer: { enter: 260, exit: 190 },
 };
 const REDUCED_TIMING = { enter: 120, exit: 80 };
 const SCRIM_ENTER_MS = 200;
 
 function hiddenFrame(variant: DialogVariant, reduced: boolean, leaving: boolean): Keyframe {
   if (reduced) return { opacity: 0, transform: "none" };
-  if (variant === "drawer") return { opacity: 1, transform: "translateX(100%)" };
+  if (variant === "drawer") return { opacity: 0, transform: "translate3d(100%, 0, 0)" };
   return { opacity: 0, transform: leaving ? "translateY(6px) scale(0.985)" : "translateY(8px) scale(0.985)" };
 }
 

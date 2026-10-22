@@ -21,7 +21,7 @@ export type TimelineItem =
   | { kind: "message"; data: TicketMessageResponse; createdAt: string }
   | { kind: "event"; data: TicketEventResponse; createdAt: string };
 
-export type TicketDetailTab = "conversacion" | "tareas" | "notas" | "reclamacion";
+export type TicketDetailTab = "datos" | "conversacion" | "tareas" | "notas" | "reclamacion";
 
 type TimelineFilter = "all" | "messages" | "events";
 
@@ -182,7 +182,7 @@ export function TicketTimelineSheet({
     <div
       ref={scrimRef}
       inert={isExiting ? true : undefined}
-      className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] ${
+      className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] will-change-[opacity] ${
         isExiting ? "pointer-events-none" : ""
       }`}
       onMouseDown={(event) => {
@@ -194,7 +194,7 @@ export function TicketTimelineSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[560px] ${
+        className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[560px] will-change-[transform,opacity] ${
           isExiting ? "pointer-events-none" : ""
         }`}
       >
@@ -235,8 +235,9 @@ export function TicketTimelineSheet({
           </button>
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-1.5 border-b border-line px-6 py-2.5">
+        <div className="shrink-0 border-b border-line px-6 py-2.5">
           <SegmentedFilter
+            fullWidth
             aria-label="Filtro del historial"
             value={filter}
             onChange={setFilter}
@@ -249,24 +250,26 @@ export function TicketTimelineSheet({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-          {filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <span
-                aria-hidden
-                className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
-              >
-                <History className="size-4" strokeWidth={2.25} />
-              </span>
-              <p className="text-[13px] font-medium text-zinc-700">No hay registros de este tipo.</p>
-            </div>
-          ) : (
-            <ol className="relative">
-              <span aria-hidden className="absolute bottom-2 left-[9.5px] top-2 w-px bg-zinc-200" />
-              {filtered.map((item, index) =>
-                item.kind === "event" ? renderEvent(item.data, index) : renderMessage(item.data),
-              )}
-            </ol>
-          )}
+          <div key={filter} className="animate-plf-apple-tab">
+            {filtered.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <span
+                  aria-hidden
+                  className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
+                >
+                  <History className="size-4" strokeWidth={2.25} />
+                </span>
+                <p className="text-[13px] font-medium text-zinc-700">No hay registros de este tipo.</p>
+              </div>
+            ) : (
+              <ol className="relative">
+                <span aria-hidden className="absolute bottom-2 left-[9.5px] top-2 w-px bg-zinc-200" />
+                {filtered.map((item, index) =>
+                  item.kind === "event" ? renderEvent(item.data, index) : renderMessage(item.data),
+                )}
+              </ol>
+            )}
+          </div>
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3">
