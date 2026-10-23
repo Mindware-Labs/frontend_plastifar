@@ -12,8 +12,9 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ticketsApi } from "../../api/tickets";
+import { prefersReducedMotion } from "../../hooks/motion";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -91,6 +92,62 @@ export function TicketTasksTab({
   useEffect(() => {
     onTasksCountChangedRef.current = onTasksCountChanged;
   }, [onTasksCountChanged]);
+
+  // Registro de posiciones de los elementos de tarea para animación FLIP
+  const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const prevPositions = useRef<Map<number, number>>(new Map());
+  const prevActiveId = useRef<number | null | undefined>(activeCommentsTaskId);
+
+  // Antes del render, registrar las posiciones actuales de cada elemento
+  useLayoutEffect(() => {
+    const reduced = prefersReducedMotion();
+    const currActiveId = activeCommentsTaskId;
+    const wasActive = prevActiveId.current;
+
+    if (!reduced && wasActive !== currActiveId) {
+      // Tomar nueva posición y animar la tarea seleccionada que sube o baja
+      itemRefs.current.forEach((el, id) => {
+        if (!el) return;
+        const oldTop = prevPositions.current.get(id);
+        const newTop = el.getBoundingClientRect().top;
+
+        if (oldTop !== undefined && oldTop !== newTop) {
+          const deltaY = oldTop - newTop;
+          // Animar desde la posición anterior hacia la actual
+          el.animate(
+            [
+              { transform: `translateY(${deltaY}px)` },
+              { transform: "none" },
+            ],
+            {
+              duration: 440,
+              easing: "cubic-bezier(0.32, 0.72, 0, 1)",
+            },
+          );
+        } else if (currActiveId === null && wasActive !== null && id !== wasActive) {
+          // Si se están restaurando las otras tareas, entran con un fade-in suave
+          el.animate(
+            [
+              { opacity: 0, transform: "translateY(8px)" },
+              { opacity: 1, transform: "none" },
+            ],
+            {
+              duration: 360,
+              easing: "cubic-bezier(0.32, 0.72, 0, 1)",
+            },
+          );
+        }
+      });
+    }
+
+    // Guardar posiciones para el siguiente cambio
+    const nextMap = new Map<number, number>();
+    itemRefs.current.forEach((el, id) => {
+      if (el) nextMap.set(id, el.getBoundingClientRect().top);
+    });
+    prevPositions.current = nextMap;
+    prevActiveId.current = currActiveId;
+  }, [activeCommentsTaskId, tasks, filter]);
 
   useEffect(() => {
     let active = true;
@@ -174,12 +231,17 @@ export function TicketTasksTab({
   const completedTasks = tasks.filter((t) => t.status === "Completada");
   const myTasks = tasks.filter((t) => t.assignedStaffId === currentStaffId);
 
-  const filteredTasks = tasks.filter((t) => {
+  const baseFilteredTasks = tasks.filter((t) => {
     if (filter === "pending") return t.status !== "Completada" && t.status !== "Cancelada";
     if (filter === "completed") return t.status === "Completada";
     if (filter === "mine") return t.assignedStaffId === currentStaffId;
     return true;
   });
+
+  // Si hay una tarea con panel de comentarios activo, sólo se muestra esa tarea
+  const filteredTasks = activeCommentsTaskId
+    ? baseFilteredTasks.filter((t) => t.id === activeCommentsTaskId)
+    : baseFilteredTasks;
 
   return (
     <div className="mt-3.5 space-y-3.5">
@@ -263,7 +325,11 @@ export function TicketTasksTab({
             return (
               <div
                 key={task.id}
-                className={`group rounded-xl border transition-all duration-150 p-4 ${
+                ref={(el) => {
+                  if (el) itemRefs.current.set(task.id, el);
+                  else itemRefs.current.delete(task.id);
+                }}
+                className={`group rounded-xl border transition-colors duration-150 p-4 ${
                   isCompleted
                     ? "border-emerald-200/80 bg-emerald-50/15"
                     : "border-zinc-200 bg-white hover:border-zinc-300 shadow-2xs"
