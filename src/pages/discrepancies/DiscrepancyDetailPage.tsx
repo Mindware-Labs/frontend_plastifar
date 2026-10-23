@@ -373,7 +373,11 @@ export function DiscrepancyDetailPage() {
       </div>
 
       {editing && (
-        <DiscrepancyFormModal discrepancy={discrepancy} onClose={() => setEditing(false)} onSaved={(saved) => setDetail(saved)} />
+        <DiscrepancyFormModal
+          discrepancy={discrepancy}
+          onClose={() => setEditing(false)}
+          onSaved={(saved) => setDetail(saved)}
+        />
       )}
 
       {completing && (

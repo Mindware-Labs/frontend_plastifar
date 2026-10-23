@@ -28,12 +28,27 @@ export function describeStatus(status: DiscrepancyStatus): string {
   }
 }
 
+const ticketCache = new Map<number, { label: string; clientName: string | null; clientId: number | null }>();
+
+export function cacheTicketInfo(id: number, label: string, clientName?: string | null, clientId?: number | null) {
+  if (id > 0) {
+    ticketCache.set(id, { label, clientName: clientName ?? null, clientId: clientId ?? null });
+  }
+}
+
+export function getCachedTicketInfo(id: number) {
+  return ticketCache.get(id);
+}
+
 /**
  * Búsqueda de tickets para ligar la investigación. Mismo adaptador que el
  * resto de los `LookupField`: veinte como mucho, y se invita a acotar.
  */
 export async function searchTickets(term: string): Promise<LookupResult> {
   const { items, total } = await ticketsApi.list({ page: 1, pageSize: 20, search: term || undefined });
+  items.forEach((ticket) => {
+    cacheTicketInfo(ticket.id, `${ticket.number} · ${ticket.subject}`, ticket.clientName, ticket.clientId);
+  });
   return {
     options: items.map((ticket) => ({
       value: String(ticket.id),
@@ -45,8 +60,14 @@ export async function searchTickets(term: string): Promise<LookupResult> {
 }
 
 export async function resolveTicketLabel(value: string): Promise<string | null> {
-  const ticket = await ticketsApi.getById(Number(value));
-  return `${ticket.number} · ${ticket.subject}`;
+  const id = Number(value);
+  if (!id) return null;
+  const cached = ticketCache.get(id);
+  if (cached) return cached.label;
+  const ticket = await ticketsApi.getById(id);
+  const label = `${ticket.number} · ${ticket.subject}`;
+  cacheTicketInfo(id, label, ticket.clientName, ticket.clientId);
+  return label;
 }
 
 const quantityFormat = new Intl.NumberFormat("es-DO", { maximumFractionDigits: 2 });

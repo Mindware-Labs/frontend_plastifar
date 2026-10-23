@@ -1150,6 +1150,9 @@ export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProp
         <DiscrepancyFormModal
           discrepancy={editingDiscrepancy}
           ticketId={ticket.id}
+          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
+          ticketClientName={ticket.clientName ?? undefined}
+          ticketClientId={ticket.clientId ?? undefined}
           initialData={discrepancyInitialData}
           onClose={() => setDiscrepancyModalOpen(false)}
           onSaved={() => {
