@@ -45,6 +45,7 @@ import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { useAuth } from "../../context/useAuth";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useEmailCounts } from "../../context/useEmailCounts";
+import { useReceipts } from "../../context/useReceipts";
 import { departmentPath, departmentPathOptions } from "../../lib/departments";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes, formatDateTime, formatPhoneNumber, formatSlaRemaining } from "../../lib/format";
@@ -61,7 +62,7 @@ import type {
 } from "../../types/api";
 import { AttachmentPreviewModal } from "../bandeja/AttachmentPreviewModal";
 import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
-import { TaskCommentsAside } from "./TaskCommentsAside";
+import { TaskCommentsAside, type TaskCommentsAsideHandle } from "./TaskCommentsAside";
 import { FormattedTicketBody } from "./FormattedTicketBody";
 import { AttachmentChip, TicketMessageCard } from "./TicketMessageCard";
 import { TicketTasksTab } from "./TicketTasksTab";
@@ -353,13 +354,23 @@ export function TicketDetailPage() {
   useDynamicBreadcrumb(ticket?.number ?? null);
   const [showTimeline, setShowTimeline] = useState(false);
   const [activeCommentsTask, setActiveCommentsTask] = useState<TicketTaskResponse | null>(null);
+  const commentsAsideRef = useRef<TaskCommentsAsideHandle>(null);
   const [latestAddedComment, setLatestAddedComment] = useState<{
     taskId: number;
     comment: TicketTaskCommentResponse;
   } | null>(null);
 
   const handleToggleTaskComments = useCallback((task: TicketTaskResponse) => {
-    setActiveCommentsTask((prev) => (prev?.id === task.id ? null : task));
+    setActiveCommentsTask((prev) => {
+      if (prev?.id === task.id) {
+        if (commentsAsideRef.current) {
+          commentsAsideRef.current.requestClose();
+          return prev;
+        }
+        return null;
+      }
+      return task;
+    });
   }, []);
 
   // Respuesta al cliente: el mismo editor que la bandeja, porque lo que sale de aqui tambien es un correo.
@@ -451,6 +462,7 @@ export function TicketDetailPage() {
   }, [ticketId]);
 
   const { onTicketsChanged, onTicketStatusChanged, onTicketNewMessage } = useEmailCounts();
+  const receipts = useReceipts();
 
   useEffect(() => {
     if (!ticketId) return;
@@ -525,6 +537,7 @@ export function TicketDetailPage() {
       setReplyAttachments([]);
       setReplyOpen(false);
       await refreshTicket();
+      receipts.done({ action: "responder-ticket", title: "Respuesta enviada", detail: ticket?.number });
     } catch (err) {
       setReplySendError(err instanceof Error ? err.message : "Ocurrió un error al enviar la respuesta.");
     } finally {
@@ -559,6 +572,7 @@ export function TicketDetailPage() {
       setNoteAttachments([]);
       setShowNoteModal(false);
       await refreshTicket();
+      receipts.done({ action: "nota-ticket", title: "Nota interna guardada", detail: ticket?.number });
     } catch (err) {
       setNoteSendError(err instanceof Error ? err.message : "Error al guardar nota");
       triggerNoteSettle();
@@ -745,6 +759,7 @@ export function TicketDetailPage() {
 
       await ticketsApi.updateStatus(ticketId, formData);
       await refreshTicket();
+      receipts.done({ action: "estado-ticket", title: "Estado del ticket actualizado", detail: ticket?.number });
 
       setUpdateSuccess(true);
       if (updateSuccessTimerRef.current) clearTimeout(updateSuccessTimerRef.current);
@@ -788,6 +803,11 @@ export function TicketDetailPage() {
       });
       setShowAssignModal(false);
       await refreshTicket();
+      receipts.done({
+        action: "asignar-ticket",
+        title: selectedStaffId ? "Ticket asignado" : "Asignación retirada",
+        detail: ticket?.number,
+      });
     } catch (err) {
       setAssignError(err instanceof Error ? err.message : "Error al asignar");
       triggerAssignSettle();
@@ -871,6 +891,7 @@ export function TicketDetailPage() {
       });
       setShowEditModal(false);
       await refreshTicket();
+      receipts.done({ action: "editar-ticket", title: "Clasificación actualizada", detail: ticket?.number });
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "Error al actualizar");
       triggerEditSettle();
@@ -1664,7 +1685,8 @@ export function TicketDetailPage() {
 
                 {/* TAB: TAREAS (con panel de comentarios integrado si está activo) */}
                 <div className={activeTab === "tareas" ? "block" : "hidden"}>
-                  <div className={activeCommentsTask ? "flex flex-col gap-6 lg:flex-row lg:items-start" : ""}>
+                  {/* El contenedor es siempre el mismo: cambiar de flex a bloque al cerrar el panel hacía saltar la lista (colapso de márgenes). */}
+                  <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-0">
                     <div className="min-w-0 flex-1">
                       <TicketTasksTab
                         ticketId={ticket.id}
@@ -1675,11 +1697,13 @@ export function TicketDetailPage() {
                         activeCommentsTaskId={activeCommentsTask?.id}
                         onToggleTaskComments={handleToggleTaskComments}
                         latestAddedComment={latestAddedComment}
+                        onActivity={() => void refreshTicket()}
                       />
                     </div>
 
                     {activeCommentsTask && (
                       <TaskCommentsAside
+                        ref={commentsAsideRef}
                         key={`task-comments-${activeCommentsTask.id}`}
                         ticketId={ticket.id}
                         task={activeCommentsTask}
@@ -1701,8 +1725,10 @@ export function TicketDetailPage() {
                             taskId,
                             comment: newComment,
                           });
+                          receipts.done({ action: "comentar-tarea", title: "Comentario añadido", detail: activeCommentsTask.title });
+                          void refreshTicket();
                         }}
-                        className="w-full shrink-0 lg:w-[360px] lg:sticky lg:top-2 self-start"
+                        className="w-full shrink-0 lg:ml-6 lg:w-[360px] lg:sticky lg:top-2 self-start"
                       />
                     )}
                   </div>

@@ -21,6 +21,7 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { Spinner } from "../../components/ui/Spinner";
 import { Toast } from "../../components/ui/Toast";
+import { useReceipts } from "../../context/useReceipts";
 import { formatBytes, formatDateTime } from "../../lib/format";
 import type {
   CreateTicketTaskRequest,
@@ -41,6 +42,8 @@ interface TicketTasksTabProps {
   activeCommentsTaskId?: number | null;
   onToggleTaskComments?: (task: TicketTaskResponse) => void;
   latestAddedComment?: { taskId: number; comment: TicketTaskCommentResponse } | null;
+  /** Se avisa tras crear, completar, reabrir o eliminar una tarea, para que el historial se refresque. */
+  onActivity?: () => void;
 }
 
 type TaskFilter = "all" | "pending" | "completed" | "mine";
@@ -54,7 +57,9 @@ export function TicketTasksTab({
   activeCommentsTaskId,
   onToggleTaskComments,
   latestAddedComment,
+  onActivity,
 }: TicketTasksTabProps) {
+  const receipts = useReceipts();
   const [tasks, setTasks] = useState<TicketTaskResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,11 +117,15 @@ export function TicketTasksTab({
     const created = await ticketsApi.createTask(ticketId, taskData);
     setTasks((prev) => [created, ...prev]);
     onTasksCountChanged?.(tasks.length + 1);
+    receipts.done({ action: "crear-tarea", title: "Tarea creada", detail: created.title });
+    onActivity?.();
   };
 
   const handleCompleteTask = async (taskId: number, formData: FormData) => {
     const updated = await ticketsApi.completeTask(ticketId, taskId, formData);
     setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+    receipts.done({ action: "completar-tarea", title: "Tarea completada", detail: updated.title });
+    onActivity?.();
   };
 
   const handleReopenTask = async (taskId: number) => {
@@ -124,8 +133,12 @@ export function TicketTasksTab({
       setReopeningId(taskId);
       const updated = await ticketsApi.reopenTask(ticketId, taskId);
       setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+      receipts.done({ action: "reabrir-tarea", title: "Tarea reabierta", detail: updated.title });
+      onActivity?.();
     } catch (err) {
-      setToastError(err instanceof Error ? err.message : "Error al reabrir la tarea.");
+      const message = err instanceof Error ? err.message : "Error al reabrir la tarea.";
+      setToastError(message);
+      receipts.failed({ action: "reabrir-tarea", title: "No se pudo reabrir la tarea", detail: message });
     } finally {
       setReopeningId(null);
     }
@@ -133,12 +146,15 @@ export function TicketTasksTab({
 
   const handleConfirmDelete = async () => {
     if (!taskToDelete) return;
-    await ticketsApi.deleteTask(ticketId, taskToDelete.id);
+    const deleted = taskToDelete;
+    await ticketsApi.deleteTask(ticketId, deleted.id);
     setTasks((prev) => {
-      const next = prev.filter((t) => t.id !== taskToDelete.id);
+      const next = prev.filter((t) => t.id !== deleted.id);
       onTasksCountChanged?.(next.length);
       return next;
     });
+    receipts.done({ action: "eliminar-tarea", title: "Tarea eliminada", detail: deleted.title });
+    onActivity?.();
   };
 
 

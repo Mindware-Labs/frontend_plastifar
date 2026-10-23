@@ -4,12 +4,37 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, forwardRef } from "react";
 import { ticketsApi } from "../../api/tickets";
+import { prefersReducedMotion } from "../../hooks/motion";
 import { openOverlay } from "../../hooks/overlayStack";
 import { Avatar } from "../../components/ui/Avatar";
 import { formatDateTime } from "../../lib/format";
 import type { TicketTaskCommentResponse, TicketTaskResponse } from "../../types/api";
+
+// Curva de desaceleración larga, la de las hojas y paneles de iOS/macOS.
+const APPLE_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
+const ENTER_MS = 480;
+const EXIT_MS = 320;
+
+/**
+ * Fotogramas cerrado/abierto del panel. En escritorio el panel es una columna: se anima su
+ * ancho y su margen para que la lista de tareas ceda y recupere el espacio de forma continua,
+ * en lugar de saltar. En pantallas estrechas (apilado) solo se desliza y se desvanece.
+ */
+function panelFrames(el: HTMLElement): [Keyframe, Keyframe] {
+  if (window.matchMedia("(min-width: 1024px)").matches) {
+    const style = getComputedStyle(el);
+    return [
+      { width: "0px", marginLeft: "0px", opacity: 0 },
+      { width: style.width, marginLeft: style.marginLeft, opacity: 1 },
+    ];
+  }
+  return [
+    { opacity: 0, transform: "translateY(12px) scale(0.985)" },
+    { opacity: 1, transform: "none" },
+  ];
+}
 
 interface TaskCommentsAsideProps {
   task: TicketTaskResponse;
@@ -22,39 +47,84 @@ interface TaskCommentsAsideProps {
   targetHeight?: number | null;
 }
 
-export function TaskCommentsAside({
-  task,
-  ticketId,
-  currentStaffId,
-  currentStaffName,
-  onClose,
-  onCommentAdded,
-  className = "",
-  targetHeight,
-}: TaskCommentsAsideProps) {
+export interface TaskCommentsAsideHandle {
+  requestClose: () => void;
+}
+
+export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskCommentsAsideProps>(
+  function TaskCommentsAside(
+    {
+      task,
+      ticketId,
+      currentStaffId,
+      currentStaffName,
+      onClose,
+      onCommentAdded,
+      className = "",
+      targetHeight,
+    },
+    ref,
+  ) {
   const [commentText, setCommentText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const asideRef = useRef<HTMLElement>(null);
+  const closingRef = useRef(false);
 
   // Desplazar suavemente al último comentario al abrir o al añadir uno nuevo
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [task.comments.length]);
 
+  // Entrada: el panel emerge desde la derecha con una curva suave tipo Apple.
+  useLayoutEffect(() => {
+    const el = asideRef.current;
+    if (!el || prefersReducedMotion()) return;
+    const [closed, open] = panelFrames(el);
+    el.style.overflow = "hidden";
+    const anim = el.animate([closed, open], { duration: ENTER_MS, easing: APPLE_EASING });
+    anim.onfinish = () => {
+      anim.cancel();
+      el.style.overflow = "";
+    };
+    return () => anim.cancel();
+  }, []);
+
+  // Salida: la misma coreografía a la inversa y, al terminar, se desmonta de verdad.
+  const requestClose = useCallback(() => {
+    if (closingRef.current) return;
+    const el = asideRef.current;
+    if (!el || prefersReducedMotion()) {
+      onClose();
+      return;
+    }
+    closingRef.current = true;
+    el.style.pointerEvents = "none";
+    el.style.overflow = "hidden";
+    const [closed, open] = panelFrames(el);
+    const anim = el.animate([open, closed], { duration: EXIT_MS, easing: APPLE_EASING, fill: "forwards" });
+    anim.onfinish = () => onClose();
+    anim.oncancel = () => onClose();
+  }, [onClose]);
+
+  useImperativeHandle(ref, () => ({
+    requestClose,
+  }), [requestClose]);
+
   // Escape cierra el panel solo si no hay un dialogo abierto encima.
   useEffect(() => {
     const overlay = openOverlay();
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && overlay.isTop()) onClose();
+      if (e.key === "Escape" && overlay.isTop()) requestClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       overlay.close();
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [requestClose]);
 
   // Enfocar el textarea al montar o al cambiar de tarea
   useEffect(() => {
@@ -85,12 +155,13 @@ export function TaskCommentsAside({
 
   return (
     <aside
+      ref={asideRef}
       aria-label="Comentarios de la tarea"
-      className={`${className} animate-plf-side-panel-in`}
+      className={className}
     >
       <div
         style={targetHeight ? { height: `${targetHeight}px` } : undefined}
-        className="flex flex-col h-[520px] max-h-[calc(100vh-6rem)] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xs"
+        className="flex flex-col h-[520px] max-h-[calc(100vh-6rem)] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xs lg:min-w-[360px]"
       >
         {/* Cabecera del panel lateral: Comentarios al extremo izquierdo, X al extremo derecho */}
         <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-zinc-100 px-3.5 bg-white">
@@ -111,7 +182,7 @@ export function TaskCommentsAside({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Cerrar panel de comentarios (Esc)"
             title="Cerrar panel de comentarios (Esc)"
             className="flex size-6 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors cursor-pointer shrink-0"
@@ -255,4 +326,4 @@ export function TaskCommentsAside({
       </div>
     </aside>
   );
-}
+});
