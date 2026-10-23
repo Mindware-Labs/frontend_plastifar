@@ -1,9 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
-  Package,
+  Building2,
+  Check,
+  ChevronLeft,
+  ChevronRight,
   Plus,
+  ShieldAlert,
   Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -21,18 +23,17 @@ import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
 import { ticketsApi } from "../../api/tickets";
-import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
   DateField,
   LookupField,
-  SelectField,
   TextAreaField,
-  TextField,
   type FieldState,
 } from "../../components/ui/Field";
+import { LookupSelect } from "../../components/ui/LookupSelect";
 import { Modal } from "../../components/ui/Modal";
+import { Select } from "../../components/ui/Select";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import {
   cacheTicketInfo,
@@ -41,9 +42,19 @@ import {
   searchTickets,
   toNumber,
 } from "../../lib/discrepancies";
-import { resolveClientLabel, searchClients } from "../../lib/lookups";
+import {
+  resolveClientLabel,
+  resolveProductLabel,
+  searchClients,
+  searchProducts,
+} from "../../lib/lookups";
 import { today } from "../../lib/quality";
-import type { DiscrepancyDetail, LoadDiscrepancy } from "../../types/discrepancies";
+import type {
+  DiscrepancyDetail,
+  LoadDiscrepancy,
+  SecurityCheckInput,
+  SecurityCheckResult,
+} from "../../types/discrepancies";
 
 const quantity = z
   .string()
@@ -114,10 +125,10 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 type LineValues = FormValues["lines"][number];
 
-const emptyLine = (defaultClientId = ""): LineValues => ({
+const emptyLine = (defaultClientId = "", defaultClaimRef = ""): LineValues => ({
   productId: "",
   invoiceRef: "",
-  claimRef: "",
+  claimRef: defaultClaimRef,
   clientId: defaultClientId,
   surplusQuantity: "",
   shortageQuantity: "",
@@ -127,16 +138,51 @@ const emptyLine = (defaultClientId = ""): LineValues => ({
   supervisorName: "",
 });
 
-const QUALIFIES = [
+const QUALIFIES_OPTIONS = [
   { value: "", label: "Sin decidir" },
   { value: "si", label: "Sí" },
   { value: "no", label: "No" },
 ];
 
-const DISCREPANCY_TYPES = [
-  { value: "faltante", label: "Faltante", icon: ArrowDownRight },
-  { value: "sobrante", label: "Sobrante", icon: ArrowUpRight },
-] as const;
+/** Lista oficial de los 9 puntos de seguridad de PF-FOR-291 */
+const SECURITY_ITEMS = [
+  {
+    itemNumber: 1,
+    text: "No se pudo evidenciar video de vigilancia de la carga al momento de la investigación",
+  },
+  {
+    itemNumber: 2,
+    text: "El despachador no realizó la inspeccion previa de contenedor vacio antes de iniciar la carga de materiales.",
+  },
+  {
+    itemNumber: 3,
+    text: "El despachador no utiliza las herramientas de inspeccion (Martillo de Goma, Formato de Inspección).",
+  },
+  {
+    itemNumber: 4,
+    text: "No hay suficiente iluminacion al momento de realizar la inspeccion del contenedor y no se utilizo linterna en caso falta de iluminacion.",
+  },
+  {
+    itemNumber: 5,
+    text: "La carga es introducida al contenedor antes de realizar la inspeccion de seguridad.",
+  },
+  {
+    itemNumber: 6,
+    text: "Durante el proceso de carga se pudo evidenciar la manipulación de empaques para introducir materiales sospechas dentro del empaque?",
+  },
+  {
+    itemNumber: 7,
+    text: "Durante el proceso de carga se pudo evidenciar la presencia de personal ajeno a la carga o no autorizado?",
+  },
+  {
+    itemNumber: 8,
+    text: "Alguna persona de las que trabajaron en la carga de contenedor nunca salió del contenedor al finalizar la carga? Contrabando de personas",
+  },
+  {
+    itemNumber: 9,
+    text: "En caso de positivo en alguna de las anteriores preguntas se notifico a las Gerencias de Seguridad y Logística del evento?",
+  },
+];
 
 interface DiscrepancyFormModalProps {
   /** Ausente = alta. */
@@ -160,18 +206,6 @@ interface DiscrepancyFormModalProps {
   onSaved: (detail: DiscrepancyDetail) => void;
 }
 
-/** Divisor idéntico al de ClientModal */
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-zinc-100" />
-    </div>
-  );
-}
-
 /** Parsea la fecha y el cuerpo de la nota si existiera un prefijo [Fecha: ...] */
 function parseNote(rawNote: string | null | undefined): { date: string; note: string } {
   if (!rawNote) return { date: today(), note: "" };
@@ -184,303 +218,24 @@ function parseNote(rawNote: string | null | undefined): { date: string; note: st
   return { date: today(), note: rawNote };
 }
 
-interface DiscrepancyLineCardProps {
-  index: number;
-  control: Control<FormValues>;
-  register: UseFormRegister<FormValues>;
-  errors: FieldErrors<FormValues>;
-  setValue: UseFormSetValue<FormValues>;
-  remove: (index: number) => void;
-  canRemove: boolean;
-  ticketClientName?: string;
-  ticketClientId?: number;
-  existingClientName?: string;
-}
-
-function DiscrepancyLineCard({
-  index,
-  control,
-  register,
-  errors,
-  setValue,
-  remove,
-  canRemove,
-  ticketClientName,
-  ticketClientId,
-  existingClientName,
-}: DiscrepancyLineCardProps) {
-  const lineErrors = errors.lines?.[index];
-
-  const surplus = useWatch({ control, name: `lines.${index}.surplusQuantity` }) ?? "";
-  const shortage = useWatch({ control, name: `lines.${index}.shortageQuantity` }) ?? "";
-  const qualifies = useWatch({ control, name: `lines.${index}.qualifies` }) ?? "";
-
-  // Determinamos el modo activo (faltante o sobrante).
-  const isSurplusActive = Number(surplus) > 0 && !shortage;
-  const activeType: "faltante" | "sobrante" = isSurplusActive ? "sobrante" : "faltante";
-  const qtyValue = activeType === "sobrante" ? surplus : shortage;
-
-  function handleTypeChange(nextType: "faltante" | "sobrante") {
-    if (nextType === activeType) return;
-    const currentVal = qtyValue;
-    if (nextType === "faltante") {
-      setValue(`lines.${index}.shortageQuantity`, currentVal, { shouldValidate: true, shouldDirty: true });
-      setValue(`lines.${index}.surplusQuantity`, "", { shouldValidate: true, shouldDirty: true });
-    } else {
-      setValue(`lines.${index}.surplusQuantity`, currentVal, { shouldValidate: true, shouldDirty: true });
-      setValue(`lines.${index}.shortageQuantity`, "", { shouldValidate: true, shouldDirty: true });
-    }
-  }
-
-  function handleQtyChange(val: string) {
-    if (activeType === "faltante") {
-      setValue(`lines.${index}.shortageQuantity`, val, { shouldValidate: true, shouldDirty: true });
-      setValue(`lines.${index}.surplusQuantity`, "", { shouldValidate: true, shouldDirty: true });
-    } else {
-      setValue(`lines.${index}.surplusQuantity`, val, { shouldValidate: true, shouldDirty: true });
-      setValue(`lines.${index}.shortageQuantity`, "", { shouldValidate: true, shouldDirty: true });
-    }
-  }
-
-  const qtyError = lineErrors?.shortageQuantity?.message || lineErrors?.surplusQuantity?.message;
-
-  // Etiqueta legible del cliente heredado del ticket
-  const ticketInheritedLabel = ticketClientName
-    ? `${ticketClientName} (Cliente del ticket)`
-    : "Cliente del ticket";
-
+/** Divisor idéntico al de ClientModal */
+function FormDivider({ title }: { title: string }) {
   return (
-    <div className="rounded-xl border border-zinc-200/90 bg-white p-3.5 shadow-2xs hover:border-zinc-300 transition-all flex flex-col gap-3">
-      {/* Cabecera de la tarjeta de línea */}
-      <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-2 py-0.5 font-heading text-[11px] font-bold text-zinc-700">
-            <Package className="h-3 w-3 text-zinc-500" />
-            Línea #{index + 1}
-          </span>
-          {Number(qtyValue) > 0 && (
-            <span
-              className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md border ${
-                activeType === "faltante"
-                  ? "text-brand-red bg-red-50 border-red-200/60"
-                  : "text-emerald-700 bg-emerald-50 border-emerald-200/60"
-              }`}
-            >
-              {activeType === "faltante" ? (
-                <>
-                  <ArrowDownRight className="h-3 w-3 text-brand-red" />
-                  Faltante: {qtyValue}
-                </>
-              ) : (
-                <>
-                  <ArrowUpRight className="h-3 w-3 text-emerald-600" />
-                  Sobrante: {qtyValue}
-                </>
-              )}
-            </span>
-          )}
-        </div>
-
-        {canRemove && (
-          <button
-            type="button"
-            onClick={() => remove(index)}
-            className="inline-flex items-center gap-1 text-[11.5px] font-medium text-zinc-400 hover:text-brand-red hover:bg-rose-50 px-2 py-1 rounded-md transition-colors cursor-pointer"
-            title={`Quitar línea ${index + 1}`}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Quitar línea</span>
-          </button>
-        )}
-      </div>
-
-      {/* Producto */}
-      <Controller
-        name={`lines.${index}.productId`}
-        control={control}
-        render={({ field: productField }) => (
-          <ProductLookupField
-            size="sm"
-            label="Producto"
-            required
-            name={productField.name}
-            value={productField.value}
-            onChange={(value) => productField.onChange(value)}
-            onBlur={productField.onBlur}
-            placeholder="Buscar por código o descripción…"
-            error={lineErrors?.productId?.message}
-          />
-        )}
-      />
-
-      {/* Factura y # Reclamo */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        <TextField
-          size="sm"
-          label="Factura"
-          required
-          placeholder="Ej. B1500000123"
-          error={lineErrors?.invoiceRef?.message}
-          {...register(`lines.${index}.invoiceRef`)}
-        />
-        <TextField
-          size="sm"
-          label="# Reclamo"
-          placeholder="El del ticket"
-          error={lineErrors?.claimRef?.message}
-          {...register(`lines.${index}.claimRef`)}
-        />
-      </div>
-
-      {/* Cliente: Muestra el nombre real del cliente y aclara que es el del ticket */}
-      <Controller
-        name={`lines.${index}.clientId`}
-        control={control}
-        render={({ field: clientField }) => {
-          const isTicketClient =
-            clientField.value === "" ||
-            (ticketClientId !== undefined && clientField.value === String(ticketClientId));
-
-          const selectedLabel = isTicketClient
-            ? (ticketClientName ? `${ticketClientName} (Cliente del ticket)` : undefined)
-            : existingClientName && clientField.value === (existingClientName ? clientField.value : "")
-            ? existingClientName
-            : undefined;
-
-          return (
-            <LookupField
-              size="sm"
-              label="Cliente"
-              name={clientField.name}
-              value={clientField.value}
-              selectedLabel={selectedLabel}
-              onChange={(value) => clientField.onChange(value)}
-              onBlur={clientField.onBlur}
-              placeholder={ticketInheritedLabel}
-              searchPlaceholder="Buscar otro cliente para esta línea…"
-              clearLabel={ticketInheritedLabel}
-              search={searchClients}
-              resolveSelectedLabel={resolveClientLabel}
-            />
-          );
-        }}
-      />
-
-      {/* Tipo de discrepancia y Cantidad */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
-        <div className="flex flex-col gap-1">
-          <label className="font-heading text-[11.5px] font-semibold text-faint">
-            Discrepancia <span className="text-brand-red">*</span>
-          </label>
-          <div
-            role="radiogroup"
-            aria-label="Tipo de discrepancia"
-            className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50/70 p-0.5"
-          >
-            {DISCREPANCY_TYPES.map((item) => {
-              const isSelected = activeType === item.value;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  onClick={() => handleTypeChange(item.value)}
-                  className={`inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] transition-all cursor-pointer select-none ${
-                    isSelected
-                      ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                      : "border border-transparent font-medium text-zinc-600 hover:text-zinc-900 hover:bg-white/50"
-                  }`}
-                >
-                  <Icon
-                    className={`h-3 w-3 shrink-0 ${
-                      isSelected
-                        ? item.value === "faltante"
-                          ? "text-brand-red"
-                          : "text-emerald-600"
-                        : "text-zinc-400"
-                    }`}
-                  />
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <TextField
-          size="sm"
-          label={activeType === "faltante" ? "Cantidad faltante" : "Cantidad sobrante"}
-          required
-          type="number"
-          min="0"
-          step="0.01"
-          inputMode="decimal"
-          placeholder="0.00"
-          value={qtyValue}
-          onChange={(e) => handleQtyChange(e.target.value)}
-          error={qtyError}
-        />
-      </div>
-
-      {/* Nota de crédito: ¿Aplica? y # N/C */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        <Controller
-          name={`lines.${index}.qualifies`}
-          control={control}
-          render={({ field: qualifiesField }) => (
-            <SelectField
-              size="sm"
-              label="¿Cumple para N/C?"
-              name={qualifiesField.name}
-              value={qualifiesField.value}
-              onChange={(val) => {
-                qualifiesField.onChange(val);
-                if (val !== "si") {
-                  setValue(`lines.${index}.creditNoteNumber`, "");
-                }
-              }}
-              onBlur={qualifiesField.onBlur}
-              options={QUALIFIES}
-            />
-          )}
-        />
-        <TextField
-          size="sm"
-          label="# Nota de crédito"
-          placeholder={qualifies === "si" ? "Ej. NC-00124" : "Si cumple = Sí"}
-          disabled={qualifies !== "si"}
-          error={lineErrors?.creditNoteNumber?.message}
-          {...register(`lines.${index}.creditNoteNumber`)}
-        />
-      </div>
-
-      {/* Despachador y Supervisor */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        <TextField
-          size="sm"
-          label="Despachador"
-          required
-          placeholder="Nombre de quien despachó"
-          error={lineErrors?.dispatcherName?.message}
-          {...register(`lines.${index}.dispatcherName`)}
-        />
-        <TextField
-          size="sm"
-          label="Supervisor"
-          placeholder="Opcional"
-          error={lineErrors?.supervisorName?.message}
-          {...register(`lines.${index}.supervisorName`)}
-        />
-      </div>
+    <div className="flex items-center gap-2 pt-1 border-t border-zinc-100 first:border-0 first:pt-0">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
     </div>
   );
 }
 
 /**
- * RF-D1 y RF-D2: Formulario de discrepancia con idéntica experiencia,
- * inputs, ancho y estilo que el formulario de Clientes (PF-FOR-291).
+ * Formulario de Investigación de Discrepancia de Carga (PF-FOR-291)
+ * Reestructurado en 3 pasos con diseño editorial y simetría perfecta:
+ * 1. Identificación y Origen (Ticket + Fecha de despacho)
+ * 2. Tabla editorial de Líneas en discrepancia + Nota operativa
+ * 3. Checklist de Puntos de Seguridad (Positivo / Negativo con 'X')
  */
 export function DiscrepancyFormModal({
   discrepancy,
@@ -493,14 +248,15 @@ export function DiscrepancyFormModal({
   onSaved,
 }: DiscrepancyFormModalProps) {
   const isEdit = discrepancy !== undefined;
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [formError, setFormError] = useState<string | null>(null);
   const { isExiting, requestClose } = useModalAnimation();
 
-  // Parsing de nota inicial y fecha
+  // Parsing de nota inicial y fecha de despacho
   const parsedNote = parseNote(discrepancy?.note ?? initialData?.note);
   const [discrepancyDate, setDiscrepancyDate] = useState<string>(parsedNote.date);
 
-  // Ticket label y cliente resueltos de inmediato (sin delay de red ni mostrar el ID numérico)
+  // Ticket label y cliente resueltos de inmediato (sin delay de red ni mostrar ID en bruto)
   const initialTicketId = discrepancy ? discrepancy.ticketId : ticketId;
   const initialTicketLabel =
     fixedTicketLabel ??
@@ -524,12 +280,17 @@ export function DiscrepancyFormModal({
   const [effectiveTicketClientName, setEffectiveTicketClientName] = useState<string | undefined>(initialClientName);
   const [effectiveTicketClientId, setEffectiveTicketClientId] = useState<number | undefined>(initialClientId);
 
-  // Si tenemos ticketId y label, aseguramos la caché en memoria de inmediato
+  // Derivar número de ticket para autocompletar # Reclamo
+  const derivedTicketNumber =
+    discrepancy?.ticketNumber ||
+    (ticketLabel ? ticketLabel.split(" ")[0].trim() : "");
+
+  // Caché inmediata
   if (initialTicketId && initialTicketLabel) {
     cacheTicketInfo(initialTicketId, initialTicketLabel, initialClientName, initialClientId);
   }
 
-  // Si falta el nombre del cliente del ticket, lo consultamos en segundo plano
+  // Consulta en segundo plano si falta el cliente
   useEffect(() => {
     if (initialTicketId && !effectiveTicketClientName) {
       ticketsApi
@@ -547,11 +308,13 @@ export function DiscrepancyFormModal({
 
   const defaultClientIdForLines = initialClientId ? String(initialClientId) : "";
 
+  // React Hook Form
   const {
     control,
     register,
     handleSubmit,
     setValue,
+    trigger,
     formState: { errors, touchedFields, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -568,7 +331,7 @@ export function DiscrepancyFormModal({
           ? discrepancy.lines.map((line) => ({
               productId: String(line.productId),
               invoiceRef: line.invoiceRef,
-              claimRef: line.claimRef ?? "",
+              claimRef: line.claimRef || derivedTicketNumber || "",
               clientId: line.clientId ? String(line.clientId) : defaultClientIdForLines,
               surplusQuantity:
                 line.surplusQuantity === 0 ? "" : String(line.surplusQuantity),
@@ -586,34 +349,111 @@ export function DiscrepancyFormModal({
             }))
           : initialData?.lines && initialData.lines.length > 0
           ? initialData.lines.map((l) => ({
-              ...emptyLine(defaultClientIdForLines),
+              ...emptyLine(defaultClientIdForLines, derivedTicketNumber),
               productId: l.productId,
               invoiceRef: l.invoiceRef ?? "",
               clientId: l.clientId ?? defaultClientIdForLines,
               surplusQuantity: l.surplusQuantity ?? "",
               shortageQuantity: l.shortageQuantity ?? "",
             }))
-          : [emptyLine(defaultClientIdForLines)],
+          : [emptyLine(defaultClientIdForLines, derivedTicketNumber)],
     },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "lines" });
   const noteValue = useWatch({ control, name: "note" }) ?? "";
+  const ticketIdValue = useWatch({ control, name: "ticketId" }) ?? "";
+
+  // Puntos de Seguridad (Paso 3)
+  type CheckChoice = "Positivo" | "Negativo" | "";
+  const [checks, setChecks] = useState<Record<number, CheckChoice>>(() => {
+    if (discrepancy?.checks && discrepancy.checks.length > 0) {
+      return Object.fromEntries(
+        discrepancy.checks.map((c) => [c.itemNumber, (c.result as CheckChoice) ?? ""]),
+      );
+    }
+    return { 1: "", 2: "", 3: "", 4: "", 5: "", 6: "", 7: "", 8: "", 9: "" };
+  });
+
+  // Verifica si hay algún hallazgo positivo en los puntos 1 al 8
+  const anyPositive = Object.entries(checks).some(
+    ([n, val]) => Number(n) !== 9 && val === "Positivo",
+  );
+
+  function toggleCheck(itemNumber: number, choice: "Positivo" | "Negativo") {
+    // Si es el punto 9 y no hay ningún positivo en 1..8, no aplica
+    if (itemNumber === 9 && !anyPositive) return;
+
+    setChecks((prev) => {
+      const current = prev[itemNumber];
+      const nextVal: CheckChoice = current === choice ? "" : choice;
+      const updated: Record<number, CheckChoice> = { ...prev, [itemNumber]: nextVal };
+
+      // Si ningún punto 1-8 quedó positivo, limpiamos el punto 9 automáticamente
+      const stillPositive = Object.entries(updated).some(
+        ([n, val]) => Number(n) !== 9 && val === "Positivo",
+      );
+      if (!stillPositive) {
+        updated[9] = "";
+      }
+      return updated;
+    });
+  }
 
   function stateOf(field: "ticketId"): FieldState {
     if (errors[field]) return "error";
     return touchedFields[field] ? "valid" : "idle";
   }
 
+  // Navegación entre pasos con validación
+  async function handleNextStep() {
+    setFormError(null);
+    if (step === 1) {
+      const validTicket = await trigger("ticketId");
+      if (!validTicket || !ticketIdValue) {
+        setFormError("Por favor selecciona un ticket para continuar.");
+        return;
+      }
+      // Autocompleta # Reclamo si quedó en blanco
+      fields.forEach((_, idx) => {
+        const currentRef = control._formValues.lines?.[idx]?.claimRef;
+        if (!currentRef && derivedTicketNumber) {
+          setValue(`lines.${idx}.claimRef`, derivedTicketNumber);
+        }
+      });
+      setStep(2);
+    } else if (step === 2) {
+      const validLines = await trigger("lines");
+      if (!validLines) {
+        setFormError("Revisa las líneas en discrepancia. Completa los campos obligatorios marcados.");
+        return;
+      }
+      setStep(3);
+    }
+  }
+
   async function onSubmit(values: FormValues) {
     setFormError(null);
+
+    // Validación del punto 9 según la regla de negocio
+    if (anyPositive && !checks[9]) {
+      setFormError("Hay un punto de seguridad positivo. Es obligatorio responder el punto 9.");
+      setStep(3);
+      return;
+    }
+
     const blank = (value: string) => (value.trim() === "" ? null : value.trim());
 
-    // Construye la nota final incluyendo la fecha seleccionada en el DateField
+    // Construye la nota final incluyendo la fecha de despacho seleccionada
     const cleanUserNote = values.note.trim();
     const finalNote = discrepancyDate
       ? `[Fecha: ${discrepancyDate}]${cleanUserNote ? `\n${cleanUserNote}` : ""}`
       : cleanUserNote;
+
+    const checksPayload: SecurityCheckInput[] = Object.entries(checks).map(([n, val]) => ({
+      itemNumber: Number(n),
+      result: val === "" ? null : (val as SecurityCheckResult),
+    }));
 
     const request = {
       note: blank(finalNote),
@@ -632,7 +472,7 @@ export function DiscrepancyFormModal({
         supervisorName: blank(line.supervisorName),
         supervisorStaffId: null,
       })),
-      checks: null,
+      checks: checksPayload,
     };
 
     try {
@@ -652,180 +492,733 @@ export function DiscrepancyFormModal({
     }
   }
 
-  function handleKeyDown(event: React.KeyboardEvent<HTMLFormElement>) {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-      event.preventDefault();
-      void handleSubmit(onSubmit)();
-    }
-  }
+  // Dinamismo de ancho: amplio en paso 2 para la tabla editorial sin apretar columnas
+  const modalMaxWidth =
+    step === 1 ? "max-w-xl" : step === 2 ? "max-w-7xl" : "max-w-3xl";
+
+  const ticketInheritedLabel = effectiveTicketClientName
+    ? effectiveTicketClientName
+    : "Buscar cliente…";
 
   return (
     <Modal
-      maxWidth="max-w-xl"
-      eyebrow={isEdit ? `Investigación #${discrepancy.id} · ${discrepancy.number}` : "Código asignado automáticamente"}
+      maxWidth={modalMaxWidth}
+      eyebrow={
+        isEdit
+          ? `Investigación #${discrepancy.id} · ${discrepancy.number}`
+          : "PF-FOR-291 · INVESTIGACIÓN DE DISCREPANCIA"
+      }
       title={isEdit ? `Editar ${discrepancy.number}` : "Nueva investigación de discrepancia"}
       description={
-        isEdit
-          ? "Actualiza los datos de la investigación, líneas o notas internas."
-          : "El código se asignará de forma automática al guardar."
+        step === 1
+          ? "Paso 1 de 3: Identificación del caso y fecha de despacho."
+          : step === 2
+          ? "Paso 2 de 3: Tabla de productos en discrepancia y notas operativas."
+          : "Paso 3 de 3: Evaluación de los 9 puntos de seguridad de la carga."
       }
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
         <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
+          {step === 3 ? (
+            <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+              <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                Ctrl
+              </kbd>
+              <span>+</span>
+              <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                Enter
+              </kbd>
+              <span className="ml-0.5">para finalizar</span>
+            </span>
+          ) : (
+            <span className="text-[11.5px] text-zinc-400">
+              Paso {step} de 3
+            </span>
+          )}
+
           <div className="flex items-center gap-2 ml-auto">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={requestClose}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              form="discrepancy-form"
-              size="sm"
-              isLoading={isSubmitting}
-            >
-              {isEdit ? "Guardar cambios" : "Crear investigación"}
-            </Button>
+            {step > 1 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setFormError(null);
+                  setStep((s) => (s - 1) as 1 | 2);
+                }}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span>Anterior</span>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={requestClose}
+              >
+                Cancelar
+              </Button>
+            )}
+
+            {step < 3 ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleNextStep}
+              >
+                <span>Siguiente</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                form="discrepancy-form"
+                size="sm"
+                isLoading={isSubmitting}
+              >
+                {isEdit ? "Guardar cambios" : "Crear investigación"}
+              </Button>
+            )}
           </div>
         </div>
       }
     >
+      {/* STEPPER HEADER */}
+      <div className="mb-4 -mt-2 border-b border-zinc-100 pb-3">
+        <div className="flex w-full items-center justify-between max-w-md mx-auto">
+          {/* Step 1 */}
+          <button
+            type="button"
+            onClick={() => setStep(1)}
+            className="flex items-center gap-1.5 cursor-pointer focus:outline-hidden"
+          >
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
+                step === 1
+                  ? "bg-brand-red text-white shadow-2xs"
+                  : step > 1
+                  ? "bg-emerald-600 text-white"
+                  : "bg-zinc-200 text-zinc-600"
+              }`}
+            >
+              {step > 1 ? <Check className="h-3.5 w-3.5" /> : "1"}
+            </span>
+            <span
+              className={`text-[12px] font-heading font-semibold transition-colors ${
+                step === 1 ? "text-zinc-900" : step > 1 ? "text-zinc-700" : "text-zinc-400"
+              }`}
+            >
+              Origen
+            </span>
+          </button>
+
+          <div
+            className={`h-0.5 flex-1 mx-3 rounded-full transition-colors ${
+              step > 1 ? "bg-emerald-600/40" : "bg-zinc-200"
+            }`}
+          />
+
+          {/* Step 2 */}
+          <button
+            type="button"
+            onClick={() => {
+              if (ticketIdValue) setStep(2);
+            }}
+            disabled={!ticketIdValue}
+            className="flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed focus:outline-hidden"
+          >
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
+                step === 2
+                  ? "bg-brand-red text-white shadow-2xs"
+                  : step > 2
+                  ? "bg-emerald-600 text-white"
+                  : "bg-zinc-200 text-zinc-600"
+              }`}
+            >
+              {step > 2 ? <Check className="h-3.5 w-3.5" /> : "2"}
+            </span>
+            <span
+              className={`text-[12px] font-heading font-semibold transition-colors ${
+                step === 2 ? "text-zinc-900" : step > 2 ? "text-zinc-700" : "text-zinc-400"
+              }`}
+            >
+              Líneas y Nota
+            </span>
+          </button>
+
+          <div
+            className={`h-0.5 flex-1 mx-3 rounded-full transition-colors ${
+              step > 2 ? "bg-emerald-600/40" : "bg-zinc-200"
+            }`}
+          />
+
+          {/* Step 3 */}
+          <button
+            type="button"
+            onClick={() => {
+              if (ticketIdValue && fields.length > 0) setStep(3);
+            }}
+            disabled={!ticketIdValue || fields.length === 0}
+            className="flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed focus:outline-hidden"
+          >
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
+                step === 3
+                  ? "bg-brand-red text-white shadow-2xs"
+                  : "bg-zinc-200 text-zinc-600"
+              }`}
+            >
+              3
+            </span>
+            <span
+              className={`text-[12px] font-heading font-semibold transition-colors ${
+                step === 3 ? "text-zinc-900" : "text-zinc-400"
+              }`}
+            >
+              Seguridad
+            </span>
+          </button>
+        </div>
+      </div>
+
       <form
         id="discrepancy-form"
         onSubmit={handleSubmit(onSubmit)}
-        onKeyDown={handleKeyDown}
         noValidate
         className="flex flex-col gap-3 text-left"
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        {/* 1. IDENTIFICACIÓN Y ORIGEN */}
-        <FormDivider title="Identificación" />
+        {/* ======================================================== */}
+        {/* PASO 1: ORIGEN E IDENTIFICACIÓN                          */}
+        {/* ======================================================== */}
+        {step === 1 && (
+          <div className="flex flex-col gap-3.5 animate-plf-fade">
+            <FormDivider title="Identificación del caso" />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <Controller
-            name="ticketId"
-            control={control}
-            render={({ field }) => (
-              <LookupField
-                size="sm"
-                label="Ticket vinculado"
-                required
-                name={field.name}
-                value={field.value}
-                selectedLabel={ticketLabel}
-                onChange={(value, option) => {
-                  field.onChange(value);
-                  if (option) {
-                    setTicketLabel(option.label);
-                    if (option.hint) {
-                      setEffectiveTicketClientName(option.hint);
-                    }
-                  }
-                }}
-                onBlur={field.onBlur}
-                placeholder="Elige un ticket…"
-                searchPlaceholder="Número, asunto o cliente…"
-                search={searchTickets}
-                resolveSelectedLabel={resolveTicketLabel}
-                disabled={isEdit || ticketId !== undefined}
-                state={stateOf("ticketId")}
-                error={errors.ticketId?.message}
-              />
-            )}
-          />
-
-          <DateField
-            label="Fecha del despacho"
-            required
-            value={discrepancyDate}
-            onChange={setDiscrepancyDate}
-            placeholder="Seleccionar fecha…"
-            headerLabel="Fecha del despacho"
-          />
-        </div>
-
-        {/* 2. LÍNEAS EN DISCREPANCIA */}
-        <FormDivider title="Líneas en discrepancia" />
-
-        <div className="flex flex-col gap-3">
-          {fields.map((field, index) => {
-            const lineData = discrepancy?.lines?.[index];
-            return (
-              <DiscrepancyLineCard
-                key={field.id}
-                index={index}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Controller
+                name="ticketId"
                 control={control}
-                register={register}
-                errors={errors}
-                setValue={setValue}
-                remove={remove}
-                canRemove={fields.length > 1}
-                ticketClientName={effectiveTicketClientName}
-                ticketClientId={effectiveTicketClientId}
-                existingClientName={lineData?.clientName}
+                render={({ field }) => (
+                  <LookupField
+                    size="sm"
+                    label="Ticket vinculado"
+                    required
+                    name={field.name}
+                    value={field.value}
+                    selectedLabel={ticketLabel}
+                    onChange={(value, option) => {
+                      field.onChange(value);
+                      if (option) {
+                        setTicketLabel(option.label);
+                        if (option.hint) {
+                          setEffectiveTicketClientName(option.hint);
+                        }
+                      }
+                    }}
+                    onBlur={field.onBlur}
+                    placeholder="Elige un ticket…"
+                    searchPlaceholder="Número, asunto o cliente…"
+                    search={searchTickets}
+                    resolveSelectedLabel={resolveTicketLabel}
+                    disabled={isEdit || ticketId !== undefined}
+                    state={stateOf("ticketId")}
+                    error={errors.ticketId?.message}
+                  />
+                )}
               />
-            );
-          })}
-        </div>
 
-        {/* Botón para añadir otra línea */}
-        <div className="flex items-center justify-between pt-1">
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => append(emptyLine(defaultClientIdForLines))}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Agregar otra línea</span>
-          </Button>
+              <DateField
+                label="Fecha del despacho"
+                required
+                value={discrepancyDate}
+                onChange={setDiscrepancyDate}
+                placeholder="Seleccionar fecha…"
+                headerLabel="Fecha del despacho"
+              />
+            </div>
 
-          <span className="text-[11.5px] text-zinc-400 select-none">
-            {fields.length} {fields.length === 1 ? "línea registrada" : "líneas registradas"}
-          </span>
-        </div>
+            {/* Tarjeta resumen del ticket seleccionado */}
+            {ticketLabel && (
+              <div className="rounded-xl border border-zinc-200/90 bg-zinc-50/60 p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-zinc-400">
+                    Ticket seleccionado
+                  </span>
+                  <span className="text-[13px] font-semibold text-zinc-900">
+                    {ticketLabel}
+                  </span>
+                </div>
+                {effectiveTicketClientName && (
+                  <div className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[12px] font-medium text-zinc-700 shadow-2xs">
+                    <Building2 className="h-3.5 w-3.5 text-zinc-400" />
+                    <span>{effectiveTicketClientName}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* 3. USO INTERNO */}
-        <FormDivider title="Uso interno" />
+        {/* ======================================================== */}
+        {/* PASO 2: LÍNEAS EN DISCREPANCIA (TABLA EDITORIAL) Y NOTA  */}
+        {/* ======================================================== */}
+        {step === 2 && (
+          <div className="flex flex-col gap-3.5 animate-plf-fade">
+            <div className="flex items-center justify-between">
+              <FormDivider title="Líneas en discrepancia (Formato PF-FOR-291)" />
+            </div>
 
-        <TextAreaField
-          id="discrepancy-notes"
-          label="Notas internas"
-          rows={2}
-          className="text-[12.5px] py-1.5"
-          placeholder="Observaciones de entrega, horarios de recepción, particularidades de la carga…"
-          hint={
-            <span className="flex items-center justify-between text-[11px] text-zinc-400">
-              <span>Instrucciones operativas internas</span>
-              <span
-                className={`tabular-nums ${
-                  noteValue.length > 3800 ? "text-brand-red font-medium" : ""
-                }`}
+            {/* TABLA EDITORIAL DE LÍNEAS - ENCABEZADOS DE UNA SOLA LÍNEA Y ALINEACIÓN PERFECTA */}
+            <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-2xs">
+              <table className="w-full text-left border-collapse min-w-[1240px]">
+                <thead>
+                  <tr className="border-b border-zinc-200 bg-zinc-50/90 text-[11px] font-heading font-bold uppercase tracking-wider text-zinc-500 select-none">
+                    <th className="py-2.5 px-2.5 w-10 text-center whitespace-nowrap">#</th>
+                    <th className="py-2.5 px-2.5 w-32 whitespace-nowrap"># Reclamo</th>
+                    <th className="py-2.5 px-2.5 w-32 whitespace-nowrap">Factura *</th>
+                    <th className="py-2.5 px-2.5 w-52 whitespace-nowrap">Cliente</th>
+                    <th className="py-2.5 px-2.5 w-72 whitespace-nowrap">Producto *</th>
+                    <th className="py-2.5 px-2.5 w-28 text-center whitespace-nowrap">Sobrante</th>
+                    <th className="py-2.5 px-2.5 w-28 text-center whitespace-nowrap">Faltante</th>
+                    <th className="py-2.5 px-2.5 w-32 text-center whitespace-nowrap">¿Cumple N/C?</th>
+                    <th className="py-2.5 px-2.5 w-28 whitespace-nowrap"># N/C</th>
+                    <th className="py-2.5 px-2.5 w-40 whitespace-nowrap">Despachador *</th>
+                    <th className="py-2.5 px-2.5 w-36 whitespace-nowrap">Supervisor</th>
+                    <th className="py-2.5 px-2 w-10 text-center whitespace-nowrap"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {fields.map((field, index) => {
+                    const lineErrors = errors.lines?.[index];
+                    const existingLine = discrepancy?.lines?.[index];
+
+                    return (
+                      <DiscrepancyTableRow
+                        key={field.id}
+                        index={index}
+                        control={control}
+                        register={register}
+                        setValue={setValue}
+                        lineErrors={lineErrors}
+                        existingLine={existingLine}
+                        ticketClientName={effectiveTicketClientName}
+                        ticketClientId={effectiveTicketClientId}
+                        ticketInheritedLabel={ticketInheritedLabel}
+                        canRemove={fields.length > 1}
+                        onRemove={() => remove(index)}
+                      />
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pie de tabla con botón agregar y contador */}
+            <div className="flex items-center justify-between pt-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  append(emptyLine(defaultClientIdForLines, derivedTicketNumber))
+                }
               >
-                {noteValue.length} / 4000
+                <Plus className="h-3.5 w-3.5" />
+                <span>Agregar otra línea</span>
+              </Button>
+
+              <span className="text-[11.5px] text-zinc-400 select-none">
+                {fields.length} {fields.length === 1 ? "línea registrada" : "líneas registradas"}
               </span>
-            </span>
-          }
-          error={errors.note?.message}
-          {...register("note")}
-        />
+            </div>
+
+            {/* SECCIÓN DE LA NOTA (según PF-FOR-291) */}
+            <div className="mt-2 flex flex-col gap-1.5">
+              <FormDivider title="Nota de la investigación" />
+              <TextAreaField
+                id="discrepancy-notes"
+                label="Nota operativa"
+                rows={2}
+                className="text-[12.5px] py-1.5"
+                placeholder="Observaciones de entrega, horarios de recepción, particularidades de la carga, precinto o contenedor…"
+                hint={
+                  <span className="flex items-center justify-between text-[11px] text-zinc-400">
+                    <span>Contexto de la carga, contenedor o precinto</span>
+                    <span
+                      className={`tabular-nums ${
+                        noteValue.length > 3800 ? "text-brand-red font-medium" : ""
+                      }`}
+                    >
+                      {noteValue.length} / 4000
+                    </span>
+                  </span>
+                }
+                error={errors.note?.message}
+                {...register("note")}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* PASO 3: PUNTOS DE SEGURIDAD A EVALUAR (PASO FINAL)       */}
+        {/* ======================================================== */}
+        {step === 3 && (
+          <div className="flex flex-col gap-3.5 animate-plf-fade">
+            <FormDivider title="Puntos de seguridad a evaluar (PF-FOR-291)" />
+
+            {anyPositive && (
+              <Alert variant="error">
+                <span className="flex items-start gap-2">
+                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    <strong>Hallazgo de seguridad detectado:</strong> se ha marcado al menos un punto positivo. El punto 9 es obligatorio para indicar si se notificó a las Gerencias de Seguridad y Logística.
+                  </span>
+                </span>
+              </Alert>
+            )}
+
+            {/* TABLA DE PUNTOS DE SEGURIDAD */}
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xs">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-zinc-200 bg-zinc-50/90 text-[11px] font-heading font-bold uppercase tracking-wider text-zinc-500 select-none">
+                    <th className="py-2.5 pl-3 pr-2 w-10 text-center whitespace-nowrap">#</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">Puntos de Seguridad a Evaluar</th>
+                    <th className="py-2.5 px-2 w-24 text-center whitespace-nowrap">
+                      <span className="block text-[9px] text-zinc-400 font-normal lowercase tracking-normal">marcar X</span>
+                      <span className="text-brand-red">Positivo</span>
+                    </th>
+                    <th className="py-2.5 px-2 w-24 text-center whitespace-nowrap">
+                      <span className="block text-[9px] text-zinc-400 font-normal lowercase tracking-normal">marcar X</span>
+                      <span>Negativo</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 text-[12.5px]">
+                  {SECURITY_ITEMS.map((item) => {
+                    const isNinth = item.itemNumber === 9;
+                    const disabled = isNinth && !anyPositive;
+                    const currentVal = checks[item.itemNumber] || "";
+
+                    return (
+                      <tr
+                        key={item.itemNumber}
+                        className={`transition-colors ${
+                          currentVal === "Positivo" && !isNinth
+                            ? "bg-rose-50/50 hover:bg-rose-50/80"
+                            : "hover:bg-zinc-50/70"
+                        } ${disabled ? "opacity-45" : ""}`}
+                      >
+                        <td className="py-2.5 pl-3 pr-2 text-center font-mono text-[11px] font-semibold text-zinc-400">
+                          {item.itemNumber}
+                        </td>
+                        <td className="py-2.5 px-3 leading-relaxed text-zinc-800">
+                          <p>{item.text}</p>
+                          {isNinth && !anyPositive && (
+                            <span className="mt-0.5 inline-block text-[11px] text-zinc-400 italic">
+                              (Aplica únicamente cuando al menos un punto del 1 al 8 es Positivo)
+                            </span>
+                          )}
+                        </td>
+                        {/* Checkbox / Botón POSITIVO */}
+                        <td className="py-2 px-2 text-center">
+                          <button
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => toggleCheck(item.itemNumber, "Positivo")}
+                            className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md border text-[13px] font-bold transition-all cursor-pointer select-none disabled:cursor-not-allowed ${
+                              currentVal === "Positivo"
+                                ? "border-brand-red bg-brand-red text-white shadow-2xs"
+                                : "border-zinc-300 bg-white text-transparent hover:border-brand-red/60 hover:text-brand-red/30"
+                            }`}
+                            title={`Marcar punto ${item.itemNumber} como Positivo`}
+                          >
+                            X
+                          </button>
+                        </td>
+                        {/* Checkbox / Botón NEGATIVO */}
+                        <td className="py-2 px-2 text-center">
+                          <button
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => toggleCheck(item.itemNumber, "Negativo")}
+                            className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md border text-[13px] font-bold transition-all cursor-pointer select-none disabled:cursor-not-allowed ${
+                              currentVal === "Negativo"
+                                ? "border-zinc-800 bg-zinc-800 text-white shadow-2xs"
+                                : "border-zinc-300 bg-white text-transparent hover:border-zinc-500 hover:text-zinc-400"
+                            }`}
+                            title={`Marcar punto ${item.itemNumber} como Negativo`}
+                          >
+                            X
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </form>
     </Modal>
+  );
+}
+
+/** Fila individual en la tabla editorial de líneas con simetría y altura homogénea h-8 */
+interface DiscrepancyTableRowProps {
+  index: number;
+  control: Control<FormValues>;
+  register: UseFormRegister<FormValues>;
+  setValue: UseFormSetValue<FormValues>;
+  lineErrors: FieldErrors<LineValues> | undefined;
+  existingLine?: any;
+  ticketClientName?: string;
+  ticketClientId?: number;
+  ticketInheritedLabel: string;
+  canRemove: boolean;
+  onRemove: () => void;
+}
+
+function DiscrepancyTableRow({
+  index,
+  control,
+  register,
+  setValue,
+  lineErrors,
+  existingLine,
+  ticketClientName,
+  ticketClientId,
+  ticketInheritedLabel,
+  canRemove,
+  onRemove,
+}: DiscrepancyTableRowProps) {
+  const surplus = useWatch({ control, name: `lines.${index}.surplusQuantity` }) ?? "";
+  const shortage = useWatch({ control, name: `lines.${index}.shortageQuantity` }) ?? "";
+
+  function handleSurplusChange(val: string) {
+    setValue(`lines.${index}.surplusQuantity`, val, { shouldValidate: true, shouldDirty: true });
+    if (val && Number(val) > 0) {
+      setValue(`lines.${index}.shortageQuantity`, "", { shouldValidate: true, shouldDirty: true });
+    }
+  }
+
+  function handleShortageChange(val: string) {
+    setValue(`lines.${index}.shortageQuantity`, val, { shouldValidate: true, shouldDirty: true });
+    if (val && Number(val) > 0) {
+      setValue(`lines.${index}.surplusQuantity`, "", { shouldValidate: true, shouldDirty: true });
+    }
+  }
+
+  return (
+    <tr className="hover:bg-zinc-50/70 transition-colors">
+      {/* 1. Índice */}
+      <td className="py-2 px-2 text-center font-mono text-[11.5px] font-semibold text-zinc-400 align-middle">
+        {index + 1}
+      </td>
+
+      {/* 2. # Reclamo */}
+      <td className="py-2 px-2 align-middle">
+        <input
+          type="text"
+          className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12.5px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-red focus:ring-2 focus:ring-brand-red/10 outline-none transition-all"
+          placeholder="El del ticket"
+          title={lineErrors?.claimRef?.message}
+          {...register(`lines.${index}.claimRef`)}
+        />
+      </td>
+
+      {/* 3. Factura * */}
+      <td className="py-2 px-2 align-middle">
+        <input
+          type="text"
+          required
+          className={`h-8 w-full rounded-md border bg-white px-2 text-[12.5px] text-zinc-800 placeholder:text-zinc-400 focus:outline-none transition-all ${
+            lineErrors?.invoiceRef
+              ? "border-brand-red bg-red-50/20 focus:ring-2 focus:ring-brand-red/20"
+              : "border-zinc-200 focus:border-brand-red focus:ring-2 focus:ring-brand-red/10"
+          }`}
+          placeholder="B1500000123"
+          title={lineErrors?.invoiceRef?.message}
+          {...register(`lines.${index}.invoiceRef`)}
+        />
+      </td>
+
+      {/* 4. Cliente (LookupSelect compacto y directo, sin label encima) */}
+      <td className="py-2 px-2 align-middle">
+        <Controller
+          name={`lines.${index}.clientId`}
+          control={control}
+          render={({ field: clientField }) => {
+            const isTicketClient =
+              clientField.value === "" ||
+              (ticketClientId !== undefined && clientField.value === String(ticketClientId));
+
+            const selectedLabel = isTicketClient
+              ? ticketClientName || undefined
+              : existingLine?.clientName && clientField.value === String(existingLine.clientId)
+              ? existingLine.clientName
+              : undefined;
+
+            return (
+              <LookupSelect
+                size="sm"
+                value={clientField.value}
+                selectedLabel={selectedLabel}
+                onChange={(value) => clientField.onChange(value)}
+                onBlur={clientField.onBlur}
+                placeholder={ticketInheritedLabel}
+                searchPlaceholder="Buscar cliente…"
+                clearLabel={ticketInheritedLabel}
+                search={searchClients}
+                resolveSelectedLabel={resolveClientLabel}
+              />
+            );
+          }}
+        />
+      </td>
+
+      {/* 5. Producto (LookupSelect directo y sin asterisco huérfano arriba) */}
+      <td className="py-2 px-2 align-middle">
+        <Controller
+          name={`lines.${index}.productId`}
+          control={control}
+          render={({ field: productField }) => (
+            <LookupSelect
+              size="sm"
+              value={productField.value}
+              onChange={(value) => productField.onChange(value)}
+              onBlur={productField.onBlur}
+              placeholder="Buscar producto…"
+              searchPlaceholder="Código o descripción…"
+              search={searchProducts}
+              resolveSelectedLabel={resolveProductLabel}
+              state={lineErrors?.productId ? "error" : "idle"}
+            />
+          )}
+        />
+      </td>
+
+      {/* 6. Cantidad Sobrante */}
+      <td className="py-2 px-2 align-middle">
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-center text-[12.5px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-red focus:ring-2 focus:ring-brand-red/10 outline-none transition-all"
+          placeholder="0.00"
+          value={surplus}
+          onChange={(e) => handleSurplusChange(e.target.value)}
+        />
+      </td>
+
+      {/* 7. Cantidad Faltante */}
+      <td className="py-2 px-2 align-middle">
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          className={`h-8 w-full rounded-md border bg-white px-2 text-center text-[12.5px] text-zinc-800 placeholder:text-zinc-400 focus:outline-none transition-all ${
+            lineErrors?.shortageQuantity || lineErrors?.surplusQuantity
+              ? "border-brand-red bg-red-50/20 focus:ring-2 focus:ring-brand-red/20"
+              : "border-zinc-200 focus:border-brand-red focus:ring-2 focus:ring-brand-red/10"
+          }`}
+          placeholder="0.00"
+          title={lineErrors?.shortageQuantity?.message || lineErrors?.surplusQuantity?.message}
+          value={shortage}
+          onChange={(e) => handleShortageChange(e.target.value)}
+        />
+      </td>
+
+      {/* 8. ¿Cumple para N/C? (Componente Select oficial con size="sm") */}
+      <td className="py-2 px-2 align-middle">
+        <Controller
+          name={`lines.${index}.qualifies`}
+          control={control}
+          render={({ field: qualifiesField }) => (
+            <Select
+              size="sm"
+              value={qualifiesField.value}
+              onChange={(val) => {
+                qualifiesField.onChange(val);
+                if (val !== "si") {
+                  setValue(`lines.${index}.creditNoteNumber`, "");
+                }
+              }}
+              options={QUALIFIES_OPTIONS}
+            />
+          )}
+        />
+      </td>
+
+      {/* 9. # N C */}
+      <td className="py-2 px-2 align-middle">
+        <Controller
+          name={`lines.${index}.qualifies`}
+          control={control}
+          render={({ field: qualifiesField }) => {
+            const isQualifies = qualifiesField.value === "si";
+            return (
+              <input
+                type="text"
+                disabled={!isQualifies}
+                className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12.5px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-red focus:ring-2 focus:ring-brand-red/10 outline-none transition-all disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed"
+                placeholder={isQualifies ? "NC-00124" : "Si cumple"}
+                {...register(`lines.${index}.creditNoteNumber`)}
+              />
+            );
+          }}
+        />
+      </td>
+
+      {/* 10. Despachador */}
+      <td className="py-2 px-2 align-middle">
+        <input
+          type="text"
+          required
+          className={`h-8 w-full rounded-md border bg-white px-2 text-[12.5px] text-zinc-800 placeholder:text-zinc-400 focus:outline-none transition-all ${
+            lineErrors?.dispatcherName
+              ? "border-brand-red bg-red-50/20 focus:ring-2 focus:ring-brand-red/20"
+              : "border-zinc-200 focus:border-brand-red focus:ring-2 focus:ring-brand-red/10"
+          }`}
+          placeholder="Nombre despachador"
+          title={lineErrors?.dispatcherName?.message}
+          {...register(`lines.${index}.dispatcherName`)}
+        />
+      </td>
+
+      {/* 11. Supervisor */}
+      <td className="py-2 px-2 align-middle">
+        <input
+          type="text"
+          className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12.5px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-red focus:ring-2 focus:ring-brand-red/10 outline-none transition-all"
+          placeholder="Supervisor (opcional)"
+          {...register(`lines.${index}.supervisorName`)}
+        />
+      </td>
+
+      {/* 12. Acción Eliminar */}
+      <td className="py-2 px-2 text-center align-middle">
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:text-brand-red hover:bg-rose-50 transition-colors cursor-pointer"
+            title={`Quitar línea ${index + 1}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </td>
+    </tr>
   );
 }
