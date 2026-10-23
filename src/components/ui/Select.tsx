@@ -1,4 +1,4 @@
-﻿import { Building, Check, ChevronDown, Search } from "lucide-react";
+import { Building, Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
@@ -329,13 +329,13 @@ export function Select({
           flex items-center justify-between font-medium
           ${selected ? "text-zinc-900" : "text-zinc-400"} ${buttonClassName}`}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2 truncate">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden" title={selected?.hint ? `${selected.label} (${selected.hint})` : undefined}>
           {leftIcon}
-          <span className="truncate">{selected?.label ?? placeholder}</span>
+          <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
           {selected?.hint && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-[5px] bg-zinc-100 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-600 border border-zinc-200/80">
-              <Building className="h-2.5 w-2.5 text-zinc-400" />
-              {selected.hint}
+            <span className="inline-flex min-w-0 shrink-[4] items-center gap-1 rounded-[5px] bg-zinc-100 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-600 border border-zinc-200/80">
+              <Building className="h-2.5 w-2.5 shrink-0 text-zinc-400" />
+              <span className="truncate">{selected.hint}</span>
             </span>
           )}
         </div>
@@ -439,9 +439,9 @@ export function Select({
                       <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                         <span className="truncate">{option.label}</span>
                         {option.hint && (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-[5px] bg-zinc-100/90 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-500 border border-zinc-200/60">
-                            <Building className="h-2.5 w-2.5 text-zinc-400" />
-                            {option.hint}
+                          <span className="inline-flex min-w-0 shrink-[4] items-center gap-1 rounded-[5px] bg-zinc-100/90 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-500 border border-zinc-200/60">
+                            <Building className="h-2.5 w-2.5 shrink-0 text-zinc-400" />
+                            <span className="truncate">{option.hint}</span>
                           </span>
                         )}
                       </div>
