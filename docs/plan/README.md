@@ -61,7 +61,7 @@ Los números de línea se desplazan con cada cambio; ante la duda manda el nombr
 | # | Documento | Contenido | Tablas nuevas |
 |---|---|---|---|
 | 00 | [Base común](00-base-comun.md) | Catálogo de productos, plantas y equipos | `Product`, `Plant`, `Team`, `TeamMember` |
-| 01 | [Organización y permisos](01-organizacion-y-permisos.md) | Departamentos, roles, agentes, claves de permiso y matriz rol × permiso | Ninguna; amplía `Department` y `Staff`, y añade la baja lógica a `Ticket` y `TicketTask` |
+| 01 | [Organización y permisos](01-organizacion-y-permisos.md) | Departamentos, roles, claves de permiso y matriz rol × permiso | Ninguna; amplía `Department` y `Staff`, y añade la baja lógica a `Ticket` y `TicketTask` |
 | 02 | [Tareas y SLA](02-tareas-y-sla.md) | Tipos de tarea, SLA por tipo, enrutamiento de formularios y cierre condicionado | `TaskType`, `TaskTypeDepartment`, `TaskTypeAssignee`, `FormRoutingRule`; amplía `TicketTask` |
 | 03 | [Reclamación de clientes](03-reclamacion-de-clientes.md) | Formulario PF-FOR-034 | `CustomerClaim`, `CustomerClaimLine`, `CustomerClaimPlant` |
 | 04 | [Retiro de mercancía](04-retiro-de-mercancia.md) | Formulario PF-FOR-068 | `MerchandiseWithdrawal`, `MerchandiseWithdrawalLine` |
@@ -69,8 +69,6 @@ Los números de línea se desplazan con cada cambio; ante la duda manda el nombr
 | 06 | [Discrepancia de carga](06-discrepancia-de-carga.md) | Formulario PF-FOR-291 | `LoadDiscrepancy`, `LoadDiscrepancyLine`, `LoadDiscrepancyCheck` |
 
 Los nombres de tabla son **[Propuesta]** y se cierran en la revisión cruzada.
-
-Las preguntas abiertas de todos los documentos, consolidadas y priorizadas para llevarlas a Plastifar, están en [PREGUNTAS-CLIENTE.md](PREGUNTAS-CLIENTE.md).
 
 ## 4. Orden y dependencias
 
@@ -170,7 +168,6 @@ G7 a G9. Lo mismo vale para otras ocho reglas que los documentos tomaban del pla
 | `PF-FOR-291- Formulario Investigación de Discrepancia de Carga V1 (1).xlsx` | `PF-FOR-291` | Formulario y lista de puntos de seguridad | 06 |
 | `PLAN-SLA-PERMISOS-PLASTIFAR.xlsx` | `SLA` | 14 plazos por acción | 02 |
 | | `DEPARTAMENTOS` | 38 departamentos | 01 |
-| | `AGENTES` | 101 agentes | 01 |
 | | `PLANTAS` | 16 plantas | 00 |
 | | `FORMULARIOS` | 6 reglas de quién llena o ve cada formulario | 02 |
 | | `ROLES` | 5 roles | 01 |
@@ -187,7 +184,7 @@ que existe y de por qué se excluye.
 | PF-FOR-068, nombres definidos `Conductor`, `Contenido`, `Hora` | Listas en caché de otro formulario (PF-FOR-056, retorno de contenedores) | Ninguna celda del formulario las usa; son residuo de una plantilla copiada |
 | PF-FOR-291, hojas ocultas `Costo`, `Hoja3`, `Hoja4`, `Hoja5` | Registro de reclamos de exportación de 2015 con clientes, facturas y montos por despachador | Es historial de negocio, no definición. Sus fórmulas de costo están rotas (`#REF!`) |
 | PF-FOR-109, metadatos de SharePoint y logotipo | Listas `Tipo de Anexo` y `Proceso`, y logotipo de otra empresa | La plantilla proviene de otra organización; esas listas no describen la operación de Plastifar |
-| `AGENTES`, columnas eliminadas | La consulta descartó 38 columnas, una por departamento | No están en el libro; habría que pedir el archivo original (ver documento 01) |
+| `AGENTES`, toda la hoja | Los 101 agentes del sistema anterior | La carga de agentes salió del alcance el 23 de octubre de 2026; el personal se da de alta desde la pantalla de Personal (ver documento 01) |
 
 ## 8. Preguntas abiertas que bloquean más de un documento
 
@@ -201,7 +198,6 @@ de Plastifar ni del plan original.
 | G1 | Los plazos del SLA están en «DIAS». ¿Son días laborables o días calendario? Opciones: (a) laborables, lo que exige un calendario de jornada y feriados y decidir cuál aplica a cada país; (b) calendario, que es una suma directa de días sin depender de `Holiday`. Ver documento 02, sección 8, regla 4 | 02, 04, 05, 06 | **Ninguno.** El modelo admite las dos; no se calcula ni se promete ningún vencimiento hasta tener la respuesta |
 | G2 | ¿De dónde sale el maestro de productos (código y descripción) y cada cuánto cambia? | 00, 03, 04, 05, 06 | Carga inicial por archivo y mantenimiento manual desde Configuración |
 | G3 | El rol figura en el agente y en el departamento, y no coinciden. ¿Cuál prevalece? Opciones: (a) el del agente; (b) el del departamento; (c) el más amplio de los dos; (d) el más restrictivo; (e) el del agente en su departamento principal y el del departamento en los demás. Ver documento 01, sección 16, pregunta 3 | 01, 02 | **Ninguno.** Se guardan los dos datos tal como vienen; ningún acceso real se otorga hasta tener la respuesta |
-| G4 | Los 101 agentes vienen sin correo electrónico, y el sistema lo exige. Alternativas: (a) Plastifar entrega los correos; (b) inicio de sesión por nombre de usuario, con correo opcional; (c) cargar a los agentes inactivos hasta que se informe su correo. Ver documento 01, sección 8.1 | 01 y todos los que asignan personas | **Ninguno.** Sigue siendo un bloqueo: mientras no se elija una alternativa no se carga ningún agente |
 | G5 | Las «firmas» de los formularios, ¿deben capturarse en el sistema o basta imprimir y firmar en papel? | 03, 04, 05, 06 | El sistema registra quién y cuándo; la firma autógrafa se hace sobre la impresión |
 | G6 | ¿Las opciones de «Planta Involucrada» del PF-FOR-034 son las mismas plantas de la hoja `PLANTAS`? | 00, 03, 05 | Sí, con la correspondencia propuesta en el documento 00 |
 | G7 | ¿La línea de producto es un concepto distinto de la planta? Los datos reales solo muestran plantas; «Flexible», que el plan original cita como línea, no aparece en ninguna hoja de cálculo. Ver documento 00, sección 16, pregunta 3 | 00, 03, 05 | **Ninguno.** El modelo conserva `ProductLine`, que ya existe en el código, y añade la planta, ambos opcionales, para no cerrar ninguna opción |

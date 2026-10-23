@@ -47,7 +47,6 @@ import {
   getCachedTicketInfo,
   resolveTicketLabel,
   searchTickets,
-  toNumber,
 } from "../../lib/discrepancies";
 import {
   resolveClientLabel,
@@ -55,6 +54,7 @@ import {
   searchClients,
   searchProducts,
 } from "../../lib/lookups";
+import { toNumber } from "../../lib/numbers";
 import { today } from "../../lib/quality";
 import type {
   DiscrepancyDetail,

@@ -17,7 +17,8 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > producto; impresión PF-FOR-109 en `/calidad/hca/{id}/imprimir`; y el nombre «Hecho, Causa y Acción» en código
 > y textos (RF-H12). **No construido, a propósito:** `TaskId` y todo lo que toca la tarea (RF-H7, RF-H8, los
 > criterios 3 y 4 de la sección 14): es la Bandeja y depende del documento 02. La migración
-> `AddFormModules` (consolidada en `feature/formularios`) está escrita y no probada contra Postgres.
+> `AddFormModules` (consolidada en `feature/formularios`) está aplicada en Postgres 17 local el 23 de octubre de 2026,
+> desde el estado anterior a los módulos y sobre datos de prueba; falta aplicarla en Railway.
 
 ## 1. Situación y objetivo
 
@@ -369,8 +370,9 @@ Reglas espejo entre Zod y el servidor. Las validaciones existentes de la hoja no
 
 ## 14. Criterios de aceptación
 
-- [ ] Una hoja existente con causa raíz muestra ese texto como su primera causa después de la migración.
-      **Escrito, no probado:** el `INSERT` va en la migración `AddFormModules` y solo corre en Postgres.
+- [x] Una hoja existente con causa raíz muestra ese texto como su primera causa después de la migración.
+      Comprobado en Postgres 17 local el 23 de octubre de 2026: la causa sale recortada de espacios y cortada a
+      1000 caracteres, y las hojas con causa vacía o nula no reciben ninguna. Falta repetirlo en Railway.
 - [x] Una hoja sin causas no puede pasar a «En ejecución», y el mensaje dice qué falta
       (`HcaFormTests.Advancing_to_execution_needs_at_least_one_cause_and_the_message_says_so`).
 - [ ] Una tarea que exige HCA no puede completarse con una hoja que no tiene causas ni acciones. **Pendiente:**

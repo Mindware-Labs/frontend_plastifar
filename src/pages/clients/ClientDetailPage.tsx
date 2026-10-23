@@ -38,12 +38,13 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { ListPanel } from "../../components/ui/ListPanel";
+import { PageSpinner } from "../../components/ui/PageSpinner";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Spinner } from "../../components/ui/Spinner";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
@@ -333,21 +334,14 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     return (
       <div>
         <ModuleHeader backTo="/clientes" backLabel="Volver al directorio de clientes" title="Cliente" sections={sections} />
-        <div className="flex flex-col items-start gap-2">
-          <Alert variant="error">{error}</Alert>
-          <Button size="sm" variant="secondary" onClick={() => void loadRecord()}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry onRetry={() => void loadRecord()}>{error}</ErrorRetry>
       </div>
     );
   }
 
   if (client === null) {
     return (
-      <div className="flex justify-center py-16">
-        <Spinner />
-      </div>
+      <PageSpinner />
     );
   }
 
@@ -410,21 +404,11 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-8">
         <div className="mx-auto w-full max-w-6xl">
           {error !== null && (
-            <div className="mb-3 flex flex-col items-start gap-2">
-              <Alert variant="error">{error}</Alert>
-              <Button size="sm" variant="secondary" onClick={() => void loadRecord()}>
-                Reintentar
-              </Button>
-            </div>
+            <ErrorRetry className="mb-3" onRetry={() => void loadRecord()}>{error}</ErrorRetry>
           )}
 
           {referenceError !== null && (
-            <div className="mb-3 flex flex-col items-start gap-2">
-              <Alert variant="error">{referenceError}</Alert>
-              <Button size="sm" variant="secondary" onClick={() => void loadReferenceData()}>
-                Reintentar
-              </Button>
-            </div>
+            <ErrorRetry className="mb-3" onRetry={() => void loadReferenceData()}>{referenceError}</ErrorRetry>
           )}
 
           {/* Animación de entrada fluida estilo Apple */}

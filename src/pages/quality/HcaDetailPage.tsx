@@ -13,7 +13,7 @@ import {
   Trash2,
   UserCheck,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
@@ -21,7 +21,6 @@ import { productLinesApi } from "../../api/productLines";
 import {
   qualityApi,
   type ActionPlanListResponse,
-  type ClosureCondition,
   type PlanItemCounts,
 } from "../../api/quality";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -30,24 +29,21 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { ListPanel } from "../../components/ui/ListPanel";
+import { PageSpinner } from "../../components/ui/PageSpinner";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { Spinner } from "../../components/ui/Spinner";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
+import { useDetail } from "../../hooks/useDetail";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import {
-  describeDue,
-  formatDay,
-  formatInstant,
-  isPlanItemOverdue,
-  isPlanItemSettled,
-  isSheetOverdue,
-  nextStatus,
-} from "../../lib/quality";
-import type { ActionPlanItem, CorrectiveActionSheet } from "../../types/quality";
+import { formatDay, formatInstant } from "../../lib/dates";
+import { formatBytes } from "../../lib/format";
+import { describeDue, isPlanItemOverdue, isPlanItemSettled, isSheetOverdue, nextStatus } from "../../lib/quality";
+import type { ActionPlanItem } from "../../types/quality";
 import type { ProductLine } from "../../types/settings";
 import { ActionPlanItemModal } from "./ActionPlanItemModal";
 import { CancelPlanItemModal } from "./CancelPlanItemModal";
@@ -56,8 +52,20 @@ import { EffectivenessModal } from "./EffectivenessModal";
 import { HcaModal } from "./HcaModal";
 import { HcaParticipantModal } from "./HcaParticipantModal";
 import { HcaStatusBadge, PlanItemStatusBadge } from "./StatusBadges";
-import { formatBytes } from "../../lib/format";
 import { TicketLink } from "./TicketLink";
+
+/**
+ * La ficha y las líneas de producto llegan juntas: las líneas son catálogo
+ * acotado y se recorren enteras para el diálogo de edición; el cliente y el
+ * responsable no se precargan, sus selectores buscan en el servidor.
+ */
+async function loadSheet(id: number) {
+  const [detail, productLines] = await Promise.all([
+    qualityApi.sheets.get(id),
+    fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize })),
+  ]);
+  return { ...detail, productLines };
+}
 
 /** Criterios de la lista paginada del plan; `sheetId` entra para que cambiar de HCA la reinicie. */
 interface PlanListQuery {
@@ -78,18 +86,19 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
 
   const sheetId = Number(id);
 
-  const [sheet, setSheet] = useState<CorrectiveActionSheet | null>(null);
-  const [conditions, setConditions] = useState<ClosureCondition[]>([]);
-  const [closable, setClosable] = useState(false);
-  const [productLines, setProductLines] = useState<ProductLine[]>([]);
+  const { data, setData, error, reload: retry } = useDetail(sheetId, loadSheet, {
+    notFound: "La HCA no existe o no tienes acceso.",
+    failed: "No se pudo cargar la HCA. Vuelve a intentarlo.",
+  });
+  const sheet = data?.sheet ?? null;
+  const conditions = data?.closureConditions ?? [];
+  const closable = data?.canClose ?? false;
+  const productLines = data?.productLines ?? [];
   const [planPageSize, setPlanPageSize] = useState(10);
-  const [error, setError] = useState<string | null>(null);
   /** Error de una accion sobre la pagina ya cargada: no reemplaza la ficha. */
   const [actionError, setActionError] = useState<string | null>(null);
   /** Relectura sobre una ficha ya pintada: se atenua, no se reemplaza. */
   const [isRefetching, setIsRefetching] = useState(false);
-  /** Cada reintento vuelve a lanzar la carga. */
-  const [attempt, setAttempt] = useState(0);
 
   const [editing, setEditing] = useState(false);
   const [itemModal, setItemModal] = useState<"nueva" | ActionPlanItem | null>(null);
@@ -122,10 +131,8 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
   async function reload() {
     setIsRefetching(true);
     try {
-      const data = await qualityApi.sheets.get(sheetId);
-      setSheet(data.sheet);
-      setConditions(data.closureConditions);
-      setClosable(data.canClose);
+      const detail = await qualityApi.sheets.get(sheetId);
+      setData((current) => current && { ...current, ...detail });
       setActionError(null);
     } catch (err) {
       setActionError(
@@ -154,50 +161,13 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     await reload();
   }
 
-  /**
-   * Carga de la ficha. Se vacia primero y se descarta la respuesta si el id
-   * cambio: sin esto, ir de HCA-001 a HCA-002 seguia pintando la 001 bajo la
-   * miga de la 002, y dos navegaciones rapidas podian resolverse al reves y
-   * dejar clavada la hoja equivocada.
-   */
-  // El vaciado ocurre en render, no en el efecto: en el efecto corre despues de
-  // pintar, y en ese hueco se alcanzaba a ver un fotograma de la hoja anterior
-  // bajo la miga de la nueva.
+  // Cambiar de HCA vacía la ficha en render (useDetail) y descarta la respuesta
+  // de la anterior; aquí solo queda el error de acción, que es de esta página.
   const [lastSheetId, setLastSheetId] = useState(sheetId);
   if (sheetId !== lastSheetId) {
     setLastSheetId(sheetId);
-    setSheet(null);
-    setConditions([]);
-    setClosable(false);
-    setError(null);
     setActionError(null);
   }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    // Las lineas de producto son catalogo acotado y se recorren enteras; el
-    // cliente y el responsable ya no se precargan: sus selectores buscan en el
-    // servidor porque ninguno de los dos catalogos tiene tope.
-    Promise.all([
-      qualityApi.sheets.get(sheetId),
-      fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize })),
-    ])
-      .then(([detail, lines]) => {
-        if (cancelled) return;
-        setSheet(detail.sheet);
-        setConditions(detail.closureConditions);
-        setClosable(detail.canClose);
-        setProductLines(lines);
-      })
-      .catch(() => {
-        if (!cancelled) setError("No se pudo cargar la HCA. Vuelve a intentarlo.");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sheetId, attempt]);
 
   // Ya no queda ningun nombre por resolver en el navegador: la HCA, sus
   // acciones y el sello de cierre llegan con el suyo desde el servidor. La
@@ -216,25 +186,12 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     return (
       <div>
         <ModuleHeader title="HCA" sections={sections} />
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button size="sm" variant="secondary" onClick={() => setAttempt((value) => value + 1)}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry onRetry={retry}>{error}</ErrorRetry>
       </div>
     );
   }
 
-  if (sheet === null) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner />
-      </div>
-    );
-  }
+  if (sheet === null) return <PageSpinner />;
 
   const planData = plan.data;
   const planItems = planData?.items ?? [];
@@ -574,14 +531,7 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
       )}
 
       {section === "plan" && planError !== null && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{planError}</Alert>
-          </div>
-          <Button size="sm" variant="secondary" onClick={() => plan.refresh()}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={() => plan.refresh()}>{planError}</ErrorRetry>
       )}
 
       {section === "plan" && planCounts !== undefined && planCounts.all > 0 && (

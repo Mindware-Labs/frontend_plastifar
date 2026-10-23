@@ -70,14 +70,3 @@ export async function resolveTicketLabel(value: string): Promise<string | null> 
   return label;
 }
 
-const quantityFormat = new Intl.NumberFormat("es-DO", { maximumFractionDigits: 2 });
-
-export function formatQuantity(value: number): string {
-  return quantityFormat.format(value);
-}
-
-/** Un `<input type="number">` vacío es null, no cero. */
-export function toNumber(value: string): number {
-  const parsed = Number(value.trim());
-  return value.trim() === "" || Number.isNaN(parsed) ? 0 : parsed;
-}

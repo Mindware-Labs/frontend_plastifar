@@ -5,9 +5,8 @@ import { claimsApi, type ClaimListResponse, type ClaimQuery } from "../../api/cl
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
-import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import {
   ClearFiltersButton,
   DateRangeFilterDropdown,
@@ -23,8 +22,10 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { useSort } from "../../hooks/useSort";
+import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
-import { formatAmount, formatDay } from "../../lib/quality";
+import { formatAmount } from "../../lib/numbers";
 import { CLAIM_REASONS, type ClaimStatus } from "../../types/claims";
 import type { Plant } from "../../types/settings";
 import { ClaimStatusBadge } from "./ClaimStatusBadge";
@@ -56,7 +57,7 @@ export function ClaimsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
-  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "fecha", dir: "desc" });
+  const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
 
   const debouncedSearch = useDebouncedValue(search).trim();
@@ -105,14 +106,6 @@ export function ClaimsPage() {
     setTo("");
     setPage(1);
   }
-
-  function toggleSort(key: SortKey) {
-    setSort((current) =>
-      current.key === key ? { key, dir: current.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
-    );
-  }
-
-  const sortOf = (key: SortKey) => ({ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) });
 
   const unfiltered = chip === "todas" && filtrosPuestos === 0 && !debouncedSearch;
 
@@ -184,14 +177,7 @@ export function ClaimsPage() {
       />
 
       {error && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button size="sm" variant="secondary" onClick={refresh}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={refresh}>{error}</ErrorRetry>
       )}
 
       <ListPanel

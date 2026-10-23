@@ -32,27 +32,6 @@ export function computeTotal(lines: LineFigures[]): number {
   return round2(lines.reduce((sum, line) => sum + line.lineTotal, 0));
 }
 
-/** Un `<input type="number">` vacío es null, no cero: cero es un dato. */
-export function toNumberOrNull(value: string): number | null {
-  const trimmed = value.trim();
-  if (trimmed === "") return null;
-  const parsed = Number(trimmed);
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-/** Cantidad sin moneda: las unidades no llevan símbolo. */
-const quantityFormat = new Intl.NumberFormat("es-DO", { maximumFractionDigits: 2 });
-
-export function formatQuantity(value: number | null): string {
-  return value === null ? "—" : quantityFormat.format(value);
-}
-
-const priceFormat = new Intl.NumberFormat("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-
-export function formatPrice(value: number | null): string {
-  return value === null ? "—" : priceFormat.format(value);
-}
-
 /** Sí / No / sin responder: la sección IV distingue «no» de «todavía no». */
 export function yesNo(value: boolean | null): string {
   if (value === null) return "Sin responder";

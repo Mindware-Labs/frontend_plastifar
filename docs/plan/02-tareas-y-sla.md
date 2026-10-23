@@ -20,8 +20,7 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > `BusinessDaysOnly` admite nulo («por definir») y así se cargan los 13 tipos: ningún vencimiento se calcula
 > hasta la pregunta 1. **No construido, a propósito:** todo lo demás de este documento es la Bandeja (cambios en
 > `TicketTask`, `TicketTasksController`, `SlaBreachWorker`, listado de tareas, bloqueo de cierre, cancelación,
-> `CreateTaskModal`, `CompleteTaskModal`, `TicketTasksTab`). La migración está escrita y no probada contra
-> Postgres.
+> `CreateTaskModal`, `CompleteTaskModal`, `TicketTasksTab`). La migración está aplicada en Postgres 17 local el 23 de octubre de 2026, desde el estado anterior a los módulos y sobre datos de prueba; falta aplicarla en Railway.
 
 ## 1. Situación y objetivo
 
@@ -212,8 +211,8 @@ Problemas de la fuente y valor propuesto:
 
 Se crea un tipo por cada una de las 13 filas `TAREA`, con el nombre de la columna `ACCION`, el plazo de la
 columna `TIEMPO`, los departamentos de la columna `DEPARTAMENTO` y los responsables de la columna `AGENTE`
-emparejados contra `Staff`. Hasta que los agentes estén cargados (documento 01), los tipos se crean sin
-responsables.
+emparejados contra `Staff`. Los tipos se crean sin responsables; se completan a mano desde Configuración cuando esas personas estén
+dadas de alta.
 
 ### 7.3 Plazo de ticket: «RESPUESTA A RECLAMACIONES» **[Abierta]**
 
@@ -417,7 +416,7 @@ Reglas espejo entre Zod y el servidor.
 
 - [x] Los 13 tipos de tarea de la sección 7.1 quedan cargados con su plazo y sus departamentos
       (`OrganizationSeederTests.The_thirteen_task_types_and_the_routing_rules_are_loaded_once`). Sin
-      responsables, hasta que los agentes se carguen (documento 01), y con los días «por definir».
+      responsables, que se completan a mano, y con los días «por definir».
 - [ ] El vencimiento de una tarea sigue el criterio que Plastifar confirme en la pregunta 1. Este criterio no
       puede cerrarse antes. Como ilustración de cada opción, para una tarea de tipo «APROBACION DE CASOS DE
       CALIDAD» (1 día) creada un viernes:

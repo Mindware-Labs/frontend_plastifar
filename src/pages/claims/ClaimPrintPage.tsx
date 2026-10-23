@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
-import { ApiError } from "../../api/client";
-import { CLAIM_FORM_CONTROL, formatPrice, formatQuantity, yesNo } from "../../lib/claims";
-import { formatAmount, formatDay } from "../../lib/quality";
+import { PrintCell, PrintPending, PrintSheet } from "../../components/print/PrintSheet";
+import { padRows } from "../../components/print/rows";
+import { usePrintRecord } from "../../components/print/usePrintRecord";
+import { CLAIM_FORM_CONTROL, yesNo } from "../../lib/claims";
+import { formatDay } from "../../lib/dates";
+import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
 import {
   CLAIM_AREAS,
   CLAIM_DEFECT_MOMENTS,
   CLAIM_REASONS,
-  type CustomerClaim,
 } from "../../types/claims";
 
 /** Casilla dibujada, como en la plantilla: ☒ marcada, ☐ vacía. */
@@ -25,15 +26,6 @@ function Box({ checked, label }: { checked: boolean; label: string }) {
   );
 }
 
-function Cell({ label, children, className = "" }: { label: string; children?: React.ReactNode; className?: string }) {
-  return (
-    <div className={`border border-black px-1.5 py-1 ${className}`}>
-      <span className="font-semibold">{label} </span>
-      <span>{children ?? ""}</span>
-    </div>
-  );
-}
-
 /**
  * RF-R9: la reclamación con la distribución y el control documental del
  * PF-FOR-034, en una página propia con hoja de estilos de impresión y sin
@@ -43,67 +35,18 @@ function Cell({ label, children, className = "" }: { label: string; children?: R
 export function ClaimPrintPage() {
   const { id } = useParams();
   const claimId = Number(id);
-  const [claim, setClaim] = useState<CustomerClaim | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    claimsApi
-      .get(claimId)
-      .then((detail) => {
-        if (cancelled) return;
-        setClaim(detail.claim);
-        document.title = `${CLAIM_FORM_CONTROL.code} · ${detail.claim.ticketNumber}`;
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "No se pudo cargar la reclamación.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [claimId]);
-
-  // Se imprime sola al cargar: la ventana existe para eso.
-  useEffect(() => {
-    if (claim === null) return;
-    const timer = window.setTimeout(() => window.print(), 300);
-    return () => window.clearTimeout(timer);
-  }, [claim]);
-
-  if (error) {
-    return <p className="p-8 text-[13px] text-red-700">{error}</p>;
-  }
-
-  if (claim === null) {
-    return <p className="p-8 text-[13px] text-zinc-500">Preparando la impresión…</p>;
-  }
+  const { data: claim, error } = usePrintRecord(claimId, async (key) => (await claimsApi.get(key)).claim, {
+    documentTitle: (record) => `${CLAIM_FORM_CONTROL.code} · ${record.ticketNumber}`,
+    failed: "No se pudo cargar la reclamación.",
+  });
+  if (claim === null) return <PrintPending error={error} />;
 
   // El papel trae tres renglones; una reclamación larga sigue en más páginas (sección 15).
-  const lines = claim.lines.length < 3 ? [...claim.lines, ...Array(3 - claim.lines.length).fill(null)] : claim.lines;
+  const lines = padRows(claim.lines, 3);
   const money = (value: number) => (claim.currency ? formatAmount(value, claim.currency) : formatQuantity(value));
 
   return (
-    <div className="mx-auto max-w-[800px] bg-white p-8 text-[11px] leading-snug text-black print:p-0">
-      <style>{`
-        @page { size: letter; margin: 14mm; }
-        @media print {
-          body { background: white; }
-          .no-print { display: none !important; }
-          .avoid-break { break-inside: avoid; }
-        }
-      `}</style>
-
-      <div className="no-print mb-4 flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12px] text-zinc-600">
-        <span>Vista de impresión. Si el diálogo no se abrió, usa el botón.</span>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="rounded bg-black px-3 py-1 text-[12px] font-semibold text-white"
-        >
-          Imprimir
-        </button>
-      </div>
-
+    <PrintSheet orientation="portrait">
       {/* Cabecera: A1:I1 y F3:F4 */}
       <header className="avoid-break mb-2 grid grid-cols-[1fr_auto] items-end gap-4 border-b-2 border-black pb-2">
         <div>
@@ -124,12 +67,12 @@ export function ClaimPrintPage() {
       <section className="avoid-break mb-2">
         <h2 className="bg-zinc-200 px-1.5 py-0.5 text-[11px] font-bold">I. Información General</h2>
         <div className="grid grid-cols-3">
-          <Cell label="Empresa:">{claim.clientName}</Cell>
-          <Cell label="Contacto:">{claim.contactName ?? ""}</Cell>
-          <Cell label="País:">{claim.country ?? ""}</Cell>
-          <Cell label="Teléfonos:" className="col-span-3">
+          <PrintCell label="Empresa:">{claim.clientName}</PrintCell>
+          <PrintCell label="Contacto:">{claim.contactName ?? ""}</PrintCell>
+          <PrintCell label="País:">{claim.country ?? ""}</PrintCell>
+          <PrintCell label="Teléfonos:" className="col-span-3">
             {[claim.contactPhone, claim.clientPhone].filter(Boolean).join(" · ")}
-          </Cell>
+          </PrintCell>
         </div>
       </section>
 
@@ -169,9 +112,9 @@ export function ClaimPrintPage() {
         </div>
 
         <div className="mt-1 grid grid-cols-3">
-          <Cell label="Fecha de Producción (# Lote):">{claim.productionLot ?? ""}</Cell>
-          <Cell label="Factura:">{claim.invoiceRef ?? ""}</Cell>
-          <Cell label="Número de PO:">{claim.poNumber ?? ""}</Cell>
+          <PrintCell label="Fecha de Producción (# Lote):">{claim.productionLot ?? ""}</PrintCell>
+          <PrintCell label="Factura:">{claim.invoiceRef ?? ""}</PrintCell>
+          <PrintCell label="Número de PO:">{claim.poNumber ?? ""}</PrintCell>
         </div>
 
         <table className="mt-1 w-full border-collapse">
@@ -200,7 +143,7 @@ export function ClaimPrintPage() {
         </table>
 
         <div className="mt-1 grid grid-cols-2">
-          <Cell label="Cantidad de Unidades a Retornar:">{formatQuantity(claim.unitsToReturn)}</Cell>
+          <PrintCell label="Cantidad de Unidades a Retornar:">{formatQuantity(claim.unitsToReturn)}</PrintCell>
           <div className="border border-black px-1.5 py-1">
             <span className="font-semibold">Defecto Identificado Durante: </span>
             <span className="ml-2 inline-flex gap-4">
@@ -253,9 +196,9 @@ export function ClaimPrintPage() {
           <span className="whitespace-pre-line">{claim.comments ?? ""}</span>
         </div>
         <div className="mt-1 grid grid-cols-3">
-          <Cell label="Nombre de quién recibe esta Reclamación:">{claim.receivedByName}</Cell>
-          <Cell label="Fecha:">{formatDay(claim.receivedAt)}</Cell>
-          <Cell label="Firma:" />
+          <PrintCell label="Nombre de quién recibe esta Reclamación:">{claim.receivedByName}</PrintCell>
+          <PrintCell label="Fecha:">{formatDay(claim.receivedAt)}</PrintCell>
+          <PrintCell label="Firma:" />
         </div>
       </section>
 
@@ -328,6 +271,6 @@ export function ClaimPrintPage() {
         <span>Fecha de Creación: {CLAIM_FORM_CONTROL.createdOn}</span>
         <span>Emitido por: {claim.receivedByName}</span>
       </footer>
-    </div>
+    </PrintSheet>
   );
 }

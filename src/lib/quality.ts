@@ -3,34 +3,6 @@
 // un credito) las resuelve el servidor; este archivo ya no las duplica.
 import type { ActionPlanItem, CorrectiveActionSheet, HcaStatus } from "../types/quality";
 
-const dateFormat = new Intl.DateTimeFormat("es-DO", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
-
-const dateTimeFormat = new Intl.DateTimeFormat("es-DO", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-/** Fecha de dia (ISO corto). La conversion a hora local ocurre solo al mostrar. */
-export function formatDay(value: string | null) {
-  if (!value) return "—";
-  const parsed = new Date(`${value}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? "—" : dateFormat.format(parsed);
-}
-
-/** Instante UTC con hora. */
-export function formatInstant(value: string | null) {
-  if (!value) return "—";
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? "—" : dateTimeFormat.format(parsed);
-}
-
 /**
  * República Dominicana es UTC−4 todo el año: no hay horario de verano desde
  * 2000. Espejo de `QualityRules.DominicanOffset` en el servidor.
@@ -133,12 +105,3 @@ export function nextStatus(sheet: CorrectiveActionSheet): {
   }
 }
 
-const currencyFormats: Record<string, Intl.NumberFormat> = {
-  DOP: new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP" }),
-  USD: new Intl.NumberFormat("es-DO", { style: "currency", currency: "USD" }),
-};
-
-export function formatAmount(amount: number, currency: string): string {
-  const format = currencyFormats[currency] ?? currencyFormats.DOP;
-  return format.format(amount);
-}

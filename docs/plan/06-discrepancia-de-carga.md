@@ -20,7 +20,8 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > ticket): es la Bandeja y depende del documento 02. Mientras tanto la investigación se crea desde el listado
 > eligiendo el ticket. Los destinatarios del aviso (pregunta 2) se leen de la configuración
 > `Discrepancies:SecurityNotifyEmails`; sin ella, el hallazgo queda en la bitácora sin aviso. La migración está
-> escrita y no probada contra Postgres.
+> aplicada en Postgres 17 local el 23 de octubre de 2026, desde el estado anterior a los módulos y sobre datos de prueba;
+> falta aplicarla en Railway.
 
 ## 1. Situación y objetivo
 

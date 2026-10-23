@@ -11,6 +11,20 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > nuevas. La división de la clave `tickets.write` cambia el contrato de autorización de la Bandeja y debe
 > acordarse con su responsable antes de escribirla.
 
+> **Estado (23 de octubre de 2026).** En `main` de ambos repositorios: `Department.Type`, `DefaultRoleId` y
+> `MailboxId` con sus pantallas; la carga en `OrganizationSeeder` de los 5 roles y los 38 departamentos en dos
+> niveles, que solo enlaza buzones ya existentes y no crea personal; `Staff.LegacyUsername` (opcional, hasta 40
+> caracteres, único sin distinguir mayúsculas, nunca sirve para iniciar sesión); las siete claves de tickets
+> reservadas (`Reserved = true`: se conceden y ningún endpoint las comprueba); y la migración
+> `BackfillPrerequisiteReadKeys`, que añade a los roles guardados la clave de lectura que exige cada clave
+> concedida. **En rama, sin merge:** la división de `tickets.write`, las claves `tasks.*` y la retirada de las
+> puertas `AdminOnly` de tickets y tareas están en `feature/organizacion` (backend `fcac174`, frontend `58cfb1d`);
+> tocan `TicketsController` y `TicketTasksController` y esperan el visto bueno del responsable de la Bandeja.
+> Mientras tanto los roles sembrados reciben solo las concesiones que corresponden a una clave que ya existe.
+> **No construido:** la baja lógica de `Ticket` y `TicketTask` (Bandeja). La carga de los 101 agentes salió del
+> alcance el 23 de octubre de 2026 (sección 2). Las migraciones de `main` se aplicaron en Postgres 17 local el 23 de octubre de 2026 sobre datos de prueba;
+> falta aplicarlas en Railway. `SplitTicketsWriteAndAddTaskKeys` (de la rama) también se aplicó encima sin error.
+
 ## 1. Situación y objetivo
 
 El libro `PLAN-SLA-PERMISOS-PLASTIFAR.xlsx` describe la organización del sistema anterior: 38 departamentos, 5
@@ -31,7 +45,6 @@ inventar las respuestas que la fuente no da.
 
 - Dos atributos nuevos en el departamento: tipo y rol del departamento; y la relación con el buzón.
 - Carga de los 38 departamentos y de los 5 roles.
-- Especificación de la carga de los 101 agentes, de lo que la bloquea y de las alternativas para desbloquearla.
 - Claves de permiso nuevas para tickets y tareas, y la matriz rol × permiso.
 - La eliminación de tickets y de tareas que la matriz concede, como baja lógica auditada.
 
@@ -41,12 +54,12 @@ inventar las respuestas que la fuente no da.
   reservan sus claves; cada función se especifica cuando se decida construirla (sección 16, pregunta 5).
 - Los permisos de los formularios nuevos; cada documento (03, 04 y 06) añade los suyos.
 - El SLA y las reglas de formularios, que van en el documento 02.
+- La carga de los 101 agentes de la hoja `AGENTES`. Se retiró del alcance el 23 de octubre de 2026: el personal
+  se da de alta desde la pantalla de Personal.
 
 ## 3. Dependencias
 
-Ninguna para la estructura. La carga de agentes depende de dos respuestas de Plastifar: cómo se resuelve la
-falta de correos electrónicos (sección 8.1 y sección 16, pregunta 1) y qué rol prevalece entre el del agente y
-el del departamento (sección 16, pregunta 3).
+Ninguna.
 
 ## 4. Fuente y trazabilidad
 
@@ -54,7 +67,6 @@ el del departamento (sección 16, pregunta 3).
 |---|---|---|
 | Departamentos: nombre, tipo, correo, administrador y rol | `DEPARTAMENTOS` | A1:E39 (38 filas de datos; la fila 40 es una fila de tabla vacía) |
 | Roles | `ROLES` | A2:A6 |
-| Agentes: nombre, usuario, estado, rol y departamento principal | `AGENTES` | A1:E102 (101 filas de datos) |
 | Matriz de permisos por rol | `PERMISOS` | A1:E21 (20 filas de datos) |
 
 El libro no tiene hojas, filas ni columnas ocultas, validaciones, comentarios ni macros.
@@ -110,7 +122,7 @@ pero repite el nombre del padre en cada pantalla. Se cierra en la revisión cruz
 
 | Campo | Tipo | Regla |
 |---|---|---|
-| `LegacyUsername` | string(40)? | Usuario en el sistema anterior. Único cuando viene. Sirve para emparejar la carga; no se usa para iniciar sesión |
+| `LegacyUsername` | string(40)? | Usuario en el sistema anterior. Único cuando viene. Es un dato informativo; no se usa para iniciar sesión |
 
 `LegacyStaffId` ya existe para el arrastre del sistema anterior (`api/Models/Staff.cs:25`; sección 2.2 del plan
 original). El libro no trae identificadores numéricos, solo el nombre de usuario; de ahí el campo adicional.
@@ -250,37 +262,7 @@ grafía de la hoja `AGENTES` y hay que confirmarlos:
 
 ### 7.3 Agentes
 
-La lista de 101 agentes es dato semilla real, pero no se transcribe en este documento: se carga directamente
-desde la hoja `AGENTES` (A2:E102).
-
-**[Fuente]** Totales:
-
-| Corte | Cantidad |
-|---|---|
-| Agentes | 101 |
-| Estado `ACTIVO` | 88 |
-| Estado `BLOQUEADO` | 13 |
-| Rol `LIMITE ACCESS` | 48 (47 activos, 1 bloqueado) |
-| Rol `EXPANDED ACCESS` | 35 |
-| Rol `ALL ACCESS` | 5 |
-| Sin rol | 13 (12 bloqueados, 1 activo) |
-
-No hay nombres ni usuarios duplicados. `BLOQUEADO` corresponde a `IsActive = false`.
-
-**Problemas que bloquean o condicionan la carga:**
-
-| # | Problema | Efecto |
-|---|---|---|
-| 1 | Ningún agente trae correo electrónico. `Staff.Email` es obligatorio y único | **Bloquea toda la carga.** Las alternativas para desbloquearla están en la sección 8.1 |
-| 2 | La consulta que generó la hoja descartó 38 columnas, una por departamento. Con toda probabilidad contenían el acceso de cada agente a departamentos adicionales (inferencia). El archivo de origen no está en el libro | Solo puede cargarse el departamento principal; los accesos secundarios se pierden |
-| 3 | El departamento principal no coincide con los nombres de `DEPARTAMENTOS`: variantes con tilde («ADMINISTRACIÓN», «PRODUCCIÓN», «CENTROAMÉRICA»), «CREDITO Y COBROS» frente a «CREDITOS Y COBROS», y los hijos escritos solo con el nombre final («FLORIDA», «HAITI», «ZONA SUR») | Requiere una tabla de equivalencias antes de cargar |
-| 4 | Nombres finales ambiguos: ALMACEN, CALIDAD y PRODUCCION existen en el primer nivel y también bajo PLASTIFAR CENTROAMERICA. COMERCIAL, COMPRAS y FINANZAS existen solo bajo PLASTIFAR CENTROAMERICA | No puede resolverse sin confirmación de Plastifar para cada agente afectado |
-| 5 | Un agente activo no tiene rol (fila 26) | No puede otorgársele acceso |
-| 6 | Un agente bloqueado conserva su rol (fila 30); los otros 12 bloqueados no | Inconsistencia menor; se carga inactivo |
-| 7 | Cinco usuarios no siguen el patrón inicial más apellido (filas 3, 80, 83, 84 y 98) | Se conservan tal cual en `LegacyUsername` |
-| 8 | Nombres con doble espacio o con espacio de no separación (23 filas), y «ZONA ESTE » con espacio final | Se normalizan los espacios al cargar |
-| 9 | La hoja trae el nombre completo en una sola columna; `Staff` separa nombre y apellido | Requiere una regla de separación o revisión manual |
-| 10 | Ningún agente tiene SOPORTE, CUBA, LAS ISLAS ni ZONA SANTO DOMINGO ESTE como departamento principal | Esos departamentos quedan sin personal |
+Fuera de alcance desde el 23 de octubre de 2026 (sección 2). La hoja `AGENTES` no se carga.
 
 ### 7.4 Claves de permiso y matriz
 
@@ -366,18 +348,13 @@ Problemas de la fuente:
 3. **[Abierta]** Precedencia entre el rol del agente y el rol del departamento. La fuente asigna un rol en dos
    sitios —la columna `PERMISOS` de `AGENTES` y la columna `PERMISOS` de `DEPARTAMENTOS`— y no dice cuál manda
    cuando difieren, que es lo habitual (ejemplos en la pregunta 3). Este plan no toma partido. Lo único que se
-   construye sin esperar la respuesta es guardar los dos datos tal como vienen: el rol del departamento en
-   `Department.DefaultRoleId` y el rol del agente en el archivo de carga. Qué hace el sistema con
+   construye sin esperar la respuesta es guardar el rol del departamento tal como viene, en
+   `Department.DefaultRoleId`. Qué hace el sistema con
    `DefaultRoleId` —si concede permisos, si limita los del agente, si los amplía o si solo informa— se define
    cuando Plastifar responda. Conviene tener presente una restricción del modelo actual: el permiso efectivo
    sale del rol guardado en el acceso por persona y departamento (`StaffDepartmentAccess.RoleId`), de modo que
    elegir con qué rol se crea ese acceso ya es aplicar una de las opciones.
-4. **[Propuesta]** Al cargar un agente se crea un único acceso: su departamento principal, marcado como
-   principal; el mismo departamento va en `Staff.PrimaryDepartmentId`, que es obligatorio. **[Abierta]** El rol
-   de ese acceso depende de la regla 3: mientras la pregunta 3 esté abierta, la carga no otorga accesos reales.
-   Cómo se crea la cuenta —con invitación por correo, con nombre de usuario o inactiva— depende de la
-   alternativa que se elija en la sección 8.1. A los agentes `BLOQUEADO` se les crea inactivos y no se les envía
-   invitación en ningún caso.
+4. *Retirada el 23 de octubre de 2026:* trataba la carga de agentes, que salió del alcance (sección 2).
 5. **[Propuesta]** Un departamento `Privado` se guarda y se muestra como tal, pero no cambia ninguna regla de
    visibilidad hasta que Plastifar defina qué significa (pregunta 6).
 6. **[Propuesta]** Los cinco roles se crean como roles normales, no del sistema, para que Plastifar pueda
@@ -416,36 +393,6 @@ Problemas de la fuente:
    —por ejemplo, para retirar datos cargados por error— se pregunta (pregunta 4); no se construye mientras
    tanto.
 
-### 8.1 Alternativas para los agentes sin correo electrónico **[Abierta]**
-
-La hoja `AGENTES` no trae correo de ninguno de los 101 agentes; trae un nombre de usuario. En el sistema actual
-el correo es obligatorio y único (`Staff.cs:8`; `StaffConfiguration.cs:18`) y el alta envía por correo una
-invitación con un código válido 24 horas (`StaffController.cs:204-226`). Sin correo, por tanto, hoy no puede
-crearse ninguna cuenta. Hay tres salidas y este plan no elige ninguna.
-
-**Cómo depende hoy la autenticación del correo** (comprobado contra el código el 11 de octubre de 2026):
-
-| Pieza | Dónde | Qué hace con el correo |
-|---|---|---|
-| Inicio de sesión | `api/Controllers/AuthController.cs:28-55`; cuerpo `LoginRequest(Email, Password)` en `api/Dtos/AuthDtos.cs:3` | Normaliza el correo y busca a la persona por `Email` y `IsActive` (:33-37). No hay otro identificador de entrada |
-| Token de acceso | `api/Services/TokenService.cs:60-67` | El sujeto es el identificador numérico (:60), no el correo; pero el correo viaja como dato del token (:61), junto con nombre, marca de administrador y accesos por departamento |
-| Recuperación de contraseña | `AuthController.cs:207-227` (solicitar), :229-242 (verificar código) y :244-274 (restablecer) | Los tres pasos identifican a la persona por su correo, y el código se envía a esa dirección (:330-354). Sin correo no hay ningún canal de recuperación |
-| Primera contraseña | `StaffController.cs:204-226` | La invitación con el código viaja por correo |
-| Cambio de contraseña con sesión abierta | `AuthController.cs:159-205` | No usa el correo: identifica por la sesión |
-| Edición de personal | `StaffController.cs:252-255`, :302 | El correo es obligatorio y se valida único también al editar |
-| Pantalla de inicio de sesión | `src/pages/auth/LoginPage.tsx:14`, :173-174 | El esquema exige un correo con formato válido y el campo es de tipo correo. Existen además `ForgotPasswordPage.tsx` y `ResetPasswordPage.tsx`, que parten del correo |
-
-Con eso, lo que cada alternativa exige es:
-
-| Alternativa | Qué implica | Qué deja sin resolver |
-|---|---|---|
-| (a) Plastifar entrega los correos | No cambia el modelo ni el alta. La carga sigue el flujo existente: contraseña aleatoria, nunca una fija, e invitación por correo. Es la única que no toca el módulo de Autenticación | Depende de un tercero y puede que parte del personal no tenga correo corporativo |
-| (b) Inicio de sesión por nombre de usuario, con correo opcional | Seis cambios, todos en el módulo de Autenticación y Personal, que es la implementación de referencia del plan original: (1) `Staff.Email` pasa a opcional y su índice único a parcial, en una migración nueva; (2) hace falta un nombre de usuario único para iniciar sesión: el `LegacyUsername` propuesto en la sección 6.2 dejaría de ser solo un dato heredado; (3) `LoginRequest` y la búsqueda de `AuthController.cs:33-37` aceptan usuario o correo; (4) el dato de correo del token (`TokenService.cs:61`) pasa a ser opcional, y hay que revisar qué lo consume en el frontend, cosa que no se revisó aquí; (5) la primera contraseña y la recuperación necesitan un canal nuevo, porque hoy los tres pasos de recuperación y la invitación dependen del correo: por ejemplo, una contraseña temporal que fija un administrador, con cambio obligatorio al entrar, lo que exige un endpoint que hoy no existe; (6) `LoginPage.tsx` deja de exigir formato de correo (:14, :173-174) y las pantallas de recuperación necesitan una salida para quien no tiene correo | Quien no tiene correo tampoco recibe los avisos de vencimiento ni de asignación, y depende de un administrador para recuperar el acceso |
-| (c) Cargar a los agentes inactivos hasta que se informe su correo | Aun así `Staff.Email` es obligatorio: o se vuelve opcional solo para personal inactivo, con la regla de que nadie se activa sin correo, o se guarda un valor provisional, lo que este plan desaconseja porque introduce direcciones falsas. La carga no envía invitaciones; al completar el correo de una persona se la activa y se le invita con el flujo existente. No toca el inicio de sesión ni la recuperación, que ya ignoran al personal inactivo (`AuthController.cs:37`, :213) | Mientras estén inactivos no pueden recibir asignaciones: los documentos 00 y 02 proponen que solo el personal activo sea responsable, de modo que tipos de tarea, plantas y equipos siguen sin responsables |
-
-Las alternativas (b) y (c) pueden combinarse con (a) para una parte del personal. Elegir es decisión de
-Plastifar y del equipo (pregunta 1); hasta entonces la carga de agentes está bloqueada.
-
 ## 9. Requisitos funcionales
 
 | ID | Requisito |
@@ -457,7 +404,6 @@ Plastifar y del equipo (pregunta 1); hasta entonces la carga de agentes está bl
 | RF-O5 | La matriz de permisos señala las claves cuya función aún no está disponible |
 | RF-O6 | Todo endpoint de tickets y de tareas declara la clave que exige y responde 403 con mensaje explicativo cuando falta |
 | RF-O7 | Carga única de los 38 departamentos y los 5 roles con su matriz, repetible sin duplicar |
-| RF-O8 | Carga de agentes desde archivo, con informe de filas creadas y rechazadas y el motivo de cada rechazo |
 | RF-O9 | La ficha del colaborador muestra el usuario del sistema anterior cuando existe |
 | RF-O10 | Quien tiene `tickets.delete` puede eliminar un ticket, y quien tiene `tasks.delete` una tarea, con motivo obligatorio y confirmación; el registro deja de verse y queda en la bitácora |
 
@@ -468,7 +414,6 @@ Plastifar y del equipo (pregunta 1); hasta entonces la carga de agentes está bl
 | `GET /api/permissions` y `GET /api/permissions/matrix` | Ya existen (`PermissionsController.cs:30`, :37); devuelven además el grupo «Tareas» y la marca de función no disponible | Autenticado · `roles.read` |
 | `GET /api/departments` | Ya existe (`DepartmentsController.cs:53`); no está paginado a propósito, porque alimenta desplegables (:43-46). Añade `type`, `defaultRoleId`, `mailboxId` y `managerStaffId` a la respuesta, y el filtro `type` | Autenticado |
 | `POST · PUT /api/departments` | Ya existen (:78, :126); alta y edición con los campos nuevos y con `managerStaffId` | `settings.write` |
-| `POST /api/staff/import` | Carga de agentes por archivo, con informe. Su comportamiento ante las filas sin correo depende de la alternativa de la sección 8.1 | Administrador (`AdminOnly`), igual que el alta existente (`StaffController.cs:166`) |
 | `DELETE /api/tickets/{id}` (nuevo) | Baja lógica auditada del ticket, con motivo en el cuerpo. No borra la fila | `tickets.delete` |
 | Endpoints de `TicketsController` | Sustituir `AdminOnly` por la clave correspondiente: asignar (:1419) y asignación masiva (:1561) → `tickets.assign`; prioridad masiva (:1701) → `tickets.edit`; cambio de estado (:1799) → `tickets.close`. Añadir comprobación de clave donde hoy solo se exige sesión: crear (:375) → `tickets.create`; editar (:701) → `tickets.edit`; responder (:1081) → `tickets.reply` | Según la tabla 7.4 |
 | Endpoints de `TicketTasksController` | Añadir comprobación de clave: listar (:86) y enlace de adjunto (:490), crear (:109), editar (:178), completar (:263) y reabrir (:377), comentar (:433), eliminar (:535). El de eliminar pasa de borrado físico (:569) a baja lógica auditada con motivo, y deja de depender de ser el creador o administrador (:549) para depender de la clave | `tasks.read`, `tasks.create`, `tasks.edit`, `tasks.close`, `tasks.comment`, `tasks.delete` |
@@ -485,8 +430,7 @@ interfaz; debe poder ejecutarse dos veces sin duplicar.
   obligatorio. Nunca `confirm` del navegador.
 - **Permisos:** la matriz existente (`PermissionMatrix.tsx`) no cambia de estructura; recibe un grupo más y una
   indicación por clave. La indicación usa `Badge` y `Tooltip`, sin variantes nuevas.
-- **Personal:** acción «Cargar agentes» en el listado, con un diálogo que muestra el resultado; el usuario
-  heredado aparece en la ficha.
+- **Personal:** el usuario heredado aparece en la ficha.
 - Componentes: `Modal`, `Field`, `Select`, `FilterChip`, `DataTable`, `Badge`, `Tooltip`, `Alert`,
   `ConfirmDialog`.
 
@@ -494,8 +438,7 @@ interfaz; debe poder ejecutarse dos veces sin duplicar.
 
 Este módulo no crea claves para sí mismo. Usa `settings.write` para departamentos (`DepartmentsController.cs:79`,
 :127) y `roles.write` para roles y para la matriz (`RolesController.cs:90`, :116; `PermissionsController.cs:112`).
-La carga de agentes exige administrador, porque así está protegida hoy toda escritura de personal
-(`StaffController.cs:166`); `staff.write` existe en el catálogo, pero ningún endpoint del servidor lo consulta:
+Toda escritura de personal exige administrador (`StaffController.cs:166`); `staff.write` existe en el catálogo, pero ningún endpoint del servidor lo consulta:
 solo lo usa el frontend para mostrar acciones (`src/pages/staff/StaffDetailPage.tsx:47`). Las claves que
 este documento define son las de la tabla 7.4, que consumen la Bandeja y sus tareas.
 
@@ -509,15 +452,20 @@ Reglas espejo entre Zod y el servidor.
 | `Department.DefaultRoleId` | Opcional; debe ser un rol activo |
 | `Department.MailboxId` | Opcional; debe ser un buzón activo |
 | Permisos de un rol | Cada clave debe pertenecer al catálogo y cumplir sus prerrequisitos; las desconocidas se rechazan con 400 |
-| Archivo de agentes | CSV en UTF-8; departamento principal existente; rol existente. El correo, cuando viene, con formato válido y único; si es obligatorio en cada fila depende de la alternativa de la sección 8.1 |
 | `Staff.LegacyUsername` | Opcional; hasta 40 caracteres; único |
 | Eliminar ticket o tarea | Motivo obligatorio, de 10 a 500 caracteres; un registro ya eliminado responde 404 |
 
 ## 14. Criterios de aceptación
 
-- [ ] Los 38 departamentos quedan cargados con su jerarquía de dos niveles, tipo, rol del departamento y buzón.
+- [x] Los 38 departamentos quedan cargados con su jerarquía de dos niveles, tipo, rol del departamento y buzón
+      (`OrganizationSeederTests.Seeds_the_five_roles_and_the_38_departments_in_two_levels`). El buzón se enlaza
+      solo si ya existe (`It_never_creates_a_mailbox_and_links_only_one_that_already_exists`).
 - [ ] Los 5 roles existen; ALL ACCESS, EXPANDED ACCESS y LIMITED ACCESS con las concesiones de la tabla 7.4.
-- [ ] Ejecutar la carga dos veces no duplica departamentos ni roles.
+      **Parcial:** los 5 roles existen, pero en `main` solo reciben las concesiones que corresponden a una clave
+      existente (`Roles_only_get_the_grants_that_map_to_a_key_that_exists_today`). La tabla 7.4 completa llega con
+      `feature/organizacion`.
+- [x] Ejecutar la carga dos veces no duplica departamentos ni roles
+      (`OrganizationSeederTests.Running_it_twice_creates_nothing_and_keeps_later_edits`).
 - [ ] Un rol que tenía `tickets.write` conserva exactamente las mismas capacidades después de la migración.
 - [ ] Un usuario con rol LIMITED ACCESS puede crear un ticket y recibe 403 al intentar responder al cliente.
 - [ ] Un usuario sin `tasks.create` recibe 403 al crear una tarea por API directa y no ve el botón.
@@ -525,9 +473,6 @@ Reglas espejo entre Zod y el servidor.
       acciones sobre tareas que hoy tiene: listar, crear, editar, completar, reabrir y comentar.
 - [ ] Un ticket o una tarea eliminados no generan avisos de vencimiento ni de asignación, y no aparecen en la
       búsqueda, el tablero ni los reportes; cada consumidor de la lista de la sección 6.4 tiene su prueba.
-- [ ] La carga de agentes trata las filas sin correo según la alternativa elegida en la sección 8.1 y lo informa
-      fila por fila; este criterio se concreta al resolver la pregunta 1.
-- [ ] Ningún acceso real de agente se otorga mientras la pregunta 3 siga abierta.
 - [ ] Un usuario con rol ALL ACCESS elimina un ticket indicando el motivo: el ticket deja de aparecer en
       listados y contadores, su fila sigue en la base y la bitácora registra actor, fecha y motivo.
 - [ ] Un usuario con rol EXPANDED ACCESS recibe 403 al intentar eliminar un ticket o una tarea y no ve la acción.
@@ -544,11 +489,8 @@ Reglas espejo entre Zod y el servidor.
 | Eliminación habilitada antes de excluir lo eliminado en todos los consumidores | Un registro eliminado sigue visible o sigue generando avisos de vencimiento | Condición de salida de la sección 6.4: no se habilita el endpoint hasta probar cada consumidor |
 | Cargar la matriz tal cual | LIMITED ACCESS crea tickets que no puede responder | Confirmar con Plastifar antes de aplicar (pregunta 7) |
 | Claves sin función | La matriz promete acciones que no existen | Indicación visible en la matriz; no ocultarlas |
-| Agentes sin correo | No se puede asignar ninguna tarea ni SLA a personas reales | Plantear a Plastifar las tres alternativas de la sección 8.1 como primera gestión |
-| Precedencia de roles sin definir | Se otorgan permisos de más o de menos a 101 personas | No otorgar accesos reales hasta resolver la pregunta 3; los dos datos se guardan para poder aplicar cualquier respuesta |
 | La eliminación pasa a existir | Un ticket o una tarea desaparece de la vista por error | Baja lógica con motivo obligatorio y confirmación; el registro se conserva y puede recuperarse desde la base |
 | El borrado de tareas cambia de físico a lógico | Cambia un comportamiento ya entregado en el módulo de otro responsable | Acordarlo con el responsable de la Bandeja antes de escribirlo |
-| Accesos secundarios perdidos | Personas que hoy ven varios departamentos verán solo uno | Pedir el archivo original de agentes |
 | El libro describe el sistema anterior | Se replica una configuración que quizá ya no refleja la operación | Validar la organización con Plastifar antes de la carga definitiva |
 
 ## 16. Preguntas abiertas para Plastifar
@@ -558,8 +500,8 @@ del plan original (README, sección 2).
 
 | # | Pregunta | Opciones | Se asume mientras tanto |
 |---|---|---|---|
-| 1 | Los 101 agentes no traen correo electrónico y el sistema lo exige para crear la cuenta e iniciar sesión. ¿Cómo se resuelve? En cualquier caso, ¿puede entregarse la lista con nombre y apellido separados? | (a) Plastifar entrega los correos; (b) inicio de sesión por nombre de usuario, con correo opcional; (c) cargar a los agentes inactivos hasta que se informe su correo. Lo que implica cada una está en la sección 8.1 | **Ninguno.** Es un bloqueo: no se carga ningún agente hasta elegir una alternativa |
-| 2 | ¿Puede entregarse el archivo de agentes original, con las 38 columnas de acceso por departamento? | — | Solo se carga el departamento principal |
+| 1 | Retirada el 23 de octubre de 2026: trataba la carga de agentes, que salió del alcance (sección 2) | — | — |
+| 2 | Retirada el 23 de octubre de 2026: trataba la carga de agentes, que salió del alcance (sección 2) | — | — |
 | 3 | El rol figura en el agente y en el departamento, y se contradicen. Hay un agente con rol limitado que administra cinco departamentos marcados como ampliados, y un departamento limitado con cuatro agentes de acceso total. ¿Cuál prevalece? | (a) el del agente, en todos los departamentos a los que accede; (b) el del departamento, para todo el que accede a él; (c) el más amplio de los dos; (d) el más restrictivo de los dos; (e) el del agente en su departamento principal y el del departamento en los demás | **Ninguno.** Se guardan los dos datos tal como vienen y no se otorga ningún acceso real hasta tener la respuesta |
 | 4 | La matriz concede «Eliminar» sobre tickets y sobre tareas a ALL ACCESS. El plan las implementa como baja lógica auditada: el registro deja de verse, pero se conserva con actor, fecha y motivo. ¿Basta con eso, o Plastifar necesita que el registro se borre físicamente de la base? Si hace falta el borrado físico, ¿en qué casos y quién lo autoriza? | (a) basta la baja lógica; (b) hace falta además el borrado físico, en los casos que Plastifar indique | Las claves `tickets.delete` y `tasks.delete` se crean, porque la fuente las concede. Supuesto provisional de trabajo: (a), baja lógica; el borrado físico no se construye |
 | 5 | ¿Deben construirse las funciones de fusionar, vincular, transferir, referir, liberar asignación, editar el hilo de otro y marcar como contestado? | Por función: sí o no | Solo se reservan las claves |
@@ -571,6 +513,6 @@ del plan original (README, sección 2).
 | 11 | ¿Qué permisos tienen estos roles fuera de tickets y tareas (clientes, personal, calidad, reportes, configuración)? | Por rol y por módulo | Ninguno; solo las claves de la tabla 7.4 más sus prerrequisitos de lectura |
 | 12 | ¿El correo del departamento es el buzón por el que entra el correo, la dirección con la que responde, o ambas? | (a) entrada; (b) salida; (c) ambas | (c) |
 | 13 | AUDITORIA, SOPORTE y VENTAS INTERNACIONALES no tienen administrador. ¿Quién lo es? | — | Se cargan sin responsable |
-| 14 | ¿A qué departamento pertenecen los agentes cuyo departamento principal es ALMACEN, CALIDAD o PRODUCCION: al de primer nivel o al de PLASTIFAR CENTROAMERICA? | Por agente | Al de primer nivel, salvo quien administra el departamento de Centroamérica |
+| 14 | Retirada el 23 de octubre de 2026: trataba la carga de agentes, que salió del alcance (sección 2) | — | — |
 | 15 | El sistema tiene una marca de administrador que da todos los permisos y la administración de personal, roles y configuración. La fuente no tiene esa figura: su nivel más alto es el rol ALL ACCESS, con 5 agentes. ¿Quiénes son administradores del sistema? | (a) los agentes con ALL ACCESS; (b) personas que Plastifar designe aparte; (c) solo el equipo técnico | **Ninguno.** La carga no marca a nadie como administrador |
 | 16 | ¿El permiso de una persona vale solo en los departamentos donde tiene rol, o alcanza a otros? ¿Existe una figura de supervisión que vea todos los departamentos sin poder escribir? El plan original responde las dos cosas (sección 6.3, reglas 2 y 3) y la fuente no las confirma | Alcance: (a) solo sus departamentos y los hijos de estos; (b) además, los departamentos PUBLICO; (c) todos. Supervisión: (d) existe, con lectura total; (e) no existe | Supuesto provisional de trabajo: (a) y (d), que es como está construido el código |

@@ -9,10 +9,10 @@ import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
-import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -23,10 +23,11 @@ import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { useSort } from "../../hooks/useSort";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
+import { departmentPath } from "../../lib/departments";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
 import { StaffModal } from "./StaffModal";
-import { departmentPath } from "../../lib/departments";
 
 type FilterKey = "todos" | "activos" | "inactivos" | "administradores";
 type SortKey = "nombre" | "correo" | "departamento" | "rol" | "estado";
@@ -68,7 +69,7 @@ export function StaffPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("todos");
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
-  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "nombre", dir: "asc" });
+  const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
   const [pageSize, setPageSize] = useState(10);
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -131,12 +132,6 @@ export function StaffPage() {
 
   function fullName(member: StaffResponse) {
     return `${member.firstName} ${member.lastName}`;
-  }
-
-  function toggleSort(key: SortKey) {
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
-    );
   }
 
   /** Desactivar y eliminar nunca aplican sobre uno mismo; editar si. */
@@ -547,7 +542,7 @@ export function StaffPage() {
                   {columns.map(({ key, label }) => (
                     <Th
                       key={key}
-                      sort={{ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) }}
+                      sort={sortOf(key)}
                     >
                       {label}
                     </Th>

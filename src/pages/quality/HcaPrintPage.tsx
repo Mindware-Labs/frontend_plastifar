@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ApiError } from "../../api/client";
-import { qualityApi, type SheetDetailResponse } from "../../api/quality";
+import { qualityApi } from "../../api/quality";
 import { Logo } from "../../components/Logo";
-import { formatDay } from "../../lib/quality";
+import { PrintCell, PrintPending, PrintSheet } from "../../components/print/PrintSheet";
+import { padRows } from "../../components/print/rows";
+import { usePrintRecord } from "../../components/print/usePrintRecord";
+import { formatDay } from "../../lib/dates";
 
 /** Control documental del pie del PF-FOR-109, tal como está en la plantilla entregada (V0). */
 const FORM_CONTROL = {
@@ -13,20 +14,6 @@ const FORM_CONTROL = {
   lastRevision: "N/A",
   issuedOn: "17.04.2015",
 } as const;
-
-function Cell({ label, children, className = "" }: { label: string; children?: React.ReactNode; className?: string }) {
-  return (
-    <div className={`border border-black px-1.5 py-1 ${className}`}>
-      <span className="font-semibold">{label} </span>
-      <span>{children ?? ""}</span>
-    </div>
-  );
-}
-
-/** Renglones vacíos hasta completar los del papel; con más datos, sigue. */
-function pad<T>(items: T[], minimum: number): (T | null)[] {
-  return items.length >= minimum ? items : [...items, ...Array<null>(minimum - items.length).fill(null)];
-}
 
 /**
  * RF-H10: la HCA con la distribución y el control documental del PF-FOR-109 y
@@ -38,59 +25,20 @@ function pad<T>(items: T[], minimum: number): (T | null)[] {
 export function HcaPrintPage() {
   const { id } = useParams();
   const sheetId = Number(id);
-  const [detail, setDetail] = useState<SheetDetailResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    qualityApi.sheets
-      .get(sheetId)
-      .then((data) => {
-        if (cancelled) return;
-        setDetail(data);
-        document.title = `${FORM_CONTROL.code} · ${data.sheet.number}`;
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "No se pudo cargar la HCA.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sheetId]);
-
-  useEffect(() => {
-    if (detail === null) return;
-    const timer = window.setTimeout(() => window.print(), 300);
-    return () => window.clearTimeout(timer);
-  }, [detail]);
-
-  if (error) return <p className="p-8 text-[13px] text-red-700">{error}</p>;
-  if (detail === null) return <p className="p-8 text-[13px] text-zinc-500">Preparando la impresión…</p>;
+  const { data: detail, error } = usePrintRecord(sheetId, qualityApi.sheets.get, {
+    documentTitle: (record) => `${FORM_CONTROL.code} · ${record.sheet.number}`,
+    failed: "No se pudo cargar la HCA.",
+  });
+  if (detail === null) return <PrintPending error={error} />;
 
   const { sheet, planItems } = detail;
-  const causes = pad(sheet.causes, 4);
-  const actions = pad(planItems, 2);
-  const evidences = pad(planItems.filter((item) => item.evidenceNotes || item.attachments.length > 0), 4);
-  const participants = pad(sheet.participants, 4);
+  const causes = padRows(sheet.causes, 4);
+  const actions = padRows(planItems, 2);
+  const evidences = padRows(planItems.filter((item) => item.evidenceNotes || item.attachments.length > 0), 4);
+  const participants = padRows(sheet.participants, 4);
 
   return (
-    <div className="mx-auto max-w-[800px] bg-white p-8 text-[11px] leading-snug text-black print:p-0">
-      <style>{`
-        @page { size: letter; margin: 14mm; }
-        @media print {
-          body { background: white; }
-          .no-print { display: none !important; }
-          .avoid-break { break-inside: avoid; }
-        }
-      `}</style>
-
-      <div className="no-print mb-4 flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12px] text-zinc-600">
-        <span>Vista de impresión. Si el diálogo no se abrió, usa el botón.</span>
-        <button type="button" onClick={() => window.print()} className="rounded bg-black px-3 py-1 text-[12px] font-semibold text-white">
-          Imprimir
-        </button>
-      </div>
-
+    <PrintSheet orientation="portrait">
       {/* Cabecera: C1:C5 título, D2:H4 datos */}
       <header className="avoid-break mb-2 grid grid-cols-[auto_1fr_1fr] items-stretch border-2 border-black">
         <div className="flex flex-col items-center justify-center gap-1 border-r border-black px-4 py-2">
@@ -99,18 +47,18 @@ export function HcaPrintPage() {
           <span className="text-[9px] uppercase">Hecho, Causa y Acción</span>
         </div>
         <div className="grid grid-rows-3 border-r border-black">
-          <Cell label="Codigo:" className="border-0 border-b">
+          <PrintCell label="Codigo:" className="border-0 border-b">
             <span className="font-mono">{sheet.number}</span>
-          </Cell>
-          <Cell label="Fecha:" className="border-0 border-b">{formatDay(sheet.detectedAt.slice(0, 10))}</Cell>
-          <Cell label="Elaborado por:" className="border-0">{sheet.createdByName ?? ""}</Cell>
+          </PrintCell>
+          <PrintCell label="Fecha:" className="border-0 border-b">{formatDay(sheet.detectedAt.slice(0, 10))}</PrintCell>
+          <PrintCell label="Elaborado por:" className="border-0">{sheet.createdByName ?? ""}</PrintCell>
         </div>
         <div className="grid grid-rows-3">
-          <Cell label="Producto:" className="border-0 border-b">
+          <PrintCell label="Producto:" className="border-0 border-b">
             {sheet.productName ? `${sheet.productCode} · ${sheet.productName}` : sheet.productLineName}
-          </Cell>
-          <Cell label="Planta:" className="border-0 border-b">{sheet.plantName ?? ""}</Cell>
-          <Cell label="Responsable:" className="border-0">{sheet.responsibleName}</Cell>
+          </PrintCell>
+          <PrintCell label="Planta:" className="border-0 border-b">{sheet.plantName ?? ""}</PrintCell>
+          <PrintCell label="Responsable:" className="border-0">{sheet.responsibleName}</PrintCell>
         </div>
       </header>
 
@@ -240,6 +188,6 @@ export function HcaPrintPage() {
         <span>Fecha emisión: {FORM_CONTROL.issuedOn}</span>
         <span>Emitido por: {sheet.createdByName ?? sheet.responsibleName}</span>
       </footer>
-    </div>
+    </PrintSheet>
   );
 }

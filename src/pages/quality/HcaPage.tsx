@@ -9,17 +9,18 @@ import {
   type SheetListResponse,
   type SheetQuery,
 } from "../../api/quality";
+import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { EmptyResult } from "../../components/ui/EmptyResult";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import {
   ClearFiltersButton,
   FilterDropdown,
   LookupFilterDropdown,
 } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -28,9 +29,10 @@ import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useSort } from "../../hooks/useSort";
+import { formatDay } from "../../lib/dates";
 import { resolveProductLabel, searchProducts } from "../../lib/lookups";
-import { describeDueShort, formatDay, isSheetOverdue } from "../../lib/quality";
-import { settingsApi } from "../../api/settings";
+import { describeDueShort, isSheetOverdue } from "../../lib/quality";
 import type { Plant, ProductLine } from "../../types/settings";
 import { HcaFilterPopover } from "./HcaFilterPopover";
 import { HcaModal } from "./HcaModal";
@@ -89,7 +91,7 @@ export function HcaPage() {
     const requested = searchParams.get("estado");
     return CHIPS.some((entry) => entry.key === requested) ? (requested as ChipKey) : "todas";
   });
-  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "compromiso", dir: "asc" });
+  const { sort, sortOf } = useSort<SortKey>("compromiso", "asc");
   const [pageSize, setPageSize] = useState(10);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -181,12 +183,6 @@ export function HcaPage() {
     setPage(1);
   }
 
-  function toggleSort(key: SortKey) {
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
-    );
-  }
-
   return (
     <div>
       <ModuleHeader
@@ -264,14 +260,7 @@ export function HcaPage() {
       />
 
       {error && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button size="sm" variant="secondary" onClick={refresh}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={refresh}>{error}</ErrorRetry>
       )}
 
       <ListPanel
@@ -397,13 +386,13 @@ export function HcaPage() {
                     solo admite compromiso y cliente), y un control que gira el
                     cursor sin cambiar el orden es peor que no tenerlo. */}
                 <Th>Número</Th>
-                <Th sort={{ dir: sort.key === "cliente" ? sort.dir : null, onToggle: () => toggleSort("cliente") }}>
+                <Th sort={sortOf("cliente")}>
                   Cliente
                 </Th>
                 <Th>Línea</Th>
                 <Th>Responsable</Th>
                 <Th
-                  sort={{ dir: sort.key === "compromiso" ? sort.dir : null, onToggle: () => toggleSort("compromiso") }}
+                  sort={sortOf("compromiso")}
                 >
                   Vence
                 </Th>

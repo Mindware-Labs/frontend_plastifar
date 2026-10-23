@@ -10,6 +10,21 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > puntos pertenecen a la Bandeja de tickets (sección 9 del plan original, Richard De León). La integración debe
 > acordarse con su responsable.
 
+> **Estado (23 de octubre de 2026).** Construido en `main` de ambos repositorios (backend `d3dfec7` y
+> correcciones, frontend `d02f67a`), bajo los supuestos provisionales de la sección 16: modelo y migración
+> `AddMerchandiseWithdrawals`; los endpoints `GET /api/withdrawals`, `GET /api/withdrawals/{id}`,
+> `GET|POST /api/tickets/{ticketId}/withdrawals`, `PUT /api/withdrawals/{id}` y `POST …/decision`, `…/complete` y
+> `…/cancel`; valores y total calculados en el servidor; aprobación exigida solo cuando el origen es un error; aviso
+> al solicitante en cada cambio de estado hecho por otro; cambios concurrentes detectados con `xmin` y respondidos
+> con 409; las claves `withdrawals.*`, que la lectura exige sobre el departamento del ticket; y las pantallas
+> `/retiros` (listado con pastillas de estado y filtros), ficha y la impresión horizontal en
+> `/retiros/{id}/imprimir`. Solo puede registrar un retiro el departamento con una regla de enrutamiento activa
+> para este formulario al crear el ticket, y la heredan sus subdepartamentos. **No construido, a propósito:**
+> llenarlo desde el alta del ticket (`CreateTicketModal.tsx`), abrirlo desde la tarea de Almacén y la pestaña del
+> ticket: es la Bandeja y depende del documento 02. Mientras tanto la solicitud se crea desde el listado eligiendo
+> el ticket. La migración está aplicada en Postgres 17 local el 23 de octubre de 2026, desde el estado anterior a los módulos y sobre datos de prueba;
+> falta aplicarla en Railway.
+
 ## 1. Situación y objetivo
 
 El formulario PF-FOR-068, «SOLICITUD RETIRO DE MERCANCIA», autoriza recoger producto en las instalaciones de un
@@ -258,13 +273,20 @@ Reglas espejo entre Zod y el servidor.
 
 - [ ] Un ticket creado desde VENTAS LOCALES / HAITI permite llenar la solicitud; uno creado desde CALIDAD, no.
 - [ ] Almacén abre la solicitud desde su tarea y la imprime con el código PF-FOR-068 y el número del ticket.
-- [ ] Un usuario sin `withdrawals.approve` recibe 403 al intentar aprobar o rechazar una solicitud.
+- [x] Un usuario sin `withdrawals.approve` recibe 403 al intentar aprobar o rechazar una solicitud
+      (`WithdrawalsControllerTests`, prueba marcada «Criterio 3»; el 403 nombra la clave).
 - [ ] Solo si Plastifar confirma la separación (pregunta 9, opción b o c): el solicitante recibe 409 con mensaje
       claro al intentar aprobar su propia solicitud. Mientras la pregunta siga abierta, este criterio no aplica.
-- [ ] Una solicitud en `Retirado` no admite edición ni por la interfaz ni por API.
-- [ ] Una línea con cantidad 3 y precio 250,00 da valor 750,00, y el total es la suma de las líneas.
-- [ ] El listado responde en menos de 300 ms con 10 000 solicitudes de prueba.
-- [ ] Ningún dato del archivo de ejemplo aparece en la base ni en los datos de prueba.
+- [x] Una solicitud en `Retirado` no admite edición ni por la interfaz ni por API
+      (`WithdrawalsControllerTests.A_rejected_one_is_final_and_a_withdrawn_one_cannot_be_edited_cancelled_or_withdrawn_again`;
+      la ficha muestra las acciones según `canEdit` y los demás permisos que manda el servidor).
+- [x] Una línea con cantidad 3 y precio 250,00 da valor 750,00, y el total es la suma de las líneas
+      (`WithdrawalsControllerTests.Create_inherits_the_client_copies_the_product_and_computes_values_and_total`).
+- [x] El listado responde en menos de 300 ms con 10 000 solicitudes de prueba. Medido el 23 de octubre de 2026
+      en Postgres 17 local, llamando al controlador y serializando la respuesta (sin red ni HTTP): p95 de 5 ms en
+      la primera página, 12 ms en la última y 27 ms con búsqueda y estado.
+- [x] Ningún dato del archivo de ejemplo aparece en la base ni en los datos de prueba: no hay semilla de retiros
+      (`DevelopmentSeeder` solo concede las claves `withdrawals.*`).
 - [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original.
 
 ## 15. Riesgos

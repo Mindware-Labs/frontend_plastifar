@@ -1,10 +1,8 @@
-import { Ban, Check, CircleDashed, PackageCheck, X, type LucideIcon } from "lucide-react";
-import { Badge } from "../../components/ui/Badge";
+import { Ban, Check, CircleDashed, PackageCheck, X } from "lucide-react";
+import { StatusBadge, type StatusStyles } from "../../components/ui/StatusBadge";
 import type { WithdrawalStatus } from "../../types/withdrawals";
 
-type Tone = "neutral" | "green" | "warn" | "red";
-
-const tones: Record<WithdrawalStatus, { tone: Tone; icon: LucideIcon }> = {
+const styles: StatusStyles<WithdrawalStatus> = {
   Solicitado: { tone: "neutral", icon: CircleDashed },
   Aprobado: { tone: "warn", icon: Check },
   Rechazado: { tone: "red", icon: X },
@@ -12,15 +10,6 @@ const tones: Record<WithdrawalStatus, { tone: Tone; icon: LucideIcon }> = {
   Cancelado: { tone: "neutral", icon: Ban },
 };
 
-/** Icono siempre junto a la etiqueta: ningún estado se distingue solo por color. */
 export function WithdrawalStatusBadge({ status }: { status: WithdrawalStatus }) {
-  const { tone, icon: Icon } = tones[status];
-  return (
-    <Badge tone={tone}>
-      <span className="inline-flex items-center gap-1.5">
-        <Icon aria-hidden className="h-3 w-3" />
-        {status}
-      </span>
-    </Badge>
-  );
+  return <StatusBadge status={status} styles={styles} />;
 }

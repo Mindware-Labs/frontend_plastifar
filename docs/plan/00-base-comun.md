@@ -141,8 +141,8 @@ transcriben tal como están.
 Observaciones sobre la fuente:
 
 - Las 11 plantas de RD tienen administrador (columna C) y agentes (columna D). Las 5 de Guatemala tienen ambas
-  columnas vacías. Los nombres de persona no se copian a este documento; se resuelven contra `Staff` cuando los
-  agentes estén cargados (documento 01).
+  columnas vacías. Los nombres de persona no se copian a este documento; se resuelven contra `Staff` cuando esas
+  personas estén dadas de alta desde Personal.
 - Las plantas de Guatemala no llevan el prefijo «PLANTA». `VASOS FOAM` (Guatemala) y `PLANTA VASOS FOAM` (RD)
   solo se distinguen por el prefijo y el país; por eso la unicidad propuesta es por país y nombre.
 - Nota en D20, con relleno amarillo: **«NOTA: ESTAN REGISTRADAS COMO EQUIPO SOLO LAS DE RD»**.
@@ -291,16 +291,26 @@ Reglas espejo entre el esquema de Zod y el servidor; cada lado indica en un come
 
 ## 14. Criterios de aceptación
 
-- [ ] El listado de productos responde en menos de 300 ms con 10 000 productos de prueba. **No medido:** lo
-      comprobado es que, con 10 000 productos, el listado pagina en la base y no carga la tabla.
-- [ ] El selector de producto encuentra un artículo por código parcial y por parte de la descripción.
+- [x] El listado de productos responde en menos de 300 ms con 10 000 productos de prueba. Medido el 23 de
+      octubre de 2026 en Postgres 17 local, llamando al controlador y serializando la respuesta (sin red ni
+      HTTP): p95 de 5 ms en la primera página, 10 ms en la última, 19 ms con búsqueda y 4 ms en el selector.
+- [x] El selector de producto encuentra un artículo por código parcial y por parte de la descripción
+      (`ProductsControllerTests.The_lookup_ranks_the_exact_code_first_then_prefixes_offers_only_active_and_caps_at_20`;
+      en pantalla, `ProductLookupField`).
 - [x] Intentar eliminar un producto usado en un formulario devuelve 409 con el mensaje correcto. Comprobado
-      con las líneas de la reclamación de clientes (03), el primer formulario que referencia productos
-      (`ClaimsControllerTests.A_product_named_in_a_claim_cannot_be_deleted_from_the_catalogue`). Los de 04 y 06
-      se suman a `ProductsController.IsInUseAsync` cuando existan.
-- [ ] Cargar dos veces el mismo archivo no duplica productos: la segunda carga informa cero creados.
-- [ ] Las 16 plantas de la sección 7.1 quedan cargadas con su país.
-- [ ] Un usuario sin `settings.write` no ve las acciones de alta ni de edición y recibe 403 por API directa.
+      con las líneas de la reclamación de clientes (03)
+      (`ClaimsControllerTests.A_product_named_in_a_claim_cannot_be_deleted_from_the_catalogue`) y del retiro de
+      mercancía (04) (`WithdrawalsControllerTests.A_product_named_in_a_withdrawal_is_in_use_and_cannot_be_deleted`).
+      y de la discrepancia de carga (06)
+      (`DiscrepanciesControllerTests.A_product_named_in_a_discrepancy_is_in_use_and_cannot_be_deleted`).
+- [x] Cargar dos veces el mismo archivo no duplica productos: la segunda carga informa cero creados
+      (`ProductsControllerTests.Importing_the_same_file_again_creates_nothing_and_never_deletes`).
+- [x] Las 16 plantas de la sección 7.1 quedan cargadas con su país
+      (`PlantsControllerTests.Seeds_the_16_plants_with_their_country_and_no_manager` y
+      `Running_it_twice_creates_no_plant_and_keeps_later_edits`).
+- [x] Un usuario sin `settings.write` no ve las acciones de alta ni de edición y recibe 403 por API directa
+      (`SettingsWritePermissionTests`: cada escritura de productos, plantas y equipos declara la clave, y la
+      política responde 403 con su nombre). Las secciones de Configuración esconden las acciones.
 - [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original.
 
 ## 15. Riesgos
@@ -309,7 +319,7 @@ Reglas espejo entre el esquema de Zod y el servidor; cada lado indica en un come
 |---|---|---|
 | No hay maestro de productos en el insumo | Los formularios 03, 04 y 06 no pueden probarse con datos reales | Pedir el maestro antes de empezar 03; mientras tanto, datos de prueba |
 | Las plantas del formulario y las de la lista no coinciden | Reclamaciones marcadas con una planta equivocada | Resolver la pregunta 1 antes de construir 03 |
-| Los administradores y agentes de planta se referencian por nombre | No se pueden enlazar hasta que los agentes estén cargados | Cargar plantas sin administrador y completarlo después de 01 |
+| Los administradores y agentes de planta se referencian por nombre | No se pueden enlazar hasta que esas personas estén dadas de alta | Cargar plantas sin administrador y completarlo a mano desde Configuración |
 | Línea de producto y planta pueden ser el mismo concepto | Se mantienen dos catálogos para una sola clasificación, o se retira uno que la operación sí usa | Resolver la pregunta 3 antes de exigir cualquiera de los dos campos en un formulario; mientras tanto, ambos opcionales |
 
 ## 16. Preguntas abiertas para Plastifar

@@ -1,17 +1,18 @@
 import { Ban, PackageCheck, Pencil, Printer, ThumbsDown, ThumbsUp } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiError } from "../../api/client";
 import { withdrawalsApi } from "../../api/withdrawals";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
-import { Spinner } from "../../components/ui/Spinner";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
+import { PageSpinner } from "../../components/ui/PageSpinner";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
-import { formatPrice, formatQuantity } from "../../lib/claims";
-import { formatAmount, formatDay, formatInstant } from "../../lib/quality";
+import { useDetail } from "../../hooks/useDetail";
+import { formatDay, formatInstant } from "../../lib/dates";
+import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
 import { describeStatus } from "../../lib/withdrawals";
 import type { WithdrawalDetail, WithdrawalLine } from "../../types/withdrawals";
 import { WithdrawalCancelModal } from "./WithdrawalCancelModal";
@@ -35,9 +36,10 @@ export function WithdrawalDetailPage() {
   const { id } = useParams();
   const withdrawalId = Number(id);
 
-  const [detail, setDetail] = useState<WithdrawalDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
+  const { data: detail, setData: setDetail, error, reload } = useDetail(withdrawalId, withdrawalsApi.get, {
+    notFound: "La solicitud de retiro no existe o no tienes acceso.",
+    failed: "No se pudo cargar la solicitud de retiro. Vuelve a intentarlo.",
+  });
 
   const [editing, setEditing] = useState(false);
   const [deciding, setDeciding] = useState<"aprobar" | "rechazar" | null>(null);
@@ -46,9 +48,15 @@ export function WithdrawalDetailPage() {
   /** Mensaje del servidor tras un 409: la ficha ya se recargó con lo vigente. */
   const [notice, setNotice] = useState<string | null>(null);
 
+  const [lastId, setLastId] = useState(withdrawalId);
+  if (withdrawalId !== lastId) {
+    setLastId(withdrawalId);
+    setNotice(null);
+  }
+
   function reloadAfterConflict(message: string) {
     setNotice(message);
-    setAttempt((value) => value + 1);
+    reload();
   }
 
   function saved(next: WithdrawalDetail) {
@@ -56,65 +64,18 @@ export function WithdrawalDetailPage() {
     setDetail(next);
   }
 
-  function retry() {
-    // Sin limpiar el error, la pantalla de error se queda aunque la recarga funcione.
-    setError(null);
-    setAttempt((value) => value + 1);
-  }
-
   useDynamicBreadcrumb(detail?.withdrawal.number ?? null);
-
-  const [lastId, setLastId] = useState(withdrawalId);
-  if (withdrawalId !== lastId) {
-    setLastId(withdrawalId);
-    setDetail(null);
-    setError(null);
-    setNotice(null);
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    withdrawalsApi
-      .get(withdrawalId)
-      .then((data) => {
-        if (!cancelled) setDetail(data);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(
-          err instanceof ApiError && err.status === 404
-            ? "La solicitud de retiro no existe o no tienes acceso."
-            : "No se pudo cargar la solicitud de retiro. Vuelve a intentarlo.",
-        );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [withdrawalId, attempt]);
 
   if (error) {
     return (
       <div className="max-w-[960px]">
         <ModuleHeader title="Solicitud de retiro" />
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button size="sm" variant="secondary" onClick={retry}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry onRetry={reload}>{error}</ErrorRetry>
       </div>
     );
   }
 
-  if (detail === null) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner />
-      </div>
-    );
-  }
+  if (detail === null) return <PageSpinner />;
 
   const { withdrawal, canEdit, canDecide, canComplete, canCancel } = detail;
   const withdrawn = withdrawal.status === "Retirado";

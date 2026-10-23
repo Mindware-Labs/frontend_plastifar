@@ -3,9 +3,9 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { discrepanciesApi, type DiscrepancyListResponse, type DiscrepancyQuery } from "../../api/discrepancies";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import {
   ClearFiltersButton,
   DateRangeFilterDropdown,
@@ -21,8 +21,9 @@ import { Tooltip } from "../../components/ui/Tooltip";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useSort } from "../../hooks/useSort";
+import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
-import { formatDay } from "../../lib/quality";
 import type { DiscrepancyStatus } from "../../types/discrepancies";
 import { DiscrepancyFormModal } from "./DiscrepancyFormModal";
 import { DiscrepancyStatusBadge } from "./DiscrepancyStatusBadge";
@@ -51,7 +52,7 @@ export function DiscrepanciesPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
-  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "fecha", dir: "desc" });
+  const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
   const [creating, setCreating] = useState(false);
 
@@ -88,12 +89,6 @@ export function DiscrepanciesPage() {
     setTo("");
     setPage(1);
   }
-
-  function toggleSort(key: SortKey) {
-    setSort((current) => (current.key === key ? { key, dir: current.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
-  }
-
-  const sortOf = (key: SortKey) => ({ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) });
 
   return (
     <div>
@@ -197,14 +192,7 @@ export function DiscrepanciesPage() {
       />
 
       {error && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button size="sm" variant="secondary" onClick={refresh}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={refresh}>{error}</ErrorRetry>
       )}
 
       <ListPanel

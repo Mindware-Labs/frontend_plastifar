@@ -6,16 +6,16 @@ import { fetchAllPages } from "../../api/paging";
 import { staffApi } from "../../api/staff";
 import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
-import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { EmptyResult } from "../../components/ui/EmptyResult";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { ClearFiltersButton, FilterDropdown, LookupFilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -27,7 +27,13 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useReceipts } from "../../context/useReceipts";
-import { resolveStaffLabel, resolveTerritoryLabel, searchActiveStaff, searchTerritories } from "../../lib/lookups";
+import { useSort } from "../../hooks/useSort";
+import {
+  resolveStaffLabel,
+  resolveTerritoryLabel,
+  searchActiveStaff,
+  searchTerritories,
+} from "../../lib/lookups";
 import type { Client, ClientListResponse, Territory } from "../../types/clients";
 import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
 import { ClientModal } from "./ClientModal";
@@ -82,7 +88,7 @@ export function ClientsPage() {
   const [salesRepId, setSalesRepId] = useState("todos");
   const [type, setType] = useState("todos");
   const [chip, setChip] = useState<ChipKey>("todos");
-  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "fecha", dir: "desc" });
+const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
   const [pageSize, setPageSize] = useState(10);
 
   const [modal, setModal] = useState<"nuevo" | Client | null>(null);
@@ -197,19 +203,6 @@ export function ClientsPage() {
    * ordenar IsActive de menor a mayor pondria a los inactivos arriba, y nadie
    * abre el listado para ver primero lo que ya no opera.
    */
-  function toggleSort(key: SortKey) {
-    setSort((previous) =>
-      previous.key === key
-        ? { key, dir: previous.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: "asc" },
-    );
-  }
-
-  /** Cabecera ordenable; las columnas que el servidor no ordena no la reciben. */
-  function sortProps(key: SortKey) {
-    return { dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) };
-  }
-
   function territoryName(id: number) {
     return territories.find((territory) => territory.id === id)?.name ?? "—";
   }
@@ -412,21 +405,11 @@ export function ClientsPage() {
       {/* El reintento va en linea con su aviso, no debajo: apilados en columna
           eran dos bloques de dos alturas cada uno empujando la tabla. */}
       {referenceError !== null && (
-        <div className="mb-3 flex items-start gap-3">
-          <Alert variant="error">{referenceError}</Alert>
-          <Button size="sm" variant="secondary" onClick={() => void loadReferenceData()}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={() => void loadReferenceData()}>{referenceError}</ErrorRetry>
       )}
 
       {error && (
-        <div className="mb-3 flex items-start gap-3">
-          <Alert variant="error">{error}</Alert>
-          <Button size="sm" variant="secondary" onClick={refresh}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={refresh}>{error}</ErrorRetry>
       )}
 
       {/* Un error de carga no deja el spinner girando debajo: la primera version
@@ -562,13 +545,13 @@ export function ClientsPage() {
                       </div>
                     </Th>
                   )}
-                  <Th sort={sortProps("nombre")}>Cliente</Th>
-                  {isVisible("codigo") && <Th sort={sortProps("codigo")}>Código</Th>}
+                  <Th sort={sortOf("nombre")}>Cliente</Th>
+                  {isVisible("codigo") && <Th sort={sortOf("codigo")}>Código</Th>}
                   {isVisible("tipo") && <Th>Tipo</Th>}
-                  {isVisible("territorio") && <Th sort={sortProps("territorio")}>Territorio</Th>}
+                  {isVisible("territorio") && <Th sort={sortOf("territorio")}>Territorio</Th>}
                   {isVisible("vendedor") && <Th>Vendedor</Th>}
                   {isVisible("contactos") && <Th>Contactos</Th>}
-                  {isVisible("estado") && <Th sort={sortProps("estado")}>Estado</Th>}
+                  {isVisible("estado") && <Th sort={sortOf("estado")}>Estado</Th>}
                   {canWrite && <Th className="w-24 text-right">Acciones</Th>}
                 </HeadRow>
               </thead>
