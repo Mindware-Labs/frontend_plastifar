@@ -85,8 +85,13 @@ export function TicketMessageCard({
   const origin = originLabel(channel);
 
   const author = message.authorStaffName ?? message.authorContactName ?? requesterName ?? "Remitente";
-  // Lo que escribe el cliente llega como HTML ajeno: va al marco aislado; lo del personal se compone aqui.
-  const clientHtml = !isInternal && !isOutbound ? message.bodyHtml?.trim() : undefined;
+  // Lo que escribe el cliente llega como HTML ajeno: va al marco aislado solo si contiene etiquetas complejas;
+  // de lo contrario o si es manual/puro texto, se compone con FormattedTicketBody para un renderizado nativo y ceñido.
+  const rawHtml = !isInternal && !isOutbound ? message.bodyHtml?.trim() : undefined;
+  const isComplexHtml = Boolean(
+    rawHtml && /<(table|img|iframe|style|font|span\s+style|div\s+style|h[1-6]|ul|ol|blockquote)\b/i.test(rawHtml)
+  );
+  const clientHtml = isComplexHtml ? rawHtml : undefined;
   const seed = message.authorStaffId ?? message.authorContactId ?? 1;
 
   // Papel blanco con filete para todo lo que ve el cliente; ámbar solo para lo interno.

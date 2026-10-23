@@ -915,16 +915,7 @@ export function TicketDetailPage() {
         badge={
           <div className="flex items-center gap-1.5">
             <StatusCell status={ticket.status} />
-            {isSolucionado && ticket.verdictName && (
-              <span
-                className="inline-flex h-5 items-center gap-1 rounded-md border border-emerald-200/80 bg-white px-2 font-heading text-[10.5px] font-bold text-emerald-800 shadow-2xs"
-                title={`Veredicto de resolución: ${ticket.verdictName}`}
-              >
-                <Gavel className="size-3 text-emerald-600" strokeWidth={2} />
-                <span className="max-w-[150px] truncate">{ticket.verdictName}</span>
-              </span>
-            )}
-            <PriorityCell priority={ticket.priority} />
+            {!isClosed && <PriorityCell priority={ticket.priority} />}
           </div>
         }
         sections={sections}
@@ -967,7 +958,13 @@ export function TicketDetailPage() {
 
       {/* Zona de contenido con scroll vertical asegurado */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-8">
-        <div className="mx-auto w-full max-w-6xl">
+        <div
+          className={`w-full transition-all duration-200 ${
+            activeTab === "formularios" || activeTab === "reclamacion"
+              ? "px-4 sm:px-6 2xl:px-8"
+              : "mx-auto max-w-6xl"
+          }`}
+        >
           <div className="pt-2">
             <h1 className="text-balance font-heading text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink">
               {ticket.subject}
@@ -1528,6 +1525,7 @@ export function TicketDetailPage() {
                     <TicketFormsTab
                       ticket={ticket}
                       onHasFormsChanged={(has) => setHasForms(has)}
+                      onTicketStatusChanged={refreshTicket}
                     />
                   </div>
                 )}

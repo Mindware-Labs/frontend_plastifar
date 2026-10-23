@@ -19,6 +19,8 @@ export interface ModalProps {
   maxWidth?: string;
   /** Asentamiento del modal cuando el envío no prospera: baja 3px y vuelve. */
   settle?: boolean;
+  /** Si es false, hacer clic en el telón de fondo no cierra el diálogo. Por defecto true. */
+  closeOnBackdropClick?: boolean;
 }
 
 /** Diálogo modal accesible con animación fluida y soporte para reducción de movimiento. */
@@ -33,6 +35,7 @@ export function Modal({
   onRequestClose: externalRequestClose,
   maxWidth = "max-w-lg",
   settle = false,
+  closeOnBackdropClick = true,
 }: ModalProps) {
   const motion = useDialogMotion(onClose, { exiting: externalIsExiting });
   const { isExiting, scrimRef, panelRef } = motion;
@@ -51,7 +54,7 @@ export function Modal({
         isExiting ? "pointer-events-none" : ""
       }`}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !isExiting) requestClose();
+        if (closeOnBackdropClick && event.target === event.currentTarget && !isExiting) requestClose();
       }}
     >
       <div

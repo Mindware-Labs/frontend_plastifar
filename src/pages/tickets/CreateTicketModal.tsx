@@ -3,8 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type R
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { z } from "zod";
-import { Building2, Check, FileSpreadsheet, FileText, Flag, Info, Mail, MessageSquareText, RotateCcw, Tag, X } from "lucide-react";
-import { Modal } from "../../components/ui/Modal";
+import { Building2, Check, Flag, Info, Mail, MessageSquareText, RotateCcw, Tag, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
@@ -158,12 +157,6 @@ export function CreateTicketModal({
   const [catalogsError, setCatalogsError] = useState<string | null>(null);
   const [departmentTree, setDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
-  const [createdSuggestion, setCreatedSuggestion] = useState<{
-    ticket: TicketSummaryResponse;
-    suggestedForm: string;
-    suggestedFormLabel: string;
-    topicName: string;
-  } | null>(null);
   const [detectedMatch, setDetectedMatch] = useState<{ clientName: string; contactName: string } | null>(null);
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
@@ -321,18 +314,6 @@ export function CreateTicketModal({
         emailId: emailId ?? null,
       });
 
-      const suggestedForm = created.topicSuggestedForm || selectedTopic?.suggestedForm;
-      const suggestedFormLabel = created.topicSuggestedFormLabel || selectedTopic?.suggestedFormLabel;
-
-      if (suggestedForm && suggestedFormLabel) {
-        setCreatedSuggestion({
-          ticket: created,
-          suggestedForm,
-          suggestedFormLabel,
-          topicName: selectedTopic?.name || created.topicName || "Motivo seleccionado",
-        });
-        return;
-      }
 
       onCreated(created);
       requestClose();
@@ -496,21 +477,6 @@ export function CreateTicketModal({
                       />
                     )}
                   />
-
-                  {selectedTopic?.suggestedFormLabel && (
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-200/90 bg-amber-50/60 px-3 py-2 text-[12px] text-amber-900 shadow-2xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FileText className="size-4 text-amber-700 shrink-0" />
-                        <div className="truncate">
-                          <span className="font-semibold">Formulario sugerido: </span>
-                          <span className="font-medium text-amber-950">{selectedTopic.suggestedFormLabel}</span>
-                        </div>
-                      </div>
-                      <span className="text-[11px] text-amber-700 shrink-0 font-medium hidden sm:inline">
-                        Podrás completarlo en «Formularios»
-                      </span>
-                    </div>
-                  )}
 
                   <Controller
                     control={control}
@@ -799,74 +765,7 @@ export function CreateTicketModal({
         </div>
       </div>
     </div>
-    {createdSuggestion && (
-      <Modal
-        eyebrow={`Ticket Creado · ${createdSuggestion.ticket.code}`}
-        title="Sugerencia de formulario oficial"
-        description="El ticket fue registrado en el sistema. Para este caso, el proceso formal de Plastifar recomienda completar el siguiente formulario oficial."
-        onClose={() => {
-          onCreated(createdSuggestion.ticket);
-          requestClose();
-        }}
-        footer={
-          <div className="flex w-full items-center justify-end gap-2.5">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                onCreated(createdSuggestion.ticket, `/tickets/${createdSuggestion.ticket.id}`);
-                requestClose();
-              }}
-            >
-              Ir al ticket más tarde
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => {
-                onCreated(
-                  createdSuggestion.ticket,
-                  `/tickets/${createdSuggestion.ticket.id}?tab=formularios&openForm=${createdSuggestion.suggestedForm}`
-                );
-                requestClose();
-              }}
-              className="font-heading font-semibold shadow-xs"
-            >
-              Llenar formulario ahora
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4 py-1">
-          <div className="rounded-xl border border-brand-red/20 bg-brand-red/[0.04] p-4">
-            <div className="flex items-center gap-2">
-              <span className="font-heading text-[10.5px] font-bold uppercase tracking-wider text-brand-red">
-                Clasificación / Motivo
-              </span>
-              <span className="rounded bg-brand-red/10 px-2 py-0.5 text-xs font-semibold text-brand-red">
-                {createdSuggestion.topicName}
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-zinc-600 leading-relaxed">
-              Este ticket fue clasificado como <strong className="text-zinc-900">{createdSuggestion.topicName}</strong>. La recomendación oficial es completar:
-            </p>
-            <div className="mt-3 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white p-3.5 shadow-2xs">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red">
-                <FileSpreadsheet className="size-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-heading text-[13px] font-bold text-zinc-900">
-                  {createdSuggestion.suggestedFormLabel}
-                </div>
-                <p className="text-[11.5px] text-zinc-500 mt-0.5">
-                  Formato oficial de Plastifar requerido para documentar, gestionar o dar resolución formal a este caso.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Modal>
-    )}
+
     </>,
     document.body,
   );

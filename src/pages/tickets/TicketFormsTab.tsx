@@ -2,11 +2,17 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   ArrowUpRight,
+  Check,
   CheckCircle2,
   FileSpreadsheet,
+  FileText,
+  MinusCircle,
   Pencil,
   Plus,
+  PlusCircle,
   Printer,
+  ShieldAlert,
+  ShieldCheck,
   Truck,
   Wrench,
 } from "lucide-react";
@@ -45,6 +51,7 @@ export type EnterpriseFormType = "reclamacion" | "retiro" | "discrepancia" | "hc
 interface TicketFormsTabProps {
   ticket: TicketDetailResponse;
   onHasFormsChanged?: (hasForms: boolean) => void;
+  onTicketStatusChanged?: () => void;
 }
 
 interface CommonExtractedData {
@@ -58,7 +65,7 @@ interface CommonExtractedData {
   }>;
 }
 
-export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProps) {
+export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChanged }: TicketFormsTabProps) {
   const { can } = usePermissions();
 
   const canReadClaims = can("claims.read", ticket.departmentId ?? undefined);
@@ -81,6 +88,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProp
 
   // Selected sub-tab when forms exist
   const [selectedSubTabKey, setSelectedSubTabKey] = useState<string | null>(null);
+  const [newFormModalOpen, setNewFormModalOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -502,7 +510,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProp
   // RENDER MODO PÁGINA: Si el usuario inició o está editando la discrepancia de cargas
   if (discrepancyModalOpen) {
     return (
-      <div className="mt-3.5">
+      <div className="mt-3.5 w-full">
         <DiscrepancyFormModal
           inline
           discrepancy={editingDiscrepancy}
@@ -510,6 +518,8 @@ export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProp
           fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
           ticketClientName={ticket.clientName ?? undefined}
           ticketClientId={ticket.clientId ?? undefined}
+          ticketStatus={ticket.status}
+          onTicketStatusChanged={onTicketStatusChanged}
           initialData={discrepancyInitialData}
           onClose={() => {
             setDiscrepancyModalOpen(false);
@@ -521,6 +531,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProp
             setEditingDiscrepancy(undefined);
             setDiscrepancyInitialData(undefined);
             fetchAllForms();
+            onTicketStatusChanged?.();
           }}
         />
       </div>
@@ -636,55 +647,17 @@ export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProp
               })}
             </div>
 
-            {/* Add another form dropdown / action */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-zinc-400 hidden sm:inline">¿Agregar otro formulario?</span>
-              <div className="inline-flex rounded-md shadow-2xs">
-                {!claim && canWriteClaims && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="border border-zinc-200 bg-white hover:bg-zinc-50"
-                    title="Agregar Reclamación"
-                    onClick={() => handleOpenNewClaim()}
-                  >
-                    <Plus className="size-3 mr-1" /> Reclamación
-                  </Button>
-                )}
-                {canWriteWithdrawals && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="border border-zinc-200 bg-white hover:bg-zinc-50"
-                    title="Agregar Solicitud de Retiro"
-                    onClick={() => handleOpenNewWithdrawal()}
-                  >
-                    <Plus className="size-3 mr-1" /> Retiro
-                  </Button>
-                )}
-                {canWriteDiscrepancies && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="border border-zinc-200 bg-white hover:bg-zinc-50"
-                    title="Agregar Discrepancia"
-                    onClick={() => handleOpenNewDiscrepancy()}
-                  >
-                    <Plus className="size-3 mr-1" /> Discrepancia
-                  </Button>
-                )}
-                {canWriteQuality && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="border border-zinc-200 bg-white hover:bg-zinc-50"
-                    title="Agregar Hoja HCA"
-                    onClick={() => handleOpenNewHca()}
-                  >
-                    <Plus className="size-3 mr-1" /> HCA
-                  </Button>
-                )}
-              </div>
+            {/* Add another form action */}
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => setNewFormModalOpen(true)}
+                title="Llenar o agregar otro formulario vinculado a este ticket"
+              >
+                <Plus className="size-3.5 mr-1" />
+                Llenar otro formulario
+              </Button>
             </div>
           </div>
 
@@ -931,70 +904,255 @@ export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProp
 
                 {/* 3. DISCREPANCIA DETAILS */}
                 {activeForm.type === "discrepancia" && (() => {
-                  const d = (activeForm.data as DiscrepancyDetail).discrepancy;
+                  const detail = activeForm.data as DiscrepancyDetail;
+                  const d = detail.discrepancy;
+                  const checks = d.checks || [];
+                  const positiveChecks = checks.filter((c) => c.result === "Positivo");
+
                   return (
                     <div className="space-y-4">
-                      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 rounded-lg bg-zinc-50 p-3.5 text-xs">
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Número</dt>
-                          <dd className="mt-0.5 font-mono font-medium text-zinc-800">{d.number}</dd>
+                      {/* Security Finding Alert Banner */}
+                      {d.hasSecurityFinding ? (
+                        <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-4 shadow-2xs flex items-start gap-3">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                            <ShieldAlert className="size-4.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wide font-heading">
+                                Hallazgo de Seguridad Operativa Detectado
+                              </h4>
+                              <span className="inline-flex items-center rounded-md bg-amber-200/70 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-900">
+                                {positiveChecks.length} {positiveChecks.length === 1 ? "punto positivo" : "puntos positivos"}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-amber-800 leading-relaxed">
+                              Se detectaron novedades en el chequeo de 9 puntos de la carga. Notificación oficial emitida al área de Seguridad y Logística.
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Fecha Creación</dt>
-                          <dd className="mt-0.5 font-medium text-zinc-800">{formatDay(d.createdAt)}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Hallazgo de Seguridad</dt>
-                          <dd className="mt-0.5 font-medium text-zinc-800">{d.hasSecurityFinding ? "Sí (Positivo)" : "No"}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Líneas analizadas</dt>
-                          <dd className="mt-0.5 font-semibold text-zinc-900">{d.lines.length}</dd>
-                        </div>
-                      </dl>
-
-                      {d.note && (
-                        <div className="rounded-lg border border-zinc-100 bg-zinc-50/50 p-3 text-xs">
-                          <span className="font-heading text-[10px] font-bold uppercase text-zinc-400">Nota / Causa investigada:</span>
-                          <p className="mt-1 text-zinc-700 whitespace-pre-wrap">{d.note}</p>
+                      ) : (
+                        <div className="rounded-xl border border-emerald-200/90 bg-emerald-50/60 p-3.5 flex items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-700">
+                              <ShieldCheck className="size-4" />
+                            </div>
+                            <span className="font-medium text-emerald-900">
+                              Chequeo de seguridad conforme sin hallazgos negativos (9/9 puntos verificados).
+                            </span>
+                          </div>
+                          <span className="shrink-0 text-[11px] font-semibold text-emerald-700">
+                            Protocolo seguro
+                          </span>
                         </div>
                       )}
 
-                      <div>
-                        <h4 className="text-xs font-semibold text-zinc-800 mb-2">Líneas de discrepancia de carga</h4>
-                        <div className="overflow-x-auto rounded-lg border border-zinc-200">
+                      {/* Executive Summary Cards */}
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            No. Investigación
+                          </span>
+                          <p className="mt-1 font-mono text-sm font-bold text-zinc-900">
+                            {d.number}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            Formato oficial PF-FOR-291
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Fecha de Registro
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900">
+                            {formatDay(d.createdAt)}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            Registrado por {d.createdByName || "Sistema"}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Investigador / Despacho
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900 truncate">
+                            {d.performedByName || "En investigación"}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            {d.performedAt ? `Completada ${formatDay(d.performedAt)}` : "En curso"}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Dictamen & Aprobación
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900 truncate">
+                            {d.approvedByName || "Pendiente"}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            {d.approvedAt ? `Aprobada ${formatDay(d.approvedAt)}` : "Sin aprobación"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Operational Note / Root Cause */}
+                      {d.note && (
+                        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-2xs">
+                          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500 font-heading">
+                            <FileText className="size-3.5 text-zinc-400" />
+                            <span>Nota Operativa / Causa Investigada</span>
+                          </div>
+                          <p className="mt-2.5 text-xs text-zinc-800 leading-relaxed whitespace-pre-wrap">
+                            {d.note}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Discrepancy Lines Table */}
+                      <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-2xs">
+                        <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5 flex items-center justify-between">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 font-heading">
+                            Líneas en Discrepancia ({d.lines.length})
+                          </h4>
+                          <span className="text-[11px] text-zinc-500">
+                            Detalle de producto y balance de despacho
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto">
                           <table className="w-full text-left text-xs">
-                            <thead className="bg-zinc-50 text-[10.5px] uppercase font-bold text-zinc-500 border-b border-zinc-200">
+                            <thead className="bg-zinc-50/80 text-[10.5px] uppercase font-bold text-zinc-500 border-b border-zinc-200/80">
                               <tr>
-                                <th className="p-2.5">Factura</th>
-                                <th className="p-2.5">Producto</th>
-                                <th className="p-2.5 text-right">Sobrante</th>
-                                <th className="p-2.5 text-right">Faltante</th>
-                                <th className="p-2.5">Despachador</th>
-                                <th className="p-2.5">Apta N/C</th>
+                                <th className="p-3">Factura</th>
+                                <th className="p-3">Producto</th>
+                                <th className="p-3">Problemática</th>
+                                <th className="p-3">Despachador</th>
+                                <th className="p-3">Apta N/C</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                              {d.lines.map((l) => (
-                                <tr key={l.id} className="hover:bg-zinc-50/50">
-                                  <td className="p-2.5 font-mono text-[11px] text-zinc-600">{l.invoiceRef}</td>
-                                  <td className="p-2.5 font-medium text-zinc-800">{l.productName}</td>
-                                  <td className="p-2.5 text-right text-emerald-600 font-medium">{l.surplusQuantity > 0 ? l.surplusQuantity : "—"}</td>
-                                  <td className="p-2.5 text-right text-brand-red font-medium">{l.shortageQuantity > 0 ? l.shortageQuantity : "—"}</td>
-                                  <td className="p-2.5 text-zinc-600">{l.dispatcherName}</td>
-                                  <td className="p-2.5">
-                                    {l.qualifiesForCreditNote === true ? (
-                                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">Sí</span>
-                                    ) : l.qualifiesForCreditNote === false ? (
-                                      <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-600">No</span>
-                                    ) : (
-                                      <span className="text-zinc-400">—</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
+                              {d.lines.map((line) => {
+                                const isShortage = line.shortageQuantity > 0;
+                                const isSurplus = line.surplusQuantity > 0;
+                                return (
+                                  <tr key={line.id} className="hover:bg-zinc-50/50 transition-colors">
+                                    <td className="p-3 font-mono font-medium text-zinc-800">
+                                      {line.invoiceRef}
+                                    </td>
+                                    <td className="p-3">
+                                      <p className="font-semibold text-zinc-900">{line.productName}</p>
+                                      {line.productCode && (
+                                        <span className="font-mono text-[10.5px] text-zinc-400">
+                                          {line.productCode}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="p-3">
+                                      {isShortage ? (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 border border-rose-200/80 px-2.5 py-0.5 text-xs font-semibold text-brand-red">
+                                          <MinusCircle className="size-3" />
+                                          Faltante: {line.shortageQuantity} und
+                                        </span>
+                                      ) : isSurplus ? (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                                          <PlusCircle className="size-3" />
+                                          Sobrante: {line.surplusQuantity} und
+                                        </span>
+                                      ) : (
+                                        <span className="text-zinc-400 text-xs">Sin diferencia</span>
+                                      )}
+                                    </td>
+                                    <td className="p-3 text-zinc-700">
+                                      <p className="font-medium text-zinc-800">{line.dispatcherName}</p>
+                                      {line.supervisorName && (
+                                        <span className="text-[10.5px] text-zinc-400">
+                                          Sup: {line.supervisorName}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="p-3">
+                                      {line.qualifiesForCreditNote === true ? (
+                                        <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 text-[10.5px] font-bold uppercase text-emerald-700">
+                                          Apta N/C
+                                        </span>
+                                      ) : line.qualifiesForCreditNote === false ? (
+                                        <span className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-0.5 text-[10.5px] text-zinc-600">
+                                          No apta
+                                        </span>
+                                      ) : (
+                                        <span className="text-zinc-400">—</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
+                        </div>
+                      </div>
+
+                      {/* 9-Point Security Checklist Table */}
+                      <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-2xs">
+                        <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 font-heading">
+                              Protocolo de Chequeo de Seguridad (9 Puntos)
+                            </h4>
+                            <span className="font-mono text-[10px] text-zinc-400 font-bold">
+                              PF-FOR-291
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-zinc-500">
+                            {positiveChecks.length > 0 ? (
+                              <span className="font-semibold text-amber-700">
+                                {positiveChecks.length} hallazgos reportados
+                              </span>
+                            ) : (
+                              "Todos los puntos conformes"
+                            )}
+                          </span>
+                        </div>
+                        <div className="divide-y divide-zinc-100">
+                          {checks.map((chk) => {
+                            const isPositive = chk.result === "Positivo";
+                            const isEvaluated = chk.result !== null && chk.result !== undefined;
+                            return (
+                              <div
+                                key={chk.itemNumber}
+                                className={`px-4 py-3 flex items-start justify-between gap-3 text-xs transition-colors ${
+                                  isPositive ? "bg-amber-50/50" : "hover:bg-zinc-50/50"
+                                }`}
+                              >
+                                <div className="flex items-start gap-3 min-w-0 flex-1">
+                                  <span className={`flex size-5 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold ${
+                                    isPositive ? "bg-amber-200 text-amber-900" : "bg-zinc-100 text-zinc-600"
+                                  }`}>
+                                    {String(chk.itemNumber).padStart(2, "0")}
+                                  </span>
+                                  <p className="text-xs text-zinc-700 leading-relaxed">
+                                    {chk.text}
+                                  </p>
+                                </div>
+                                <div className="shrink-0">
+                                  {isPositive ? (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
+                                      <AlertTriangle className="size-3 text-amber-600" />
+                                      Positivo
+                                    </span>
+                                  ) : isEvaluated ? (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700">
+                                      <Check className="size-3 text-emerald-600" strokeWidth={2.5} />
+                                      Negativo
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-zinc-400">Sin evaluar</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -1186,6 +1344,63 @@ export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProp
             fetchAllForms();
           }}
         />
+      )}
+
+      {/* 5. Modal para elegir nuevo formulario */}
+      {newFormModalOpen && (
+        <Modal
+          title="Seleccionar Formulario Oficial"
+          eyebrow="Ciclo de Vida del Ticket"
+          onClose={() => setNewFormModalOpen(false)}
+          maxWidth="max-w-xl"
+        >
+          <div className="space-y-3 py-1">
+            <p className="text-xs text-zinc-500">
+              Selecciona el formato empresarial de Plastifar que deseas iniciar para el ticket #{ticket.number}:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {availableForms.map((form) => {
+                const isRecommended = form.key === suggestedFormRaw;
+                const Icon = form.icon;
+                return (
+                  <button
+                    key={form.key}
+                    type="button"
+                    disabled={form.disabled}
+                    onClick={() => {
+                      setNewFormModalOpen(false);
+                      form.action();
+                    }}
+                    className={`flex flex-col text-left p-3.5 rounded-xl border transition-all ${
+                      isRecommended
+                        ? "border-brand-red/40 bg-brand-red/5 ring-1 ring-brand-red/20 hover:bg-brand-red/10 cursor-pointer"
+                        : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50 cursor-pointer"
+                    } ${form.disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`font-heading text-[10px] font-bold uppercase tracking-wider ${form.codeColor}`}>
+                        {form.code}
+                      </span>
+                      {isRecommended && (
+                        <span className="text-[10px] font-bold text-brand-red bg-brand-red/10 px-1.5 py-0.5 rounded">
+                          Recomendado
+                        </span>
+                      )}
+                    </div>
+                    <span className="mt-1 text-xs font-semibold text-zinc-900">{form.title}</span>
+                    <span className="mt-0.5 text-[11px] text-zinc-500 line-clamp-2 leading-relaxed">{form.description}</span>
+                    <div className="mt-2.5 pt-2 border-t border-zinc-100 flex items-center justify-between text-[10.5px] text-zinc-400">
+                      <span>{form.dept}</span>
+                      <span className="inline-flex items-center text-xs font-semibold text-zinc-700">
+                        Iniciar <Icon className="size-3 ml-1" />
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
