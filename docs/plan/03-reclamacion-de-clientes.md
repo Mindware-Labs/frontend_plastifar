@@ -368,8 +368,8 @@ Reglas espejo entre Zod y el servidor.
 - [x] La impresión muestra el código PF-FOR-034, la revisión y el número del ticket. Comprobado en el código de
       `ClaimPrintPage.tsx`; sin prueba automática, el frontend no tiene corredor de pruebas.
 - [ ] Cumple la lista de verificación de cierre de la sección 4.5 del plan original. **Por revisar** en la revisión
-      cruzada; la migración `AddFormModules` está escrita y no probada contra Postgres (las pruebas corren en
-      SQLite).
+      cruzada; la migración `AddFormModules` está aplicada en Postgres 17 local el 23 de octubre de 2026, desde el estado anterior a los módulos y sobre datos de prueba;
+      falta aplicarla en Railway.
 
 ## 15. Riesgos
 
