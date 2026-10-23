@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  ArrowLeft,
   Building2,
   Check,
   ChevronLeft,
@@ -8,7 +9,7 @@ import {
   ShieldAlert,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Controller,
   useFieldArray,
@@ -34,6 +35,7 @@ import {
 import { LookupSelect } from "../../components/ui/LookupSelect";
 import { Modal } from "../../components/ui/Modal";
 import { Select } from "../../components/ui/Select";
+import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import {
   cacheTicketInfo,
@@ -204,6 +206,8 @@ interface DiscrepancyFormModalProps {
   };
   onClose: () => void;
   onSaved: (detail: DiscrepancyDetail) => void;
+  /** Si es true, se renderiza como una página completa dentro de la pestaña en vez de una ventana emergente modal */
+  inline?: boolean;
 }
 
 /** Parsea la fecha y el cuerpo de la nota si existiera un prefijo [Fecha: ...] */
@@ -246,11 +250,28 @@ export function DiscrepancyFormModal({
   initialData,
   onClose,
   onSaved,
+  inline = false,
 }: DiscrepancyFormModalProps) {
   const isEdit = discrepancy !== undefined;
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [formError, setFormError] = useState<string | null>(null);
-  const { isExiting, requestClose } = useModalAnimation();
+
+  // Almacena el resultado para entregarlo a onSaved cuando termine la animación de salida
+  const savedResultRef = useRef<DiscrepancyDetail | null>(null);
+
+  const handleFinishedExit = () => {
+    if (savedResultRef.current) {
+      onSaved(savedResultRef.current);
+    } else {
+      onClose();
+    }
+  };
+
+  const modalAnimation = useModalAnimation();
+  const inlineMotion = useDialogMotion(handleFinishedExit);
+
+  const requestClose = inline ? inlineMotion.requestClose : modalAnimation.requestClose;
+  const isExiting = inline ? inlineMotion.isExiting : modalAnimation.isExiting;
 
   // Parsing de nota inicial y fecha de despacho
   const parsedNote = parseNote(discrepancy?.note ?? initialData?.note);
@@ -479,8 +500,13 @@ export function DiscrepancyFormModal({
       const saved = isEdit
         ? await discrepanciesApi.update(discrepancy.id, request)
         : await discrepanciesApi.create(Number(values.ticketId), request);
-      onSaved(saved);
-      requestClose();
+      if (inline) {
+        savedResultRef.current = saved;
+        requestClose();
+      } else {
+        onSaved(saved);
+        requestClose();
+      }
     } catch (err) {
       setFormError(
         err instanceof ApiError
@@ -492,7 +518,7 @@ export function DiscrepancyFormModal({
     }
   }
 
-  // Dinamismo de ancho: amplio en paso 2 para la tabla editorial sin apretar columnas
+  // Dinamismo de ancho para modal: amplio en paso 2 para la tabla editorial sin apretar columnas
   const modalMaxWidth =
     step === 1 ? "max-w-xl" : step === 2 ? "max-w-7xl" : "max-w-3xl";
 
@@ -500,6 +526,568 @@ export function DiscrepancyFormModal({
     ? effectiveTicketClientName
     : "Buscar cliente…";
 
+  // Stepper Header
+  const renderStepper = () => (
+    <div className="flex w-full items-center justify-between max-w-lg mx-auto select-none">
+      {/* Paso 1 */}
+      <button
+        type="button"
+        onClick={() => setStep(1)}
+        className="flex items-center gap-2 cursor-pointer focus:outline-hidden group"
+      >
+        <span
+          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
+            step === 1
+              ? "bg-brand-red text-white shadow-2xs ring-2 ring-brand-red/20"
+              : step > 1
+              ? "bg-emerald-600 text-white"
+              : "bg-zinc-200 text-zinc-600 group-hover:bg-zinc-300"
+          }`}
+        >
+          {step > 1 ? <Check className="h-3.5 w-3.5" /> : "1"}
+        </span>
+        <div className="flex flex-col text-left">
+          <span
+            className={`text-[12px] font-heading font-semibold transition-colors ${
+              step === 1 ? "text-zinc-900" : step > 1 ? "text-zinc-700" : "text-zinc-400"
+            }`}
+          >
+            Origen y Despacho
+          </span>
+          <span className="text-[10px] text-zinc-400 hidden sm:inline">Ticket y fecha</span>
+        </div>
+      </button>
+
+      <div
+        className={`h-0.5 flex-1 mx-3 rounded-full transition-colors ${
+          step > 1 ? "bg-emerald-600/40" : "bg-zinc-200"
+        }`}
+      />
+
+      {/* Paso 2 */}
+      <button
+        type="button"
+        onClick={() => {
+          if (ticketIdValue) setStep(2);
+        }}
+        disabled={!ticketIdValue}
+        className="flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed focus:outline-hidden group"
+      >
+        <span
+          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
+            step === 2
+              ? "bg-brand-red text-white shadow-2xs ring-2 ring-brand-red/20"
+              : step > 2
+              ? "bg-emerald-600 text-white"
+              : "bg-zinc-200 text-zinc-600 group-hover:bg-zinc-300"
+          }`}
+        >
+          {step > 2 ? <Check className="h-3.5 w-3.5" /> : "2"}
+        </span>
+        <div className="flex flex-col text-left">
+          <span
+            className={`text-[12px] font-heading font-semibold transition-colors ${
+              step === 2 ? "text-zinc-900" : step > 2 ? "text-zinc-700" : "text-zinc-400"
+            }`}
+          >
+            Líneas y Detalle
+          </span>
+          <span className="text-[10px] text-zinc-400 hidden sm:inline">Productos y nota</span>
+        </div>
+      </button>
+
+      <div
+        className={`h-0.5 flex-1 mx-3 rounded-full transition-colors ${
+          step > 2 ? "bg-emerald-600/40" : "bg-zinc-200"
+        }`}
+      />
+
+      {/* Paso 3 */}
+      <button
+        type="button"
+        onClick={() => {
+          if (ticketIdValue && fields.length > 0) setStep(3);
+        }}
+        disabled={!ticketIdValue || fields.length === 0}
+        className="flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed focus:outline-hidden group"
+      >
+        <span
+          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
+            step === 3
+              ? "bg-brand-red text-white shadow-2xs ring-2 ring-brand-red/20"
+              : "bg-zinc-200 text-zinc-600 group-hover:bg-zinc-300"
+          }`}
+        >
+          3
+        </span>
+        <div className="flex flex-col text-left">
+          <span
+            className={`text-[12px] font-heading font-semibold transition-colors ${
+              step === 3 ? "text-zinc-900" : "text-zinc-400"
+            }`}
+          >
+            Puntos de Seguridad
+          </span>
+          <span className="text-[10px] text-zinc-400 hidden sm:inline">9 puntos de control</span>
+        </div>
+      </button>
+    </div>
+  );
+
+  // Paso 1: Origen e Identificación
+  const renderStep1 = () => (
+    <div className="flex flex-col gap-4 animate-plf-fade">
+      <FormDivider title="Identificación del caso y despacho" />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Controller
+          name="ticketId"
+          control={control}
+          render={({ field }) => (
+            <LookupField
+              size="sm"
+              label="Ticket vinculado"
+              required
+              name={field.name}
+              value={field.value}
+              selectedLabel={ticketLabel}
+              onChange={(value, option) => {
+                field.onChange(value);
+                if (option) {
+                  setTicketLabel(option.label);
+                  if (option.hint) {
+                    setEffectiveTicketClientName(option.hint);
+                  }
+                }
+              }}
+              onBlur={field.onBlur}
+              placeholder="Elige un ticket…"
+              searchPlaceholder="Número, asunto o cliente…"
+              search={searchTickets}
+              resolveSelectedLabel={resolveTicketLabel}
+              disabled={isEdit || ticketId !== undefined}
+              state={stateOf("ticketId")}
+              error={errors.ticketId?.message}
+            />
+          )}
+        />
+
+        <DateField
+          label="Fecha del despacho"
+          required
+          value={discrepancyDate}
+          onChange={setDiscrepancyDate}
+          placeholder="Seleccionar fecha…"
+          headerLabel="Fecha del despacho"
+        />
+      </div>
+
+      {/* Tarjeta resumen del ticket seleccionado */}
+      {ticketLabel && (
+        <div className="rounded-xl border border-zinc-200/90 bg-zinc-50/70 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-zinc-400">
+              Ticket seleccionado
+            </span>
+            <span className="text-[13px] font-semibold text-zinc-900 mt-0.5">
+              {ticketLabel}
+            </span>
+          </div>
+          {effectiveTicketClientName && (
+            <div className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-700 shadow-2xs">
+              <Building2 className="h-3.5 w-3.5 text-zinc-400" />
+              <span>{effectiveTicketClientName}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tarjeta explicativa con tono oficial Plastifar */}
+      <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-4 text-xs text-purple-900 leading-relaxed">
+        <p className="font-semibold text-purple-950 flex items-center gap-1.5">
+          <span>Formato Oficial PF-FOR-291 · Flujo de 3 Pasos</span>
+        </p>
+        <p className="mt-1 text-purple-800/90">
+          En el siguiente paso podrás registrar en la tabla editorial las líneas en discrepancia (sobrantes o faltantes), indicar si aplican para nota de crédito, asignar despachador y supervisor, y finalmente completar la evaluación de seguridad de 9 puntos.
+        </p>
+      </div>
+    </div>
+  );
+
+  // Paso 2: Líneas en Discrepancia y Nota Operativa
+  const renderStep2 = () => (
+    <div className="flex flex-col gap-3.5 animate-plf-fade">
+      <div className="flex items-center justify-between">
+        <FormDivider title="Líneas en discrepancia (Formato PF-FOR-291)" />
+      </div>
+
+      {/* TABLA EDITORIAL DE LÍNEAS - ENCABEZADOS DE UNA SOLA LÍNEA Y ALINEACIÓN PERFECTA */}
+      <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-2xs">
+        <table className="w-full text-left border-collapse min-w-[1240px]">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50/90 text-[11px] font-heading font-bold uppercase tracking-wider text-zinc-500 select-none">
+              <th className="py-2.5 px-2.5 w-10 text-center whitespace-nowrap">#</th>
+              <th className="py-2.5 px-2.5 w-32 whitespace-nowrap"># Reclamo</th>
+              <th className="py-2.5 px-2.5 w-32 whitespace-nowrap">Factura *</th>
+              <th className="py-2.5 px-2.5 w-52 whitespace-nowrap">Cliente</th>
+              <th className="py-2.5 px-2.5 w-72 whitespace-nowrap">Producto *</th>
+              <th className="py-2.5 px-2.5 w-28 text-center whitespace-nowrap">Sobrante</th>
+              <th className="py-2.5 px-2.5 w-28 text-center whitespace-nowrap">Faltante</th>
+              <th className="py-2.5 px-2.5 w-32 text-center whitespace-nowrap">¿Cumple N/C?</th>
+              <th className="py-2.5 px-2.5 w-28 whitespace-nowrap"># N/C</th>
+              <th className="py-2.5 px-2.5 w-40 whitespace-nowrap">Despachador *</th>
+              <th className="py-2.5 px-2.5 w-36 whitespace-nowrap">Supervisor</th>
+              <th className="py-2.5 px-2 w-10 text-center whitespace-nowrap"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100">
+            {fields.map((field, index) => {
+              const lineErrors = errors.lines?.[index];
+              const existingLine = discrepancy?.lines?.[index];
+
+              return (
+                <DiscrepancyTableRow
+                  key={field.id}
+                  index={index}
+                  control={control}
+                  register={register}
+                  setValue={setValue}
+                  lineErrors={lineErrors}
+                  existingLine={existingLine}
+                  ticketClientName={effectiveTicketClientName}
+                  ticketClientId={effectiveTicketClientId}
+                  ticketInheritedLabel={ticketInheritedLabel}
+                  canRemove={fields.length > 1}
+                  onRemove={() => remove(index)}
+                />
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pie de tabla con botón agregar y contador */}
+      <div className="flex items-center justify-between pt-1">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={() =>
+            append(emptyLine(defaultClientIdForLines, derivedTicketNumber))
+          }
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span>Agregar otra línea</span>
+        </Button>
+
+        <span className="text-[11.5px] text-zinc-400 select-none">
+          {fields.length} {fields.length === 1 ? "línea registrada" : "líneas registradas"}
+        </span>
+      </div>
+
+      {/* SECCIÓN DE LA NOTA (según PF-FOR-291) */}
+      <div className="mt-2 flex flex-col gap-1.5">
+        <FormDivider title="Nota de la investigación" />
+        <TextAreaField
+          id="discrepancy-notes"
+          label="Nota operativa"
+          rows={3}
+          className="text-[12.5px] py-2"
+          placeholder="Observaciones de entrega, horarios de recepción, particularidades de la carga, precinto o contenedor…"
+          hint={
+            <span className="flex items-center justify-between text-[11px] text-zinc-400">
+              <span>Contexto de la carga, contenedor o precinto</span>
+              <span
+                className={`tabular-nums ${
+                  noteValue.length > 3800 ? "text-brand-red font-medium" : ""
+                }`}
+              >
+                {noteValue.length} / 4000
+              </span>
+            </span>
+          }
+          error={errors.note?.message}
+          {...register("note")}
+        />
+      </div>
+    </div>
+  );
+
+  // Paso 3: Puntos de Seguridad a Evaluar
+  const renderStep3 = () => (
+    <div className="flex flex-col gap-3.5 animate-plf-fade">
+      <FormDivider title="Puntos de seguridad a evaluar (PF-FOR-291)" />
+
+      {anyPositive && (
+        <Alert variant="error">
+          <span className="flex items-start gap-2">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <strong>Hallazgo de seguridad detectado:</strong> se ha marcado al menos un punto positivo. El punto 9 es obligatorio para indicar si se notificó a las Gerencias de Seguridad y Logística.
+            </span>
+          </span>
+        </Alert>
+      )}
+
+      {/* TABLA DE PUNTOS DE SEGURIDAD */}
+      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xs">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50/90 text-[11px] font-heading font-bold uppercase tracking-wider text-zinc-500 select-none">
+              <th className="py-2.5 pl-3 pr-2 w-10 text-center whitespace-nowrap">#</th>
+              <th className="py-2.5 px-3 whitespace-nowrap">Puntos de Seguridad a Evaluar</th>
+              <th className="py-2.5 px-2 w-24 text-center whitespace-nowrap">
+                <span className="block text-[9px] text-zinc-400 font-normal lowercase tracking-normal">marcar X</span>
+                <span className="text-brand-red">Positivo</span>
+              </th>
+              <th className="py-2.5 px-2 w-24 text-center whitespace-nowrap">
+                <span className="block text-[9px] text-zinc-400 font-normal lowercase tracking-normal">marcar X</span>
+                <span>Negativo</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100 text-[12.5px]">
+            {SECURITY_ITEMS.map((item) => {
+              const isNinth = item.itemNumber === 9;
+              const disabled = isNinth && !anyPositive;
+              const currentVal = checks[item.itemNumber] || "";
+
+              return (
+                <tr
+                  key={item.itemNumber}
+                  className={`transition-colors ${
+                    currentVal === "Positivo" && !isNinth
+                      ? "bg-rose-50/50 hover:bg-rose-50/80"
+                      : "hover:bg-zinc-50/70"
+                  } ${disabled ? "opacity-45" : ""}`}
+                >
+                  <td className="py-2.5 pl-3 pr-2 text-center font-mono text-[11px] font-semibold text-zinc-400">
+                    {item.itemNumber}
+                  </td>
+                  <td className="py-2.5 px-3 leading-relaxed text-zinc-800">
+                    <p>{item.text}</p>
+                    {isNinth && !anyPositive && (
+                      <span className="mt-0.5 inline-block text-[11px] text-zinc-400 italic">
+                        (Aplica únicamente cuando al menos un punto del 1 al 8 es Positivo)
+                      </span>
+                    )}
+                  </td>
+                  {/* Checkbox / Botón POSITIVO */}
+                  <td className="py-2 px-2 text-center">
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => toggleCheck(item.itemNumber, "Positivo")}
+                      className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md border text-[13px] font-bold transition-all cursor-pointer select-none disabled:cursor-not-allowed ${
+                        currentVal === "Positivo"
+                          ? "border-brand-red bg-brand-red text-white shadow-2xs"
+                          : "border-zinc-300 bg-white text-transparent hover:border-brand-red/60 hover:text-brand-red/30"
+                      }`}
+                      title={`Marcar punto ${item.itemNumber} como Positivo`}
+                    >
+                      X
+                    </button>
+                  </td>
+                  {/* Checkbox / Botón NEGATIVO */}
+                  <td className="py-2 px-2 text-center">
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => toggleCheck(item.itemNumber, "Negativo")}
+                      className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md border text-[13px] font-bold transition-all cursor-pointer select-none disabled:cursor-not-allowed ${
+                        currentVal === "Negativo"
+                          ? "border-zinc-800 bg-zinc-800 text-white shadow-2xs"
+                          : "border-zinc-300 bg-white text-transparent hover:border-zinc-500 hover:text-zinc-400"
+                      }`}
+                      title={`Marcar punto ${item.itemNumber} como Negativo`}
+                    >
+                      X
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  // Footer izquierda (indicador de paso y atajo de teclado)
+  const renderFooterLeft = () => (
+    <>
+      {step === 3 ? (
+        <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+          <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+            Ctrl
+          </kbd>
+          <span>+</span>
+          <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+            Enter
+          </kbd>
+          <span className="ml-0.5">para finalizar</span>
+        </span>
+      ) : (
+        <span className="text-[11.5px] text-zinc-400">
+          Paso {step} de 3
+        </span>
+      )}
+    </>
+  );
+
+  // Footer derecha (botones de navegación y guardado)
+  const renderFooterButtons = () => (
+    <div className="flex items-center gap-2 ml-auto">
+      {step > 1 ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setFormError(null);
+            setStep((s) => (s - 1) as 1 | 2);
+          }}
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+          <span>Anterior</span>
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={requestClose}
+        >
+          Cancelar
+        </Button>
+      )}
+
+      {step < 3 ? (
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleNextStep}
+        >
+          <span>Siguiente paso</span>
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
+      ) : (
+        <Button
+          type="submit"
+          form="discrepancy-form"
+          size="sm"
+          isLoading={isSubmitting}
+        >
+          {isEdit ? "Guardar cambios" : "Crear investigación"}
+        </Button>
+      )}
+    </div>
+  );
+
+  // RENDER MODO PÁGINA (INLINE EN TAB)
+  if (inline) {
+    return (
+      <div
+        ref={inlineMotion.panelRef}
+        className="rounded-xl border border-zinc-200 bg-white shadow-2xs overflow-hidden"
+      >
+        {/* Encabezado en UNA SOLA LÍNEA perfectamente alineada */}
+        <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 sm:px-6 py-2.5">
+          <div className="flex items-center justify-between gap-3">
+            {/* Izquierda: Flechita para atrás + Insignia + Título */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <button
+                type="button"
+                onClick={requestClose}
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600 shadow-2xs hover:bg-zinc-100 hover:text-zinc-900 transition-colors focus:outline-hidden cursor-pointer"
+                title="Volver a formularios"
+                aria-label="Volver a formularios"
+              >
+                <ArrowLeft className="size-4 text-zinc-600" />
+              </button>
+
+              <div className="h-4 w-px bg-zinc-200 shrink-0" />
+
+              <span className="shrink-0 font-heading text-[10.5px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 border border-purple-200/80 px-2 py-0.5 rounded-md">
+                PF-FOR-291
+              </span>
+
+              <h2 className="text-sm sm:text-base font-bold text-zinc-900 font-heading truncate">
+                {isEdit ? `Editar ${discrepancy.number}` : "Investigación de Discrepancia de Cargas"}
+              </h2>
+
+              <span className="hidden xl:inline text-zinc-300">·</span>
+              <span className="hidden xl:inline text-xs text-zinc-500 truncate">
+                {step === 1
+                  ? "Identificación y fecha de despacho"
+                  : step === 2
+                  ? "Líneas en discrepancia y nota operativa"
+                  : "Evaluación de 9 puntos de seguridad"}
+              </span>
+            </div>
+
+            {/* Derecha: Chip del ticket en la misma línea */}
+            {ticketLabel && (
+              <div className="shrink-0 flex items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-2.5 py-1 text-xs text-zinc-700 shadow-2xs">
+                <span className="font-heading font-bold text-zinc-400 text-[10px] uppercase tracking-wider">
+                  Ticket:
+                </span>
+                <span className="font-medium text-zinc-900 truncate max-w-[200px] sm:max-w-[340px]">
+                  {ticketLabel}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Stepper centrado en su propia barra limpia */}
+        <div className="border-b border-zinc-100 bg-white py-3 px-4 sm:px-6">
+          {renderStepper()}
+        </div>
+
+        {/* Cuerpo del formulario según el paso */}
+        <div className="p-4 sm:p-6">
+          <form
+            id="discrepancy-form"
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+            className="flex flex-col gap-3 text-left"
+          >
+            {formError && <Alert variant="error">{formError}</Alert>}
+
+            {/* Paso 1: Centrado de manera elegante y enfocada */}
+            {step === 1 && (
+              <div className="max-w-2xl mx-auto w-full py-4">
+                {renderStep1()}
+              </div>
+            )}
+
+            {/* Paso 2: Todo el ancho de la página para la tabla editorial */}
+            {step === 2 && (
+              <div className="w-full">
+                {renderStep2()}
+              </div>
+            )}
+
+            {/* Paso 3: Centrado de manera cómoda para los 9 puntos */}
+            {step === 3 && (
+              <div className="max-w-4xl mx-auto w-full py-2">
+                {renderStep3()}
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* Barra inferior de navegación y guardado */}
+        <div className="border-t border-zinc-200/80 bg-zinc-50/70 px-5 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+          {renderFooterLeft()}
+          {renderFooterButtons()}
+        </div>
+      </div>
+    );
+  }
+
+  // RENDER MODO MODAL
   return (
     <Modal
       maxWidth={modalMaxWidth}
@@ -521,168 +1109,13 @@ export function DiscrepancyFormModal({
       onRequestClose={requestClose}
       footer={
         <div className="flex w-full items-center justify-between gap-3">
-          {step === 3 ? (
-            <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
-              <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-                Ctrl
-              </kbd>
-              <span>+</span>
-              <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-                Enter
-              </kbd>
-              <span className="ml-0.5">para finalizar</span>
-            </span>
-          ) : (
-            <span className="text-[11.5px] text-zinc-400">
-              Paso {step} de 3
-            </span>
-          )}
-
-          <div className="flex items-center gap-2 ml-auto">
-            {step > 1 ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setFormError(null);
-                  setStep((s) => (s - 1) as 1 | 2);
-                }}
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-                <span>Anterior</span>
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={requestClose}
-              >
-                Cancelar
-              </Button>
-            )}
-
-            {step < 3 ? (
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleNextStep}
-              >
-                <span>Siguiente</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            ) : (
-              <Button
-                type="submit"
-                form="discrepancy-form"
-                size="sm"
-                isLoading={isSubmitting}
-              >
-                {isEdit ? "Guardar cambios" : "Crear investigación"}
-              </Button>
-            )}
-          </div>
+          {renderFooterLeft()}
+          {renderFooterButtons()}
         </div>
       }
     >
-      {/* STEPPER HEADER */}
       <div className="mb-4 -mt-2 border-b border-zinc-100 pb-3">
-        <div className="flex w-full items-center justify-between max-w-md mx-auto">
-          {/* Step 1 */}
-          <button
-            type="button"
-            onClick={() => setStep(1)}
-            className="flex items-center gap-1.5 cursor-pointer focus:outline-hidden"
-          >
-            <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
-                step === 1
-                  ? "bg-brand-red text-white shadow-2xs"
-                  : step > 1
-                  ? "bg-emerald-600 text-white"
-                  : "bg-zinc-200 text-zinc-600"
-              }`}
-            >
-              {step > 1 ? <Check className="h-3.5 w-3.5" /> : "1"}
-            </span>
-            <span
-              className={`text-[12px] font-heading font-semibold transition-colors ${
-                step === 1 ? "text-zinc-900" : step > 1 ? "text-zinc-700" : "text-zinc-400"
-              }`}
-            >
-              Origen
-            </span>
-          </button>
-
-          <div
-            className={`h-0.5 flex-1 mx-3 rounded-full transition-colors ${
-              step > 1 ? "bg-emerald-600/40" : "bg-zinc-200"
-            }`}
-          />
-
-          {/* Step 2 */}
-          <button
-            type="button"
-            onClick={() => {
-              if (ticketIdValue) setStep(2);
-            }}
-            disabled={!ticketIdValue}
-            className="flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed focus:outline-hidden"
-          >
-            <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
-                step === 2
-                  ? "bg-brand-red text-white shadow-2xs"
-                  : step > 2
-                  ? "bg-emerald-600 text-white"
-                  : "bg-zinc-200 text-zinc-600"
-              }`}
-            >
-              {step > 2 ? <Check className="h-3.5 w-3.5" /> : "2"}
-            </span>
-            <span
-              className={`text-[12px] font-heading font-semibold transition-colors ${
-                step === 2 ? "text-zinc-900" : step > 2 ? "text-zinc-700" : "text-zinc-400"
-              }`}
-            >
-              Líneas y Nota
-            </span>
-          </button>
-
-          <div
-            className={`h-0.5 flex-1 mx-3 rounded-full transition-colors ${
-              step > 2 ? "bg-emerald-600/40" : "bg-zinc-200"
-            }`}
-          />
-
-          {/* Step 3 */}
-          <button
-            type="button"
-            onClick={() => {
-              if (ticketIdValue && fields.length > 0) setStep(3);
-            }}
-            disabled={!ticketIdValue || fields.length === 0}
-            className="flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed focus:outline-hidden"
-          >
-            <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
-                step === 3
-                  ? "bg-brand-red text-white shadow-2xs"
-                  : "bg-zinc-200 text-zinc-600"
-              }`}
-            >
-              3
-            </span>
-            <span
-              className={`text-[12px] font-heading font-semibold transition-colors ${
-                step === 3 ? "text-zinc-900" : "text-zinc-400"
-              }`}
-            >
-              Seguridad
-            </span>
-          </button>
-        </div>
+        {renderStepper()}
       </div>
 
       <form
@@ -692,281 +1125,9 @@ export function DiscrepancyFormModal({
         className="flex flex-col gap-3 text-left"
       >
         {formError && <Alert variant="error">{formError}</Alert>}
-
-        {/* ======================================================== */}
-        {/* PASO 1: ORIGEN E IDENTIFICACIÓN                          */}
-        {/* ======================================================== */}
-        {step === 1 && (
-          <div className="flex flex-col gap-3.5 animate-plf-fade">
-            <FormDivider title="Identificación del caso" />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Controller
-                name="ticketId"
-                control={control}
-                render={({ field }) => (
-                  <LookupField
-                    size="sm"
-                    label="Ticket vinculado"
-                    required
-                    name={field.name}
-                    value={field.value}
-                    selectedLabel={ticketLabel}
-                    onChange={(value, option) => {
-                      field.onChange(value);
-                      if (option) {
-                        setTicketLabel(option.label);
-                        if (option.hint) {
-                          setEffectiveTicketClientName(option.hint);
-                        }
-                      }
-                    }}
-                    onBlur={field.onBlur}
-                    placeholder="Elige un ticket…"
-                    searchPlaceholder="Número, asunto o cliente…"
-                    search={searchTickets}
-                    resolveSelectedLabel={resolveTicketLabel}
-                    disabled={isEdit || ticketId !== undefined}
-                    state={stateOf("ticketId")}
-                    error={errors.ticketId?.message}
-                  />
-                )}
-              />
-
-              <DateField
-                label="Fecha del despacho"
-                required
-                value={discrepancyDate}
-                onChange={setDiscrepancyDate}
-                placeholder="Seleccionar fecha…"
-                headerLabel="Fecha del despacho"
-              />
-            </div>
-
-            {/* Tarjeta resumen del ticket seleccionado */}
-            {ticketLabel && (
-              <div className="rounded-xl border border-zinc-200/90 bg-zinc-50/60 p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-zinc-400">
-                    Ticket seleccionado
-                  </span>
-                  <span className="text-[13px] font-semibold text-zinc-900">
-                    {ticketLabel}
-                  </span>
-                </div>
-                {effectiveTicketClientName && (
-                  <div className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[12px] font-medium text-zinc-700 shadow-2xs">
-                    <Building2 className="h-3.5 w-3.5 text-zinc-400" />
-                    <span>{effectiveTicketClientName}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ======================================================== */}
-        {/* PASO 2: LÍNEAS EN DISCREPANCIA (TABLA EDITORIAL) Y NOTA  */}
-        {/* ======================================================== */}
-        {step === 2 && (
-          <div className="flex flex-col gap-3.5 animate-plf-fade">
-            <div className="flex items-center justify-between">
-              <FormDivider title="Líneas en discrepancia (Formato PF-FOR-291)" />
-            </div>
-
-            {/* TABLA EDITORIAL DE LÍNEAS - ENCABEZADOS DE UNA SOLA LÍNEA Y ALINEACIÓN PERFECTA */}
-            <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-2xs">
-              <table className="w-full text-left border-collapse min-w-[1240px]">
-                <thead>
-                  <tr className="border-b border-zinc-200 bg-zinc-50/90 text-[11px] font-heading font-bold uppercase tracking-wider text-zinc-500 select-none">
-                    <th className="py-2.5 px-2.5 w-10 text-center whitespace-nowrap">#</th>
-                    <th className="py-2.5 px-2.5 w-32 whitespace-nowrap"># Reclamo</th>
-                    <th className="py-2.5 px-2.5 w-32 whitespace-nowrap">Factura *</th>
-                    <th className="py-2.5 px-2.5 w-52 whitespace-nowrap">Cliente</th>
-                    <th className="py-2.5 px-2.5 w-72 whitespace-nowrap">Producto *</th>
-                    <th className="py-2.5 px-2.5 w-28 text-center whitespace-nowrap">Sobrante</th>
-                    <th className="py-2.5 px-2.5 w-28 text-center whitespace-nowrap">Faltante</th>
-                    <th className="py-2.5 px-2.5 w-32 text-center whitespace-nowrap">¿Cumple N/C?</th>
-                    <th className="py-2.5 px-2.5 w-28 whitespace-nowrap"># N/C</th>
-                    <th className="py-2.5 px-2.5 w-40 whitespace-nowrap">Despachador *</th>
-                    <th className="py-2.5 px-2.5 w-36 whitespace-nowrap">Supervisor</th>
-                    <th className="py-2.5 px-2 w-10 text-center whitespace-nowrap"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
-                  {fields.map((field, index) => {
-                    const lineErrors = errors.lines?.[index];
-                    const existingLine = discrepancy?.lines?.[index];
-
-                    return (
-                      <DiscrepancyTableRow
-                        key={field.id}
-                        index={index}
-                        control={control}
-                        register={register}
-                        setValue={setValue}
-                        lineErrors={lineErrors}
-                        existingLine={existingLine}
-                        ticketClientName={effectiveTicketClientName}
-                        ticketClientId={effectiveTicketClientId}
-                        ticketInheritedLabel={ticketInheritedLabel}
-                        canRemove={fields.length > 1}
-                        onRemove={() => remove(index)}
-                      />
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pie de tabla con botón agregar y contador */}
-            <div className="flex items-center justify-between pt-1">
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() =>
-                  append(emptyLine(defaultClientIdForLines, derivedTicketNumber))
-                }
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Agregar otra línea</span>
-              </Button>
-
-              <span className="text-[11.5px] text-zinc-400 select-none">
-                {fields.length} {fields.length === 1 ? "línea registrada" : "líneas registradas"}
-              </span>
-            </div>
-
-            {/* SECCIÓN DE LA NOTA (según PF-FOR-291) */}
-            <div className="mt-2 flex flex-col gap-1.5">
-              <FormDivider title="Nota de la investigación" />
-              <TextAreaField
-                id="discrepancy-notes"
-                label="Nota operativa"
-                rows={2}
-                className="text-[12.5px] py-1.5"
-                placeholder="Observaciones de entrega, horarios de recepción, particularidades de la carga, precinto o contenedor…"
-                hint={
-                  <span className="flex items-center justify-between text-[11px] text-zinc-400">
-                    <span>Contexto de la carga, contenedor o precinto</span>
-                    <span
-                      className={`tabular-nums ${
-                        noteValue.length > 3800 ? "text-brand-red font-medium" : ""
-                      }`}
-                    >
-                      {noteValue.length} / 4000
-                    </span>
-                  </span>
-                }
-                error={errors.note?.message}
-                {...register("note")}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ======================================================== */}
-        {/* PASO 3: PUNTOS DE SEGURIDAD A EVALUAR (PASO FINAL)       */}
-        {/* ======================================================== */}
-        {step === 3 && (
-          <div className="flex flex-col gap-3.5 animate-plf-fade">
-            <FormDivider title="Puntos de seguridad a evaluar (PF-FOR-291)" />
-
-            {anyPositive && (
-              <Alert variant="error">
-                <span className="flex items-start gap-2">
-                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    <strong>Hallazgo de seguridad detectado:</strong> se ha marcado al menos un punto positivo. El punto 9 es obligatorio para indicar si se notificó a las Gerencias de Seguridad y Logística.
-                  </span>
-                </span>
-              </Alert>
-            )}
-
-            {/* TABLA DE PUNTOS DE SEGURIDAD */}
-            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xs">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-zinc-200 bg-zinc-50/90 text-[11px] font-heading font-bold uppercase tracking-wider text-zinc-500 select-none">
-                    <th className="py-2.5 pl-3 pr-2 w-10 text-center whitespace-nowrap">#</th>
-                    <th className="py-2.5 px-3 whitespace-nowrap">Puntos de Seguridad a Evaluar</th>
-                    <th className="py-2.5 px-2 w-24 text-center whitespace-nowrap">
-                      <span className="block text-[9px] text-zinc-400 font-normal lowercase tracking-normal">marcar X</span>
-                      <span className="text-brand-red">Positivo</span>
-                    </th>
-                    <th className="py-2.5 px-2 w-24 text-center whitespace-nowrap">
-                      <span className="block text-[9px] text-zinc-400 font-normal lowercase tracking-normal">marcar X</span>
-                      <span>Negativo</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 text-[12.5px]">
-                  {SECURITY_ITEMS.map((item) => {
-                    const isNinth = item.itemNumber === 9;
-                    const disabled = isNinth && !anyPositive;
-                    const currentVal = checks[item.itemNumber] || "";
-
-                    return (
-                      <tr
-                        key={item.itemNumber}
-                        className={`transition-colors ${
-                          currentVal === "Positivo" && !isNinth
-                            ? "bg-rose-50/50 hover:bg-rose-50/80"
-                            : "hover:bg-zinc-50/70"
-                        } ${disabled ? "opacity-45" : ""}`}
-                      >
-                        <td className="py-2.5 pl-3 pr-2 text-center font-mono text-[11px] font-semibold text-zinc-400">
-                          {item.itemNumber}
-                        </td>
-                        <td className="py-2.5 px-3 leading-relaxed text-zinc-800">
-                          <p>{item.text}</p>
-                          {isNinth && !anyPositive && (
-                            <span className="mt-0.5 inline-block text-[11px] text-zinc-400 italic">
-                              (Aplica únicamente cuando al menos un punto del 1 al 8 es Positivo)
-                            </span>
-                          )}
-                        </td>
-                        {/* Checkbox / Botón POSITIVO */}
-                        <td className="py-2 px-2 text-center">
-                          <button
-                            type="button"
-                            disabled={disabled}
-                            onClick={() => toggleCheck(item.itemNumber, "Positivo")}
-                            className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md border text-[13px] font-bold transition-all cursor-pointer select-none disabled:cursor-not-allowed ${
-                              currentVal === "Positivo"
-                                ? "border-brand-red bg-brand-red text-white shadow-2xs"
-                                : "border-zinc-300 bg-white text-transparent hover:border-brand-red/60 hover:text-brand-red/30"
-                            }`}
-                            title={`Marcar punto ${item.itemNumber} como Positivo`}
-                          >
-                            X
-                          </button>
-                        </td>
-                        {/* Checkbox / Botón NEGATIVO */}
-                        <td className="py-2 px-2 text-center">
-                          <button
-                            type="button"
-                            disabled={disabled}
-                            onClick={() => toggleCheck(item.itemNumber, "Negativo")}
-                            className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md border text-[13px] font-bold transition-all cursor-pointer select-none disabled:cursor-not-allowed ${
-                              currentVal === "Negativo"
-                                ? "border-zinc-800 bg-zinc-800 text-white shadow-2xs"
-                                : "border-zinc-300 bg-white text-transparent hover:border-zinc-500 hover:text-zinc-400"
-                            }`}
-                            title={`Marcar punto ${item.itemNumber} como Negativo`}
-                          >
-                            X
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
       </form>
     </Modal>
   );

@@ -499,8 +499,36 @@ export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProp
     );
   }
 
+  // RENDER MODO PÁGINA: Si el usuario inició o está editando la discrepancia de cargas
+  if (discrepancyModalOpen) {
+    return (
+      <div className="mt-3.5">
+        <DiscrepancyFormModal
+          inline
+          discrepancy={editingDiscrepancy}
+          ticketId={ticket.id}
+          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
+          ticketClientName={ticket.clientName ?? undefined}
+          ticketClientId={ticket.clientId ?? undefined}
+          initialData={discrepancyInitialData}
+          onClose={() => {
+            setDiscrepancyModalOpen(false);
+            setEditingDiscrepancy(undefined);
+            setDiscrepancyInitialData(undefined);
+          }}
+          onSaved={() => {
+            setDiscrepancyModalOpen(false);
+            setEditingDiscrepancy(undefined);
+            setDiscrepancyInitialData(undefined);
+            fetchAllForms();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="mt-3.5 space-y-4">
+    <div className="mt-3.5 space-y-4 animate-plf-fade">
       {/* ZERO STATE: No forms registered yet */}
       {registeredForms.length === 0 ? (
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-2xs">
@@ -1145,22 +1173,6 @@ export function TicketFormsTab({ ticket, onHasFormsChanged }: TicketFormsTabProp
         />
       )}
 
-      {/* 3. Discrepancia Modal */}
-      {discrepancyModalOpen && (
-        <DiscrepancyFormModal
-          discrepancy={editingDiscrepancy}
-          ticketId={ticket.id}
-          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
-          ticketClientName={ticket.clientName ?? undefined}
-          ticketClientId={ticket.clientId ?? undefined}
-          initialData={discrepancyInitialData}
-          onClose={() => setDiscrepancyModalOpen(false)}
-          onSaved={() => {
-            setDiscrepancyModalOpen(false);
-            fetchAllForms();
-          }}
-        />
-      )}
 
       {/* 4. HCA Modal */}
       {hcaModalOpen && (
