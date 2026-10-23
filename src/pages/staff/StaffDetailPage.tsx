@@ -13,18 +13,19 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
+import { PageSpinner } from "../../components/ui/PageSpinner";
 import { RowAction } from "../../components/ui/RowAction";
-import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { usePermissions } from "../../hooks/usePermissions";
 import { departmentPaths } from "../../lib/departments";
+import type { DepartmentResponse } from "../../types/api";
 import type {
   DepartmentAccess,
   PermissionMatrixResponse,
   StaffDetail,
 } from "../../types/permissions";
-import type { DepartmentResponse } from "../../types/api";
 import { AccessModal } from "./AccessModal";
 
 interface StaffDetailPageProps {
@@ -215,21 +216,14 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
     return (
       <div>
         <ModuleHeader title="Colaborador" sections={sections} />
-        <div className="flex flex-col items-start gap-2">
-          <Alert variant="error">{error}</Alert>
-          <Button size="sm" variant="secondary" onClick={() => void load()}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry onRetry={() => void load()}>{error}</ErrorRetry>
       </div>
     );
   }
 
   if (staff === null) {
     return (
-      <div className="flex justify-center py-16">
-        <Spinner />
-      </div>
+      <PageSpinner />
     );
   }
 
@@ -254,21 +248,11 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
       />
 
       {error !== null && (
-        <div className="mb-3 flex flex-col items-start gap-2">
-          <Alert variant="error">{error}</Alert>
-          <Button size="sm" variant="secondary" onClick={() => void load()}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={() => void load()}>{error}</ErrorRetry>
       )}
 
       {section === "accesos" && referenceError !== null && (
-        <div className="mb-3 flex flex-col items-start gap-2">
-          <Alert variant="error">{referenceError}</Alert>
-          <Button size="sm" variant="secondary" onClick={() => void loadReferenceData()}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={() => void loadReferenceData()}>{referenceError}</ErrorRetry>
       )}
 
       {/* RF-P7: la instalación no puede quedarse sin ningún administrador

@@ -14,8 +14,9 @@ import { CheckboxField, SelectField, TextAreaField, TextField, type FieldState }
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { RowAction } from "../../components/ui/RowAction";
-import { computeLine, computeTotal, toNumberOrNull } from "../../lib/claims";
-import { formatAmount, today } from "../../lib/quality";
+import { computeLine, computeTotal } from "../../lib/claims";
+import { formatAmount, toNumberOrNull } from "../../lib/numbers";
+import { today } from "../../lib/quality";
 import {
   CLAIM_AREAS,
   CLAIM_CURRENCIES,

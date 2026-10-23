@@ -11,19 +11,19 @@ import {
 import { fetchAllPages } from "../../api/paging";
 import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { ListPanel } from "../../components/ui/ListPanel";
+import { PageSpinner } from "../../components/ui/PageSpinner";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Spinner } from "../../components/ui/Spinner";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
@@ -255,12 +255,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     return (
       <div>
         <ModuleHeader title="Cliente" sections={sections} />
-        <div className="flex flex-col items-start gap-2">
-          <Alert variant="error">{error}</Alert>
-          <Button size="sm" variant="secondary" onClick={() => void loadRecord()}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry onRetry={() => void loadRecord()}>{error}</ErrorRetry>
       </div>
     );
   }
@@ -269,9 +264,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   // su propia caida, y no debe retener la ficha entera.
   if (client === null) {
     return (
-      <div className="flex justify-center py-16">
-        <Spinner />
-      </div>
+      <PageSpinner />
     );
   }
 
@@ -302,21 +295,11 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       />
 
       {error !== null && (
-        <div className="mb-3 flex flex-col items-start gap-2">
-          <Alert variant="error">{error}</Alert>
-          <Button size="sm" variant="secondary" onClick={() => void loadRecord()}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={() => void loadRecord()}>{error}</ErrorRetry>
       )}
 
       {referenceError !== null && (
-        <div className="mb-3 flex flex-col items-start gap-2">
-          <Alert variant="error">{referenceError}</Alert>
-          <Button size="sm" variant="secondary" onClick={() => void loadReferenceData()}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={() => void loadReferenceData()}>{referenceError}</ErrorRetry>
       )}
 
       {section === "datos" && (
@@ -370,12 +353,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
           {/* El reintento va en linea con su aviso, y afuera del panel: es un
               error de carga, no un dato de la tabla. */}
           {contactsError !== null && (
-            <div className="mb-3 flex items-start gap-3">
-              <Alert variant="error">{contactsError}</Alert>
-              <Button size="sm" variant="secondary" onClick={refreshContacts}>
-                Reintentar
-              </Button>
-            </div>
+            <ErrorRetry className="mb-3" onRetry={refreshContacts}>{contactsError}</ErrorRetry>
           )}
 
           <ListPanel

@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, CreditCard, Pencil, Printer, RotateCcw, ShieldAlert, ShieldCheck, ThumbsDown, ThumbsUp } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
@@ -9,16 +9,18 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
+import { PageSpinner } from "../../components/ui/PageSpinner";
 import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
-import { Spinner } from "../../components/ui/Spinner";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
+import { useDetail } from "../../hooks/useDetail";
 import { usePermissions } from "../../hooks/usePermissions";
-import { NOTIFICATION_ITEM, describeStatus, formatQuantity } from "../../lib/discrepancies";
-import { formatInstant } from "../../lib/quality";
+import { formatInstant } from "../../lib/dates";
+import { NOTIFICATION_ITEM, describeStatus } from "../../lib/discrepancies";
+import { formatQuantity } from "../../lib/numbers";
 import type {
   DiscrepancyCompletionCondition,
-  DiscrepancyDetail,
   DiscrepancyLine,
   SecurityCheckResult,
 } from "../../types/discrepancies";
@@ -39,11 +41,12 @@ export function DiscrepancyDetailPage() {
   const discrepancyId = Number(id);
   const { can } = usePermissions();
 
-  const [detail, setDetail] = useState<DiscrepancyDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: detail, setData: setDetail, error, reload: retry } = useDetail(discrepancyId, discrepanciesApi.get, {
+    notFound: "La investigación no existe o no tienes acceso.",
+    failed: "No se pudo cargar la investigación. Vuelve a intentarlo.",
+  });
   const [actionError, setActionError] = useState<string | null>(null);
   const [isRefetching, setIsRefetching] = useState(false);
-  const [attempt, setAttempt] = useState(0);
 
   const [editing, setEditing] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -59,31 +62,9 @@ export function DiscrepancyDetailPage() {
   const [lastId, setLastId] = useState(discrepancyId);
   if (discrepancyId !== lastId) {
     setLastId(discrepancyId);
-    setDetail(null);
-    setError(null);
     setActionError(null);
     setDraftChecks(null);
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    discrepanciesApi
-      .get(discrepancyId)
-      .then((data) => {
-        if (!cancelled) setDetail(data);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(
-          err instanceof ApiError && err.status === 404
-            ? "La investigación no existe o no tienes acceso."
-            : "No se pudo cargar la investigación. Vuelve a intentarlo.",
-        );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [discrepancyId, attempt]);
 
   async function reload() {
     setIsRefetching(true);
@@ -101,33 +82,12 @@ export function DiscrepancyDetailPage() {
     return (
       <div className="max-w-[960px]">
         <ModuleHeader title="Investigación de discrepancia" />
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              // Sin limpiar el error, la pantalla de error se queda aunque la recarga funcione.
-              setError(null);
-              setAttempt((value) => value + 1);
-            }}
-          >
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry onRetry={retry}>{error}</ErrorRetry>
       </div>
     );
   }
 
-  if (detail === null) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner />
-      </div>
-    );
-  }
+  if (detail === null) return <PageSpinner />;
 
   const { discrepancy, completionConditions, canComplete } = detail;
   const scope = discrepancy.departmentId ?? undefined;

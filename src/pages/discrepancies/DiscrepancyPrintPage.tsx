@@ -1,19 +1,16 @@
-import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
 import { Logo } from "../../components/Logo";
-import { DISCREPANCY_FORM_CONTROL, NOTIFICATION_ITEM, formatQuantity } from "../../lib/discrepancies";
-import { formatDay } from "../../lib/quality";
-import type { LoadDiscrepancy } from "../../types/discrepancies";
+import { PrintPending, PrintSheet } from "../../components/print/PrintSheet";
+import { padRows } from "../../components/print/rows";
+import { usePrintRecord } from "../../components/print/usePrintRecord";
+import { formatDay } from "../../lib/dates";
+import { DISCREPANCY_FORM_CONTROL, NOTIFICATION_ITEM } from "../../lib/discrepancies";
+import { formatQuantity } from "../../lib/numbers";
 
 /** Casilla con «X», como en la plantilla. */
 function Mark({ on }: { on: boolean }) {
   return <span className="inline-block w-4 text-center font-bold">{on ? "X" : " "}</span>;
-}
-
-function pad<T>(items: T[], minimum: number): (T | null)[] {
-  return items.length >= minimum ? items : [...items, ...Array<null>(minimum - items.length).fill(null)];
 }
 
 /**
@@ -24,56 +21,21 @@ function pad<T>(items: T[], minimum: number): (T | null)[] {
 export function DiscrepancyPrintPage() {
   const { id } = useParams();
   const discrepancyId = Number(id);
-  const [discrepancy, setDiscrepancy] = useState<LoadDiscrepancy | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: discrepancy, error } = usePrintRecord(
+    discrepancyId,
+    async (key) => (await discrepanciesApi.get(key)).discrepancy,
+    {
+      documentTitle: (record) => `${DISCREPANCY_FORM_CONTROL.code} · ${record.number}`,
+      failed: "No se pudo cargar la investigación.",
+    },
+  );
+  if (discrepancy === null) return <PrintPending error={error} />;
 
-  useEffect(() => {
-    let cancelled = false;
-    discrepanciesApi
-      .get(discrepancyId)
-      .then((detail) => {
-        if (cancelled) return;
-        setDiscrepancy(detail.discrepancy);
-        document.title = `${DISCREPANCY_FORM_CONTROL.code} · ${detail.discrepancy.number}`;
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "No se pudo cargar la investigación.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [discrepancyId]);
-
-  useEffect(() => {
-    if (discrepancy === null) return;
-    const timer = window.setTimeout(() => window.print(), 300);
-    return () => window.clearTimeout(timer);
-  }, [discrepancy]);
-
-  if (error) return <p className="p-8 text-[13px] text-red-700">{error}</p>;
-  if (discrepancy === null) return <p className="p-8 text-[13px] text-zinc-500">Preparando la impresión…</p>;
-
-  const lines = pad(discrepancy.lines, 6);
+  const lines = padRows(discrepancy.lines, 6);
   const cell = "border border-black px-1.5 py-1 align-top";
 
   return (
-    <div className="mx-auto max-w-[1040px] bg-white p-8 text-[10.5px] leading-snug text-black print:p-0">
-      <style>{`
-        @page { size: letter landscape; margin: 12mm; }
-        @media print {
-          body { background: white; }
-          .no-print { display: none !important; }
-          .avoid-break { break-inside: avoid; }
-        }
-      `}</style>
-
-      <div className="no-print mb-4 flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12px] text-zinc-600">
-        <span>Vista de impresión (horizontal). Si el diálogo no se abrió, usa el botón.</span>
-        <button type="button" onClick={() => window.print()} className="rounded bg-black px-3 py-1 text-[12px] font-semibold text-white">
-          Imprimir
-        </button>
-      </div>
-
+    <PrintSheet orientation="landscape">
       {/* Cabecera: filas 1 a 3, título y control documental */}
       <header className="avoid-break mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-4 border-2 border-black px-3 py-2">
         <Logo height={26} />
@@ -205,6 +167,6 @@ export function DiscrepancyPrintPage() {
           ))}
         </tbody>
       </table>
-    </div>
+    </PrintSheet>
   );
 }

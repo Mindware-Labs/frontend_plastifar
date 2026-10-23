@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, ClipboardList, FileText, Pencil, RotateCcw, ShieldCheck, Stethoscope } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
@@ -11,13 +11,16 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
-import { Spinner } from "../../components/ui/Spinner";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
+import { PageSpinner } from "../../components/ui/PageSpinner";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
+import { useDetail } from "../../hooks/useDetail";
 import { usePermissions } from "../../hooks/usePermissions";
-import { describeStatus, formatPrice, formatQuantity, yesNo } from "../../lib/claims";
-import { formatAmount, formatDay, formatInstant } from "../../lib/quality";
-import type { ClaimClosureCondition, ClaimDetail, CustomerClaim } from "../../types/claims";
+import { describeStatus, yesNo } from "../../lib/claims";
+import { formatDay, formatInstant } from "../../lib/dates";
+import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
+import type { ClaimClosureCondition, CustomerClaim } from "../../types/claims";
 import type { ProductLine } from "../../types/settings";
 import { HcaModal } from "../quality/HcaModal";
 import { ClaimFormModal } from "./ClaimFormModal";
@@ -35,11 +38,12 @@ export function ClaimDetailPage() {
   const claimId = Number(id);
   const { can } = usePermissions();
 
-  const [detail, setDetail] = useState<ClaimDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: detail, setData: setDetail, error, reload: retry } = useDetail(claimId, claimsApi.get, {
+    notFound: "La reclamación no existe o no tienes acceso.",
+    failed: "No se pudo cargar la reclamación. Vuelve a intentarlo.",
+  });
   const [actionError, setActionError] = useState<string | null>(null);
   const [isRefetching, setIsRefetching] = useState(false);
-  const [attempt, setAttempt] = useState(0);
 
   const [editing, setEditing] = useState(false);
   const [treating, setTreating] = useState(false);
@@ -52,30 +56,8 @@ export function ClaimDetailPage() {
   const [lastClaimId, setLastClaimId] = useState(claimId);
   if (claimId !== lastClaimId) {
     setLastClaimId(claimId);
-    setDetail(null);
-    setError(null);
     setActionError(null);
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    claimsApi
-      .get(claimId)
-      .then((data) => {
-        if (!cancelled) setDetail(data);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(
-          err instanceof ApiError && err.status === 404
-            ? "La reclamación no existe o no tienes acceso."
-            : "No se pudo cargar la reclamación. Vuelve a intentarlo.",
-        );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [claimId, attempt]);
 
   async function reload() {
     setIsRefetching(true);
@@ -109,25 +91,12 @@ export function ClaimDetailPage() {
     return (
       <div className="max-w-[880px]">
         <ModuleHeader title="Reclamación" />
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button size="sm" variant="secondary" onClick={() => setAttempt((value) => value + 1)}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry onRetry={retry}>{error}</ErrorRetry>
       </div>
     );
   }
 
-  if (detail === null) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner />
-      </div>
-    );
-  }
+  if (detail === null) return <PageSpinner />;
 
   const { claim, closureConditions, canClose } = detail;
   const scope = claim.departmentId ?? undefined;

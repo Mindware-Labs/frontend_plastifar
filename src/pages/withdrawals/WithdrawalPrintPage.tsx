@@ -1,20 +1,15 @@
-import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ApiError } from "../../api/client";
 import { withdrawalsApi } from "../../api/withdrawals";
 import { Logo } from "../../components/Logo";
-import { formatPrice, formatQuantity } from "../../lib/claims";
-import { formatAmount } from "../../lib/quality";
+import { PrintPending, PrintSheet } from "../../components/print/PrintSheet";
+import { padRows } from "../../components/print/rows";
+import { usePrintRecord } from "../../components/print/usePrintRecord";
+import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
 import { WITHDRAWAL_FORM_CONTROL } from "../../lib/withdrawals";
-import type { MerchandiseWithdrawal } from "../../types/withdrawals";
 
 /** Casilla con «X», como en la plantilla. */
 function Mark({ on }: { on: boolean }) {
   return <span className="inline-block h-4 w-5 border border-black text-center font-bold leading-4">{on ? "X" : " "}</span>;
-}
-
-function pad<T>(items: T[], minimum: number): (T | null)[] {
-  return items.length >= minimum ? items : [...items, ...Array<null>(minimum - items.length).fill(null)];
 }
 
 /**
@@ -26,58 +21,23 @@ function pad<T>(items: T[], minimum: number): (T | null)[] {
 export function WithdrawalPrintPage() {
   const { id } = useParams();
   const withdrawalId = Number(id);
-  const [withdrawal, setWithdrawal] = useState<MerchandiseWithdrawal | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: withdrawal, error } = usePrintRecord(
+    withdrawalId,
+    async (key) => (await withdrawalsApi.get(key)).withdrawal,
+    {
+      documentTitle: (record) => `${WITHDRAWAL_FORM_CONTROL.code} · ${record.number}`,
+      failed: "No se pudo cargar la solicitud de retiro.",
+    },
+  );
+  if (withdrawal === null) return <PrintPending error={error} />;
 
-  useEffect(() => {
-    let cancelled = false;
-    withdrawalsApi
-      .get(withdrawalId)
-      .then((detail) => {
-        if (cancelled) return;
-        setWithdrawal(detail.withdrawal);
-        document.title = `${WITHDRAWAL_FORM_CONTROL.code} · ${detail.withdrawal.number}`;
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "No se pudo cargar la solicitud de retiro.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [withdrawalId]);
-
-  useEffect(() => {
-    if (withdrawal === null) return;
-    const timer = window.setTimeout(() => window.print(), 300);
-    return () => window.clearTimeout(timer);
-  }, [withdrawal]);
-
-  if (error) return <p className="p-8 text-[13px] text-red-700">{error}</p>;
-  if (withdrawal === null) return <p className="p-8 text-[13px] text-zinc-500">Preparando la impresión…</p>;
-
-  const lines = pad(withdrawal.lines, 15);
+  const lines = padRows(withdrawal.lines, 15);
   const [year, month, day] = withdrawal.requestDate.split("-");
   const cell = "border border-black px-1.5 py-1 align-top";
   const money = (value: number | null) => (value === null || withdrawal.currency === null ? "" : formatAmount(value, withdrawal.currency));
 
   return (
-    <div className="mx-auto max-w-[1040px] bg-white p-8 text-[10.5px] leading-snug text-black print:p-0">
-      <style>{`
-        @page { size: letter landscape; margin: 12mm; }
-        @media print {
-          body { background: white; }
-          .no-print { display: none !important; }
-          .avoid-break { break-inside: avoid; }
-        }
-      `}</style>
-
-      <div className="no-print mb-4 flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12px] text-zinc-600">
-        <span>Vista de impresión (horizontal). Si el diálogo no se abrió, usa el botón.</span>
-        <button type="button" onClick={() => window.print()} className="rounded bg-black px-3 py-1 text-[12px] font-semibold text-white">
-          Imprimir
-        </button>
-      </div>
-
+    <PrintSheet orientation="landscape">
       {/* Filas 1 a 5: logo y título */}
       <header className="avoid-break mb-3 flex items-center justify-between gap-4">
         <Logo height={26} />
@@ -181,7 +141,7 @@ export function WithdrawalPrintPage() {
         <span>Fecha de emisión: {WITHDRAWAL_FORM_CONTROL.issuedOn}</span>
         <span>Emitido por: {withdrawal.requestedByName}</span>
       </footer>
-    </div>
+    </PrintSheet>
   );
 }
 

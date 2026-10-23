@@ -6,10 +6,10 @@ import {
   type CreditQuery,
 } from "../../api/quality";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import {
   ClearFiltersButton,
   InputFilterDropdown,
@@ -26,8 +26,9 @@ import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { formatDay, formatInstant } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
-import { formatAmount, formatDay, formatInstant } from "../../lib/quality";
+import { formatAmount } from "../../lib/numbers";
 import type { CreditRequest, CreditStatus } from "../../types/quality";
 import { CreditDecisionModal } from "./CreditDecisionModal";
 import { CreditRequestModal } from "./CreditRequestModal";
@@ -224,14 +225,7 @@ export function CreditRequestsPage() {
       />
 
       {error && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button size="sm" variant="secondary" onClick={refresh}>
-            Reintentar
-          </Button>
-        </div>
+        <ErrorRetry className="mb-3" onRetry={refresh}>{error}</ErrorRetry>
       )}
 
 

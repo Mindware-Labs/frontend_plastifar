@@ -9,7 +9,7 @@ import { Button } from "../../components/ui/Button";
 import { TextField } from "../../components/ui/Field";
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
-import { formatQuantity } from "../../lib/claims";
+import { formatQuantity } from "../../lib/numbers";
 import { MAX_LINE_INPUT } from "../../lib/withdrawals";
 import type { MerchandiseWithdrawal, WithdrawalDetail } from "../../types/withdrawals";
 

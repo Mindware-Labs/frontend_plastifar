@@ -6,7 +6,7 @@ import type {
   QualityReport,
 } from "../../api/reports";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { formatAmount } from "../../lib/quality";
+import { formatAmount } from "../../lib/numbers";
 import type { ReportDefinition } from "../../types/reports";
 import type { ReportCriteria } from "./ReportFilters";
 import { StatTile } from "./StatTile";

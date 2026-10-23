@@ -6,7 +6,6 @@
 // `WithdrawalRules.Compute` y `WithdrawalRules.Total` en el backend.
 
 import type { WithdrawalStatus } from "../types/withdrawals";
-import { formatAmount } from "./quality";
 
 /**
  * Lo más que cabe en el valor de una línea y en el total: numeric(14,2) en
@@ -66,13 +65,6 @@ export function computeLineValue(quantity: number | null, unitPrice: number | nu
 export function computeTotal(values: (number | null)[]): number {
   const cents = values.reduce<number>((sum, value) => sum + (value === null ? 0 : Math.round(value * 100)), 0);
   return cents / 100;
-}
-
-/** Con moneda, como importe; sin moneda elegida, solo el número, sin inventar «DOP». */
-const plainAmount = new Intl.NumberFormat("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-export function formatWithdrawalAmount(amount: number, currency: string | null | undefined): string {
-  return currency ? formatAmount(amount, currency) : plainAmount.format(amount);
 }
 
 /** Lo que cada estado permite, en palabras (8.1). */

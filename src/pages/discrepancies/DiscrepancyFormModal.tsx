@@ -12,8 +12,9 @@ import { LookupField, SelectField, TextAreaField, TextField } from "../../compon
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { RowAction } from "../../components/ui/RowAction";
-import { resolveTicketLabel, searchTickets, toNumber } from "../../lib/discrepancies";
+import { resolveTicketLabel, searchTickets } from "../../lib/discrepancies";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
+import { toNumber } from "../../lib/numbers";
 import type { DiscrepancyDetail, LoadDiscrepancy } from "../../types/discrepancies";
 
 const quantity = z

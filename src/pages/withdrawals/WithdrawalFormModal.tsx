@@ -12,10 +12,10 @@ import { LookupField, SelectField, TextField } from "../../components/ui/Field";
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { RowAction } from "../../components/ui/RowAction";
-import { toNumberOrNull } from "../../lib/claims";
 import { resolveTicketLabel, searchTickets } from "../../lib/discrepancies";
+import { formatAmountOrPlain, toNumberOrNull } from "../../lib/numbers";
 import { today } from "../../lib/quality";
-import { computeLineValue, computeTotal, formatWithdrawalAmount, MAX_LINE_INPUT, MAX_WITHDRAWAL_AMOUNT } from "../../lib/withdrawals";
+import { computeLineValue, computeTotal, MAX_LINE_INPUT, MAX_WITHDRAWAL_AMOUNT } from "../../lib/withdrawals";
 import {
   WITHDRAWAL_CURRENCIES,
   WITHDRAWAL_ERROR_ORIGINS,
@@ -369,7 +369,7 @@ export function WithdrawalFormModal({ withdrawal, onClose, onSaved, onConflict }
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[12.5px] font-medium text-ink">Valor</span>
                       <span className="flex h-9 items-center justify-end text-[13px] tabular-nums text-brand-gray">
-                        {value === null ? "—" : formatWithdrawalAmount(value, watchedCurrency)}
+                        {value === null ? "—" : formatAmountOrPlain(value, watchedCurrency)}
                       </span>
                     </div>
                   </div>
@@ -405,7 +405,7 @@ export function WithdrawalFormModal({ withdrawal, onClose, onSaved, onConflict }
               </div>
               <p className="pb-1.5 text-[13px] text-brand-gray">
                 Total{" "}
-                <span className="font-semibold tabular-nums text-ink">{anyPrice ? formatWithdrawalAmount(total, watchedCurrency) : "—"}</span>
+                <span className="font-semibold tabular-nums text-ink">{anyPrice ? formatAmountOrPlain(total, watchedCurrency) : "—"}</span>
               </p>
             </div>
           </div>
