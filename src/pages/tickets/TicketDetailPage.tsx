@@ -391,6 +391,7 @@ export function TicketDetailPage() {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteBody, setNoteBody] = useState("");
   const [noteAttachments, setNoteAttachments] = useState<File[]>([]);
+  const [isDraggingNote, setIsDraggingNote] = useState(false);
   const {
     isShowing: showNoteAttachedFeedback,
     isExiting: noteAttachedExiting,
@@ -1968,65 +1969,146 @@ export function TicketDetailPage() {
               }`}
             />
 
-            <div className="flex flex-wrap items-center gap-3">
+            {/* Carga de archivos adjuntos */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-heading text-[11px] font-semibold text-zinc-500">
+                  Archivos adjuntos (opcional)
+                </span>
+                <span className="text-[11px] text-zinc-400">Máx. 10 MB por archivo</span>
+              </div>
+
               <input
                 ref={noteFileInputRef}
                 id="note-attachment-input"
                 type="file"
                 multiple
                 className="hidden"
-                onChange={(event) =>
+                onChange={(event) => {
                   pickFiles(
                     event.target,
                     noteAttachments,
                     setNoteAttachments,
                     setNoteSendError,
                     () => triggerNoteAttachedFeedback(),
-                  )
-                }
+                  );
+                }}
               />
-              <label
-                htmlFor="note-attachment-input"
-                className={
+
+              <button
+                type="button"
+                onClick={() => noteFileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingNote(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingNote(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingNote(false);
+                  if (e.dataTransfer.files) {
+                    const chosen = Array.from(e.dataTransfer.files);
+                    const problem = validateAttachments(chosen, noteAttachments);
+                    if (problem) {
+                      setNoteSendError(problem);
+                      return;
+                    }
+                    setNoteSendError(null);
+                    setNoteAttachments((prev) => [...prev, ...chosen]);
+                    triggerNoteAttachedFeedback();
+                  }
+                }}
+                className={`group relative flex h-[106px] min-h-[106px] w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-3 transition-colors duration-300 outline-none ${
                   showNoteAttachedFeedback
                     ? noteAttachedExiting
-                      ? attachExitingLabelClass
-                      : attachSuccessLabelClass
-                    : attachLabelClass
-                }
+                      ? "border-emerald-200 bg-emerald-50/25"
+                      : "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-100/80"
+                    : isDraggingNote
+                      ? "border-brand-red bg-brand-red/5 ring-2 ring-brand-red/20"
+                      : "border-zinc-200 bg-zinc-50/50 hover:border-brand-red/40 hover:bg-brand-red/5"
+                }`}
               >
                 {showNoteAttachedFeedback ? (
-                  <span
-                    className={`inline-flex items-center gap-1.5 ${
+                  <div
+                    className={`flex flex-col items-center justify-center text-center ${
                       noteAttachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
                     }`}
                   >
-                    <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
-                      <AnimatedCheckIcon size={11} strokeWidth={3} />
-                    </span>
-                    <span>¡Adjuntado!</span>
-                  </span>
+                    <div className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-2 ring-emerald-200/70 shadow-3xs animate-plf-check-breathe">
+                      <AnimatedCheckIcon size={16} strokeWidth={2.8} />
+                    </div>
+                    <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-bold text-emerald-700 leading-tight">
+                      ¡{noteAttachments.length === 1 ? "Archivo adjuntado correctamente" : `${noteAttachments.length} archivos adjuntados correctamente`}!
+                    </p>
+                    <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-emerald-600/80 leading-tight">
+                      Haz clic o arrastra para añadir más si lo deseas
+                    </p>
+                  </div>
                 ) : (
-                  <>
-                    <Paperclip className="h-3.5 w-3.5" />
-                    Adjuntar
-                  </>
+                  <div className="flex flex-col items-center justify-center text-center transition-opacity duration-300">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-transform group-hover:scale-105">
+                      <Upload className="size-4" />
+                    </div>
+                    <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-semibold text-zinc-700 leading-tight">
+                      Haz clic para adjuntar archivos a la nota
+                    </p>
+                    <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-zinc-400 leading-tight">
+                      Imágenes (PNG, JPG), documentos PDF, hojas de Excel o reportes internos
+                    </p>
+                  </div>
                 )}
-              </label>
-              <span className="text-[11px] text-faint">{SAVE_SHORTCUT} para guardar</span>
-            </div>
+              </button>
 
-            {noteAttachments.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {noteAttachments.map((file, index) => (
-                  <PendingFile
-                    key={`${file.name}-${index}`}
-                    file={file}
-                    onRemove={() => setNoteAttachments((prev) => prev.filter((_, i) => i !== index))}
-                  />
-                ))}
+              <div className="flex items-center justify-between pt-0.5">
+                <span className="text-[11px] text-zinc-400">{SAVE_SHORTCUT} para guardar</span>
               </div>
-            )}
+
+              {/* Lista de archivos seleccionados */}
+              {noteAttachments.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  {noteAttachments.map((file, idx) => (
+                    <div
+                      key={`${file.name}-${idx}`}
+                      className="animate-plf-seal-pop flex items-center justify-between gap-2 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px] shadow-2xs"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-2xs animate-plf-check-in"
+                          title="Adjuntado correctamente"
+                        >
+                          <AnimatedCheckIcon size={12} strokeWidth={3} />
+                        </span>
+                        {file.type.startsWith("image/") ? (
+                          <ImageIcon className="size-3.5 shrink-0 text-brand-red" />
+                        ) : (
+                          <FileText className="size-3.5 shrink-0 text-zinc-400" />
+                        )}
+                        <span className="truncate font-medium text-zinc-800" title={file.name}>
+                          {file.name}
+                        </span>
+                        <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">
+                          ({formatBytes(file.size)})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNoteAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                        title="Quitar archivo"
+                        className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </Modal>
       )}
