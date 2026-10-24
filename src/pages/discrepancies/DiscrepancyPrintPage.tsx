@@ -8,6 +8,18 @@ import { formatDay } from "../../lib/dates";
 import { DISCREPANCY_FORM_CONTROL, NOTIFICATION_ITEM } from "../../lib/discrepancies";
 import { formatQuantity } from "../../lib/numbers";
 
+/** Formatea la fecha para la cabecera oficial en formato largo (ej. "24 de octubre de 2026"). */
+function formatHeaderDate(isoDateString: string | null | undefined): string {
+  if (!isoDateString) return "—";
+  const date = new Date(isoDateString.includes("T") ? isoDateString : `${isoDateString}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-DO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
 /** Casilla con «X», como en la plantilla. */
 function Mark({ on }: { on: boolean }) {
   return <span className="inline-block w-4 text-center font-bold">{on ? "X" : " "}</span>;
@@ -35,7 +47,7 @@ export function DiscrepancyPrintPage() {
   const cell = "border border-black px-1.5 py-1 align-top";
 
   return (
-    <PrintSheet orientation="landscape">
+    <PrintSheet orientation="landscape" filename={`${DISCREPANCY_FORM_CONTROL.code}_${discrepancy.number}.pdf`}>
       {/* Cabecera: filas 1 a 3, título y control documental */}
       <header className="avoid-break mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-4 border-2 border-black px-3 py-2">
         <Logo height={26} />
@@ -44,11 +56,11 @@ export function DiscrepancyPrintPage() {
           <dt className="font-semibold">Código Documento:</dt>
           <dd>{DISCREPANCY_FORM_CONTROL.code}</dd>
           <dt className="font-semibold">Fecha de Emisión:</dt>
-          <dd>{DISCREPANCY_FORM_CONTROL.issuedOn}</dd>
+          <dd>{formatHeaderDate(discrepancy.createdAt)}</dd>
           <dt className="font-semibold">Revisión:</dt>
           <dd>{DISCREPANCY_FORM_CONTROL.revision}</dd>
-          <dt className="font-semibold">Fecha de Revision:</dt>
-          <dd>{DISCREPANCY_FORM_CONTROL.revisedOn}</dd>
+          <dt className="font-semibold">Fecha de Revisión:</dt>
+          <dd>{formatHeaderDate(discrepancy.approvedAt || discrepancy.performedAt || discrepancy.createdAt)}</dd>
         </dl>
       </header>
 

@@ -44,6 +44,7 @@ export function usePrintRecord<T>(id: number, fetch: (id: number) => Promise<T>,
 
   useEffect(() => {
     if (data === null) return;
+    if (window.location.search.includes("mode=pdf")) return;
     const timer = window.setTimeout(() => window.print(), PRINT_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [data]);

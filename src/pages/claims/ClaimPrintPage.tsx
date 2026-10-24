@@ -46,7 +46,7 @@ export function ClaimPrintPage() {
   const money = (value: number) => (claim.currency ? formatAmount(value, claim.currency) : formatQuantity(value));
 
   return (
-    <PrintSheet orientation="portrait">
+    <PrintSheet orientation="portrait" filename={`${CLAIM_FORM_CONTROL.code}_${claim.ticketNumber || claim.id}.pdf`}>
       {/* Cabecera: A1:I1 y F3:F4 */}
       <header className="avoid-break mb-2 grid grid-cols-[1fr_auto] items-end gap-4 border-b-2 border-black pb-2">
         <div>

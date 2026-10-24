@@ -37,7 +37,7 @@ export function WithdrawalPrintPage() {
   const money = (value: number | null) => (value === null || withdrawal.currency === null ? "" : formatAmount(value, withdrawal.currency));
 
   return (
-    <PrintSheet orientation="landscape">
+    <PrintSheet orientation="landscape" filename={`${WITHDRAWAL_FORM_CONTROL.code}_${withdrawal.number}.pdf`}>
       {/* Filas 1 a 5: logo y título */}
       <header className="avoid-break mb-3 flex items-center justify-between gap-4">
         <Logo height={26} />

@@ -38,7 +38,7 @@ export function HcaPrintPage() {
   const participants = padRows(sheet.participants, 4);
 
   return (
-    <PrintSheet orientation="portrait">
+    <PrintSheet orientation="portrait" filename={`${FORM_CONTROL.code}_${detail.sheet.number}.pdf`}>
       {/* Cabecera: C1:C5 título, D2:H4 datos */}
       <header className="avoid-break mb-2 grid grid-cols-[auto_1fr_1fr] items-stretch border-2 border-black">
         <div className="flex flex-col items-center justify-center gap-1 border-r border-black px-4 py-2">

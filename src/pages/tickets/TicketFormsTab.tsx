@@ -30,6 +30,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDay } from "../../lib/dates";
 import { formatAmount } from "../../lib/numbers";
@@ -67,6 +68,21 @@ interface CommonExtractedData {
   }>;
 }
 
+async function downloadWorkbook(wb: any, filename: string) {
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChanged }: TicketFormsTabProps) {
   const { can } = usePermissions();
 
@@ -92,15 +108,25 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   const [selectedSubTabKey, setSelectedSubTabKey] = useState<string | null>(null);
   const [newFormModalOpen, setNewFormModalOpen] = useState(false);
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
-  const actionsMenuRef = useRef<HTMLDivElement>(null);
+  const actionsMenuContainerRef = useRef<HTMLDivElement>(null);
+  const { mounted: menuMounted, exiting: menuExiting, ref: menuPanelRef } = useDisclosureMotion<HTMLDivElement>(actionsMenuOpen);
+
+  const [printMenuOpen, setPrintMenuOpen] = useState(false);
+  const printMenuContainerRef = useRef<HTMLDivElement>(null);
+  const { mounted: printMenuMounted, exiting: printMenuExiting, ref: printMenuPanelRef } = useDisclosureMotion<HTMLDivElement>(printMenuOpen);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     if (!actionsMenuOpen) return;
     function handlePointerDown(e: PointerEvent) {
-      if (!actionsMenuRef.current?.contains(e.target as Node)) {
-        setActionsMenuOpen(false);
+      const target = e.target as Node;
+      if (
+        actionsMenuContainerRef.current?.contains(target) ||
+        menuPanelRef.current?.contains(target)
+      ) {
+        return;
       }
+      setActionsMenuOpen(false);
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setActionsMenuOpen(false);
@@ -111,7 +137,30 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [actionsMenuOpen]);
+  }, [actionsMenuOpen, menuPanelRef]);
+
+  useEffect(() => {
+    if (!printMenuOpen) return;
+    function handlePointerDown(e: PointerEvent) {
+      const target = e.target as Node;
+      if (
+        printMenuContainerRef.current?.contains(target) ||
+        printMenuPanelRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setPrintMenuOpen(false);
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setPrintMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [printMenuOpen, printMenuPanelRef]);
 
   useEffect(() => {
     const formToOpen = searchParams.get("openForm");
@@ -293,6 +342,141 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     if (!selectedSubTabKey) return registeredForms[0] ?? null;
     return registeredForms.find((f) => f.key === selectedSubTabKey) ?? registeredForms[0] ?? null;
   }, [selectedSubTabKey, registeredForms]);
+
+  const getPrintPath = (form: NonNullable<typeof activeForm>): string => {
+    if (form.type === "reclamacion") {
+      return `/reclamaciones/${(form.data as CustomerClaim).id}/imprimir`;
+    }
+    if (form.type === "retiro") {
+      return `/retiros/${(form.data as MerchandiseWithdrawal).id}/imprimir`;
+    }
+    if (form.type === "discrepancia") {
+      return `/discrepancias/${(form.data as DiscrepancyDetail).discrepancy.id}/imprimir`;
+    }
+    if (form.type === "hca") {
+      return `/calidad/hca/${(form.data as CorrectiveActionSheet).id}/imprimir`;
+    }
+    return "";
+  };
+
+  const handleExportExcel = async (form: NonNullable<typeof activeForm>) => {
+    try {
+      const ExcelJSModule = await import("exceljs");
+      const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+      const wb = new ExcelJS.Workbook();
+
+      if (form.type === "discrepancia") {
+        const d = form.data as DiscrepancyDetail;
+        const res = await fetch("/templates/PF-FOR-291.xlsx");
+        if (!res.ok) throw new Error("No se pudo cargar la plantilla PF-FOR-291.xlsx");
+        const arrayBuffer = await res.arrayBuffer();
+        await wb.xlsx.load(arrayBuffer);
+
+        const sheet = wb.getWorksheet("PF-FOR-291") || wb.worksheets[0];
+        if (!sheet) throw new Error("Hoja PF-FOR-291 no encontrada");
+
+        // Quitar vista de salto de página ("Page 1") y dejar vista normal
+        sheet.views = [{ state: "normal", showGridLines: true, zoomScale: 100, zoomScaleNormal: 100 }];
+
+        // Cabecera de control documental
+        sheet.getCell("B3").value = "PF-FOR-291";
+        sheet.getCell("D3").value = d.discrepancy.createdAt ? d.discrepancy.createdAt.slice(0, 10) : "";
+        sheet.getCell("F3").value = d.discrepancy.performedByName || "Williams Marte";
+        sheet.getCell("G3").value = d.discrepancy.approvedByName || "Santos Rosario";
+        sheet.getCell("I3").value = 1;
+        sheet.getCell("L3").value = (d.discrepancy.approvedAt || d.discrepancy.performedAt || d.discrepancy.createdAt || "").slice(0, 10);
+
+        // Líneas de la investigación (filas 7 a 13)
+        (d.discrepancy.lines || []).forEach((line, index) => {
+          const r = 7 + index;
+          sheet.getCell(`B${r}`).value = line.claimRef || "";
+          sheet.getCell(`C${r}`).value = line.invoiceRef || "";
+          sheet.getCell(`D${r}`).value = line.clientName || "";
+          sheet.getCell(`E${r}`).value = line.productCode || "";
+          sheet.getCell(`F${r}`).value = line.productName || "";
+          sheet.getCell(`G${r}`).value = line.surplusQuantity > 0 ? line.surplusQuantity : "";
+          sheet.getCell(`H${r}`).value = line.shortageQuantity > 0 ? line.shortageQuantity : "";
+          sheet.getCell(`I${r}`).value = line.qualifiesForCreditNote === true ? "X" : "";
+          sheet.getCell(`J${r}`).value = line.qualifiesForCreditNote === false ? "X" : "";
+          sheet.getCell(`K${r}`).value = line.creditNoteNumber || line.creditRequestNumber || "";
+          sheet.getCell(`L${r}`).value = line.dispatcherName || "";
+          sheet.getCell(`M${r}`).value = line.supervisorName || "";
+        });
+
+        // Firmas y nota
+        sheet.getCell("B14").value = `Realizado por: ${d.discrepancy.performedByName || "______________________________"}`;
+        sheet.getCell("B16").value = `Aprobado por: ${d.discrepancy.status === "Aprobada" ? (d.discrepancy.approvedByName || "") : "______________________________"}`;
+        sheet.getCell("G14").value = d.discrepancy.note || "";
+
+        // Puntos de seguridad (filas 21 a 29)
+        (d.discrepancy.checks || []).forEach((c) => {
+          const r = 20 + c.itemNumber;
+          if (r >= 21 && r <= 29) {
+            sheet.getCell(`J${r}`).value = c.result === "Positivo" ? "X" : "";
+            sheet.getCell(`L${r}`).value = c.result === "Negativo" ? "X" : "";
+          }
+        });
+
+        await downloadWorkbook(wb, `PF-FOR-291_${d.discrepancy.number}.xlsx`);
+      } else if (form.type === "reclamacion") {
+        const c = form.data as CustomerClaim;
+        const sheet = wb.addWorksheet("PF-FOR-034");
+        sheet.columns = [
+          { header: "Código", key: "code", width: 14 },
+          { header: "Descripción del Producto", key: "name", width: 34 },
+          { header: "Cant. Facturada", key: "invoiced", width: 16 },
+          { header: "Cant. Defectuosa", key: "defective", width: 16 },
+          { header: "Precio Unitario", key: "price", width: 16 },
+          { header: "Monto", key: "total", width: 16 },
+        ];
+        sheet.addRow(["PLASTIFAR, S.A."]);
+        sheet.addRow(["Formulario de Reclamación de Clientes - PF-FOR-034"]);
+        sheet.addRow([`Número: ${c.ticketNumber || c.id}`, `Fecha: ${c.claimDate?.slice(0, 10) || ""}`, `Cliente: ${c.clientName || ""}`]);
+        sheet.addRow([]);
+        sheet.addRow(["Código", "Descripción del Producto", "Cant. Facturada", "Cant. Defectuosa", "Precio Unitario", "Monto"]);
+        (c.lines || []).forEach((l) => {
+          sheet.addRow([l.productCode, l.productName, l.invoicedQuantity, l.defectiveQuantity, l.unitPrice, l.lineTotal]);
+        });
+        sheet.addRow([]);
+        sheet.addRow([`Observaciones: ${c.description || ""}`]);
+        await downloadWorkbook(wb, `PF-FOR-034_${c.ticketNumber || c.id}.xlsx`);
+      } else if (form.type === "retiro") {
+        const w = form.data as MerchandiseWithdrawal;
+        const sheet = wb.addWorksheet("PF-FOR-068");
+        sheet.columns = [
+          { header: "Código", key: "code", width: 14 },
+          { header: "Descripción", key: "name", width: 34 },
+          { header: "Cantidad", key: "qty", width: 14 },
+          { header: "Unidad", key: "unit", width: 12 },
+          { header: "Empaque", key: "pack", width: 16 },
+          { header: "Precio", key: "price", width: 14 },
+        ];
+        sheet.addRow(["PLASTIFAR, S.A."]);
+        sheet.addRow(["Formulario de Retiro de Mercancía - PF-FOR-068"]);
+        sheet.addRow([`Número: ${w.number}`, `Fecha: ${w.requestDate?.slice(0, 10) || ""}`, `Cliente: ${w.clientName || ""}`]);
+        sheet.addRow([`Motivo: ${w.reason || ""}`]);
+        sheet.addRow([]);
+        sheet.addRow(["Código", "Descripción", "Cantidad", "Unidad", "Empaque", "Precio"]);
+        (w.lines || []).forEach((l) => {
+          sheet.addRow([l.productCode, l.productName, l.quantity, l.quantityUnit, l.packDetail, l.unitPrice]);
+        });
+        await downloadWorkbook(wb, `PF-FOR-068_${w.number}.xlsx`);
+      } else if (form.type === "hca") {
+        const s = form.data as CorrectiveActionSheet;
+        const sheet = wb.addWorksheet("PF-FOR-109");
+        sheet.addRow(["PLASTIFAR, S.A."]);
+        sheet.addRow(["Hoja de Acción Correctiva (HCA) - PF-FOR-109"]);
+        sheet.addRow([`Número: ${s.number}`, `Estado: ${s.status}`, `Fecha: ${s.createdAt?.slice(0, 10) || ""}`]);
+        sheet.addRow([`Descripción: ${s.description || ""}`]);
+        sheet.addRow([`Acción Inmediata: ${s.immediateAction || ""}`]);
+        sheet.addRow([`Causas: ${(s.causes || []).map((c) => c.description).join("; ")}`]);
+        sheet.addRow([`Responsable: ${s.responsibleName || ""}`]);
+        await downloadWorkbook(wb, `PF-FOR-109_${s.number}.xlsx`);
+      }
+    } catch (err) {
+      console.error("Error al exportar Excel:", err);
+    }
+  };
 
   // Suggested form from ticket topic
   const suggestedFormRaw = ticket.topicSuggestedForm; // "Reclamacion" | "RetiroMercancia" | "DiscrepanciaCarga" | "Hca" | null
@@ -714,52 +898,113 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                     Llenar otro formulario
                   </Button>
 
-                  {/* Official Print Button */}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      let printPath = "";
-                      if (activeForm.type === "reclamacion") {
-                        printPath = `/reclamaciones/${(activeForm.data as CustomerClaim).id}/imprimir`;
-                      } else if (activeForm.type === "retiro") {
-                        printPath = `/retiros/${(activeForm.data as MerchandiseWithdrawal).id}/imprimir`;
-                      } else if (activeForm.type === "discrepancia") {
-                        printPath = `/discrepancias/${(activeForm.data as DiscrepancyDetail).discrepancy.id}/imprimir`;
-                      } else if (activeForm.type === "hca") {
-                        printPath = `/calidad/hca/${(activeForm.data as CorrectiveActionSheet).id}/imprimir`;
-                      }
-                      if (printPath) window.open(printPath, "_blank");
-                    }}
-                    title="Exportar o imprimir con el formato y cabecera oficial de Plastifar"
-                  >
-                    <Printer className="size-3.5 text-zinc-500" />
-                    Imprimir formato oficial
-                  </Button>
-
-                  {/* Dropdown with more options */}
-                  <div className="relative" ref={actionsMenuRef}>
+                  {/* Print / Export Dropdown */}
+                  <div className="relative" ref={printMenuContainerRef}>
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => setActionsMenuOpen((prev) => !prev)}
+                      onClick={() => {
+                        setActionsMenuOpen(false);
+                        setPrintMenuOpen((prev) => !prev);
+                      }}
+                      className="gap-1.5"
+                      title="Opciones de impresión y exportación"
+                    >
+                      <Printer className="size-3.5 text-zinc-600" />
+                      <span>Imprimir</span>
+                      <ChevronDown
+                        className={`size-3 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+                          printMenuOpen ? "rotate-180 text-zinc-700" : "group-hover:text-zinc-600"
+                        }`}
+                      />
+                    </Button>
+
+                    {printMenuMounted && (
+                      <div
+                        ref={printMenuPanelRef}
+                        style={printMenuExiting ? { pointerEvents: "none" } : undefined}
+                        aria-hidden={printMenuExiting}
+                        className="absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-zinc-200/90 bg-white/95 backdrop-blur-xs py-1 shadow-lg z-30"
+                      >
+                        {/* Option 1: Exportar doc Excel */}
+                        <button
+                          type="button"
+                          data-motion-item
+                          onClick={() => {
+                            setPrintMenuOpen(false);
+                            handleExportExcel(activeForm);
+                          }}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                        >
+                          <FileSpreadsheet className="size-3.5 text-emerald-600" />
+                          <span>Exportar doc excel</span>
+                        </button>
+
+                        {/* Option 2: PDF */}
+                        <button
+                          type="button"
+                          data-motion-item
+                          onClick={() => {
+                            setPrintMenuOpen(false);
+                            const path = getPrintPath(activeForm);
+                            if (path) window.open(`${path}?mode=pdf`, "_blank");
+                          }}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                        >
+                          <FileText className="size-3.5 text-rose-600" />
+                          <span>Guardar doc PDF</span>
+                        </button>
+
+                        {/* Option 3: Imprimir */}
+                        <button
+                          type="button"
+                          data-motion-item
+                          onClick={() => {
+                            setPrintMenuOpen(false);
+                            const path = getPrintPath(activeForm);
+                            if (path) window.open(`${path}?mode=print`, "_blank");
+                          }}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                        >
+                          <Printer className="size-3.5 text-zinc-600" />
+                          <span>Imprimir</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dropdown with more options */}
+                  <div className="relative" ref={actionsMenuContainerRef}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setPrintMenuOpen(false);
+                        setActionsMenuOpen((prev) => !prev);
+                      }}
                       className="gap-1.5"
                       title="Más opciones del formulario"
                     >
                       <MoreHorizontal className="size-3.5 text-zinc-600" />
                       <span>Más opciones</span>
                       <ChevronDown
-                        className={`size-3 text-zinc-400 transition-transform duration-150 ${
-                          actionsMenuOpen ? "rotate-180" : ""
+                        className={`size-3 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+                          actionsMenuOpen ? "rotate-180 text-zinc-700" : "group-hover:text-zinc-600"
                         }`}
                       />
                     </Button>
 
-                    {actionsMenuOpen && (
-                      <div className="absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-zinc-200 bg-white py-1 shadow-lg z-30 animate-plf-fade">
+                    {menuMounted && (
+                      <div
+                        ref={menuPanelRef}
+                        style={menuExiting ? { pointerEvents: "none" } : undefined}
+                        aria-hidden={menuExiting}
+                        className="absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-zinc-200/90 bg-white/95 backdrop-blur-xs py-1 shadow-lg z-30"
+                      >
                         {/* Edit Form Button */}
                         <button
                           type="button"
+                          data-motion-item
                           onClick={() => {
                             setActionsMenuOpen(false);
                             if (activeForm.type === "reclamacion") {
@@ -785,6 +1030,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                         {/* Switch / Migrate Form Button */}
                         <button
                           type="button"
+                          data-motion-item
                           onClick={() => {
                             setActionsMenuOpen(false);
                             handleTriggerMigration(activeForm);
@@ -808,6 +1054,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                               ? `/discrepancias/${(activeForm.data as DiscrepancyDetail).discrepancy.id}`
                               : `/calidad/hca/${(activeForm.data as CorrectiveActionSheet).id}`
                           }
+                          data-motion-item
                           onClick={() => setActionsMenuOpen(false)}
                           className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
                         >
