@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowLeft,
   Building2,
@@ -8,9 +9,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
+  PenLine,
   Plus,
   Trash2,
   Truck,
+  Users,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -30,6 +33,7 @@ import { discrepanciesApi } from "../../api/discrepancies";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { Button } from "../../components/ui/Button";
+import { ControlInput } from "../../components/ui/ControlInput";
 import {
   DateField,
   LookupField,
@@ -38,6 +42,7 @@ import {
   TextField,
   type FieldState,
 } from "../../components/ui/Field";
+import { LookupSelect } from "../../components/ui/LookupSelect";
 import { Modal } from "../../components/ui/Modal";
 import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
@@ -51,6 +56,8 @@ import {
 import {
   resolveClientLabel,
   resolveProductLabel,
+  resolveStaffLabel,
+  searchActiveStaff,
   searchClients,
   searchProducts,
 } from "../../lib/lookups";
@@ -90,10 +97,11 @@ const lineSchema = z
     quantity: quantity,
     qualifies: z.enum(["", "si", "no"]),
     creditNoteNumber: z.string().trim().max(20, "Máximo 20 caracteres"),
+    dispatcherMode: z.enum(["sistema", "manual"]),
+    dispatcherStaffId: z.string().optional(),
     dispatcherName: z
       .string()
       .trim()
-      .min(3, "Escribe el despachador: al menos 3 caracteres")
       .max(160, "Máximo 160 caracteres"),
     supervisorName: z.string().trim().max(160, "Máximo 160 caracteres"),
   })
@@ -104,6 +112,23 @@ const lineSchema = z
         path: ["creditNoteNumber"],
         message: "Solo en una línea apta para nota de crédito",
       });
+    }
+    if (line.dispatcherMode === "sistema") {
+      if (!line.dispatcherStaffId || !line.dispatcherName || line.dispatcherName.trim().length < 3) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["dispatcherName"],
+          message: "Selecciona el despachador del sistema",
+        });
+      }
+    } else {
+      if (!line.dispatcherName || line.dispatcherName.trim().length < 3) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["dispatcherName"],
+          message: "Escribe el despachador: al menos 3 caracteres",
+        });
+      }
     }
   });
 
@@ -125,6 +150,8 @@ const emptyLine = (defaultClientId = "", defaultClaimRef = ""): LineValues => ({
   quantity: "",
   qualifies: "",
   creditNoteNumber: "",
+  dispatcherMode: "sistema",
+  dispatcherStaffId: "",
   dispatcherName: "",
   supervisorName: "",
 });
@@ -406,6 +433,12 @@ export function DiscrepancyFormModal({
                     ? "si"
                     : "no",
                 creditNoteNumber: line.creditNoteNumber ?? "",
+                dispatcherMode: line.dispatcherStaffId
+                  ? ("sistema" as const)
+                  : line.dispatcherName
+                  ? ("manual" as const)
+                  : ("sistema" as const),
+                dispatcherStaffId: line.dispatcherStaffId ? String(line.dispatcherStaffId) : "",
                 dispatcherName: line.dispatcherName,
                 supervisorName: line.supervisorName ?? "",
               };
@@ -432,6 +465,32 @@ export function DiscrepancyFormModal({
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "lines" });
+  const watchLines = useWatch({ control, name: "lines" });
+  const [activeLineIndex, setActiveLineIndex] = useState(0);
+
+  const safeActiveLineIndex = Math.min(
+    activeLineIndex,
+    Math.max(0, fields.length - 1),
+  );
+
+  const handleAddLine = () => {
+    append(emptyLine(defaultClientIdForLines, derivedTicketNumber));
+    setActiveLineIndex(fields.length);
+  };
+
+  const handleRemoveLine = (idxToRemove: number) => {
+    if (fields.length <= 1) return;
+    remove(idxToRemove);
+    setActiveLineIndex((current) => {
+      if (current === idxToRemove) {
+        return Math.max(0, idxToRemove - 1);
+      }
+      if (current > idxToRemove) {
+        return current - 1;
+      }
+      return current;
+    });
+  };
   const noteValue = useWatch({ control, name: "note" }) ?? "";
   const ticketIdValue = useWatch({ control, name: "ticketId" }) ?? "";
 
@@ -508,6 +567,13 @@ export function DiscrepancyFormModal({
     } else if (step === 2) {
       const validLines = await trigger("lines");
       if (!validLines) {
+        const currentErrors = control._formState.errors.lines;
+        if (Array.isArray(currentErrors)) {
+          const firstErrIdx = currentErrors.findIndex((err) => Boolean(err));
+          if (firstErrIdx !== -1) {
+            setActiveLineIndex(firstErrIdx);
+          }
+        }
         receipts.failed({
           action: "lineas-incompletas",
           title: "Campos obligatorios requeridos",
@@ -569,7 +635,10 @@ export function DiscrepancyFormModal({
           line.qualifies === "" ? null : line.qualifies === "si",
         creditNoteNumber: blank(line.creditNoteNumber),
         dispatcherName: line.dispatcherName.trim(),
-        dispatcherStaffId: null,
+        dispatcherStaffId:
+          line.dispatcherMode === "sistema" && line.dispatcherStaffId
+            ? Number(line.dispatcherStaffId)
+            : null,
         supervisorName: blank(line.supervisorName),
         supervisorStaffId: null,
       })),
@@ -911,58 +980,126 @@ export function DiscrepancyFormModal({
     </div>
   );
 
-  // Paso 2: Líneas en Discrepancia y Nota Operativa (Diseño en Fichas Estructuradas sin Scroll)
-  const renderStep2 = () => (
-    <div className="flex flex-col gap-4 animate-plf-fade">
-      <div className="flex items-center justify-between">
-        <FormDivider title="Líneas en discrepancia (Formato PF-FOR-291)" />
-        <span className="text-xs font-medium text-zinc-400 select-none">
-          {fields.length} {fields.length === 1 ? "línea registrada" : "líneas registradas"}
-        </span>
-      </div>
+  // Paso 2: Líneas en Discrepancia y Nota Operativa (Diseño con Pestañas y Transición Fluida)
+  const renderStep2 = () => {
+    const activeField = fields[safeActiveLineIndex] ?? fields[0];
+    const activeIndex = activeField ? fields.indexOf(activeField) : 0;
+    const activeLineErrors = errors.lines?.[activeIndex];
+    const activeExistingLine = discrepancy?.lines?.[activeIndex];
 
-      {/* Lista de Fichas de Líneas - 100% visible sin scroll horizontal */}
-      <div className="flex flex-col gap-3.5">
-        {fields.map((field, index) => {
-          const lineErrors = errors.lines?.[index];
-          const existingLine = discrepancy?.lines?.[index];
+    return (
+      <div className="flex flex-col gap-3.5 animate-plf-fade">
+        {/* Encabezado con divisor oficial y pestañas interactivas */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <FormDivider title="Líneas en discrepancia (Formato PF-FOR-291)" />
+            <span className="text-xs font-medium text-zinc-400 select-none">
+              {fields.length} {fields.length === 1 ? "línea registrada" : "líneas registradas"}
+            </span>
+          </div>
 
-          return (
+          {/* Barra de pestañas interactiva */}
+          <div className="flex items-center justify-between gap-2 border-b border-zinc-200/80 pb-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar flex-1 min-w-0">
+              {fields.map((field, idx) => {
+                const lineDiscrepancyType = watchLines?.[idx]?.discrepancyType ?? "faltante";
+                const lineQty = Number(watchLines?.[idx]?.quantity) || 0;
+                const hasError = Boolean(errors.lines?.[idx]);
+                const isActive = idx === safeActiveLineIndex;
+
+                return (
+                  <button
+                    key={field.id}
+                    type="button"
+                    onClick={() => setActiveLineIndex(idx)}
+                    className={`group relative inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-all duration-150 cursor-pointer select-none shrink-0 ${
+                      isActive
+                        ? "bg-white text-zinc-900 border border-zinc-200/90 shadow-2xs font-semibold ring-1 ring-zinc-950/5"
+                        : "bg-zinc-100/80 text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800 border border-transparent font-medium"
+                    }`}
+                  >
+                    <span
+                      className={`flex size-4.5 items-center justify-center rounded-md text-[10px] font-bold font-heading ${
+                        isActive ? "bg-zinc-900 text-white" : "bg-zinc-200 text-zinc-600"
+                      }`}
+                    >
+                      {idx + 1}
+                    </span>
+
+                    <span>Línea #{idx + 1}</span>
+
+                    {lineQty > 0 && (
+                      <span
+                        className={`px-1.5 py-0.5 text-[10px] rounded font-semibold tabular-nums leading-none ${
+                          lineDiscrepancyType === "sobrante"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                            : "bg-amber-50 text-amber-700 border border-amber-200/60"
+                        }`}
+                      >
+                        {lineDiscrepancyType === "sobrante" ? `+${lineQty}` : `-${lineQty}`}
+                      </span>
+                    )}
+
+                    {hasError && (
+                      <span
+                        className="size-1.5 rounded-full bg-brand-red animate-pulse"
+                        title="Tiene campos pendientes"
+                      />
+                    )}
+
+                    {fields.length > 1 && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveLine(idx);
+                        }}
+                        title={`Quitar línea #${idx + 1}`}
+                        className="ml-0.5 -mr-1 p-0.5 rounded hover:bg-rose-100 hover:text-brand-red text-zinc-400 opacity-60 group-hover:opacity-100 transition-all cursor-pointer"
+                      >
+                        <X className="size-3" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+
+              {/* Botón rápido para agregar otra línea en la misma barra de pestañas */}
+              <button
+                type="button"
+                onClick={handleAddLine}
+                className="inline-flex items-center gap-1 rounded-lg border border-dashed border-zinc-300 hover:border-zinc-400 bg-white/60 hover:bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900 transition-all cursor-pointer shadow-2xs shrink-0"
+                title="Agregar otra línea en discrepancia"
+              >
+                <Plus className="size-3.5 text-zinc-500" />
+                <span>Agregar línea</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Ficha de la Línea Activa en la misma posición con animación fluida oficial del módulo */}
+        {activeField && (
+          <div key={activeField.id} className="animate-plf-apple-tab">
             <DiscrepancyLineCard
-              key={field.id}
-              index={index}
+              index={activeIndex}
               control={control}
               register={register}
               setValue={setValue}
-              lineErrors={lineErrors}
-              existingLine={existingLine}
+              lineErrors={activeLineErrors}
+              existingLine={activeExistingLine}
               ticketClientName={effectiveTicketClientName}
               ticketClientId={effectiveTicketClientId}
               ticketInheritedLabel={ticketInheritedLabel}
               canRemove={fields.length > 1}
-              onRemove={() => remove(index)}
+              onRemove={() => handleRemoveLine(activeIndex)}
             />
-          );
-        })}
-      </div>
+          </div>
+        )}
 
-      {/* Pie con botón agregar línea */}
-      <div className="flex items-center justify-between pt-1">
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          onClick={() =>
-            append(emptyLine(defaultClientIdForLines, derivedTicketNumber))
-          }
-        >
-          <Plus className="h-3.5 w-3.5 text-zinc-500" />
-          <span>Agregar otra línea</span>
-        </Button>
-      </div>
-
-      {/* SECCIÓN DE LA NOTA (según PF-FOR-291) */}
-      <div className="mt-2 flex flex-col gap-1.5">
+        {/* SECCIÓN DE LA NOTA (según PF-FOR-291) */}
+        <div className="mt-2 flex flex-col gap-1.5">
         <FormDivider title="Uso interno" />
         <TextAreaField
           id="discrepancy-notes"
@@ -985,9 +1122,10 @@ export function DiscrepancyFormModal({
           error={errors.note?.message}
           {...register("note")}
         />
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Paso 3: Puntos de Seguridad a Evaluar
   const renderStep3 = () => (
@@ -1473,6 +1611,16 @@ function DiscrepancyLineCard({
   const discrepancyType = useWatch({ control, name: `lines.${index}.discrepancyType` }) ?? "faltante";
   const quantityValue = useWatch({ control, name: `lines.${index}.quantity` }) ?? "";
   const qtyNum = Number(quantityValue) || 0;
+  const dispatcherMode = useWatch({ control, name: `lines.${index}.dispatcherMode` }) ?? "sistema";
+  const dispatcherName = useWatch({ control, name: `lines.${index}.dispatcherName` }) ?? "";
+
+  const handleDispatcherModeChange = (newMode: "sistema" | "manual") => {
+    if (newMode === dispatcherMode) return;
+    setValue(`lines.${index}.dispatcherMode`, newMode, { shouldDirty: true });
+    if (newMode === "manual") {
+      setValue(`lines.${index}.dispatcherStaffId`, "", { shouldDirty: true });
+    }
+  };
 
   return (
     <div className="rounded-xl border border-zinc-200/90 bg-white shadow-2xs overflow-hidden transition-all hover:border-zinc-300">
@@ -1697,15 +1845,100 @@ function DiscrepancyLineCard({
           </div>
 
           {/* 9. Despachador * */}
-          <div className="lg:col-span-2">
-            <TextField
-              size="sm"
-              label="Despachador"
-              required
-              placeholder="Nombre despachador"
-              error={lineErrors?.dispatcherName?.message}
-              {...register(`lines.${index}.dispatcherName`)}
-            />
+          <div className="lg:col-span-2 flex flex-col gap-1.5">
+            <label
+              htmlFor={
+                dispatcherMode === "sistema"
+                  ? `lines.${index}.dispatcherSelect`
+                  : `lines.${index}.dispatcherName`
+              }
+              className="font-heading text-[11.5px] font-semibold text-faint flex items-center"
+            >
+              <span>Despachador</span>
+              <span className="ml-1 text-brand-red">*</span>
+            </label>
+
+            {dispatcherMode === "sistema" ? (
+              <Controller
+                name={`lines.${index}.dispatcherStaffId`}
+                control={control}
+                render={({ field: staffField }) => (
+                  <LookupSelect
+                    size="sm"
+                    id={`lines.${index}.dispatcherSelect`}
+                    value={staffField.value || ""}
+                    selectedLabel={dispatcherName || undefined}
+                    onChange={(value, option) => {
+                      staffField.onChange(value);
+                      setValue(
+                        `lines.${index}.dispatcherName`,
+                        option ? option.label : "",
+                        {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        },
+                      );
+                    }}
+                    onBlur={staffField.onBlur}
+                    placeholder="Buscar usuario…"
+                    searchPlaceholder="Buscar por nombre o correo…"
+                    search={searchActiveStaff}
+                    resolveSelectedLabel={resolveStaffLabel}
+                    clearLabel="Quitar despachador"
+                    state={lineErrors?.dispatcherName ? "error" : "idle"}
+                    rightAction={
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDispatcherModeChange("manual");
+                        }}
+                        tabIndex={-1}
+                        title="Escribir nombre manualmente"
+                        aria-label="Escribir nombre manualmente"
+                        className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                      >
+                        <PenLine className="h-3.5 w-3.5" />
+                      </button>
+                    }
+                  />
+                )}
+              />
+            ) : (
+              <div className="relative">
+                <ControlInput
+                  size="sm"
+                  id={`lines.${index}.dispatcherName`}
+                  placeholder="Nombre despachador"
+                  state={lineErrors?.dispatcherName ? "error" : "idle"}
+                  className="w-full pr-8"
+                  {...register(`lines.${index}.dispatcherName`)}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleDispatcherModeChange("sistema")}
+                  tabIndex={-1}
+                  title="Buscar usuario en el sistema"
+                  aria-label="Buscar usuario en el sistema"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                >
+                  <Users className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
+            {lineErrors?.dispatcherName?.message && (
+              <p
+                id={`lines.${index}.dispatcherName-error`}
+                title={lineErrors.dispatcherName.message}
+                className="animate-plf-shake flex items-center gap-1.5 text-[11px] font-medium text-brand-red-dark leading-none truncate"
+              >
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {lineErrors.dispatcherName.message}
+                </span>
+              </p>
+            )}
           </div>
 
           {/* 10. Supervisor */}

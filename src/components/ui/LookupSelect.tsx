@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Search, X } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import {
@@ -56,6 +56,8 @@ export interface LookupSelectProps {
   disabled?: boolean;
   id?: string;
   className?: string;
+  /** Elemento o botón de acción integrado a la derecha dentro del control */
+  rightAction?: ReactNode;
   "aria-label"?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
@@ -90,6 +92,7 @@ export function LookupSelect({
   disabled,
   id,
   className = "",
+  rightAction,
   "aria-label": ariaLabel,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
@@ -364,7 +367,7 @@ export function LookupSelect({
         onClick={() => (open ? closeList() : openList())}
         onKeyDown={handleTriggerKeyDown}
         className={`${controlBase} ${stateClasses[resolvedState]} ${controlSizes[size]}
-          flex items-center justify-between gap-2 pl-3 pr-2.5 font-medium
+          flex items-center justify-between gap-2 pl-3 ${rightAction ? "pr-8" : "pr-2.5"} font-medium
           focus-visible:ring-3 focus-visible:ring-brand-red/25
           ${currentLabel !== null ? "text-ink" : "text-faint"}`}
       >
@@ -374,6 +377,12 @@ export function LookupSelect({
           className={`h-4 w-4 shrink-0 text-faint transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
+
+      {rightAction && (
+        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 flex items-center">
+          {rightAction}
+        </div>
+      )}
 
       {open &&
         anchor &&
