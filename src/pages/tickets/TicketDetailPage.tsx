@@ -1075,17 +1075,24 @@ export function TicketDetailPage() {
           }`}
         >
           <div className="pt-2">
-            <h1 className="text-balance font-heading text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink">
-              {ticket.subject}
-            </h1>
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[12px] text-zinc-500">
-              <span>Creado el {formatDateTime(ticket.createdAt)} por</span>
-              <span className="font-medium text-zinc-800">{ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}</span>
-              <span aria-hidden className="text-zinc-300">·</span>
-              <span className="font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">{ticket.channel}</span>
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Asunto (izquierda) */}
+              <div className="min-w-0 max-w-full lg:max-w-2xl">
+                <h1 className="font-heading text-[18px] sm:text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink truncate" title={ticket.subject}>
+                  {ticket.subject}
+                </h1>
+              </div>
 
-            <div className="mt-5">
+              {/* Creado por y demás (derecha) */}
+              <p className="flex flex-wrap items-center gap-x-1.5 text-[12px] text-zinc-500 shrink-0">
+                <span>Creado el {formatDateTime(ticket.createdAt)} por</span>
+                <span className="font-medium text-zinc-800">{ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}</span>
+                <span aria-hidden className="text-zinc-300">·</span>
+                <span className="font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">{ticket.channel}</span>
+              </p>
+            </div>
+
+            <div className="mt-3.5">
               {/* Animación de entrada fluida estilo Apple idéntica a la vista de clientes */}
               <div key={activeTab} className="animate-plf-apple-tab">
                 {/* TAB: DATOS / RESUMEN */}

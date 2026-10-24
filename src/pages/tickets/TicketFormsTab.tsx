@@ -4,19 +4,20 @@ import {
   ArrowUpRight,
   Check,
   CheckCircle2,
+  ChevronDown,
   FileSpreadsheet,
   FileText,
   MinusCircle,
+  MoreHorizontal,
   Pencil,
   Plus,
   PlusCircle,
   Printer,
-  ShieldAlert,
   ShieldCheck,
   Truck,
   Wrench,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
@@ -90,7 +91,27 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   // Selected sub-tab when forms exist
   const [selectedSubTabKey, setSelectedSubTabKey] = useState<string | null>(null);
   const [newFormModalOpen, setNewFormModalOpen] = useState(false);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (!actionsMenuOpen) return;
+    function handlePointerDown(e: PointerEvent) {
+      if (!actionsMenuRef.current?.contains(e.target as Node)) {
+        setActionsMenuOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setActionsMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [actionsMenuOpen]);
 
   useEffect(() => {
     const formToOpen = searchParams.get("openForm");
@@ -612,9 +633,9 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       ) : (
         /* REGISTERED FORMS VIEW */
         <div className="space-y-3">
-          {/* Top Sub-tabs & Add Form Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 pb-2">
-            <div className="flex flex-wrap items-center gap-1.5">
+          {/* Sub-tabs switcher only if there are 2 or more forms */}
+          {registeredForms.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1.5 pb-1">
               {registeredForms.map((item) => {
                 const isSelected = item.key === activeForm?.key;
                 return (
@@ -622,45 +643,24 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                     key={item.key}
                     type="button"
                     onClick={() => setSelectedSubTabKey(item.key)}
-                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                    className={`inline-flex items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
                       isSelected
-                        ? "bg-zinc-900 text-white shadow-xs"
-                        : "bg-white text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 border border-zinc-200"
+                        ? "bg-brand-red/10 border border-brand-red/30 text-brand-red shadow-2xs font-semibold"
+                        : "bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border border-zinc-200"
                     }`}
                   >
-                    <span
-                      className={`font-mono text-[10px] font-bold uppercase ${
-                        isSelected ? "text-zinc-300" : "text-zinc-400"
-                      }`}
-                    >
+                    <span className={`font-mono text-[10px] font-bold uppercase ${isSelected ? "text-brand-red" : "text-zinc-400"}`}>
                       {item.code}
                     </span>
                     <span>{item.title}</span>
-                    <span
-                      className={`rounded px-1.5 py-0.2 text-[10px] ${
-                        isSelected ? "bg-zinc-800 text-zinc-200" : "bg-zinc-100 text-zinc-600"
-                      }`}
-                    >
+                    <span className={`rounded px-1.5 py-0.2 text-[10px] ${isSelected ? "bg-brand-red/15 text-brand-red font-semibold" : "bg-zinc-100 text-zinc-600"}`}>
                       {item.badgeText}
                     </span>
                   </button>
                 );
               })}
             </div>
-
-            {/* Add another form action */}
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => setNewFormModalOpen(true)}
-                title="Llenar o agregar otro formulario vinculado a este ticket"
-              >
-                <Plus className="size-3.5 mr-1" />
-                Llenar otro formulario
-              </Button>
-            </div>
-          </div>
+          )}
 
           {/* ACTIVE FORM DETAILS */}
           {activeForm && (
@@ -681,9 +681,17 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                       <WithdrawalStatusBadge status={(activeForm.data as MerchandiseWithdrawal).status} />
                     )}
                     {activeForm.type === "discrepancia" && (
-                      <DiscrepancyStatusBadge
-                        status={(activeForm.data as DiscrepancyDetail).discrepancy.status}
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <DiscrepancyStatusBadge
+                          status={(activeForm.data as DiscrepancyDetail).discrepancy.status}
+                        />
+                        {((activeForm.data as DiscrepancyDetail).discrepancy.checks || []).some((c) => c.result === "Positivo") && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                            <AlertTriangle className="size-3 text-amber-600" />
+                            Novedad de seguridad
+                          </span>
+                        )}
+                      </div>
                     )}
                     {activeForm.type === "hca" && (
                       <HcaStatusBadge status={(activeForm.data as CorrectiveActionSheet).status} />
@@ -694,8 +702,18 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                   </p>
                 </div>
 
-                {/* Form Actions (Print, Edit, Switch, Link) */}
+                {/* Form Actions (Add another, Print, Edit, Switch, Link) */}
                 <div className="flex flex-wrap items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => setNewFormModalOpen(true)}
+                    title="Llenar o agregar otro formulario vinculado a este ticket"
+                  >
+                    <Plus className="size-3.5 mr-1" />
+                    Llenar otro formulario
+                  </Button>
+
                   {/* Official Print Button */}
                   <Button
                     size="sm"
@@ -719,59 +737,88 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                     Imprimir formato oficial
                   </Button>
 
-                  {/* Edit Form Button */}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      if (activeForm.type === "reclamacion") {
-                        setEditingClaim(activeForm.data as CustomerClaim);
-                        setClaimModalOpen(true);
-                      } else if (activeForm.type === "retiro") {
-                        setEditingWithdrawal(activeForm.data as MerchandiseWithdrawal);
-                        setWithdrawalModalOpen(true);
-                      } else if (activeForm.type === "discrepancia") {
-                        setEditingDiscrepancy((activeForm.data as DiscrepancyDetail).discrepancy);
-                        setDiscrepancyModalOpen(true);
-                      } else if (activeForm.type === "hca") {
-                        setEditingHca(activeForm.data as CorrectiveActionSheet);
-                        setHcaModalOpen(true);
-                      }
-                    }}
-                    title="Editar datos del formulario"
-                  >
-                    <Pencil className="size-3.5 text-zinc-500" />
-                    Editar
-                  </Button>
+                  {/* Dropdown with more options */}
+                  <div className="relative" ref={actionsMenuRef}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setActionsMenuOpen((prev) => !prev)}
+                      className="gap-1.5"
+                      title="Más opciones del formulario"
+                    >
+                      <MoreHorizontal className="size-3.5 text-zinc-600" />
+                      <span>Más opciones</span>
+                      <ChevronDown
+                        className={`size-3 text-zinc-400 transition-transform duration-150 ${
+                          actionsMenuOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </Button>
 
-                  {/* Switch / Migrate Form Button */}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="text-amber-800 border-amber-200 bg-amber-50 hover:bg-amber-100"
-                    onClick={() => handleTriggerMigration(activeForm)}
-                    title="Cambiar o transferir datos a otro tipo de formulario"
-                  >
-                    <ArrowLeftRight className="size-3.5 text-amber-600" />
-                    Cambiar de formulario
-                  </Button>
+                    {actionsMenuOpen && (
+                      <div className="absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-zinc-200 bg-white py-1 shadow-lg z-30 animate-plf-fade">
+                        {/* Edit Form Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActionsMenuOpen(false);
+                            if (activeForm.type === "reclamacion") {
+                              setEditingClaim(activeForm.data as CustomerClaim);
+                              setClaimModalOpen(true);
+                            } else if (activeForm.type === "retiro") {
+                              setEditingWithdrawal(activeForm.data as MerchandiseWithdrawal);
+                              setWithdrawalModalOpen(true);
+                            } else if (activeForm.type === "discrepancia") {
+                              setEditingDiscrepancy((activeForm.data as DiscrepancyDetail).discrepancy);
+                              setDiscrepancyModalOpen(true);
+                            } else if (activeForm.type === "hca") {
+                              setEditingHca(activeForm.data as CorrectiveActionSheet);
+                              setHcaModalOpen(true);
+                            }
+                          }}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                        >
+                          <Pencil className="size-3.5 text-zinc-500" />
+                          <span>Editar datos</span>
+                        </button>
 
-                  {/* View Details Link */}
-                  <Link
-                    to={
-                      activeForm.type === "reclamacion"
-                        ? `/reclamaciones/${(activeForm.data as CustomerClaim).id}`
-                        : activeForm.type === "retiro"
-                        ? `/retiros/${(activeForm.data as MerchandiseWithdrawal).id}`
-                        : activeForm.type === "discrepancia"
-                        ? `/discrepancias/${(activeForm.data as DiscrepancyDetail).discrepancy.id}`
-                        : `/calidad/hca/${(activeForm.data as CorrectiveActionSheet).id}`
-                    }
-                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50"
-                  >
-                    Ficha
-                    <ArrowUpRight className="size-3.5" />
-                  </Link>
+                        {/* Switch / Migrate Form Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActionsMenuOpen(false);
+                            handleTriggerMigration(activeForm);
+                          }}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                        >
+                          <ArrowLeftRight className="size-3.5 text-amber-600" />
+                          <span>Cambiar de formulario</span>
+                        </button>
+
+                        <div className="my-1 border-t border-zinc-100" />
+
+                        {/* View Details Link */}
+                        <Link
+                          to={
+                            activeForm.type === "reclamacion"
+                              ? `/reclamaciones/${(activeForm.data as CustomerClaim).id}`
+                              : activeForm.type === "retiro"
+                              ? `/retiros/${(activeForm.data as MerchandiseWithdrawal).id}`
+                              : activeForm.type === "discrepancia"
+                              ? `/discrepancias/${(activeForm.data as DiscrepancyDetail).discrepancy.id}`
+                              : `/calidad/hca/${(activeForm.data as CorrectiveActionSheet).id}`
+                          }
+                          onClick={() => setActionsMenuOpen(false)}
+                          className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <ArrowUpRight className="size-3.5 text-zinc-500" />
+                            <span>Ver ficha completa</span>
+                          </span>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -912,42 +959,6 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
 
                   return (
                     <div className="space-y-4">
-                      {/* Security Finding Alert Banner */}
-                      {d.hasSecurityFinding ? (
-                        <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-4 shadow-2xs flex items-start gap-3">
-                          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                            <ShieldAlert className="size-4.5" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wide font-heading">
-                                Hallazgo de Seguridad Operativa Detectado
-                              </h4>
-                              <span className="inline-flex items-center rounded-md bg-amber-200/70 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-900">
-                                {positiveChecks.length} {positiveChecks.length === 1 ? "punto positivo" : "puntos positivos"}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-xs text-amber-800 leading-relaxed">
-                              Se detectaron novedades en el chequeo de 9 puntos de la carga. Notificación oficial emitida al área de Seguridad y Logística.
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="rounded-xl border border-emerald-200/90 bg-emerald-50/60 p-3.5 flex items-center justify-between gap-3 text-xs">
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-700">
-                              <ShieldCheck className="size-4" />
-                            </div>
-                            <span className="font-medium text-emerald-900">
-                              Chequeo de seguridad conforme sin hallazgos negativos (9/9 puntos verificados).
-                            </span>
-                          </div>
-                          <span className="shrink-0 text-[11px] font-semibold text-emerald-700">
-                            Protocolo seguro
-                          </span>
-                        </div>
-                      )}
-
                       {/* Executive Summary Cards */}
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
@@ -1105,13 +1116,17 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                               PF-FOR-291
                             </span>
                           </div>
-                          <span className="text-[11px] text-zinc-500">
+                          <span className="text-[11px]">
                             {positiveChecks.length > 0 ? (
-                              <span className="font-semibold text-amber-700">
-                                {positiveChecks.length} hallazgos reportados
+                              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 font-semibold text-amber-800">
+                                <AlertTriangle className="size-3 text-amber-600" />
+                                {positiveChecks.length} {positiveChecks.length === 1 ? "hallazgo reportado" : "hallazgos reportados"}
                               </span>
                             ) : (
-                              "Todos los puntos conformes"
+                              <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2.5 py-0.5 font-medium text-zinc-600">
+                                <ShieldCheck className="size-3 text-emerald-600" />
+                                9/9 conformes
+                              </span>
                             )}
                           </span>
                         </div>
