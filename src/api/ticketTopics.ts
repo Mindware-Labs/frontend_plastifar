@@ -39,4 +39,10 @@ export const ticketTopicsApi = {
     }),
 
   remove: (id: number) => apiRequest<void>(`/api/ticket-topics/${id}`, { method: "DELETE" }),
+
+  bulk: (input: { ids: number[]; action: "activate" | "deactivate" | "delete" }) =>
+    apiRequest<{ updatedCount: number; totalRequested: number }>("/api/ticket-topics/bulk", {
+      method: "POST",
+      body: JSON.stringify({ ids: input.ids, action: input.action }),
+    }),
 };

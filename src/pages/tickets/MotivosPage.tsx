@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { ticketTopicsApi, type TicketTopicQuery } from "../../api/ticketTopics";
@@ -25,10 +25,13 @@ import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { SelectBox } from "../../components/ui/SelectBox";
 import { Spinner } from "../../components/ui/Spinner";
+import { TableSelectionBar } from "../../components/ui/TableSelectionBar";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
@@ -65,6 +68,7 @@ export function MotivosPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [modal, setModal] = useState<"nuevo" | TicketTopicResponse | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
 
@@ -89,6 +93,77 @@ export function MotivosPage() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
+  const pageIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
+
+  async function runBulk(action: "activate" | "deactivate" | "delete") {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    setActionError(null);
+    try {
+      const result = await ticketTopicsApi.bulk({
+        ids: Array.from(selectedIds),
+        action,
+      });
+      if (action === "delete" && result.updatedCount < result.totalRequested) {
+        setActionError(
+          `Se eliminaron ${result.updatedCount} de ${result.totalRequested}. Los demás están en uso en tickets; desactívalos en su lugar.`,
+        );
+      }
+      clearSelection();
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo completar la acción en lote");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function askBulkActivate() {
+    setConfirmation({
+      tone: "warn",
+      icon: CheckCircle2,
+      eyebrow: "Tickets · Motivos",
+      title: `Activar ${selectedIds.size} motivos`,
+      description: "Volverán a ofrecerse al crear o clasificar tickets.",
+      confirmLabel: "Activar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("activate");
+      },
+    });
+  }
+
+  function askBulkDeactivate() {
+    setConfirmation({
+      tone: "danger",
+      icon: Ban,
+      eyebrow: "Tickets · Motivos",
+      title: `Desactivar ${selectedIds.size} motivos`,
+      description: "Dejarán de ofrecerse en tickets nuevos. Los tickets que ya los usan no cambian.",
+      confirmLabel: "Desactivar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("deactivate");
+      },
+    });
+  }
+
+  function askBulkDelete() {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      eyebrow: "Tickets · Motivos",
+      title: `Eliminar ${selectedIds.size} motivos`,
+      description:
+        "Solo se borran los que ningún ticket usa. El resto se omitirá y tendrás que desactivarlos.",
+      confirmLabel: "Eliminar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("delete");
+      },
+    });
+  }
 
   async function run(id: number, action: () => Promise<unknown>) {
     setBusyId(id);
@@ -239,6 +314,35 @@ export function MotivosPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          {isAdmin && selectedIds.size > 0 ? (
+            <TableSelectionBar
+              count={selectedIds.size}
+              pageState={pageState}
+              busy={bulkBusy}
+              onTogglePage={togglePage}
+              onClear={clearSelection}
+              actions={[
+                {
+                  key: "activate",
+                  label: "Activar",
+                  icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
+                  onClick: askBulkActivate,
+                },
+                {
+                  key: "deactivate",
+                  label: "Desactivar",
+                  icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
+                  onClick: askBulkDeactivate,
+                },
+                {
+                  key: "delete",
+                  label: "Eliminar",
+                  icon: <Trash2 aria-hidden className="h-3.5 w-3.5 text-rose-600" />,
+                  onClick: askBulkDelete,
+                },
+              ]}
+            />
+          ) : (
           <div className="flex flex-wrap items-center gap-2">
             <SearchInput
               value={search}
@@ -279,6 +383,7 @@ export function MotivosPage() {
               </button>
             )}
           </div>
+          )}
         </div>
 
         {(error || actionError) && (
@@ -297,6 +402,21 @@ export function MotivosPage() {
             <DataTable>
               <thead>
                 <HeadRow>
+                  {isAdmin && (
+                    <Th className="w-10 text-center">
+                      <div className="flex items-center justify-center">
+                        <SelectBox
+                          checked={pageState}
+                          onToggle={togglePage}
+                          label={
+                            pageState === true
+                              ? "Quitar la selección de esta página"
+                              : "Seleccionar toda la página"
+                          }
+                        />
+                      </div>
+                    </Th>
+                  )}
                   <Th>Motivo</Th>
                   <Th>Departamento</Th>
                   <Th>Prioridad</Th>
@@ -308,8 +428,21 @@ export function MotivosPage() {
                 </HeadRow>
               </thead>
               <tbody>
-                {rows.map((topic) => (
-                  <Row key={topic.id} busy={busyId === topic.id}>
+                {rows.map((topic) => {
+                  const checked = selectedIds.has(topic.id);
+                  return (
+                  <Row key={topic.id} busy={busyId === topic.id || bulkBusy} data-checked={checked}>
+                    {isAdmin && (
+                      <Td className="w-10 text-center">
+                        <div className="flex items-center justify-center">
+                          <SelectBox
+                            checked={checked}
+                            onToggle={() => toggleSelect(topic.id)}
+                            label={`Seleccionar ${topic.name}`}
+                          />
+                        </div>
+                      </Td>
+                    )}
                     <Td className="text-[13px] font-medium text-ink">{topic.name}</Td>
                     <Td className="text-[12.5px] text-ink">
                       {departmentPathById.get(topic.defaultDepartmentId) ?? topic.defaultDepartmentName}
@@ -376,7 +509,8 @@ export function MotivosPage() {
                       </Td>
                     )}
                   </Row>
-                ))}
+                  );
+                })}
               </tbody>
             </DataTable>
 
