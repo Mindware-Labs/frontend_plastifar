@@ -3,7 +3,8 @@ import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type R
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { z } from "zod";
-import { Building2, Check, Flag, Info, Mail, MessageSquareText, RotateCcw, Tag, X } from "lucide-react";
+import { Building2, Check, Flag, Info, Mail, MessageSquareText, Package, RotateCcw, Tag, X } from "lucide-react";
+import { TicketProductsField, type TicketProductDraft } from "../../components/app/TicketProductsField";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
@@ -26,7 +27,6 @@ const schema = z.object({
   clientId: z.string().optional(),
   contactId: z.string().optional(),
   topicId: z.string().optional(),
-  productLineId: z.string().optional(),
   subject: z
     .string()
     .trim()
@@ -157,6 +157,7 @@ export function CreateTicketModal({
   const [catalogsError, setCatalogsError] = useState<string | null>(null);
   const [departmentTree, setDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
+  const [ticketProducts, setTicketProducts] = useState<TicketProductDraft[]>([]);
   const [detectedMatch, setDetectedMatch] = useState<{ clientName: string; contactName: string } | null>(null);
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
@@ -184,7 +185,6 @@ export function CreateTicketModal({
       clientId: initialClientId ? String(initialClientId) : "",
       contactId: "",
       topicId: "",
-      productLineId: "",
       subject: initialSubject ?? "",
       priority: "Normal",
       departmentId: "",
@@ -305,7 +305,7 @@ export function CreateTicketModal({
         clientId: values.clientId ? Number(values.clientId) : null,
         contactId: values.contactId ? Number(values.contactId) : null,
         topicId: values.topicId ? Number(values.topicId) : null,
-        productLineId: values.productLineId ? Number(values.productLineId) : null,
+        productIds: ticketProducts.length > 0 ? ticketProducts.map((p) => p.productId) : null,
         subject: values.subject.trim(),
         priority: values.priority || "Normal",
         departmentId: values.departmentId ? Number(values.departmentId) : null,
@@ -454,7 +454,7 @@ export function CreateTicketModal({
               <section className="flex flex-col gap-3.5 border-t border-line-soft px-6 py-5">
                 <SectionHeading icon={Tag} title="Clasificación y enrutamiento" aside="Opcional" />
 
-                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
                   <Controller
                     control={control}
                     name="topicId"
@@ -517,27 +517,16 @@ export function CreateTicketModal({
                     )}
                   />
 
-                  <Controller
-                    control={control}
-                    name="productLineId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Línea de producto (Opcional)"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder="Selecciona una línea"
-                        options={[
-                          { value: "", label: "Aún sin línea" },
-                          ...(catalogs?.productLines ?? []).map((pl) => ({
-                            value: String(pl.id),
-                            label: `${pl.name} (${pl.code})`,
-                          })),
-                        ]}
-                      />
-                    )}
-                  />
                 </div>
+              </section>
+
+              <section className="flex flex-col gap-3 border-t border-line-soft px-6 py-5">
+                <SectionHeading icon={Package} title="Productos relacionados" aside="Opcional" />
+                <TicketProductsField
+                  value={ticketProducts}
+                  onChange={setTicketProducts}
+                  hint="Artículos del caso; puedes completarlos después en la ficha."
+                />
               </section>
 
               {/* Prioridad: control segmentado; el color solo en el punto, la elección en papel. */}

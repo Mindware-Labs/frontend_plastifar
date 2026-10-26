@@ -368,7 +368,9 @@ export function LookupSelect({
         onKeyDown={handleTriggerKeyDown}
         className={`${controlBase} ${stateClasses[resolvedState]} ${controlSizes[size]}
           flex items-center justify-between gap-2 pl-3 ${rightAction ? "pr-8" : "pr-2.5"} font-medium
+          transition-[box-shadow,border-color,transform] duration-200 ease-out
           focus-visible:ring-3 focus-visible:ring-brand-red/25
+          ${open ? "ring-3 ring-brand-red/15 border-line-strong" : ""}
           ${currentLabel !== null ? "text-ink" : "text-faint"}`}
       >
         <span className="truncate">{currentLabel ?? (value === "" ? placeholder : value)}</span>
@@ -396,7 +398,7 @@ export function LookupSelect({
               bottom: anchor.bottom,
               width: anchor.width,
             }}
-            className="animate-plf-toast-in z-[60] rounded-edge border border-line bg-white shadow-panel"
+            className="animate-plf-popover-in z-[60] rounded-edge border border-line bg-white shadow-panel"
           >
             <div className="relative border-b border-line p-1.5">
               <Search

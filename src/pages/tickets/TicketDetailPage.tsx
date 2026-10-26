@@ -31,6 +31,7 @@ import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { ModuleHeader, type ModuleHeaderSection } from "../../components/app/ModuleHeader";
+import { TicketProductsField } from "../../components/app/TicketProductsField";
 import { Alert } from "../../components/ui/Alert";
 import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Badge } from "../../components/ui/Badge";
@@ -49,6 +50,7 @@ import { useReceipts } from "../../context/useReceipts";
 import { departmentPath, departmentPathOptions } from "../../lib/departments";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes, formatDateTime, formatPhoneNumber, formatSlaRemaining } from "../../lib/format";
+import { formatTicketProductsSummary } from "../../lib/ticketProducts";
 import { Avatar } from "../../components/ui/Avatar";
 import type {
   DepartmentResponse,
@@ -823,7 +825,9 @@ export function TicketDetailPage() {
   const [editTopicId, setEditTopicId] = useState<number | null>(null);
   const [editPriority, setEditPriority] = useState("Normal");
   const [editDepartmentId, setEditDepartmentId] = useState<number | null>(null);
-  const [editProductLineId, setEditProductLineId] = useState<number | null>(null);
+  const [editProducts, setEditProducts] = useState<
+    { productId: number; productCode: string; productName: string }[]
+  >([]);
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editCatalogs, setEditCatalogs] = useState<TicketCreateOptionsResponse | null>(null);
@@ -848,7 +852,13 @@ export function TicketDetailPage() {
     setEditTopicId(ticket.topicId ?? null);
     setEditPriority(ticket.priority);
     setEditDepartmentId(ticket.departmentId ?? null);
-    setEditProductLineId(ticket.productLineId ?? null);
+    setEditProducts(
+      (ticket.products ?? []).map((p) => ({
+        productId: p.productId,
+        productCode: p.productCode,
+        productName: p.productName,
+      })),
+    );
     setEditError(null);
     setShowEditModal(true);
 
@@ -888,7 +898,7 @@ export function TicketDetailPage() {
         topicId: editTopicId,
         priority: editPriority,
         departmentId: editDepartmentId,
-        productLineId: editProductLineId,
+        productIds: editProducts.map((p) => p.productId),
       });
       setShowEditModal(false);
       await refreshTicket();
@@ -1254,10 +1264,15 @@ export function TicketDetailPage() {
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between py-2 text-[12.5px]">
-                              <span className="text-zinc-500 font-medium">Línea de producto</span>
-                              <span className="text-zinc-800 font-medium text-right truncate max-w-[65%]" title={ticket.productLineName ?? undefined}>
-                                {ticket.productLineName ?? <span className="text-zinc-400 font-normal">No aplica</span>}
+                            <div className="flex items-start justify-between gap-3 py-2 text-[12.5px]">
+                              <span className="text-zinc-500 font-medium shrink-0">Productos</span>
+                              <span
+                                className="text-zinc-800 font-medium text-right max-w-[65%]"
+                                title={formatTicketProductsSummary(ticket.products) ?? undefined}
+                              >
+                                {formatTicketProductsSummary(ticket.products) ?? (
+                                  <span className="text-zinc-400 font-normal">Sin especificar</span>
+                                )}
                               </span>
                             </div>
 
@@ -2800,23 +2815,13 @@ export function TicketDetailPage() {
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <SelectField
-                      id="edit-line"
-                      label="Línea de producto"
-                      size="sm"
-                      value={editProductLineId !== null ? String(editProductLineId) : ""}
-                      onChange={(value) => {
-                        setEditProductLineId(value ? Number(value) : null);
+                    <TicketProductsField
+                      value={editProducts}
+                      onChange={(rows) => {
+                        setEditProducts(rows);
                         if (editError) setEditError(null);
                       }}
-                      placeholder="No aplica"
-                      options={[
-                        { value: "", label: "No aplica" },
-                        ...(editCatalogs?.productLines ?? []).map((line) => ({
-                          value: String(line.id),
-                          label: `${line.name} (${line.code})`,
-                        })),
-                      ]}
+                      hint="Opcional; puedes completarlo después."
                     />
                   </div>
                 </div>

@@ -12,6 +12,7 @@ import {
 import type { ReactNode } from "react";
 import { Avatar } from "../../components/ui/Avatar";
 import { formatBytes, formatDateTime, type formatSlaRemaining } from "../../lib/format";
+import { formatTicketProductsSummary } from "../../lib/ticketProducts";
 import type { TicketAttachmentResponse, TicketDetailResponse } from "../../types/api";
 import { PriorityCell, SlaCell } from "./ticketCells";
 
@@ -230,9 +231,14 @@ export function TicketPropertiesAside({
               </span>
             </PropertyRow>
 
-            <PropertyRow label="Línea">
-              <span className="block truncate" title={ticket.productLineName ?? undefined}>
-                {ticket.productLineName ?? <span className="text-zinc-400 font-normal">No aplica</span>}
+            <PropertyRow label="Productos">
+              <span
+                className="block truncate"
+                title={formatTicketProductsSummary(ticket.products) ?? undefined}
+              >
+                {formatTicketProductsSummary(ticket.products) ?? (
+                  <span className="text-zinc-400 font-normal">Sin especificar</span>
+                )}
               </span>
             </PropertyRow>
 

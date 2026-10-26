@@ -449,6 +449,13 @@ export interface ComposingPresence {
   active: boolean;
 }
 
+export interface TicketProductResponse {
+  id: number;
+  productId: number;
+  productCode: string;
+  productName: string;
+}
+
 export interface TicketListItemResponse {
   id: number;
   number: string;
@@ -478,6 +485,7 @@ export interface TicketListItemResponse {
   lastActivityAt: string;
   createdAt: string;
   updatedAt: string;
+  products?: TicketProductResponse[];
   topicSuggestedForm?: string | null;
   topicSuggestedFormLabel?: string | null;
 }
@@ -609,6 +617,7 @@ export interface TicketDetailResponse {
   events: TicketEventResponse[];
   watchers: TicketWatcherResponse[];
   attachments: TicketAttachmentResponse[];
+  products?: TicketProductResponse[];
   requesterEmail?: string | null;
   requesterName?: string | null;
   verdictId: number | null;
@@ -814,6 +823,7 @@ export interface CreateManualTicketRequest {
   contactId?: number | null;
   topicId?: number | null;
   productLineId?: number | null;
+  productIds?: number[] | null;
   subject: string;
   initialMessage?: string | null;
   priority?: string | null;
@@ -828,6 +838,7 @@ export interface UpdateTicketDetailsRequest {
   priority?: string | null;
   departmentId?: number | null;
   productLineId?: number | null;
+  productIds?: number[] | null;
 }
 
 export interface BulkAssignTicketsRequest {

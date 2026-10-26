@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
+import { formatTicketProductsSummary } from "../../lib/ticketProducts";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -794,7 +795,9 @@ export function TicketsPage() {
                           <p className="truncate text-[11px] text-zinc-500 font-normal leading-tight mt-0.5">
                             {t.topicName ?? "Sin motivo"}
                             {department && <span className="text-zinc-400 2xl:hidden"> · {department}</span>}
-                            {t.productLineName && <span className="text-zinc-400"> · {t.productLineName}</span>}
+                            {formatTicketProductsSummary(t.products) && (
+                              <span className="text-zinc-400"> · {formatTicketProductsSummary(t.products)}</span>
+                            )}
                           </p>
                         </div>
                       </Td>
