@@ -68,10 +68,16 @@ export function searchStaff(status?: string) {
 /** Solo colaboradores activos: es lo que se ofrece para asignar trabajo. */
 export const searchActiveStaff = searchStaff("activos");
 
+const staffLabelCache = new Map<string, string>();
+
 /** Nombre de un colaborador por id, para pintar lo ya seleccionado. */
 export async function resolveStaffLabel(value: string): Promise<string | null> {
-  const person = await staffApi.getDepartmentAccess(Number(value));
-  return `${person.firstName} ${person.lastName}`;
+  const cached = staffLabelCache.get(value);
+  if (cached !== undefined) return cached;
+  const person = await staffApi.getById(Number(value));
+  const label = `${person.firstName} ${person.lastName}`;
+  staffLabelCache.set(value, label);
+  return label;
 }
 
 /**

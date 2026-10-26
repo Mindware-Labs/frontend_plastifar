@@ -4,7 +4,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  FileText,
   PenLine,
   Plus,
   Trash2,
@@ -16,7 +15,9 @@ import {
   useFieldArray,
   useForm,
   useWatch,
+  type Control,
   type FieldErrors,
+  type UseFormRegister,
   type UseFormRegisterReturn,
 } from "react-hook-form";
 import { z } from "zod";
@@ -26,15 +27,12 @@ import { qualityApi } from "../../api/quality";
 import { settingsApi } from "../../api/settings";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Logo } from "../../components/Logo";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ControlInput } from "../../components/ui/ControlInput";
 import {
   DateField,
-  LookupField,
   SelectField,
   TextAreaField,
-  TextField,
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
@@ -57,7 +55,9 @@ const planRowSchema = z
   .object({
     serverId: z.number().optional(),
     description: z.string().trim().max(500, "Máximo 500 caracteres"),
+    responsibleMode: z.enum(["sistema", "manual"]),
     responsibleStaffId: z.string(),
+    responsibleManualName: z.string().trim().max(160, "Máximo 160 caracteres"),
     dueDate: z.string(),
     evidenceNotes: z.string().trim().max(2000, "Máximo 2000 caracteres"),
   })
@@ -65,6 +65,7 @@ const planRowSchema = z
     const started =
       row.description.trim() !== "" ||
       row.responsibleStaffId !== "" ||
+      row.responsibleManualName.trim() !== "" ||
       row.dueDate !== "" ||
       row.evidenceNotes.trim() !== "";
     if (!started) return;
@@ -75,11 +76,19 @@ const planRowSchema = z
         message: "Describe la acción: al menos 10 caracteres",
       });
     }
-    if (row.responsibleStaffId === "") {
+    if (row.responsibleMode === "sistema") {
+      if (row.responsibleStaffId === "") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["responsibleStaffId"],
+          message: "Elige quién responde",
+        });
+      }
+    } else if (row.responsibleManualName.trim().length < 3) {
       ctx.addIssue({
         code: "custom",
-        path: ["responsibleStaffId"],
-        message: "Elige quién responde",
+        path: ["responsibleManualName"],
+        message: "Escribe el nombre: al menos 3 caracteres",
       });
     }
     if (row.dueDate === "") {
@@ -145,7 +154,7 @@ const schema = z
       )
       .max(20, "Una hoja admite hasta 20 causas"),
     planItems: z.array(planRowSchema).max(20),
-    participants: z.array(participantRowSchema).max(20),
+    participants: z.array(participantRowSchema).max(2),
     comments: z.string().trim().max(4000, "Máximo 4000 caracteres"),
   })
   .superRefine((values, ctx) => {
@@ -173,7 +182,9 @@ type ParticipantRowValues = FormValues["participants"][number];
 function emptyPlanRow(): PlanRowValues {
   return {
     description: "",
+    responsibleMode: "sistema",
     responsibleStaffId: "",
+    responsibleManualName: "",
     dueDate: "",
     evidenceNotes: "",
   };
@@ -183,8 +194,229 @@ function emptyParticipant(): ParticipantRowValues {
   return { kind: "personal", staffId: "", name: "" };
 }
 
-const CAUSE_REMOVE_MS = 360;
+function defaultCreatorParticipant(user: {
+  staffId: number;
+  firstName?: string;
+  lastName?: string;
+} | null): ParticipantRowValues {
+  if (user?.staffId) {
+    return { kind: "personal", staffId: String(user.staffId), name: "" };
+  }
+  const manualName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
+  if (manualName.length >= 3) {
+    return { kind: "manual", staffId: "", name: manualName };
+  }
+  return emptyParticipant();
+}
+
+function HcaParticipantWhoCell({
+  index,
+  rowId,
+  control,
+  register,
+  rowErrors,
+  staffLabel,
+  pickLabel,
+  onPickLabel,
+  onKindChange,
+}: {
+  index: number;
+  rowId: string;
+  control: Control<FormValues>;
+  register: UseFormRegister<FormValues>;
+  rowErrors: FieldErrors<ParticipantRowValues> | undefined;
+  staffLabel?: string;
+  pickLabel?: string;
+  onPickLabel: (rowId: string, label: string | null) => void;
+  onKindChange: (index: number, kind: "personal" | "manual") => void;
+}) {
+  const kind = useWatch({ control, name: `participants.${index}.kind` }) ?? "personal";
+  const staffError = rowErrors?.staffId?.message;
+  const manualError = rowErrors?.name?.message;
+  const fieldError = staffError ?? manualError;
+  const displayStaffLabel = pickLabel ?? staffLabel;
+
+  return (
+    <div className="min-w-0 w-full">
+      {kind === "personal" ? (
+        <Controller
+          name={`participants.${index}.staffId`}
+          control={control}
+          render={({ field }) => (
+            <LookupSelect
+              size="sm"
+              className="w-full min-w-0"
+              id={`hca-participant-${rowId}`}
+              value={field.value}
+              selectedLabel={displayStaffLabel}
+              onChange={(value, option) => {
+                field.onChange(value);
+                onPickLabel(rowId, option?.label ?? null);
+              }}
+              onBlur={field.onBlur}
+              placeholder="Participante…"
+              searchPlaceholder="Buscar por nombre…"
+              search={searchActiveStaff}
+              resolveSelectedLabel={resolveStaffLabel}
+              clearLabel="Quitar participante"
+              state={staffError ? "error" : "idle"}
+              rightAction={
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onKindChange(index, "manual");
+                  }}
+                  tabIndex={-1}
+                  title="Escribir nombre manualmente"
+                  aria-label="Escribir nombre manualmente"
+                  className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                >
+                  <PenLine className="h-3.5 w-3.5" />
+                </button>
+              }
+            />
+          )}
+        />
+      ) : (
+        <div className="relative">
+          <ControlInput
+            size="sm"
+            id={`hca-participant-manual-${rowId}`}
+            placeholder="Nombre completo…"
+            state={manualError ? "error" : "idle"}
+            className="w-full pr-8"
+            {...register(`participants.${index}.name`)}
+          />
+          <button
+            type="button"
+            onClick={() => onKindChange(index, "personal")}
+            tabIndex={-1}
+            title="Buscar usuario en el sistema"
+            aria-label="Buscar usuario en el sistema"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+          >
+            <Users className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+      {fieldError ? (
+        <p className="mt-0.5 px-0.5 text-[10px] font-medium leading-snug text-brand-red-dark">
+          {fieldError}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+const LIST_ROW_REMOVE_MS = 280;
 const HCA_TEXTAREA_AUTO = "min-h-0 resize-none overflow-hidden";
+/** Una línea (13px + py-2.5 + borde), mismo mínimo que autoResize en causas y plan. */
+const HCA_CAUSE_LINE_MIN_PX = 42;
+/** Campos dentro de celdas: etiqueta solo para lectores de pantalla. */
+const HCA_TABLE_FIELD = "[&_label]:sr-only";
+
+function HcaPlanWhoCell({
+  index,
+  rowId,
+  control,
+  register,
+  planErrors,
+  staffLabel,
+  pickLabel,
+  onPickLabel,
+  onModeChange,
+}: {
+  index: number;
+  rowId: string;
+  control: Control<FormValues>;
+  register: UseFormRegister<FormValues>;
+  planErrors: FieldErrors<PlanRowValues> | undefined;
+  staffLabel?: string;
+  pickLabel?: string;
+  onPickLabel: (rowId: string, label: string | null) => void;
+  onModeChange: (index: number, mode: "sistema" | "manual") => void;
+}) {
+  const mode = useWatch({ control, name: `planItems.${index}.responsibleMode` }) ?? "sistema";
+  const staffError = planErrors?.responsibleStaffId?.message;
+  const manualError = planErrors?.responsibleManualName?.message;
+  const fieldError = staffError ?? manualError;
+  const displayStaffLabel = pickLabel ?? staffLabel;
+
+  return (
+    <div className="min-w-0 w-full">
+      {mode === "sistema" ? (
+        <Controller
+          name={`planItems.${index}.responsibleStaffId`}
+          control={control}
+          render={({ field }) => (
+            <LookupSelect
+              size="sm"
+              className="w-full min-w-0"
+              id={`hca-plan-who-${rowId}`}
+              aria-labelledby={`hca-plan-who-label-${index}`}
+              value={field.value}
+              selectedLabel={displayStaffLabel}
+              onChange={(value, option) => {
+                field.onChange(value);
+                onPickLabel(rowId, option?.label ?? null);
+              }}
+              onBlur={field.onBlur}
+              placeholder="Responsable…"
+              searchPlaceholder="Buscar por nombre…"
+              search={searchActiveStaff}
+              resolveSelectedLabel={resolveStaffLabel}
+              clearLabel="Quitar responsable"
+              state={staffError ? "error" : "idle"}
+              rightAction={
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onModeChange(index, "manual");
+                  }}
+                  tabIndex={-1}
+                  title="Escribir nombre manualmente"
+                  aria-label="Escribir nombre manualmente"
+                  className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                >
+                  <PenLine className="h-3.5 w-3.5" />
+                </button>
+              }
+            />
+          )}
+        />
+      ) : (
+        <div className="relative">
+          <ControlInput
+            size="sm"
+            id={`hca-plan-who-manual-${rowId}`}
+            aria-labelledby={`hca-plan-who-label-${index}`}
+            placeholder="Nombre del responsable"
+            state={manualError ? "error" : "idle"}
+            className="w-full pr-8"
+            {...register(`planItems.${index}.responsibleManualName`)}
+          />
+          <button
+            type="button"
+            onClick={() => onModeChange(index, "sistema")}
+            tabIndex={-1}
+            title="Buscar usuario en el sistema"
+            aria-label="Buscar usuario en el sistema"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+          >
+            <Users className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+      {fieldError ? (
+        <p className="mt-0.5 px-0.5 text-[10px] font-medium leading-snug text-brand-red-dark">
+          {fieldError}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function bindAutoResizeTextarea(
   field: UseFormRegisterReturn,
@@ -240,7 +472,6 @@ export function HcaFormModal({
   const { user } = useAuth();
   const receipts = useReceipts();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [formError, setFormError] = useState<string | null>(null);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loadingExtras, setLoadingExtras] = useState(isEdit);
   const originalParticipants = useRef<HcaParticipant[]>(sheet?.participants ?? []);
@@ -297,7 +528,7 @@ export function HcaFormModal({
           ? sheet.causes.map((cause) => ({ text: cause.description }))
           : [{ text: "" }, { text: "" }],
       planItems: [emptyPlanRow(), emptyPlanRow()],
-      participants: [emptyParticipant(), emptyParticipant()],
+      participants: isEdit ? [emptyParticipant()] : [defaultCreatorParticipant(user)],
       comments: sheet?.comments ?? "",
     },
   });
@@ -318,13 +549,46 @@ export function HcaFormModal({
   const [causeEnterIds, setCauseEnterIds] = useState<Set<string>>(() => new Set());
   const prevCauseFieldIdsRef = useRef<string[] | null>(null);
   const causeRemoveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const planTextareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+  const planItemsWatch = useWatch({ control, name: "planItems" });
+  const [removingPlanIds, setRemovingPlanIds] = useState<Set<string>>(() => new Set());
+  const [planEnterIds, setPlanEnterIds] = useState<Set<string>>(() => new Set());
+  const prevPlanFieldIdsRef = useRef<string[] | null>(null);
+  const planRemoveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  /** Etiqueta del responsable en filas cargadas del servidor (modo sistema). */
+  const planStaffLabelsRef = useRef<Record<number, string>>({});
+  const [planStaffPickLabels, setPlanStaffPickLabels] = useState<Record<string, string>>({});
+  const [participantPickLabels, setParticipantPickLabels] = useState<Record<string, string>>({});
+  const [removingParticipantIds, setRemovingParticipantIds] = useState<Set<string>>(() => new Set());
+  const [participantEnterIds, setParticipantEnterIds] = useState<Set<string>>(() => new Set());
+  const prevParticipantFieldIdsRef = useRef<string[] | null>(null);
+  const participantRemoveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const commentsTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const commentsValue = useWatch({ control, name: "comments" }) ?? "";
 
   const responsibleMode = useWatch({ control, name: "responsibleMode" }) ?? "sistema";
+
+  function handlePlanStaffPickLabel(rowId: string, label: string | null) {
+    setPlanStaffPickLabels((prev) => {
+      if (label === null || label === "") {
+        if (prev[rowId] === undefined) return prev;
+        const next = { ...prev };
+        delete next[rowId];
+        return next;
+      }
+      if (prev[rowId] === label) return prev;
+      return { ...prev, [rowId]: label };
+    });
+  }
 
   useEffect(() => {
     return () => {
       for (const timer of causeRemoveTimers.current.values()) clearTimeout(timer);
       causeRemoveTimers.current.clear();
+      for (const timer of planRemoveTimers.current.values()) clearTimeout(timer);
+      planRemoveTimers.current.clear();
+      for (const timer of participantRemoveTimers.current.values()) clearTimeout(timer);
+      participantRemoveTimers.current.clear();
     };
   }, []);
 
@@ -345,14 +609,62 @@ export function HcaFormModal({
     prevCauseFieldIdsRef.current = ids;
   }, [causeFields.fields]);
 
+  useEffect(() => {
+    const ids = planFields.fields.map((field) => field.id);
+    if (prevPlanFieldIdsRef.current === null) {
+      prevPlanFieldIdsRef.current = ids;
+      return;
+    }
+    const added = ids.filter((id) => !prevPlanFieldIdsRef.current!.includes(id));
+    if (added.length > 0 && !prefersReducedMotion()) {
+      setPlanEnterIds((prev) => {
+        const next = new Set(prev);
+        for (const id of added) next.add(id);
+        return next;
+      });
+    }
+    prevPlanFieldIdsRef.current = ids;
+  }, [planFields.fields]);
+
+  useEffect(() => {
+    const ids = participantFields.fields.map((field) => field.id);
+    if (prevParticipantFieldIdsRef.current === null) {
+      prevParticipantFieldIdsRef.current = ids;
+      return;
+    }
+    const added = ids.filter((id) => !prevParticipantFieldIdsRef.current!.includes(id));
+    if (added.length > 0 && !prefersReducedMotion()) {
+      setParticipantEnterIds((prev) => {
+        const next = new Set(prev);
+        for (const id of added) next.add(id);
+        return next;
+      });
+    }
+    prevParticipantFieldIdsRef.current = ids;
+  }, [participantFields.fields]);
+
   useLayoutEffect(() => {
     if (step !== 2) return;
     autoResizeTextarea(descriptionTextareaRef.current, 96);
     autoResizeTextarea(immediateActionTextareaRef.current, 64);
     for (const element of causeTextareaRefs.current.values()) {
-      autoResizeTextarea(element, 64);
+      autoResizeTextarea(element, HCA_CAUSE_LINE_MIN_PX);
     }
   }, [step, descriptionValue, immediateActionValue, causesWatch, causeFields.fields.length]);
+
+  useLayoutEffect(() => {
+    if (step !== 3) return;
+    for (const element of planTextareaRefs.current.values()) {
+      autoResizeTextarea(element, HCA_CAUSE_LINE_MIN_PX);
+    }
+  }, [step, planItemsWatch, planFields.fields.length]);
+
+  useLayoutEffect(() => {
+    if (step !== 4) return;
+    autoResizeTextarea(commentsTextareaRef.current, HCA_CAUSE_LINE_MIN_PX);
+  }, [step, commentsValue, participantFields.fields.length]);
+
+  const commentsField = register("comments");
 
   function handleAddCause() {
     causeFields.append({ text: "" });
@@ -384,8 +696,42 @@ export function HcaFormModal({
       });
       causeTextareaRefs.current.delete(fieldId);
       causeRemoveTimers.current.delete(fieldId);
-    }, CAUSE_REMOVE_MS);
+    }, LIST_ROW_REMOVE_MS);
     causeRemoveTimers.current.set(fieldId, timer);
+  }
+
+  function handleAddPlanRow() {
+    planFields.append(emptyPlanRow());
+  }
+
+  function handleRemovePlanRow(index: number) {
+    if (planFields.fields.length <= 1) return;
+    const fieldId = planFields.fields[index]?.id;
+    if (!fieldId) {
+      planFields.remove(index);
+      return;
+    }
+    if (removingPlanIds.has(fieldId)) return;
+
+    if (prefersReducedMotion()) {
+      planFields.remove(index);
+      planTextareaRefs.current.delete(fieldId);
+      return;
+    }
+
+    setRemovingPlanIds((prev) => new Set(prev).add(fieldId));
+    const timer = setTimeout(() => {
+      const currentIndex = planFields.fields.findIndex((field) => field.id === fieldId);
+      if (currentIndex >= 0) planFields.remove(currentIndex);
+      setRemovingPlanIds((prev) => {
+        const next = new Set(prev);
+        next.delete(fieldId);
+        return next;
+      });
+      planTextareaRefs.current.delete(fieldId);
+      planRemoveTimers.current.delete(fieldId);
+    }, LIST_ROW_REMOVE_MS);
+    planRemoveTimers.current.set(fieldId, timer);
   }
 
   function handleResponsibleModeChange(newMode: "sistema" | "manual") {
@@ -408,11 +754,22 @@ export function HcaFormModal({
       .then(([planRes]) => {
         if (cancelled) return;
         if (planRes.items.length > 0) {
+          const staffLabels: Record<number, string> = {};
+          for (const item of planRes.items) {
+            if (item.responsibleStaffId != null) {
+              staffLabels[item.id] = item.responsibleName;
+            }
+          }
+          planStaffLabelsRef.current = staffLabels;
           planFields.replace(
             planRes.items.map((item) => ({
               serverId: item.id,
               description: item.description,
-              responsibleStaffId: String(item.responsibleStaffId),
+              responsibleMode:
+                item.responsibleStaffId != null ? ("sistema" as const) : ("manual" as const),
+              responsibleStaffId:
+                item.responsibleStaffId != null ? String(item.responsibleStaffId) : "",
+              responsibleManualName: item.responsibleManualName ?? "",
               dueDate: item.dueDate,
               evidenceNotes: item.evidenceNotes ?? "",
             })),
@@ -421,13 +778,15 @@ export function HcaFormModal({
         originalParticipants.current = sheet.participants;
         if (sheet.participants.length > 0) {
           participantFields.replace(
-            sheet.participants.map((p) => ({
+            sheet.participants.slice(0, 2).map((p) => ({
               serverId: p.id,
               kind: p.staffId ? ("personal" as const) : ("manual" as const),
               staffId: p.staffId ? String(p.staffId) : "",
               name: p.name,
             })),
           );
+        } else {
+          participantFields.replace([defaultCreatorParticipant(user)]);
         }
       })
       .catch(() => {
@@ -509,7 +868,6 @@ export function HcaFormModal({
   }
 
   async function handleNextStep() {
-    setFormError(null);
     if (step === 1) {
       const ok = await trigger([
         "detectedAt",
@@ -551,17 +909,100 @@ export function HcaFormModal({
     }
   }
 
+  function handleParticipantPickLabel(rowId: string, label: string | null) {
+    setParticipantPickLabels((current) => {
+      if (!label) {
+        const next = { ...current };
+        delete next[rowId];
+        return next;
+      }
+      return { ...current, [rowId]: label };
+    });
+  }
+
+  function handleAddParticipant() {
+    if (participantFields.fields.length >= 2) return;
+    participantFields.append(emptyParticipant());
+  }
+
+  function handleRemoveParticipant(index: number) {
+    if (index <= 0) return;
+    const fieldId = participantFields.fields[index]?.id;
+    if (!fieldId) {
+      participantFields.remove(index);
+      return;
+    }
+    if (removingParticipantIds.has(fieldId)) return;
+
+    if (prefersReducedMotion()) {
+      participantFields.remove(index);
+      setParticipantPickLabels((prev) => {
+        if (prev[fieldId] === undefined) return prev;
+        const next = { ...prev };
+        delete next[fieldId];
+        return next;
+      });
+      return;
+    }
+
+    setRemovingParticipantIds((prev) => new Set(prev).add(fieldId));
+    const timer = setTimeout(() => {
+      const currentIndex = participantFields.fields.findIndex((field) => field.id === fieldId);
+      if (currentIndex >= 0) participantFields.remove(currentIndex);
+      setRemovingParticipantIds((prev) => {
+        const next = new Set(prev);
+        next.delete(fieldId);
+        return next;
+      });
+      setParticipantPickLabels((prev) => {
+        if (prev[fieldId] === undefined) return prev;
+        const next = { ...prev };
+        delete next[fieldId];
+        return next;
+      });
+      participantRemoveTimers.current.delete(fieldId);
+    }, LIST_ROW_REMOVE_MS);
+    participantRemoveTimers.current.set(fieldId, timer);
+  }
+
+  function handleParticipantKindChange(index: number, newKind: "personal" | "manual") {
+    const current = getValues(`participants.${index}.kind`);
+    if (current === newKind) return;
+    setValue(`participants.${index}.kind`, newKind, { shouldDirty: true, shouldValidate: true });
+    if (newKind === "manual") {
+      setValue(`participants.${index}.staffId`, "");
+    } else {
+      setValue(`participants.${index}.name`, "");
+    }
+  }
+
+  function handlePlanResponsibleModeChange(index: number, newMode: "sistema" | "manual") {
+    const current = getValues(`planItems.${index}.responsibleMode`);
+    if (current === newMode) return;
+    setValue(`planItems.${index}.responsibleMode`, newMode, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    if (newMode === "manual") {
+      setValue(`planItems.${index}.responsibleStaffId`, "");
+    } else {
+      setValue(`planItems.${index}.responsibleManualName`, "");
+    }
+  }
+
   async function syncPlanItems(sheetId: number, rows: PlanRowValues[]) {
-    const filled = rows.filter(
-      (row) =>
-        row.description.trim().length >= 10 &&
-        row.responsibleStaffId !== "" &&
-        row.dueDate !== "",
-    );
+    const filled = rows.filter((row) => {
+      if (row.description.trim().length < 10 || row.dueDate === "") return false;
+      if (row.responsibleMode === "sistema") return row.responsibleStaffId !== "";
+      return row.responsibleManualName.trim().length >= 3;
+    });
     for (const row of filled) {
       const payload = {
         description: row.description.trim(),
-        responsibleStaffId: Number(row.responsibleStaffId),
+        responsibleStaffId:
+          row.responsibleMode === "sistema" ? Number(row.responsibleStaffId) : null,
+        responsibleManualName:
+          row.responsibleMode === "manual" ? row.responsibleManualName.trim() : null,
         dueDate: row.dueDate,
         evidenceNotes: row.evidenceNotes.trim() === "" ? null : row.evidenceNotes.trim(),
       };
@@ -595,7 +1036,6 @@ export function HcaFormModal({
   }
 
   async function onSubmit(values: FormValues) {
-    setFormError(null);
     const immediateAction = values.immediateAction.trim();
     const comments = values.comments.trim();
 
@@ -604,7 +1044,6 @@ export function HcaFormModal({
     const dueDate = resolveDueDate(values.detectedAt, values.dueDate);
 
     if (clientId === "") {
-      setFormError("Falta el cliente: abre la HCA desde un ticket con cliente o edita una hoja existente.");
       receipts.failed({
         action: "hca-cliente",
         title: "Cliente requerido",
@@ -613,11 +1052,19 @@ export function HcaFormModal({
       return;
     }
     if (productLineId === "") {
-      setFormError("No hay línea de producto disponible para esta HCA.");
+      receipts.failed({
+        action: "hca-linea",
+        title: "Línea de producto requerida",
+        detail: "No hay línea de producto disponible para esta HCA.",
+      });
       return;
     }
     if (dueDate < values.detectedAt) {
-      setFormError("La fecha de cierre no puede ser anterior a la del hecho.");
+      receipts.failed({
+        action: "hca-fechas",
+        title: "Fechas inconsistentes",
+        detail: "La fecha de cierre no puede ser anterior a la del hecho.",
+      });
       return;
     }
 
@@ -657,7 +1104,6 @@ export function HcaFormModal({
     } catch (err) {
       const fallback = isEdit ? "No se pudo guardar la HCA" : "No se pudo crear la HCA";
       const msg = err instanceof ApiError ? err.message : fallback;
-      setFormError(msg);
       receipts.failed({ action: "error-hca", title: "Error al guardar", detail: msg });
     }
   }
@@ -671,13 +1117,19 @@ export function HcaFormModal({
   }
 
   const modalMaxWidth =
-    step === 1 ? "max-w-3xl" : step === 2 ? "max-w-4xl" : "max-w-[96vw] 2xl:max-w-[1400px] w-full";
+    step === 1
+      ? "max-w-3xl"
+      : step === 2
+      ? "max-w-4xl"
+      : step === 4
+      ? "max-w-3xl"
+      : "w-full max-w-[min(96vw,96rem)]";
 
   const stepLabels: Record<typeof step, { title: string; hint: string }> = {
     1: { title: "Identificación", hint: "Código, fechas y responsables" },
     2: { title: "Hecho y causas", hint: "Descripción del hallazgo" },
     3: { title: "Plan de acción", hint: "Qué, quién y cuándo" },
-    4: { title: "Participantes", hint: "Firmas y comentarios" },
+    4: { title: "Participantes", hint: "Elaboró, otro participante y comentarios" },
   };
 
   const renderStepper = () => (
@@ -939,37 +1391,33 @@ export function HcaFormModal({
         <div className="space-y-2">
           {causeFields.fields.map((field, index) => {
             const causeField = register(`causes.${index}.text`);
+            const causeFieldId = `hca-cause-${field.id}`;
+            const causeLabel = index === 0 ? "Causa identificada" : `Causa ${index + 1}`;
+            const causeError = errors.causes?.[index]?.text?.message;
             const exiting = removingCauseIds.has(field.id);
             const entering = causeEnterIds.has(field.id);
             return (
               <div
                 key={field.id}
-                className={`flex items-start gap-2 ${
+                className={`grid grid-cols-[1fr_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1.5 ${
                   exiting
-                    ? "animate-plf-check-out"
+                    ? "animate-plf-list-row-out"
                     : entering
-                    ? "animate-plf-seal-pop"
+                    ? "animate-plf-list-row-in"
                     : ""
                 }`}
               >
-                <span className="mt-2.5 w-5 shrink-0 text-xs font-mono text-zinc-400 tabular-nums">
-                  {index + 1}.
-                </span>
-                <div className="min-w-0 flex-1">
-                  <TextAreaField
-                    label={index === 0 ? "Causa identificada" : `Causa ${index + 1}`}
-                    rows={2}
-                    className={HCA_TEXTAREA_AUTO}
-                    placeholder="Describe una causa raíz o factor contribuyente…"
-                    error={errors.causes?.[index]?.text?.message}
-                    {...bindAutoResizeTextarea(causeField, 64, (element) => {
-                      if (element) causeTextareaRefs.current.set(field.id, element);
-                      else causeTextareaRefs.current.delete(field.id);
-                    })}
-                  />
-                </div>
-                {causeFields.fields.length > 1 && (
-                  <div className="pt-6">
+                <label
+                  htmlFor={causeFieldId}
+                  className="col-start-1 row-start-1 flex min-w-0 items-baseline gap-1 font-heading text-[11.5px] font-semibold leading-[1.2] text-faint"
+                >
+                  <span className="w-4 shrink-0 text-right font-normal tabular-nums text-zinc-400">
+                    {index + 1}.
+                  </span>
+                  <span className="min-w-0">{causeLabel}</span>
+                </label>
+                {causeFields.fields.length > 1 ? (
+                  <div className="col-start-2 row-start-1 self-center">
                     <RowAction
                       label={`Quitar causa ${index + 1}`}
                       icon={Trash2}
@@ -978,7 +1426,27 @@ export function HcaFormModal({
                       onClick={() => handleRemoveCause(index)}
                     />
                   </div>
-                )}
+                ) : null}
+                <textarea
+                  id={causeFieldId}
+                  rows={1}
+                  aria-invalid={causeError !== undefined}
+                  placeholder="Describe una causa raíz o factor contribuyente…"
+                  className={`col-span-2 row-start-2 w-full rounded-edge border bg-white px-3 py-2.5 text-[13px] leading-relaxed text-ink outline-none transition-colors placeholder:text-faint ${
+                    causeError
+                      ? "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/10"
+                      : "border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
+                  } ${HCA_TEXTAREA_AUTO}`}
+                  {...bindAutoResizeTextarea(causeField, HCA_CAUSE_LINE_MIN_PX, (element) => {
+                    if (element) causeTextareaRefs.current.set(field.id, element);
+                    else causeTextareaRefs.current.delete(field.id);
+                  })}
+                />
+                {causeError ? (
+                  <p className="col-span-2 row-start-3 animate-plf-shake text-[11px] font-medium text-brand-red-dark leading-none">
+                    {causeError}
+                  </p>
+                ) : null}
               </div>
             );
           })}
@@ -996,114 +1464,146 @@ export function HcaFormModal({
     </div>
   );
 
-  const renderPlanRow = (index: number, planErrors: FieldErrors<PlanRowValues> | undefined) => (
-    <tr key={planFields.fields[index]?.id ?? index} className="align-top">
-      <td className="py-2 pl-3 pr-2 text-center font-mono text-[11px] text-zinc-400">{index + 1}</td>
-      <td className="py-2 px-2 min-w-[200px]">
-        <TextAreaField
-          label="Acción (qué)"
-          rows={2}
-          placeholder="Qué se hará para corregir o prevenir…"
-          error={planErrors?.description?.message}
-          {...register(`planItems.${index}.description`)}
-        />
-      </td>
-      <td className="py-2 px-2 min-w-[180px]">
-        <Controller
-          name={`planItems.${index}.responsibleStaffId`}
-          control={control}
-          render={({ field }) => (
-            <LookupField
-              size="sm"
-              label="Quién"
-              name={field.name}
-              value={field.value}
-              onChange={(value) => field.onChange(value)}
-              onBlur={field.onBlur}
-              placeholder="Responsable…"
-              search={searchActiveStaff}
-              resolveSelectedLabel={resolveStaffLabel}
-              error={planErrors?.responsibleStaffId?.message}
-            />
-          )}
-        />
-      </td>
-      <td className="py-2 px-2 min-w-[140px]">
-        <Controller
-          name={`planItems.${index}.dueDate`}
-          control={control}
-          render={({ field }) => (
-            <DateField
-              label="Cuándo"
-              value={field.value}
-              onChange={field.onChange}
-              placeholder="Fecha…"
-              headerLabel="Cuándo"
-              error={planErrors?.dueDate?.message}
-            />
-          )}
-        />
-      </td>
-      <td className="py-2 pr-3 pl-1">
-        {planFields.fields.length > 1 && (
-          <RowAction
-            label="Quitar fila"
-            icon={Trash2}
-            danger
-            onClick={() => planFields.remove(index)}
-          />
-        )}
-      </td>
-    </tr>
-  );
-
   const renderStep3 = () => (
-    <div className="flex flex-col gap-4 animate-plf-fade w-full">
+    <div className="flex w-full flex-col gap-4 animate-plf-fade">
       {loadingExtras && isEdit && (
         <p className="text-xs text-zinc-500 text-center">Cargando plan de acción…</p>
       )}
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xs">
-        <div className="border-b border-zinc-200 bg-zinc-50/90 px-4 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="size-4 text-brand-red" />
-            <span className="font-heading text-xs font-bold uppercase tracking-wider text-zinc-800">
-              Plan de acción
-            </span>
-          </div>
-          <span className="text-[10px] text-zinc-400 uppercase tracking-wide">Acción · Quién · Cuándo</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[720px]">
+      <HcaFormBlock label="Plan de acción">
+        <div className="-mx-1 w-full overflow-x-auto sm:-mx-0">
+          <table className="w-full min-w-0 table-fixed border-collapse text-[13px]">
+            <colgroup>
+              <col className="w-9" />
+              <col />
+              <col className="w-[17rem]" />
+              <col className="w-[11rem]" />
+              <col className="w-9" />
+            </colgroup>
             <thead>
-              <tr className="border-b border-zinc-200 text-[10px] font-heading font-bold uppercase tracking-wider text-zinc-500">
-                <th className="py-2 pl-3 w-10">#</th>
-                <th className="py-2 px-2">Acción (qué)</th>
-                <th className="py-2 px-2 w-[200px]">Quién</th>
-                <th className="py-2 px-2 w-[150px]">Cuándo</th>
-                <th className="w-10" />
+              <tr className="border-b border-zinc-200/90 bg-zinc-50/70">
+                <th className="py-2 pl-2 text-center font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-500">
+                  #
+                </th>
+                <th className="border-l border-zinc-200/80 px-3 py-2 text-left font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-500">
+                  Acción (qué)
+                </th>
+                <th className="border-l border-zinc-200/80 px-3 py-2 text-left font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-500">
+                  Quién
+                </th>
+                <th className="border-l border-zinc-200/80 px-2 py-2 text-left font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-500">
+                  Cuándo
+                </th>
+                <th className="border-l border-zinc-200/80" aria-hidden />
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {planFields.fields.map((_, index) =>
-                renderPlanRow(index, errors.planItems?.[index]),
-              )}
+            <tbody>
+              {planFields.fields.map((planField, index) => {
+                const planErrors = errors.planItems?.[index];
+                const descriptionField = register(`planItems.${index}.description`);
+                const exiting = removingPlanIds.has(planField.id);
+                const entering = planEnterIds.has(planField.id);
+                return (
+                  <tr
+                    key={planField.id}
+                    className={`border-b border-zinc-100/90 transition-colors hover:bg-zinc-50/40 ${
+                      exiting
+                        ? "animate-plf-list-row-out"
+                        : entering
+                        ? "animate-plf-list-row-in"
+                        : ""
+                    }`}
+                  >
+                    <td className="align-top py-2.5 pl-2 text-center font-heading text-[11.5px] font-normal tabular-nums leading-none text-zinc-400">
+                      {index + 1}
+                    </td>
+                    <td className="align-top border-l border-zinc-100 px-2 py-1.5">
+                      <div className={HCA_TABLE_FIELD}>
+                        <textarea
+                          rows={1}
+                          aria-label={`Acción ${index + 1}`}
+                          placeholder="Qué se hará para corregir o prevenir…"
+                          className={`w-full rounded-md border bg-white px-2.5 py-2 text-[13px] leading-relaxed text-ink outline-none transition-colors placeholder:text-faint ${
+                            planErrors?.description?.message
+                              ? "border-brand-red bg-brand-red/[0.02] focus:ring-2 focus:ring-brand-red/10"
+                              : "border-transparent hover:border-zinc-200 focus:border-brand-red/40 focus:ring-2 focus:ring-brand-red/10"
+                          } ${HCA_TEXTAREA_AUTO}`}
+                          {...bindAutoResizeTextarea(descriptionField, HCA_CAUSE_LINE_MIN_PX, (element) => {
+                            if (element) planTextareaRefs.current.set(planField.id, element);
+                            else planTextareaRefs.current.delete(planField.id);
+                          })}
+                        />
+                        {planErrors?.description?.message ? (
+                          <p className="px-0.5 text-[10px] font-medium leading-snug text-brand-red-dark">
+                            {planErrors.description.message}
+                          </p>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="align-top border-l border-zinc-100 px-1 py-1.5">
+                      <span id={`hca-plan-who-label-${index}`} className="sr-only">
+                        Quién · acción {index + 1}
+                      </span>
+                      <HcaPlanWhoCell
+                        index={index}
+                        rowId={planField.id}
+                        control={control}
+                        register={register}
+                        planErrors={planErrors}
+                        pickLabel={planStaffPickLabels[planField.id]}
+                        staffLabel={
+                          planField.serverId != null
+                            ? planStaffLabelsRef.current[planField.serverId]
+                            : undefined
+                        }
+                        onPickLabel={handlePlanStaffPickLabel}
+                        onModeChange={handlePlanResponsibleModeChange}
+                      />
+                    </td>
+                    <td className="align-top border-l border-zinc-100 px-1 py-1.5">
+                      <div className={`${HCA_TABLE_FIELD} w-full min-w-0`}>
+                        <Controller
+                          name={`planItems.${index}.dueDate`}
+                          control={control}
+                          render={({ field }) => (
+                            <DateField
+                              label="Cuándo"
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Fecha…"
+                              headerLabel="Cuándo"
+                              className="w-full"
+                              error={planErrors?.dueDate?.message}
+                            />
+                          )}
+                        />
+                      </div>
+                    </td>
+                    <td className="align-top border-l border-zinc-100 px-1 py-2">
+                      {planFields.fields.length > 1 ? (
+                        <RowAction
+                          label="Quitar acción"
+                          icon={Trash2}
+                          danger
+                          disabled={exiting}
+                          onClick={() => handleRemovePlanRow(index)}
+                        />
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
         {planFields.fields.length < 20 && (
-          <div className="border-t border-zinc-100 px-4 py-2.5">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => planFields.append(emptyPlanRow())}
-            >
+          <div className="mt-3 border-t border-zinc-100 pt-3">
+            <Button type="button" size="sm" variant="secondary" onClick={handleAddPlanRow}>
               <Plus className="h-3.5 w-3.5" />
               Agregar acción
             </Button>
           </div>
         )}
-      </div>
+      </HcaFormBlock>
 
       <HcaFormBlock label="Evidencias">
         <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
@@ -1131,142 +1631,160 @@ export function HcaFormModal({
     </div>
   );
 
-  function ParticipantTableRow({
-    index,
-    rowErrors,
-  }: {
-    index: number;
-    rowErrors: FieldErrors<ParticipantRowValues> | undefined;
-  }) {
-    const kind = useWatch({ control, name: `participants.${index}.kind` }) ?? "personal";
+  const renderStep4 = () => {
+    const elaboroField = participantFields.fields[0];
+    const elaboroRow = elaboroField ? getValues("participants.0") : undefined;
+    let elaboroStaffLabel: string | undefined;
+    if (elaboroRow?.kind === "personal" && elaboroRow.staffId !== "") {
+      if (elaboroRow.staffId === String(user?.staffId ?? "")) {
+        elaboroStaffLabel = elaboradoLabel;
+      } else if (elaboroRow.name.trim() !== "") {
+        elaboroStaffLabel = elaboroRow.name.trim();
+      }
+    }
+
+    const fieldLabelClass = "mb-1 block font-heading text-[11.5px] font-semibold text-faint";
+    const participantActionCol = "1.75rem";
+
     return (
-      <tr key={participantFields.fields[index]?.id ?? index} className="align-top">
-        <td className="py-2 pl-3 pr-2 text-center font-mono text-[11px] text-zinc-400">{index + 1}</td>
-        <td className="py-2 px-2 min-w-[160px]">
-          <Controller
-            name={`participants.${index}.kind`}
-            control={control}
-            render={({ field }) => (
-              <SelectField
-                size="sm"
-                label="Tipo"
-                name={field.name}
-                value={field.value}
-                onChange={field.onChange}
-                options={[
-                  { value: "personal", label: "Personal del sistema" },
-                  { value: "manual", label: "Nombre manual" },
-                ]}
+      <div className="animate-plf-fade mx-auto w-full max-w-3xl">
+        <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-stretch lg:divide-x lg:divide-zinc-100">
+            <div className="min-w-0 p-3 sm:p-4">
+              <div
+                className="grid gap-x-1 gap-y-2"
+                style={{ gridTemplateColumns: `minmax(0, 1fr) ${participantActionCol}` }}
+              >
+                {elaboroField ? (
+                  <>
+                    <div
+                      className="flex items-center justify-between gap-2"
+                      style={{ gridColumn: "1 / -1" }}
+                    >
+                      <label
+                        htmlFor={`hca-participant-${elaboroField.id}`}
+                        className="font-heading text-[11.5px] font-semibold text-faint"
+                      >
+                        Elaboró
+                        <span className="ml-1 font-normal text-zinc-400">· tu usuario</span>
+                      </label>
+                      {participantFields.fields.length < 2 ? (
+                        <button
+                          type="button"
+                          onClick={handleAddParticipant}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800"
+                        >
+                          <Plus className="h-3.5 w-3.5" aria-hidden />
+                          Otro
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="min-w-0">
+                      <HcaParticipantWhoCell
+                        index={0}
+                        rowId={elaboroField.id}
+                        control={control}
+                        register={register}
+                        rowErrors={errors.participants?.[0]}
+                        pickLabel={participantPickLabels[elaboroField.id]}
+                        staffLabel={elaboroStaffLabel}
+                        onPickLabel={handleParticipantPickLabel}
+                        onKindChange={handleParticipantKindChange}
+                      />
+                    </div>
+                    <span className="h-7 w-7 shrink-0 self-center" aria-hidden />
+                  </>
+                ) : null}
+
+                {participantFields.fields.slice(1).map((field, sliceIndex) => {
+                  const index = sliceIndex + 1;
+                  const row = getValues(`participants.${index}`);
+                  let staffLabel: string | undefined;
+                  if (row?.kind === "personal" && row.staffId !== "") {
+                    if (row.staffId === String(user?.staffId ?? "")) {
+                      staffLabel = elaboradoLabel;
+                    } else if (row.name.trim() !== "") {
+                      staffLabel = row.name.trim();
+                    }
+                  }
+                  const exiting = removingParticipantIds.has(field.id);
+                  const entering = participantEnterIds.has(field.id);
+                  return (
+                    <div
+                      key={field.id}
+                      className={`col-span-full grid gap-x-1 gap-y-1 ${
+                        exiting
+                          ? "animate-plf-list-row-out"
+                          : entering
+                          ? "animate-plf-list-row-in"
+                          : ""
+                      }`}
+                      style={{ gridTemplateColumns: `minmax(0, 1fr) ${participantActionCol}` }}
+                    >
+                      <label
+                        htmlFor={`hca-participant-${field.id}`}
+                        className={fieldLabelClass}
+                        style={{ gridColumn: "1 / -1" }}
+                      >
+                        Otro
+                      </label>
+                      <div className="min-w-0">
+                        <HcaParticipantWhoCell
+                          index={index}
+                          rowId={field.id}
+                          control={control}
+                          register={register}
+                          rowErrors={errors.participants?.[index]}
+                          pickLabel={participantPickLabels[field.id]}
+                          staffLabel={staffLabel}
+                          onPickLabel={handleParticipantPickLabel}
+                          onKindChange={handleParticipantKindChange}
+                        />
+                      </div>
+                      <div className="flex self-center justify-center">
+                        <RowAction
+                          label="Quitar participante"
+                          icon={Trash2}
+                          danger
+                          disabled={exiting}
+                          onClick={() => handleRemoveParticipant(index)}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex min-h-0 min-w-0 flex-col border-t border-zinc-100 p-3 sm:p-4 lg:border-t-0">
+              <label htmlFor="hca-comments" className={fieldLabelClass}>
+                Comentarios
+              </label>
+              <textarea
+                id="hca-comments"
+                rows={1}
+                placeholder="Acuerdos de seguimiento o notas para el cierre…"
+                aria-invalid={errors.comments?.message !== undefined}
+                className={`min-h-[42px] w-full flex-1 rounded-edge border bg-white px-3 py-2.5 text-[13px] leading-relaxed text-ink outline-none transition-colors placeholder:text-faint lg:min-h-[42px] ${
+                  errors.comments?.message
+                    ? "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/10"
+                    : "border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
+                } ${HCA_TEXTAREA_AUTO}`}
+                {...bindAutoResizeTextarea(commentsField, HCA_CAUSE_LINE_MIN_PX, (element) => {
+                  commentsTextareaRef.current = element;
+                })}
               />
-            )}
-          />
-        </td>
-        <td className="py-2 px-2 min-w-[240px]">
-          {kind === "personal" ? (
-            <Controller
-              name={`participants.${index}.staffId`}
-              control={control}
-              render={({ field }) => (
-                <LookupField
-                  size="sm"
-                  label="Nombre"
-                  name={field.name}
-                  value={field.value}
-                  onChange={(value) => field.onChange(value)}
-                  onBlur={field.onBlur}
-                  placeholder="Participante…"
-                  search={searchActiveStaff}
-                  resolveSelectedLabel={resolveStaffLabel}
-                  error={rowErrors?.staffId?.message}
-                />
-              )}
-            />
-          ) : (
-            <TextField
-              label="Nombre"
-              placeholder="Nombre completo…"
-              error={rowErrors?.name?.message}
-              {...register(`participants.${index}.name`)}
-            />
-          )}
-        </td>
-        <td className="py-2 px-2 min-w-[140px]">
-          <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/80 px-3 py-2.5 text-center">
-            <PenLine className="size-4 mx-auto text-zinc-300" />
-            <span className="text-[10px] text-zinc-400 mt-1 block">Firma en impresión</span>
+              {errors.comments?.message ? (
+                <p className="mt-1 text-[10px] font-medium leading-snug text-brand-red-dark">
+                  {errors.comments.message}
+                </p>
+              ) : null}
+            </div>
           </div>
-        </td>
-        <td className="py-2 pr-3">
-          {participantFields.fields.length > 1 && (
-            <RowAction
-              label="Quitar"
-              icon={Trash2}
-              danger
-              onClick={() => participantFields.remove(index)}
-            />
-          )}
-        </td>
-      </tr>
-    );
-  }
-
-  const renderStep4 = () => (
-    <div className="flex flex-col gap-4 animate-plf-fade max-w-4xl mx-auto w-full">
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xs">
-        <div className="border-b border-zinc-200 bg-zinc-50/90 px-4 py-2.5 flex items-center gap-2">
-          <Users className="size-4 text-brand-red" />
-          <span className="font-heading text-xs font-bold uppercase tracking-wider text-zinc-800">
-            Participantes
-          </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[640px]">
-            <thead>
-              <tr className="border-b border-zinc-200 text-[10px] font-heading font-bold uppercase tracking-wider text-zinc-500">
-                <th className="py-2 pl-3 w-10">#</th>
-                <th className="py-2 px-2 w-[160px]">Origen</th>
-                <th className="py-2 px-2">Nombre</th>
-                <th className="py-2 px-2 w-[140px]">Firma</th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {participantFields.fields.map((_, index) => (
-                <ParticipantTableRow
-                  key={participantFields.fields[index]?.id ?? index}
-                  index={index}
-                  rowErrors={errors.participants?.[index]}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {participantFields.fields.length < 20 && (
-          <div className="border-t border-zinc-100 px-4 py-2.5">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => participantFields.append(emptyParticipant())}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Agregar participante
-            </Button>
-          </div>
-        )}
       </div>
-
-      <HcaFormBlock label="Comentarios">
-        <TextAreaField
-          label="Comentarios generales"
-          rows={4}
-          placeholder="Observaciones, acuerdos de seguimiento o notas para el cierre…"
-          error={errors.comments?.message}
-          {...register("comments")}
-        />
-      </HcaFormBlock>
-    </div>
-  );
+    );
+  };
 
   const renderFooterLeft = () => (
     <span className="text-[11px] text-zinc-400 select-none">
@@ -1284,24 +1802,46 @@ export function HcaFormModal({
   );
 
   const renderFooterButtons = () => (
-    <div className="flex items-center gap-2">
-      {step > 1 && (
-        <Button type="button" variant="secondary" size="sm" onClick={() => setStep((step - 1) as typeof step)}>
-          <ChevronLeft className="size-3.5" />
-          Anterior
+    <div className="ml-auto flex shrink-0 items-center gap-2">
+      {step > 1 ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => setStep((step - 1) as typeof step)}
+        >
+          <ChevronLeft className="size-3.5 shrink-0" />
+          <span>Anterior</span>
+        </Button>
+      ) : (
+        <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+          Cancelar
         </Button>
       )}
       {step < 4 ? (
-        <Button type="button" size="sm" onClick={() => void handleNextStep()}>
-          Siguiente
-          <ChevronRight className="size-3.5" />
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          className="rounded-full px-4 font-semibold shadow-sm"
+          onClick={() => void handleNextStep()}
+        >
+          <span>Siguiente</span>
+          <ChevronRight className="size-3.5 shrink-0" strokeWidth={2.25} />
         </Button>
       ) : (
         <>
           <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
             Cancelar
           </Button>
-          <Button type="submit" form="hca-form" size="sm" isLoading={isSubmitting}>
+          <Button
+            type="submit"
+            form="hca-form"
+            variant="primary"
+            size="sm"
+            className="rounded-full px-4 font-semibold shadow-sm"
+            isLoading={isSubmitting}
+          >
             {isEdit ? "Guardar cambios" : "Crear HCA"}
           </Button>
         </>
@@ -1317,7 +1857,6 @@ export function HcaFormModal({
       noValidate
       className="flex flex-col gap-3 text-left"
     >
-      {formError && <Alert variant="error">{formError}</Alert>}
       {step === 1 && renderStep1()}
       {step === 2 && renderStep2()}
       {step === 3 && renderStep3()}

@@ -79,7 +79,8 @@ export function ActionPlanItemModal({
     mode: "onTouched",
     defaultValues: {
       description: item?.description ?? "",
-      responsibleStaffId: item ? String(item.responsibleStaffId) : "",
+      responsibleStaffId:
+        item?.responsibleStaffId != null ? String(item.responsibleStaffId) : "",
       dueDate: item?.dueDate ?? "",
       evidenceNotes: item?.evidenceNotes ?? "",
     },
@@ -118,6 +119,7 @@ export function ActionPlanItemModal({
     const request = {
       description: values.description.trim(),
       responsibleStaffId: Number(values.responsibleStaffId),
+      responsibleManualName: null,
       dueDate: values.dueDate,
       evidenceNotes: evidenceNotes === "" ? null : evidenceNotes,
     };

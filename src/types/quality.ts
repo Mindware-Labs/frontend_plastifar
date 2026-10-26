@@ -109,7 +109,8 @@ export interface ActionPlanItem {
   id: number;
   sheetId: number;
   description: string;
-  responsibleStaffId: number;
+  responsibleStaffId: number | null;
+  responsibleManualName: string | null;
   /** Resuelto por el servidor: la tabla ya no lo busca contra una lista topada. */
   responsibleName: string;
   /** Fecha comprometida, ISO corto. */

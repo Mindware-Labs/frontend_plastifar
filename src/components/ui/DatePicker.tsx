@@ -321,19 +321,19 @@ export function DatePicker({
             : "border-zinc-200 hover:border-zinc-300 focus-visible:border-brand-red focus-visible:ring-2 focus-visible:ring-brand-red/20"
         } ${disabled ? "cursor-not-allowed bg-zinc-50 text-zinc-400" : "text-zinc-800"} ${className}`}
       >
-        <span className="flex items-center gap-2 truncate">
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
           <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-          {hasSelection ? (
-            <span className="font-semibold text-zinc-900 tabular-nums">
-              {formatDisplayDate(value)}
-            </span>
-          ) : (
-            <span className="text-zinc-400 font-normal">{placeholder}</span>
-          )}
+          <span className="min-w-[5.65rem] shrink-0 whitespace-nowrap tabular-nums">
+            {hasSelection ? (
+              <span className="font-semibold text-zinc-900">{formatDisplayDate(value)}</span>
+            ) : (
+              <span className="font-normal text-zinc-400">{placeholder}</span>
+            )}
+          </span>
         </span>
 
-        <span className="flex items-center gap-1.5 shrink-0">
-          {hasSelection && !disabled && (
+        <span className="flex shrink-0 items-center gap-1.5">
+          {hasSelection && !disabled ? (
             <span
               role="button"
               tabIndex={0}
@@ -347,6 +347,8 @@ export function DatePicker({
             >
               <X className="h-3 w-3" />
             </span>
+          ) : (
+            <span className="h-4 w-4 shrink-0" aria-hidden />
           )}
           <ChevronDown
             className={`h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 ${

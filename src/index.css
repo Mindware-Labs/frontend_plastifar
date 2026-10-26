@@ -738,6 +738,28 @@ input:-webkit-autofill:focus {
   to { transform: none; }
 }
 
+@keyframes plf-list-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plf-list-row-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
 @keyframes plf-settle {
   0%, 100% { transform: translateY(0); }
   38% { transform: translateY(3px); }
@@ -786,6 +808,8 @@ input:-webkit-autofill:focus {
 .animate-plf-otp-confirm { animation: plf-otp-confirm 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-receipt-in { animation: plf-receipt-in 0.28s var(--ease-plf-spring) both; }
 .animate-plf-seal-pop { animation: plf-seal-pop 0.42s var(--ease-plf-spring) both; }
+.animate-plf-list-row-in { animation: plf-list-row-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-list-row-out { animation: plf-list-row-out 0.28s cubic-bezier(0.4, 0, 0.2, 1) both; }
 .animate-plf-settle { animation: plf-settle 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-side-panel-back { animation: plf-side-panel-back 0.40s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-side-panel-in { animation: plf-side-panel-in 0.44s cubic-bezier(0.16, 1, 0.3, 1) both; }

@@ -76,7 +76,8 @@ export interface SaveSheetRequest {
 
 export interface SavePlanItemRequest {
   description: string;
-  responsibleStaffId: number;
+  responsibleStaffId: number | null;
+  responsibleManualName: string | null;
   dueDate: string;
   evidenceNotes: string | null;
 }

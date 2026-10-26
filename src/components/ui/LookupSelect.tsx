@@ -133,6 +133,7 @@ export function LookupSelect({
 
   const [picked, setPicked] = useState<LookupOption | null>(null);
   const [resolved, setResolved] = useState<Record<string, string>>({});
+  const [resolvingValue, setResolvingValue] = useState<string | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -166,16 +167,26 @@ export function LookupSelect({
         null);
 
   useEffect(() => {
-    if (value === "" || !resolveSelectedLabel) return;
-    if (selectedLabel != null || picked?.value === value || resolved[value] !== undefined) return;
+    if (value === "" || !resolveSelectedLabel) {
+      setResolvingValue(null);
+      return;
+    }
+    if (selectedLabel != null || picked?.value === value || resolved[value] !== undefined) {
+      setResolvingValue(null);
+      return;
+    }
 
     let cancelled = false;
+    setResolvingValue(value);
     resolveSelectedLabel(value)
       .then((label) => {
         if (cancelled || label === null) return;
         setResolved((current) => ({ ...current, [value]: label }));
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setResolvingValue(null);
+      });
 
     return () => {
       cancelled = true;
@@ -403,7 +414,14 @@ export function LookupSelect({
           ${open ? "border-zinc-300 bg-zinc-50/80 text-zinc-900 shadow-2xs" : ""}
           ${currentLabel !== null ? "text-ink" : "text-faint"}`}
       >
-        <span className="truncate">{currentLabel ?? (value === "" ? placeholder : value)}</span>
+        <span className="truncate">
+          {currentLabel ??
+            (value === ""
+              ? placeholder
+              : resolvingValue === value
+              ? "Cargando…"
+              : value)}
+        </span>
         <ChevronDown
           aria-hidden
           className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
