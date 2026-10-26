@@ -9,17 +9,27 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlState } from "../../hooks/useUrlState";
 import { flattenPermissions } from "../../lib/permissionCatalog";
 import type { PermissionKey, PermissionMatrixResponse } from "../../types/permissions";
 import { PermissionMatrix } from "./PermissionMatrix";
 
 type ChipKey = "todos" | "sinAsignar" | "conCambios";
+
+/*
+ * Parametros propios de la matriz. Vive dentro de /roles?tab=permisos, cuyo
+ * listado ya ocupa `q` y `estado`: compartirlos haria que una pestaña filtrara
+ * con la busqueda de la otra. «Con cambios» no se restaura desde la URL: los
+ * cambios sin guardar no sobreviven a una recarga.
+ */
+const CHIPS_FROM_URL: readonly ChipKey[] = ["todos", "sinAsignar"];
 
 /** Concesiones de un rol, siempre como lista nueva: nunca se muta el estado. */
 function withPermission(current: PermissionKey[], key: PermissionKey) {
@@ -42,9 +52,9 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   const [original, setOriginal] = useState<Record<number, PermissionKey[]>>({});
   const [visibleRoles, setVisibleRoles] = useState<string[]>([]);
 
-  const [search, setSearch] = useState("");
-  const [module, setModule] = useState("todos");
-  const [chip, setChip] = useState<ChipKey>("todos");
+  const [search, setSearch] = useUrlState<string>("permiso", "");
+  const [module, setModule] = useUrlState<string>("modulo", "todos");
+  const [chip, setChip] = useUrlState<ChipKey>("filtro", "todos", CHIPS_FROM_URL);
 
   const [isSaving, setIsSaving] = useState(false);
   /** Relectura de la matriz sobre una pagina ya pintada: se atenua, no se vacia. */
@@ -285,6 +295,12 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   const catalogIsEmpty = catalog.length === 0;
   const unfiltered = chip === "todos" && module === "todos" && debouncedSearch === "";
 
+  function clearFilters() {
+    setSearch("");
+    setModule("todos");
+    setChip("todos");
+  }
+
   return (
     <div>
       <ModuleHeader
@@ -444,11 +460,16 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
           </div>
         )
       ) : isEmpty ? (
-        <p className="py-14 text-center text-[13.5px] text-faint">
-          {catalogIsEmpty || unfiltered
-            ? "Todavía no hay permisos en el catálogo."
-            : "Ningún permiso coincide con este filtro o búsqueda."}
-        </p>
+        catalogIsEmpty || unfiltered ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            Todavía no hay permisos en el catálogo.
+          </p>
+        ) : (
+          <EmptyResult
+            message="Ningún permiso coincide con este filtro o búsqueda."
+            onClear={clearFilters}
+          />
+        )
       ) : (
         <div className={`transition-opacity ${isRefetching ? "opacity-60" : ""}`}>
           {/* Con una sola columna esto no es una tabulacion cruzada, y la

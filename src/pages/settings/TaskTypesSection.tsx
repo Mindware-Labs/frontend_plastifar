@@ -1,5 +1,4 @@
 import { FileSpreadsheet, Plus, Power, Trash2 } from "lucide-react";
-import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -18,13 +17,18 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { REQUIRED_FORMS, type TaskType } from "../../types/settings";
 import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert, WarnNotice } from "./catalogSection";
 import { freshCopy } from "./catalogState";
 import { TaskTypeModal } from "./TaskTypeModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todos" | "activos" | "inactivos";
+const CHIPS = ["todos", "activos", "inactivos"] as const;
+type ChipKey = (typeof CHIPS)[number];
+
+const FORM_FILTERS: readonly string[] = ["todos", ...REQUIRED_FORMS.map(({ value }) => value)];
 
 /** Cómo se cuentan los días del plazo, en palabras; «por definir» es la pregunta 1 de docs/plan/02. */
 function daysLabel(businessDaysOnly: boolean | null): string {
@@ -42,10 +46,10 @@ export function TaskTypesSection() {
   const canWrite = can("settings.write");
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<TaskType>();
-  const [search, setSearch] = useState("");
-  const [form, setForm] = useState("todos");
-  const [chip, setChip] = useState<ChipKey>("todos");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [form, setForm] = useUrlState<string>("formulario", "todos", FORM_FILTERS);
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -58,11 +62,18 @@ export function TaskTypesSection() {
       status: chip === "todos" ? undefined : chip,
     },
     fallbackError: "No se pudieron cargar los tipos de tarea",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos" || form !== "todos";
+
+  function clearFilters() {
+    setSearch("");
+    setForm("todos");
+    setChip("todos");
+  }
   const undecided = rows.some((type) => type.businessDaysOnly === null);
 
   function askDelete(type: TaskType) {
@@ -229,6 +240,7 @@ export function TaskTypesSection() {
           empty={
             isFiltering ? "Ningún tipo coincide con este filtro o búsqueda." : "Todavía no hay tipos de tarea. La carga inicial trae los 13 de la hoja SLA."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

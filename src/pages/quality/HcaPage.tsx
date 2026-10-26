@@ -1,6 +1,6 @@
 import { Factory, Layers, Package, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { fetchAllPages } from "../../api/paging";
 import { productLinesApi } from "../../api/productLines";
 import {
@@ -31,6 +31,8 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useSort } from "../../hooks/useSort";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
+import { idParam } from "../../lib/idParam";
 import { formatDay } from "../../lib/dates";
 import { resolveProductLabel, searchProducts } from "../../lib/lookups";
 import { describeDueShort, isSheetOverdue } from "../../lib/quality";
@@ -39,6 +41,7 @@ import { HcaFilterPopover } from "./HcaFilterPopover";
 import { HcaModal } from "./HcaModal";
 import { HcaStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type ChipKey = "todas" | "abiertas" | "vencidas" | "cerradas";
 /** Solo lo que el servidor sabe ordenar (SheetQuery.sort). */
@@ -50,6 +53,8 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
   { key: "vencidas", label: "Vencidas", status: "vencidas", countKey: "overdue" },
   { key: "cerradas", label: "Cerradas", status: "cerradas", countKey: "closed" },
 ];
+
+const CHIP_KEYS = CHIPS.map((c) => c.key);
 
 /**
  * Lo que el listado debe, antes de lo que contiene. La ficha ya abria diciendo
@@ -74,26 +79,21 @@ export function HcaPage() {
   const [productLines, setProductLines] = useState<ProductLine[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
 
-  const [search, setSearch] = useState("");
-  const [productLineId, setProductLineId] = useState("todas");
+  // Filtros, busqueda y pagina viven en la URL: volver desde el detalle deja el
+  // listado como estaba. `?estado=vencidas` es tambien como el Dashboard abre
+  // la lista que produjo una de sus cifras.
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [productLineId, setProductLineId] = useUrlState<string>("linea", "todas");
   // RF-H9 (docs/plan/05): planta y producto concreto.
-  const [plantId, setPlantId] = useState("todas");
-  const [productId, setProductId] = useState("");
-  const [responsibleId, setResponsibleId] = useState("todos");
-  const [clientId, setClientId] = useState("todos");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  // La pastilla inicial puede venir en la URL (`/calidad/hca?estado=vencidas`):
-  // es como el Dashboard abre la lista que produjo una de sus cifras. Solo se
-  // lee al montar y no se sincroniza de vuelta —cambiar de pastilla no reescribe
-  // la barra de direcciones—, para no meterle historial a un filtro.
-  const [searchParams] = useSearchParams();
-  const [chip, setChip] = useState<ChipKey>(() => {
-    const requested = searchParams.get("estado");
-    return CHIPS.some((entry) => entry.key === requested) ? (requested as ChipKey) : "todas";
-  });
+  const [plantId, setPlantId] = useUrlState<string>("planta", "todas");
+  const [productId, setProductId] = useUrlState<string>("producto", "");
+  const [responsibleId, setResponsibleId] = useUrlState<string>("responsable", "todos");
+  const [clientId, setClientId] = useUrlState<string>("cliente", "todos");
+  const [from, setFrom] = useUrlState<string>("desde", "");
+  const [to, setTo] = useUrlState<string>("hasta", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIP_KEYS);
   const { sort, sortOf } = useSort<SortKey>("compromiso", "asc");
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -116,11 +116,11 @@ export function HcaPage() {
   const criteria: Omit<SheetQuery, "page"> = {
     pageSize,
     search: debouncedSearch || undefined,
-    productLineId: productLineId === "todas" ? undefined : Number(productLineId),
-    plantId: plantId === "todas" ? undefined : Number(plantId),
-    productId: productId === "" ? undefined : Number(productId),
-    responsibleId: responsibleId === "todos" ? undefined : Number(responsibleId),
-    clientId: clientId === "todos" ? undefined : Number(clientId),
+    productLineId: productLineId === "todas" ? undefined : idParam(productLineId),
+    plantId: plantId === "todas" ? undefined : idParam(plantId),
+    productId: productId === "" ? undefined : idParam(productId),
+    responsibleId: responsibleId === "todos" ? undefined : idParam(responsibleId),
+    clientId: clientId === "todos" ? undefined : idParam(clientId),
     from: from || undefined,
     to: to || undefined,
     status: CHIPS.find((c) => c.key === chip)?.status,
@@ -132,6 +132,7 @@ export function HcaPage() {
     fetch: qualityApi.sheets.list,
     criteria,
     fallbackError: "No se pudieron cargar las HCA. Vuelve a intentarlo.",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];

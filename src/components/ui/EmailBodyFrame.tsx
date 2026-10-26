@@ -49,6 +49,14 @@ export function EmailBodyFrame({ html, title, className = "", fit = false }: Ema
     fit ? estimateInitialHeight(clean) : 0
   );
 
+  // Reestimar cuando el HTML cambie o se active `fit` (ajuste de estado durante el render)
+  const estimateKey = fit ? clean : null;
+  const [estimatedFor, setEstimatedFor] = useState(estimateKey);
+  if (estimatedFor !== estimateKey) {
+    setEstimatedFor(estimateKey);
+    if (estimateKey !== null) setMeasuredHeight(estimateInitialHeight(estimateKey));
+  }
+
   const measureHeight = useCallback(() => {
     if (!fit || !iframeRef.current) return;
     try {
@@ -69,9 +77,6 @@ export function EmailBodyFrame({ html, title, className = "", fit = false }: Ema
 
   useEffect(() => {
     if (!fit) return;
-    // Reestimar cuando el HTML cambie
-    setMeasuredHeight(estimateInitialHeight(clean));
-
     // Múltiples intentos tras montar para asegurar que las fuentes/imágenes se asienten
     const t1 = setTimeout(measureHeight, 50);
     const t2 = setTimeout(measureHeight, 200);

@@ -7,6 +7,7 @@ import { settingsApi } from "../../api/settings";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import {
   ClearFiltersButton,
@@ -24,12 +25,15 @@ import { Tooltip } from "../../components/ui/Tooltip";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
+import { idParam } from "../../lib/idParam";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import { formatAmount } from "../../lib/numbers";
 import { CLAIM_REASONS, type ClaimStatus } from "../../types/claims";
 import type { Plant } from "../../types/settings";
 import { ClaimStatusBadge } from "./ClaimStatusBadge";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type ChipKey = "todas" | ClaimStatus;
 type SortKey = "fecha" | "cliente" | "total" | "ticket";
@@ -41,6 +45,9 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
   { key: "Cerrada", label: "Cerradas", status: "Cerrada", countKey: "closed" },
 ];
 
+const CHIP_KEYS = CHIPS.map((c) => c.key);
+const REASON_KEYS: string[] = ["todos", ...CLAIM_REASONS];
+
 /**
  * RF-R8: listado paginado de reclamaciones con pastillas por estado y filtros
  * por motivo, planta, cliente y rango de fechas. No hay «Nueva reclamación»
@@ -51,15 +58,16 @@ export function ClaimsPage() {
   const navigate = useNavigate();
   const [plants, setPlants] = useState<Plant[]>([]);
 
-  const [search, setSearch] = useState("");
-  const [reason, setReason] = useState("todos");
-  const [plantId, setPlantId] = useState("todas");
-  const [clientId, setClientId] = useState("todos");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todas");
+  // Criterios en la URL: volver desde el detalle deja el listado como estaba.
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [reason, setReason] = useUrlState<string>("motivo", "todos", REASON_KEYS);
+  const [plantId, setPlantId] = useUrlState<string>("planta", "todas");
+  const [clientId, setClientId] = useUrlState<string>("cliente", "todos");
+  const [from, setFrom] = useUrlState<string>("desde", "");
+  const [to, setTo] = useUrlState<string>("hasta", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIP_KEYS);
   const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -74,8 +82,8 @@ export function ClaimsPage() {
     pageSize,
     search: debouncedSearch || undefined,
     reason: reason === "todos" ? undefined : reason,
-    plantId: plantId === "todas" ? undefined : Number(plantId),
-    clientId: clientId === "todos" ? undefined : Number(clientId),
+    plantId: idParam(plantId),
+    clientId: idParam(clientId),
     from: from || undefined,
     to: to || undefined,
     status: CHIPS.find((c) => c.key === chip)?.status,
@@ -87,6 +95,7 @@ export function ClaimsPage() {
     fetch: claimsApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las reclamaciones. Vuelve a intentarlo.",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
@@ -109,6 +118,13 @@ export function ClaimsPage() {
   }
 
   const unfiltered = chip === "todas" && filtrosPuestos === 0 && !debouncedSearch;
+
+  /** Quita todos los recortes, pastilla incluida: es la salida del estado vacio. */
+  function clearFilters() {
+    setSearch("");
+    setChip("todas");
+    clearNarrowFilters();
+  }
 
   return (
     <div>
@@ -252,18 +268,19 @@ export function ClaimsPage() {
         {data === null ? (
           error === null && <TableSkeleton rows={pageSize} columns={7} />
         ) : rows.length === 0 ? (
-          <div className="py-14 text-center">
-            <p className="text-[13.5px] text-faint">
-              {unfiltered
-                ? "Todavía no hay reclamaciones registradas."
-                : "Ninguna reclamación coincide con este filtro o búsqueda."}
-            </p>
-            {unfiltered && (
+          unfiltered ? (
+            <div className="py-14 text-center">
+              <p className="text-[13.5px] text-faint">Todavía no hay reclamaciones registradas.</p>
               <p className="mx-auto mt-1.5 max-w-md text-[12.5px] text-faint">
                 Se registran desde el ticket: abre el ticket de la reclamación y entra a su pestaña «Reclamación».
               </p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <EmptyResult
+              message="Ninguna reclamación coincide con este filtro o búsqueda."
+              onClear={clearFilters}
+            />
+          )
         ) : (
           <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
             <DataTable>

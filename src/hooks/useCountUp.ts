@@ -50,16 +50,18 @@ export function useCountUp(
     delay = 0,
   }: { duration?: number; delay?: number } = {},
 ): number {
-  // Nace en la verdad. Si nada más ocurre, esto es lo que se ve.
-  const [value, setValue] = useState(target);
+  /*
+   * Nace en la verdad. Si nada más ocurre, esto es lo que se ve: mientras no
+   * haya recorrido en curso (`null`), se devuelve el valor real tal cual, sin
+   * pasar por el estado. Asi los cambios posteriores entran en seco sin un
+   * render extra.
+   */
+  const [value, setValue] = useState<number | null>(null);
   /** El recorrido se hace una vez. Después, los cambios entran en seco. */
   const ran = useRef(false);
 
   useEffect(() => {
-    if (ran.current) {
-      setValue(target);
-      return;
-    }
+    if (ran.current) return;
     ran.current = true;
 
     /*
@@ -82,12 +84,11 @@ export function useCountUp(
     let frame = 0;
     const startAt = performance.now() + delay;
 
-    // Sólo ahora se baja a cero: a partir de aquí hay quien lo suba.
-    setValue(0);
-
     function step(now: number) {
       const elapsed = now - startAt;
       if (elapsed < 0) {
+        // Sólo ahora se baja a cero: a partir de aquí hay quien lo suba.
+        setValue(0);
         frame = requestAnimationFrame(step);
         return;
       }
@@ -102,8 +103,12 @@ export function useCountUp(
        * animación sin nada que mirar. Con 2.2 ese arrastre invisible baja a
        * 50 ms sobre 750.
        */
-      setValue(Math.round(target * (1 - Math.pow(1 - t, 2.2))));
-      if (t < 1) frame = requestAnimationFrame(step);
+      if (t < 1) {
+        setValue(Math.round(target * (1 - Math.pow(1 - t, 2.2))));
+        frame = requestAnimationFrame(step);
+      } else {
+        setValue(null);
+      }
     }
 
     frame = requestAnimationFrame(step);
@@ -120,18 +125,18 @@ export function useCountUp(
      */
     const guard = window.setTimeout(() => {
       cancelAnimationFrame(frame);
-      setValue(target);
+      setValue(null);
     }, delay + duration + 200);
 
     return () => {
       cancelAnimationFrame(frame);
       window.clearTimeout(guard);
       // Si el efecto se interrumpe a mitad, el dato queda correcto.
-      setValue(target);
+      setValue(null);
     };
   }, [target, duration, delay]);
 
-  return value;
+  return value ?? target;
 }
 
 /** Se lee en el momento, no al importar: la preferencia puede cambiar en caliente. */

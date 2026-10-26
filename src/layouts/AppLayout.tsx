@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import { Outlet } from "react-router-dom";
 import { InboxAlerts } from "../components/app/InboxAlerts";
 import { Sidebar } from "../components/app/Sidebar";
 import { ReceiptStack } from "../components/app/ReceiptStack";
+import { PageSpinner } from "../components/ui/PageSpinner";
 import { EmailCountsProvider } from "../context/EmailCountsContext";
 import { ReceiptProvider } from "../context/ReceiptContext";
 import { BreadcrumbLabelContext } from "../context/useBreadcrumb";
@@ -52,7 +54,11 @@ function Shell() {
                 tarjetas— flotan encima en blanco. Esa diferencia minima de
                 valor es lo que las despega sin necesitar una sombra pesada. */}
             <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 lg:px-4 lg:pb-3.5">
-              <Outlet />
+              {/* La pantalla llega en su propio fragmento: mientras baja, el
+                  armazon (barra lateral, cabecera) sigue en su sitio. */}
+              <Suspense fallback={<PageSpinner />}>
+                <Outlet />
+              </Suspense>
             </div>
           </BreadcrumbLabelContext.Provider>
 

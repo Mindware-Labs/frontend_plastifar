@@ -1,11 +1,9 @@
 import { AlertTriangle, Check, History, Lock, Mail, Ticket as TicketIcon, User, X } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { Drawer } from "../../components/ui/Drawer";
 import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
-import { useDialogMotion } from "../../hooks/useDialogMotion";
-import { openOverlay } from "../../hooks/overlayStack";
 import { formatDateTime } from "../../lib/format";
 import type {
   TicketAttachmentResponse,
@@ -44,29 +42,7 @@ export function TicketTimelineSheet({
   onSelectTab,
   initialFilter = "all",
 }: TicketTimelineSheetProps) {
-  const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
-  const titleId = useId();
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [filter, setFilter] = useState<TimelineFilter>(initialFilter);
-
-  useEffect(() => {
-    const overlay = openOverlay();
-    closeButtonRef.current?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isExiting && overlay.isTop()) requestClose();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      overlay.close();
-      window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [isExiting, requestClose]);
 
   const messageCount = timeline.filter((item) => item.kind === "message").length;
   const eventCount = timeline.length - messageCount;
@@ -178,101 +154,16 @@ export function TicketTimelineSheet({
     );
   }
 
-  return createPortal(
-    <div
-      ref={scrimRef}
-      inert={isExiting ? true : undefined}
-      className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] will-change-[opacity] ${
-        isExiting ? "pointer-events-none" : ""
-      }`}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !isExiting) requestClose();
-      }}
-    >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[560px] will-change-[transform,opacity] ${
-          isExiting ? "pointer-events-none" : ""
-        }`}
-      >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
-          <div className="min-w-0">
-            <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
-              Tickets · Cronología
-            </p>
-            <h2 id={titleId} className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
-              Historial
-            </h2>
-            <p className="mt-1 flex items-center gap-2 text-[12px] text-zinc-500">
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  aria-hidden
-                  className="flex size-4 shrink-0 items-center justify-center rounded-[5px] bg-brand-red/10 text-brand-red"
-                >
-                  <TicketIcon className="size-2.5" strokeWidth={2.25} />
-                </span>
-                <span className="font-heading text-[11px] font-bold tabular-nums text-zinc-900">{ticket.number}</span>
-              </span>
-              <span aria-hidden className="text-zinc-300">·</span>
-              <span className="tabular-nums">
-                {timeline.length} {timeline.length === 1 ? "registro" : "registros"}
-              </span>
-            </p>
-          </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={requestClose}
-            aria-label="Cerrar el historial (Esc)"
-            title="Cerrar (Esc)"
-            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none
-              transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="shrink-0 border-b border-line px-6 py-2.5">
-          <SegmentedFilter
-            fullWidth
-            aria-label="Filtro del historial"
-            value={filter}
-            onChange={setFilter}
-            items={[
-              { key: "all", label: "Todos", count: timeline.length },
-              { key: "messages", label: "Mensajes", count: messageCount },
-              { key: "events", label: "Eventos", count: eventCount },
-            ]}
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-          <div key={filter} className="animate-plf-apple-tab">
-            {filtered.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-12 text-center">
-                <span
-                  aria-hidden
-                  className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
-                >
-                  <History className="size-4" strokeWidth={2.25} />
-                </span>
-                <p className="text-[13px] font-medium text-zinc-700">No hay registros de este tipo.</p>
-              </div>
-            ) : (
-              <ol className="relative">
-                <span aria-hidden className="absolute bottom-2 left-[9.5px] top-2 w-px bg-zinc-200" />
-                {filtered.map((item, index) =>
-                  item.kind === "event" ? renderEvent(item.data, index) : renderMessage(item.data),
-                )}
-              </ol>
-            )}
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3">
+  return (
+    <Drawer
+      title="Historial"
+      onClose={onClose}
+      animated
+      panelClassName="relative h-full w-full bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[560px] will-change-[transform,opacity]"
+      bodyClassName="min-h-0 flex-1 overflow-y-auto px-6 py-5"
+      footerClassName="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3"
+      footer={({ requestClose }) => (
+        <>
           <span className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-400">
             <kbd className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600">
               Esc
@@ -297,9 +188,82 @@ export function TicketTimelineSheet({
               Cerrar
             </Button>
           </div>
-        </div>
+        </>
+      )}
+      header={({ requestClose }) => (
+        <>
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
+            <div className="min-w-0">
+              <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
+                Tickets · Cronología
+              </p>
+              <h2 className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+                Historial
+              </h2>
+              <p className="mt-1 flex items-center gap-2 text-[12px] text-zinc-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    aria-hidden
+                    className="flex size-4 shrink-0 items-center justify-center rounded-[5px] bg-brand-red/10 text-brand-red"
+                  >
+                    <TicketIcon className="size-2.5" strokeWidth={2.25} />
+                  </span>
+                  <span className="font-heading text-[11px] font-bold tabular-nums text-zinc-900">{ticket.number}</span>
+                </span>
+                <span aria-hidden className="text-zinc-300">·</span>
+                <span className="tabular-nums">
+                  {timeline.length} {timeline.length === 1 ? "registro" : "registros"}
+                </span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={requestClose}
+              aria-label="Cerrar el historial (Esc)"
+              title="Cerrar (Esc)"
+              className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none
+                transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="shrink-0 border-b border-line px-6 py-2.5">
+            <SegmentedFilter
+              fullWidth
+              aria-label="Filtro del historial"
+              value={filter}
+              onChange={setFilter}
+              items={[
+                { key: "all", label: "Todos", count: timeline.length },
+                { key: "messages", label: "Mensajes", count: messageCount },
+                { key: "events", label: "Eventos", count: eventCount },
+              ]}
+            />
+          </div>
+        </>
+      )}
+    >
+      <div key={filter} className="animate-plf-apple-tab">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
+            <span
+              aria-hidden
+              className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
+            >
+              <History className="size-4" strokeWidth={2.25} />
+            </span>
+            <p className="text-[13px] font-medium text-zinc-700">No hay registros de este tipo.</p>
+          </div>
+        ) : (
+          <ol className="relative">
+            <span aria-hidden className="absolute bottom-2 left-[9.5px] top-2 w-px bg-zinc-200" />
+            {filtered.map((item, index) =>
+              item.kind === "event" ? renderEvent(item.data, index) : renderMessage(item.data),
+            )}
+          </ol>
+        )}
       </div>
-    </div>,
-    document.body,
+    </Drawer>
   );
 }

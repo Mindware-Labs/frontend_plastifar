@@ -55,7 +55,8 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
   const { user } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
   const [roles, setRoles] = useState<RoleResponse[]>([]);
-  const [loadingRoles, setLoadingRoles] = useState(false);
+  // Nace cargando: el catalogo se pide al montar
+  const [loadingRoles, setLoadingRoles] = useState(true);
   const { isExiting, requestClose } = useModalAnimation();
   const isEdit = staff !== undefined;
   const isSelf = isEdit && staff.id === user?.staffId;
@@ -84,7 +85,6 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
   // Carga de catálogo de roles activos
   useEffect(() => {
     let mounted = true;
-    setLoadingRoles(true);
     rolesApi
       .list({ page: 1, pageSize: 100 })
       .then((res) => {

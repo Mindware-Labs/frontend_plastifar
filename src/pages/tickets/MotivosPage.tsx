@@ -20,6 +20,7 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -30,6 +31,7 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useRowRun } from "../../hooks/useRowRun";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
@@ -41,8 +43,12 @@ import type {
 } from "../../types/api";
 import { MotivoModal } from "./MotivoModal";
 import { FilterDropdown, type FilterOption } from "../../components/ui/FilterDropdown";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type StatusFilter = "todos" | "activos" | "inactivos";
+
+const STATUS_KEYS: StatusFilter[] = ["todos", "activos", "inactivos"];
+const PRIORITY_KEYS = ["todas", "Emergencia", "Alta", "Normal", "Baja"];
 
 /** El tono no decora: dice cuánta prisa mete cada motivo en el SLA del ticket. */
 const priorityClass: Record<string, string> = {
@@ -58,11 +64,14 @@ export function MotivosPage() {
   const isAdmin = Boolean(user?.isAdmin);
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
-  const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
-  const [priority, setPriority] = useState<string>("todas");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("todos");
-  const [pageSize, setPageSize] = useState(10);
+  const [departmentParam, setDepartmentParam] = useUrlState<string>("departamento", "todos");
+  const [priority, setPriority] = useUrlState<string>("prioridad", "todas", PRIORITY_KEYS);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [status, setStatus] = useUrlState<StatusFilter>("estado", "todos", STATUS_KEYS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
+  // Un id que no es numero (enlace editado a mano) cuenta como «todos».
+  const departmentId: number | "todos" =
+    departmentParam === "todos" || Number.isNaN(Number(departmentParam)) ? "todos" : Number(departmentParam);
   const { modal, setModal, busyId, setBusyId, ask, dialog } = useCatalogActions<TicketTopicResponse>();
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
@@ -80,6 +89,7 @@ export function MotivosPage() {
       priority: priority === "todas" ? undefined : priority,
     },
     fallbackError: "No se pudieron cargar los motivos",
+    pageKey: "pagina",
   });
 
   useEffect(() => {
@@ -88,6 +98,15 @@ export function MotivosPage() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
+  const filtered =
+    Boolean(debouncedSearch) || status !== "todos" || departmentId !== "todos" || priority !== "todas";
+
+  function clearAll() {
+    setSearch("");
+    setDepartmentParam("todos");
+    setPriority("todas");
+    setStatus("todos");
+  }
 
   const { actionError, run } = useRowRun(setBusyId, refresh);
 
@@ -231,7 +250,7 @@ export function MotivosPage() {
             <FilterDropdown
               title="Seleccionar departamento"
               value={String(departmentId)}
-              onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+              onChange={setDepartmentParam}
               options={departmentOptions}
               defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
               aria-label="Filtrar por departamento"
@@ -250,7 +269,7 @@ export function MotivosPage() {
                 type="button"
                 onClick={() => {
                   setSearch("");
-                  setDepartmentId("todos");
+                  setDepartmentParam("todos");
                   setPriority("todas");
                 }}
                 title="Limpiar filtros"
@@ -362,16 +381,15 @@ export function MotivosPage() {
               </tbody>
             </DataTable>
 
-            {rows.length === 0 && (
-              <div className="flex flex-col items-center gap-2 py-14 text-center">
-                <Tag className="h-6 w-6 text-faint" />
-                <p className="text-[13.5px] text-faint">
-                  {debouncedSearch || status !== "todos" || departmentId !== "todos" || priority !== "todas"
-                    ? "Ningún motivo coincide con el filtro."
-                    : "Todavía no hay motivos en el catálogo."}
-                </p>
-              </div>
-            )}
+            {rows.length === 0 &&
+              (filtered ? (
+                <EmptyResult message="Ningún motivo coincide con el filtro." onClear={clearAll} />
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-14 text-center">
+                  <Tag className="h-6 w-6 text-faint" />
+                  <p className="text-[13.5px] text-faint">Todavía no hay motivos en el catálogo.</p>
+                </div>
+              ))}
 
             <Pagination
               page={data.page}

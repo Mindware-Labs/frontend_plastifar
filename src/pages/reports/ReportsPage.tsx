@@ -412,6 +412,7 @@ export function ReportsPage() {
           title="Generar reporte"
           description="Elige el reporte y acota lo que quieras medir."
           onClose={() => setPanelOpen(false)}
+          animated
           footer={
             <>
               <Button variant="secondary" onClick={() => setCriteria(emptyCriteria())}>

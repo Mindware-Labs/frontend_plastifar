@@ -23,11 +23,13 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useSort } from "../../hooks/useSort";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import type { DiscrepancyStatus } from "../../types/discrepancies";
 import { DiscrepancyFormModal } from "./DiscrepancyFormModal";
 import { DiscrepancyStatusBadge } from "./DiscrepancyStatusBadge";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type ChipKey = "todas" | DiscrepancyStatus | "hallazgo";
 type SortKey = "fecha" | "numero" | "ticket" | "cliente";
@@ -41,20 +43,22 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
   { key: "hallazgo", label: "Con hallazgo de seguridad", status: "hallazgo", countKey: "withFinding" },
 ];
 
+const CHIP_KEYS = CHIPS.map((c) => c.key);
+
 /** RF-D9: listado paginado con pastillas por estado y «Con hallazgo de seguridad». */
 export function DiscrepanciesPage() {
   const navigate = useNavigate();
   const { can } = usePermissions();
   const canWrite = can("discrepancies.write");
 
-  const [search, setSearch] = useState("");
-  const [clientId, setClientId] = useState("todos");
-  const [dispatcher, setDispatcher] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todas");
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [clientId, setClientId] = useUrlState<string>("cliente", "todos");
+  const [dispatcher, setDispatcher] = useUrlState<string>("despachador", "");
+  const [from, setFrom] = useUrlState<string>("desde", "");
+  const [to, setTo] = useUrlState<string>("hasta", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIP_KEYS);
   const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
   const [creating, setCreating] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search).trim();
@@ -76,6 +80,7 @@ export function DiscrepanciesPage() {
     fetch: discrepanciesApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las investigaciones. Vuelve a intentarlo.",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
@@ -89,6 +94,12 @@ export function DiscrepanciesPage() {
     setFrom("");
     setTo("");
     setPage(1);
+  }
+
+  function clearAll() {
+    setSearch("");
+    setChip("todas");
+    clearNarrowFilters();
   }
 
   return (
@@ -256,6 +267,7 @@ export function DiscrepanciesPage() {
           skeletonRows={pageSize}
           skeletonColumns={7}
           empty={unfiltered ? "Todavía no hay investigaciones registradas." : "Ninguna investigación coincide con este filtro o búsqueda."}
+          onClear={unfiltered ? undefined : clearAll}
           animateIn
         >
           <DataTable>

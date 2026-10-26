@@ -1,5 +1,4 @@
 import { Calendar, CalendarOff, Plus } from "lucide-react";
-import { useState } from "react";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
@@ -17,13 +16,17 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { WEEKDAYS, type Holiday, type SlaPolicy } from "../../types/settings";
 import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, useReferenceData } from "./catalogState";
 import { HolidayModal } from "./HolidayModal";
+import { idParam } from "../../lib/idParam";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todos" | "activos" | "inactivos";
+const CHIPS = ["todos", "activos", "inactivos"] as const;
+type ChipKey = (typeof CHIPS)[number];
 
 const dayFormat = new Intl.DateTimeFormat("es-DO", { weekday: "long" });
 const dateFormat = new Intl.DateTimeFormat("es-DO", {
@@ -77,10 +80,10 @@ export function HolidaysSection() {
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Holiday>();
 
-  const [search, setSearch] = useState("");
-  const [year, setYear] = useState<string>("todos");
-  const [chip, setChip] = useState<ChipKey>("todos");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [year, setYear] = useUrlState<string>("anio", "todos");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -92,9 +95,10 @@ export function HolidaysSection() {
       pageSize,
       search: debouncedSearch || undefined,
       status: chip === "todos" ? undefined : chip,
-      year: year === "todos" ? undefined : Number(year),
+      year: year === "todos" ? undefined : idParam(year),
     },
     fallbackError: "No se pudieron cargar los días no laborables",
+    pageKey: "pagina",
   });
 
   const yearsRef = useReferenceData<string[]>(loadYears, []);
@@ -109,6 +113,12 @@ export function HolidaysSection() {
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
   const isFiltering = debouncedSearch !== "" || chip !== "todos" || year !== "todos";
+
+  function clearFilters() {
+    setSearch("");
+    setYear("todos");
+    setChip("todos");
+  }
 
   /** Tras escribir, el calendario puede estrenar año: los años se releen tambien. */
   function reloadAll() {
@@ -278,6 +288,7 @@ export function HolidaysSection() {
               ? "Ningún día coincide con este filtro o búsqueda."
               : "Todavía no hay ningún día no laborable registrado."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

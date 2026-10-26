@@ -17,6 +17,7 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import {
   PLANT_COUNTRIES,
   type Plant,
@@ -29,8 +30,11 @@ import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, useReferenceData } from "./catalogState";
 import { ProductImportModal } from "./ProductImportModal";
 import { ProductModal } from "./ProductModal";
+import { idParam } from "../../lib/idParam";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todos" | "activos" | "inactivos";
+const CHIPS = ["todos", "activos", "inactivos"] as const;
+type ChipKey = (typeof CHIPS)[number];
 
 /** Valor de los filtros de planta y de línea sin nada elegido. */
 const TODOS = "todos";
@@ -50,11 +54,11 @@ export function ProductsSection() {
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Product>();
 
-  const [search, setSearch] = useState("");
-  const [plantId, setPlantId] = useState(TODOS);
-  const [productLineId, setProductLineId] = useState(TODOS);
-  const [chip, setChip] = useState<ChipKey>("todos");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [plantId, setPlantId] = useUrlState<string>("planta", TODOS);
+  const [productLineId, setProductLineId] = useUrlState<string>("linea", TODOS);
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const [isImporting, setIsImporting] = useState(false);
 
@@ -80,17 +84,25 @@ export function ProductsSection() {
     criteria: {
       pageSize,
       search: debouncedSearch || undefined,
-      plantId: plantId === TODOS ? undefined : Number(plantId),
-      productLineId: productLineId === TODOS ? undefined : Number(productLineId),
+      plantId: plantId === TODOS ? undefined : idParam(plantId),
+      productLineId: productLineId === TODOS ? undefined : idParam(productLineId),
       status: chip === "todos" ? undefined : chip,
     },
     fallbackError: "No se pudieron cargar los productos",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const isFiltering =
     debouncedSearch !== "" || chip !== "todos" || plantId !== TODOS || productLineId !== TODOS;
+
+  function clearFilters() {
+    setSearch("");
+    setPlantId(TODOS);
+    setProductLineId(TODOS);
+    setChip("todos");
+  }
 
   function askToggle(product: Product) {
     confirm(product.id, {
@@ -295,6 +307,7 @@ export function ProductsSection() {
               ? "Ningún producto coincide con este filtro o búsqueda."
               : "Todavía no hay ningún producto registrado. Crea uno o carga el catálogo desde un archivo."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

@@ -26,6 +26,7 @@ import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { Modal } from "../../components/ui/Modal";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -36,7 +37,9 @@ import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { formatActivityDate, formatSlaRemaining } from "../../lib/format";
+import { idParam } from "../../lib/idParam";
 import type {
   DepartmentResponse,
   TicketCounts,
@@ -48,6 +51,7 @@ import type {
 import { CreateTicketModal } from "./CreateTicketModal";
 import { AssigneeCell, PriorityCell, SlaCell, StatusCell } from "./ticketCells";
 import { TicketSelectionBar } from "./TicketSelectionBar";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type TicketFilterKey = "todos" | "abiertos" | "por-vencer" | "vencidos" | "espera" | "cerrados";
 type SortKey = "numero" | "asunto" | "cliente" | "departamento" | "prioridad" | "estado" | "sla" | "actividad";
@@ -68,6 +72,7 @@ const filters: TicketFilter[] = [
 ];
 
 // Solo dos tags visibles en la barra principal; el resto queda en el menú Más.
+const FILTER_KEYS = filters.map((f) => f.key);
 const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos"];
 const primaryFilters = filters.filter((f) => PRIMARY_FILTER_KEYS.includes(f.key));
 const secondaryFilters = filters.filter((f) => !PRIMARY_FILTER_KEYS.includes(f.key));
@@ -112,6 +117,8 @@ const priorityOptions = [
   { value: "Normal", label: "Normal" },
   { value: "Baja", label: "Baja" },
 ];
+
+const PRIORITY_KEYS = ["todas", ...priorityOptions.map((option) => option.value)];
 
 const STATUS_MENU_WIDTH = 224;
 
@@ -293,12 +300,14 @@ export function TicketsPage() {
   const { onTicketsChanged } = useEmailCounts();
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<TicketFilterKey>("todos");
-  const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
-  const [priority, setPriority] = useState<string>("todas");
+  // Criterios en la URL: volver desde el detalle deja la bandeja como estaba.
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [filter, setFilter] = useUrlState<TicketFilterKey>("estado", "todos", FILTER_KEYS);
+  const [departmentParam, setDepartmentParam] = useUrlState<string>("departamento", "todos");
+  const departmentId: number | "todos" = idParam(departmentParam) ?? "todos";
+  const [priority, setPriority] = useUrlState<string>("prioridad", "todas", PRIORITY_KEYS);
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "actividad", dir: "desc" });
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -325,6 +334,7 @@ export function TicketsPage() {
       dir: sort.dir,
     },
     fallbackError: "No se pudieron cargar los tickets",
+    pageKey: "pagina",
   });
 
   useEffect(() => onTicketsChanged(refresh), [onTicketsChanged, refresh]);
@@ -397,7 +407,7 @@ export function TicketsPage() {
   function clearCriteria() {
     setSearch("");
     setFilter("todos");
-    setDepartmentId("todos");
+    setDepartmentParam("todos");
     setPriority("todas");
   }
 
@@ -613,7 +623,7 @@ export function TicketsPage() {
                 <FilterDropdown
                   title="Seleccionar departamento"
                   value={String(departmentId)}
-                  onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+                  onChange={setDepartmentParam}
                   options={departmentOptions}
                   defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
                   aria-label="Filtrar por departamento"
@@ -634,7 +644,7 @@ export function TicketsPage() {
                     type="button"
                     onClick={() => {
                       setSearch("");
-                      setDepartmentId("todos");
+                      setDepartmentParam("todos");
                       setPriority("todas");
                     }}
                     title="Limpiar filtros"
@@ -849,31 +859,23 @@ export function TicketsPage() {
               </tbody>
             </DataTable>
 
-            {rows.length === 0 && (
-              <div className="flex flex-col items-center gap-3 py-14 text-center">
-                <span
-                  aria-hidden
-                  className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
-                >
-                  <TicketIcon className="size-4" strokeWidth={2.25} />
-                </span>
-                {hasCriteria ? (
-                  <>
-                    <p className="text-[13px] font-medium text-zinc-700">Ningún ticket coincide con estos criterios.</p>
-                    <Button variant="secondary" size="sm" onClick={clearCriteria}>
-                      Quitar filtros
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-[13px] font-medium text-zinc-700">Todavía no hay tickets.</p>
-                    <p className="max-w-xs text-[12px] leading-relaxed text-zinc-400">
-                      Se crean desde un correo de la bandeja o a mano con «Nuevo ticket».
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
+            {rows.length === 0 &&
+              (hasCriteria ? (
+                <EmptyResult message="Ningún ticket coincide con estos criterios." onClear={clearCriteria} />
+              ) : (
+                <div className="flex flex-col items-center gap-3 py-14 text-center">
+                  <span
+                    aria-hidden
+                    className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
+                  >
+                    <TicketIcon className="size-4" strokeWidth={2.25} />
+                  </span>
+                  <p className="text-[13px] font-medium text-zinc-700">Todavía no hay tickets.</p>
+                  <p className="max-w-xs text-[12px] leading-relaxed text-zinc-400">
+                    Se crean desde un correo de la bandeja o a mano con «Nuevo ticket».
+                  </p>
+                </div>
+              ))}
 
             <Pagination
               page={data.page}

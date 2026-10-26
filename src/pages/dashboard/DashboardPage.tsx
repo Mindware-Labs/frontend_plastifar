@@ -135,38 +135,26 @@ export function DashboardPage() {
   /** El mismo reporte, un periodo atras. Es contra esto que comparan las fichas. */
   const [previous, setPrevious] = useState<QualityReport | null>(null);
   const [clients, setClients] = useState<ClientsReport | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodKey>("12m");
+  /** Cada clic en "Actualizar" o "Reintentar" sube este contador y relanza la carga. */
+  const [reloadTick, setReloadTick] = useState(0);
 
   const periodEntry = PERIODS.find((entry) => entry.key === period) ?? PERIODS[2];
   const range = useMemo(() => periodRange(periodEntry.months), [periodEntry.months]);
   const before = useMemo(() => previousRange(periodEntry.months), [periodEntry.months]);
 
-  const load = useCallback(() => {
-    setError(null);
-    setIsLoading(true);
-    Promise.all([
-      reportsApi.quality(range.from, range.to),
-      reportsApi.quality(before.from, before.to),
-      reportsApi.clients(),
-    ])
-      .then(([q, p, c]) => {
-        setQuality(q);
-        setPrevious(p);
-        setClients(c);
-      })
-      .catch((err) =>
-        setError(
-          err instanceof ApiError
-            ? `${err.message} Vuelve a intentarlo.`
-            : "No se pudo cargar el tablero. Vuelve a intentarlo.",
-        ),
-      )
-      .finally(() => setIsLoading(false));
-  }, [range.from, range.to, before.from, before.to]);
+  /*
+   * Carga y error se derivan de la peticion en curso: mientras la ultima peticion
+   * resuelta no sea la actual, el tablero esta cargando, y un error solo cuenta
+   * si es de la peticion actual.
+   */
+  const requestKey = `${range.from}|${range.to}|${before.from}|${before.to}|${reloadTick}`;
+  const [settledKey, setSettledKey] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
+  const isLoading = settledKey !== requestKey;
+  const error = failure?.key === requestKey ? failure.message : null;
 
-  useEffect(load, [load]);
+  const load = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
   /**
    * El periodo por defecto se ajusta UNA vez a la data que existe. Doce meses
@@ -174,16 +162,44 @@ export function DashboardPage() {
    * el tablero se leia como si el reporte estuviera roto.
    */
   const autoRanged = useRef(false);
+
   useEffect(() => {
-    if (autoRanged.current || !quality) return;
-    autoRanged.current = true;
+    let ignore = false;
+    Promise.all([
+      reportsApi.quality(range.from, range.to),
+      reportsApi.quality(before.from, before.to),
+      reportsApi.clients(),
+    ])
+      .then(([q, p, c]) => {
+        if (ignore) return;
+        setQuality(q);
+        setPrevious(p);
+        setClients(c);
 
-    const withActivity = quality.byMonth.filter((m) => m.opened > 0 || m.closed > 0).length;
-    if (withActivity === 0) return;
-
-    const fits = PERIODS.find((entry) => entry.months >= withActivity);
-    if (fits && fits.key !== period) setPeriod(fits.key);
-  }, [quality, period]);
+        if (autoRanged.current) return;
+        autoRanged.current = true;
+        const withActivity = q.byMonth.filter((m) => m.opened > 0 || m.closed > 0).length;
+        if (withActivity === 0) return;
+        const fits = PERIODS.find((entry) => entry.months >= withActivity);
+        if (fits && fits.key !== period) setPeriod(fits.key);
+      })
+      .catch((err) => {
+        if (ignore) return;
+        setFailure({
+          key: requestKey,
+          message:
+            err instanceof ApiError
+              ? `${err.message} Vuelve a intentarlo.`
+              : "No se pudo cargar el tablero. Vuelve a intentarlo.",
+        });
+      })
+      .finally(() => {
+        if (!ignore) setSettledKey(requestKey);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [range.from, range.to, before.from, before.to, period, requestKey]);
 
   const months = useMemo(
     () =>

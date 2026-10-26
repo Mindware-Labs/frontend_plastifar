@@ -1,5 +1,4 @@
 import { Ban, CheckCircle2, Pencil, Plus } from "lucide-react";
-import { useState } from "react";
 import { territoriesApi, type TerritoryQuery } from "../../api/territories";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -19,12 +18,15 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import type { Territory } from "../../types/clients";
 import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy } from "./catalogState";
 import { TerritoryModal } from "./TerritoryModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todos" | "activos" | "inactivos";
+const CHIPS = ["todos", "activos", "inactivos"] as const;
+type ChipKey = (typeof CHIPS)[number];
 
 /** El listado siempre manda pagina; en el catalogo de opciones es opcional. */
 type PagedTerritoryQuery = TerritoryQuery & { page: number };
@@ -36,9 +38,9 @@ export function TerritoriesSection() {
   const receipts = useReceipts();
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Territory>();
 
-  const [search, setSearch] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todos");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -55,6 +57,7 @@ export function TerritoriesSection() {
       status: chip === "todos" ? undefined : chip,
     },
     fallbackError: "No se pudieron cargar los territorios",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
@@ -63,6 +66,11 @@ export function TerritoriesSection() {
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
+
+  function clearFilters() {
+    setSearch("");
+    setChip("todos");
+  }
 
   function askToggle(territory: Territory) {
     const willDeactivate = territory.isActive;
@@ -205,6 +213,7 @@ export function TerritoriesSection() {
               ? "Ningún territorio coincide con este filtro o búsqueda."
               : "Todavía no hay ningún territorio registrado."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

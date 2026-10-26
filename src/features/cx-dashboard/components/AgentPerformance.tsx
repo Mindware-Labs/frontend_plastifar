@@ -28,7 +28,7 @@ export function AgentPerformance() {
     if (sortBy === "Vencidos") return list.sort((a, b) => b.overdue - a.overdue);
     if (sortBy === "En cola") return list.sort((a, b) => b.open - a.open);
     return list.sort((a, b) => b.closed - a.closed);
-  }, [sortBy]);
+  }, [AGENTS, sortBy]);
 
   const maxClosed = Math.max(...AGENTS.map((a) => a.closed), 1);
 

@@ -5,13 +5,13 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
 import { sedesApi } from "../../api/sedes";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
@@ -23,12 +23,15 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import type { Sede, SedeQuery } from "../../types/sedes";
 import { LoadErrorAlert } from "../settings/catalogSection";
 import { CatalogRowActions } from "../settings/CatalogRowActions";
 import { SedeModal } from "./SedeModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todos" | "activos" | "inactivos";
+const CHIPS = ["todos", "activos", "inactivos"] as const;
+type ChipKey = (typeof CHIPS)[number];
 type PagedSedeQuery = SedeQuery & { page: number };
 
 export function SedesPage() {
@@ -36,9 +39,9 @@ export function SedesPage() {
   const canWrite = can("settings.write");
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Sede>();
-  const [search, setSearch] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todos");
-  const [pageSize, setPageSize] = useState(15);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 15, PAGE_SIZES);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -54,11 +57,17 @@ export function SedesPage() {
       includeInactive: true,
     },
     fallbackError: "No se pudieron cargar las sedes",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
+
+  function clearFilters() {
+    setSearch("");
+    setChip("todos");
+  }
 
   function askToggle(sede: Sede) {
     const willDeactivate = sede.isActive;
@@ -192,12 +201,7 @@ export function SedesPage() {
                   ]}
                 />
                 {isFiltering && (
-                  <ClearFiltersButton
-                    onClick={() => {
-                      setSearch("");
-                      setChip("todos");
-                    }}
-                  />
+                  <ClearFiltersButton onClick={clearFilters} />
                 )}
               </div>
             </div>
@@ -213,14 +217,19 @@ export function SedesPage() {
             />
           }
         >
-          {data === undefined ? (
+          {data === null ? (
             !error && <TableSkeleton rows={6} columns={5} />
           ) : rows.length === 0 ? (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {isFiltering
-                ? "Ninguna sede coincide con este filtro o búsqueda."
-                : "Todavía no hay ninguna sede registrada."}
-            </p>
+            isFiltering ? (
+              <EmptyResult
+                message="Ninguna sede coincide con este filtro o búsqueda."
+                onClear={clearFilters}
+              />
+            ) : (
+              <p className="py-14 text-center text-[13.5px] text-faint">
+                Todavía no hay ninguna sede registrada.
+              </p>
+            )
           ) : (
             <DataTable>
               <thead>

@@ -27,6 +27,7 @@ import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { formatDay, formatInstant } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import { formatAmount } from "../../lib/numbers";
@@ -35,6 +36,7 @@ import { CreditDecisionModal } from "./CreditDecisionModal";
 import { CreditRequestModal } from "./CreditRequestModal";
 import { CreditStatusBadge } from "./StatusBadges";
 import { TicketLink } from "./TicketLink";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type ChipKey = "todas" | CreditStatus;
 
@@ -45,6 +47,8 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
   { key: "Rechazada", label: "Rechazadas", status: "Rechazada", countKey: "rejected" },
   { key: "Aplicada", label: "Aplicadas", status: "Aplicada", countKey: "applied" },
 ];
+
+const CHIP_KEYS = CHIPS.map((c) => c.key);
 
 /**
  * Por que esta fila no ofrece ninguna accion.
@@ -81,11 +85,11 @@ export function CreditRequestsPage() {
   const viewerStaffId = user?.staffId ?? null;
 
 
-  const [search, setSearch] = useState("");
-  const [clientId, setClientId] = useState("todos");
-  const [minAmount, setMinAmount] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todas");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [clientId, setClientId] = useUrlState<string>("cliente", "todos");
+  const [minAmount, setMinAmount] = useUrlState<string>("monto", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIP_KEYS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const [creating, setCreating] = useState(false);
   const [deciding, setDeciding] = useState<{
@@ -119,6 +123,7 @@ export function CreditRequestsPage() {
     fetch: qualityApi.creditRequests.list,
     criteria,
     fallbackError: "No se pudieron cargar las solicitudes de crédito. Vuelve a intentarlo.",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
@@ -132,6 +137,12 @@ export function CreditRequestsPage() {
     setClientId("todos");
     setMinAmount("");
     setPage(1);
+  }
+
+  function clearAll() {
+    setSearch("");
+    setChip("todas");
+    clearNarrowFilters();
   }
 
   const unfiltered =
@@ -291,6 +302,7 @@ export function CreditRequestsPage() {
               ? "Todavía no hay solicitudes de crédito."
               : "Ninguna solicitud coincide con este filtro o búsqueda."
           }
+          onClear={unfiltered ? undefined : clearAll}
           animateIn
         >
           <DataTable>

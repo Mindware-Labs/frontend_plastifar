@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { createPortal } from "react-dom";
 import { z } from "zod";
 import { Building2, Check, Flag, Info, Mail, MessageSquareText, RotateCcw, Tag, X } from "lucide-react";
 import { ApiError } from "../../api/client";
@@ -9,11 +8,11 @@ import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { Drawer } from "../../components/ui/Drawer";
 import { SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { controlBase, stateClasses } from "../../components/ui/fieldStyles";
 import { Spinner } from "../../components/ui/Spinner";
-import { useDialogBehavior } from "../../hooks/useDialogBehavior";
-import { useDialogMotion } from "../../hooks/useDialogMotion";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { departmentPathOptions } from "../../lib/departments";
 import type {
@@ -102,7 +101,7 @@ export function CreateTicketModal({
   const [departmentTree, setDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
   const [detectedMatch, setDetectedMatch] = useState<{ clientName: string; contactName: string } | null>(null);
-  const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
+  const { isExiting, requestClose } = useModalAnimation();
 
   const normalizedInitialMessage = useMemo(
     () => (initialMessage ? reflowPlainText(initialMessage) : ""),
@@ -110,9 +109,6 @@ export function CreateTicketModal({
   );
 
   const messageTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const titleId = useId();
-  const descriptionId = useId();
-  useDialogBehavior(panelRef, requestClose);
 
   const {
     register,
@@ -270,419 +266,17 @@ export function CreateTicketModal({
     }
   }
 
-  return createPortal(
-    <>
-    <div
-      ref={scrimRef}
-      inert={isExiting ? true : undefined}
-      className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] transition-opacity ${
-        isExiting ? "pointer-events-none" : ""
-      }`}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !isExiting) requestClose();
-      }}
-    >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        className={`relative flex h-full w-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)]
-          sm:w-[620px] md:w-[700px] lg:w-[760px]
-          ${isExiting ? "pointer-events-none" : ""}`}
-      >
-        {/* Cabecera: sin baldosa; el pie en versalitas sitúa la acción y el título manda. */}
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
-          <div className="min-w-0">
-            <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
-              {emailId ? "Bandeja · Nuevo ticket" : "Tickets · Alta manual"}
-            </p>
-            <h2 id={titleId} className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
-              Crear ticket
-            </h2>
-            <p id={descriptionId} className="mt-0.5 max-w-[52ch] text-[12px] leading-relaxed text-subtle">
-              {emailId
-                ? "Quedará vinculado a esta conversación. Solo el asunto es obligatorio."
-                : "Para dar seguimiento a una solicitud, consulta o incidencia. Solo el asunto es obligatorio."}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={requestClose}
-            aria-label="Cerrar"
-            title="Cerrar (Esc)"
-            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none
-              transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Cuerpo del Sheet */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          {loadingCatalogs ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-center">
-              <Spinner size="md" />
-              <p className="text-xs font-medium text-subtle">Cargando catálogos del sistema…</p>
-            </div>
-          ) : catalogsError ? (
-            <div className="p-6">
-              <Alert variant="error">{catalogsError}</Alert>
-            </div>
-          ) : (
-            <form
-              id={FORM_ID}
-              onSubmit={handleSubmit(onSubmit)}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  void handleSubmit(onSubmit)();
-                }
-              }}
-              className="flex flex-1 flex-col"
-            >
-              {formError && (
-                <div className="px-6 pt-5">
-                  <Alert variant="error">{formError}</Alert>
-                </div>
-              )}
-
-              {/* Asunto y procedencia: lo primero que se lee, sin caja alrededor. */}
-              <section className="flex flex-col gap-4 px-6 py-5">
-                {emailId && (
-                  <div className="flex items-center gap-2.5 rounded-lg border border-zinc-200 bg-white py-1.5 pl-1.5 pr-2.5 shadow-2xs">
-                    <span
-                      aria-hidden
-                      className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
-                    >
-                      <Mail className="size-3.5" strokeWidth={2.25} />
-                    </span>
-                    <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                      <span className="font-heading text-[8.5px] font-bold uppercase leading-none tracking-[0.08em] text-zinc-400">
-                        Correo entrante · las respuestas quedarán en el ticket
-                      </span>
-                      <span className="truncate text-[12px] leading-none text-ink">
-                        <span className="font-semibold">{senderName || senderEmail || "Correo entrante"}</span>
-                        {senderName && senderEmail && (
-                          <span className="ml-1.5 font-mono text-[11px] text-subtle">{senderEmail}</span>
-                        )}
-                      </span>
-                    </div>
-                    <span className="shrink-0 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase tracking-[0.06em] text-zinc-500">
-                      Correo
-                    </span>
-                  </div>
-                )}
-
-                <TextField
-                  id="ticket-subject"
-                  label="Asunto del ticket"
-                  required
-                  maxLength={200}
-                  hint={
-                    <span className="flex items-center justify-between">
-                      <span>Resumen claro y conciso de la solicitud.</span>
-                      <span className="tabular-nums">{currentSubject.length}/200</span>
-                    </span>
-                  }
-                  placeholder="Ej: Solicitud de cotización de empaques biodegradables…"
-                  state={stateOf("subject")}
-                  error={errors.subject?.message}
-                  {...register("subject")}
-                />
-              </section>
-
-              {/* Clasificación y enrutamiento */}
-              <section className="flex flex-col gap-3.5 border-t border-line-soft px-6 py-5">
-                <SectionHeading icon={Tag} title="Clasificación y enrutamiento" aside="Opcional" />
-
-                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                  <Controller
-                    control={control}
-                    name="topicId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Motivo del ticket"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        state={stateOf("topicId")}
-                        error={errors.topicId?.message}
-                        placeholder="Aún sin motivo"
-                        options={[
-                          { value: "", label: "Aún sin motivo" },
-                          ...(catalogs?.topics ?? []).map((t) => ({
-                            value: String(t.id),
-                            label: t.name,
-                          })),
-                        ]}
-                      />
-                    )}
-                  />
-
-                  <Controller
-                    control={control}
-                    name="departmentId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Departamento"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder="Aún sin departamento"
-                        options={[
-                          { value: "", label: "Aún sin departamento" },
-                          ...departmentPathOptions(catalogs?.departments ?? [], departmentTree),
-                        ]}
-                      />
-                    )}
-                  />
-
-                  <Controller
-                    control={control}
-                    name="assignedStaffId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Asignar a colaborador"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder="Sin asignar, en cola general"
-                        options={[
-                          { value: "", label: "Sin asignar, en cola general" },
-                          ...(catalogs?.assignableStaff ?? []).map((s) => ({
-                            value: String(s.id),
-                            label: s.fullName,
-                          })),
-                        ]}
-                      />
-                    )}
-                  />
-
-                  <Controller
-                    control={control}
-                    name="productLineId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Línea de producto (Opcional)"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder="Selecciona una línea"
-                        options={[
-                          { value: "", label: "Aún sin línea" },
-                          ...(catalogs?.productLines ?? []).map((pl) => ({
-                            value: String(pl.id),
-                            label: `${pl.name} (${pl.code})`,
-                          })),
-                        ]}
-                      />
-                    )}
-                  />
-                </div>
-              </section>
-
-              {/* Prioridad: control segmentado; el color solo en el punto, la elección en papel. */}
-              <section className="flex flex-col gap-3 border-t border-line-soft px-6 py-5">
-                <SectionHeading icon={Flag} title="Nivel de prioridad" />
-                <div
-                  role="radiogroup"
-                  aria-label="Nivel de prioridad"
-                  className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 sm:grid-cols-4"
-                >
-                  {PRIORITIES.map((p) => {
-                    const isSelected = selectedPriority === p.value;
-                    return (
-                      <button
-                        key={p.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={isSelected}
-                        onClick={() => setValue("priority", p.value, { shouldValidate: true })}
-                        className={`flex cursor-pointer flex-col items-start gap-1 rounded-md border px-2.5 py-2 text-left outline-none
-                          transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out
-                          focus-visible:ring-2 focus-visible:ring-brand-red/25 active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 ${
-                            isSelected
-                              ? "border-zinc-200 bg-white text-zinc-900 shadow-2xs"
-                              : "border-transparent text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-                          }`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <span
-                            className={`size-2 shrink-0 rounded-full transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${p.dot} ${
-                              isSelected ? "scale-100" : "scale-75"
-                            }`}
-                          />
-                          <span className="font-heading text-[12px] font-semibold leading-none">{p.label}</span>
-                        </span>
-                        <span className="text-[10.5px] leading-none text-zinc-400">{p.desc}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-
-              {/* Cliente y contacto */}
-              <section className="flex flex-col gap-3.5 border-t border-line-soft px-6 py-5">
-                <SectionHeading
-                  icon={Building2}
-                  title="Cliente y contacto comercial"
-                  aside={
-                    selectedClientId ? (
-                      <button
-                        type="button"
-                        onClick={handleClearClient}
-                        className="cursor-pointer rounded font-medium text-zinc-500 underline-offset-4 transition-colors hover:text-brand-red hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red"
-                      >
-                        Quitar cliente
-                      </button>
-                    ) : (
-                      "Opcional"
-                    )
-                  }
-                />
-
-                {detectedMatch && (
-                  <div className="flex items-center gap-2.5 rounded-lg border border-brand-green/30 bg-brand-green/[0.05] py-1.5 pl-1.5 pr-2.5">
-                    <span
-                      aria-hidden
-                      className="animate-plf-seal-pop flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-green text-white"
-                    >
-                      <Check className="size-3" strokeWidth={3} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[12px] text-ink">
-                      Identificado por remitente: <strong className="font-semibold">{detectedMatch.clientName}</strong>
-                      <span className="text-subtle"> · {detectedMatch.contactName}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleClearClient}
-                      className="shrink-0 cursor-pointer rounded text-[11px] font-medium text-zinc-500 underline-offset-4 transition-colors hover:text-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red"
-                    >
-                      Desvincular
-                    </button>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                  <Controller
-                    control={control}
-                    name="clientId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Cliente registrado"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        state={stateOf("clientId")}
-                        error={errors.clientId?.message}
-                        placeholder="Aún sin cliente asociado"
-                        options={[
-                          { value: "", label: "Aún sin cliente asociado" },
-                          ...(catalogs?.clients ?? []).map((c) => ({
-                            value: String(c.id),
-                            label: `${c.name} (${c.code})`,
-                          })),
-                        ]}
-                      />
-                    )}
-                  />
-
-                  <Controller
-                    control={control}
-                    name="contactId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Contacto del cliente"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder={
-                          contactOptions.length === 0
-                            ? "Aún no hay contactos registrados"
-                            : "Aún sin contacto específico"
-                        }
-                        disabled={contactOptions.length === 0}
-                        options={[
-                          { value: "", label: "Aún sin contacto específico" },
-                          ...contactOptions.map((k) => ({
-                            value: String(k.id),
-                            label: `${k.fullName}${k.isPrimary ? " (Principal)" : ""}${
-                              k.email ? ` · ${k.email}` : ""
-                            }`,
-                          })),
-                        ]}
-                      />
-                    )}
-                  />
-                </div>
-
-                {!selectedClientId && (
-                  <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-400">
-                    <Info className="mt-px size-3 shrink-0" />
-                    <span>
-                      Sin cliente registrado, el ticket se tramita con los datos del solicitante
-                      {senderEmail ? ` (${senderEmail})` : ""}.
-                    </span>
-                  </p>
-                )}
-              </section>
-
-              {/* Mensaje inicial */}
-              <section className="flex flex-col gap-3 border-t border-line-soft px-6 py-5">
-                <SectionHeading
-                  icon={MessageSquareText}
-                  title={emailId ? "Mensaje inicial del ticket" : "Descripción de la incidencia"}
-                  htmlFor="ticket-initial-message"
-                  aside={
-                    normalizedInitialMessage && currentMessage !== normalizedInitialMessage ? (
-                      <button
-                        type="button"
-                        onClick={handleResetMessage}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded font-medium text-zinc-500 underline-offset-4 transition-colors hover:text-brand-red hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red"
-                      >
-                        <RotateCcw className="size-3" />
-                        Restaurar el texto del correo
-                      </button>
-                    ) : (
-                      "Opcional"
-                    )
-                  }
-                />
-                <p className="-mt-1.5 text-[11.5px] leading-relaxed text-subtle">
-                  {emailId
-                    ? "Cuerpo del correo original. Será el primer mensaje del ticket y puedes editarlo."
-                    : "Cuenta brevemente la solicitud o incidencia. Quedará como primer mensaje del historial."}
-                </p>
-
-                <textarea
-                  id="ticket-initial-message"
-                  placeholder="Detalles de la incidencia, antecedentes o instrucciones para el equipo que atenderá el caso…"
-                  className={`${controlBase} ${stateClasses.idle} min-h-[96px] resize-none overflow-hidden px-3 py-2.5 text-[12.5px] leading-relaxed placeholder:text-zinc-400`}
-                  name={initialMessageField.name}
-                  onChange={(event) => {
-                    initialMessageField.onChange(event);
-                    autoResizeTextarea(event.target, 96);
-                  }}
-                  onBlur={initialMessageField.onBlur}
-                  ref={(el) => {
-                    initialMessageField.ref(el);
-                    messageTextareaRef.current = el;
-                    // Ajuste de altura inicial tras carga diferida de catálogos.
-                    autoResizeTextarea(el, 96);
-                  }}
-                />
-
-                <p className="text-right text-[11px] tabular-nums text-zinc-400">{currentMessage.length} caracteres</p>
-              </section>
-            </form>
-          )}
-        </div>
-
-        {/* Pie de acciones */}
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3.5">
+  return (
+    <Drawer
+      title="Crear ticket"
+      onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
+      panelClassName="relative h-full w-full bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[620px] md:w-[700px] lg:w-[760px]"
+      bodyClassName="flex min-h-0 flex-1 flex-col overflow-y-auto"
+      footerClassName="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3.5"
+      footer={
+        <>
           <span className="hidden items-center gap-1.5 text-[11.5px] text-zinc-400 sm:flex">
             <kbd className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600">
               Ctrl
@@ -706,11 +300,395 @@ export function CreateTicketModal({
               {isSubmitting ? "Creando ticket…" : "Crear ticket"}
             </Button>
           </div>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+      header={
+        /* Cabecera: sin baldosa; el pie en versalitas situa la accion y el titulo manda. */
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
+          <div className="min-w-0">
+            <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
+              {emailId ? "Bandeja · Nuevo ticket" : "Tickets · Alta manual"}
+            </p>
+            <h2 className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+              Crear ticket
+            </h2>
+            <p className="mt-0.5 max-w-[52ch] text-[12px] leading-relaxed text-subtle">
+              {emailId
+                ? "Quedará vinculado a esta conversación. Solo el asunto es obligatorio."
+                : "Para dar seguimiento a una solicitud, consulta o incidencia. Solo el asunto es obligatorio."}
+            </p>
+          </div>
 
-    </>,
-    document.body,
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Cerrar"
+            title="Cerrar (Esc)"
+            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none
+              transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      }
+    >
+      {loadingCatalogs ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-center">
+          <Spinner size="md" />
+          <p className="text-xs font-medium text-subtle">Cargando catálogos del sistema…</p>
+        </div>
+      ) : catalogsError ? (
+        <div className="p-6">
+          <Alert variant="error">{catalogsError}</Alert>
+        </div>
+      ) : (
+        <form
+          id={FORM_ID}
+          onSubmit={handleSubmit(onSubmit)}
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.preventDefault();
+              void handleSubmit(onSubmit)();
+            }
+          }}
+          className="flex flex-1 flex-col"
+        >
+          {formError && (
+            <div className="px-6 pt-5">
+              <Alert variant="error">{formError}</Alert>
+            </div>
+          )}
+
+          {/* Asunto y procedencia: lo primero que se lee, sin caja alrededor. */}
+          <section className="flex flex-col gap-4 px-6 py-5">
+            {emailId && (
+              <div className="flex items-center gap-2.5 rounded-lg border border-zinc-200 bg-white py-1.5 pl-1.5 pr-2.5 shadow-2xs">
+                <span
+                  aria-hidden
+                  className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
+                >
+                  <Mail className="size-3.5" strokeWidth={2.25} />
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                  <span className="font-heading text-[8.5px] font-bold uppercase leading-none tracking-[0.08em] text-zinc-400">
+                    Correo entrante · las respuestas quedarán en el ticket
+                  </span>
+                  <span className="truncate text-[12px] leading-none text-ink">
+                    <span className="font-semibold">{senderName || senderEmail || "Correo entrante"}</span>
+                    {senderName && senderEmail && (
+                      <span className="ml-1.5 font-mono text-[11px] text-subtle">{senderEmail}</span>
+                    )}
+                  </span>
+                </div>
+                <span className="shrink-0 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase tracking-[0.06em] text-zinc-500">
+                  Correo
+                </span>
+              </div>
+            )}
+
+            <TextField
+              id="ticket-subject"
+              label="Asunto del ticket"
+              required
+              maxLength={200}
+              hint={
+                <span className="flex items-center justify-between">
+                  <span>Resumen claro y conciso de la solicitud.</span>
+                  <span className="tabular-nums">{currentSubject.length}/200</span>
+                </span>
+              }
+              placeholder="Ej: Solicitud de cotización de empaques biodegradables…"
+              state={stateOf("subject")}
+              error={errors.subject?.message}
+              {...register("subject")}
+            />
+          </section>
+
+          {/* Clasificación y enrutamiento */}
+          <section className="flex flex-col gap-3.5 border-t border-line-soft px-6 py-5">
+            <SectionHeading icon={Tag} title="Clasificación y enrutamiento" aside="Opcional" />
+
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+              <Controller
+                control={control}
+                name="topicId"
+                render={({ field }) => (
+                  <SelectField
+                    label="Motivo del ticket"
+                    size="sm"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    state={stateOf("topicId")}
+                    error={errors.topicId?.message}
+                    placeholder="Aún sin motivo"
+                    options={[
+                      { value: "", label: "Aún sin motivo" },
+                      ...(catalogs?.topics ?? []).map((t) => ({
+                        value: String(t.id),
+                        label: t.name,
+                      })),
+                    ]}
+                  />
+                )}
+              />
+
+              <Controller
+                control={control}
+                name="departmentId"
+                render={({ field }) => (
+                  <SelectField
+                    label="Departamento"
+                    size="sm"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Aún sin departamento"
+                    options={[
+                      { value: "", label: "Aún sin departamento" },
+                      ...departmentPathOptions(catalogs?.departments ?? [], departmentTree),
+                    ]}
+                  />
+                )}
+              />
+
+              <Controller
+                control={control}
+                name="assignedStaffId"
+                render={({ field }) => (
+                  <SelectField
+                    label="Asignar a colaborador"
+                    size="sm"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Sin asignar, en cola general"
+                    options={[
+                      { value: "", label: "Sin asignar, en cola general" },
+                      ...(catalogs?.assignableStaff ?? []).map((s) => ({
+                        value: String(s.id),
+                        label: s.fullName,
+                      })),
+                    ]}
+                  />
+                )}
+              />
+
+              <Controller
+                control={control}
+                name="productLineId"
+                render={({ field }) => (
+                  <SelectField
+                    label="Línea de producto (Opcional)"
+                    size="sm"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Selecciona una línea"
+                    options={[
+                      { value: "", label: "Aún sin línea" },
+                      ...(catalogs?.productLines ?? []).map((pl) => ({
+                        value: String(pl.id),
+                        label: `${pl.name} (${pl.code})`,
+                      })),
+                    ]}
+                  />
+                )}
+              />
+            </div>
+          </section>
+
+          {/* Prioridad: control segmentado; el color solo en el punto, la elección en papel. */}
+          <section className="flex flex-col gap-3 border-t border-line-soft px-6 py-5">
+            <SectionHeading icon={Flag} title="Nivel de prioridad" />
+            <div
+              role="radiogroup"
+              aria-label="Nivel de prioridad"
+              className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 sm:grid-cols-4"
+            >
+              {PRIORITIES.map((p) => {
+                const isSelected = selectedPriority === p.value;
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => setValue("priority", p.value, { shouldValidate: true })}
+                    className={`flex cursor-pointer flex-col items-start gap-1 rounded-md border px-2.5 py-2 text-left outline-none
+                      transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out
+                      focus-visible:ring-2 focus-visible:ring-brand-red/25 active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                        isSelected
+                          ? "border-zinc-200 bg-white text-zinc-900 shadow-2xs"
+                          : "border-transparent text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+                      }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className={`size-2 shrink-0 rounded-full transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${p.dot} ${
+                          isSelected ? "scale-100" : "scale-75"
+                        }`}
+                      />
+                      <span className="font-heading text-[12px] font-semibold leading-none">{p.label}</span>
+                    </span>
+                    <span className="text-[10.5px] leading-none text-zinc-400">{p.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Cliente y contacto */}
+          <section className="flex flex-col gap-3.5 border-t border-line-soft px-6 py-5">
+            <SectionHeading
+              icon={Building2}
+              title="Cliente y contacto comercial"
+              aside={
+                selectedClientId ? (
+                  <button
+                    type="button"
+                    onClick={handleClearClient}
+                    className="cursor-pointer rounded font-medium text-zinc-500 underline-offset-4 transition-colors hover:text-brand-red hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red"
+                  >
+                    Quitar cliente
+                  </button>
+                ) : (
+                  "Opcional"
+                )
+              }
+            />
+
+            {detectedMatch && (
+              <div className="flex items-center gap-2.5 rounded-lg border border-brand-green/30 bg-brand-green/[0.05] py-1.5 pl-1.5 pr-2.5">
+                <span
+                  aria-hidden
+                  className="animate-plf-seal-pop flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-green text-white"
+                >
+                  <Check className="size-3" strokeWidth={3} />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[12px] text-ink">
+                  Identificado por remitente: <strong className="font-semibold">{detectedMatch.clientName}</strong>
+                  <span className="text-subtle"> · {detectedMatch.contactName}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearClient}
+                  className="shrink-0 cursor-pointer rounded text-[11px] font-medium text-zinc-500 underline-offset-4 transition-colors hover:text-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red"
+                >
+                  Desvincular
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+              <Controller
+                control={control}
+                name="clientId"
+                render={({ field }) => (
+                  <SelectField
+                    label="Cliente registrado"
+                    size="sm"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    state={stateOf("clientId")}
+                    error={errors.clientId?.message}
+                    placeholder="Aún sin cliente asociado"
+                    options={[
+                      { value: "", label: "Aún sin cliente asociado" },
+                      ...(catalogs?.clients ?? []).map((c) => ({
+                        value: String(c.id),
+                        label: `${c.name} (${c.code})`,
+                      })),
+                    ]}
+                  />
+                )}
+              />
+
+              <Controller
+                control={control}
+                name="contactId"
+                render={({ field }) => (
+                  <SelectField
+                    label="Contacto del cliente"
+                    size="sm"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder={
+                      contactOptions.length === 0
+                        ? "Aún no hay contactos registrados"
+                        : "Aún sin contacto específico"
+                    }
+                    disabled={contactOptions.length === 0}
+                    options={[
+                      { value: "", label: "Aún sin contacto específico" },
+                      ...contactOptions.map((k) => ({
+                        value: String(k.id),
+                        label: `${k.fullName}${k.isPrimary ? " (Principal)" : ""}${
+                          k.email ? ` · ${k.email}` : ""
+                        }`,
+                      })),
+                    ]}
+                  />
+                )}
+              />
+            </div>
+
+            {!selectedClientId && (
+              <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-400">
+                <Info className="mt-px size-3 shrink-0" />
+                <span>
+                  Sin cliente registrado, el ticket se tramita con los datos del solicitante
+                  {senderEmail ? ` (${senderEmail})` : ""}.
+                </span>
+              </p>
+            )}
+          </section>
+
+          {/* Mensaje inicial */}
+          <section className="flex flex-col gap-3 border-t border-line-soft px-6 py-5">
+            <SectionHeading
+              icon={MessageSquareText}
+              title={emailId ? "Mensaje inicial del ticket" : "Descripción de la incidencia"}
+              htmlFor="ticket-initial-message"
+              aside={
+                normalizedInitialMessage && currentMessage !== normalizedInitialMessage ? (
+                  <button
+                    type="button"
+                    onClick={handleResetMessage}
+                    className="inline-flex cursor-pointer items-center gap-1 rounded font-medium text-zinc-500 underline-offset-4 transition-colors hover:text-brand-red hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red"
+                  >
+                    <RotateCcw className="size-3" />
+                    Restaurar el texto del correo
+                  </button>
+                ) : (
+                  "Opcional"
+                )
+              }
+            />
+            <p className="-mt-1.5 text-[11.5px] leading-relaxed text-subtle">
+              {emailId
+                ? "Cuerpo del correo original. Será el primer mensaje del ticket y puedes editarlo."
+                : "Cuenta brevemente la solicitud o incidencia. Quedará como primer mensaje del historial."}
+            </p>
+
+            <textarea
+              id="ticket-initial-message"
+              placeholder="Detalles de la incidencia, antecedentes o instrucciones para el equipo que atenderá el caso…"
+              className={`${controlBase} ${stateClasses.idle} min-h-[96px] resize-none overflow-hidden px-3 py-2.5 text-[12.5px] leading-relaxed placeholder:text-zinc-400`}
+              name={initialMessageField.name}
+              onChange={(event) => {
+                initialMessageField.onChange(event);
+                autoResizeTextarea(event.target, 96);
+              }}
+              onBlur={initialMessageField.onBlur}
+              ref={(el) => {
+                initialMessageField.ref(el);
+                messageTextareaRef.current = el;
+                // Ajuste de altura inicial tras carga diferida de catálogos.
+                autoResizeTextarea(el, 96);
+              }}
+            />
+
+            <p className="text-right text-[11px] tabular-nums text-zinc-400">{currentMessage.length} caracteres</p>
+          </section>
+        </form>
+      )}
+    </Drawer>
   );
 }

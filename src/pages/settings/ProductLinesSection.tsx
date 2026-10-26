@@ -1,5 +1,4 @@
 import { Ban, CheckCircle2, Pencil, Plus } from "lucide-react";
-import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -18,12 +17,15 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import type { ProductLine } from "../../types/settings";
 import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy } from "./catalogState";
 import { ProductLineModal } from "./ProductLineModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todas" | "activas" | "inactivas";
+const CHIPS = ["todas", "activas", "inactivas"] as const;
+type ChipKey = (typeof CHIPS)[number];
 
 export function ProductLinesSection() {
   const { can } = usePermissions();
@@ -32,9 +34,9 @@ export function ProductLinesSection() {
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<ProductLine, "nueva">();
 
-  const [search, setSearch] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todas");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIPS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -48,6 +50,7 @@ export function ProductLinesSection() {
       status: chip === "todas" ? undefined : chip,
     },
     fallbackError: "No se pudieron cargar las líneas de producto",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
@@ -56,6 +59,11 @@ export function ProductLinesSection() {
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
   const isFiltering = debouncedSearch !== "" || chip !== "todas";
+
+  function clearFilters() {
+    setSearch("");
+    setChip("todas");
+  }
 
   /**
    * RF-K5: no se desactiva la ultima linea en uso. La regla la aplica el
@@ -200,6 +208,7 @@ export function ProductLinesSection() {
               ? "Ninguna línea coincide con este filtro o búsqueda."
               : "Todavía no hay ninguna línea de producto configurada."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

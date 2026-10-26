@@ -25,13 +25,18 @@ import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
+import { idParam } from "../../lib/idParam";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPath } from "../../lib/departments";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
 import { StaffModal } from "./StaffModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type FilterKey = "todos" | "activos" | "inactivos" | "administradores";
 type SortKey = "nombre" | "correo" | "departamento" | "rol" | "estado";
+
+const FILTER_KEYS: FilterKey[] = ["todos", "activos", "inactivos", "administradores"];
 
 /**
  * Orden de columnas: quién, dónde, cómo se le escribe, qué puede hacer, si opera.
@@ -67,11 +72,13 @@ export function StaffPage() {
   // null = cerrado, "nuevo" = alta, un StaffResponse = edicion de esa fila.
   const [modal, setModal] = useState<"nuevo" | StaffResponse | null>(null);
 
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<FilterKey>("todos");
-  const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
+  // Criterios en la URL: volver desde la ficha deja el listado como estaba.
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [filter, setFilter] = useUrlState<FilterKey>("estado", "todos", FILTER_KEYS);
+  const [departmentParam, setDepartmentParam] = useUrlState<string>("departamento", "todos");
+  const departmentId: number | "todos" = idParam(departmentParam) ?? "todos";
   const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -96,6 +103,7 @@ export function StaffPage() {
       dir: sort.dir,
     },
     fallbackError: "No se pudo cargar el personal",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
@@ -105,7 +113,7 @@ export function StaffPage() {
   /** Quita los tres recortes de una vez: es la salida del estado vacio. */
   function clearFilters() {
     setSearch("");
-    setDepartmentId("todos");
+    setDepartmentParam("todos");
     setFilter("todos");
     setPage(1);
   }
@@ -470,7 +478,7 @@ export function StaffPage() {
                 title="Seleccionar departamento"
                 aria-label="Filtrar por departamento"
                 value={String(departmentId)}
-                onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+                onChange={setDepartmentParam}
                 options={buildDepartmentFilterOptions(departments)}
                 defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
                 searchable
@@ -481,7 +489,7 @@ export function StaffPage() {
                 <ClearFiltersButton
                   onClick={() => {
                     setSearch("");
-                    setDepartmentId("todos");
+                    setDepartmentParam("todos");
                   }}
                 />
               )}

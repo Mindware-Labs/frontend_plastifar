@@ -20,14 +20,17 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import type { DepartmentResponse } from "../../types/api";
 import { providerLabel, type Mailbox } from "../../types/settings";
 import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, useReferenceData } from "./catalogState";
 import { MailboxModal } from "./MailboxModal";
 import { departmentPath } from "../../lib/departments";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todos" | "activos" | "inactivos";
+const CHIPS = ["todos", "activos", "inactivos"] as const;
+type ChipKey = (typeof CHIPS)[number];
 type TestResult = { ok: boolean; message: string };
 
 /** Una prueba de conexión caduca: un visto verde de hace tres minutos ya no
@@ -61,9 +64,9 @@ export function MailboxesSection() {
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Mailbox>();
 
-  const [search, setSearch] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todos");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const [testingId, setTestingId] = useState<number | null>(null);
   const [testResult, setTestResult] = useState<{ id: number; result: TestResult } | null>(null);
@@ -80,6 +83,7 @@ export function MailboxesSection() {
       status: chip === "todos" ? undefined : chip,
     },
     fallbackError: "No se pudieron cargar los buzones",
+    pageKey: "pagina",
   });
 
   // Los departamentos nombran una columna y llenan el desplegable del dialogo:
@@ -107,6 +111,13 @@ export function MailboxesSection() {
   function changeCriteria(apply: () => void) {
     setTestResult(null);
     apply();
+  }
+
+  function clearFilters() {
+    changeCriteria(() => {
+      setSearch("");
+      setChip("todos");
+    });
   }
 
   useEffect(() => {
@@ -277,6 +288,7 @@ export function MailboxesSection() {
               ? "Ningún buzón coincide con este filtro o búsqueda."
               : "Todavía no hay ningún buzón configurado."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

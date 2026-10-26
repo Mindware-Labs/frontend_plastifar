@@ -1,5 +1,4 @@
 import { Plus, Power, Trash2 } from "lucide-react";
-import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -16,13 +15,16 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import type { Team } from "../../types/settings";
 import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy } from "./catalogState";
 import { TeamModal } from "./TeamModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todos" | "activos" | "inactivos";
+const CHIPS = ["todos", "activos", "inactivos"] as const;
+type ChipKey = (typeof CHIPS)[number];
 
 export function TeamsSection() {
   const { can } = usePermissions();
@@ -30,12 +32,16 @@ export function TeamsSection() {
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Team>();
 
-  const [search, setSearch] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todos");
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
   // Regla 4 del plan: localizar los equipos sin ningun integrante activo
   // (vacios, o con todos desactivados). Es un filtro aparte del estado.
-  const [onlyWithoutMembers, setOnlyWithoutMembers] = useState(false);
-  const [pageSize, setPageSize] = useState(10);
+  const [members, setMembers] = useUrlState<"" | "sin-activos">("integrantes", "", [
+    "",
+    "sin-activos",
+  ]);
+  const onlyWithoutMembers = members === "sin-activos";
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -47,14 +53,21 @@ export function TeamsSection() {
       pageSize,
       search: debouncedSearch || undefined,
       status: chip === "todos" ? undefined : chip,
-      members: onlyWithoutMembers ? ("sin-activos" as const) : undefined,
+      members: members || undefined,
     },
     fallbackError: "No se pudieron cargar los equipos",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos" || onlyWithoutMembers;
+
+  function clearFilters() {
+    setSearch("");
+    setChip("todos");
+    setMembers("");
+  }
 
   /* El servidor es quien sabe si el equipo conserva integrantes: su 409 sube al
      dialogo con el motivo, y las salidas que ofrece son quitarlos o desactivarlo. */
@@ -120,7 +133,7 @@ export function TeamsSection() {
                   active={chip === "todos" && !onlyWithoutMembers}
                   onClick={() => {
                     setChip("todos");
-                    setOnlyWithoutMembers(false);
+                    setMembers("");
                     setPage(1);
                   }}
                   tone="neutral"
@@ -155,7 +168,7 @@ export function TeamsSection() {
                   count={counts.withoutActiveMembers}
                   active={onlyWithoutMembers}
                   onClick={() => {
-                    setOnlyWithoutMembers((current) => !current);
+                    setMembers(onlyWithoutMembers ? "" : "sin-activos");
                     setPage(1);
                   }}
                   tone="amber"
@@ -212,6 +225,7 @@ export function TeamsSection() {
               ? "Ningún equipo coincide con este filtro o búsqueda."
               : "Todavía no hay ningún equipo registrado."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

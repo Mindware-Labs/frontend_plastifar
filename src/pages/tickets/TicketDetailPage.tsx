@@ -6,7 +6,6 @@ import { ModuleHeader, type ModuleHeaderSection } from "../../components/app/Mod
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Spinner";
-import { openOverlay } from "../../hooks/overlayStack";
 import { useSettle } from "../../hooks/useSettle";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { useAuth } from "../../context/useAuth";
@@ -63,12 +62,15 @@ export function TicketDetailPage() {
       : "datos"
   );
 
-  useEffect(() => {
+  // Si la URL cambia (enlace, atras/adelante), la pestana sigue a ?tab= (ajuste durante el render).
+  const [syncedParams, setSyncedParams] = useState(searchParams);
+  if (syncedParams !== searchParams) {
+    setSyncedParams(searchParams);
     const tab = searchParams.get("tab") as TicketDetailTab | null;
     if (tab && ["datos", "conversacion", "tareas", "notas", "formularios", "reclamacion"].includes(tab)) {
       setActiveTab(tab);
     }
-  }, [searchParams]);
+  }
   const [tasksCount, setTasksCount] = useState(0);
   useDynamicBreadcrumb(ticket?.number ?? null);
   const [showTimeline, setShowTimeline] = useState(false);
@@ -197,20 +199,6 @@ export function TicketDetailPage() {
     ];
     return () => unsubs.forEach((unsub) => unsub());
   }, [ticketId, onTicketsChanged, onTicketStatusChanged, onTicketNewMessage, refreshTicket]);
-
-  // El editor tapa la pagina entera: Escape tiene que devolverte a donde estabas, salvo que haya un modal encima.
-  useEffect(() => {
-    if (!replyOpen) return;
-    const overlay = openOverlay();
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape" && overlay.isTop()) setReplyOpen(false);
-    }
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      overlay.close();
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [replyOpen]);
 
   const openAttachment = (attachments: TicketAttachmentResponse[], attachmentId: number) => {
     const index = attachments.findIndex((a) => a.id === attachmentId);

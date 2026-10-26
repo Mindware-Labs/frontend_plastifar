@@ -26,9 +26,11 @@ import { StatusDot } from "../../components/ui/StatusDot";
 import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useReceipts } from "../../context/useReceipts";
 import { useSort } from "../../hooks/useSort";
+import { idParam } from "../../lib/idParam";
 import {
   resolveStaffLabel,
   resolveTerritoryLabel,
@@ -39,6 +41,7 @@ import type { Client, ClientListResponse, Territory } from "../../types/clients"
 import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
 import { ClientModal } from "./ClientModal";
 import { ReassignSalesRepModal } from "./ReassignSalesRepModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type ChipKey = "todos" | "activos" | "inactivos" | "sinVendedor";
 
@@ -71,6 +74,18 @@ const chipToStatus: Record<ChipKey, string | undefined> = {
   sinVendedor: "sinvendedor",
 };
 
+const CHIP_KEYS = Object.keys(chipToStatus) as ChipKey[];
+
+const TYPE_OPTIONS = [
+  { value: "todos", label: "Todos los tipos" },
+  { value: "Distribuidor", label: "Distribuidor" },
+  { value: "Mayorista", label: "Mayorista" },
+  { value: "Detallista", label: "Detallista" },
+  { value: "Institucional", label: "Institucional" },
+];
+
+const TYPE_KEYS = TYPE_OPTIONS.map((option) => option.value);
+
 export function ClientsPage() {
   const navigate = useNavigate();
   const { can } = usePermissions();
@@ -84,13 +99,14 @@ export function ClientsPage() {
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Client>();
 
-  const [search, setSearch] = useState("");
-  const [territoryId, setTerritoryId] = useState("todos");
-  const [salesRepId, setSalesRepId] = useState("todos");
-  const [type, setType] = useState("todos");
-  const [chip, setChip] = useState<ChipKey>("todos");
+  // Criterios en la URL: volver desde la ficha deja el listado como estaba.
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [territoryId, setTerritoryId] = useUrlState<string>("territorio", "todos");
+  const [salesRepId, setSalesRepId] = useUrlState<string>("vendedor", "todos");
+  const [type, setType] = useUrlState<string>("tipo", "todos", TYPE_KEYS);
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIP_KEYS);
 const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const [reassigning, setReassigning] = useState<Client | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(COLUMNS.map((c) => c.id));
@@ -144,14 +160,15 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
     criteria: {
       pageSize,
       search: debouncedSearch || undefined,
-      territoryId: territoryId === "todos" ? undefined : Number(territoryId),
-      salesRepId: salesRepId === "todos" ? undefined : Number(salesRepId),
+      territoryId: idParam(territoryId),
+      salesRepId: idParam(salesRepId),
       type: type === "todos" ? undefined : type,
       status: chipToStatus[chip],
       sort: sort.key,
       dir: sort.dir,
     },
     fallbackError: "No se pudieron cargar los clientes",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
@@ -462,13 +479,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
               value={type}
               onChange={setType}
               defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
-              options={[
-                { value: "todos", label: "Todos los tipos" },
-                { value: "Distribuidor", label: "Distribuidor" },
-                { value: "Mayorista", label: "Mayorista" },
-                { value: "Detallista", label: "Detallista" },
-                { value: "Institucional", label: "Institucional" },
-              ]}
+              options={TYPE_OPTIONS}
             />
 
             {(search || filtrosPuestos > 0) && (

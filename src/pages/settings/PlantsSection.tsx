@@ -1,5 +1,4 @@
 import { Globe, Pencil, Plus, Power, Trash2 } from "lucide-react";
-import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -18,16 +17,24 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { PLANT_COUNTRIES, type Plant, type PlantCountry } from "../../types/settings";
 import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy } from "./catalogState";
 import { PlantModal } from "./PlantModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todas" | "activas" | "inactivas";
+const CHIPS = ["todas", "activas", "inactivas"] as const;
+type ChipKey = (typeof CHIPS)[number];
 
 const COUNTRY_LABEL: Record<PlantCountry, string> = Object.fromEntries(
   PLANT_COUNTRIES.map(({ value, label }) => [value, label]),
 ) as Record<PlantCountry, string>;
+
+const COUNTRY_FILTERS = ["todos", ...PLANT_COUNTRIES.map(({ value }) => value)] as const;
+type CountryFilter = (typeof COUNTRY_FILTERS)[number];
+
+const MANAGER_FILTERS = ["", "sin-activo"] as const;
 
 export function PlantsSection() {
   const { can } = usePermissions();
@@ -35,13 +42,14 @@ export function PlantsSection() {
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Plant, "nueva">();
 
-  const [search, setSearch] = useState("");
-  const [country, setCountry] = useState<PlantCountry | "todos">("todos");
-  const [chip, setChip] = useState<ChipKey>("todas");
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [country, setCountry] = useUrlState<CountryFilter>("pais", "todos", COUNTRY_FILTERS);
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIPS);
   // Regla 4 del plan: localizar las plantas sin administrador, o con uno
   // desactivado, para corregirlas. Es un filtro aparte del estado.
-  const [onlyWithoutManager, setOnlyWithoutManager] = useState(false);
-  const [pageSize, setPageSize] = useState(10);
+  const [manager, setManager] = useUrlState("administrador", "", MANAGER_FILTERS);
+  const onlyWithoutManager = manager === "sin-activo";
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -54,15 +62,23 @@ export function PlantsSection() {
       search: debouncedSearch || undefined,
       country: country === "todos" ? undefined : country,
       status: chip === "todas" ? undefined : chip,
-      manager: onlyWithoutManager ? ("sin-activo" as const) : undefined,
+      manager: manager || undefined,
     },
     fallbackError: "No se pudieron cargar las plantas",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const isFiltering =
     debouncedSearch !== "" || chip !== "todas" || country !== "todos" || onlyWithoutManager;
+
+  function clearFilters() {
+    setSearch("");
+    setCountry("todos");
+    setChip("todas");
+    setManager("");
+  }
 
   /* El servidor es quien sabe si algun equipo o producto la usa: su 409 sube al
      dialogo con el motivo, y la salida que ofrece es desactivarla. */
@@ -129,7 +145,7 @@ export function PlantsSection() {
                   active={chip === "todas" && !onlyWithoutManager}
                   onClick={() => {
                     setChip("todas");
-                    setOnlyWithoutManager(false);
+                    setManager("");
                     setPage(1);
                   }}
                   tone="neutral"
@@ -164,7 +180,7 @@ export function PlantsSection() {
                   count={counts.withoutActiveManager}
                   active={onlyWithoutManager}
                   onClick={() => {
-                    setOnlyWithoutManager((current) => !current);
+                    setManager(onlyWithoutManager ? "" : "sin-activo");
                     setPage(1);
                   }}
                   tone="amber"
@@ -238,6 +254,7 @@ export function PlantsSection() {
               ? "Ninguna planta coincide con este filtro o búsqueda."
               : "Todavía no hay ninguna planta registrada."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

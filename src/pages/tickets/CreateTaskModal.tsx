@@ -46,10 +46,12 @@ export function CreateTaskModal({
   const transitionRef = useRef<{ fromHeight: number; dir: 1 | -1 } | null>(null);
   const changingRef = useRef(false);
 
-  // Al cerrar, el próximo uso vuelve a empezar por el primer paso.
+  // Al cerrar, el próximo uso vuelve a empezar por el primer paso (ajuste durante el render).
+  if (!open && step !== 0) setStep(0);
+
+  // Las animaciones pendientes del paso se descartan al cerrar.
   useEffect(() => {
     if (!open) {
-      setStep(0);
       transitionRef.current = null;
       changingRef.current = false;
     }

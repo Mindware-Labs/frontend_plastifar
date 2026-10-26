@@ -21,13 +21,19 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { humanizeMinutes, workdayMinutes } from "../../lib/sla";
 import { PRIORITIES, type Holiday, type Priority, type SlaPolicy } from "../../types/settings";
 import { LoadErrorAlert, WarnNotice } from "./catalogSection";
 import { freshCopy, useReferenceData } from "./catalogState";
 import { SlaModal } from "./SlaModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todas" | "activas" | "inactivas";
+const CHIPS = ["todas", "activas", "inactivas"] as const;
+type ChipKey = (typeof CHIPS)[number];
+
+type PriorityFilter = Priority | "todas";
+const PRIORITY_FILTERS: readonly PriorityFilter[] = ["todas", ...PRIORITIES];
 
 /**
  * Prioridades sin política predeterminada activa. Se pregunta por prioridad y se
@@ -80,10 +86,10 @@ export function SlaSection() {
   const { modal, setModal, busyId, setBusyId, confirm, dialog } = useCatalogActions<SlaPolicy, "nueva">();
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState("");
-  const [priority, setPriority] = useState<Priority | "todas">("todas");
-  const [chip, setChip] = useState<ChipKey>("todas");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [priority, setPriority] = useUrlState<PriorityFilter>("prioridad", "todas", PRIORITY_FILTERS);
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIPS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -98,6 +104,7 @@ export function SlaSection() {
       priority: priority === "todas" ? undefined : priority,
     },
     fallbackError: "No se pudieron cargar las políticas de SLA",
+    pageKey: "pagina",
   });
 
   const uncoveredRef = useReferenceData<Priority[]>(loadUncovered, []);
@@ -112,6 +119,12 @@ export function SlaSection() {
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
   const isFiltering = debouncedSearch !== "" || chip !== "todas" || priority !== "todas";
+
+  function clearFilters() {
+    setSearch("");
+    setPriority("todas");
+    setChip("todas");
+  }
 
   /** Marcar o desactivar una predeterminada cambia la cobertura: se relee. */
   function reloadAll() {
@@ -302,6 +315,7 @@ export function SlaSection() {
               ? "Ninguna política coincide con este filtro o búsqueda."
               : "Todavía no hay ninguna política de SLA configurada."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

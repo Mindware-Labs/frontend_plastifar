@@ -1,11 +1,11 @@
 import { Ban, CheckCircle2, Gavel, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
 import { ticketVerdictsApi, type TicketVerdictQuery } from "../../api/ticketVerdicts";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -17,21 +17,25 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useRowRun } from "../../hooks/useRowRun";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { formatDateTime } from "../../lib/format";
 import { staleClass } from "../../lib/listState";
 import type { TicketVerdictListResponse, TicketVerdictResponse } from "../../types/api";
 import { VeredictoModal } from "./VeredictoModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type StatusFilter = "todos" | "activos" | "inactivos";
+
+const STATUS_KEYS: StatusFilter[] = ["todos", "activos", "inactivos"];
 
 /** Gestión del catálogo de veredictos para tickets solucionados. */
 export function VeredictosPage() {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
 
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("todos");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [status, setStatus] = useUrlState<StatusFilter>("estado", "todos", STATUS_KEYS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
   const { modal, setModal, busyId, setBusyId, ask, dialog } = useCatalogActions<TicketVerdictResponse>();
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
@@ -43,10 +47,17 @@ export function VeredictosPage() {
     fetch: ticketVerdictsApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined, status },
     fallbackError: "No se pudieron cargar los veredictos",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
+  const filtered = Boolean(debouncedSearch) || status !== "todos";
+
+  function clearAll() {
+    setSearch("");
+    setStatus("todos");
+  }
 
   const { actionError, run } = useRowRun(setBusyId, refresh);
 
@@ -234,16 +245,15 @@ export function VeredictosPage() {
               </tbody>
             </DataTable>
 
-            {rows.length === 0 && (
-              <div className="flex flex-col items-center gap-2 py-14 text-center">
-                <Gavel className="h-6 w-6 text-faint" />
-                <p className="text-[13.5px] text-faint">
-                  {debouncedSearch || status !== "todos"
-                    ? "Ningún veredicto coincide con el filtro."
-                    : "Todavía no hay veredictos en el catálogo."}
-                </p>
-              </div>
-            )}
+            {rows.length === 0 &&
+              (filtered ? (
+                <EmptyResult message="Ningún veredicto coincide con el filtro." onClear={clearAll} />
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-14 text-center">
+                  <Gavel className="h-6 w-6 text-faint" />
+                  <p className="text-[13.5px] text-faint">Todavía no hay veredictos en el catálogo.</p>
+                </div>
+              ))}
 
             <Pagination
               page={data.page}

@@ -18,6 +18,7 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ClearFiltersButton, FilterDropdown, type FilterOption } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
@@ -32,6 +33,7 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { staleClass } from "../../lib/listState";
 import type {
   DepartmentListResponse,
@@ -43,9 +45,13 @@ import { LoadErrorAlert } from "../settings/catalogSection";
 import { useReferenceData } from "../settings/catalogState";
 import { CatalogRowActions } from "../settings/CatalogRowActions";
 import { DepartmentModal } from "./DepartmentModal";
+import { idParam } from "../../lib/idParam";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todos" | "activos" | "inactivos";
+const CHIPS = ["todos", "activos", "inactivos"] as const;
+type ChipKey = (typeof CHIPS)[number];
 type TypeKey = "todos" | DepartmentType;
+const TYPES: readonly TypeKey[] = ["todos", "Publico", "Privado"];
 type PagedDepartmentQuery = DepartmentQuery & { page: number };
 
 export function DepartmentsPage() {
@@ -53,11 +59,11 @@ export function DepartmentsPage() {
   const canWrite = can("settings.write");
 
   const { modal, setModal, busyId, confirm, ask, dialog } = useCatalogActions<DepartmentResponse>();
-  const [search, setSearch] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todos");
-  const [typeChip, setTypeChip] = useState<TypeKey>("todos");
-  const [selectedSedeId, setSelectedSedeId] = useState<string>("todas");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
+  const [typeChip, setTypeChip] = useUrlState<TypeKey>("tipo", "todos", TYPES);
+  const [selectedSedeId, setSelectedSedeId] = useUrlState<string>("sede", "todas");
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   // Selección múltiple y acciones en lote
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -86,11 +92,12 @@ export function DepartmentsPage() {
           ? undefined
           : selectedSedeId === "sin-sede"
             ? -1
-            : Number(selectedSedeId),
+            : idParam(selectedSedeId),
       type: typeChip === "todos" ? undefined : typeChip,
       includeInactive: true,
     },
     fallbackError: "No se pudieron cargar los departamentos",
+    pageKey: "pagina",
   });
 
   const { data: sedesList } = useReferenceData(
@@ -220,6 +227,13 @@ export function DepartmentsPage() {
 
   const isFiltering =
     debouncedSearch !== "" || chip !== "todos" || typeChip !== "todos" || selectedSedeId !== "todas";
+
+  function clearFilters() {
+    setSearch("");
+    setTypeChip("todos");
+    setChip("todos");
+    setSelectedSedeId("todas");
+  }
 
   function askToggle(department: DepartmentResponse) {
     confirm(department.id, {
@@ -432,14 +446,7 @@ export function DepartmentsPage() {
                     searchPlaceholder="Buscar sede…"
                   />
                   {(search || typeChip !== "todos" || chip !== "todos" || selectedSedeId !== "todas") && (
-                    <ClearFiltersButton
-                      onClick={() => {
-                        setSearch("");
-                        setTypeChip("todos");
-                        setChip("todos");
-                        setSelectedSedeId("todas");
-                      }}
-                    />
+                    <ClearFiltersButton onClick={clearFilters} />
                   )}
                 </div>
               )}
@@ -460,11 +467,16 @@ export function DepartmentsPage() {
           {data === null ? (
             <TableSkeleton rows={8} columns={7} />
           ) : data.items.length === 0 ? (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {isFiltering
-                ? "Ningún departamento coincide con este filtro o búsqueda."
-                : "Todavía no hay ningún departamento registrado."}
-            </p>
+            isFiltering ? (
+              <EmptyResult
+                message="Ningún departamento coincide con este filtro o búsqueda."
+                onClear={clearFilters}
+              />
+            ) : (
+              <p className="py-14 text-center text-[13.5px] text-faint">
+                Todavía no hay ningún departamento registrado.
+              </p>
+            )
           ) : (
             <div className={staleClass(isStale)}>
               <DataTable>

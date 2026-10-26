@@ -1,4 +1,5 @@
-﻿import { ChevronLeft, ChevronRight } from "lucide-react";
+﻿import { PAGE_SIZES } from "../../lib/pageSizes";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Select } from "./Select";
 
 interface PaginationProps {
@@ -18,7 +19,7 @@ interface PaginationProps {
   nounSingular?: string;
 }
 
-const pageSizes = [10, 25, 50];
+const pageSizes: number[] = [...PAGE_SIZES];
 
 /**
  * Los tamaños ofrecidos, incluyendo SIEMPRE el que está en uso.

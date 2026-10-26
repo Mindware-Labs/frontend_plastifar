@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Building2, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
@@ -79,7 +79,7 @@ export function DiscrepancyFormModal({
   const receipts = useReceipts();
 
   // Almacena el resultado para entregarlo a onSaved cuando termine la animación de salida
-  const savedResultRef = useRef<DiscrepancyDetail | null>(null);
+  const [savedResult, setSavedResult] = useState<DiscrepancyDetail | null>(null);
 
   // Modal para preguntar si desea cerrar el ticket al completar la investigación
   const [showClosePrompt, setShowClosePrompt] = useState(false);
@@ -91,9 +91,6 @@ export function DiscrepancyFormModal({
 
   useEffect(() => {
     if (showClosePrompt && completedDiscrepancy) {
-      setCloseReason(
-        `Cerrado tras completar investigación de discrepancia ${completedDiscrepancy.discrepancy.number}`
-      );
       ticketVerdictsApi
         .list({ page: 1, pageSize: 100, status: "activos" })
         .then((res) => {
@@ -110,7 +107,7 @@ export function DiscrepancyFormModal({
   const finishModal = (saved: DiscrepancyDetail) => {
     setShowClosePrompt(false);
     if (inline) {
-      savedResultRef.current = saved;
+      setSavedResult(saved);
       requestClose();
     } else {
       onSaved(saved);
@@ -119,18 +116,22 @@ export function DiscrepancyFormModal({
   };
 
   const handleFinishedExit = () => {
-    if (savedResultRef.current) {
-      onSaved(savedResultRef.current);
+    if (savedResult) {
+      onSaved(savedResult);
     } else {
       onClose();
     }
   };
 
   const modalAnimation = useModalAnimation();
-  const inlineMotion = useDialogMotion(handleFinishedExit);
+  const {
+    requestClose: inlineRequestClose,
+    isExiting: inlineExiting,
+    panelRef: inlinePanelRef,
+  } = useDialogMotion(handleFinishedExit);
 
-  const requestClose = inline ? inlineMotion.requestClose : modalAnimation.requestClose;
-  const isExiting = inline ? inlineMotion.isExiting : modalAnimation.isExiting;
+  const requestClose = inline ? inlineRequestClose : modalAnimation.requestClose;
+  const isExiting = inline ? inlineExiting : modalAnimation.isExiting;
 
   // Parsing de nota inicial y fecha de despacho
   const parsedNote = parseNote(discrepancy?.note ?? initialData?.note);
@@ -417,6 +418,9 @@ export function DiscrepancyFormModal({
 
       if (!isAlreadyClosed && effectiveTicketId > 0) {
         setCompletedDiscrepancy(saved);
+        setCloseReason(
+          `Cerrado tras completar investigación de discrepancia ${saved.discrepancy.number}`
+        );
         setShowClosePrompt(true);
       } else {
         finishModal(saved);
@@ -612,7 +616,7 @@ export function DiscrepancyFormModal({
   if (inline) {
     return (
       <div
-        ref={inlineMotion.panelRef}
+        ref={inlinePanelRef}
         className="rounded-xl border border-zinc-200 bg-white shadow-2xs overflow-hidden"
       >
         {/* Encabezado Editorial Limpio, Simétrico y Organizado */}

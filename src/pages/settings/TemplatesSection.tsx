@@ -1,5 +1,4 @@
 import { Plus, Power } from "lucide-react";
-import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -17,14 +16,17 @@ import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { usedVariables } from "../../lib/templates";
 import type { EmailTemplate } from "../../types/settings";
 import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy } from "./catalogState";
 import { TemplateModal } from "./TemplateModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todas" | "activas" | "inactivas";
+const CHIPS = ["todas", "activas", "inactivas"] as const;
+type ChipKey = (typeof CHIPS)[number];
 
 export function TemplatesSection() {
   const { can } = usePermissions();
@@ -32,9 +34,9 @@ export function TemplatesSection() {
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<EmailTemplate, "nueva">();
 
-  const [search, setSearch] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todas");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIPS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -48,6 +50,7 @@ export function TemplatesSection() {
       status: chip === "todas" ? undefined : chip,
     },
     fallbackError: "No se pudieron cargar las plantillas",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
@@ -56,6 +59,11 @@ export function TemplatesSection() {
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
   const isFiltering = debouncedSearch !== "" || chip !== "todas";
+
+  function clearFilters() {
+    setSearch("");
+    setChip("todas");
+  }
 
   function askToggle(template: EmailTemplate) {
     confirm(template.id, {
@@ -181,6 +189,7 @@ export function TemplatesSection() {
               ? "Ninguna plantilla coincide con este filtro o búsqueda."
               : "Todavía no hay ninguna plantilla configurada."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

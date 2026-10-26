@@ -1,5 +1,4 @@
 import { Clock, FileSpreadsheet, Plus, Power, Trash2 } from "lucide-react";
-import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -15,13 +14,19 @@ import { StatusDot } from "../../components/ui/StatusDot";
 import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { REQUIRED_FORMS, ROUTING_MOMENTS, type FormRoutingRule } from "../../types/settings";
 import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy } from "./catalogState";
 import { FormRoutingRuleModal } from "./FormRoutingRuleModal";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
-type ChipKey = "todas" | "activas" | "inactivas";
+const CHIPS = ["todas", "activas", "inactivas"] as const;
+type ChipKey = (typeof CHIPS)[number];
+
+const FORM_FILTERS: readonly string[] = ["todos", ...REQUIRED_FORMS.map(({ value }) => value)];
+const MOMENT_FILTERS: readonly string[] = ["todos", ...ROUTING_MOMENTS.map(({ value }) => value)];
 
 /**
  * Configuración → Formularios (docs/plan/02, RF-S8): quién llena o consulta
@@ -34,10 +39,10 @@ export function FormRoutingRulesSection() {
   const canWrite = can("settings.write");
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<FormRoutingRule, "nueva">();
-  const [form, setForm] = useState("todos");
-  const [moment, setMoment] = useState("todos");
-  const [chip, setChip] = useState<ChipKey>("todas");
-  const [pageSize, setPageSize] = useState(10);
+  const [form, setForm] = useUrlState<string>("formulario", "todos", FORM_FILTERS);
+  const [moment, setMoment] = useUrlState<string>("momento", "todos", MOMENT_FILTERS);
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIPS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
     fetch: settingsApi.formRoutingRules.list,
@@ -48,11 +53,18 @@ export function FormRoutingRulesSection() {
       status: chip === "todas" ? undefined : chip,
     },
     fallbackError: "No se pudieron cargar las reglas de formularios",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const isFiltering = chip !== "todas" || form !== "todos" || moment !== "todos";
+
+  function clearFilters() {
+    setForm("todos");
+    setMoment("todos");
+    setChip("todas");
+  }
 
   function describe(rule: FormRoutingRule) {
     return `${rule.formLabel} · ${rule.momentLabel} · ${rule.departmentName ?? rule.teamName ?? ""}`;
@@ -211,6 +223,7 @@ export function FormRoutingRulesSection() {
           empty={
             isFiltering ? "Ninguna regla coincide con este filtro." : "Todavía no hay reglas. La carga inicial trae las de la hoja FORMULARIOS."
           }
+          onClear={isFiltering ? clearFilters : undefined}
         >
           <DataTable>
             <thead>

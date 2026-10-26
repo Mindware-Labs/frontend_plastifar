@@ -9,6 +9,7 @@ import { clientsApi } from "../api/clients";
 import { settingsApi } from "../api/settings";
 import { staffApi } from "../api/staff";
 import { territoriesApi } from "../api/territories";
+import { idParam } from "./idParam";
 import type { LookupResult } from "../components/ui/LookupSelect";
 
 /**
@@ -70,7 +71,10 @@ export const searchActiveStaff = searchStaff("activos");
 
 /** Nombre de un colaborador por id, para pintar lo ya seleccionado. */
 export async function resolveStaffLabel(value: string): Promise<string | null> {
-  const person = await staffApi.getDepartmentAccess(Number(value));
+  const id = idParam(value);
+  // Un id que no es entero (un enlace editado a mano) no se pide al servidor.
+  if (id === undefined) return null;
+  const person = await staffApi.getDepartmentAccess(id);
   return `${person.firstName} ${person.lastName}`;
 }
 
@@ -101,13 +105,19 @@ export async function searchProducts(term: string): Promise<LookupResult> {
  * nombrándolo.
  */
 export async function resolveProductLabel(value: string): Promise<string | null> {
-  const product = await settingsApi.products.get(Number(value));
+  const id = idParam(value);
+  // Un id que no es entero (un enlace editado a mano) no se pide al servidor.
+  if (id === undefined) return null;
+  const product = await settingsApi.products.get(id);
   return `${product.code} · ${product.name}${product.isActive ? "" : " (inactivo)"}`;
 }
 
 /** Nombre de un cliente por id, para pintar lo ya seleccionado. */
 export async function resolveClientLabel(value: string): Promise<string | null> {
-  const { client } = await clientsApi.get(Number(value));
+  const id = idParam(value);
+  // Un id que no es entero (un enlace editado a mano) no se pide al servidor.
+  if (id === undefined) return null;
+  const { client } = await clientsApi.get(id);
   return client.name;
 }
 
@@ -131,6 +141,9 @@ export async function searchTerritories(term: string): Promise<LookupResult> {
 
 /** Nombre de un territorio por id, para pintar lo ya seleccionado. */
 export async function resolveTerritoryLabel(value: string): Promise<string | null> {
-  const territory = await territoriesApi.get(Number(value));
+  const id = idParam(value);
+  // Un id que no es entero (un enlace editado a mano) no se pide al servidor.
+  if (id === undefined) return null;
+  const territory = await territoriesApi.get(id);
   return territory.name;
 }

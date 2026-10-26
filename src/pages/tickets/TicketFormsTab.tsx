@@ -1,5 +1,5 @@
 import { AlertTriangle, FileSpreadsheet, Plus, Truck, Wrench } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
@@ -65,25 +65,6 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   const [newFormModalOpen, setNewFormModalOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  useEffect(() => {
-    const formToOpen = searchParams.get("openForm");
-    if (!formToOpen) return;
-
-    const next = new URLSearchParams(searchParams);
-    next.delete("openForm");
-    setSearchParams(next, { replace: true });
-
-    if (formToOpen === "Reclamacion" || formToOpen.toLowerCase() === "reclamacion") {
-      handleOpenNewClaim();
-    } else if (formToOpen === "RetiroMercancia" || formToOpen.toLowerCase().includes("retiro")) {
-      handleOpenNewWithdrawal();
-    } else if (formToOpen === "DiscrepanciaCarga" || formToOpen.toLowerCase().includes("discrepancia")) {
-      handleOpenNewDiscrepancy();
-    } else if (formToOpen === "Hca" || formToOpen.toLowerCase() === "hca") {
-      handleOpenNewHca();
-    }
-  }, [searchParams]);
-
   // Modal open states
   const [claimModalOpen, setClaimModalOpen] = useState(false);
   const [editingClaim, setEditingClaim] = useState<CustomerClaim | undefined>(undefined);
@@ -127,6 +108,62 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   const [migrationTargetType, setMigrationTargetType] = useState<EnterpriseFormType>("reclamacion");
   const [migrateCommonFields, setMigrateCommonFields] = useState(true);
 
+  // Helpers to start new forms
+  const handleOpenNewClaim = useCallback((initData?: typeof claimInitialData) => {
+    setEditingClaim(undefined);
+    setClaimInitialData(initData);
+    setClaimModalOpen(true);
+  }, []);
+
+  const handleOpenNewWithdrawal = useCallback((initLines?: typeof withdrawalInitialLines) => {
+    setEditingWithdrawal(undefined);
+    setWithdrawalInitialLines(initLines);
+    setWithdrawalModalOpen(true);
+  }, []);
+
+  const handleOpenNewDiscrepancy = useCallback((initData?: typeof discrepancyInitialData) => {
+    setEditingDiscrepancy(undefined);
+    setDiscrepancyInitialData(initData);
+    setDiscrepancyModalOpen(true);
+  }, []);
+
+  const handleOpenNewHca = useCallback(
+    (initDefaults?: typeof hcaInitialDefaults) => {
+      setEditingHca(undefined);
+      setHcaInitialDefaults(initDefaults ?? {
+        clientId: ticket.clientId ?? 0,
+        ticketId: ticket.id,
+        description: ticket.subject,
+      });
+      setHcaModalOpen(true);
+    },
+    [ticket.clientId, ticket.id, ticket.subject],
+  );
+
+  // ?openForm= abre el formulario pedido (ajuste durante el render, una vez por URL)...
+  const [openFormParams, setOpenFormParams] = useState<URLSearchParams | null>(null);
+  if (openFormParams !== searchParams) {
+    setOpenFormParams(searchParams);
+    const formToOpen = searchParams.get("openForm");
+    if (formToOpen === "Reclamacion" || formToOpen?.toLowerCase() === "reclamacion") {
+      handleOpenNewClaim();
+    } else if (formToOpen === "RetiroMercancia" || formToOpen?.toLowerCase().includes("retiro")) {
+      handleOpenNewWithdrawal();
+    } else if (formToOpen === "DiscrepanciaCarga" || formToOpen?.toLowerCase().includes("discrepancia")) {
+      handleOpenNewDiscrepancy();
+    } else if (formToOpen === "Hca" || formToOpen?.toLowerCase() === "hca") {
+      handleOpenNewHca();
+    }
+  }
+
+  // ...y se retira de la URL para no reabrirlo.
+  useEffect(() => {
+    if (!searchParams.has("openForm")) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("openForm");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   // Load product lines for HCA
   useEffect(() => {
     fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize }))
@@ -134,39 +171,69 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       .catch(() => setProductLines([]));
   }, []);
 
-  const fetchAllForms = async () => {
+  /*
+   * Carga de formularios. Se relanza al cambiar de ticket (o de permisos) y cuando
+   * `reloadForms` sube el contador tras guardar. El spinner y el error se reinician
+   * desde quien pide la carga, no desde el efecto.
+   */
+  const [reloadTick, setReloadTick] = useState(0);
+  const reloadForms = () => {
     setLoading(true);
     setError(null);
-    try {
-      const [claimRes, withRes, discRes, sheetRes] = await Promise.allSettled([
-        canReadClaims ? claimsApi.getByTicket(ticket.id) : Promise.reject("no-permission"),
-        canReadWithdrawals ? withdrawalsApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
-        canReadDiscrepancies ? discrepanciesApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
-        canReadQuality ? qualityApi.sheets.listByTicket(ticket.id) : Promise.reject("no-permission"),
-      ]);
-
-      const foundClaim = claimRes.status === "fulfilled" ? claimRes.value.claim : null;
-      const foundWith = withRes.status === "fulfilled" ? withRes.value.map((d) => d.withdrawal) : [];
-      const foundDisc = discRes.status === "fulfilled" ? discRes.value : [];
-      const foundSheets = sheetRes.status === "fulfilled" ? sheetRes.value : [];
-
-      setClaim(foundClaim);
-      setWithdrawals(foundWith);
-      setDiscrepancies(foundDisc);
-      setSheets(foundSheets);
-
-      const hasAny = Boolean(foundClaim || foundWith.length > 0 || foundDisc.length > 0 || foundSheets.length > 0);
-      onHasFormsChanged?.(hasAny);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Error al cargar los formularios del ticket");
-    } finally {
-      setLoading(false);
-    }
+    setReloadTick((tick) => tick + 1);
   };
 
+  const formsKey = `${ticket.id}|${canReadClaims}|${canReadWithdrawals}|${canReadDiscrepancies}|${canReadQuality}`;
+  const [loadedFormsKey, setLoadedFormsKey] = useState(formsKey);
+  if (loadedFormsKey !== formsKey) {
+    setLoadedFormsKey(formsKey);
+    setLoading(true);
+    setError(null);
+  }
+
+  // El padre pasa una flecha nueva en cada render: se lee por ref para no relanzar la carga.
+  const onHasFormsChangedRef = useRef(onHasFormsChanged);
   useEffect(() => {
-    fetchAllForms();
-  }, [ticket.id]);
+    onHasFormsChangedRef.current = onHasFormsChanged;
+  }, [onHasFormsChanged]);
+
+  useEffect(() => {
+    let ignore = false;
+    const fetchAllForms = async () => {
+      try {
+        const [claimRes, withRes, discRes, sheetRes] = await Promise.allSettled([
+          canReadClaims ? claimsApi.getByTicket(ticket.id) : Promise.reject("no-permission"),
+          canReadWithdrawals ? withdrawalsApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
+          canReadDiscrepancies ? discrepanciesApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
+          canReadQuality ? qualityApi.sheets.listByTicket(ticket.id) : Promise.reject("no-permission"),
+        ]);
+
+        const foundClaim = claimRes.status === "fulfilled" ? claimRes.value.claim : null;
+        const foundWith = withRes.status === "fulfilled" ? withRes.value.map((d) => d.withdrawal) : [];
+        const foundDisc = discRes.status === "fulfilled" ? discRes.value : [];
+        const foundSheets = sheetRes.status === "fulfilled" ? sheetRes.value : [];
+        if (ignore) return;
+
+        setClaim(foundClaim);
+        setWithdrawals(foundWith);
+        setDiscrepancies(foundDisc);
+        setSheets(foundSheets);
+
+        const hasAny = Boolean(foundClaim || foundWith.length > 0 || foundDisc.length > 0 || foundSheets.length > 0);
+        onHasFormsChangedRef.current?.(hasAny);
+      } catch (err) {
+        if (!ignore) {
+          setError(err instanceof ApiError ? err.message : "Error al cargar los formularios del ticket");
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+    void fetchAllForms();
+    return () => {
+      ignore = true;
+    };
+  }, [ticket.id, canReadClaims, canReadWithdrawals, canReadDiscrepancies, canReadQuality, reloadTick]);
 
   // Build the list of active forms for navigation
   const registeredForms = useMemo(() => {
@@ -219,16 +286,14 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     return list;
   }, [claim, withdrawals, discrepancies, sheets]);
 
-  // Set default selected sub-tab
-  useEffect(() => {
-    if (registeredForms.length > 0) {
-      if (!selectedSubTabKey || !registeredForms.some((f) => f.key === selectedSubTabKey)) {
-        setSelectedSubTabKey(registeredForms[0].key);
-      }
-    } else {
-      setSelectedSubTabKey(null);
+  // Set default selected sub-tab (ajuste durante el render: converge en una pasada)
+  if (registeredForms.length > 0) {
+    if (!selectedSubTabKey || !registeredForms.some((f) => f.key === selectedSubTabKey)) {
+      setSelectedSubTabKey(registeredForms[0].key);
     }
-  }, [registeredForms, selectedSubTabKey]);
+  } else if (selectedSubTabKey !== null) {
+    setSelectedSubTabKey(null);
+  }
 
   const activeForm = useMemo(() => {
     if (!selectedSubTabKey) return registeredForms[0] ?? null;
@@ -302,36 +367,17 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       if (b.key === suggestedFormRaw) return 1;
       return 0;
     });
-  }, [suggestedFormRaw, canWriteClaims, canWriteWithdrawals, canWriteDiscrepancies, canWriteQuality]);
-
-    // Helpers to start new forms
-  const handleOpenNewClaim = (initData?: typeof claimInitialData) => {
-    setEditingClaim(undefined);
-    setClaimInitialData(initData);
-    setClaimModalOpen(true);
-  };
-
-  const handleOpenNewWithdrawal = (initLines?: typeof withdrawalInitialLines) => {
-    setEditingWithdrawal(undefined);
-    setWithdrawalInitialLines(initLines);
-    setWithdrawalModalOpen(true);
-  };
-
-  const handleOpenNewDiscrepancy = (initData?: typeof discrepancyInitialData) => {
-    setEditingDiscrepancy(undefined);
-    setDiscrepancyInitialData(initData);
-    setDiscrepancyModalOpen(true);
-  };
-
-  const handleOpenNewHca = (initDefaults?: typeof hcaInitialDefaults) => {
-    setEditingHca(undefined);
-    setHcaInitialDefaults(initDefaults ?? {
-      clientId: ticket.clientId ?? 0,
-      ticketId: ticket.id,
-      description: ticket.subject,
-    });
-    setHcaModalOpen(true);
-  };
+  }, [
+    suggestedFormRaw,
+    canWriteClaims,
+    canWriteWithdrawals,
+    canWriteDiscrepancies,
+    canWriteQuality,
+    handleOpenNewClaim,
+    handleOpenNewWithdrawal,
+    handleOpenNewDiscrepancy,
+    handleOpenNewHca,
+  ]);
 
   // Helper to trigger form migration
   const handleTriggerMigration = (currentForm: NonNullable<typeof activeForm>) => {
@@ -493,7 +539,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
             setDiscrepancyModalOpen(false);
             setEditingDiscrepancy(undefined);
             setDiscrepancyInitialData(undefined);
-            fetchAllForms();
+            reloadForms();
             onTicketStatusChanged?.();
           }}
         />
@@ -697,7 +743,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
           onClose={() => setClaimModalOpen(false)}
           onSaved={() => {
             setClaimModalOpen(false);
-            fetchAllForms();
+            reloadForms();
           }}
         />
       )}
@@ -712,7 +758,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
           onClose={() => setWithdrawalModalOpen(false)}
           onSaved={() => {
             setWithdrawalModalOpen(false);
-            fetchAllForms();
+            reloadForms();
           }}
         />
       )}
@@ -727,7 +773,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
           onClose={() => setHcaModalOpen(false)}
           onSaved={() => {
             setHcaModalOpen(false);
-            fetchAllForms();
+            reloadForms();
           }}
         />
       )}

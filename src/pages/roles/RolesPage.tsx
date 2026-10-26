@@ -1,6 +1,5 @@
 import { KeyRound, Lock, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { rolesApi, type RoleQuery } from "../../api/roles";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
@@ -9,6 +8,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -19,38 +19,27 @@ import { useAuth } from "../../context/useAuth";
 import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { staleClass } from "../../lib/listState";
 import type { RoleListResponse, RoleResponse } from "../../types/api";
 import type { PermissionMatrixResponse } from "../../types/permissions";
 import { PermissionsView } from "../permissions/PermissionsPage";
 import { RoleModal } from "./RoleModal";
 import { RolePermissionsDrawer } from "./RolePermissionsDrawer";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type FilterKey = "todos" | "activos" | "sistema" | "personalizados";
+type TabKey = "roles" | "permisos";
+
+const FILTER_KEYS: FilterKey[] = ["todos", "activos", "sistema", "personalizados"];
+const TAB_KEYS: TabKey[] = ["roles", "permisos"];
 
 export function RolesPage() {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const currentTab = (searchParams.get("tab") === "permisos" ? "permisos" : "roles") as
-    | "roles"
-    | "permisos";
-
-  function setTab(nextTab: "roles" | "permisos") {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (nextTab === "permisos") {
-          next.set("tab", "permisos");
-        } else {
-          next.delete("tab");
-        }
-        return next;
-      },
-      { replace: true },
-    );
-  }
+  // `?tab=permisos` abre la matriz; la vista de roles es la de por defecto.
+  const [currentTab, setTab] = useUrlState<TabKey>("tab", "roles", TAB_KEYS);
 
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<RoleResponse>();
 
@@ -67,20 +56,26 @@ export function RolesPage() {
       .catch(() => {});
   }, []);
 
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<FilterKey>("todos");
-  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [filter, setFilter] = useUrlState<FilterKey>("estado", "todos", FILTER_KEYS);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const { data, isStale, error, setPage, refresh } = usePagedList<RoleQuery, RoleListResponse>({
     fetch: rolesApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined, status: filter },
     fallbackError: "No se pudieron cargar los roles",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const unfiltered = filter === "todos" && !debouncedSearch;
+
+  function clearAll() {
+    setSearch("");
+    setFilter("todos");
+  }
 
   /** Los roles del sistema no se tocan: sostienen los permisos base. */
   function canManage(role: RoleResponse) {
@@ -363,13 +358,12 @@ export function RolesPage() {
               </tbody>
             </DataTable>
 
-            {rows.length === 0 && (
-              <p className="py-14 text-center text-[13.5px] text-faint">
-                {unfiltered
-                  ? "Todavía no hay roles creados."
-                  : "Ningún rol coincide con este filtro o búsqueda."}
-              </p>
-            )}
+            {rows.length === 0 &&
+              (unfiltered ? (
+                <p className="py-14 text-center text-[13.5px] text-faint">Todavía no hay roles creados.</p>
+              ) : (
+                <EmptyResult message="Ningún rol coincide con este filtro o búsqueda." onClear={clearAll} />
+              ))}
 
             <Pagination
               page={data.page}

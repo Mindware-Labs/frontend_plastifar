@@ -22,12 +22,14 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useSort } from "../../hooks/useSort";
+import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, resolveStaffLabel, searchClients, searchStaff } from "../../lib/lookups";
 import { formatAmount } from "../../lib/numbers";
 import { WITHDRAWAL_REASONS, type WithdrawalStatus } from "../../types/withdrawals";
 import { WithdrawalFormModal } from "./WithdrawalFormModal";
 import { WithdrawalStatusBadge } from "./WithdrawalStatusBadge";
+import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type ChipKey = "todas" | WithdrawalStatus;
 type SortKey = "fecha" | "numero" | "cliente" | "valor";
@@ -40,6 +42,8 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: keyof Wit
   { key: "Rechazado", label: "Rechazadas", status: "Rechazado", countKey: "rejected" },
   { key: "Cancelado", label: "Canceladas", status: "Cancelado", countKey: "cancelled" },
 ];
+
+const CHIP_KEYS = CHIPS.map((c) => c.key);
 
 const REASON_OPTIONS = [{ value: "", label: "Todos los motivos" }, ...WITHDRAWAL_REASONS.map((value) => ({ value, label: value }))];
 
@@ -56,15 +60,15 @@ export function WithdrawalsPage() {
   const { can } = usePermissions();
   const canWrite = can("withdrawals.write");
 
-  const [search, setSearch] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [sellerId, setSellerId] = useState("");
-  const [reason, setReason] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todas");
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [clientId, setClientId] = useUrlState<string>("cliente", "");
+  const [sellerId, setSellerId] = useUrlState<string>("vendedor", "");
+  const [reason, setReason] = useUrlState<string>("motivo", "");
+  const [from, setFrom] = useUrlState<string>("desde", "");
+  const [to, setTo] = useUrlState<string>("hasta", "");
+  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIP_KEYS);
   const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
   const [creating, setCreating] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search).trim();
@@ -86,6 +90,7 @@ export function WithdrawalsPage() {
     fetch: withdrawalsApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las solicitudes de retiro. Vuelve a intentarlo.",
+    pageKey: "pagina",
   });
 
   const rows = data?.items ?? [];
@@ -100,6 +105,12 @@ export function WithdrawalsPage() {
     setFrom("");
     setTo("");
     setPage(1);
+  }
+
+  function clearAll() {
+    setSearch("");
+    setChip("todas");
+    clearNarrowFilters();
   }
 
   return (
@@ -276,6 +287,7 @@ export function WithdrawalsPage() {
           skeletonRows={pageSize}
           skeletonColumns={7}
           empty={unfiltered ? "Todavía no hay solicitudes de retiro registradas." : "Ninguna solicitud coincide con este filtro o búsqueda."}
+          onClear={unfiltered ? undefined : clearAll}
           animateIn
         >
           <DataTable>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { staleClass } from "../../lib/listState";
+import { EmptyResult } from "./EmptyResult";
 import { TableSkeleton } from "./Skeleton";
 
 interface ListBodyProps {
@@ -14,6 +15,8 @@ interface ListBodyProps {
   empty: ReactNode;
   /** Entrada animada de los resultados (`plf-results-in`). */
   animateIn?: boolean;
+  /** Quita filtros y busqueda. Solo cuando el vacio viene de un recorte: anade el boton. */
+  onClear?: () => void;
   children: ReactNode;
 }
 
@@ -29,6 +32,7 @@ export function ListBody({
   skeletonColumns,
   empty,
   animateIn = false,
+  onClear,
   children,
 }: ListBodyProps) {
   if (data === null) {
@@ -36,6 +40,7 @@ export function ListBody({
   }
 
   if (data.items.length === 0) {
+    if (onClear) return <EmptyResult message={empty} onClear={onClear} />;
     return <p className="py-14 text-center text-[13.5px] text-faint">{empty}</p>;
   }
 
