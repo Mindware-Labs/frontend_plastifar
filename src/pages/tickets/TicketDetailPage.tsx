@@ -8,11 +8,13 @@ import {
   CornerUpLeft,
   Eye,
   FileText,
+  Flag,
   Gavel,
   History,
   Image as ImageIcon,
   Lock,
   Mail,
+  Package,
   Paperclip,
   Phone,
   Pencil,
@@ -25,7 +27,7 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
@@ -92,7 +94,47 @@ function validateAttachments(chosen: File[], existing: File[]): string | null {
   return null;
 }
 
-const PRIORITY_OPTIONS = ["Emergencia", "Alta", "Normal", "Baja"].map((value) => ({ value, label: value }));
+/** Misma escala que al crear ticket: color solo en Alta y Emergencia. */
+const EDIT_TICKET_PRIORITIES = [
+  { value: "Baja", label: "Baja", desc: "Rutinario", dot: "bg-zinc-300" },
+  { value: "Normal", label: "Normal", desc: "SLA estándar", dot: "bg-zinc-500" },
+  { value: "Alta", label: "Alta", desc: "Prioritario", dot: "bg-amber-500" },
+  { value: "Emergencia", label: "Emergencia", desc: "Inmediato", dot: "bg-brand-red" },
+] as const;
+
+function EditTicketFormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 border-t border-zinc-100 pt-4 first:border-0 first:pt-0">
+      <span className="select-none font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
+
+interface EditTicketSectionHeadingProps {
+  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+  title: string;
+  aside?: ReactNode;
+}
+
+function EditTicketSectionHeading({ icon: Icon, title, aside }: EditTicketSectionHeadingProps) {
+  return (
+    <div className="flex h-5 items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden
+          className="flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
+        >
+          <Icon className="size-3" strokeWidth={2.25} />
+        </span>
+        <span className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink">{title}</span>
+      </div>
+      {aside && <span className="text-[11px] text-zinc-400">{aside}</span>}
+    </div>
+  );
+}
 
 /** Paso 1 del dialogo "Actualizar ticket": a que grupo de campos lleva cada transicion en el paso 2. */
 type UpdateCategory = "pausar" | "veredicto" | "cancelar" | "otro";
@@ -882,8 +924,7 @@ export function TicketDetailPage() {
     }
   };
 
-  const handleConfirmEdit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const submitTicketEdit = async () => {
     if (!editSubject.trim()) {
       setEditError("El asunto es obligatorio");
       triggerEditSettle();
@@ -908,6 +949,18 @@ export function TicketDetailPage() {
       triggerEditSettle();
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleConfirmEdit = (event: React.FormEvent) => {
+    event.preventDefault();
+    void submitTicketEdit();
+  };
+
+  const handleEditFormKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      void submitTicketEdit();
     }
   };
 
@@ -2719,39 +2772,69 @@ export function TicketDetailPage() {
           settle={editSettle}
           eyebrow={ticket.number}
           title="Editar clasificación y detalles"
-          description="Ajusta el asunto y la clasificación. El SLA se recalcula automáticamente."
-          maxWidth="max-w-md"
+          maxWidth="max-w-xl"
           onClose={() => {
             if (!savingEdit) setShowEditModal(false);
           }}
           footer={
-            <>
-              <Button type="button" variant="secondary" size="sm" disabled={savingEdit} onClick={() => setShowEditModal(false)}>
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                form="edit-ticket-form"
-                size="sm"
-                isLoading={savingEdit}
-                tone={editError ? "ink" : "primary"}
-                toneLabel={editError}
-              >
-                Guardar cambios
-              </Button>
-            </>
+            <div className="flex w-full items-center justify-between gap-3">
+              <span className="hidden select-none items-center gap-1 text-[11px] text-zinc-400 sm:inline-flex">
+                <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[10px] text-zinc-500">
+                  Ctrl
+                </kbd>
+                <span>+</span>
+                <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[10px] text-zinc-500">
+                  Enter
+                </kbd>
+                <span className="ml-0.5">para guardar</span>
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={savingEdit}
+                  onClick={() => setShowEditModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  form="edit-ticket-form"
+                  size="sm"
+                  isLoading={savingEdit}
+                  tone={editError ? "ink" : "primary"}
+                  toneLabel={editError}
+                >
+                  Guardar cambios
+                </Button>
+              </div>
+            </div>
           }
         >
-          <form id="edit-ticket-form" onSubmit={handleConfirmEdit} className="space-y-3">
+          <form
+            id="edit-ticket-form"
+            onSubmit={handleConfirmEdit}
+            onKeyDown={handleEditFormKeyDown}
+            className="flex flex-col gap-4 text-left"
+          >
             {loadingEditCatalogs ? (
-              <div className="flex justify-center py-6">
+              <div className="flex justify-center py-10">
                 <Spinner size="sm" label="Cargando catálogos…" />
               </div>
             ) : (
               <>
+                {editError && (
+                  <Alert variant="error" className="text-[12px]">
+                    {editError}
+                  </Alert>
+                )}
+
+                <EditTicketFormDivider title="Asunto" />
+
                 <TextField
                   id="edit-subject"
-                  label="Asunto"
+                  label="Asunto del ticket"
                   size="sm"
                   required
                   maxLength={200}
@@ -2761,74 +2844,110 @@ export function TicketDetailPage() {
                     if (editError) setEditError(null);
                   }}
                   state={editError && !editSubject.trim() ? "error" : "idle"}
-                  placeholder="Describe brevemente el caso…"
+                  placeholder="Ej.: Reclamación por lote defectuoso en empaque…"
+                  hint={<span className="tabular-nums">{editSubject.length}/200</span>}
                 />
 
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  <SelectField
-                    id="edit-topic"
-                    label="Motivo"
-                    size="sm"
-                    value={editTopicId !== null ? String(editTopicId) : ""}
-                    onChange={(value) => {
-                      const nextId = value ? Number(value) : null;
-                      setEditTopicId(nextId);
-                      if (editError) setEditError(null);
-                      // El motivo trae su departamento y prioridad por defecto; se pueden corregir despues.
-                      const topic = nextId ? editCatalogs?.topics.find((t) => t.id === nextId) : undefined;
-                      if (topic?.defaultDepartmentId) setEditDepartmentId(topic.defaultDepartmentId);
-                      if (topic?.defaultPriority) setEditPriority(topic.defaultPriority);
-                    }}
-                    placeholder="Sin motivo"
-                    options={[
-                      { value: "", label: "Sin motivo" },
-                      ...(editCatalogs?.topics ?? []).map((t) => ({ value: String(t.id), label: t.name })),
-                    ]}
-                  />
-                  <SelectField
-                    id="edit-priority"
-                    label="Prioridad"
-                    size="sm"
-                    required
-                    value={editPriority}
-                    onChange={(value) => {
-                      setEditPriority(value as TicketDetailResponse["priority"]);
-                      if (editError) setEditError(null);
-                    }}
-                    options={PRIORITY_OPTIONS}
-                  />
-                  <div className="sm:col-span-2">
+                <EditTicketFormDivider title="Clasificación" />
+
+                <div className="flex flex-col gap-3.5">
+                  <EditTicketSectionHeading icon={Tag} title="Motivo y departamento" />
+
+                  <div className="flex flex-col gap-2.5">
+                    <SelectField
+                      id="edit-topic"
+                      label="Motivo del ticket"
+                      size="sm"
+                      searchable
+                      value={editTopicId !== null ? String(editTopicId) : ""}
+                      onChange={(value) => {
+                        const nextId = value ? Number(value) : null;
+                        setEditTopicId(nextId);
+                        if (editError) setEditError(null);
+                        const topic = nextId ? editCatalogs?.topics.find((t) => t.id === nextId) : undefined;
+                        if (topic?.defaultDepartmentId) setEditDepartmentId(topic.defaultDepartmentId);
+                        if (topic?.defaultPriority) setEditPriority(topic.defaultPriority);
+                      }}
+                      placeholder="Aún sin motivo"
+                      options={[
+                        { value: "", label: "Aún sin motivo" },
+                        ...(editCatalogs?.topics ?? []).map((t) => ({ value: String(t.id), label: t.name })),
+                      ]}
+                    />
                     <SelectField
                       id="edit-dept"
                       label="Departamento"
                       size="sm"
+                      searchable
+                      wrapValue
                       value={editDepartmentId !== null ? String(editDepartmentId) : ""}
                       onChange={(value) => {
                         setEditDepartmentId(value ? Number(value) : null);
                         if (editError) setEditError(null);
                       }}
-                      placeholder="Sin departamento"
+                      placeholder="Aún sin departamento"
                       options={[
-                        { value: "", label: "Sin departamento" },
+                        { value: "", label: "Aún sin departamento" },
                         ...departmentPathOptions(editCatalogs?.departments ?? [], editDepartmentTree),
                       ]}
                     />
                   </div>
-                  <div className="sm:col-span-2">
-                    <TicketProductsField
-                      value={editProducts}
-                      onChange={(rows) => {
-                        setEditProducts(rows);
-                        if (editError) setEditError(null);
-                      }}
-                      hint="Opcional; puedes completarlo después."
-                    />
-                  </div>
                 </div>
 
-                <p className="text-[11px] leading-normal text-zinc-400">
-                  Si cambias el departamento y la persona asignada no pertenece al nuevo, quedará sin asignar.
-                </p>
+                <EditTicketFormDivider title="Productos" />
+
+                <div className="flex flex-col gap-3">
+                  <EditTicketSectionHeading icon={Package} title="Productos relacionados" />
+                  <TicketProductsField
+                    value={editProducts}
+                    onChange={(rows) => {
+                      setEditProducts(rows);
+                      if (editError) setEditError(null);
+                    }}
+                  />
+                </div>
+
+                <EditTicketFormDivider title="Prioridad" />
+
+                <div className="flex flex-col gap-3">
+                  <EditTicketSectionHeading icon={Flag} title="Nivel de prioridad" />
+                  <div
+                    role="radiogroup"
+                    aria-label="Nivel de prioridad"
+                    className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 sm:grid-cols-4"
+                  >
+                    {EDIT_TICKET_PRIORITIES.map((p) => {
+                      const isSelected = editPriority === p.value;
+                      return (
+                        <button
+                          key={p.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          onClick={() => {
+                            setEditPriority(p.value);
+                            if (editError) setEditError(null);
+                          }}
+                          className={`flex cursor-pointer flex-col items-start gap-1 rounded-md border px-2.5 py-2 text-left outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:ring-2 focus-visible:ring-brand-red/25 active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                            isSelected
+                              ? "border-zinc-200 bg-white text-zinc-900 shadow-2xs"
+                              : "border-transparent text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span
+                              className={`size-2 shrink-0 rounded-full transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${p.dot} ${
+                                isSelected ? "scale-100" : "scale-75"
+                              }`}
+                            />
+                            <span className="font-heading text-[12px] font-semibold leading-none">{p.label}</span>
+                          </span>
+                          <span className="text-[10.5px] leading-none text-zinc-400">{p.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </>
             )}
           </form>

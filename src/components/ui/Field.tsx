@@ -192,6 +192,7 @@ interface SelectFieldProps {
   required?: boolean;
   disabled?: boolean;
   searchable?: boolean;
+  wrapValue?: boolean;
   id?: string;
   name?: string;
 }
@@ -211,6 +212,7 @@ export function SelectField({
   required,
   disabled,
   searchable,
+  wrapValue,
   id,
   name,
 }: SelectFieldProps) {
@@ -231,6 +233,7 @@ export function SelectField({
         state={resolved}
         disabled={disabled}
         searchable={searchable}
+        wrapValue={wrapValue}
         aria-invalid={resolved === "error"}
         aria-describedby={describedBy(fieldId, error, hint)}
       />
