@@ -79,6 +79,15 @@ interface Kpi {
    */
   hint: { icon: LucideIcon; text: string; urgent: boolean } | null;
   filter: DashboardFilter;
+  /**
+   * Proporcion que dibuja el medidor, de 0 a 1, contra su propio total (los
+   * vivos, o las HCA abiertas). La cifra dice cuantos; el medidor dice cuanto
+   * pesan, que es lo que permite comparar las cinco tarjetas sin hacer cuentas.
+   * `null` cuando no hay total contra el cual medir.
+   */
+  meter: number | null;
+  /** Color del medidor; por defecto, el del rol. */
+  meterRole?: Role;
 }
 
 /**
@@ -210,9 +219,13 @@ function KpiCard({ kpi, index }: { kpi: Kpi; index: number }) {
         {/* Cifra y variación comparten línea base: cuánto hay y hacia dónde va
             son el mismo hecho leído dos veces. */}
         <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-          <span style={{ ...T.figure, ...NUM, fontSize: 24, color: C.ink }}>{n(shown)}</span>
+          <span style={{ ...T.figure, ...NUM, fontSize: 28, letterSpacing: "-0.03em", color: C.ink }}>
+            {n(shown)}
+          </span>
           <Acompanante kpi={kpi} />
         </span>
+
+        <Meter value={kpi.meter} color={hueFor(kpi.meterRole ?? kpi.role).color} />
 
         <span
           style={{
@@ -229,6 +242,37 @@ function KpiCard({ kpi, index }: { kpi: Kpi; index: number }) {
         </span>
       </button>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * El medidor bajo la cifra: una pista con la proporcion rellena.
+ *
+ * Fino a proposito (4 px): acompaña a la cifra, no compite con ella. Sin total
+ * contra el cual medir se dibuja la pista vacia —el alto se conserva para que
+ * las cinco tarjetas sigan alineadas— en vez de un cero que afirmaria algo.
+ */
+function Meter({ value, color }: { value: number | null; color: string }) {
+  const pct = value === null ? 0 : Math.min(Math.max(value, 0), 1) * 100;
+  return (
+    <span
+      aria-hidden
+      style={{ display: "block", height: 4, borderRadius: 99, background: C.rail, overflow: "hidden" }}
+    >
+      <span
+        className="cx-meter"
+        style={{
+          display: "block",
+          height: "100%",
+          width: `${pct}%`,
+          minWidth: pct > 0 ? 4 : 0,
+          borderRadius: 99,
+          background: color,
+        }}
+      />
+    </span>
   );
 }
 
@@ -261,6 +305,7 @@ export function KpiRow() {
               urgent: attention.oldestOverdueDays >= 1,
             },
       filter: { kind: "estado", value: "vencidos", label: "los tickets vencidos" },
+      meter: live === 0 ? null : counts.overdue / live,
     },
     {
       label: "Por vencer",
@@ -274,6 +319,7 @@ export function KpiRow() {
           ? null
           : { icon: AlarmClock, text: `${n(attention.dueWithin2h)} en 2 h`, urgent: true },
       filter: { kind: "estado", value: "por-vencer", label: "los tickets por vencer" },
+      meter: live === 0 ? null : counts.upcoming / live,
     },
     {
       label: "Abiertos",
@@ -288,13 +334,14 @@ export function KpiRow() {
           ? null
           : { icon: UserX, text: `${n(attention.unassigned)} sin asignar`, urgent: true },
       filter: { kind: "estado", value: "abiertos", label: "los tickets abiertos" },
+      meter: live === 0 ? null : counts.open / live,
     },
     {
       label: "En espera",
       role: "espera",
       icon: PauseCircle,
       count: counts.waitingOnClient,
-      qualifier: "del cliente",
+      qualifier: live === 0 ? "del cliente" : `del cliente · ${Math.round((counts.waitingOnClient / live) * 100)}% de los vivos`,
       // Esperar al cliente es normal; esperar una semana es una fuga. El reloj
       // se cuenta desde que entró en espera, no desde que se creó.
       hint:
@@ -306,6 +353,7 @@ export function KpiRow() {
               urgent: true,
             },
       filter: { kind: "estado", value: "espera", label: "los tickets en espera del cliente" },
+      meter: live === 0 ? null : counts.waitingOnClient / live,
     },
     {
       label: "HCA abiertas",
@@ -314,12 +362,18 @@ export function KpiRow() {
       count: quality.openNow,
       // El acompañante ya dice cuántas están vencidas; repetirlo aquí gastaba
       // las dos líneas de la tarjeta en el mismo dato.
-      qualifier: "hojas sin cerrar",
+      qualifier:
+        quality.openNow === 0
+          ? "hojas sin cerrar"
+          : `hojas sin cerrar · ${Math.round((quality.overdueNow / quality.openNow) * 100)}% vencidas`,
       hint:
         quality.overdueNow === 0
           ? null
           : { icon: AlertTriangle, text: `${n(quality.overdueNow)} vencidas`, urgent: true },
       filter: { kind: "hca", value: "abiertas", label: "las HCA abiertas" },
+      // En HCA el medidor dice cuantas de las abiertas ya estan vencidas.
+      meter: quality.openNow === 0 ? null : quality.overdueNow / quality.openNow,
+      meterRole: "vencido",
     },
   ];
 

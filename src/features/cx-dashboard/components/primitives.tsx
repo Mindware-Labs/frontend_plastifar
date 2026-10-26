@@ -335,9 +335,10 @@ export function CardHead({
     <div
       style={{
         display: "flex",
+        flexWrap: "wrap",
         alignItems: "flex-start",
         justifyContent: "space-between",
-        gap: S.md,
+        gap: `${S.xs}px ${S.md}px`,
         paddingBottom: S.sm,
         marginBottom: S.md,
         borderBottom: `1px solid ${C.hair2}`,

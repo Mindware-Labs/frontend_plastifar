@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useDashboard } from "../dashboardContext";
 import { useApplyFilter, type DashboardFilter } from "../filters";
-import { C, FONT, NUM, T, hueFor } from "../styles";
+import { C, FONT, NUM, T, hueFor, n } from "../styles";
 import { Card, CardHead } from "./primitives";
 
 /**
@@ -78,7 +78,6 @@ export function TicketByStage() {
   ];
 
   const active = bands.find((b) => b.key === hover) ?? null;
-  const shownBands = bands.filter((b) => b.value > 0);
 
   return (
     <Card className="cx-hover">
@@ -88,40 +87,21 @@ export function TicketByStage() {
         right={<span style={{ ...T.caption, ...NUM, color: C.body }}>{live} vivos</span>}
       />
 
-      {/* La cifra con su denominador: un porcentaje solo no dice sobre qué está
-          calculado, y 92 % de 226 no es lo mismo que 92 % de 12. */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 12 }}>
-        <span style={{ ...T.figure, ...NUM, color: C.ink }}>{Math.round(share * 100)}%</span>
-        <span style={{ ...T.label, ...NUM, color: C.body }}>
-          {onTime} de {live}
-        </span>
-      </div>
+      {/* Medio anillo: la particion entera de los vivos, con el porcentaje en
+          plazo en el centro. Tiene techo —el 100 % de los vivos— y por eso es un
+          instrumento y no un adorno: el arco se lee contra el arco completo.
+          Los tramos van en el mismo orden que la lista de abajo, y el vencido
+          cierra el arco a la derecha, donde termina la lectura. */}
+      <StageGauge
+        bands={gaugeOrder(bands)}
+        hover={hover}
+        onHover={setHover}
+        share={share}
+        onTime={onTime}
+        live={live}
+      />
 
-      <div
-        aria-hidden
-        style={{ display: "flex", gap: 2, height: 8, marginTop: 12 }}
-      >
-        {shownBands.map((b, i) => (
-          <div
-            key={b.key}
-            onMouseEnter={() => setHover(b.key)}
-            onMouseLeave={() => setHover(null)}
-            style={{
-              flex: b.value,
-              background: b.color,
-              opacity: hover === null || hover === b.key ? 1 : 0.3,
-              borderTopLeftRadius: i === 0 ? 4 : 1,
-              borderBottomLeftRadius: i === 0 ? 4 : 1,
-              borderTopRightRadius: i === shownBands.length - 1 ? 4 : 1,
-              borderBottomRightRadius: i === shownBands.length - 1 ? 4 : 1,
-              cursor: "pointer",
-              transition: "opacity .15s",
-            }}
-          />
-        ))}
-      </div>
-
-      <ul style={{ marginTop: 10 }}>
+      <ul style={{ marginTop: 4 }}>
         {bands.map((b, i) => (
           <li key={b.key} style={{ borderTop: i === 0 ? "none" : `1px solid ${C.hair2}` }}>
             <button
@@ -197,5 +177,107 @@ export function TicketByStage() {
             : "Nada fuera de plazo."}
       </p>
     </Card>
+  );
+}
+
+/** En plazo primero; vencido al final, cerrando el arco. */
+function gaugeOrder(bands: Band[]): Band[] {
+  const order = ["open", "waiting", "upcoming", "overdue"];
+  return [...bands].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+}
+
+const GW = 240;
+const GH = 132;
+const GR = 96;
+const GSTROKE = 16;
+const GCX = GW / 2;
+const GCY = GH - 14;
+
+function polar(angle: number): [number, number] {
+  return [GCX + GR * Math.cos(angle), GCY - GR * Math.sin(angle)];
+}
+
+function arc(from: number, to: number): string {
+  const [x0, y0] = polar(from);
+  const [x1, y1] = polar(to);
+  return `M ${x0} ${y0} A ${GR} ${GR} 0 0 1 ${x1} ${y1}`;
+}
+
+function StageGauge({
+  bands,
+  hover,
+  onHover,
+  share,
+  onTime,
+  live,
+}: {
+  bands: Band[];
+  hover: string | null;
+  onHover: (key: string | null) => void;
+  share: number;
+  onTime: number;
+  live: number;
+}) {
+  const visible = bands.filter((b) => b.value > 0);
+  /* 2 px de lienzo entre tramos, medidos sobre el arco y pasados a angulo. */
+  const gap = visible.length > 1 ? 2.5 / GR : 0;
+  const span = Math.PI - gap * (visible.length - 1);
+
+  const segments = visible.reduce<{ band: Band; from: number; to: number }[]>((acc, b) => {
+    const from = acc.length === 0 ? Math.PI : acc[acc.length - 1].to - gap;
+    const length = live === 0 ? 0 : (b.value / live) * span;
+    return [...acc, { band: b, from, to: from - length }];
+  }, []);
+
+  const active = bands.find((b) => b.key === hover) ?? null;
+
+  return (
+    <svg
+      viewBox={`0 0 ${GW} ${GH}`}
+      width="100%"
+      role="img"
+      aria-label={`${Math.round(share * 100)}% de los tickets vivos en plazo: ${onTime} de ${live}.`}
+      style={{ display: "block", maxWidth: 260, margin: "4px auto 0" }}
+    >
+      <path d={arc(Math.PI, 0)} fill="none" stroke={C.rail} strokeWidth={GSTROKE} strokeLinecap="round" />
+
+      {segments.map(({ band, from, to }, i) => (
+        <path
+          key={band.key}
+          d={arc(from, to)}
+          fill="none"
+          stroke={band.color}
+          strokeWidth={GSTROKE}
+          /* Solo los extremos del arco completo llevan punta redonda: con punta
+             en cada tramo dejarian de leerse como partes de un mismo arco. */
+          strokeLinecap={segments.length === 1 || i === 0 || i === segments.length - 1 ? "round" : "butt"}
+          opacity={hover === null || hover === band.key ? 1 : 0.3}
+          onMouseEnter={() => onHover(band.key)}
+          onMouseLeave={() => onHover(null)}
+          style={{ cursor: "pointer", transition: "opacity .15s" }}
+        />
+      ))}
+
+      <text
+        x={GCX}
+        y={GCY - 22}
+        textAnchor="middle"
+        fontSize={30}
+        fontWeight={600}
+        letterSpacing="-0.8"
+        fill={C.ink}
+        fontFamily={FONT}
+        style={NUM}
+      >
+        {active
+          ? n(active.value)
+          : live === 0
+            ? "—"
+            : `${Math.round(share * 100)}%`}
+      </text>
+      <text x={GCX} y={GCY - 4} textAnchor="middle" fontSize={11} fill={C.soft} fontFamily={FONT} style={NUM}>
+        {active ? active.label.toLowerCase() : `en plazo · ${n(onTime)} de ${n(live)}`}
+      </text>
+    </svg>
   );
 }

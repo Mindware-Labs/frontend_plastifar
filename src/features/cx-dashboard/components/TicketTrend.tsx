@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useDashboard } from "../dashboardContext";
-import { C, NUM, T, n } from "../styles";
-import { BarChart, SERIES_IN, SERIES_OUT } from "./BarChart";
+import { C, NUM, T, hueFor, n } from "../styles";
+import { AreaChart } from "./AreaChart";
 import { Card, CardHead } from "./primitives";
 
 /**
@@ -45,6 +45,11 @@ export function TicketTrend() {
      pasa, la serie entera queda aplastada contra el suelo y no se distingue un
      dia de otro. Se redondea hacia arriba para que la ultima marca del eje sea
      un numero legible y no el maximo exacto. */
+  /* El promedio diario de entrada: la linea punteada contra la que se lee cada
+     dia. Sobre la ventana completa, no sobre los dias con movimiento — un dia
+     sin tickets tambien es un dia de la ventana. */
+  const average = trend.length === 0 ? 0 : totalIn / trend.length;
+
   const pico = Math.max(1, ...entered, ...closed);
   const escala = Math.pow(10, Math.floor(Math.log10(pico)));
   const max = Math.ceil(pico / escala) * escala;
@@ -68,7 +73,7 @@ export function TicketTrend() {
     <Card className="cx-hover">
       <CardHead
         title="Entrados y cerrados"
-        hint="Entrados contra cerrados, día a día, en los últimos 30 días. Pasa el cursor por una columna para ver el detalle del día. Cuando la barra azul supera a la verde, ese día la cola creció."
+        hint="Entrados contra cerrados, día a día, en los últimos 30 días. Pasa el cursor por la gráfica, o enfócala y usa las flechas, para ver el detalle de cada día. Cuando la línea azul va por encima de la verde, la cola crece."
         /* El total y el promedio viajan en la cabecera, no en una banda propia.
            Sueltos ocupaban cuarenta pixeles de alto para decir dos numeros, y
            ese alto se lo estaban comiendo a las barras: la serie quedaba en una
@@ -90,15 +95,16 @@ export function TicketTrend() {
       />
 
       <div style={{ marginTop: 6 }}>
-        <BarChart
+        <AreaChart
           series={[
-            { label: "Entrados", values: entered, color: SERIES_IN },
-            { label: "Cerrados", values: closed, color: SERIES_OUT },
+            { label: "Entrados", values: entered, color: hueFor("abierto").color },
+            { label: "Cerrados", values: closed, color: hueFor("cumplido").color },
           ]}
           max={max}
           ticks={ticks}
           tooltipTop={etiquetaDe}
           tooltipUnit="tickets"
+          reference={{ value: average, label: `promedio ${n(average, 1)}/día` }}
         />
       </div>
     </Card>

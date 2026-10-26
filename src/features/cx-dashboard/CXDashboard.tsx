@@ -3,7 +3,9 @@ import "./dashboard.css";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { AgentPerformance } from "./components/AgentPerformance";
 import { CallDetails } from "./components/CallDetails";
+import { DashboardSkeleton } from "./components/DashboardSkeleton";
 import { KpiRow } from "./components/KpiRow";
+import { PeriodPulse } from "./components/PeriodPulse";
 import { TicketByState } from "./components/TicketByState";
 import { TicketByCategory } from "./components/TicketByCategory";
 import { TicketByStage } from "./components/TicketByStage";
@@ -11,7 +13,6 @@ import { TicketTrend } from "./components/TicketTrend";
 import { dashboardApi, type DashboardResponse } from "../../api/dashboard";
 import { DashboardContext } from "./dashboardContext";
 import { LoadErrorAlert } from "../../pages/settings/catalogSection";
-import { TableSkeleton } from "../../components/ui/Skeleton";
 import { S } from "./styles";
 import { usePageChrome } from "../../layouts/usePageChrome";
 
@@ -44,12 +45,26 @@ import { usePageChrome } from "../../layouts/usePageChrome";
  * como un grupo y no como cuatro cajas sueltas.
  */
 
-/** 1.85fr / 1fr en escritorio; `cx-pair` lo colapsa a una columna bajo 1024 px. */
+/**
+ * 1.85fr / 1fr en escritorio; `cx-pair` lo colapsa a una columna bajo 1024 px.
+ *
+ * `stretch` y no `start`: las dos tarjetas de una banda terminan a la misma
+ * altura. Con `start` la mas corta dejaba un hueco de lienzo debajo, y la
+ * banda se leia como dos cajas sueltas en vez de una fila.
+ */
 const WIDE: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(0,1.85fr) minmax(0,1fr)",
   gap: S.md,
-  alignItems: "start",
+  alignItems: "stretch",
+};
+
+/** Tres columnas iguales para la banda de reparto; `cx-trio` la parte en pantallas chicas. */
+const TRIO: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: S.md,
+  alignItems: "stretch",
 };
 
 /*
@@ -123,7 +138,7 @@ export function CXDashboard() {
     return (
       <div className="cxhub" style={{ padding: "2px 3px" }}>
         <ModuleHeader title="Dashboard" summary="Cargando el tablero de operaciones…" />
-        <TableSkeleton rows={10} columns={4} />
+        <DashboardSkeleton />
       </div>
     );
   }
@@ -163,21 +178,24 @@ export function CXDashboard() {
           <KpiRow />
         </div>
 
-        {/* 2 — CÓMO VIENE + SI ESTAMOS EN PLAZO. */}
+        {/* 2 — CÓMO VIENE LA COLA: la forma a la izquierda, las cifras que la
+            cuantifican a la derecha. Las dos leen la misma serie diaria. */}
         <div className="cx-pair plf-band" style={WIDE}>
           <TicketTrend />
+          <PeriodPulse />
+        </div>
+
+        {/* 3 — DÓNDE ESTÁ PARADO EL TRABAJO + SI ESTAMOS EN PLAZO. */}
+        <div className="cx-pair plf-band" style={WIDE}>
+          <TicketByState />
           <TicketByStage />
         </div>
 
-        {/* 3 — DÓNDE ESTÁ PARADO EL TRABAJO + POR QUÉ ENTRA. */}
-        <div className="cx-pair plf-band" style={WIDE}>
-          <TicketByState />
-          <TicketByCategory />
-        </div>
-
-        {/* 4 — POR DÓNDE ENTRA Y DE QUIÉN ES. */}
-        <div className="cx-pair plf-band" style={WIDE}>
+        {/* 4 — POR DÓNDE ENTRA, POR QUÉ, Y DE QUIÉN ES. Tres repartos del mismo
+            trabajo, uno al lado del otro. */}
+        <div className="cx-trio plf-band" style={TRIO}>
           <CallDetails />
+          <TicketByCategory />
           <AgentPerformance />
         </div>
       </div>

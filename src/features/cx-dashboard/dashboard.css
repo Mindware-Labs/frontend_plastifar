@@ -190,19 +190,15 @@
   flex-shrink: 0;
 }
 
-/* La lista de responsables scrollea dentro de su tarjeta. El riel va mas fino
-   que el de la pagina: es un scroll secundario y no debe competir con el
-   principal por atencion. */
-.cxhub .cx-agents::-webkit-scrollbar {
-  width: 5px;
+/* La pagina se desplaza con rueda, trackpad y teclado, pero sin riel visible:
+   una barra gris al costado del tablero se leia como una ventana dentro de la
+   ventana. */
+.cxhub .cx-scroll {
+  scrollbar-width: none;
 }
 
-.cxhub .cx-agents::-webkit-scrollbar-thumb {
-  background: var(--cx-hair);
-}
-
-.cxhub .cx-agents:hover::-webkit-scrollbar-thumb {
-  background: var(--cx-hair-hover);
+.cxhub .cx-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 /* ------------------------------------------------------------------ */
@@ -285,8 +281,64 @@
 }
 
 @media (max-width: 1024px) {
-  .cxhub .cx-pair {
+  .cxhub .cx-pair,
+  .cxhub .cx-trio {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1280px) {
+  .cxhub .cx-trio {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Graficas                                                           */
+/* ------------------------------------------------------------------ */
+
+/* La grafica de areas es enfocable (las flechas recorren los dias). El anillo
+   se dibuja con el mismo lenguaje que el resto de los controles. */
+.cxhub .cx-chart:focus-visible {
+  outline: 2px solid var(--cx-serie);
+  outline-offset: 4px;
+  border-radius: var(--cx-r-inset);
+}
+
+/* Las lineas se trazan al llegar: un solo gesto, acompaña la carga y no la
+   hace esperar. */
+.cxhub .cx-line {
+  /* Con `pathLength="1"` el trazo mide 1 sea cual sea el ancho real. */
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: cxdraw 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+}
+
+.cxhub .cx-area {
+  opacity: 0;
+  animation: cxfade 0.6s ease-out 0.35s forwards;
+}
+
+.cxhub .cx-meter {
+  transform-origin: left;
+  animation: cxgrow 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+
+@keyframes cxdraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes cxfade {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cxgrow {
+  from {
+    transform: scaleX(0);
   }
 }
 

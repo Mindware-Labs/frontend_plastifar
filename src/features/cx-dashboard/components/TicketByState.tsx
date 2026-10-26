@@ -77,12 +77,17 @@ export function TicketByState() {
   }));
   const max = Math.max(...rows.map((r) => r.total), 1);
   const stale = rows.reduce((sum, r) => sum + r.stale, 0);
+  const totals = {
+    fresh: rows.reduce((sum, r) => sum + r.fresh, 0),
+    aging: rows.reduce((sum, r) => sum + r.aging, 0),
+    stale,
+  };
   const total = rows.reduce((sum, r) => sum + r.total, 0);
   /* El estado con más tickets estancados: es la lectura de la tarjeta en una línea. */
-  const worst = [...rows].sort((a, b) => b.stale - a.stale)[0];
+  const worst = [...rows].sort((a, b) => b.stale - a.stale)[0] as (typeof rows)[number] | undefined;
 
   return (
-    <Card className="cx-hover">
+    <Card className="cx-hover" bodyStyle={{ display: "flex", flexDirection: "column" }}>
       <CardHead
         title="Estados de tickets"
         hint="Cuántos tickets hay en cada estado y cuánto llevan ahí. Cuanto más oscura la barra, más viejo el ticket. Click en un estado para filtrar la bandeja."
@@ -124,7 +129,7 @@ export function TicketByState() {
             >
               <span
                 style={{
-                  width: NAME_W,
+                  width: `min(${NAME_W}px, 36%)`,
                   flexShrink: 0,
                   ...T.label,
                   color: C.body,
@@ -195,33 +200,69 @@ export function TicketByState() {
         ))}
       </ul>
 
-      {/* Leyenda: con tres tramos, la identidad no puede vivir sólo en la
-          claridad de un mismo tono. */}
+      {/* La leyenda ES el resumen: un panel por tramo de antiguedad, con su
+          cifra. Antes eran tres muestras de color sin numero, y para saber
+          cuantos tickets llevaban mas de tres dias habia que sumar a ojo los
+          tramos oscuros de cada fila. Se asienta al pie: cuando la tarjeta
+          vecina es mas alta, el aire queda entre las filas y el resumen. */}
       <div
         style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: S.md,
-          marginTop: S.md,
+          display: "grid",
+          /* En angosto los tres paneles bajan de a uno antes que cortar su rotulo. */
+          gridTemplateColumns: "repeat(auto-fit, minmax(118px, 1fr))",
+          gap: S.sm,
+          marginTop: "auto",
           paddingTop: S.md,
-          borderTop: `1px solid ${C.hair2}`,
         }}
       >
-        {AGE_STEPS.map((step) => (
-          <span key={step.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span
-              aria-hidden
-              style={{ width: 10, height: 10, borderRadius: 3, background: step.color }}
-            />
-            <span style={{ ...T.caption, color: C.soft }}>{step.label}</span>
-          </span>
-        ))}
-
-        <span style={{ ...T.caption, color: C.soft, marginLeft: "auto" }}>
-          {n(stale)} llevan más de 3 días · el atasco está en{" "}
-          <strong style={{ fontWeight: 600, color: C.body }}>{worst.state.toLowerCase()}</strong>
-        </span>
+        {AGE_STEPS.map((step) => {
+          const count = totals[step.key];
+          return (
+            <div
+              key={step.key}
+              className="cx-inset"
+              style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <span
+                  aria-hidden
+                  style={{ width: 8, height: 8, flexShrink: 0, borderRadius: 2, background: step.color }}
+                />
+                <span
+                  style={{
+                    ...T.caption,
+                    color: C.body,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {step.label}
+                </span>
+              </span>
+              <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span style={{ ...T.figure, ...NUM, fontSize: 20, color: C.ink }}>{n(count)}</span>
+                <span style={{ ...T.caption, ...NUM, color: C.soft }}>
+                  {total === 0 ? "—" : `${Math.round((count / total) * 100)}%`}
+                </span>
+              </span>
+            </div>
+          );
+        })}
       </div>
+
+      <p style={{ ...T.caption, color: C.soft, marginTop: S.sm }}>
+        {worst && worst.stale > 0 ? (
+          <>
+            {n(stale)} llevan más de 3 días · el atasco está en{" "}
+            <strong style={{ fontWeight: 600, color: C.body }}>{worst.state.toLowerCase()}</strong>
+          </>
+        ) : total === 0 ? (
+          "No hay tickets vivos."
+        ) : (
+          "Ninguno lleva más de 3 días en su estado."
+        )}
+      </p>
     </Card>
   );
 }
