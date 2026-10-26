@@ -454,7 +454,7 @@ export function CreateTicketModal({
               <section className="flex flex-col gap-3.5 border-t border-line-soft px-6 py-5">
                 <SectionHeading icon={Tag} title="Clasificación y enrutamiento" aside="Opcional" />
 
-                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                   <Controller
                     control={control}
                     name="topicId"
@@ -473,24 +473,6 @@ export function CreateTicketModal({
                             value: String(t.id),
                             label: t.name,
                           })),
-                        ]}
-                      />
-                    )}
-                  />
-
-                  <Controller
-                    control={control}
-                    name="departmentId"
-                    render={({ field }) => (
-                      <SelectField
-                        label="Departamento"
-                        size="sm"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder="Aún sin departamento"
-                        options={[
-                          { value: "", label: "Aún sin departamento" },
-                          ...departmentPathOptions(catalogs?.departments ?? [], departmentTree),
                         ]}
                       />
                     )}
@@ -517,6 +499,26 @@ export function CreateTicketModal({
                     )}
                   />
 
+                  <div className="sm:col-span-2">
+                    <Controller
+                      control={control}
+                      name="departmentId"
+                      render={({ field }) => (
+                        <SelectField
+                          label="Departamento"
+                          size="sm"
+                          searchable
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          placeholder="Aún sin departamento"
+                          options={[
+                            { value: "", label: "Aún sin departamento" },
+                            ...departmentPathOptions(catalogs?.departments ?? [], departmentTree),
+                          ]}
+                        />
+                      )}
+                    />
+                  </div>
                 </div>
               </section>
 

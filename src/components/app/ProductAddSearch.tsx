@@ -37,6 +37,7 @@ export function ProductAddSearch({
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLUListElement>(null);
+  const panelWrapRef = useRef<HTMLDivElement>(null);
 
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
@@ -50,6 +51,7 @@ export function ProductAddSearch({
   const debouncedTerm = useDebouncedValue(term).trim();
   const exclude = useRef(excludeProductIds);
   exclude.current = excludeProductIds;
+  const excludeKey = excludeProductIds.join(",");
 
   function measure() {
     const rect = rootRef.current?.getBoundingClientRect();
@@ -97,14 +99,14 @@ export function ProductAddSearch({
     return () => {
       cancelled = true;
     };
-  }, [open, debouncedTerm]);
+  }, [open, debouncedTerm, excludeKey]);
 
   useEffect(() => {
     if (!open) return;
 
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Node;
-      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      if (rootRef.current?.contains(target) || panelWrapRef.current?.contains(target)) return;
       closePanel();
     }
 
@@ -135,10 +137,12 @@ export function ProductAddSearch({
       return;
     }
     onPick(option);
-    setTerm("");
-    setOptions([]);
-    closePanel();
-    requestAnimationFrame(() => inputRef.current?.focus());
+    measure();
+    setOpen(true);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      measure();
+    });
   }
 
   function move(from: number, step: number) {
@@ -155,7 +159,7 @@ export function ProductAddSearch({
       ? "Buscando…"
       : options.length === 0
         ? debouncedTerm === ""
-          ? "Escribe código o descripción."
+          ? "Escribe para buscar o elige de la lista."
           : "Sin coincidencias."
         : hasMore
           ? "Hay más resultados; sigue escribiendo."
@@ -225,6 +229,7 @@ export function ProductAddSearch({
       {open && anchor
         ? createPortal(
             <div
+              ref={panelWrapRef}
               style={{
                 position: "fixed",
                 left: anchor.left,

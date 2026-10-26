@@ -329,7 +329,16 @@ export function Select({
           flex items-center justify-between font-medium
           ${selected ? "text-zinc-900" : "text-zinc-400"} ${buttonClassName}`}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden" title={selected?.hint ? `${selected.label} (${selected.hint})` : undefined}>
+        <div
+          className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
+          title={
+            selected
+              ? selected.hint
+                ? `${selected.label} (${selected.hint})`
+                : selected.label
+              : undefined
+          }
+        >
           {leftIcon}
           <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
           {selected?.hint && (
