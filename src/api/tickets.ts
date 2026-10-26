@@ -92,10 +92,10 @@ export const ticketsApi = {
   getTasks: (ticketId: number) =>
     apiRequest<import("../types/api").TicketTaskResponse[]>(`/api/tickets/${ticketId}/tasks`),
 
-  createTask: (ticketId: number, data: import("../types/api").CreateTicketTaskRequest) =>
+  createTask: (ticketId: number, form: FormData) =>
     apiRequest<import("../types/api").TicketTaskResponse>(`/api/tickets/${ticketId}/tasks`, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: form,
     }),
 
   completeTask: (ticketId: number, taskId: number, form: FormData) =>

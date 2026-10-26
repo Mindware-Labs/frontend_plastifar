@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Calendar, Plus, UserCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, FileText, Plus, UserCheck } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { DatePicker } from "../../components/ui/DatePicker";
@@ -7,7 +7,9 @@ import { Select } from "../../components/ui/Select";
 import { Modal } from "../../components/ui/Modal";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { useSettle } from "../../hooks/useSettle";
-import type { CreateTicketTaskRequest, TicketStaffOptionResponse } from "../../types/api";
+import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
+import { formatBytes } from "../../lib/format";
+import type { TicketStaffOptionResponse } from "../../types/api";
 
 // Misma curva larga que el resto de paneles: arranca rápido y se asienta con suavidad.
 const STEP_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
@@ -20,7 +22,7 @@ const STEPS = ["Detalle", "Responsable y fecha"] as const;
 interface CreateTaskModalProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (task: CreateTicketTaskRequest) => Promise<void>;
+  onCreate: (formData: FormData) => Promise<void>;
   assignableStaff: TicketStaffOptionResponse[];
   currentStaffId: number;
 }
@@ -36,6 +38,7 @@ export function CreateTaskModal({
   const [description, setDescription] = useState("");
   const [assignedStaffId, setAssignedStaffId] = useState<string>("");
   const [dueDate, setDueDate] = useState("");
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settle, triggerSettle] = useSettle();
@@ -46,9 +49,15 @@ export function CreateTaskModal({
   const transitionRef = useRef<{ fromHeight: number; dir: 1 | -1 } | null>(null);
   const changingRef = useRef(false);
 
-  // Al cerrar, el próximo uso vuelve a empezar por el primer paso.
+  // Al cerrar (crear, cancelar o clic fuera) el formulario queda en blanco para la próxima tarea.
   useEffect(() => {
     if (!open) {
+      setTitle("");
+      setDescription("");
+      setAssignedStaffId("");
+      setDueDate("");
+      setEvidenceFiles([]);
+      setError(null);
       setStep(0);
       transitionRef.current = null;
       changingRef.current = false;
@@ -142,12 +151,14 @@ export function CreateTaskModal({
     try {
       setSaving(true);
       setError(null);
-      await onCreate({
-        title: title.trim(),
-        description: description.trim() || null,
-        assignedStaffId: assignedStaffId ? Number(assignedStaffId) : null,
-        dueDate: dueDate ? new Date(`${dueDate}T23:59:59`).toISOString() : null,
-      });
+      const formData = new FormData();
+      formData.append("Title", title.trim());
+      if (description.trim()) formData.append("Description", description.trim());
+      if (assignedStaffId) formData.append("AssignedStaffId", assignedStaffId);
+      if (dueDate) formData.append("DueDate", new Date(`${dueDate}T23:59:59`).toISOString());
+      evidenceFiles.forEach((f) => formData.append("EvidenceFiles", f));
+
+      await onCreate(formData);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear la tarea");
@@ -158,6 +169,10 @@ export function CreateTaskModal({
   };
 
   const isSelfAssigned = assignedStaffId === String(currentStaffId);
+  const assigneeLabel =
+    assignedStaffId === ""
+      ? "Sin asignar"
+      : assignableStaff.find((s) => String(s.id) === assignedStaffId)?.fullName ?? "Colaborador";
 
   return (
     <Modal
@@ -265,19 +280,78 @@ export function CreateTaskModal({
                   </label>
                   <textarea
                     id="task-description"
-                    rows={9}
+                    rows={5}
                     placeholder="Detalla qué se necesita averiguar, qué pruebas realizar o qué información recopilar..."
                     value={description}
                     onChange={(e) => {
                       setDescription(e.target.value);
                       if (error) setError(null);
                     }}
-                    className="min-h-[180px] w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-[12.5px] leading-relaxed text-zinc-800 shadow-2xs outline-none transition-colors focus:border-brand-red focus:ring-1 focus:ring-brand-red/20 placeholder:text-zinc-400"
+                    className="min-h-[120px] w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-[12.5px] leading-relaxed text-zinc-800 shadow-2xs outline-none transition-colors focus:border-brand-red focus:ring-1 focus:ring-brand-red/20 placeholder:text-zinc-400"
                   />
                 </div>
+
+                <TaskEvidenceUpload
+                  files={evidenceFiles}
+                  onFilesChange={setEvidenceFiles}
+                  label="Documentos adjuntos (opcional)"
+                  dropzoneTitle="Haz clic o arrastra documentos de referencia"
+                  dropzoneHint="Instrucciones, fotos del lote, correos o cualquier archivo útil para quien ejecute la tarea."
+                  onReportError={(message) => {
+                    if (message) {
+                      setError(message);
+                      triggerSettle();
+                    } else if (error) setError(null);
+                  }}
+                />
               </>
             ) : (
               <>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3 space-y-2">
+                  <p className="font-heading text-[10.5px] font-bold uppercase tracking-[0.06em] text-zinc-400">
+                    Vista previa
+                  </p>
+                  <p className="font-heading text-[13px] font-semibold text-zinc-900 leading-tight">{title}</p>
+                  {description.trim() && (
+                    <p className="text-[12px] leading-relaxed text-zinc-600 line-clamp-4 whitespace-pre-line">
+                      {description.trim()}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-zinc-600">
+                    <span>
+                      <span className="text-zinc-400">Asignada a:</span>{" "}
+                      <strong className="font-semibold text-zinc-800">{assigneeLabel}</strong>
+                    </span>
+                    {dueDate && (
+                      <span>
+                        <span className="text-zinc-400">Vence:</span>{" "}
+                        <strong className="font-semibold text-zinc-800 tabular-nums">{dueDate}</strong>
+                      </span>
+                    )}
+                  </div>
+                  {evidenceFiles.length > 0 && (
+                    <div className="pt-1 border-t border-zinc-200/80">
+                      <p className="mt-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.06em] text-zinc-500">
+                        Documentos adjuntos ({evidenceFiles.length})
+                      </p>
+                      <ul className="mt-1.5 space-y-1">
+                        {evidenceFiles.map((file, idx) => (
+                          <li
+                            key={`${file.name}-${idx}`}
+                            className="flex items-center gap-1.5 text-[12px] text-zinc-700"
+                          >
+                            <FileText className="size-3 shrink-0 text-zinc-400" />
+                            <span className="truncate font-medium">{file.name}</span>
+                            <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">
+                              ({formatBytes(file.size)})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
                 {/* Asignación y autoasignación rápida */}
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">

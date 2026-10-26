@@ -3,6 +3,7 @@ import {
   Check,
   CheckCircle2,
   CheckSquare,
+  ListChecks,
   ChevronRight,
   Eye,
   FileText,
@@ -25,7 +26,6 @@ import { Toast } from "../../components/ui/Toast";
 import { useReceipts } from "../../context/useReceipts";
 import { formatBytes, formatDateTime } from "../../lib/format";
 import type {
-  CreateTicketTaskRequest,
   TicketStaffOptionResponse,
   TicketTaskAttachmentResponse,
   TicketTaskCommentResponse,
@@ -170,10 +170,11 @@ export function TicketTasksTab({
     };
   }, [ticketId]);
 
-  const handleCreateTask = async (taskData: CreateTicketTaskRequest) => {
-    const created = await ticketsApi.createTask(ticketId, taskData);
-    setTasks((prev) => [created, ...prev]);
-    onTasksCountChanged?.(tasks.length + 1);
+  const handleCreateTask = async (formData: FormData) => {
+    const created = await ticketsApi.createTask(ticketId, formData);
+    const data = await ticketsApi.getTasks(ticketId);
+    setTasks(data);
+    onTasksCountChanged?.(data.length);
     receipts.done({ action: "crear-tarea", title: "Tarea creada", detail: created.title });
     onActivity?.();
   };
@@ -226,6 +227,29 @@ export function TicketTasksTab({
       setToastError(err instanceof Error ? err.message : "Error al abrir el archivo.");
     }
   };
+
+  const renderAttachmentButtons = (task: TicketTaskResponse) =>
+    task.attachments.map((att) => {
+      const isImg = att.contentType.startsWith("image/");
+      return (
+        <button
+          key={att.id}
+          type="button"
+          onClick={() => void handleOpenEvidenceFile(task.id, att)}
+          title={`Abrir: ${att.fileName}`}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11.5px] font-medium text-zinc-800 transition-colors hover:border-zinc-300 hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-brand-red/25"
+        >
+          {isImg ? (
+            <ImageIcon className="size-3 text-brand-red" />
+          ) : (
+            <FileText className="size-3 text-zinc-500" />
+          )}
+          <span className="truncate max-w-[150px]">{att.fileName}</span>
+          <span className="text-[10px] text-zinc-400 tabular-nums">({formatBytes(att.sizeBytes)})</span>
+          <Eye className="size-3 text-zinc-400 ml-0.5" />
+        </button>
+      );
+    });
 
   const pendingTasks = tasks.filter((t) => t.status !== "Completada" && t.status !== "Cancelada");
   const completedTasks = tasks.filter((t) => t.status === "Completada");
@@ -354,11 +378,10 @@ export function TicketTasksTab({
                         type="button"
                         onClick={() => setTaskToComplete(task)}
                         disabled={isClosed}
-                        title="Marcar como completada y adjuntar evidencia"
-                        className="group/btn flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-zinc-300 bg-white shadow-2xs transition-all hover:border-emerald-600 hover:bg-emerald-50/50 cursor-pointer active:scale-90"
-                      >
-                        <Check className="size-2.5 text-transparent transition-colors group-hover/btn:text-emerald-600 stroke-[2.75]" />
-                      </button>
+                        title="Abrir formulario para completar la tarea"
+                        aria-label="Completar tarea"
+                        className="flex size-4 shrink-0 items-center justify-center rounded-[4px] border-2 border-zinc-300 bg-white shadow-2xs transition-all hover:border-zinc-500 hover:bg-zinc-50 cursor-pointer active:scale-90"
+                      />
                     )}
 
                     <div className="min-w-0 flex-1">
@@ -419,11 +442,11 @@ export function TicketTasksTab({
                         type="button"
                         onClick={() => setTaskToComplete(task)}
                         disabled={isClosed}
-                        className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50/90 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 shadow-2xs transition-colors hover:bg-emerald-100 hover:border-emerald-300 active:scale-95 cursor-pointer disabled:opacity-50"
-                        title="Marcar tarea como completada"
+                        className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer disabled:opacity-50"
+                        title="Registrar conclusión y evidencia (la tarea sigue pendiente hasta confirmar)"
                       >
-                        <Check className="size-3 stroke-[2.5]" />
-                        <span>Completar</span>
+                        <ListChecks className="size-3 text-zinc-500" />
+                        <span>Completar tarea</span>
                       </button>
                     )}
 
@@ -444,6 +467,15 @@ export function TicketTasksTab({
                     <p className="text-[12.5px] leading-relaxed text-zinc-600 whitespace-pre-line">
                       {task.description}
                     </p>
+                  </div>
+                )}
+
+                {!isCompleted && task.attachments.length > 0 && (
+                  <div className="mt-3 ml-7.5 rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-3">
+                    <p className="font-heading text-[10.5px] font-bold uppercase tracking-[0.06em] text-zinc-500 mb-1.5">
+                      Documentos adjuntos ({task.attachments.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">{renderAttachmentButtons(task)}</div>
                   </div>
                 )}
 
@@ -469,33 +501,9 @@ export function TicketTasksTab({
                     {task.attachments.length > 0 && (
                       <div className="pt-1">
                         <p className="font-heading text-[10.5px] font-bold uppercase tracking-[0.06em] text-zinc-500 mb-1.5">
-                          Archivos de evidencia ({task.attachments.length}):
+                          Archivos adjuntos ({task.attachments.length})
                         </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {task.attachments.map((att) => {
-                            const isImg = att.contentType.startsWith("image/");
-                            return (
-                              <button
-                                key={att.id}
-                                type="button"
-                                onClick={() => void handleOpenEvidenceFile(task.id, att)}
-                                title={`Abrir evidencia: ${att.fileName}`}
-                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11.5px] font-medium text-zinc-800 transition-colors hover:border-zinc-300 hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-brand-red/25"
-                              >
-                                {isImg ? (
-                                  <ImageIcon className="size-3 text-brand-red" />
-                                ) : (
-                                  <FileText className="size-3 text-zinc-500" />
-                                )}
-                                <span className="truncate max-w-[150px]">{att.fileName}</span>
-                                <span className="text-[10px] text-zinc-400 tabular-nums">
-                                  ({formatBytes(att.sizeBytes)})
-                                </span>
-                                <Eye className="size-3 text-zinc-400 ml-0.5" />
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <div className="flex flex-wrap gap-1.5">{renderAttachmentButtons(task)}</div>
                       </div>
                     )}
                   </div>
