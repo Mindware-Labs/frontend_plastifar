@@ -726,6 +726,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
           ticketClientId={ticket.clientId ?? undefined}
           ticketStatus={ticket.status}
           onTicketStatusChanged={onTicketStatusChanged}
+          ticketProducts={ticket.products}
           initialData={discrepancyInitialData}
           onClose={() => {
             setDiscrepancyModalOpen(false);

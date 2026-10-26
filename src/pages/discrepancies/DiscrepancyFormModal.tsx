@@ -16,7 +16,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
   useFieldArray,
@@ -42,7 +42,7 @@ import {
   TextField,
   type FieldState,
 } from "../../components/ui/Field";
-import { LookupSelect } from "../../components/ui/LookupSelect";
+import { LookupSelect, type LookupOption } from "../../components/ui/LookupSelect";
 import { Modal } from "../../components/ui/Modal";
 import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
@@ -61,8 +61,14 @@ import {
   searchClients,
   searchProducts,
 } from "../../lib/lookups";
+import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { toNumber } from "../../lib/numbers";
 import { today } from "../../lib/quality";
+import {
+  ticketProductLabelMap,
+  ticketProductsToLookupOptions,
+} from "../../lib/ticketProducts";
+import type { TicketProductResponse } from "../../types/api";
 import type {
   DiscrepancyDetail,
   LoadDiscrepancy,
@@ -217,6 +223,8 @@ interface DiscrepancyFormModalProps {
   ticketClientId?: number;
   ticketStatus?: string;
   onTicketStatusChanged?: () => void;
+  /** Productos ligados al ticket: prellenan líneas y aparecen como recomendados al buscar. */
+  ticketProducts?: TicketProductResponse[];
   initialData?: {
     note?: string;
     lines?: Array<{
@@ -272,12 +280,21 @@ export function DiscrepancyFormModal({
   ticketClientId,
   ticketStatus,
   onTicketStatusChanged,
+  ticketProducts,
   initialData,
   onClose,
   onSaved,
   inline = false,
 }: DiscrepancyFormModalProps) {
   const isEdit = discrepancy !== undefined;
+  const recommendedProductOptions = useMemo(
+    () => ticketProductsToLookupOptions(ticketProducts),
+    [ticketProducts],
+  );
+  const ticketProductLabels = useMemo(
+    () => ticketProductLabelMap(ticketProducts),
+    [ticketProducts],
+  );
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const receipts = useReceipts();
 
@@ -460,6 +477,11 @@ export function DiscrepancyFormModal({
                 quantity: qty,
               };
             })
+          : !isEdit && ticketProducts && ticketProducts.length > 0
+          ? ticketProducts.map((p) => ({
+              ...emptyLine(defaultClientIdForLines, derivedTicketNumber),
+              productId: String(p.productId),
+            }))
           : [emptyLine(defaultClientIdForLines, derivedTicketNumber)],
     },
   });
@@ -492,7 +514,13 @@ export function DiscrepancyFormModal({
     });
   };
   const noteValue = useWatch({ control, name: "note" }) ?? "";
+  const noteField = register("note");
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const ticketIdValue = useWatch({ control, name: "ticketId" }) ?? "";
+
+  useLayoutEffect(() => {
+    autoResizeTextarea(noteTextareaRef.current, 64);
+  }, [noteValue, step]);
 
   // Puntos de Seguridad (Paso 3)
   type CheckChoice = "Positivo" | "Negativo" | "";
@@ -937,7 +965,11 @@ export function DiscrepancyFormModal({
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="size-1.5 rounded-full bg-brand-red mt-1.5 shrink-0" />
-                  <span>En el siguiente paso se registrarán los productos sobrantes o faltantes.</span>
+                  <span>
+                    {recommendedProductOptions.length > 0
+                      ? `En el paso 2 se propondrán los ${recommendedProductOptions.length} producto(s) ligados al ticket; solo indicas cantidades y factura.`
+                      : "En el siguiente paso se registrarán los productos sobrantes o faltantes."}
+                  </span>
                 </li>
               </ul>
             </div>
@@ -1092,6 +1124,8 @@ export function DiscrepancyFormModal({
               ticketClientName={effectiveTicketClientName}
               ticketClientId={effectiveTicketClientId}
               ticketInheritedLabel={ticketInheritedLabel}
+              recommendedProductOptions={recommendedProductOptions}
+              ticketProductLabels={ticketProductLabels}
               canRemove={fields.length > 1}
               onRemove={() => handleRemoveLine(activeIndex)}
             />
@@ -1104,8 +1138,8 @@ export function DiscrepancyFormModal({
         <TextAreaField
           id="discrepancy-notes"
           label="Notas operativas"
-          rows={3}
-          className="text-[12.5px] py-2"
+          rows={2}
+          className="min-h-[64px] resize-none overflow-hidden text-[12.5px] py-2"
           placeholder="Observaciones de entrega, horarios de recepción, particularidades de la carga, precinto o contenedor…"
           hint={
             <span className="flex items-center justify-between text-[11px] text-zinc-400">
@@ -1120,7 +1154,17 @@ export function DiscrepancyFormModal({
             </span>
           }
           error={errors.note?.message}
-          {...register("note")}
+          name={noteField.name}
+          onBlur={noteField.onBlur}
+          onChange={(event) => {
+            noteField.onChange(event);
+            autoResizeTextarea(event.target, 64);
+          }}
+          ref={(element) => {
+            noteField.ref(element);
+            noteTextareaRef.current = element;
+            autoResizeTextarea(element, 64);
+          }}
         />
         </div>
       </div>
@@ -1591,6 +1635,8 @@ interface DiscrepancyLineCardProps {
   ticketClientName?: string;
   ticketClientId?: number;
   ticketInheritedLabel: string;
+  recommendedProductOptions: LookupOption[];
+  ticketProductLabels: Map<string, string>;
   canRemove: boolean;
   onRemove: () => void;
 }
@@ -1605,9 +1651,12 @@ function DiscrepancyLineCard({
   ticketClientName,
   ticketClientId,
   ticketInheritedLabel,
+  recommendedProductOptions,
+  ticketProductLabels,
   canRemove,
   onRemove,
 }: DiscrepancyLineCardProps) {
+  const productPickerId = useId();
   const discrepancyType = useWatch({ control, name: `lines.${index}.discrepancyType` }) ?? "faltante";
   const quantityValue = useWatch({ control, name: `lines.${index}.quantity` }) ?? "";
   const qtyNum = Number(quantityValue) || 0;
@@ -1737,13 +1786,15 @@ function DiscrepancyLineCard({
                   size="sm"
                   label="Producto"
                   required
-                  name={productField.name}
+                  id={productPickerId}
                   value={productField.value}
+                  selectedLabel={ticketProductLabels.get(productField.value)}
                   onChange={(value) => productField.onChange(value)}
                   onBlur={productField.onBlur}
                   placeholder="Buscar producto…"
                   searchPlaceholder="Código o descripción…"
                   search={searchProducts}
+                  recommendedOptions={recommendedProductOptions}
                   resolveSelectedLabel={resolveProductLabel}
                   error={lineErrors?.productId?.message}
                 />

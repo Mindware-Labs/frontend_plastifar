@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Search, X } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import {
@@ -51,6 +51,8 @@ export interface LookupSelectProps {
   searchPlaceholder?: string;
   /** Texto de la opcion que vacia la seleccion. Sin esto no se ofrece. */
   clearLabel?: string;
+  /** Productos del ticket: abre el panel con pestañas ticket / catálogo completo. */
+  recommendedOptions?: LookupOption[];
   size?: ControlSize;
   state?: FieldState;
   disabled?: boolean;
@@ -65,6 +67,16 @@ export interface LookupSelectProps {
 
 const PANEL_MAX_HEIGHT = 300;
 const LIST_MAX_HEIGHT = 232;
+
+function filterOptions(options: LookupOption[], term: string): LookupOption[] {
+  const q = term.trim().toLowerCase();
+  if (!q) return options;
+  return options.filter(
+    (o) =>
+      o.label.toLowerCase().includes(q) ||
+      (o.hint !== undefined && o.hint.toLowerCase().includes(q)),
+  );
+}
 
 /**
  * Desplegable de busqueda para catalogos que no tienen tope: clientes y
@@ -87,6 +99,7 @@ export function LookupSelect({
   placeholder = "Selecciona una opción",
   searchPlaceholder = "Escribe para buscar…",
   clearLabel,
+  recommendedOptions,
   size = "md",
   state = "idle",
   disabled,
@@ -104,6 +117,7 @@ export function LookupSelect({
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [sourceTab, setSourceTab] = useState<"ticket" | "all">("ticket");
   const [anchor, setAnchor] = useState<{
     left: number;
     width: number;
@@ -115,13 +129,7 @@ export function LookupSelect({
   const [isLoading, setIsLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  /**
-   * Etiqueta de lo que se eligio en esta sesion del control. Se recuerda para
-   * que cerrar el panel --lo que descarta los resultados-- no borre el nombre
-   * de lo que se acaba de elegir.
-   */
   const [picked, setPicked] = useState<LookupOption | null>(null);
-  /** Etiqueta traida por `resolveSelectedLabel`, por valor. */
   const [resolved, setResolved] = useState<Record<string, string>>({});
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -130,9 +138,19 @@ export function LookupSelect({
   const listRef = useRef<HTMLUListElement>(null);
 
   const debouncedTerm = useDebouncedValue(term).trim();
+  const recommended = recommendedOptions ?? [];
+  const ticketTabEnabled = recommended.length > 0;
+  const ticketTabLabel =
+    recommended.length === 1 ? "Producto del ticket" : "Productos del ticket";
 
-  // El nombre de lo elegido, por orden de fiabilidad: lo que quien llama sabe,
-  // lo que se acaba de elegir, lo que se resolvio por id.
+  const ticketOptions = useMemo(
+    () => filterOptions(recommended, debouncedTerm),
+    [recommended, debouncedTerm],
+  );
+
+  const onTicketTab = ticketTabEnabled && sourceTab === "ticket";
+  const options = onTicketTab ? ticketOptions : result.options;
+
   const currentLabel =
     value === ""
       ? null
@@ -141,7 +159,6 @@ export function LookupSelect({
         resolved[value] ??
         null);
 
-  // Resolucion perezosa del valor inicial: solo cuando nadie dio la etiqueta.
   useEffect(() => {
     if (value === "" || !resolveSelectedLabel) return;
     if (selectedLabel != null || picked?.value === value || resolved[value] !== undefined) return;
@@ -152,22 +169,22 @@ export function LookupSelect({
         if (cancelled || label === null) return;
         setResolved((current) => ({ ...current, [value]: label }));
       })
-      .catch(() => {
-        // Sin nombre se muestra el id: decir «sin selección» seria falso.
-      });
+      .catch(() => {});
 
     return () => {
       cancelled = true;
     };
-    // `picked`/`resolved` se leen dentro de la guarda; reejecutar por ellos
-    // volveria a pedir lo que se acaba de resolver.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, selectedLabel, resolveSelectedLabel]);
 
-  // La consulta solo vive mientras el panel esta abierto: cerrado no hay lista
-  // que llenar y cada pulsacion seria una peticion tirada a la basura.
   useEffect(() => {
     if (!open) return;
+    if (onTicketTab) {
+      setIsLoading(false);
+      setFailed(false);
+      setActiveIndex(ticketOptions.length > 0 ? 0 : -1);
+      return;
+    }
 
     let cancelled = false;
     setIsLoading(true);
@@ -191,10 +208,8 @@ export function LookupSelect({
     return () => {
       cancelled = true;
     };
-    // `search` se recrea en cada render de quien llama; depender de ella
-    // dispararia una consulta por render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, debouncedTerm]);
+  }, [open, debouncedTerm, sourceTab, ticketTabEnabled]);
 
   function measure() {
     const rect = triggerRef.current?.getBoundingClientRect();
@@ -215,6 +230,7 @@ export function LookupSelect({
     if (disabled) return;
     measure();
     setTerm("");
+    setSourceTab(ticketTabEnabled ? "ticket" : "all");
     setActiveIndex(-1);
     setOpen(true);
   }
@@ -223,8 +239,6 @@ export function LookupSelect({
     setOpen(false);
     onBlur?.();
   }
-
-  const options = result.options;
 
   function commit(index: number) {
     const option = options[index];
@@ -242,8 +256,6 @@ export function LookupSelect({
     triggerRef.current?.focus();
   }
 
-  // El foco entra al campo de texto en cuanto abre: el proposito del control es
-  // escribir, y obligar a un Tab extra lo convertiria en un desplegable normal.
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
@@ -258,8 +270,6 @@ export function LookupSelect({
       onBlur?.();
     }
 
-    // Igual que en Select: el scroll de la pagina cierra, pero el del propio
-    // panel no --si no, la lista se cerraba sola al llevar la opcion a la vista.
     function handleViewportChange(event: Event) {
       const target = event.target;
       if (target instanceof Node && panelRef.current?.contains(target)) return;
@@ -313,8 +323,6 @@ export function LookupSelect({
         return;
       case "Escape":
         event.preventDefault();
-        // Sin detenerlo, el mismo Escape llega al listener de Modal y descarta
-        // el formulario entero en vez de cerrar solo la lista.
         event.stopPropagation();
         closeList();
         triggerRef.current?.focus();
@@ -337,18 +345,25 @@ export function LookupSelect({
 
   const resolvedState: FieldState = state;
 
-  /** Un unico renglon de estado bajo la lista; nunca hay dos verdades a la vez. */
   const status = failed
     ? "No se pudo buscar. Escribe de nuevo para reintentar."
     : isLoading
       ? "Buscando…"
       : options.length === 0
         ? debouncedTerm === ""
-          ? "Escribe para buscar."
-          : "Ningún resultado coincide."
-        : result.hasMore
+          ? onTicketTab
+            ? null
+            : "Escribe para buscar."
+          : onTicketTab
+            ? "Ningún producto del ticket coincide."
+            : "Ningún resultado coincide."
+        : !onTicketTab && result.hasMore
           ? "Hay más coincidencias. Seguí escribiendo para acotar la búsqueda."
           : null;
+
+  const panelSurface = ticketTabEnabled
+    ? "animate-plf-popover-in z-[60] rounded-edge border border-line bg-white"
+    : "animate-plf-popover-in z-[60] rounded-edge border border-line bg-white shadow-panel";
 
   return (
     <div className={`relative ${className}`}>
@@ -398,7 +413,7 @@ export function LookupSelect({
               bottom: anchor.bottom,
               width: anchor.width,
             }}
-            className="animate-plf-popover-in z-[60] rounded-edge border border-line bg-white shadow-panel"
+            className={panelSurface}
           >
             <div className="relative border-b border-line p-1.5">
               <Search
@@ -425,13 +440,54 @@ export function LookupSelect({
               />
             </div>
 
+            {ticketTabEnabled && (
+              <div
+                className="flex gap-0.5 border-b border-line bg-zinc-50/80 p-1"
+                role="tablist"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={sourceTab === "ticket"}
+                  onClick={() => {
+                    setSourceTab("ticket");
+                    setActiveIndex(ticketOptions.length > 0 ? 0 : -1);
+                  }}
+                  className={`flex-1 rounded-md px-2 py-1.5 text-[12px] font-medium transition-colors duration-200 cursor-pointer ${
+                    sourceTab === "ticket"
+                      ? "bg-zinc-100 text-ink"
+                      : "text-faint hover:bg-zinc-100/60 hover:text-brand-gray"
+                  }`}
+                >
+                  {ticketTabLabel}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={sourceTab === "all"}
+                  onClick={() => {
+                    setSourceTab("all");
+                    setActiveIndex(result.options.length > 0 ? 0 : -1);
+                  }}
+                  className={`flex-1 rounded-md px-2 py-1.5 text-[12px] font-medium transition-colors duration-200 cursor-pointer ${
+                    sourceTab === "all"
+                      ? "bg-zinc-100 text-ink"
+                      : "text-faint hover:bg-zinc-100/60 hover:text-brand-gray"
+                  }`}
+                >
+                  Todos los productos
+                </button>
+              </div>
+            )}
+
             <ul
+              key={ticketTabEnabled ? sourceTab : "catalog"}
               ref={listRef}
               id={listId}
               role="listbox"
               aria-label={ariaLabel}
               style={{ maxHeight: LIST_MAX_HEIGHT }}
-              className="overflow-y-auto p-1"
+              className={`overflow-y-auto p-1 ${ticketTabEnabled ? "animate-plf-apple-tab" : ""}`}
             >
               {clearLabel !== undefined && value !== "" && (
                 <li
@@ -452,7 +508,7 @@ export function LookupSelect({
 
                 return (
                   <li
-                    key={option.value}
+                    key={`${option.value}-${index}`}
                     id={`${listId}-${index}`}
                     role="option"
                     aria-selected={isSelected}
