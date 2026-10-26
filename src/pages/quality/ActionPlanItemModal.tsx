@@ -6,13 +6,13 @@ import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { qualityApi } from "../../api/quality";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import {
   LookupField,
   TextAreaField,
   TextField,
   type FieldState,
 } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { formatBytes } from "../../lib/format";
@@ -161,14 +161,13 @@ export function ActionPlanItemModal({
       onClose={onClose}
       maxWidth="max-w-xl"
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="plan-item-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Agregar acción"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="plan-item-form"
+          isEdit={isEdit}
+          createLabel="Agregar acción"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form

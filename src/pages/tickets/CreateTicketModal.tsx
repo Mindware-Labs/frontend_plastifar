@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import { controlBase, stateClasses } from "../../components/ui/fieldStyles";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
+import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { departmentPathOptions } from "../../lib/departments";
 import type {
   DepartmentResponse,
@@ -21,6 +22,8 @@ import type {
   TicketCreateOptionsResponse,
   TicketSummaryResponse,
 } from "../../types/api";
+import { SectionHeading } from "./CreateTicketSectionHeading";
+import { reflowPlainText } from "./reflowPlainText";
 
 const schema = z.object({
   clientId: z.string().optional(),
@@ -81,65 +84,6 @@ const PRIORITIES = [
 ] as const;
 
 const FORM_ID = "create-ticket-form";
-
-/** Normaliza saltos de línea suaves en correos pegados para aprovechar el ancho. */
-function reflowPlainText(text: string): string {
-  return text
-    .replace(/\r\n/g, "\n")
-    .split(/\n{2,}/)
-    .map((paragraph) =>
-      paragraph
-        .split("\n")
-        .map((line) => line.trim())
-        .join(" ")
-        .trim(),
-    )
-    .join("\n\n");
-}
-
-/** Crece o encoge con el contenido: nunca queda con scroll propio. */
-function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
-  if (!textarea) return;
-  textarea.style.height = "auto";
-  const borderOffset = textarea.offsetHeight - textarea.clientHeight;
-  textarea.style.height = `${Math.max(textarea.scrollHeight + borderOffset, 96)}px`;
-}
-
-interface SectionHeadingProps {
-  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
-  title: string;
-  /** Nota o acción a la derecha: "Opcional", "Quitar cliente", "Restaurar". */
-  aside?: ReactNode;
-  htmlFor?: string;
-}
-
-/** Cabecera de sección: sello con el glifo y título en versalitas, como el chip de ticket. */
-function SectionHeading({ icon: Icon, title, aside, htmlFor }: SectionHeadingProps) {
-  const content = (
-    <>
-      <span
-        aria-hidden
-        className="flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
-      >
-        <Icon className="size-3" strokeWidth={2.25} />
-      </span>
-      <span className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink">{title}</span>
-    </>
-  );
-
-  return (
-    <div className="flex h-5 items-center justify-between gap-3">
-      {htmlFor ? (
-        <label htmlFor={htmlFor} className="flex cursor-pointer items-center gap-2">
-          {content}
-        </label>
-      ) : (
-        <div className="flex items-center gap-2">{content}</div>
-      )}
-      {aside && <span className="text-[11px] text-zinc-400">{aside}</span>}
-    </div>
-  );
-}
 
 export function CreateTicketModal({
   onClose,
@@ -202,7 +146,7 @@ export function CreateTicketModal({
 
   // Recalcula altura ante cambios manuales o programáticos del texto.
   useEffect(() => {
-    autoResizeTextarea(messageTextareaRef.current);
+    autoResizeTextarea(messageTextareaRef.current, 96);
   }, [currentMessage]);
 
   useEffect(() => {
@@ -720,14 +664,14 @@ export function CreateTicketModal({
                   name={initialMessageField.name}
                   onChange={(event) => {
                     initialMessageField.onChange(event);
-                    autoResizeTextarea(event.target);
+                    autoResizeTextarea(event.target, 96);
                   }}
                   onBlur={initialMessageField.onBlur}
                   ref={(el) => {
                     initialMessageField.ref(el);
                     messageTextareaRef.current = el;
                     // Ajuste de altura inicial tras carga diferida de catálogos.
-                    autoResizeTextarea(el);
+                    autoResizeTextarea(el, 96);
                   }}
                 />
 

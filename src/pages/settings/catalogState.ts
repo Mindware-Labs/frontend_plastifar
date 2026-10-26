@@ -5,11 +5,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/** Atenuacion del 60 % mientras hay una relectura en vuelo (DESIGN.md, «Stale data»). */
-export function staleClass(isStale: boolean): string {
-  return `transition-opacity ${isStale ? "opacity-60" : ""}`;
-}
-
 /**
  * Catalogo de apoyo de una seccion: departamentos, politicas, los años que
  * tienen feriados. No es el listado que se pagina --ese lo lleva usePagedList

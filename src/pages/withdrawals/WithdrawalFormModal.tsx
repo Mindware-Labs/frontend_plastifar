@@ -1,20 +1,22 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { withdrawalsApi } from "../../api/withdrawals";
+import { LineItemCard } from "../../components/app/LineItemCard";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { LookupField, SelectField, TextField } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
-import { RowAction } from "../../components/ui/RowAction";
 import { resolveTicketLabel, searchTickets } from "../../lib/discrepancies";
 import { formatAmountOrPlain, toNumberOrNull } from "../../lib/numbers";
 import { today } from "../../lib/quality";
+import { hasAtMostDecimals } from "../../lib/validation";
 import { computeLineValue, computeTotal, MAX_LINE_INPUT, MAX_WITHDRAWAL_AMOUNT } from "../../lib/withdrawals";
 import {
   WITHDRAWAL_CURRENCIES,
@@ -26,9 +28,6 @@ import {
   type WithdrawalReason,
 } from "../../types/withdrawals";
 
-const decimals = (places: number) => (value: string) =>
-  value === "" || Number((Number(value) * 10 ** places).toFixed(6)) % 1 === 0;
-
 // Espejo de WithdrawalRules.Validate (docs/plan/04, sección 13).
 const lineSchema = z.object({
   productId: z.string().min(1, "Elige el producto"),
@@ -37,7 +36,7 @@ const lineSchema = z.object({
     .trim()
     .refine((value) => value !== "" && !Number.isNaN(Number(value)) && Number(value) > 0, "Mayor que cero")
     .refine((value) => !(Number(value) > MAX_LINE_INPUT), "Máximo mil millones")
-    .refine(decimals(2), "Hasta dos decimales"),
+    .refine(hasAtMostDecimals(2), "Hasta dos decimales"),
   quantityUnit: z.string().trim().min(1, "Indica la unidad").max(10, "Máximo 10 caracteres"),
   packDetail: z.string().trim().max(20, "Máximo 20 caracteres"),
   unitPrice: z
@@ -45,7 +44,7 @@ const lineSchema = z.object({
     .trim()
     .refine((value) => value === "" || (!Number.isNaN(Number(value)) && Number(value) >= 0), "Número de cero en adelante")
     .refine((value) => value === "" || !(Number(value) > MAX_LINE_INPUT), "Máximo mil millones")
-    .refine(decimals(4), "Hasta cuatro decimales"),
+    .refine(hasAtMostDecimals(4), "Hasta cuatro decimales"),
 });
 
 const schema = z
@@ -236,14 +235,13 @@ export function WithdrawalFormModal({
       onClose={onClose}
       maxWidth="max-w-3xl"
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="withdrawal-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear solicitud"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="withdrawal-form"
+          isEdit={isEdit}
+          createLabel="Crear solicitud"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form id="withdrawal-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
@@ -325,32 +323,29 @@ export function WithdrawalFormModal({
               const lineError = errors.lines?.[index];
               const value = values[index] ?? null;
               return (
-                <div key={field.id} className="rounded-edge border border-line bg-canvas/60 p-3">
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <Controller
-                        name={`lines.${index}.productId`}
-                        control={control}
-                        render={({ field: productField }) => (
-                          <ProductLookupField
-                            label={`Producto ${index + 1}`}
-                            required
-                            name={productField.name}
-                            value={productField.value}
-                            onChange={(next) => productField.onChange(next)}
-                            onBlur={productField.onBlur}
-                            error={lineError?.productId?.message}
-                          />
-                        )}
-                      />
-                    </div>
-                    {fields.length > 1 && (
-                      <div className="pt-6">
-                        <RowAction label={`Quitar la línea ${index + 1}`} icon={Trash2} danger onClick={() => remove(index)} />
-                      </div>
-                    )}
-                  </div>
-
+                <LineItemCard
+                  key={field.id}
+                  index={index}
+                  canRemove={fields.length > 1}
+                  onRemove={() => remove(index)}
+                  product={
+                    <Controller
+                      name={`lines.${index}.productId`}
+                      control={control}
+                      render={({ field: productField }) => (
+                        <ProductLookupField
+                          label={`Producto ${index + 1}`}
+                          required
+                          name={productField.name}
+                          value={productField.value}
+                          onChange={(next) => productField.onChange(next)}
+                          onBlur={productField.onBlur}
+                          error={lineError?.productId?.message}
+                        />
+                      )}
+                    />
+                  }
+                >
                   <div className="mt-2 grid grid-cols-5 gap-2">
                     <TextField
                       label="Cantidad"
@@ -392,7 +387,7 @@ export function WithdrawalFormModal({
                       </span>
                     </div>
                   </div>
-                </div>
+                </LineItemCard>
               );
             })}
           </div>

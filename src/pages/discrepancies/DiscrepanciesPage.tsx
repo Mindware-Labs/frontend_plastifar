@@ -2,6 +2,7 @@ import { Building2, Plus, ShieldAlert, Truck } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { discrepanciesApi, type DiscrepancyListResponse, type DiscrepancyQuery } from "../../api/discrepancies";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -13,10 +14,10 @@ import {
   LookupFilterDropdown,
 } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { TableSkeleton } from "../../components/ui/Skeleton";
+import { ServerPagination } from "../../components/ui/ServerPagination";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -95,91 +96,83 @@ export function DiscrepanciesPage() {
       <ModuleHeader
         title="Discrepancias"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "investigación" : "investigaciones"}
-                count={counts.all}
-                active={chip === "todas"}
-                onClick={() => {
-                  setChip("todas");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todas las investigaciones de discrepancia"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="en investigación"
-                count={counts.investigating}
-                active={chip === "En investigación"}
-                onClick={() => {
-                  setChip("En investigación");
-                  setPage(1);
-                }}
-                tone="amber"
-                dot
-                title="Filtrar por investigaciones en curso"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.completed === 1 ? "completada" : "completadas"}
-                count={counts.completed}
-                active={chip === "Completada"}
-                onClick={() => {
-                  setChip("Completada");
-                  setPage(1);
-                }}
-                tone="blue"
-                dot
-                title="Filtrar por investigaciones completadas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.approved === 1 ? "aprobada" : "aprobadas"}
-                count={counts.approved}
-                active={chip === "Aprobada"}
-                onClick={() => {
-                  setChip("Aprobada");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por investigaciones aprobadas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.returned === 1 ? "devuelta" : "devueltas"}
-                count={counts.returned}
-                active={chip === "Devuelta"}
-                onClick={() => {
-                  setChip("Devuelta");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por investigaciones devueltas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="hallazgo de seguridad"
-                count={counts.withFinding}
-                active={chip === "hallazgo"}
-                onClick={() => {
-                  setChip("hallazgo");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por discrepancias con hallazgo de seguridad"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando las investigaciones de discrepancia…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando las investigaciones de discrepancia…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "investigación" : "investigaciones"}
+                  count={counts.all}
+                  active={chip === "todas"}
+                  onClick={() => {
+                    setChip("todas");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todas las investigaciones de discrepancia"
+                />
+                <HeaderTag
+                  label="en investigación"
+                  count={counts.investigating}
+                  active={chip === "En investigación"}
+                  onClick={() => {
+                    setChip("En investigación");
+                    setPage(1);
+                  }}
+                  tone="amber"
+                  dot
+                  title="Filtrar por investigaciones en curso"
+                />
+                <HeaderTag
+                  label={counts.completed === 1 ? "completada" : "completadas"}
+                  count={counts.completed}
+                  active={chip === "Completada"}
+                  onClick={() => {
+                    setChip("Completada");
+                    setPage(1);
+                  }}
+                  tone="blue"
+                  dot
+                  title="Filtrar por investigaciones completadas"
+                />
+                <HeaderTag
+                  label={counts.approved === 1 ? "aprobada" : "aprobadas"}
+                  count={counts.approved}
+                  active={chip === "Aprobada"}
+                  onClick={() => {
+                    setChip("Aprobada");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por investigaciones aprobadas"
+                />
+                <HeaderTag
+                  label={counts.returned === 1 ? "devuelta" : "devueltas"}
+                  count={counts.returned}
+                  active={chip === "Devuelta"}
+                  onClick={() => {
+                    setChip("Devuelta");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por investigaciones devueltas"
+                />
+                <HeaderTag
+                  label="hallazgo de seguridad"
+                  count={counts.withFinding}
+                  active={chip === "hallazgo"}
+                  onClick={() => {
+                    setChip("hallazgo");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por discrepancias con hallazgo de seguridad"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -247,85 +240,80 @@ export function DiscrepanciesPage() {
           </>
         }
         footer={
-          data !== null && (
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="investigaciones"
-              nounSingular="investigación"
-            />
-          )
+          <ServerPagination
+            data={data}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="investigaciones"
+            nounSingular="investigación"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={7} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {unfiltered ? "Todavía no hay investigaciones registradas." : "Ninguna investigación coincide con este filtro o búsqueda."}
-          </p>
-        ) : (
-          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th sort={sortOf("numero")}>Número</Th>
-                  <Th sort={sortOf("ticket")}>Ticket</Th>
-                  <Th sort={sortOf("cliente")}>Cliente</Th>
-                  <Th sort={sortOf("fecha")}>Fecha</Th>
-                  <Th>Despachador</Th>
-                  <Th>Seguridad</Th>
-                  <Th>Estado</Th>
-                </HeadRow>
-              </thead>
-              <tbody>
-                {rows.map((item) => (
-                  <Row key={item.id} className="cursor-pointer" onClick={() => navigate(`/discrepancias/${item.id}`)}>
-                    <Td>
-                      <Link
-                        to={`/discrepancias/${item.id}`}
-                        onClick={(event) => event.stopPropagation()}
-                        className="whitespace-nowrap font-mono text-[12px] font-medium text-ink hover:text-brand-red"
-                      >
-                        {item.number}
-                      </Link>
-                    </Td>
-                    <Td className="whitespace-nowrap font-mono text-[12px] text-brand-gray">{item.ticketNumber}</Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      <span title={item.clientName ?? undefined} className="block max-w-[200px] truncate">
-                        {item.clientName ?? "—"}
-                      </span>
-                    </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">{formatDay(item.createdAt.slice(0, 10))}</Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      <span title={item.dispatchers.join(", ")} className="block max-w-[180px] truncate">
-                        {item.dispatchers.join(", ") || "—"}
-                      </span>
-                    </Td>
-                    <Td>
-                      {item.hasSecurityFinding ? (
-                        <Tooltip content="Algún punto de seguridad del 1 al 8 es positivo">
-                          <span className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-red-dark">
-                            <ShieldAlert aria-hidden className="h-3.5 w-3.5" />
-                            Hallazgo
-                          </span>
-                        </Tooltip>
-                      ) : (
-                        <span className="text-[12px] text-faint">—</span>
-                      )}
-                    </Td>
-                    <Td>
-                      <DiscrepancyStatusBadge status={item.status} />
-                    </Td>
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={7}
+          empty={unfiltered ? "Todavía no hay investigaciones registradas." : "Ninguna investigación coincide con este filtro o búsqueda."}
+          animateIn
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th sort={sortOf("numero")}>Número</Th>
+                <Th sort={sortOf("ticket")}>Ticket</Th>
+                <Th sort={sortOf("cliente")}>Cliente</Th>
+                <Th sort={sortOf("fecha")}>Fecha</Th>
+                <Th>Despachador</Th>
+                <Th>Seguridad</Th>
+                <Th>Estado</Th>
+              </HeadRow>
+            </thead>
+            <tbody>
+              {rows.map((item) => (
+                <Row key={item.id} className="cursor-pointer" onClick={() => navigate(`/discrepancias/${item.id}`)}>
+                  <Td>
+                    <Link
+                      to={`/discrepancias/${item.id}`}
+                      onClick={(event) => event.stopPropagation()}
+                      className="whitespace-nowrap font-mono text-[12px] font-medium text-ink hover:text-brand-red"
+                    >
+                      {item.number}
+                    </Link>
+                  </Td>
+                  <Td className="whitespace-nowrap font-mono text-[12px] text-brand-gray">{item.ticketNumber}</Td>
+                  <Td className="text-[12.5px] text-brand-gray">
+                    <span title={item.clientName ?? undefined} className="block max-w-[200px] truncate">
+                      {item.clientName ?? "—"}
+                    </span>
+                  </Td>
+                  <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">{formatDay(item.createdAt.slice(0, 10))}</Td>
+                  <Td className="text-[12.5px] text-brand-gray">
+                    <span title={item.dispatchers.join(", ")} className="block max-w-[180px] truncate">
+                      {item.dispatchers.join(", ") || "—"}
+                    </span>
+                  </Td>
+                  <Td>
+                    {item.hasSecurityFinding ? (
+                      <Tooltip content="Algún punto de seguridad del 1 al 8 es positivo">
+                        <span className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-red-dark">
+                          <ShieldAlert aria-hidden className="h-3.5 w-3.5" />
+                          Hallazgo
+                        </span>
+                      </Tooltip>
+                    ) : (
+                      <span className="text-[12px] text-faint">—</span>
+                    )}
+                  </Td>
+                  <Td>
+                    <DiscrepancyStatusBadge status={item.status} />
+                  </Td>
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {creating && (

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { ApiError } from "../../api/client";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -289,43 +290,38 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
       <ModuleHeader
         title={title ?? "Permisos"}
         summary={
-          matrix ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={catalog.length === 1 ? "permiso" : "permisos"}
-                count={counts.todos}
-                active={chip === "todos"}
-                onClick={() => setChip("todos")}
-                tone="neutral"
-                title="Mostrar todos los permisos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="sin asignar"
-                count={counts.sinAsignar}
-                active={chip === "sinAsignar"}
-                onClick={() => setChip("sinAsignar")}
-                tone={counts.sinAsignar > 0 ? "amber" : "neutral"}
-                dot={counts.sinAsignar > 0}
-                title="Filtrar por permisos no asignados a ningún rol"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="con cambios"
-                count={counts.conCambios}
-                active={chip === "conCambios"}
-                onClick={() => setChip("conCambios")}
-                tone={counts.conCambios > 0 ? "blue" : "neutral"}
-                dot={counts.conCambios > 0}
-                title="Filtrar por permisos modificados sin guardar"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando el catálogo de permisos…
-            </span>
-          )
+          <HeaderCounts counts={matrix} loadingLabel="Cargando el catálogo de permisos…">
+            {() => (
+              <>
+                <HeaderTag
+                  label={catalog.length === 1 ? "permiso" : "permisos"}
+                  count={counts.todos}
+                  active={chip === "todos"}
+                  onClick={() => setChip("todos")}
+                  tone="neutral"
+                  title="Mostrar todos los permisos"
+                />
+                <HeaderTag
+                  label="sin asignar"
+                  count={counts.sinAsignar}
+                  active={chip === "sinAsignar"}
+                  onClick={() => setChip("sinAsignar")}
+                  tone={counts.sinAsignar > 0 ? "amber" : "neutral"}
+                  dot={counts.sinAsignar > 0}
+                  title="Filtrar por permisos no asignados a ningún rol"
+                />
+                <HeaderTag
+                  label="con cambios"
+                  count={counts.conCambios}
+                  active={chip === "conCambios"}
+                  onClick={() => setChip("conCambios")}
+                  tone={counts.conCambios > 0 ? "blue" : "neutral"}
+                  dot={counts.conCambios > 0}
+                  title="Filtrar por permisos modificados sin guardar"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           <div className="flex items-center gap-2">

@@ -12,7 +12,6 @@ import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import {
   CheckboxField,
   LookupField,
@@ -21,12 +20,14 @@ import {
   TextField,
   type FieldState,
 } from "../../components/ui/Field";
+import { FormDivider } from "../../components/ui/FormDivider";
 import { Modal } from "../../components/ui/Modal";
+import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatPhoneNumber } from "../../lib/format";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
+import { fieldForServerError, type FieldRule } from "../../lib/serverFieldErrors";
 import type { Client, ClientType, SaveClientRequest } from "../../types/clients";
-import { fieldForServerError, type FieldRule } from "./serverFieldErrors";
 
 /**
  * 4 tipos de cliente con micro-ícono y etiqueta compacta.
@@ -97,17 +98,6 @@ interface ClientModalProps {
   territories: { id: number; name: string; isActive: boolean }[];
   onClose: () => void;
   onSaved: (client: Client) => void;
-}
-
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-zinc-100" />
-    </div>
-  );
 }
 
 export function ClientModal({ client, territories, onClose, onSaved }: ClientModalProps) {
@@ -202,26 +192,13 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" form="client-form" size="sm" isLoading={isSubmitting}>
-              {isEdit ? "Guardar cambios" : "Crear cliente"}
-            </Button>
-          </div>
-        </div>
+        <ShortcutModalFooter
+          formId="client-form"
+          isEdit={isEdit}
+          createLabel="Crear cliente"
+          isSubmitting={isSubmitting}
+          onCancel={requestClose}
+        />
       }
     >
       <form

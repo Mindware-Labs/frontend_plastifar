@@ -5,11 +5,12 @@ import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { sedesApi } from "../../api/sedes";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextAreaField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { Sede } from "../../types/sedes";
+import { FormDivider } from "../../components/ui/FormDivider";
 
 const schema = z.object({
   name: z
@@ -27,17 +28,6 @@ interface SedeModalProps {
   sede?: Sede;
   onClose: () => void;
   onSaved: (sede: Sede) => void;
-}
-
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-1 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-zinc-100" />
-    </div>
-  );
 }
 
 export function SedeModal({ sede, onClose, onSaved }: SedeModalProps) {
@@ -116,26 +106,13 @@ export function SedeModal({ sede, onClose, onSaved }: SedeModalProps) {
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" form="sede-form" size="sm" isLoading={isSubmitting}>
-              {isEdit ? "Guardar cambios" : "Crear sede"}
-            </Button>
-          </div>
-        </div>
+        <ShortcutModalFooter
+          formId="sede-form"
+          isEdit={isEdit}
+          createLabel="Crear sede"
+          isSubmitting={isSubmitting}
+          onCancel={requestClose}
+        />
       }
     >
       <form
@@ -147,7 +124,7 @@ export function SedeModal({ sede, onClose, onSaved }: SedeModalProps) {
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <FormDivider title="Información Principal" />
+        <FormDivider title="Información Principal" tight />
 
         <TextField
           size="sm"
@@ -170,7 +147,7 @@ export function SedeModal({ sede, onClose, onSaved }: SedeModalProps) {
 
         {isEdit && (
           <>
-            <FormDivider title="Estado" />
+            <FormDivider title="Estado" tight />
             <CheckboxField
               label="Sede activa"
               description="Si se desmarca, no se podrá seleccionar al crear o editar departamentos."

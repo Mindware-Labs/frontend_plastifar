@@ -2,12 +2,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { ApiError } from "../../api/client";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
+import { applyServerError, type ServerErrorRule } from "../../lib/formErrors";
 import { PLANT_COUNTRIES, type Plant, type Product, type ProductLine } from "../../types/settings";
 
 /**
@@ -34,7 +34,7 @@ const NINGUNO = "";
  * Con que empieza cada mensaje de POST/PUT /api/settings/products que habla de
  * un solo campo. Lo que no este aqui va al aviso general del formulario.
  */
-const CAMPO_POR_MENSAJE: { field: keyof FormValues; startsWith: string }[] = [
+const CAMPO_POR_MENSAJE: ServerErrorRule<keyof FormValues>[] = [
   { field: "code", startsWith: "el código debe" },
   { field: "code", startsWith: "ya existe un producto" },
   { field: "name", startsWith: "la descripción debe" },
@@ -145,22 +145,17 @@ export function ProductModal({
       onSaved(saved);
       onClose();
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 409 || err.status === 400)) {
-        const mensaje = err.message.trim().toLowerCase();
-        const campo = CAMPO_POR_MENSAJE.find(({ startsWith }) =>
-          mensaje.startsWith(startsWith),
-        )?.field;
-        if (campo) {
-          setError(campo, { message: err.message });
+      setFormError(
+        applyServerError(err, {
+          setError,
+          setFocus,
+          rules: CAMPO_POR_MENSAJE,
           // Solo el codigo y la descripcion estan registrados con ref; la linea
           // y la planta van por Controller sin ella y setFocus no las alcanzaria.
-          if (campo === "code" || campo === "name") setFocus(campo);
-        } else {
-          setFormError(err.message);
-        }
-        return;
-      }
-      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar el producto");
+          focusable: ["code", "name"],
+          fallback: "No se pudo guardar el producto",
+        }),
+      );
     }
   }
 
@@ -174,14 +169,13 @@ export function ProductModal({
       description="Un artículo que se vende, se reclama o se retira. El código lo identifica y no puede repetirse."
       onClose={onClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="product-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear producto"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="product-form"
+          isEdit={isEdit}
+          createLabel="Crear producto"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form id="product-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">

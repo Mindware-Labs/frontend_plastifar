@@ -1,4 +1,4 @@
-import { ApiError } from "../../api/client";
+import { ApiError } from "../api/client";
 
 /**
  * Unico lugar del modulo de Clientes donde el TEXTO de un error del servidor

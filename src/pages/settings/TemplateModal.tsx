@@ -2,7 +2,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
-import { ApiError } from "../../api/client";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -12,7 +11,9 @@ import {
   TextField,
   type FieldState,
 } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
+import { applyServerError } from "../../lib/formErrors";
 import { renderPreview, unknownVariables } from "../../lib/templates";
 import { TEMPLATE_VARIABLES, type EmailTemplate } from "../../types/settings";
 
@@ -104,12 +105,16 @@ export function TemplateModal({ template, onClose, onSaved }: TemplateModalProps
       onSaved(saved);
       onClose();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setError("key", { message: err.message });
-        setFocus("key");
-        return;
-      }
-      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar la plantilla");
+      setFormError(
+        applyServerError(err, {
+          setError,
+          setFocus,
+          rules: [{ field: "key" }],
+          statuses: [409],
+          focusable: ["key"],
+          fallback: "No se pudo guardar la plantilla",
+        }),
+      );
     }
   }
 
@@ -119,17 +124,17 @@ export function TemplateModal({ template, onClose, onSaved }: TemplateModalProps
       description="El texto que se ofrece al responder al cliente. Las variables se sustituyen al enviar."
       onClose={onClose}
       footer={
-        <>
+        <FormModalFooter
+          formId="template-form"
+          isEdit={isEdit}
+          createLabel="Crear plantilla"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        >
           <Button type="button" variant="ghost" onClick={() => setShowPreview((value) => !value)}>
             {showPreview ? "Ocultar vista previa" : "Vista previa"}
           </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="template-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear plantilla"}
-          </Button>
-        </>
+        </FormModalFooter>
       }
     >
       <form

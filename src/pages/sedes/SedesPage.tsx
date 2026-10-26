@@ -2,31 +2,30 @@ import {
   Ban,
   Building,
   CheckCircle2,
-  Pencil,
   Plus,
-  Power,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { sedesApi } from "../../api/sedes";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
-import { RowAction } from "../../components/ui/RowAction";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { Sede, SedeQuery } from "../../types/sedes";
 import { LoadErrorAlert } from "../settings/catalogSection";
+import { CatalogRowActions } from "../settings/CatalogRowActions";
 import { SedeModal } from "./SedeModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -36,13 +35,10 @@ export function SedesPage() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Sede>();
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
   const [pageSize, setPageSize] = useState(15);
-
-  const [modal, setModal] = useState<"nuevo" | Sede | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -66,7 +62,7 @@ export function SedesPage() {
 
   function askToggle(sede: Sede) {
     const willDeactivate = sede.isActive;
-    setConfirmation({
+    confirm(sede.id, {
       tone: "warn",
       icon: willDeactivate ? Ban : CheckCircle2,
       title: willDeactivate ? "Desactivar sede" : "Reactivar sede",
@@ -93,24 +89,19 @@ export function SedesPage() {
       ),
       confirmLabel: willDeactivate ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(sede.id);
-        try {
-          const current = await sedesApi.get(sede.id);
-          await sedesApi.update(current.id, {
-            name: current.name,
-            address: current.address,
-            isActive: !current.isActive,
-          });
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        const current = await sedesApi.get(sede.id);
+        await sedesApi.update(current.id, {
+          name: current.name,
+          address: current.address,
+          isActive: !current.isActive,
+        });
+        refresh();
       },
     });
   }
 
   function askDelete(sede: Sede) {
-    setConfirmation({
+    confirm(sede.id, {
       tone: "danger",
       icon: Trash2,
       title: "Eliminar sede",
@@ -122,13 +113,8 @@ export function SedesPage() {
       ),
       confirmLabel: "Eliminar",
       onConfirm: async () => {
-        setBusyId(sede.id);
-        try {
-          await sedesApi.remove(sede.id);
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        await sedesApi.remove(sede.id);
+        refresh();
       },
     });
   }
@@ -138,43 +124,38 @@ export function SedesPage() {
       <ModuleHeader
         title="Sedes"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "sede" : "sedes"}
-                count={counts.all}
-                active={chip === "todos"}
-                onClick={() => setChip("todos")}
-                tone="neutral"
-                title="Mostrar todas las sedes"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activa" : "activas"}
-                count={counts.active}
-                active={chip === "activos"}
-                onClick={() => setChip("activos")}
-                tone="emerald"
-                dot
-                title="Filtrar por sedes activas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactiva" : "inactivas"}
-                count={counts.inactive}
-                active={chip === "inactivos"}
-                onClick={() => setChip("inactivos")}
-                tone="red"
-                dot
-                title="Filtrar por sedes inactivas"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando catálogo de sedes…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando catálogo de sedes…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "sede" : "sedes"}
+                  count={counts.all}
+                  active={chip === "todos"}
+                  onClick={() => setChip("todos")}
+                  tone="neutral"
+                  title="Mostrar todas las sedes"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activa" : "activas"}
+                  count={counts.active}
+                  active={chip === "activos"}
+                  onClick={() => setChip("activos")}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por sedes activas"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactiva" : "inactivas"}
+                  count={counts.inactive}
+                  active={chip === "inactivos"}
+                  onClick={() => setChip("inactivos")}
+                  tone="red"
+                  dot
+                  title="Filtrar por sedes inactivas"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -222,17 +203,14 @@ export function SedesPage() {
             </div>
           }
           footer={
-            data && data.total > 0 && (
-              <Pagination
-                page={page}
-                pageSize={pageSize}
-                total={data.total}
-                totalPages={data.totalPages}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                noun="sedes"
-              />
-            )
+            <ListPagination
+              data={data}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="sedes"
+            />
           }
         >
           {data === undefined ? (
@@ -292,29 +270,14 @@ export function SedesPage() {
                     {/* 5. ACCIONES */}
                     {canWrite && (
                       <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar ${sede.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(sede)}
-                            disabled={busyId === sede.id}
-                          />
-                          <RowAction
-                            label={sede.isActive ? `Desactivar ${sede.name}` : `Reactivar ${sede.name}`}
-                            icon={Power}
-                            onClick={() => askToggle(sede)}
-                            disabled={busyId === sede.id}
-                          />
-                          {sede.departmentCount === 0 && (
-                            <RowAction
-                              label={`Eliminar ${sede.name}`}
-                              icon={Trash2}
-                              danger
-                              onClick={() => askDelete(sede)}
-                              disabled={busyId === sede.id}
-                            />
-                          )}
-                        </div>
+                        <CatalogRowActions
+                          name={sede.name}
+                          isActive={sede.isActive}
+                          busy={busyId === sede.id}
+                          onEdit={() => setModal(sede)}
+                          onToggle={() => askToggle(sede)}
+                          onDelete={sede.departmentCount === 0 ? () => askDelete(sede) : undefined}
+                        />
                       </Td>
                     )}
                   </Row>
@@ -333,7 +296,7 @@ export function SedesPage() {
         />
       )}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </div>
   );
 }

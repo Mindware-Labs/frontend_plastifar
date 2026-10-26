@@ -2,27 +2,28 @@ import { CheckCircle2, Pencil, Plug, Plus, Power, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Pagination } from "../../components/ui/Pagination";
-import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { DepartmentResponse } from "../../types/api";
 import { providerLabel, type Mailbox } from "../../types/settings";
 import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass, useReferenceData } from "./catalogState";
+import { freshCopy, useReferenceData } from "./catalogState";
 import { MailboxModal } from "./MailboxModal";
 import { departmentPath } from "../../lib/departments";
 
@@ -58,14 +59,12 @@ export function MailboxesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Mailbox>();
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
   const [pageSize, setPageSize] = useState(10);
 
-  const [modal, setModal] = useState<"nuevo" | Mailbox | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [testingId, setTestingId] = useState<number | null>(null);
   const [testResult, setTestResult] = useState<{ id: number; result: TestResult } | null>(null);
 
@@ -117,7 +116,7 @@ export function MailboxesSection() {
   }, [testResult]);
 
   function askToggle(mailbox: Mailbox) {
-    setConfirmation({
+    confirm(mailbox.id, {
       tone: "warn",
       icon: Power,
       title: mailbox.isActive ? "Desactivar buzón" : "Reactivar buzón",
@@ -134,27 +133,22 @@ export function MailboxesSection() {
       ),
       confirmLabel: mailbox.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(mailbox.id);
         setTestResult(null);
-        try {
-          const current = await freshCopy(settingsApi.mailboxes.get, mailbox);
-          // La referencia al secreto solo baja a quien puede escribir. Sin ella
-          // el PUT la borraria: mejor detenerse y decirlo.
-          if (current.secretRef === null) {
-            throw new Error("No se pudo leer la referencia al secreto de este buzón.");
-          }
-          await settingsApi.mailboxes.update(current.id, {
-            address: current.address,
-            displayName: current.displayName,
-            provider: current.provider,
-            departmentId: current.departmentId,
-            secretRef: current.secretRef,
-            isActive: !current.isActive,
-          });
-          refresh();
-        } finally {
-          setBusyId(null);
+        const current = await freshCopy(settingsApi.mailboxes.get, mailbox);
+        // La referencia al secreto solo baja a quien puede escribir. Sin ella
+        // el PUT la borraria: mejor detenerse y decirlo.
+        if (current.secretRef === null) {
+          throw new Error("No se pudo leer la referencia al secreto de este buzón.");
         }
+        await settingsApi.mailboxes.update(current.id, {
+          address: current.address,
+          displayName: current.displayName,
+          provider: current.provider,
+          departmentId: current.departmentId,
+          secretRef: current.secretRef,
+          isActive: !current.isActive,
+        });
+        refresh();
       },
     });
   }
@@ -180,43 +174,38 @@ export function MailboxesSection() {
       <ModuleHeader
         title="Buzones"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "buzón" : "buzones"}
-                count={counts.all}
-                active={chip === "todos"}
-                onClick={() => changeCriteria(() => { setChip("todos"); setPage(1); })}
-                tone="neutral"
-                title="Mostrar todos los buzones"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={chip === "activos"}
-                onClick={() => changeCriteria(() => { setChip("activos"); setPage(1); })}
-                tone="emerald"
-                dot
-                title="Filtrar por buzones activos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                count={counts.inactive}
-                active={chip === "inactivos"}
-                onClick={() => changeCriteria(() => { setChip("inactivos"); setPage(1); })}
-                tone="red"
-                dot
-                title="Filtrar por buzones inactivos"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando los buzones configurados…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando los buzones configurados…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "buzón" : "buzones"}
+                  count={counts.all}
+                  active={chip === "todos"}
+                  onClick={() => changeCriteria(() => { setChip("todos"); setPage(1); })}
+                  tone="neutral"
+                  title="Mostrar todos los buzones"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={chip === "activos"}
+                  onClick={() => changeCriteria(() => { setChip("activos"); setPage(1); })}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por buzones activos"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                  count={counts.inactive}
+                  active={chip === "inactivos"}
+                  onClick={() => changeCriteria(() => { setChip("inactivos"); setPage(1); })}
+                  tone="red"
+                  dot
+                  title="Filtrar por buzones inactivos"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -267,114 +256,111 @@ export function MailboxesSection() {
           </>
         }
         footer={
-          data !== null &&
-          data.total > 0 && (
-            <Pagination
-              page={page}
-              pageSize={pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={(next) => changeCriteria(() => setPage(next))}
-              onPageSizeChange={(size) => changeCriteria(() => setPageSize(size))}
-              noun="buzones"
-            />
-          )
+          <ListPagination
+            data={data}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={(next) => changeCriteria(() => setPage(next))}
+            onPageSizeChange={(size) => changeCriteria(() => setPageSize(size))}
+            noun="buzones"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={6} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={6}
+          empty={
+            isFiltering
               ? "Ningún buzón coincide con este filtro o búsqueda."
-              : "Todavía no hay ningún buzón configurado."}
-          </p>
-        ) : (
-          <div className={staleClass(isStale)}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Buzón</Th>
-                  <Th>Proveedor</Th>
-                  <Th>Departamento</Th>
-                  <Th>Última sincronización</Th>
-                  <Th>Estado</Th>
-                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
+              : "Todavía no hay ningún buzón configurado."
+          }
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Buzón</Th>
+                <Th>Proveedor</Th>
+                <Th>Departamento</Th>
+                <Th>Última sincronización</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-              <tbody>
-                {rows.map((mailbox) => (
-                  <Row key={mailbox.id} busy={busyId === mailbox.id}>
-                    <Td>
-                      <span className="flex flex-col gap-0.5">
-                        <span className="text-[12.5px] font-medium leading-tight text-ink">
-                          {mailbox.displayName}
-                        </span>
-                        <span className="text-[11px] leading-tight text-faint">{mailbox.address}</span>
+            <tbody>
+              {rows.map((mailbox) => (
+                <Row key={mailbox.id} busy={busyId === mailbox.id}>
+                  <Td>
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-[12.5px] font-medium leading-tight text-ink">
+                        {mailbox.displayName}
                       </span>
-                    </Td>
-                    <Td>
-                      <Badge>{providerLabel(mailbox.provider)}</Badge>
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      {departmentName(mailbox.departmentId)}
-                    </Td>
-                    <Td className="text-[12.5px] tabular-nums text-brand-gray">
-                      {mailbox.lastSyncedAt ? (
-                        syncFormat.format(new Date(mailbox.lastSyncedAt))
-                      ) : (
-                        <span className="text-faint">Nunca</span>
-                      )}
-                    </Td>
-                    <Td>
-                      <StatusDot active={mailbox.isActive} />
-                    </Td>
-                    {canWrite && (
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Probar conexión de ${mailbox.displayName}`}
-                            icon={
-                              testingId === mailbox.id
-                                ? TestingRing
-                                : testResult?.id === mailbox.id
-                                  ? testResult.result.ok
-                                    ? CheckCircle2
-                                    : XCircle
-                                  : Plug
-                            }
-                            onClick={() => handleTest(mailbox)}
-                            disabled={testingId === mailbox.id || busyId === mailbox.id}
-                          />
-                          <RowAction
-                            label={`Editar ${mailbox.displayName}`}
-                            icon={Pencil}
-                            onClick={() => {
-                              setTestResult(null);
-                              setModal(mailbox);
-                            }}
-                            disabled={busyId === mailbox.id}
-                          />
-                          <RowAction
-                            label={
-                              mailbox.isActive
-                                ? `Desactivar ${mailbox.displayName}`
-                                : `Reactivar ${mailbox.displayName}`
-                            }
-                            icon={Power}
-                            onClick={() => askToggle(mailbox)}
-                            disabled={busyId === mailbox.id}
-                          />
-                        </div>
-                      </Td>
+                      <span className="text-[11px] leading-tight text-faint">{mailbox.address}</span>
+                    </span>
+                  </Td>
+                  <Td>
+                    <Badge>{providerLabel(mailbox.provider)}</Badge>
+                  </Td>
+                  <Td className="text-[12.5px] text-brand-gray">
+                    {departmentName(mailbox.departmentId)}
+                  </Td>
+                  <Td className="text-[12.5px] tabular-nums text-brand-gray">
+                    {mailbox.lastSyncedAt ? (
+                      syncFormat.format(new Date(mailbox.lastSyncedAt))
+                    ) : (
+                      <span className="text-faint">Nunca</span>
                     )}
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+                  </Td>
+                  <Td>
+                    <StatusDot active={mailbox.isActive} />
+                  </Td>
+                  {canWrite && (
+                    <Td>
+                      <div className="flex items-center justify-end gap-1">
+                        <RowAction
+                          label={`Probar conexión de ${mailbox.displayName}`}
+                          icon={
+                            testingId === mailbox.id
+                              ? TestingRing
+                              : testResult?.id === mailbox.id
+                                ? testResult.result.ok
+                                  ? CheckCircle2
+                                  : XCircle
+                                : Plug
+                          }
+                          onClick={() => handleTest(mailbox)}
+                          disabled={testingId === mailbox.id || busyId === mailbox.id}
+                        />
+                        <RowAction
+                          label={`Editar ${mailbox.displayName}`}
+                          icon={Pencil}
+                          onClick={() => {
+                            setTestResult(null);
+                            setModal(mailbox);
+                          }}
+                          disabled={busyId === mailbox.id}
+                        />
+                        <RowAction
+                          label={
+                            mailbox.isActive
+                              ? `Desactivar ${mailbox.displayName}`
+                              : `Reactivar ${mailbox.displayName}`
+                          }
+                          icon={Power}
+                          onClick={() => askToggle(mailbox)}
+                          disabled={busyId === mailbox.id}
+                        />
+                      </div>
+                    </Td>
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {modal !== null && (
@@ -386,7 +372,7 @@ export function MailboxesSection() {
         />
       )}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </>
   );
 }

@@ -23,6 +23,7 @@ import {
   type ActionPlanListResponse,
   type PlanItemCounts,
 } from "../../api/quality";
+import { DetailLoadError } from "../../components/app/DetailLoadError";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -184,10 +185,9 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     // La ficha conserva sus pestanas: perder el armazon del registro deja a la
     // persona sin saber donde esta, y el aviso trae la salida.
     return (
-      <div>
-        <ModuleHeader title="HCA" sections={sections} />
-        <ErrorRetry onRetry={retry}>{error}</ErrorRetry>
-      </div>
+      <DetailLoadError title="HCA" sections={sections} onRetry={retry}>
+        {error}
+      </DetailLoadError>
     );
   }
 

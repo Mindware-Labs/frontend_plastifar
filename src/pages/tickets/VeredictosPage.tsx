@@ -1,11 +1,10 @@
 import { Ban, CheckCircle2, Gavel, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
-import { ApiError } from "../../api/client";
 import { ticketVerdictsApi, type TicketVerdictQuery } from "../../api/ticketVerdicts";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -14,9 +13,12 @@ import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { useRowRun } from "../../hooks/useRowRun";
 import { formatDateTime } from "../../lib/format";
+import { staleClass } from "../../lib/listState";
 import type { TicketVerdictListResponse, TicketVerdictResponse } from "../../types/api";
 import { VeredictoModal } from "./VeredictoModal";
 
@@ -27,13 +29,10 @@ export function VeredictosPage() {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
 
-  const [actionError, setActionError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("todos");
   const [pageSize, setPageSize] = useState(10);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
-  const [modal, setModal] = useState<"nuevo" | TicketVerdictResponse | null>(null);
+  const { modal, setModal, busyId, setBusyId, ask, dialog } = useCatalogActions<TicketVerdictResponse>();
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
 
@@ -49,23 +48,11 @@ export function VeredictosPage() {
   const rows = data?.items ?? [];
   const counts = data?.counts;
 
-  async function run(id: number, action: () => Promise<unknown>) {
-    setBusyId(id);
-    setActionError(null);
-    try {
-      await action();
-      // Relee la página: totales y contadores los manda el servidor, no se adivinan aquí.
-      refresh();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "No se pudo completar la acción");
-    } finally {
-      setBusyId(null);
-    }
-  }
+  const { actionError, run } = useRowRun(setBusyId, refresh);
 
   function askToggleActive(verdict: TicketVerdictResponse) {
     if (verdict.isActive) {
-      setConfirmation({
+      ask({
         tone: "danger",
         icon: Ban,
         eyebrow: "Tickets · Veredictos",
@@ -86,7 +73,7 @@ export function VeredictosPage() {
   }
 
   function askDelete(verdict: TicketVerdictResponse) {
-    setConfirmation({
+    ask({
       tone: "danger",
       icon: Trash2,
       eyebrow: "Tickets · Veredictos",
@@ -107,52 +94,47 @@ export function VeredictosPage() {
       <ModuleHeader
         title="Veredictos"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "veredicto" : "veredictos"}
-                count={counts.all}
-                active={status === "todos"}
-                onClick={() => {
-                  setStatus("todos");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todos los veredictos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={status === "activos"}
-                onClick={() => {
-                  setStatus("activos");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por veredictos activos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                count={counts.inactive}
-                active={status === "inactivos"}
-                onClick={() => {
-                  setStatus("inactivos");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por veredictos inactivos"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando los veredictos…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando los veredictos…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "veredicto" : "veredictos"}
+                  count={counts.all}
+                  active={status === "todos"}
+                  onClick={() => {
+                    setStatus("todos");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todos los veredictos"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={status === "activos"}
+                  onClick={() => {
+                    setStatus("activos");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por veredictos activos"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                  count={counts.inactive}
+                  active={status === "inactivos"}
+                  onClick={() => {
+                    setStatus("inactivos");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por veredictos inactivos"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           isAdmin && (
@@ -199,7 +181,7 @@ export function VeredictosPage() {
           </div>
         ) : (
           // Atenuada mientras llega la página nueva: la anterior se queda para no dar un salto en blanco.
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className={staleClass(isStale)}>
             <DataTable>
               <thead>
                 <HeadRow>
@@ -276,7 +258,7 @@ export function VeredictosPage() {
         )}
       </div>
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
 
       {modal !== null && (
         <VeredictoModal

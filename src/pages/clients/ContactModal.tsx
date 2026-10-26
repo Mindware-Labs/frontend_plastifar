@@ -5,12 +5,12 @@ import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
 import { formatPhoneNumber } from "../../lib/format";
+import { fieldForServerError, type FieldRule } from "../../lib/serverFieldErrors";
 import type { Contact } from "../../types/clients";
-import { fieldForServerError, type FieldRule } from "./serverFieldErrors";
 
 /**
  * Espejo de la validacion del servidor en POST/PUT /api/clients/{id}/contacts:
@@ -52,7 +52,7 @@ type FormValues = z.infer<typeof schema>;
 /**
  * A que campo pertenece cada 400 o 409 de ContactsController. «apellido» va
  * antes que «nombre» porque el mensaje del apellido tambien lleva la palabra
- * nombre en algunas redacciones. Ver ./serverFieldErrors por que se hace asi.
+ * nombre en algunas redacciones. Ver lib/serverFieldErrors por que se hace asi.
  */
 const fieldRules: FieldRule<keyof FormValues>[] = [
   { field: "email", matches: ["correo"] },
@@ -142,14 +142,13 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
       description="La persona dentro del cliente con la que se coordina cada ticket."
       onClose={onClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="contact-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Agregar contacto"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="contact-form"
+          isEdit={isEdit}
+          createLabel="Agregar contacto"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form

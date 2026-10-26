@@ -18,6 +18,7 @@ import { Board, KpiRow, PeriodTabs, RefreshButton, type KpiItem } from "./board"
 import { CategoryBars, HealthGauge, SeriesLegend, TrendArea } from "./boardCharts";
 import { TerritoriesTable } from "./TerritoriesTable";
 import { formatDecimal, formatInteger, formatPercent } from "./format";
+import { localIso } from "../reports/useDateRange";
 
 /**
  * Tablero del panel.
@@ -61,15 +62,12 @@ const PERIODS = [
 
 type PeriodKey = (typeof PERIODS)[number]["key"];
 
-const iso = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
 function periodRange(months: number) {
   const to = new Date();
   const from = new Date(to);
   from.setMonth(from.getMonth() - (months - 1));
   from.setDate(1);
-  return { from: iso(from), to: iso(to) };
+  return { from: localIso(from), to: localIso(to) };
 }
 
 /**
@@ -89,7 +87,7 @@ function previousRange(months: number) {
   const from = new Date(to);
   from.setMonth(from.getMonth() - (months - 1));
   from.setDate(1);
-  return { from: iso(from), to: iso(to) };
+  return { from: localIso(from), to: localIso(to) };
 }
 
 /**

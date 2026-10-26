@@ -1,25 +1,26 @@
 import { Globe, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { PLANT_COUNTRIES, type Plant, type PlantCountry } from "../../types/settings";
 import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass } from "./catalogState";
+import { freshCopy } from "./catalogState";
 import { PlantModal } from "./PlantModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
@@ -32,7 +33,7 @@ export function PlantsSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Plant, "nueva">();
 
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState<PlantCountry | "todos">("todos");
@@ -41,9 +42,6 @@ export function PlantsSection() {
   // desactivado, para corregirlas. Es un filtro aparte del estado.
   const [onlyWithoutManager, setOnlyWithoutManager] = useState(false);
   const [pageSize, setPageSize] = useState(10);
-
-  const [modal, setModal] = useState<"nueva" | Plant | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -69,7 +67,7 @@ export function PlantsSection() {
   /* El servidor es quien sabe si algun equipo o producto la usa: su 409 sube al
      dialogo con el motivo, y la salida que ofrece es desactivarla. */
   function askDelete(plant: Plant) {
-    setConfirmation({
+    confirm(plant.id, {
       tone: "danger",
       icon: Trash2,
       title: "Eliminar planta",
@@ -82,19 +80,14 @@ export function PlantsSection() {
       ),
       confirmLabel: "Eliminar",
       onConfirm: async () => {
-        setBusyId(plant.id);
-        try {
-          await settingsApi.plants.remove(plant.id);
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        await settingsApi.plants.remove(plant.id);
+        refresh();
       },
     });
   }
 
   function askToggle(plant: Plant) {
-    setConfirmation({
+    confirm(plant.id, {
       tone: "warn",
       icon: Power,
       title: plant.isActive ? "Desactivar planta" : "Reactivar planta",
@@ -110,19 +103,14 @@ export function PlantsSection() {
       ),
       confirmLabel: plant.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(plant.id);
-        try {
-          const current = await freshCopy(settingsApi.plants.get, plant);
-          await settingsApi.plants.update(current.id, {
-            name: current.name,
-            country: current.country,
-            managerStaffId: current.managerStaffId,
-            isActive: !current.isActive,
-          });
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        const current = await freshCopy(settingsApi.plants.get, plant);
+        await settingsApi.plants.update(current.id, {
+          name: current.name,
+          country: current.country,
+          managerStaffId: current.managerStaffId,
+          isActive: !current.isActive,
+        });
+        refresh();
       },
     });
   }
@@ -132,66 +120,60 @@ export function PlantsSection() {
       <ModuleHeader
         title="Plantas"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "planta" : "plantas"}
-                count={counts.all}
-                active={chip === "todas" && !onlyWithoutManager}
-                onClick={() => {
-                  setChip("todas");
-                  setOnlyWithoutManager(false);
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todas las plantas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activa" : "activas"}
-                count={counts.active}
-                active={chip === "activas"}
-                onClick={() => {
-                  setChip("activas");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por plantas activas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactiva" : "inactivas"}
-                count={counts.inactive}
-                active={chip === "inactivas"}
-                onClick={() => {
-                  setChip("inactivas");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por plantas inactivas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="sin administrador"
-                count={counts.withoutActiveManager}
-                active={onlyWithoutManager}
-                onClick={() => {
-                  setOnlyWithoutManager((current) => !current);
-                  setPage(1);
-                }}
-                tone="amber"
-                dot
-                title="Filtrar por plantas sin administrador activo"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando las plantas configuradas…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando las plantas configuradas…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "planta" : "plantas"}
+                  count={counts.all}
+                  active={chip === "todas" && !onlyWithoutManager}
+                  onClick={() => {
+                    setChip("todas");
+                    setOnlyWithoutManager(false);
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todas las plantas"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activa" : "activas"}
+                  count={counts.active}
+                  active={chip === "activas"}
+                  onClick={() => {
+                    setChip("activas");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por plantas activas"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactiva" : "inactivas"}
+                  count={counts.inactive}
+                  active={chip === "inactivas"}
+                  onClick={() => {
+                    setChip("inactivas");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por plantas inactivas"
+                />
+                <HeaderTag
+                  label="sin administrador"
+                  count={counts.withoutActiveManager}
+                  active={onlyWithoutManager}
+                  onClick={() => {
+                    setOnlyWithoutManager((current) => !current);
+                    setPage(1);
+                  }}
+                  tone="amber"
+                  dot
+                  title="Filtrar por plantas sin administrador activo"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -235,92 +217,89 @@ export function PlantsSection() {
           </>
         }
         footer={
-          data !== null &&
-          data.total > 0 && (
-            <Pagination
-              page={page}
-              pageSize={pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="plantas"
-            />
-          )
+          <ListPagination
+            data={data}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="plantas"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={4} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={4}
+          empty={
+            isFiltering
               ? "Ninguna planta coincide con este filtro o búsqueda."
-              : "Todavía no hay ninguna planta registrada."}
-          </p>
-        ) : (
-          <div className={staleClass(isStale)}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Planta</Th>
-                  <Th>País</Th>
-                  <Th>Administrador</Th>
-                  <Th>Estado</Th>
-                  {canWrite && <Th className="w-32 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
+              : "Todavía no hay ninguna planta registrada."
+          }
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Planta</Th>
+                <Th>País</Th>
+                <Th>Administrador</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-32 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-              <tbody>
-                {rows.map((plant) => (
-                  <Row key={plant.id} busy={busyId === plant.id}>
-                    <Td className="text-[12.5px] font-medium text-ink">{plant.name}</Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      {COUNTRY_LABEL[plant.country] ?? plant.country}
-                    </Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      {plant.managerName === null ? (
-                        <span className="text-faint">Sin administrador</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2">
-                          {plant.managerName}
-                          {plant.managerIsActive === false && <Badge tone="neutral">Inactivo</Badge>}
-                        </span>
-                      )}
-                    </Td>
-                    <Td>
-                      <StatusDot active={plant.isActive} />
-                    </Td>
-                    {canWrite && (
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar ${plant.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(plant)}
-                            disabled={busyId === plant.id}
-                          />
-                          <RowAction
-                            label={plant.isActive ? `Desactivar ${plant.name}` : `Reactivar ${plant.name}`}
-                            icon={Power}
-                            onClick={() => askToggle(plant)}
-                            disabled={busyId === plant.id}
-                          />
-                          <RowAction
-                            label={`Eliminar ${plant.name}`}
-                            icon={Trash2}
-                            danger
-                            onClick={() => askDelete(plant)}
-                            disabled={busyId === plant.id}
-                          />
-                        </div>
-                      </Td>
+            <tbody>
+              {rows.map((plant) => (
+                <Row key={plant.id} busy={busyId === plant.id}>
+                  <Td className="text-[12.5px] font-medium text-ink">{plant.name}</Td>
+                  <Td className="text-[12.5px] text-subtle">
+                    {COUNTRY_LABEL[plant.country] ?? plant.country}
+                  </Td>
+                  <Td className="text-[12.5px] text-subtle">
+                    {plant.managerName === null ? (
+                      <span className="text-faint">Sin administrador</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        {plant.managerName}
+                        {plant.managerIsActive === false && <Badge tone="neutral">Inactivo</Badge>}
+                      </span>
                     )}
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+                  </Td>
+                  <Td>
+                    <StatusDot active={plant.isActive} />
+                  </Td>
+                  {canWrite && (
+                    <Td>
+                      <div className="flex items-center justify-end gap-1">
+                        <RowAction
+                          label={`Editar ${plant.name}`}
+                          icon={Pencil}
+                          onClick={() => setModal(plant)}
+                          disabled={busyId === plant.id}
+                        />
+                        <RowAction
+                          label={plant.isActive ? `Desactivar ${plant.name}` : `Reactivar ${plant.name}`}
+                          icon={Power}
+                          onClick={() => askToggle(plant)}
+                          disabled={busyId === plant.id}
+                        />
+                        <RowAction
+                          label={`Eliminar ${plant.name}`}
+                          icon={Trash2}
+                          danger
+                          onClick={() => askDelete(plant)}
+                          disabled={busyId === plant.id}
+                        />
+                      </div>
+                    </Td>
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {modal !== null && (
@@ -331,7 +310,7 @@ export function PlantsSection() {
         />
       )}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </>
   );
 }

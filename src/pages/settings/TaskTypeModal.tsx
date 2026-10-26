@@ -3,15 +3,15 @@ import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, LookupField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { departmentPaths } from "../../lib/departments";
+import { applyServerError } from "../../lib/formErrors";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import type { DepartmentResponse } from "../../types/api";
 import { REQUIRED_FORMS, type RequiredForm, type TaskType } from "../../types/settings";
@@ -107,11 +107,14 @@ export function TaskTypeModal({ taskType, onClose, onSaved }: TaskTypeModalProps
       onSaved(saved);
       onClose();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setError("name", { message: err.message });
-        return;
-      }
-      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar el tipo de tarea");
+      setFormError(
+        applyServerError(err, {
+          setError,
+          rules: [{ field: "name" }],
+          statuses: [409],
+          fallback: "No se pudo guardar el tipo de tarea",
+        }),
+      );
     }
   }
 
@@ -122,14 +125,13 @@ export function TaskTypeModal({ taskType, onClose, onSaved }: TaskTypeModalProps
       onClose={onClose}
       maxWidth="max-w-2xl"
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="task-type-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear tipo"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="task-type-form"
+          isEdit={isEdit}
+          createLabel="Crear tipo"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form id="task-type-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">

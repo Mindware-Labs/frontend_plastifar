@@ -13,13 +13,12 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { ticketTopicsApi, type TicketTopicQuery } from "../../api/ticketTopics";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
@@ -27,18 +26,21 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/useAuth";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { useRowRun } from "../../hooks/useRowRun";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
+import { staleClass } from "../../lib/listState";
 import type {
   DepartmentResponse,
   TicketTopicListResponse,
   TicketTopicResponse,
 } from "../../types/api";
 import { MotivoModal } from "./MotivoModal";
-import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
+import { FilterDropdown, type FilterOption } from "../../components/ui/FilterDropdown";
 
 type StatusFilter = "todos" | "activos" | "inactivos";
 
@@ -58,13 +60,10 @@ export function MotivosPage() {
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
   const [priority, setPriority] = useState<string>("todas");
-  const [actionError, setActionError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("todos");
   const [pageSize, setPageSize] = useState(10);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
-  const [modal, setModal] = useState<"nuevo" | TicketTopicResponse | null>(null);
+  const { modal, setModal, busyId, setBusyId, ask, dialog } = useCatalogActions<TicketTopicResponse>();
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
 
@@ -90,23 +89,11 @@ export function MotivosPage() {
   const rows = data?.items ?? [];
   const counts = data?.counts;
 
-  async function run(id: number, action: () => Promise<unknown>) {
-    setBusyId(id);
-    setActionError(null);
-    try {
-      await action();
-      // Relee la página: totales y contadores los manda el servidor, no se adivinan aquí.
-      refresh();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "No se pudo completar la acción");
-    } finally {
-      setBusyId(null);
-    }
-  }
+  const { actionError, run } = useRowRun(setBusyId, refresh);
 
   function askToggleActive(topic: TicketTopicResponse) {
     if (topic.isActive) {
-      setConfirmation({
+      ask({
         tone: "danger",
         icon: Ban,
         eyebrow: "Tickets · Motivos",
@@ -127,7 +114,7 @@ export function MotivosPage() {
   }
 
   function askDelete(topic: TicketTopicResponse) {
-    setConfirmation({
+    ask({
       tone: "danger",
       icon: Trash2,
       eyebrow: "Tickets · Motivos",
@@ -147,7 +134,7 @@ export function MotivosPage() {
   // El camino, no el nombre: dos departamentos pueden llamarse igual.
   const departmentPathById = departmentPaths(departments);
 
-  const priorityFilterOptions: TicketFilterOption[] = [
+  const priorityFilterOptions: FilterOption[] = [
     {
       value: "todas",
       label: "Todas las prioridades",
@@ -180,52 +167,47 @@ export function MotivosPage() {
       <ModuleHeader
         title="Motivos"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "motivo" : "motivos"}
-                count={counts.all}
-                active={status === "todos"}
-                onClick={() => {
-                  setStatus("todos");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todos los motivos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={status === "activos"}
-                onClick={() => {
-                  setStatus("activos");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por motivos activos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                count={counts.inactive}
-                active={status === "inactivos"}
-                onClick={() => {
-                  setStatus("inactivos");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por motivos inactivos"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando los motivos…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando los motivos…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "motivo" : "motivos"}
+                  count={counts.all}
+                  active={status === "todos"}
+                  onClick={() => {
+                    setStatus("todos");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todos los motivos"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={status === "activos"}
+                  onClick={() => {
+                    setStatus("activos");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por motivos activos"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                  count={counts.inactive}
+                  active={status === "inactivos"}
+                  onClick={() => {
+                    setStatus("inactivos");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por motivos inactivos"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           isAdmin && (
@@ -246,7 +228,7 @@ export function MotivosPage() {
               placeholder="Buscar por motivo o departamento…"
               className="w-[280px]"
             />
-            <TicketFilterDropdown
+            <FilterDropdown
               title="Seleccionar departamento"
               value={String(departmentId)}
               onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
@@ -254,7 +236,7 @@ export function MotivosPage() {
               defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
               aria-label="Filtrar por departamento"
             />
-            <TicketFilterDropdown
+            <FilterDropdown
               title="Seleccionar prioridad"
               value={priority}
               onChange={setPriority}
@@ -293,7 +275,7 @@ export function MotivosPage() {
           </div>
         ) : (
           // Atenuada mientras llega la página nueva: la anterior se queda para no dar un salto en blanco.
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className={staleClass(isStale)}>
             <DataTable>
               <thead>
                 <HeadRow>
@@ -404,7 +386,7 @@ export function MotivosPage() {
         )}
       </div>
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
 
       {modal !== null && (
         <MotivoModal

@@ -6,11 +6,12 @@ import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { territoriesApi } from "../../api/territories";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { Territory } from "../../types/clients";
+import { FormDivider } from "../../components/ui/FormDivider";
 
 /**
  * Espejo de la validación del servidor en POST/PUT /api/territories: código
@@ -37,17 +38,6 @@ interface TerritoryModalProps {
   territory?: Territory;
   onClose: () => void;
   onSaved: (territory: Territory) => void;
-}
-
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-1 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-zinc-100" />
-    </div>
-  );
 }
 
 export function TerritoryModal({ territory, onClose, onSaved }: TerritoryModalProps) {
@@ -129,26 +119,13 @@ export function TerritoryModal({ territory, onClose, onSaved }: TerritoryModalPr
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" form="territory-form" size="sm" isLoading={isSubmitting}>
-              {isEdit ? "Guardar cambios" : "Crear territorio"}
-            </Button>
-          </div>
-        </div>
+        <ShortcutModalFooter
+          formId="territory-form"
+          isEdit={isEdit}
+          createLabel="Crear territorio"
+          isSubmitting={isSubmitting}
+          onCancel={requestClose}
+        />
       }
     >
       <form
@@ -160,7 +137,7 @@ export function TerritoryModal({ territory, onClose, onSaved }: TerritoryModalPr
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <FormDivider title="Información de la zona" />
+        <FormDivider title="Información de la zona" tight />
 
         <TextField
           size="sm"
@@ -190,7 +167,7 @@ export function TerritoryModal({ territory, onClose, onSaved }: TerritoryModalPr
 
         {isEdit && (
           <>
-            <FormDivider title="Estado" />
+            <FormDivider title="Estado" tight />
 
             <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-2.5">
               <CheckboxField

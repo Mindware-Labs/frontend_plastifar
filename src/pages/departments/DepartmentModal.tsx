@@ -3,13 +3,11 @@ import { Lock, Users } from "lucide-react";
 import React, { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { fetchAllPages } from "../../api/paging";
 import { rolesApi } from "../../api/roles";
 import { sedesApi } from "../../api/sedes";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import {
   CheckboxField,
   LookupField,
@@ -18,11 +16,14 @@ import {
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { applyServerError, type ServerErrorRule } from "../../lib/formErrors";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import type { DepartmentResponse, RoleResponse } from "../../types/api";
 import type { Sede } from "../../types/sedes";
 import { useReferenceData } from "../settings/catalogState";
+import { FormDivider } from "../../components/ui/FormDivider";
 
 const schema = z.object({
   name: z.string().trim().min(2, "Al menos 2 caracteres").max(60, "Máximo 60 caracteres"),
@@ -38,7 +39,7 @@ type FormValues = z.infer<typeof schema>;
 const SIN_SEDE = "";
 const NINGUNO = "";
 
-const CAMPO_POR_MENSAJE: { field: keyof FormValues; startsWith: string }[] = [
+const CAMPO_POR_MENSAJE: ServerErrorRule<keyof FormValues>[] = [
   { field: "name", startsWith: "el nombre debe" },
   { field: "name", startsWith: "ya existe un departamento" },
   { field: "type", startsWith: "el tipo debe" },
@@ -46,17 +47,6 @@ const CAMPO_POR_MENSAJE: { field: keyof FormValues; startsWith: string }[] = [
   { field: "defaultRoleId", startsWith: "el rol no existe" },
   { field: "managerStaffId", startsWith: "el responsable no existe" },
 ];
-
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-1 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-zinc-100" />
-    </div>
-  );
-}
 
 interface DepartmentModalProps {
   department?: DepartmentResponse;
@@ -173,20 +163,15 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
       onSaved();
       requestClose();
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 409 || err.status === 400)) {
-        const mensaje = err.message.trim().toLowerCase();
-        const campo = CAMPO_POR_MENSAJE.find(({ startsWith }) =>
-          mensaje.startsWith(startsWith),
-        )?.field;
-        if (campo) {
-          setError(campo, { message: err.message });
-          if (campo === "name") setFocus("name");
-        } else {
-          setFormError(err.message);
-        }
-        return;
-      }
-      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar el departamento");
+      setFormError(
+        applyServerError(err, {
+          setError,
+          setFocus,
+          rules: CAMPO_POR_MENSAJE,
+          focusable: ["name"],
+          fallback: "No se pudo guardar el departamento",
+        }),
+      );
     }
   }
 
@@ -204,26 +189,13 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" form="department-form" size="sm" isLoading={isSubmitting}>
-              {isEdit ? "Guardar cambios" : "Crear departamento"}
-            </Button>
-          </div>
-        </div>
+        <ShortcutModalFooter
+          formId="department-form"
+          isEdit={isEdit}
+          createLabel="Crear departamento"
+          isSubmitting={isSubmitting}
+          onCancel={requestClose}
+        />
       }
     >
       <form
@@ -236,7 +208,7 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
         {formError && <Alert variant="error">{formError}</Alert>}
 
         {/* 1. GENERAL */}
-        <FormDivider title="General" />
+        <FormDivider title="General" tight />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <Controller
@@ -271,7 +243,7 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
         </div>
 
         {/* 2. CONFIGURACIÓN */}
-        <FormDivider title="Configuración" />
+        <FormDivider title="Configuración" tight />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <Controller
@@ -370,7 +342,7 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
         {/* 3. ESTADO (EN EDICIÓN) */}
         {isEdit && (
           <>
-            <FormDivider title="Estado" />
+            <FormDivider title="Estado" tight />
             <CheckboxField
               label="Departamento activo"
               {...register("isActive")}

@@ -1,15 +1,17 @@
-import { AlertTriangle, Check, CreditCard, Pencil, Printer, RotateCcw, ShieldAlert, ShieldCheck, ThumbsDown, ThumbsUp } from "lucide-react";
+import { CreditCard, Pencil, Printer, RotateCcw, ShieldAlert, ShieldCheck, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
+import { ConditionChecklist } from "../../components/app/ConditionChecklist";
+import { DetailLoadError } from "../../components/app/DetailLoadError";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ProductNameCode } from "../../components/app/ProductNameCode";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
-import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { PageSpinner } from "../../components/ui/PageSpinner";
 import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { Tooltip } from "../../components/ui/Tooltip";
@@ -19,11 +21,7 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { formatInstant } from "../../lib/dates";
 import { NOTIFICATION_ITEM, describeStatus } from "../../lib/discrepancies";
 import { formatQuantity } from "../../lib/numbers";
-import type {
-  DiscrepancyCompletionCondition,
-  DiscrepancyLine,
-  SecurityCheckResult,
-} from "../../types/discrepancies";
+import type { DiscrepancyLine, SecurityCheckResult } from "../../types/discrepancies";
 import { CreditRequestModal } from "../quality/CreditRequestModal";
 import { DiscrepancyDecisionModal } from "./DiscrepancyDecisionModal";
 import { DiscrepancyFormModal } from "./DiscrepancyFormModal";
@@ -80,10 +78,9 @@ export function DiscrepancyDetailPage() {
 
   if (error) {
     return (
-      <div className="max-w-[960px]">
-        <ModuleHeader title="Investigación de discrepancia" />
-        <ErrorRetry onRetry={retry}>{error}</ErrorRetry>
-      </div>
+      <DetailLoadError className="max-w-[960px]" title="Investigación de discrepancia" onRetry={retry}>
+        {error}
+      </DetailLoadError>
     );
   }
 
@@ -325,7 +322,7 @@ export function DiscrepancyDetailPage() {
             )}
             {investigating && (
               <DetailRow label="Para completar" wide>
-                <ConditionList conditions={completionConditions} />
+                <ConditionChecklist conditions={completionConditions} />
               </DetailRow>
             )}
           </DetailGroup>
@@ -350,7 +347,7 @@ export function DiscrepancyDetailPage() {
               Se sella «Realizado por» con tu nombre y la fecha de hoy. Después solo queda que quien aprueba la firme o la devuelva.
               {anyPositive && " Hay un punto positivo: se enviará el aviso automático a Seguridad y Logística, que no sustituye la notificación formal."}
               <div className="mt-3">
-                <ConditionList conditions={completionConditions} />
+                <ConditionChecklist conditions={completionConditions} />
               </div>
             </>
           }
@@ -414,8 +411,7 @@ function LinesTable({ lines, canCredit, onCredit }: { lines: DiscrepancyLine[]; 
               </span>
             </Td>
             <Td>
-              <span className="block text-[12.5px] text-ink">{line.productName}</span>
-              <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
+              <ProductNameCode name={line.productName} code={line.productCode} />
             </Td>
             <Td className="text-right tabular-nums">{line.surplusQuantity > 0 ? formatQuantity(line.surplusQuantity) : "—"}</Td>
             <Td className="text-right tabular-nums">{line.shortageQuantity > 0 ? formatQuantity(line.shortageQuantity) : "—"}</Td>
@@ -447,28 +443,5 @@ function LinesTable({ lines, canCredit, onCredit }: { lines: DiscrepancyLine[]; 
         ))}
       </tbody>
     </DataTable>
-  );
-}
-
-function ConditionList({ conditions }: { conditions: DiscrepancyCompletionCondition[] }) {
-  return (
-    <ul className="flex flex-col gap-1.5">
-      {conditions.map((condition) => (
-        <li key={condition.id} className={`flex items-start gap-2 text-[13px] leading-relaxed ${condition.met ? "text-brand-gray" : "text-warn"}`}>
-          {condition.met ? (
-            <Check aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-green" />
-          ) : (
-            <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn" />
-          )}
-          <span className="flex flex-col gap-0.5">
-            <span>
-              {condition.label}
-              <span className="sr-only">{condition.met ? ": cumplida" : ": falta"}</span>
-            </span>
-            {!condition.met && <span className="text-[12.5px]">{condition.missing}</span>}
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }

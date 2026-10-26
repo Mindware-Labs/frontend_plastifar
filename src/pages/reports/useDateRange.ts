@@ -12,7 +12,8 @@ export function todayIso(): string {
   return localIso(new Date());
 }
 
-function localIso(date: Date): string {
+/** AAAA-MM-DD a partir de los componentes locales de la fecha. */
+export function localIso(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;

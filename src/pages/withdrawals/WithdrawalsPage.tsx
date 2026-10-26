@@ -2,6 +2,7 @@ import { Building2, Plus, Tag, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { withdrawalsApi, type WithdrawalCounts, type WithdrawalListResponse, type WithdrawalQuery } from "../../api/withdrawals";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -13,10 +14,10 @@ import {
   LookupFilterDropdown,
 } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { TableSkeleton } from "../../components/ui/Skeleton";
+import { ServerPagination } from "../../components/ui/ServerPagination";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -106,90 +107,82 @@ export function WithdrawalsPage() {
       <ModuleHeader
         title="Retiros"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "solicitud" : "solicitudes"}
-                count={counts.all}
-                active={chip === "todas"}
-                onClick={() => {
-                  setChip("todas");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todas las solicitudes de retiro"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.requested === 1 ? "solicitada" : "solicitadas"}
-                count={counts.requested}
-                active={chip === "Solicitado"}
-                onClick={() => {
-                  setChip("Solicitado");
-                  setPage(1);
-                }}
-                tone="amber"
-                dot
-                title="Filtrar por solicitudes pendientes"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.approved === 1 ? "aprobada" : "aprobadas"}
-                count={counts.approved}
-                active={chip === "Aprobado"}
-                onClick={() => {
-                  setChip("Aprobado");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por solicitudes aprobadas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.withdrawn === 1 ? "retirada" : "retiradas"}
-                count={counts.withdrawn}
-                active={chip === "Retirado"}
-                onClick={() => {
-                  setChip("Retirado");
-                  setPage(1);
-                }}
-                tone="blue"
-                dot
-                title="Filtrar por mercancía retirada"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.rejected === 1 ? "rechazada" : "rechazadas"}
-                count={counts.rejected}
-                active={chip === "Rechazado"}
-                onClick={() => {
-                  setChip("Rechazado");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por solicitudes rechazadas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.cancelled === 1 ? "cancelada" : "canceladas"}
-                count={counts.cancelled}
-                active={chip === "Cancelado"}
-                onClick={() => {
-                  setChip("Cancelado");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Filtrar por solicitudes canceladas"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando las solicitudes de retiro de mercancía…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando las solicitudes de retiro de mercancía…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "solicitud" : "solicitudes"}
+                  count={counts.all}
+                  active={chip === "todas"}
+                  onClick={() => {
+                    setChip("todas");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todas las solicitudes de retiro"
+                />
+                <HeaderTag
+                  label={counts.requested === 1 ? "solicitada" : "solicitadas"}
+                  count={counts.requested}
+                  active={chip === "Solicitado"}
+                  onClick={() => {
+                    setChip("Solicitado");
+                    setPage(1);
+                  }}
+                  tone="amber"
+                  dot
+                  title="Filtrar por solicitudes pendientes"
+                />
+                <HeaderTag
+                  label={counts.approved === 1 ? "aprobada" : "aprobadas"}
+                  count={counts.approved}
+                  active={chip === "Aprobado"}
+                  onClick={() => {
+                    setChip("Aprobado");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por solicitudes aprobadas"
+                />
+                <HeaderTag
+                  label={counts.withdrawn === 1 ? "retirada" : "retiradas"}
+                  count={counts.withdrawn}
+                  active={chip === "Retirado"}
+                  onClick={() => {
+                    setChip("Retirado");
+                    setPage(1);
+                  }}
+                  tone="blue"
+                  dot
+                  title="Filtrar por mercancía retirada"
+                />
+                <HeaderTag
+                  label={counts.rejected === 1 ? "rechazada" : "rechazadas"}
+                  count={counts.rejected}
+                  active={chip === "Rechazado"}
+                  onClick={() => {
+                    setChip("Rechazado");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por solicitudes rechazadas"
+                />
+                <HeaderTag
+                  label={counts.cancelled === 1 ? "cancelada" : "canceladas"}
+                  count={counts.cancelled}
+                  active={chip === "Cancelado"}
+                  onClick={() => {
+                    setChip("Cancelado");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Filtrar por solicitudes canceladas"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -267,78 +260,73 @@ export function WithdrawalsPage() {
           </>
         }
         footer={
-          data !== null && (
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="solicitudes"
-              nounSingular="solicitud"
-            />
-          )
+          <ServerPagination
+            data={data}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="solicitudes"
+            nounSingular="solicitud"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={7} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {unfiltered ? "Todavía no hay solicitudes de retiro registradas." : "Ninguna solicitud coincide con este filtro o búsqueda."}
-          </p>
-        ) : (
-          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th sort={sortOf("numero")}>Número</Th>
-                  <Th sort={sortOf("cliente")}>Cliente</Th>
-                  <Th sort={sortOf("fecha")}>Fecha</Th>
-                  <Th>Motivo</Th>
-                  <Th>Vendedor</Th>
-                  <Th sort={sortOf("valor")} className="text-right">
-                    Valor
-                  </Th>
-                  <Th>Estado</Th>
-                </HeadRow>
-              </thead>
-              <tbody>
-                {rows.map((item) => (
-                  <Row key={item.id} className="cursor-pointer" onClick={() => navigate(`/retiros/${item.id}`)}>
-                    <Td>
-                      <Link
-                        to={`/retiros/${item.id}`}
-                        onClick={(event) => event.stopPropagation()}
-                        className="whitespace-nowrap font-mono text-[12px] font-medium text-ink hover:text-brand-red"
-                      >
-                        {item.number}
-                      </Link>
-                      <span className="block font-mono text-[11px] text-faint">{item.ticketNumber}</span>
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      <span title={item.clientName} className="block max-w-[200px] truncate">
-                        {item.clientName}
-                      </span>
-                    </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">{formatDay(item.requestDate)}</Td>
-                    <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
-                      {item.reason}
-                      {item.errorOrigin && <span className="block text-[11.5px] text-faint">Error de {item.errorOrigin.toLowerCase()}</span>}
-                    </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{item.requestedByName}</Td>
-                    <Td className="whitespace-nowrap text-right text-[12.5px] tabular-nums text-ink">
-                      {item.currency ? formatAmount(item.totalValue, item.currency) : <span className="text-faint">—</span>}
-                    </Td>
-                    <Td>
-                      <WithdrawalStatusBadge status={item.status} />
-                    </Td>
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={7}
+          empty={unfiltered ? "Todavía no hay solicitudes de retiro registradas." : "Ninguna solicitud coincide con este filtro o búsqueda."}
+          animateIn
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th sort={sortOf("numero")}>Número</Th>
+                <Th sort={sortOf("cliente")}>Cliente</Th>
+                <Th sort={sortOf("fecha")}>Fecha</Th>
+                <Th>Motivo</Th>
+                <Th>Vendedor</Th>
+                <Th sort={sortOf("valor")} className="text-right">
+                  Valor
+                </Th>
+                <Th>Estado</Th>
+              </HeadRow>
+            </thead>
+            <tbody>
+              {rows.map((item) => (
+                <Row key={item.id} className="cursor-pointer" onClick={() => navigate(`/retiros/${item.id}`)}>
+                  <Td>
+                    <Link
+                      to={`/retiros/${item.id}`}
+                      onClick={(event) => event.stopPropagation()}
+                      className="whitespace-nowrap font-mono text-[12px] font-medium text-ink hover:text-brand-red"
+                    >
+                      {item.number}
+                    </Link>
+                    <span className="block font-mono text-[11px] text-faint">{item.ticketNumber}</span>
+                  </Td>
+                  <Td className="text-[12.5px] text-brand-gray">
+                    <span title={item.clientName} className="block max-w-[200px] truncate">
+                      {item.clientName}
+                    </span>
+                  </Td>
+                  <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">{formatDay(item.requestDate)}</Td>
+                  <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
+                    {item.reason}
+                    {item.errorOrigin && <span className="block text-[11.5px] text-faint">Error de {item.errorOrigin.toLowerCase()}</span>}
+                  </Td>
+                  <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{item.requestedByName}</Td>
+                  <Td className="whitespace-nowrap text-right text-[12.5px] tabular-nums text-ink">
+                    {item.currency ? formatAmount(item.totalValue, item.currency) : <span className="text-faint">—</span>}
+                  </Td>
+                  <Td>
+                    <WithdrawalStatusBadge status={item.status} />
+                  </Td>
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {creating && (

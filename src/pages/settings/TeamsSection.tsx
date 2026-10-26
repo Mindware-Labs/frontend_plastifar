@@ -1,24 +1,25 @@
-import { Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
-import { RowAction } from "../../components/ui/RowAction";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { Team } from "../../types/settings";
+import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass } from "./catalogState";
+import { freshCopy } from "./catalogState";
 import { TeamModal } from "./TeamModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -27,7 +28,7 @@ export function TeamsSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Team>();
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
@@ -35,9 +36,6 @@ export function TeamsSection() {
   // (vacios, o con todos desactivados). Es un filtro aparte del estado.
   const [onlyWithoutMembers, setOnlyWithoutMembers] = useState(false);
   const [pageSize, setPageSize] = useState(10);
-
-  const [modal, setModal] = useState<"nuevo" | Team | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -61,7 +59,7 @@ export function TeamsSection() {
   /* El servidor es quien sabe si el equipo conserva integrantes: su 409 sube al
      dialogo con el motivo, y las salidas que ofrece son quitarlos o desactivarlo. */
   function askDelete(team: Team) {
-    setConfirmation({
+    confirm(team.id, {
       tone: "danger",
       icon: Trash2,
       title: "Eliminar equipo",
@@ -74,19 +72,14 @@ export function TeamsSection() {
       ),
       confirmLabel: "Eliminar",
       onConfirm: async () => {
-        setBusyId(team.id);
-        try {
-          await settingsApi.teams.remove(team.id);
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        await settingsApi.teams.remove(team.id);
+        refresh();
       },
     });
   }
 
   function askToggle(team: Team) {
-    setConfirmation({
+    confirm(team.id, {
       tone: "warn",
       icon: Power,
       title: team.isActive ? "Desactivar equipo" : "Reactivar equipo",
@@ -102,18 +95,13 @@ export function TeamsSection() {
       ),
       confirmLabel: team.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(team.id);
-        try {
-          const current = await freshCopy(settingsApi.teams.get, team);
-          await settingsApi.teams.update(current.id, {
-            name: current.name,
-            plantId: current.plantId,
-            isActive: !current.isActive,
-          });
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        const current = await freshCopy(settingsApi.teams.get, team);
+        await settingsApi.teams.update(current.id, {
+          name: current.name,
+          plantId: current.plantId,
+          isActive: !current.isActive,
+        });
+        refresh();
       },
     });
   }
@@ -123,66 +111,60 @@ export function TeamsSection() {
       <ModuleHeader
         title="Equipos"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "equipo" : "equipos"}
-                count={counts.all}
-                active={chip === "todos" && !onlyWithoutMembers}
-                onClick={() => {
-                  setChip("todos");
-                  setOnlyWithoutMembers(false);
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todos los equipos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={chip === "activos"}
-                onClick={() => {
-                  setChip("activos");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por equipos activos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                count={counts.inactive}
-                active={chip === "inactivos"}
-                onClick={() => {
-                  setChip("inactivos");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por equipos inactivos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="sin integrantes"
-                count={counts.withoutActiveMembers}
-                active={onlyWithoutMembers}
-                onClick={() => {
-                  setOnlyWithoutMembers((current) => !current);
-                  setPage(1);
-                }}
-                tone="amber"
-                dot
-                title="Filtrar por equipos sin integrantes activos"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando los equipos de trabajo…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando los equipos de trabajo…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "equipo" : "equipos"}
+                  count={counts.all}
+                  active={chip === "todos" && !onlyWithoutMembers}
+                  onClick={() => {
+                    setChip("todos");
+                    setOnlyWithoutMembers(false);
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todos los equipos"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={chip === "activos"}
+                  onClick={() => {
+                    setChip("activos");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por equipos activos"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                  count={counts.inactive}
+                  active={chip === "inactivos"}
+                  onClick={() => {
+                    setChip("inactivos");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por equipos inactivos"
+                />
+                <HeaderTag
+                  label="sin integrantes"
+                  count={counts.withoutActiveMembers}
+                  active={onlyWithoutMembers}
+                  onClick={() => {
+                    setOnlyWithoutMembers((current) => !current);
+                    setPage(1);
+                  }}
+                  tone="amber"
+                  dot
+                  title="Filtrar por equipos sin integrantes activos"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -209,89 +191,73 @@ export function TeamsSection() {
           </>
         }
         footer={
-          data !== null &&
-          data.total > 0 && (
-            <Pagination
-              page={page}
-              pageSize={pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="equipos"
-            />
-          )
+          <ListPagination
+            data={data}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="equipos"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={4} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={4}
+          empty={
+            isFiltering
               ? "Ningún equipo coincide con este filtro o búsqueda."
-              : "Todavía no hay ningún equipo registrado."}
-          </p>
-        ) : (
-          <div className={staleClass(isStale)}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Equipo</Th>
-                  <Th>Planta</Th>
-                  <Th>Integrantes</Th>
-                  <Th>Estado</Th>
-                  {canWrite && <Th className="w-32 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
+              : "Todavía no hay ningún equipo registrado."
+          }
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Equipo</Th>
+                <Th>Planta</Th>
+                <Th>Integrantes</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-32 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-              <tbody>
-                {rows.map((team) => (
-                  <Row key={team.id} busy={busyId === team.id}>
-                    <Td className="text-[12.5px] font-medium text-ink">{team.name}</Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      {team.plantName ?? <span className="text-faint">Sin planta</span>}
-                    </Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      {team.memberCount === 0 ? (
-                        <span className="text-faint">Sin integrantes</span>
-                      ) : (
-                        team.memberCount
-                      )}
-                    </Td>
-                    <Td>
-                      <StatusDot active={team.isActive} />
-                    </Td>
-                    {canWrite && (
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar ${team.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(team)}
-                            disabled={busyId === team.id}
-                          />
-                          <RowAction
-                            label={team.isActive ? `Desactivar ${team.name}` : `Reactivar ${team.name}`}
-                            icon={Power}
-                            onClick={() => askToggle(team)}
-                            disabled={busyId === team.id}
-                          />
-                          <RowAction
-                            label={`Eliminar ${team.name}`}
-                            icon={Trash2}
-                            danger
-                            onClick={() => askDelete(team)}
-                            disabled={busyId === team.id}
-                          />
-                        </div>
-                      </Td>
+            <tbody>
+              {rows.map((team) => (
+                <Row key={team.id} busy={busyId === team.id}>
+                  <Td className="text-[12.5px] font-medium text-ink">{team.name}</Td>
+                  <Td className="text-[12.5px] text-subtle">
+                    {team.plantName ?? <span className="text-faint">Sin planta</span>}
+                  </Td>
+                  <Td className="text-[12.5px] text-subtle">
+                    {team.memberCount === 0 ? (
+                      <span className="text-faint">Sin integrantes</span>
+                    ) : (
+                      team.memberCount
                     )}
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+                  </Td>
+                  <Td>
+                    <StatusDot active={team.isActive} />
+                  </Td>
+                  {canWrite && (
+                    <Td>
+                      <CatalogRowActions
+                        name={team.name}
+                        isActive={team.isActive}
+                        busy={busyId === team.id}
+                        onEdit={() => setModal(team)}
+                        onToggle={() => askToggle(team)}
+                        onDelete={() => askDelete(team)}
+                      />
+                    </Td>
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {modal !== null && (
@@ -303,7 +269,7 @@ export function TeamsSection() {
         />
       )}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </>
   );
 }

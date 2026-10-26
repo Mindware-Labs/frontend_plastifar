@@ -5,8 +5,8 @@ import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
 import {
   addWorkingMinutes,
@@ -208,14 +208,13 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
       description="El compromiso de tiempo que se copia al ticket al crearlo, en forma de dos fechas de vencimiento."
       onClose={onClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="sla-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear política"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="sla-form"
+          isEdit={isEdit}
+          createLabel="Crear política"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form id="sla-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">

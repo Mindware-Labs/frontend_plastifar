@@ -1,17 +1,19 @@
-import { AlertTriangle, Check, ClipboardList, FileText, Pencil, RotateCcw, ShieldCheck, Stethoscope } from "lucide-react";
+import { ClipboardList, FileText, Pencil, RotateCcw, ShieldCheck, Stethoscope } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
 import { productLinesApi } from "../../api/productLines";
+import { ConditionChecklist } from "../../components/app/ConditionChecklist";
+import { DetailLoadError } from "../../components/app/DetailLoadError";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ProductNameCode } from "../../components/app/ProductNameCode";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
-import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { PageSpinner } from "../../components/ui/PageSpinner";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
@@ -20,7 +22,7 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { describeStatus, yesNo } from "../../lib/claims";
 import { formatDay, formatInstant } from "../../lib/dates";
 import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
-import type { ClaimClosureCondition, CustomerClaim } from "../../types/claims";
+import type { CustomerClaim } from "../../types/claims";
 import type { ProductLine } from "../../types/settings";
 import { HcaModal } from "../quality/HcaModal";
 import { ClaimFormModal } from "./ClaimFormModal";
@@ -89,10 +91,9 @@ export function ClaimDetailPage() {
 
   if (error) {
     return (
-      <div className="max-w-[880px]">
-        <ModuleHeader title="Reclamación" />
-        <ErrorRetry onRetry={retry}>{error}</ErrorRetry>
-      </div>
+      <DetailLoadError className="max-w-[880px]" title="Reclamación" onRetry={retry}>
+        {error}
+      </DetailLoadError>
     );
   }
 
@@ -294,7 +295,7 @@ export function ClaimDetailPage() {
             </DetailRow>
             {!isClosed && (
               <DetailRow label="Para cerrar" wide>
-                <ClosureList conditions={closureConditions} />
+                <ConditionChecklist conditions={closureConditions} />
               </DetailRow>
             )}
           </DetailGroup>
@@ -330,7 +331,7 @@ export function ClaimDetailPage() {
               Se sella el cierre con tu nombre y la fecha de hoy. Una reclamación cerrada no se edita; para corregirla
               se reabre con un motivo.
               <div className="mt-3">
-                <ClosureList conditions={closureConditions} />
+                <ConditionChecklist conditions={closureConditions} />
               </div>
             </>
           }
@@ -376,8 +377,7 @@ function LinesTable({ claim }: { claim: CustomerClaim }) {
         {claim.lines.map((line) => (
           <Row key={line.id}>
             <Td>
-              <span className="block text-[12.5px] text-ink">{line.productName}</span>
-              <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
+              <ProductNameCode name={line.productName} code={line.productCode} />
             </Td>
             <Td className="text-right tabular-nums">{formatQuantity(line.unitsPurchased)}</Td>
             <Td className="text-right tabular-nums">{formatQuantity(line.defectiveQuantity)}</Td>
@@ -394,32 +394,5 @@ function LinesTable({ claim }: { claim: CustomerClaim }) {
         ))}
       </tbody>
     </DataTable>
-  );
-}
-
-/** Lo que falta para cerrar, tal como lo resuelve el servidor. */
-function ClosureList({ conditions }: { conditions: ClaimClosureCondition[] }) {
-  return (
-    <ul className="flex flex-col gap-1.5">
-      {conditions.map((condition) => (
-        <li
-          key={condition.id}
-          className={`flex items-start gap-2 text-[13px] leading-relaxed ${condition.met ? "text-brand-gray" : "text-warn"}`}
-        >
-          {condition.met ? (
-            <Check aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-green" />
-          ) : (
-            <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn" />
-          )}
-          <span className="flex flex-col gap-0.5">
-            <span>
-              {condition.label}
-              <span className="sr-only">{condition.met ? ": cumplida" : ": falta"}</span>
-            </span>
-            {!condition.met && <span className="text-[12.5px]">{condition.missing}</span>}
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }

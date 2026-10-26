@@ -5,6 +5,7 @@ import {
   type CreditListResponse,
   type CreditQuery,
 } from "../../api/quality";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
@@ -16,11 +17,11 @@ import {
   LookupFilterDropdown,
 } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { TableSkeleton } from "../../components/ui/Skeleton";
+import { ServerPagination } from "../../components/ui/ServerPagination";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -141,78 +142,71 @@ export function CreditRequestsPage() {
       <ModuleHeader
         title="Solicitudes de crédito"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "solicitud" : "solicitudes"}
-                count={counts.all}
-                active={chip === "todas"}
-                onClick={() => {
-                  setChip("todas");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todas las solicitudes de crédito"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.requested === 1 ? "solicitada" : "solicitadas"}
-                count={counts.requested}
-                active={chip === "Solicitada"}
-                onClick={() => {
-                  setChip("Solicitada");
-                  setPage(1);
-                }}
-                tone="amber"
-                dot
-                title="Filtrar por solicitudes pendientes de decisión"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.approved === 1 ? "aprobada" : "aprobadas"}
-                count={counts.approved}
-                active={chip === "Aprobada"}
-                onClick={() => {
-                  setChip("Aprobada");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por solicitudes aprobadas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.rejected === 1 ? "rechazada" : "rechazadas"}
-                count={counts.rejected}
-                active={chip === "Rechazada"}
-                onClick={() => {
-                  setChip("Rechazada");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por solicitudes rechazadas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.applied === 1 ? "aplicada" : "aplicadas"}
-                count={counts.applied}
-                active={chip === "Aplicada"}
-                onClick={() => {
-                  setChip("Aplicada");
-                  setPage(1);
-                }}
-                tone="blue"
-                dot
-                title="Filtrar por solicitudes aplicadas"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando las solicitudes de crédito…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando las solicitudes de crédito…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "solicitud" : "solicitudes"}
+                  count={counts.all}
+                  active={chip === "todas"}
+                  onClick={() => {
+                    setChip("todas");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todas las solicitudes de crédito"
+                />
+                <HeaderTag
+                  label={counts.requested === 1 ? "solicitada" : "solicitadas"}
+                  count={counts.requested}
+                  active={chip === "Solicitada"}
+                  onClick={() => {
+                    setChip("Solicitada");
+                    setPage(1);
+                  }}
+                  tone="amber"
+                  dot
+                  title="Filtrar por solicitudes pendientes de decisión"
+                />
+                <HeaderTag
+                  label={counts.approved === 1 ? "aprobada" : "aprobadas"}
+                  count={counts.approved}
+                  active={chip === "Aprobada"}
+                  onClick={() => {
+                    setChip("Aprobada");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por solicitudes aprobadas"
+                />
+                <HeaderTag
+                  label={counts.rejected === 1 ? "rechazada" : "rechazadas"}
+                  count={counts.rejected}
+                  active={chip === "Rechazada"}
+                  onClick={() => {
+                    setChip("Rechazada");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por solicitudes rechazadas"
+                />
+                <HeaderTag
+                  label={counts.applied === 1 ? "aplicada" : "aplicadas"}
+                  count={counts.applied}
+                  active={chip === "Aplicada"}
+                  onClick={() => {
+                    setChip("Aplicada");
+                    setPage(1);
+                  }}
+                  tone="blue"
+                  dot
+                  title="Filtrar por solicitudes aplicadas"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -278,30 +272,28 @@ export function CreditRequestsPage() {
       </>
         }
         footer={
-          data !== null && (
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="solicitudes"
-            />
-          )
+          <ServerPagination
+            data={data}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="solicitudes"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={8} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {unfiltered
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={8}
+          empty={
+            unfiltered
               ? "Todavía no hay solicitudes de crédito."
-              : "Ninguna solicitud coincide con este filtro o búsqueda."}
-          </p>
-        ) : (
-          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable>
+              : "Ninguna solicitud coincide con este filtro o búsqueda."
+          }
+          animateIn
+        >
+          <DataTable>
             <thead>
               <HeadRow>
                 <Th>Número</Th>
@@ -411,8 +403,7 @@ export function CreditRequestsPage() {
               })}
             </tbody>
           </DataTable>
-          </div>
-        )}
+        </ListBody>
       </ListPanel>
 
       {creating && (

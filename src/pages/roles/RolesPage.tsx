@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { rolesApi, type RoleQuery } from "../../api/roles";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Pagination } from "../../components/ui/Pagination";
@@ -16,8 +16,10 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
+import { staleClass } from "../../lib/listState";
 import type { RoleListResponse, RoleResponse } from "../../types/api";
 import type { PermissionMatrixResponse } from "../../types/permissions";
 import { PermissionsView } from "../permissions/PermissionsPage";
@@ -50,12 +52,7 @@ export function RolesPage() {
     );
   }
 
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(
-    null,
-  );
-  // null = cerrado, "nuevo" = alta, un RoleResponse = edicion de esa fila.
-  const [modal, setModal] = useState<"nuevo" | RoleResponse | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<RoleResponse>();
 
   // Drawer lateral para ver y editar permisos del rol seleccionado
   const [permissionDrawerRole, setPermissionDrawerRole] = useState<RoleResponse | null>(null);
@@ -91,7 +88,7 @@ export function RolesPage() {
   }
 
   function askDelete(role: RoleResponse) {
-    setConfirmation({
+    confirm(role.id, {
       tone: "danger",
       icon: Trash2,
       eyebrow: "Personal · Roles",
@@ -104,13 +101,8 @@ export function RolesPage() {
       ),
       confirmLabel: "Eliminar",
       onConfirm: async () => {
-        setBusyId(role.id);
-        try {
-          await rolesApi.remove(role.id);
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        await rolesApi.remove(role.id);
+        refresh();
       },
     });
   }
@@ -175,71 +167,59 @@ export function RolesPage() {
       <ModuleHeader
         title="Roles y Permisos"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "rol" : "roles"}
-                count={counts.all}
-                active={filter === "todos"}
-                onClick={() => {
-                  setFilter("todos");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todos los roles"
-              />
-              <span aria-hidden className="text-zinc-300">
-                ·
-              </span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={filter === "activos"}
-                onClick={() => {
-                  setFilter("activos");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por roles activos"
-              />
-              <span aria-hidden className="text-zinc-300">
-                ·
-              </span>
-              <HeaderTag
-                label="del sistema"
-                count={counts.system}
-                active={filter === "sistema"}
-                onClick={() => {
-                  setFilter("sistema");
-                  setPage(1);
-                }}
-                tone="blue"
-                dot
-                title="Filtrar por roles del sistema"
-              />
-              <span aria-hidden className="text-zinc-300">
-                ·
-              </span>
-              <HeaderTag
-                label="personalizados"
-                count={counts.custom}
-                active={filter === "personalizados"}
-                onClick={() => {
-                  setFilter("personalizados");
-                  setPage(1);
-                }}
-                tone="amber"
-                dot
-                title="Filtrar por roles personalizados"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando los roles del sistema…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando los roles del sistema…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "rol" : "roles"}
+                  count={counts.all}
+                  active={filter === "todos"}
+                  onClick={() => {
+                    setFilter("todos");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todos los roles"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={filter === "activos"}
+                  onClick={() => {
+                    setFilter("activos");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por roles activos"
+                />
+                <HeaderTag
+                  label="del sistema"
+                  count={counts.system}
+                  active={filter === "sistema"}
+                  onClick={() => {
+                    setFilter("sistema");
+                    setPage(1);
+                  }}
+                  tone="blue"
+                  dot
+                  title="Filtrar por roles del sistema"
+                />
+                <HeaderTag
+                  label="personalizados"
+                  count={counts.custom}
+                  active={filter === "personalizados"}
+                  onClick={() => {
+                    setFilter("personalizados");
+                    setPage(1);
+                  }}
+                  tone="amber"
+                  dot
+                  title="Filtrar por roles personalizados"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           <div className="flex items-center gap-2">
@@ -288,7 +268,7 @@ export function RolesPage() {
             <Spinner />
           </div>
         ) : (
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className={staleClass(isStale)}>
             <DataTable>
               <thead>
                 <HeadRow>
@@ -404,7 +384,7 @@ export function RolesPage() {
         )}
       </div>
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
 
       {modal !== null && (
         <RoleModal

@@ -10,9 +10,11 @@ import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { LookupSelect } from "../../components/ui/LookupSelect";
 import { Modal } from "../../components/ui/Modal";
 import { RowAction } from "../../components/ui/RowAction";
+import { applyServerError, type ServerErrorRule } from "../../lib/formErrors";
 import { searchActiveStaff } from "../../lib/lookups";
 import { PLANT_COUNTRIES, type Plant, type Team, type TeamMember } from "../../types/settings";
 import { LoadErrorAlert } from "./catalogSection";
@@ -39,7 +41,7 @@ const NINGUNO = "";
  * Con que empieza cada mensaje de POST/PUT /api/settings/teams que habla de un
  * solo campo. Lo que no este aqui va al aviso general del formulario.
  */
-const CAMPO_POR_MENSAJE: { field: keyof FormValues; startsWith: string }[] = [
+const CAMPO_POR_MENSAJE: ServerErrorRule<keyof FormValues>[] = [
   { field: "name", startsWith: "el nombre debe" },
   { field: "name", startsWith: "ya existe un equipo" },
   { field: "plantId", startsWith: "la planta no existe" },
@@ -126,22 +128,17 @@ export function TeamModal({ team, onClose, onSaved, onMembersChanged }: TeamModa
       onSaved(saved);
       onClose();
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 409 || err.status === 400)) {
-        const mensaje = err.message.trim().toLowerCase();
-        const campo = CAMPO_POR_MENSAJE.find(({ startsWith }) =>
-          mensaje.startsWith(startsWith),
-        )?.field;
-        if (campo) {
-          setError(campo, { message: err.message });
+      setFormError(
+        applyServerError(err, {
+          setError,
+          setFocus,
+          rules: CAMPO_POR_MENSAJE,
           // Solo el nombre esta registrado con ref; la planta va por
           // Controller sin ella y setFocus no la alcanzaria.
-          if (campo === "name") setFocus("name");
-        } else {
-          setFormError(err.message);
-        }
-        return;
-      }
-      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar el equipo");
+          focusable: ["name"],
+          fallback: "No se pudo guardar el equipo",
+        }),
+      );
     }
   }
 
@@ -151,14 +148,14 @@ export function TeamModal({ team, onClose, onSaved, onMembersChanged }: TeamModa
       description="Un grupo de personas de trabajo. Puede pertenecer a una planta o a ninguna."
       onClose={onClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            {isEdit ? "Cerrar" : "Cancelar"}
-          </Button>
-          <Button type="submit" form="team-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear equipo"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="team-form"
+          isEdit={isEdit}
+          createLabel="Crear equipo"
+          cancelLabel={isEdit ? "Cerrar" : "Cancelar"}
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form id="team-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">

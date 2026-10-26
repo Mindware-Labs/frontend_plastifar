@@ -13,6 +13,16 @@ import {
 
 const PANEL_WIDTH = 340;
 
+/** Si el objetivo vive en un dropdown, lista o select flotante (en su propio portal). */
+function isInFloatingList(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    (target.closest("[data-dropdown-portal]") !== null ||
+      target.closest("[role='listbox']") !== null ||
+      target.closest("[data-select-portal]") !== null)
+  );
+}
+
 interface HcaFilterPopoverProps {
   responsibleId: string;
   onResponsibleChange: (id: string) => void;
@@ -85,12 +95,7 @@ export function HcaFilterPopover({
         return;
       }
       // Si el click fue dentro de un portal de select/lista/datepicker flotante, no cerrar el panel
-      if (
-        target instanceof Element &&
-        (target.closest("[data-dropdown-portal]") !== null ||
-          target.closest("[role='listbox']") !== null ||
-          target.closest("[data-select-portal]") !== null)
-      ) {
+      if (isInFloatingList(target)) {
         return;
       }
       close();
@@ -109,12 +114,7 @@ export function HcaFilterPopover({
       if (target instanceof Node && panelRef.current?.contains(target)) return;
 
       // 2. Si el scroll ocurre dentro de cualquier dropdown o listbox flotante, no cerrar
-      if (
-        target instanceof Element &&
-        (target.closest("[data-dropdown-portal]") !== null ||
-          target.closest("[role='listbox']") !== null ||
-          target.closest("[data-select-portal]") !== null)
-      ) {
+      if (isInFloatingList(target)) {
         return;
       }
 

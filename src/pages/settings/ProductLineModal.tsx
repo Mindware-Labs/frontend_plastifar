@@ -6,11 +6,12 @@ import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { ProductLine } from "../../types/settings";
+import { FormDivider } from "../../components/ui/FormDivider";
 
 /**
  * Espejo de la validación del servidor en POST/PUT /api/settings/product-lines:
@@ -37,17 +38,6 @@ interface ProductLineModalProps {
   line?: ProductLine;
   onClose: () => void;
   onSaved: (line: ProductLine) => void;
-}
-
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-1 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-zinc-100" />
-    </div>
-  );
 }
 
 export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalProps) {
@@ -129,26 +119,13 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" form="line-form" size="sm" isLoading={isSubmitting}>
-              {isEdit ? "Guardar cambios" : "Crear línea"}
-            </Button>
-          </div>
-        </div>
+        <ShortcutModalFooter
+          formId="line-form"
+          isEdit={isEdit}
+          createLabel="Crear línea"
+          isSubmitting={isSubmitting}
+          onCancel={requestClose}
+        />
       }
     >
       <form
@@ -160,7 +137,7 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <FormDivider title="Información de la línea" />
+        <FormDivider title="Información de la línea" tight />
 
         <TextField
           size="sm"
@@ -190,7 +167,7 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
 
         {isEdit && (
           <>
-            <FormDivider title="Estado" />
+            <FormDivider title="Estado" tight />
 
             <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-2.5">
               <CheckboxField

@@ -1,26 +1,27 @@
-import { Pencil, Plus, Power } from "lucide-react";
+import { Plus, Power } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { RowAction } from "../../components/ui/RowAction";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Pagination } from "../../components/ui/Pagination";
-import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { usedVariables } from "../../lib/templates";
 import type { EmailTemplate } from "../../types/settings";
+import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass } from "./catalogState";
+import { freshCopy } from "./catalogState";
 import { TemplateModal } from "./TemplateModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
@@ -29,14 +30,11 @@ export function TemplatesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<EmailTemplate, "nueva">();
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
   const [pageSize, setPageSize] = useState(10);
-
-  const [modal, setModal] = useState<"nueva" | EmailTemplate | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -60,7 +58,7 @@ export function TemplatesSection() {
   const isFiltering = debouncedSearch !== "" || chip !== "todas";
 
   function askToggle(template: EmailTemplate) {
-    setConfirmation({
+    confirm(template.id, {
       tone: "warn",
       icon: Power,
       title: template.isActive ? "Desactivar plantilla" : "Reactivar plantilla",
@@ -77,20 +75,15 @@ export function TemplatesSection() {
       ),
       confirmLabel: template.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(template.id);
-        try {
-          const current = await freshCopy(settingsApi.templates.get, template);
-          await settingsApi.templates.update(current.id, {
-            key: current.key,
-            name: current.name,
-            subject: current.subject,
-            body: current.body,
-            isActive: !current.isActive,
-          });
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        const current = await freshCopy(settingsApi.templates.get, template);
+        await settingsApi.templates.update(current.id, {
+          key: current.key,
+          name: current.name,
+          subject: current.subject,
+          body: current.body,
+          isActive: !current.isActive,
+        });
+        refresh();
       },
     });
   }
@@ -100,52 +93,47 @@ export function TemplatesSection() {
       <ModuleHeader
         title="Plantillas"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "plantilla" : "plantillas"}
-                count={counts.all}
-                active={chip === "todas"}
-                onClick={() => {
-                  setChip("todas");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todas las plantillas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activa" : "activas"}
-                count={counts.active}
-                active={chip === "activas"}
-                onClick={() => {
-                  setChip("activas");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por plantillas activas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactiva" : "inactivas"}
-                count={counts.inactive}
-                active={chip === "inactivas"}
-                onClick={() => {
-                  setChip("inactivas");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por plantillas inactivas"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando las plantillas de correo…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando las plantillas de correo…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "plantilla" : "plantillas"}
+                  count={counts.all}
+                  active={chip === "todas"}
+                  onClick={() => {
+                    setChip("todas");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todas las plantillas"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activa" : "activas"}
+                  count={counts.active}
+                  active={chip === "activas"}
+                  onClick={() => {
+                    setChip("activas");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por plantillas activas"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactiva" : "inactivas"}
+                  count={counts.inactive}
+                  active={chip === "inactivas"}
+                  onClick={() => {
+                    setChip("inactivas");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por plantillas inactivas"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -172,103 +160,89 @@ export function TemplatesSection() {
           </>
         }
         footer={
-          data !== null &&
-          data.total > 0 && (
-            <Pagination
-              page={page}
-              pageSize={pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="plantillas"
-            />
-          )
+          <ListPagination
+            data={data}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="plantillas"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={5} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={5}
+          empty={
+            isFiltering
               ? "Ninguna plantilla coincide con este filtro o búsqueda."
-              : "Todavía no hay ninguna plantilla configurada."}
-          </p>
-        ) : (
-          <div className={staleClass(isStale)}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Plantilla</Th>
-                  <Th>Asunto</Th>
-                  <Th>Variables</Th>
-                  <Th>Estado</Th>
-                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
+              : "Todavía no hay ninguna plantilla configurada."
+          }
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Plantilla</Th>
+                <Th>Asunto</Th>
+                <Th>Variables</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-              <tbody>
-                {rows.map((template) => {
-                  const variables = usedVariables(`${template.subject} ${template.body}`);
+            <tbody>
+              {rows.map((template) => {
+                const variables = usedVariables(`${template.subject} ${template.body}`);
 
-                  return (
-                    <Row key={template.id} busy={busyId === template.id}>
-                      <Td>
-                        <span className="flex flex-col gap-0.5">
-                          <span className="text-[12.5px] font-medium leading-tight text-ink">
-                            {template.name}
-                          </span>
-                          <span className="font-mono text-[10.5px] leading-tight text-faint">
-                            {template.key}
-                          </span>
+                return (
+                  <Row key={template.id} busy={busyId === template.id}>
+                    <Td>
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-[12.5px] font-medium leading-tight text-ink">
+                          {template.name}
                         </span>
-                      </Td>
-                      <Td className="max-w-[320px] text-[12.5px] text-brand-gray">
-                        <span className="block truncate">{template.subject}</span>
-                      </Td>
-                      <Td>
-                        {variables.length > 0 ? (
-                          <span className="flex flex-wrap gap-1">
-                            {variables.map((variable) => (
-                              <Badge key={variable}>{variable}</Badge>
-                            ))}
-                          </span>
-                        ) : (
-                          <span className="text-[12.5px] text-faint">Ninguna</span>
-                        )}
-                      </Td>
-                      <Td>
-                        <StatusDot active={template.isActive} />
-                      </Td>
-                      {canWrite && (
-                        <Td>
-                          <div className="flex items-center justify-end gap-1">
-                            <RowAction
-                              label={`Editar ${template.name}`}
-                              icon={Pencil}
-                              onClick={() => setModal(template)}
-                              disabled={busyId === template.id}
-                            />
-                            <RowAction
-                              label={
-                                template.isActive
-                                  ? `Desactivar ${template.name}`
-                                  : `Reactivar ${template.name}`
-                              }
-                              icon={Power}
-                              onClick={() => askToggle(template)}
-                              disabled={busyId === template.id}
-                            />
-                          </div>
-                        </Td>
+                        <span className="font-mono text-[10.5px] leading-tight text-faint">
+                          {template.key}
+                        </span>
+                      </span>
+                    </Td>
+                    <Td className="max-w-[320px] text-[12.5px] text-brand-gray">
+                      <span className="block truncate">{template.subject}</span>
+                    </Td>
+                    <Td>
+                      {variables.length > 0 ? (
+                        <span className="flex flex-wrap gap-1">
+                          {variables.map((variable) => (
+                            <Badge key={variable}>{variable}</Badge>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="text-[12.5px] text-faint">Ninguna</span>
                       )}
-                    </Row>
-                  );
-                })}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+                    </Td>
+                    <Td>
+                      <StatusDot active={template.isActive} />
+                    </Td>
+                    {canWrite && (
+                      <Td>
+                        <CatalogRowActions
+                          name={template.name}
+                          isActive={template.isActive}
+                          busy={busyId === template.id}
+                          onEdit={() => setModal(template)}
+                          onToggle={() => askToggle(template)}
+                        />
+                      </Td>
+                    )}
+                  </Row>
+                );
+              })}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {modal !== null && (
@@ -279,7 +253,7 @@ export function TemplatesSection() {
         />
       )}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </>
   );
 }

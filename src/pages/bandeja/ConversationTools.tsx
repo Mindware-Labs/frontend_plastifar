@@ -8,21 +8,8 @@ import { Modal } from "../../components/ui/Modal";
 import { Select, type SelectOption } from "../../components/ui/Select";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import type { StaffOptionResponse } from "../../types/api";
-
-function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
-  if (!textarea) return;
-  textarea.style.height = "auto";
-  const borderOffset = textarea.offsetHeight - textarea.clientHeight;
-  const targetHeight = Math.max(textarea.scrollHeight + borderOffset, 64);
-  if (targetHeight >= 220) {
-    textarea.style.height = "220px";
-    textarea.style.overflowY = "auto";
-  } else {
-    textarea.style.height = `${targetHeight}px`;
-    textarea.style.overflowY = "hidden";
-  }
-}
 
 interface AssignWithNoteModalProps {
   targetStaffName: string;
@@ -46,7 +33,7 @@ function AssignWithNoteModal({
   useEffect(() => {
     setTimeout(() => {
       textareaRef.current?.focus();
-      autoResizeTextarea(textareaRef.current);
+      autoResizeTextarea(textareaRef.current, 64, 220);
     }, 80);
   }, []);
 
@@ -87,7 +74,7 @@ function AssignWithNoteModal({
             value={note}
             onChange={(e) => {
               setNote(e.target.value);
-              autoResizeTextarea(e.target);
+              autoResizeTextarea(e.target, 64, 220);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {

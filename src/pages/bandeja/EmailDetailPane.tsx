@@ -1,7 +1,6 @@
 import {
   Archive,
   ArchiveRestore,
-  ArrowUpRight,
   CornerUpLeft,
   Download,
   Forward,
@@ -11,51 +10,46 @@ import {
   RotateCcw,
   ShieldAlert,
   Star,
-  Ticket as TicketIcon,
   Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
-import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button as PfButton } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Spinner } from "../../components/ui/Spinner";
 import { TicketChip } from "../../components/app/TicketChip";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
-import { useNoticeInset, useReceipts } from "../../context/useReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
 import { Button } from "../../components/shadcn/button";
 import { Separator } from "../../components/shadcn/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/shadcn/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "../../components/shadcn/popover";
 import {
   formatBytes,
   formatDateTime,
   formatEmailListDate,
-  formatTicketCode,
 } from "../../lib/format";
 import type { ComposingPresence, EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
 import { EmailBodyFrame } from "../../components/ui/EmailBodyFrame";
-import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { openOverlay } from "../../hooks/overlayStack";
-import { useUploadFeedback } from "../../hooks/useUploadFeedback";
+import { useEmailAttachments } from "../../hooks/useEmailAttachments";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { DELIVERY_LABELS, initialsFromName } from "../../lib/format";
 import { CreateTicketModal } from "../tickets/CreateTicketModal";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
-import { CannedPicker } from "./CannedPicker";
 import { textToBlocks } from "./textToBlocks";
 import { AssignmentControl } from "./ConversationTools";
-import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
-import { RecipientInput } from "./RecipientInput";
-import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
-import { SendValidationButton } from "./SendValidationButton";
+import { AddNotePanel } from "./AddNotePanel";
+import { ConversationNotes } from "./ConversationNotes";
+import { ReplyComposer } from "./ReplyComposer";
+import { firstLine, getThreadMessageBadge, ticketsNote } from "./threadMessage";
+import { TicketsOriginPopover } from "./TicketsOriginPopover";
 import { type ValidationItem } from "./sendValidation";
 
 /** Que adjunto se esta mirando: puede ser del correo o de una respuesta nuestra. */
@@ -64,9 +58,6 @@ interface PreviewTarget {
   attachments: EmailAttachmentResponse[];
   index: number;
 }
-
-const MAX_FILES = 5;
-const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
 
 interface EmailDetailPaneProps {
   emailId: number;
@@ -78,12 +69,6 @@ interface EmailDetailPaneProps {
   onStarred?: (starred: boolean) => void;
   /** Cierra el panel y deja la lista sin seleccion. */
   onClose: () => void;
-}
-
-/** Su unico trabajo es existir: mientras el editor este abierto, el recibo se corre hacia arriba. */
-function ComposerInset() {
-  useNoticeInset(44);
-  return null;
 }
 
 interface MoveKind {
@@ -138,111 +123,7 @@ const deliveryTone: Record<string, string> = {
 /** Estados que merecen un aviso al abrir el correo, no solo una etiqueta en la tira. */
 const alertingStatuses = new Set(["Queued", "Bounced", "Complained", "Failed"]);
 
-/** La acotacion cuando el correo no se escribio desde aca. Null si salio de la bandeja. */
-function ticketsNote(message: { direction: string; origin?: string }): string | null {
-  if (message.origin !== "Tickets") return null;
-
-  return message.direction === "Outbound"
-    ? "Esta respuesta se envió desde el módulo de tickets."
-    : "El cliente responde a un correo que se envió desde el módulo de tickets.";
-}
-
-interface TicketsOriginPopoverProps {
-  note: string;
-  ticketId: number | null;
-}
-
-/** Indicador flotante en barra de herramientas con acceso al ticket vinculado. */
-function TicketsOriginPopover({ note, ticketId }: TicketsOriginPopoverProps) {
-  return (
-    <Popover>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="Ver información de origen del ticket"
-              className="group/origin inline-flex h-7 cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-white pl-1 pr-2.5 text-zinc-700 shadow-2xs outline-none transition-[background-color,border-color,color] duration-200 ease-out hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 focus-visible:ring-2 focus-visible:ring-brand-red/25 data-[state=open]:border-zinc-300 data-[state=open]:bg-zinc-100 data-[state=open]:shadow-none motion-reduce:transition-none"
-            >
-              <span className="flex size-5 items-center justify-center rounded-md bg-brand-red/10 text-brand-red transition-colors duration-200 group-hover/origin:bg-brand-red group-hover/origin:text-white group-data-[state=open]/origin:bg-brand-red group-data-[state=open]/origin:text-white">
-                <TicketIcon className="size-3" strokeWidth={2.25} />
-              </span>
-              <span className="font-heading text-[10px] font-bold uppercase leading-none tracking-[0.08em]">
-                Origen: Tickets
-              </span>
-            </button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Información de origen en Tickets</TooltipContent>
-      </Tooltip>
-
-      <PopoverContent align="start" sideOffset={6} className="w-80 p-3.5">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2.5 border-b border-line-soft pb-2.5">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-brand-red/20 bg-brand-red/8 text-brand-red shadow-2xs">
-              <TicketIcon className="h-4 w-4" />
-            </span>
-            <div className="min-w-0">
-              <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-brand-red-dark">
-                Módulo de Tickets
-              </h4>
-              <p className="text-[11px] text-subtle">Origen del correo</p>
-            </div>
-          </div>
-
-          <p className="text-[12px] leading-relaxed text-ink">
-            {note}
-          </p>
-
-          {ticketId && (
-            <div className="border-t border-line-soft pt-2.5">
-              <Link
-                to={`/tickets/${ticketId}`}
-                className="group flex w-full items-center justify-between rounded-edge border border-brand-red/25 bg-brand-red/[0.04] px-3 py-1.5 text-xs font-semibold text-brand-red-dark shadow-2xs transition-all hover:border-brand-red hover:bg-brand-red hover:text-white cursor-pointer"
-                title="Abrir este ticket en el módulo de Tickets"
-              >
-                <span>Ver ticket {formatTicketCode(ticketId)}</span>
-                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-              </Link>
-            </div>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-
-function getThreadMessageBadge(message: { direction: string; subject?: string }) {
-  if (message.direction !== "Outbound") {
-    return {
-      label: "Recibido por",
-      className: "bg-zinc-100 text-zinc-700 border border-zinc-200/90",
-    };
-  }
-
-  const sub = (message.subject ?? "").trim().toLowerCase();
-  const isReply = sub.startsWith("re:");
-
-  if (isReply) {
-    return {
-      label: "Respondido a",
-      className: "bg-brand-red/10 text-brand-red-dark border border-brand-red/20",
-    };
-  }
-
-  return {
-    label: "Enviado a",
-    className: "bg-sky-500/10 text-sky-800 border border-sky-500/25",
-  };
-}
-
 type ComposerMode = "reply" | "forward";
-
-/** Primer renglon con contenido: es el resumen que cabe en una linea de la lista. */
-function firstLine(text: string) {
-  return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
-}
 
 /** El cuerpo del correo viene de un remitente externo: se muestra siempre via EmailBodyFrame, nunca inyectado. */
 export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, onClose }: EmailDetailPaneProps) {
@@ -266,16 +147,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [replyBcc, setReplyBcc] = useState("");
   const [bccOpen, setBccOpen] = useState(false);
   const [includeAttachments, setIncludeAttachments] = useState(true);
-  const [files, setFiles] = useState<File[]>([]);
-  const {
-    isShowing: showAttachedFeedback,
-    isExiting: attachedExiting,
-    trigger: triggerAttachedFeedback,
-  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [sending, setSending] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const attachments = useEmailAttachments(setReplyError);
+  const { files, setFiles } = attachments;
   const toRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
@@ -495,27 +371,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
     } finally {
       setRetrying(false);
     }
-  }
-
-  function addFiles(incoming: File[]) {
-    if (incoming.length === 0) return;
-
-    const merged = [...files, ...incoming];
-    const total = merged.reduce((sum, file) => sum + file.size, 0);
-
-    if (merged.length > MAX_FILES) {
-      setReplyError(`No se pueden adjuntar más de ${MAX_FILES} archivos.`);
-      return;
-    }
-
-    if (total > MAX_TOTAL_BYTES) {
-      setReplyError("Los adjuntos superan los 10 MB en total.");
-      return;
-    }
-
-    setReplyError(null);
-    setFiles(merged);
-    triggerAttachedFeedback();
   }
 
   function openComposer(mode: ComposerMode) {
@@ -883,251 +738,41 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
       {/* Columna: los avisos ocupan lo suyo y el cuerpo se queda con el resto, sin desbordar sobre el pie. */}
       <div className="relative flex min-h-0 flex-1 flex-col">
         {replyOpen && (
-          <div
-            ref={replyContainerRef}
-            className="absolute inset-0 z-20 flex flex-col bg-white"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              addFiles(Array.from(event.dataTransfer.files));
-            }}
-          >
-            <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
-              {isForward ? (
-                <Forward className="h-3.5 w-3.5 shrink-0 text-brand-red" />
-              ) : (
-                <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-brand-red" />
-              )}
-              <span className="shrink-0 text-[12.5px] font-semibold text-zinc-900">
-                {isForward ? "Reenviar" : "Responder"}
-              </span>
-              <span className="truncate text-[11.5px] text-zinc-500">
-                {email.subject ? `${isForward ? "Fwd" : "Re"}: ${email.subject}` : "(sin asunto)"}
-              </span>
-              <button
-                type="button"
-                onClick={closeComposer}
-                aria-label="Cerrar el editor"
-                title="Cerrar el editor"
-                className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-              <span className={fieldLabelClass}>Para</span>
-              {isForward ? (
-                <RecipientInput
-                  inputRef={toRef}
-                  value={forwardTo}
-                  onChange={setForwardTo}
-                  placeholder="correo@dominio.com, otro@dominio.com"
-                  autoFocus
-                />
-              ) : (
-                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-zinc-900">
-                  {email.fromEmail}
-                </span>
-              )}
-              {!isForward && !ccOpen && replyAll.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCcOpen(true);
-                    setReplyCc(replyAll.join(", "));
-                  }}
-                  title="Copiar a todos los de la conversación"
-                  className={fieldToggleClass}
-                >
-                  Todos
-                </button>
-              )}
-              {!ccOpen && (
-                <button type="button" onClick={() => setCcOpen(true)} title="Agregar copia" className={fieldToggleClass}>
-                  CC
-                </button>
-              )}
-              {!bccOpen && (
-                <button
-                  type="button"
-                  onClick={() => setBccOpen(true)}
-                  title="Agregar copia oculta"
-                  className={fieldToggleClass}
-                >
-                  CCO
-                </button>
-              )}
-            </div>
-
-            {ccOpen && (
-              <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-                <span className={fieldLabelClass}>CC</span>
-                <RecipientInput
-                  inputRef={ccRef}
-                  value={replyCc}
-                  onChange={setReplyCc}
-                  placeholder="correo@dominio.com, otro@dominio.com"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCcOpen(false);
-                    setReplyCc("");
-                  }}
-                  aria-label="Quitar la copia"
-                  title="Quitar la copia"
-                  className={fieldCloseClass}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-
-            {bccOpen && (
-              <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-                <span className={fieldLabelClass}>CCO</span>
-                <RecipientInput
-                  inputRef={bccRef}
-                  value={replyBcc}
-                  onChange={setReplyBcc}
-                  placeholder="Nadie más ve a quién va esta copia"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBccOpen(false);
-                    setReplyBcc("");
-                  }}
-                  aria-label="Quitar la copia oculta"
-                  title="Quitar la copia oculta"
-                  className={fieldCloseClass}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-
-            {isForward && email.attachments.length > 0 && (
-              <label className="flex shrink-0 cursor-pointer items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-1.5 text-[12px] font-medium text-zinc-700">
-                <input
-                  type="checkbox"
-                  checked={includeAttachments}
-                  onChange={(event) => setIncludeAttachments(event.target.checked)}
-                  className="h-3.5 w-3.5 accent-brand-red rounded"
-                />
-                Incluir {email.attachments.length === 1 ? "el adjunto original" : `los ${email.attachments.length} adjuntos originales`}
-              </label>
-            )}
-
-            <div
-              className="min-h-0 flex-1 overflow-y-auto"
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                  if (replyReady) handleReply();
-                }
-              }}
-            >
-              <LazyBlockEditor
-                key={editorKey}
-                initialContent={draftBlocks}
-                onChange={setReplyBlocks}
-                placeholder={isForward ? "Comentario opcional…" : "Escribe la respuesta…"}
-              />
-            </div>
-
-            {files.length > 0 && (
-              <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-100 px-4 py-2 bg-zinc-50/30">
-                {files.map((file, position) => (
-                  <span
-                    key={`${file.name}-${position}`}
-                    className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80
-                      bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-zinc-800 shadow-2xs"
-                  >
-                    <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
-                      <AnimatedCheckIcon size={10} strokeWidth={3} />
-                    </span>
-                    <span className="max-w-[160px] truncate">{file.name}</span>
-                    <span className="text-zinc-400 text-[10.5px] tabular-nums">{formatBytes(file.size)}</span>
-                    <button
-                      type="button"
-                      onClick={() => setFiles(files.filter((_, at) => at !== position))}
-                      aria-label={`Quitar ${file.name}`}
-                      className="text-zinc-400 transition-colors hover:text-brand-red ml-0.5 cursor-pointer"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {replyError && (
-              <div className="shrink-0 px-4 pb-2 pt-2">
-                <Alert variant="error">{replyError}</Alert>
-              </div>
-            )}
-
-            <ComposerInset />
-            <div className="flex shrink-0 items-center gap-2 border-t border-zinc-100 px-4 py-2.5 bg-zinc-50/30">
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium shadow-2xs outline-none transition-all duration-300 cursor-pointer ${
-                  showAttachedFeedback
-                    ? attachedExiting
-                      ? "border-emerald-200 bg-emerald-50/40 text-emerald-600 ring-1 ring-emerald-100/50"
-                      : "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200/70 font-semibold"
-                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20"
-                }`}
-              >
-                {showAttachedFeedback ? (
-                  <span
-                    className={`inline-flex items-center gap-1.5 ${
-                      attachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
-                    }`}
-                  >
-                    <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
-                      <AnimatedCheckIcon size={11} strokeWidth={3} />
-                    </span>
-                    <span>¡Adjuntado!</span>
-                  </span>
-                ) : (
-                  <>
-                    <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
-                    Adjuntar
-                  </>
-                )}
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(event) => {
-                  addFiles(Array.from(event.target.files ?? []));
-                  event.target.value = "";
-                }}
-              />
-              <CannedPicker onPick={insertCanned} />
-              <span className="truncate text-[11px] font-medium text-zinc-400">
-                Hasta {MAX_FILES} archivos, 10 MB · también puedes soltarlos aquí
-              </span>
-
-              <div className="ml-auto flex shrink-0 gap-2">
-                <PfButton variant="ghost" size="sm" className="h-8 px-3" onClick={closeComposer}>
-                  Cancelar
-                </PfButton>
-                <SendValidationButton
-                  ready={replyReady}
-                  sending={sending}
-                  missingItems={replyMissingItems}
-                  onSend={handleReply}
-                  onFocusField={handleFocusReplyField}
-                />
-              </div>
-            </div>
-          </div>
+          <ReplyComposer
+            containerRef={replyContainerRef}
+            isForward={isForward}
+            subject={email.subject}
+            fromEmail={email.fromEmail}
+            replyAll={replyAll}
+            originalAttachmentCount={email.attachments.length}
+            toRef={toRef}
+            forwardTo={forwardTo}
+            onForwardToChange={setForwardTo}
+            ccRef={ccRef}
+            cc={replyCc}
+            onCcChange={setReplyCc}
+            ccOpen={ccOpen}
+            onCcOpenChange={setCcOpen}
+            bccRef={bccRef}
+            bcc={replyBcc}
+            onBccChange={setReplyBcc}
+            bccOpen={bccOpen}
+            onBccOpenChange={setBccOpen}
+            includeAttachments={includeAttachments}
+            onIncludeAttachmentsChange={setIncludeAttachments}
+            editorKey={editorKey}
+            draftBlocks={draftBlocks}
+            onBlocksChange={setReplyBlocks}
+            attachments={attachments}
+            error={replyError}
+            onInsertCanned={insertCanned}
+            ready={replyReady}
+            sending={sending}
+            missingItems={replyMissingItems}
+            onSend={handleReply}
+            onFocusField={handleFocusReplyField}
+            onClose={closeComposer}
+          />
         )}
 
         {openReply && (

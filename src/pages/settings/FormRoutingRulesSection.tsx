@@ -1,23 +1,24 @@
-import { Clock, FileSpreadsheet, Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Clock, FileSpreadsheet, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
-import { RowAction } from "../../components/ui/RowAction";
-import { TableSkeleton } from "../../components/ui/Skeleton";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { REQUIRED_FORMS, ROUTING_MOMENTS, type FormRoutingRule } from "../../types/settings";
+import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass } from "./catalogState";
+import { freshCopy } from "./catalogState";
 import { FormRoutingRuleModal } from "./FormRoutingRuleModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
@@ -32,13 +33,11 @@ export function FormRoutingRulesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<FormRoutingRule, "nueva">();
   const [form, setForm] = useState("todos");
   const [moment, setMoment] = useState("todos");
   const [chip, setChip] = useState<ChipKey>("todas");
   const [pageSize, setPageSize] = useState(10);
-  const [modal, setModal] = useState<"nueva" | FormRoutingRule | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
     fetch: settingsApi.formRoutingRules.list,
@@ -60,7 +59,7 @@ export function FormRoutingRulesSection() {
   }
 
   function askDelete(rule: FormRoutingRule) {
-    setConfirmation({
+    confirm(rule.id, {
       tone: "danger",
       icon: Trash2,
       title: "Eliminar regla",
@@ -71,19 +70,14 @@ export function FormRoutingRulesSection() {
       ),
       confirmLabel: "Eliminar",
       onConfirm: async () => {
-        setBusyId(rule.id);
-        try {
-          await settingsApi.formRoutingRules.remove(rule.id);
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        await settingsApi.formRoutingRules.remove(rule.id);
+        refresh();
       },
     });
   }
 
   function askToggle(rule: FormRoutingRule) {
-    setConfirmation({
+    confirm(rule.id, {
       tone: "warn",
       icon: Power,
       title: rule.isActive ? "Desactivar regla" : "Reactivar regla",
@@ -94,21 +88,16 @@ export function FormRoutingRulesSection() {
       ),
       confirmLabel: rule.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(rule.id);
-        try {
-          const current = await freshCopy(settingsApi.formRoutingRules.get, rule);
-          await settingsApi.formRoutingRules.update(current.id, {
-            form: current.form,
-            moment: current.moment,
-            departmentId: current.departmentId,
-            teamId: current.teamId,
-            isBlocking: current.isBlocking,
-            isActive: !current.isActive,
-          });
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        const current = await freshCopy(settingsApi.formRoutingRules.get, rule);
+        await settingsApi.formRoutingRules.update(current.id, {
+          form: current.form,
+          moment: current.moment,
+          departmentId: current.departmentId,
+          teamId: current.teamId,
+          isBlocking: current.isBlocking,
+          isActive: !current.isActive,
+        });
+        refresh();
       },
     });
   }
@@ -118,52 +107,47 @@ export function FormRoutingRulesSection() {
       <ModuleHeader
         title="Formularios"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "regla" : "reglas"}
-                count={counts.all}
-                active={chip === "todas"}
-                onClick={() => {
-                  setChip("todas");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todas las reglas de enrutamiento"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activa" : "activas"}
-                count={counts.active}
-                active={chip === "activas"}
-                onClick={() => {
-                  setChip("activas");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por reglas activas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactiva" : "inactivas"}
-                count={counts.inactive}
-                active={chip === "inactivas"}
-                onClick={() => {
-                  setChip("inactivas");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por reglas inactivas"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando las reglas de enrutamiento de formularios…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando las reglas de enrutamiento de formularios…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "regla" : "reglas"}
+                  count={counts.all}
+                  active={chip === "todas"}
+                  onClick={() => {
+                    setChip("todas");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todas las reglas de enrutamiento"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activa" : "activas"}
+                  count={counts.active}
+                  active={chip === "activas"}
+                  onClick={() => {
+                    setChip("activas");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por reglas activas"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactiva" : "inactivas"}
+                  count={counts.inactive}
+                  active={chip === "inactivas"}
+                  onClick={() => {
+                    setChip("inactivas");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por reglas inactivas"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -207,85 +191,80 @@ export function FormRoutingRulesSection() {
           </>
         }
         footer={
-          data !== null &&
-          data.total > 0 && (
-            <Pagination
-              page={page}
-              pageSize={pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="reglas"
-              nounSingular="regla"
-            />
-          )
+          <ListPagination
+            data={data}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="reglas"
+            nounSingular="regla"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={5} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering ? "Ninguna regla coincide con este filtro." : "Todavía no hay reglas. La carga inicial trae las de la hoja FORMULARIOS."}
-          </p>
-        ) : (
-          <div className={staleClass(isStale)}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Formulario</Th>
-                  <Th>Momento</Th>
-                  <Th>Aplica a</Th>
-                  <Th>Bloquea el cierre</Th>
-                  <Th>Estado</Th>
-                  {canWrite && <Th className="w-32 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
-              <tbody>
-                {rows.map((rule) => (
-                  <Row key={rule.id} busy={busyId === rule.id}>
-                    <Td className="text-[12.5px] font-medium text-ink">{rule.formLabel}</Td>
-                    <Td className="text-[12.5px] text-subtle">{rule.momentLabel}</Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      {rule.departmentName ? (
-                        <span>
-                          {rule.departmentName} <span className="text-faint">y sus hijos</span>
-                        </span>
-                      ) : (
-                        <span>
-                          Equipo <span className="text-ink">{rule.teamName}</span>
-                        </span>
-                      )}
-                    </Td>
-                    <Td>{rule.isBlocking ? <Badge tone="warn">Sí</Badge> : <span className="text-[12.5px] text-faint">No</span>}</Td>
-                    <Td>
-                      <StatusDot active={rule.isActive} />
-                    </Td>
-                    {canWrite && (
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction label={`Editar ${describe(rule)}`} icon={Pencil} onClick={() => setModal(rule)} disabled={busyId === rule.id} />
-                          <RowAction
-                            label={rule.isActive ? `Desactivar ${describe(rule)}` : `Reactivar ${describe(rule)}`}
-                            icon={Power}
-                            onClick={() => askToggle(rule)}
-                            disabled={busyId === rule.id}
-                          />
-                          <RowAction label={`Eliminar ${describe(rule)}`} icon={Trash2} danger onClick={() => askDelete(rule)} disabled={busyId === rule.id} />
-                        </div>
-                      </Td>
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={5}
+          empty={
+            isFiltering ? "Ninguna regla coincide con este filtro." : "Todavía no hay reglas. La carga inicial trae las de la hoja FORMULARIOS."
+          }
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Formulario</Th>
+                <Th>Momento</Th>
+                <Th>Aplica a</Th>
+                <Th>Bloquea el cierre</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-32 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
+            <tbody>
+              {rows.map((rule) => (
+                <Row key={rule.id} busy={busyId === rule.id}>
+                  <Td className="text-[12.5px] font-medium text-ink">{rule.formLabel}</Td>
+                  <Td className="text-[12.5px] text-subtle">{rule.momentLabel}</Td>
+                  <Td className="text-[12.5px] text-subtle">
+                    {rule.departmentName ? (
+                      <span>
+                        {rule.departmentName} <span className="text-faint">y sus hijos</span>
+                      </span>
+                    ) : (
+                      <span>
+                        Equipo <span className="text-ink">{rule.teamName}</span>
+                      </span>
                     )}
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+                  </Td>
+                  <Td>{rule.isBlocking ? <Badge tone="warn">Sí</Badge> : <span className="text-[12.5px] text-faint">No</span>}</Td>
+                  <Td>
+                    <StatusDot active={rule.isActive} />
+                  </Td>
+                  {canWrite && (
+                    <Td>
+                      <CatalogRowActions
+                        name={describe(rule)}
+                        isActive={rule.isActive}
+                        busy={busyId === rule.id}
+                        onEdit={() => setModal(rule)}
+                        onToggle={() => askToggle(rule)}
+                        onDelete={() => askDelete(rule)}
+                      />
+                    </Td>
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {modal !== null && <FormRoutingRuleModal rule={modal === "nueva" ? undefined : modal} onClose={() => setModal(null)} onSaved={refresh} />}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </>
   );
 }

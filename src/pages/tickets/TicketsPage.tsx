@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
 import { useNavigate } from "react-router-dom";
-import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
+import { FilterDropdown, type FilterOption } from "../../components/ui/FilterDropdown";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
 import { departmentsApi } from "../../api/departments";
@@ -456,7 +456,7 @@ export function TicketsPage() {
   // rotula con el camino, como el filtro, y cae al nombre si el id no está.
   const departmentPathById = departmentPaths(departments);
 
-  const priorityFilterOptions: TicketFilterOption[] = [
+  const priorityFilterOptions: FilterOption[] = [
     {
       value: "todas",
       label: "Todas las prioridades",
@@ -610,7 +610,7 @@ export function TicketsPage() {
                   placeholder="Buscar por número, asunto o cliente…"
                   className="w-[280px] sm:w-[300px]"
                 />
-                <TicketFilterDropdown
+                <FilterDropdown
                   title="Seleccionar departamento"
                   value={String(departmentId)}
                   onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
@@ -620,7 +620,7 @@ export function TicketsPage() {
                   searchable
                   searchPlaceholder="Buscar departamento…"
                 />
-                <TicketFilterDropdown
+                <FilterDropdown
                   title="Seleccionar prioridad"
                   value={priority}
                   onChange={setPriority}

@@ -1,25 +1,26 @@
 import { Ban, CheckCircle2, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Pagination } from "../../components/ui/Pagination";
-import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useReceipts } from "../../context/useReceipts";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { ProductLine } from "../../types/settings";
 import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass } from "./catalogState";
+import { freshCopy } from "./catalogState";
 import { ProductLineModal } from "./ProductLineModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
@@ -29,14 +30,11 @@ export function ProductLinesSection() {
   const canWrite = can("settings.write");
   const receipts = useReceipts();
 
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<ProductLine, "nueva">();
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
   const [pageSize, setPageSize] = useState(10);
-
-  const [modal, setModal] = useState<"nueva" | ProductLine | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -67,7 +65,7 @@ export function ProductLinesSection() {
    */
   function askToggle(line: ProductLine) {
     const willDeactivate = line.isActive;
-    setConfirmation({
+    confirm(line.id, {
       tone: "warn",
       icon: willDeactivate ? Ban : CheckCircle2,
       title: willDeactivate ? "Desactivar línea" : "Reactivar línea",
@@ -84,7 +82,6 @@ export function ProductLinesSection() {
       ),
       confirmLabel: willDeactivate ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(line.id);
         try {
           const current = await freshCopy(settingsApi.productLines.get, line);
           const nextActive = !current.isActive;
@@ -105,8 +102,6 @@ export function ProductLinesSection() {
             title: willDeactivate ? "No se pudo desactivar la línea" : "No se pudo reactivar la línea",
             detail: err instanceof Error ? err.message : undefined,
           });
-        } finally {
-          setBusyId(null);
         }
       },
     });
@@ -117,52 +112,47 @@ export function ProductLinesSection() {
       <ModuleHeader
         title="Líneas de producto"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "línea" : "líneas"}
-                count={counts.all}
-                active={chip === "todas"}
-                onClick={() => {
-                  setChip("todas");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todas las líneas de producto"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activa" : "activas"}
-                count={counts.active}
-                active={chip === "activas"}
-                onClick={() => {
-                  setChip("activas");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por líneas activas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactiva" : "inactivas"}
-                count={counts.inactive}
-                active={chip === "inactivas"}
-                onClick={() => {
-                  setChip("inactivas");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por líneas inactivas"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando las líneas de producto…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando las líneas de producto…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "línea" : "líneas"}
+                  count={counts.all}
+                  active={chip === "todas"}
+                  onClick={() => {
+                    setChip("todas");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todas las líneas de producto"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activa" : "activas"}
+                  count={counts.active}
+                  active={chip === "activas"}
+                  onClick={() => {
+                    setChip("activas");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por líneas activas"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactiva" : "inactivas"}
+                  count={counts.inactive}
+                  active={chip === "inactivas"}
+                  onClick={() => {
+                    setChip("inactivas");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por líneas inactivas"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -189,75 +179,72 @@ export function ProductLinesSection() {
           </>
         }
         footer={
-          data !== null &&
-          data.total > 0 && (
-            <Pagination
-              page={page}
-              pageSize={pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="líneas"
-            />
-          )
+          <ListPagination
+            data={data}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="líneas"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={4} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={4}
+          empty={
+            isFiltering
               ? "Ninguna línea coincide con este filtro o búsqueda."
-              : "Todavía no hay ninguna línea de producto configurada."}
-          </p>
-        ) : (
-          <div className={staleClass(isStale)}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Código</Th>
-                  <Th>Línea</Th>
-                  <Th>Estado</Th>
-                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
+              : "Todavía no hay ninguna línea de producto configurada."
+          }
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Código</Th>
+                <Th>Línea</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-              <tbody>
-                {rows.map((line) => (
-                  <Row key={line.id} busy={busyId === line.id}>
+            <tbody>
+              {rows.map((line) => (
+                <Row key={line.id} busy={busyId === line.id}>
+                  <Td>
+                    <span className="font-mono text-[12px] text-brand-gray">{line.code}</span>
+                  </Td>
+                  <Td className="text-[12.5px] font-medium text-ink">{line.name}</Td>
+                  <Td>
+                    <StatusDot active={line.isActive} />
+                  </Td>
+                  {canWrite && (
                     <Td>
-                      <span className="font-mono text-[12px] text-brand-gray">{line.code}</span>
+                      <div className="flex items-center justify-end gap-1">
+                        <RowAction
+                          label={`Editar ${line.name}`}
+                          icon={Pencil}
+                          onClick={() => setModal(line)}
+                          disabled={busyId === line.id}
+                        />
+                        <RowAction
+                          label={line.isActive ? `Desactivar ${line.name}` : `Reactivar ${line.name}`}
+                          icon={line.isActive ? Ban : CheckCircle2}
+                          onClick={() => askToggle(line)}
+                          disabled={busyId === line.id}
+                          danger={line.isActive}
+                        />
+                      </div>
                     </Td>
-                    <Td className="text-[12.5px] font-medium text-ink">{line.name}</Td>
-                    <Td>
-                      <StatusDot active={line.isActive} />
-                    </Td>
-                    {canWrite && (
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar ${line.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(line)}
-                            disabled={busyId === line.id}
-                          />
-                          <RowAction
-                            label={line.isActive ? `Desactivar ${line.name}` : `Reactivar ${line.name}`}
-                            icon={line.isActive ? Ban : CheckCircle2}
-                            onClick={() => askToggle(line)}
-                            disabled={busyId === line.id}
-                            danger={line.isActive}
-                          />
-                        </div>
-                      </Td>
-                    )}
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {modal !== null && (
@@ -276,7 +263,7 @@ export function ProductLinesSection() {
         />
       )}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </>
   );
 }

@@ -3,14 +3,15 @@ import { Check, Power, ShieldCheck } from "lucide-react";
 import React, { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { ApiError } from "../../api/client";
 import { rolesApi } from "../../api/roles";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { applyServerError } from "../../lib/formErrors";
 import type { RoleResponse } from "../../types/api";
+import { FormDivider } from "../../components/ui/FormDivider";
 
 const schema = z.object({
   name: z
@@ -22,17 +23,6 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
-
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-zinc-100" />
-    </div>
-  );
-}
 
 interface RoleModalProps {
   /** Presente = edición; ausente = alta. */
@@ -82,14 +72,17 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
       }
       requestClose();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setError("name", { message: err.message });
-        setFocus("name");
-        return;
-      }
-
       const fallback = isEdit ? "No se pudo guardar el rol" : "No se pudo crear el rol";
-      setFormError(err instanceof ApiError ? err.message : fallback);
+      setFormError(
+        applyServerError(err, {
+          setError,
+          setFocus,
+          rules: [{ field: "name" }],
+          statuses: [409],
+          focusable: ["name"],
+          fallback,
+        }),
+      );
     }
   }
 
@@ -114,26 +107,13 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" form="role-form" size="sm" isLoading={isSubmitting}>
-              {isEdit ? "Guardar cambios" : "Crear rol"}
-            </Button>
-          </div>
-        </div>
+        <ShortcutModalFooter
+          formId="role-form"
+          isEdit={isEdit}
+          createLabel="Crear rol"
+          isSubmitting={isSubmitting}
+          onCancel={requestClose}
+        />
       }
     >
       <form

@@ -7,8 +7,8 @@ import { departmentsApi } from "../../api/departments";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
 import { departmentPathOptions } from "../../lib/departments";
 import type { DepartmentResponse } from "../../types/api";
@@ -116,14 +116,13 @@ export function FormRoutingRuleModal({ rule, onClose, onSaved }: FormRoutingRule
       description="Quién llena o consulta un formulario y en qué momento. Un departamento incluye a sus hijos."
       onClose={onClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="routing-rule-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear regla"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="routing-rule-form"
+          isEdit={isEdit}
+          createLabel="Crear regla"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form id="routing-rule-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">

@@ -1,25 +1,26 @@
-import { Calendar, CalendarOff, Pencil, Plus, Power } from "lucide-react";
+import { Calendar, CalendarOff, Plus } from "lucide-react";
 import { useState } from "react";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { RowAction } from "../../components/ui/RowAction";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Pagination } from "../../components/ui/Pagination";
-import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { WEEKDAYS, type Holiday, type SlaPolicy } from "../../types/settings";
+import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass, useReferenceData } from "./catalogState";
+import { freshCopy, useReferenceData } from "./catalogState";
 import { HolidayModal } from "./HolidayModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -74,15 +75,12 @@ export function HolidaysSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Holiday>();
 
   const [search, setSearch] = useState("");
   const [year, setYear] = useState<string>("todos");
   const [chip, setChip] = useState<ChipKey>("todos");
   const [pageSize, setPageSize] = useState(10);
-
-  const [modal, setModal] = useState<"nuevo" | Holiday | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -131,7 +129,7 @@ export function HolidaysSection() {
   }
 
   function askToggle(holiday: Holiday) {
-    setConfirmation({
+    confirm(holiday.id, {
       tone: "warn",
       icon: CalendarOff,
       title: holiday.isActive ? "Desactivar día no laborable" : "Reactivar día no laborable",
@@ -149,18 +147,13 @@ export function HolidaysSection() {
       ),
       confirmLabel: holiday.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(holiday.id);
-        try {
-          const current = await freshCopy(settingsApi.holidays.get, holiday);
-          await settingsApi.holidays.update(current.id, {
-            date: current.date,
-            name: current.name,
-            isActive: !current.isActive,
-          });
-          reloadAll();
-        } finally {
-          setBusyId(null);
-        }
+        const current = await freshCopy(settingsApi.holidays.get, holiday);
+        await settingsApi.holidays.update(current.id, {
+          date: current.date,
+          name: current.name,
+          isActive: !current.isActive,
+        });
+        reloadAll();
       },
     });
   }
@@ -170,52 +163,47 @@ export function HolidaysSection() {
       <ModuleHeader
         title="Días no laborables"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "día registrado" : "días registrados"}
-                count={counts.all}
-                active={chip === "todos"}
-                onClick={() => {
-                  setChip("todos");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todos los días registrados"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={chip === "activos"}
-                onClick={() => {
-                  setChip("activos");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por días activos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                count={counts.inactive}
-                active={chip === "inactivos"}
-                onClick={() => {
-                  setChip("inactivos");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por días inactivos"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando el calendario de días no laborables…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando el calendario de días no laborables…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "día registrado" : "días registrados"}
+                  count={counts.all}
+                  active={chip === "todos"}
+                  onClick={() => {
+                    setChip("todos");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todos los días registrados"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={chip === "activos"}
+                  onClick={() => {
+                    setChip("activos");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por días activos"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                  count={counts.inactive}
+                  active={chip === "inactivos"}
+                  onClick={() => {
+                    setChip("inactivos");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por días inactivos"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -269,105 +257,91 @@ export function HolidaysSection() {
           </>
         }
         footer={
-          data !== null &&
-          data.total > 0 && (
-            <Pagination
-              page={page}
-              pageSize={pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="días"
-            />
-          )
+          <ListPagination
+            data={data}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="días"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={6} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={6}
+          empty={
+            isFiltering
               ? "Ningún día coincide con este filtro o búsqueda."
-              : "Todavía no hay ningún día no laborable registrado."}
-          </p>
-        ) : (
-          <div className={staleClass(isStale)}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Fecha</Th>
-                  <Th>Día</Th>
-                  <Th>Motivo del cierre</Th>
-                  <Th>Mueve vencimientos</Th>
-                  <Th>Estado</Th>
-                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
+              : "Todavía no hay ningún día no laborable registrado."
+          }
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Fecha</Th>
+                <Th>Día</Th>
+                <Th>Motivo del cierre</Th>
+                <Th>Mueve vencimientos</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-              <tbody>
-                {rows.map((holiday) => (
-                  <Row key={holiday.id} busy={busyId === holiday.id}>
-                    <Td className="text-[12.5px] font-medium tabular-nums text-ink">
-                      {dateFormat.format(asLocalDate(holiday.date))}
-                    </Td>
-                    <Td className="text-[12.5px] capitalize text-brand-gray">
-                      {dayFormat.format(asLocalDate(holiday.date))}
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">{holiday.name}</Td>
-                    <Td className="text-[12.5px] tabular-nums text-brand-gray">
-                      {(() => {
-                        const moved = movedPolicies(holiday);
-                        if (!holiday.isActive) return <span className="text-faint">—</span>;
-                        if (moved.length === 0) {
-                          return (
-                            <span className="text-faint">
-                              Ninguna · cae{" "}
-                              <span className="capitalize">
-                                {dayFormat.format(asLocalDate(holiday.date))}
-                              </span>
-                            </span>
-                          );
-                        }
+            <tbody>
+              {rows.map((holiday) => (
+                <Row key={holiday.id} busy={busyId === holiday.id}>
+                  <Td className="text-[12.5px] font-medium tabular-nums text-ink">
+                    {dateFormat.format(asLocalDate(holiday.date))}
+                  </Td>
+                  <Td className="text-[12.5px] capitalize text-brand-gray">
+                    {dayFormat.format(asLocalDate(holiday.date))}
+                  </Td>
+                  <Td className="text-[12.5px] text-brand-gray">{holiday.name}</Td>
+                  <Td className="text-[12.5px] tabular-nums text-brand-gray">
+                    {(() => {
+                      const moved = movedPolicies(holiday);
+                      if (!holiday.isActive) return <span className="text-faint">—</span>;
+                      if (moved.length === 0) {
                         return (
-                          <span>
-                            {moved.length}{" "}
-                            {moved.length === 1 ? "política de jornada" : "políticas de jornada"}
+                          <span className="text-faint">
+                            Ninguna · cae{" "}
+                            <span className="capitalize">
+                              {dayFormat.format(asLocalDate(holiday.date))}
+                            </span>
                           </span>
                         );
-                      })()}
-                    </Td>
+                      }
+                      return (
+                        <span>
+                          {moved.length}{" "}
+                          {moved.length === 1 ? "política de jornada" : "políticas de jornada"}
+                        </span>
+                      );
+                    })()}
+                  </Td>
+                  <Td>
+                    <StatusDot active={holiday.isActive} />
+                  </Td>
+                  {canWrite && (
                     <Td>
-                      <StatusDot active={holiday.isActive} />
+                      <CatalogRowActions
+                        name={holiday.name}
+                        isActive={holiday.isActive}
+                        busy={busyId === holiday.id}
+                        onEdit={() => setModal(holiday)}
+                        onToggle={() => askToggle(holiday)}
+                      />
                     </Td>
-                    {canWrite && (
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar ${holiday.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(holiday)}
-                            disabled={busyId === holiday.id}
-                          />
-                          <RowAction
-                            label={
-                              holiday.isActive
-                                ? `Desactivar ${holiday.name}`
-                                : `Reactivar ${holiday.name}`
-                            }
-                            icon={Power}
-                            onClick={() => askToggle(holiday)}
-                            disabled={busyId === holiday.id}
-                          />
-                        </div>
-                      </Td>
-                    )}
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {modal !== null && (
@@ -378,7 +352,7 @@ export function HolidaysSection() {
         />
       )}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </>
   );
 }

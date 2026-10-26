@@ -6,9 +6,10 @@ import { ApiError } from "../../api/client";
 import { rolesApi } from "../../api/roles";
 import { staffApi } from "../../api/staff";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
+import { FormDivider } from "../../components/ui/FormDivider";
 import { Modal } from "../../components/ui/Modal";
+import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { departmentPathOptions } from "../../lib/departments";
@@ -47,17 +48,6 @@ interface StaffModalProps {
   staff?: StaffResponse;
   onClose: () => void;
   onSaved: (staff: StaffResponse) => void;
-}
-
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-zinc-100" />
-    </div>
-  );
 }
 
 /** Alta y edición de personal con diseño compacto siguiendo el estándar de ClientModal. */
@@ -224,26 +214,13 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" form="staff-form" size="sm" isLoading={isSubmitting}>
-              {isEdit ? "Guardar cambios" : "Crear colaborador"}
-            </Button>
-          </div>
-        </div>
+        <ShortcutModalFooter
+          formId="staff-form"
+          isEdit={isEdit}
+          createLabel="Crear colaborador"
+          isSubmitting={isSubmitting}
+          onCancel={requestClose}
+        />
       }
     >
       <form

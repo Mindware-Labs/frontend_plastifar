@@ -2,14 +2,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { ApiError } from "../../api/client";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
 import { MAILBOX_PROVIDERS, type Mailbox } from "../../types/settings";
 import { departmentOptions } from "../../lib/departments";
+import { applyServerError } from "../../lib/formErrors";
 
 /**
  * Espejo de la validacion del servidor en POST/PUT /api/settings/mailboxes:
@@ -87,12 +87,16 @@ export function MailboxModal({ mailbox, departments, onClose, onSaved }: Mailbox
       onSaved(saved);
       onClose();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setError("address", { message: err.message });
-        setFocus("address");
-        return;
-      }
-      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar el buzón");
+      setFormError(
+        applyServerError(err, {
+          setError,
+          setFocus,
+          rules: [{ field: "address" }],
+          statuses: [409],
+          focusable: ["address"],
+          fallback: "No se pudo guardar el buzón",
+        }),
+      );
     }
   }
 
@@ -102,14 +106,13 @@ export function MailboxModal({ mailbox, departments, onClose, onSaved }: Mailbox
       description="Solo la administración del buzón. La lectura del correo entrante llega con la ingesta por correo, todavía pendiente."
       onClose={onClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="mailbox-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear buzón"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="mailbox-form"
+          isEdit={isEdit}
+          createLabel="Crear buzón"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form

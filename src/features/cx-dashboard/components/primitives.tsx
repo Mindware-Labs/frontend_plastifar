@@ -1,7 +1,7 @@
 import { Check, ChevronDown } from "lucide-react";
 import { useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { AVATAR, C, CARD_PAD, FONT, NUM, S, T, hueFor, n } from "../styles";
-import { useClickOutside } from "./useClickOutside";
+import { useClickOutside } from "../../../hooks/useClickOutside";
 
 /**
  * La caja del tablero.

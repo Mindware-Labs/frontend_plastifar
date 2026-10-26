@@ -1,26 +1,27 @@
-import { FileSpreadsheet, Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { FileSpreadsheet, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
-import { RowAction } from "../../components/ui/RowAction";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { Tooltip } from "../../components/ui/Tooltip";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { REQUIRED_FORMS, type TaskType } from "../../types/settings";
+import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert, WarnNotice } from "./catalogSection";
-import { freshCopy, staleClass } from "./catalogState";
+import { freshCopy } from "./catalogState";
 import { TaskTypeModal } from "./TaskTypeModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -40,13 +41,11 @@ export function TaskTypesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<TaskType>();
   const [search, setSearch] = useState("");
   const [form, setForm] = useState("todos");
   const [chip, setChip] = useState<ChipKey>("todos");
   const [pageSize, setPageSize] = useState(10);
-  const [modal, setModal] = useState<"nuevo" | TaskType | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -67,7 +66,7 @@ export function TaskTypesSection() {
   const undecided = rows.some((type) => type.businessDaysOnly === null);
 
   function askDelete(type: TaskType) {
-    setConfirmation({
+    confirm(type.id, {
       tone: "danger",
       icon: Trash2,
       title: "Eliminar tipo de tarea",
@@ -79,19 +78,14 @@ export function TaskTypesSection() {
       ),
       confirmLabel: "Eliminar",
       onConfirm: async () => {
-        setBusyId(type.id);
-        try {
-          await settingsApi.taskTypes.remove(type.id);
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        await settingsApi.taskTypes.remove(type.id);
+        refresh();
       },
     });
   }
 
   function askToggle(type: TaskType) {
-    setConfirmation({
+    confirm(type.id, {
       tone: "warn",
       icon: Power,
       title: type.isActive ? "Desactivar tipo de tarea" : "Reactivar tipo de tarea",
@@ -107,22 +101,17 @@ export function TaskTypesSection() {
       ),
       confirmLabel: type.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(type.id);
-        try {
-          const current = await freshCopy(settingsApi.taskTypes.get, type);
-          await settingsApi.taskTypes.update(current.id, {
-            name: current.name,
-            slaDays: current.slaDays,
-            businessDaysOnly: current.businessDaysOnly,
-            requiredForm: current.requiredForm,
-            departmentIds: current.departments.map((d) => d.id),
-            assigneeStaffIds: current.assignees.map((a) => a.staffId),
-            isActive: !current.isActive,
-          });
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        const current = await freshCopy(settingsApi.taskTypes.get, type);
+        await settingsApi.taskTypes.update(current.id, {
+          name: current.name,
+          slaDays: current.slaDays,
+          businessDaysOnly: current.businessDaysOnly,
+          requiredForm: current.requiredForm,
+          departmentIds: current.departments.map((d) => d.id),
+          assigneeStaffIds: current.assignees.map((a) => a.staffId),
+          isActive: !current.isActive,
+        });
+        refresh();
       },
     });
   }
@@ -132,52 +121,47 @@ export function TaskTypesSection() {
       <ModuleHeader
         title="Tipos de tarea"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "tipo de tarea" : "tipos de tarea"}
-                count={counts.all}
-                active={chip === "todos"}
-                onClick={() => {
-                  setChip("todos");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todos los tipos de tarea"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={chip === "activos"}
-                onClick={() => {
-                  setChip("activos");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por tipos de tarea activos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                count={counts.inactive}
-                active={chip === "inactivos"}
-                onClick={() => {
-                  setChip("inactivos");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por tipos de tarea inactivos"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando el catálogo de tipos de tarea…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando el catálogo de tipos de tarea…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "tipo de tarea" : "tipos de tarea"}
+                  count={counts.all}
+                  active={chip === "todos"}
+                  onClick={() => {
+                    setChip("todos");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todos los tipos de tarea"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={chip === "activos"}
+                  onClick={() => {
+                    setChip("activos");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por tipos de tarea activos"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                  count={counts.inactive}
+                  active={chip === "inactivos"}
+                  onClick={() => {
+                    setChip("inactivos");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por tipos de tarea inactivos"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -225,105 +209,100 @@ export function TaskTypesSection() {
           </>
         }
         footer={
-          data !== null &&
-          data.total > 0 && (
-            <Pagination
-              page={page}
-              pageSize={pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="tipos de tarea"
-              nounSingular="tipo de tarea"
-            />
-          )
+          <ListPagination
+            data={data}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="tipos de tarea"
+            nounSingular="tipo de tarea"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={6} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering ? "Ningún tipo coincide con este filtro o búsqueda." : "Todavía no hay tipos de tarea. La carga inicial trae los 13 de la hoja SLA."}
-          </p>
-        ) : (
-          <div className={staleClass(isStale)}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Tipo de tarea</Th>
-                  <Th>Plazo</Th>
-                  <Th>Departamentos</Th>
-                  <Th>Responsables</Th>
-                  <Th>Formulario exigido</Th>
-                  <Th>Estado</Th>
-                  {canWrite && <Th className="w-32 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
-              <tbody>
-                {rows.map((type) => (
-                  <Row key={type.id} busy={busyId === type.id}>
-                    <Td className="text-[12.5px] font-medium text-ink">{type.name}</Td>
-                    <Td className="whitespace-nowrap text-[12.5px] text-subtle">
-                      <span className="tabular-nums text-ink">{type.slaDays}</span> {type.slaDays === 1 ? "día" : "días"}{" "}
-                      <span className={type.businessDaysOnly === null ? "text-warn" : "text-faint"}>({daysLabel(type.businessDaysOnly)})</span>
-                    </Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      <span className="block max-w-[220px] truncate" title={type.departments.map((d) => d.name).join(", ")}>
-                        {type.departments.map((d) => d.name).join(", ") || "—"}
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={6}
+          empty={
+            isFiltering ? "Ningún tipo coincide con este filtro o búsqueda." : "Todavía no hay tipos de tarea. La carga inicial trae los 13 de la hoja SLA."
+          }
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Tipo de tarea</Th>
+                <Th>Plazo</Th>
+                <Th>Departamentos</Th>
+                <Th>Responsables</Th>
+                <Th>Formulario exigido</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-32 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
+            <tbody>
+              {rows.map((type) => (
+                <Row key={type.id} busy={busyId === type.id}>
+                  <Td className="text-[12.5px] font-medium text-ink">{type.name}</Td>
+                  <Td className="whitespace-nowrap text-[12.5px] text-subtle">
+                    <span className="tabular-nums text-ink">{type.slaDays}</span> {type.slaDays === 1 ? "día" : "días"}{" "}
+                    <span className={type.businessDaysOnly === null ? "text-warn" : "text-faint"}>({daysLabel(type.businessDaysOnly)})</span>
+                  </Td>
+                  <Td className="text-[12.5px] text-subtle">
+                    <span className="block max-w-[220px] truncate" title={type.departments.map((d) => d.name).join(", ")}>
+                      {type.departments.map((d) => d.name).join(", ") || "—"}
+                    </span>
+                  </Td>
+                  <Td className="text-[12.5px] text-subtle">
+                    {type.assignees.length === 0 ? (
+                      <span className="text-faint">Sin responsable habitual</span>
+                    ) : (
+                      <span className="inline-flex flex-wrap items-center gap-1.5">
+                        {type.assignees.map((a) => (
+                          <span key={a.staffId} className="inline-flex items-center gap-1">
+                            {a.name}
+                            {!a.isActive && <Badge tone="neutral">Inactivo</Badge>}
+                          </span>
+                        ))}
                       </span>
-                    </Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      {type.assignees.length === 0 ? (
-                        <span className="text-faint">Sin responsable habitual</span>
-                      ) : (
-                        <span className="inline-flex flex-wrap items-center gap-1.5">
-                          {type.assignees.map((a) => (
-                            <span key={a.staffId} className="inline-flex items-center gap-1">
-                              {a.name}
-                              {!a.isActive && <Badge tone="neutral">Inactivo</Badge>}
-                            </span>
-                          ))}
-                        </span>
-                      )}
-                    </Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      {type.requiredFormLabel ? (
-                        <Tooltip content="La tarea no podrá completarse sin este formulario (cuando la Bandeja lo compruebe).">
-                          <Badge tone="warn">{type.requiredFormLabel}</Badge>
-                        </Tooltip>
-                      ) : (
-                        <span className="text-faint">Ninguno</span>
-                      )}
-                    </Td>
-                    <Td>
-                      <StatusDot active={type.isActive} />
-                    </Td>
-                    {canWrite && (
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction label={`Editar ${type.name}`} icon={Pencil} onClick={() => setModal(type)} disabled={busyId === type.id} />
-                          <RowAction
-                            label={type.isActive ? `Desactivar ${type.name}` : `Reactivar ${type.name}`}
-                            icon={Power}
-                            onClick={() => askToggle(type)}
-                            disabled={busyId === type.id}
-                          />
-                          <RowAction label={`Eliminar ${type.name}`} icon={Trash2} danger onClick={() => askDelete(type)} disabled={busyId === type.id} />
-                        </div>
-                      </Td>
                     )}
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+                  </Td>
+                  <Td className="text-[12.5px] text-subtle">
+                    {type.requiredFormLabel ? (
+                      <Tooltip content="La tarea no podrá completarse sin este formulario (cuando la Bandeja lo compruebe).">
+                        <Badge tone="warn">{type.requiredFormLabel}</Badge>
+                      </Tooltip>
+                    ) : (
+                      <span className="text-faint">Ninguno</span>
+                    )}
+                  </Td>
+                  <Td>
+                    <StatusDot active={type.isActive} />
+                  </Td>
+                  {canWrite && (
+                    <Td>
+                      <CatalogRowActions
+                        name={type.name}
+                        isActive={type.isActive}
+                        busy={busyId === type.id}
+                        onEdit={() => setModal(type)}
+                        onToggle={() => askToggle(type)}
+                        onDelete={() => askDelete(type)}
+                      />
+                    </Td>
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {modal !== null && <TaskTypeModal taskType={modal === "nuevo" ? undefined : modal} onClose={() => setModal(null)} onSaved={refresh} />}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </>
   );
 }

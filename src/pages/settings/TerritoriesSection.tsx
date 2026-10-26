@@ -1,26 +1,27 @@
 import { Ban, CheckCircle2, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { territoriesApi, type TerritoryQuery } from "../../api/territories";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Pagination } from "../../components/ui/Pagination";
-import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useReceipts } from "../../context/useReceipts";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { Territory } from "../../types/clients";
 import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass } from "./catalogState";
+import { freshCopy } from "./catalogState";
 import { TerritoryModal } from "./TerritoryModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -33,14 +34,11 @@ export function TerritoriesSection() {
   const canWrite = can("settings.write");
 
   const receipts = useReceipts();
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Territory>();
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
   const [pageSize, setPageSize] = useState(10);
-
-  const [modal, setModal] = useState<"nuevo" | Territory | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -68,7 +66,7 @@ export function TerritoriesSection() {
 
   function askToggle(territory: Territory) {
     const willDeactivate = territory.isActive;
-    setConfirmation({
+    confirm(territory.id, {
       tone: "warn",
       icon: willDeactivate ? Ban : CheckCircle2,
       title: willDeactivate ? "Desactivar territorio" : "Reactivar territorio",
@@ -89,7 +87,6 @@ export function TerritoriesSection() {
       ),
       confirmLabel: willDeactivate ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(territory.id);
         try {
           const current = await freshCopy(territoriesApi.get, territory);
           const nextActive = !current.isActive;
@@ -110,8 +107,6 @@ export function TerritoriesSection() {
             title: willDeactivate ? "No se pudo desactivar el territorio" : "No se pudo reactivar el territorio",
             detail: err instanceof Error ? err.message : undefined,
           });
-        } finally {
-          setBusyId(null);
         }
       },
     });
@@ -122,52 +117,47 @@ export function TerritoriesSection() {
       <ModuleHeader
         title="Territorios"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "territorio" : "territorios"}
-                count={counts.all}
-                active={chip === "todos"}
-                onClick={() => {
-                  setChip("todos");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todos los territorios"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={chip === "activos"}
-                onClick={() => {
-                  setChip("activos");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por territorios activos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                count={counts.inactive}
-                active={chip === "inactivos"}
-                onClick={() => {
-                  setChip("inactivos");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por territorios inactivos"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando los territorios…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando los territorios…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "territorio" : "territorios"}
+                  count={counts.all}
+                  active={chip === "todos"}
+                  onClick={() => {
+                    setChip("todos");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todos los territorios"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={chip === "activos"}
+                  onClick={() => {
+                    setChip("activos");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por territorios activos"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                  count={counts.inactive}
+                  active={chip === "inactivos"}
+                  onClick={() => {
+                    setChip("inactivos");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por territorios inactivos"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -194,89 +184,86 @@ export function TerritoriesSection() {
           </>
         }
         footer={
-          data !== null &&
-          data.total > 0 && (
-            <Pagination
-              page={page}
-              pageSize={pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="territorios"
-            />
-          )
+          <ListPagination
+            data={data}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="territorios"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={5} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={5}
+          empty={
+            isFiltering
               ? "Ningún territorio coincide con este filtro o búsqueda."
-              : "Todavía no hay ningún territorio registrado."}
-          </p>
-        ) : (
-          <div className={staleClass(isStale)}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Código</Th>
-                  <Th>Territorio</Th>
-                  <Th>Clientes</Th>
-                  <Th>Estado</Th>
-                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
+              : "Todavía no hay ningún territorio registrado."
+          }
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Código</Th>
+                <Th>Territorio</Th>
+                <Th>Clientes</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-              <tbody>
-                {rows.map((territory) => (
-                  <Row key={territory.id} busy={busyId === territory.id}>
-                    <Td>
-                      <span className="font-mono text-[12px] text-brand-gray">{territory.code}</span>
-                    </Td>
-                    <Td className="text-[12.5px] font-medium text-ink">{territory.name}</Td>
-                    <Td>
-                      {territory.clientCount > 0 ? (
-                        <Badge>
-                          <span className="tabular-nums">{territory.clientCount}</span>
-                        </Badge>
-                      ) : (
-                        <span className="text-[12.5px] text-faint">Ninguno</span>
-                      )}
-                    </Td>
-                    <Td>
-                      <StatusDot active={territory.isActive} />
-                    </Td>
-                    {canWrite && (
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar ${territory.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(territory)}
-                            disabled={busyId === territory.id}
-                          />
-                          <RowAction
-                            label={
-                              territory.isActive
-                                ? `Desactivar ${territory.name}`
-                                : `Reactivar ${territory.name}`
-                            }
-                            icon={territory.isActive ? Ban : CheckCircle2}
-                            onClick={() => askToggle(territory)}
-                            disabled={busyId === territory.id}
-                            danger={territory.isActive}
-                          />
-                        </div>
-                      </Td>
+            <tbody>
+              {rows.map((territory) => (
+                <Row key={territory.id} busy={busyId === territory.id}>
+                  <Td>
+                    <span className="font-mono text-[12px] text-brand-gray">{territory.code}</span>
+                  </Td>
+                  <Td className="text-[12.5px] font-medium text-ink">{territory.name}</Td>
+                  <Td>
+                    {territory.clientCount > 0 ? (
+                      <Badge>
+                        <span className="tabular-nums">{territory.clientCount}</span>
+                      </Badge>
+                    ) : (
+                      <span className="text-[12.5px] text-faint">Ninguno</span>
                     )}
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+                  </Td>
+                  <Td>
+                    <StatusDot active={territory.isActive} />
+                  </Td>
+                  {canWrite && (
+                    <Td>
+                      <div className="flex items-center justify-end gap-1">
+                        <RowAction
+                          label={`Editar ${territory.name}`}
+                          icon={Pencil}
+                          onClick={() => setModal(territory)}
+                          disabled={busyId === territory.id}
+                        />
+                        <RowAction
+                          label={
+                            territory.isActive
+                              ? `Desactivar ${territory.name}`
+                              : `Reactivar ${territory.name}`
+                          }
+                          icon={territory.isActive ? Ban : CheckCircle2}
+                          onClick={() => askToggle(territory)}
+                          disabled={busyId === territory.id}
+                          danger={territory.isActive}
+                        />
+                      </div>
+                    </Td>
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {modal !== null && (
@@ -295,7 +282,7 @@ export function TerritoriesSection() {
         />
       )}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </>
   );
 }

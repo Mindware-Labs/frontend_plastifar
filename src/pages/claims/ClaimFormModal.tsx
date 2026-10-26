@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -7,16 +7,18 @@ import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { LineItemCard } from "../../components/app/LineItemCard";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextAreaField, TextField, type FieldState } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
-import { RowAction } from "../../components/ui/RowAction";
 import { computeLine, computeTotal } from "../../lib/claims";
 import { formatAmount, toNumberOrNull } from "../../lib/numbers";
 import { today } from "../../lib/quality";
+import { hasAtMostDecimals } from "../../lib/validation";
 import {
   CLAIM_AREAS,
   CLAIM_CURRENCIES,
@@ -36,10 +38,7 @@ const quantity = (decimals: number, what: string) =>
     .string()
     .trim()
     .refine((value) => value === "" || (!Number.isNaN(Number(value)) && Number(value) >= 0), `${what}: número de cero en adelante`)
-    .refine(
-      (value) => value === "" || Number((Number(value) * 10 ** decimals).toFixed(6)) % 1 === 0,
-      `${what}: hasta ${decimals} decimales`,
-    );
+    .refine(hasAtMostDecimals(decimals), `${what}: hasta ${decimals} decimales`);
 
 // Espejo de ClaimRules.Validate en el servidor (docs/plan/03, sección 13).
 const schema = z
@@ -295,14 +294,13 @@ export function ClaimFormModal({
       onClose={onClose}
       maxWidth="max-w-3xl"
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="claim-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Registrar reclamación"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="claim-form"
+          isEdit={isEdit}
+          createLabel="Registrar reclamación"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form id="claim-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
@@ -515,40 +513,29 @@ export function ClaimFormModal({
                 const lineError = lineErrors?.[index];
                 const figure = figures[index] ?? { difference: 0, lineTotal: 0 };
                 return (
-                  <div
+                  <LineItemCard
                     key={field.id}
-                    className="rounded-edge border border-line bg-canvas/60 p-3"
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <Controller
-                          name={`lines.${index}.productId`}
-                          control={control}
-                          render={({ field: productField }) => (
-                            <ProductLookupField
-                              label={`Producto ${index + 1}`}
-                              required
-                              name={productField.name}
-                              value={productField.value}
-                              onChange={(value) => productField.onChange(value)}
-                              onBlur={productField.onBlur}
-                              error={lineError?.productId?.message}
-                            />
-                          )}
-                        />
-                      </div>
-                      {fields.length > 1 && (
-                        <div className="pt-6">
-                          <RowAction
-                            label={`Quitar la línea ${index + 1}`}
-                            icon={Trash2}
-                            danger
-                            onClick={() => remove(index)}
+                    index={index}
+                    canRemove={fields.length > 1}
+                    onRemove={() => remove(index)}
+                    product={
+                      <Controller
+                        name={`lines.${index}.productId`}
+                        control={control}
+                        render={({ field: productField }) => (
+                          <ProductLookupField
+                            label={`Producto ${index + 1}`}
+                            required
+                            name={productField.name}
+                            value={productField.value}
+                            onChange={(value) => productField.onChange(value)}
+                            onBlur={productField.onBlur}
+                            error={lineError?.productId?.message}
                           />
-                        </div>
-                      )}
-                    </div>
-
+                        )}
+                      />
+                    }
+                  >
                     <div className="mt-2 grid grid-cols-5 gap-2">
                       <TextField
                         label="Compradas"
@@ -608,7 +595,7 @@ export function ClaimFormModal({
                         </strong>
                       </span>
                     </div>
-                  </div>
+                  </LineItemCard>
                 );
               })}
             </div>

@@ -10,6 +10,7 @@ import {
   type SheetQuery,
 } from "../../api/quality";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -22,8 +23,8 @@ import {
 } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { ServerPagination } from "../../components/ui/ServerPagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -188,66 +189,60 @@ export function HcaPage() {
       <ModuleHeader
         title="HCA"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "hoja" : "hojas"}
-                count={counts.all}
-                active={chip === "todas"}
-                onClick={() => {
-                  setChip("todas");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todas las hojas de corrección y acción"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.open === 1 ? "abierta" : "abiertas"}
-                count={counts.open}
-                active={chip === "abiertas"}
-                onClick={() => {
-                  setChip("abiertas");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por HCA abiertas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.overdue === 1 ? "vencida" : "vencidas"}
-                count={counts.overdue}
-                active={chip === "vencidas"}
-                onClick={() => {
-                  setChip("vencidas");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                dotPulse
-                title="Filtrar por HCA vencidas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.closed === 1 ? "cerrada" : "cerradas"}
-                count={counts.closed}
-                active={chip === "cerradas"}
-                onClick={() => {
-                  setChip("cerradas");
-                  setPage(1);
-                }}
-                tone="blue"
-                dot
-                title="Filtrar por HCA cerradas"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando las hojas de corrección y acción…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando las hojas de corrección y acción…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "hoja" : "hojas"}
+                  count={counts.all}
+                  active={chip === "todas"}
+                  onClick={() => {
+                    setChip("todas");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todas las hojas de corrección y acción"
+                />
+                <HeaderTag
+                  label={counts.open === 1 ? "abierta" : "abiertas"}
+                  count={counts.open}
+                  active={chip === "abiertas"}
+                  onClick={() => {
+                    setChip("abiertas");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por HCA abiertas"
+                />
+                <HeaderTag
+                  label={counts.overdue === 1 ? "vencida" : "vencidas"}
+                  count={counts.overdue}
+                  active={chip === "vencidas"}
+                  onClick={() => {
+                    setChip("vencidas");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  dotPulse
+                  title="Filtrar por HCA vencidas"
+                />
+                <HeaderTag
+                  label={counts.closed === 1 ? "cerrada" : "cerradas"}
+                  count={counts.closed}
+                  active={chip === "cerradas"}
+                  onClick={() => {
+                    setChip("cerradas");
+                    setPage(1);
+                  }}
+                  tone="blue"
+                  dot
+                  title="Filtrar por HCA cerradas"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -351,17 +346,12 @@ export function HcaPage() {
           </div>
         }
         footer={
-          data !== null && (
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="HCA"
-            />
-          )
+          <ServerPagination
+            data={data}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="HCA"
+          />
         }
       >
         {data === null ? (

@@ -3,9 +3,7 @@ import {
   Ban,
   Boxes,
   Building2,
-  Check,
   CheckCircle2,
-  Copy,
   FileText,
   Landmark,
   Mail,
@@ -37,7 +35,9 @@ import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
+import { CopyButton } from "../../components/ui/CopyButton";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { DetailCard } from "../../components/ui/DetailCard";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { ListPanel } from "../../components/ui/ListPanel";
@@ -45,6 +45,7 @@ import { PageSpinner } from "../../components/ui/PageSpinner";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { StatTile } from "../../components/ui/StatTile";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
@@ -84,26 +85,6 @@ const TYPE_ICONS: Record<string, typeof Truck> = {
   Detallista: Store,
   Institucional: Landmark,
 };
-
-function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-
-  return (
-    <button
-      type="button"
-      title={label}
-      onClick={(e) => {
-        e.stopPropagation();
-        void navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-      className="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
-    >
-      {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
-    </button>
-  );
-}
 
 export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const { id } = useParams();
@@ -417,11 +398,10 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
             <div className="space-y-3.5">
               {/* 1. Métrica rápida compacta */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="rounded-card border border-zinc-200/80 bg-white p-3 shadow-2xs">
-                  <div className="flex items-center justify-between text-zinc-400">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Estado</span>
-                    <span className={`h-2 w-2 rounded-full ${client.isActive ? "bg-emerald-500" : "bg-zinc-300"}`} />
-                  </div>
+                <StatTile
+                  label="Estado"
+                  indicator={<span className={`h-2 w-2 rounded-full ${client.isActive ? "bg-emerald-500" : "bg-zinc-300"}`} />}
+                >
                   <div className="mt-1 flex items-baseline gap-2">
                     <span className="font-heading text-[15px] font-bold text-zinc-900">
                       {client.isActive ? "Activo" : "Inactivo"}
@@ -430,43 +410,31 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                       {client.isActive ? "Habilitado" : "Suspendido"}
                     </span>
                   </div>
-                </div>
+                </StatTile>
 
-                <div className="rounded-card border border-zinc-200/80 bg-white p-3 shadow-2xs">
-                  <div className="flex items-center justify-between text-zinc-400">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Tipo</span>
-                    <TypeIcon className="h-3.5 w-3.5 text-zinc-400" />
-                  </div>
+                <StatTile label="Tipo" indicator={<TypeIcon className="h-3.5 w-3.5 text-zinc-400" />}>
                   <div className="mt-1">
                     <span className="font-heading text-[15px] font-bold text-zinc-900 truncate block">
                       {client.type}
                     </span>
                   </div>
-                </div>
+                </StatTile>
 
-                <div className="rounded-card border border-zinc-200/80 bg-white p-3 shadow-2xs">
-                  <div className="flex items-center justify-between text-zinc-400">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Territorio</span>
-                    <MapPin className="h-3.5 w-3.5 text-zinc-400" />
-                  </div>
+                <StatTile label="Territorio" indicator={<MapPin className="h-3.5 w-3.5 text-zinc-400" />}>
                   <div className="mt-1">
                     <span className="font-heading text-[15px] font-bold text-zinc-900 truncate block">
                       {territoryName(client.territoryId)}
                     </span>
                   </div>
-                </div>
+                </StatTile>
 
-                <div className="rounded-card border border-zinc-200/80 bg-white p-3 shadow-2xs">
-                  <div className="flex items-center justify-between text-zinc-400">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Vendedor</span>
-                    <UserCheck className="h-3.5 w-3.5 text-zinc-400" />
-                  </div>
+                <StatTile label="Vendedor" indicator={<UserCheck className="h-3.5 w-3.5 text-zinc-400" />}>
                   <div className="mt-1">
                     <span className={`font-heading text-[15px] font-bold truncate block ${salesRepName ? "text-zinc-900" : "text-amber-600"}`}>
                       {salesRepName ?? "Sin asignar"}
                     </span>
                   </div>
-                </div>
+                </StatTile>
               </div>
 
               {/* 2. Grilla de 2 columnas (2/3 + 1/3) */}
@@ -474,18 +442,15 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                 {/* Columna Izquierda: Información Principal */}
                 <div className="lg:col-span-2 space-y-3.5">
                   {/* Card: Identificación y Clasificación */}
-                  <div className="rounded-card border border-line bg-white shadow-card overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100 bg-zinc-50/50">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-zinc-500" />
-                        <h3 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
-                          Identificación Comercial
-                        </h3>
-                      </div>
+                  <DetailCard
+                    icon={Building2}
+                    title="Identificación Comercial"
+                    aside={
                       <span className="font-mono text-[11px] font-medium text-zinc-500 bg-white border border-zinc-200/80 px-2 py-0.5 rounded shadow-2xs tabular-nums">
                         {client.code}
                       </span>
-                    </div>
+                    }
+                  >
 
                     <div className="px-4 py-1 divide-y divide-zinc-100">
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
@@ -525,18 +490,10 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                         </span>
                       </div>
                     </div>
-                  </div>
+                  </DetailCard>
 
                   {/* Card: Canales de Contacto y Ubicación */}
-                  <div className="rounded-card border border-line bg-white shadow-card overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100 bg-zinc-50/50">
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-zinc-500" />
-                        <h3 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
-                          Canales de Contacto y Ubicación
-                        </h3>
-                      </div>
-                    </div>
+                  <DetailCard icon={Phone} title="Canales de Contacto y Ubicación">
 
                     <div className="px-4 py-1 divide-y divide-zinc-100">
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
@@ -593,21 +550,18 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </DetailCard>
 
                   {/* Card: Observaciones Internas */}
-                  <div className="rounded-card border border-line bg-white shadow-card overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-100 bg-zinc-50/50">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-zinc-500" />
-                        <h3 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
-                          Observaciones Internas
-                        </h3>
-                      </div>
+                  <DetailCard
+                    icon={FileText}
+                    title="Observaciones Internas"
+                    aside={
                       <span className="text-[10.5px] font-medium text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded">
                         Uso interno
                       </span>
-                    </div>
+                    }
+                  >
 
                     <div className="p-4">
                       {client.notes ? (
@@ -620,7 +574,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                         </p>
                       )}
                     </div>
-                  </div>
+                  </DetailCard>
                 </div>
 
                 {/* Columna Derecha: Tarjeta destacada de contacto y resumen */}

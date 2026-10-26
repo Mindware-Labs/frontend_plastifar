@@ -5,24 +5,25 @@ import { clientsApi, type ClientQuery } from "../../api/clients";
 import { fetchAllPages } from "../../api/paging";
 import { staffApi } from "../../api/staff";
 import { territoriesApi } from "../../api/territories";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { ClearFiltersButton, FilterDropdown, LookupFilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
+import { ServerPagination } from "../../components/ui/ServerPagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -81,7 +82,7 @@ export function ClientsPage() {
   // Misma politica que la ficha: los catalogos de apoyo degradan la pantalla,
   // no la tumban, pero su fallo se dice y se puede reintentar.
   const [referenceError, setReferenceError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Client>();
 
   const [search, setSearch] = useState("");
   const [territoryId, setTerritoryId] = useState("todos");
@@ -91,9 +92,7 @@ export function ClientsPage() {
 const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
   const [pageSize, setPageSize] = useState(10);
 
-  const [modal, setModal] = useState<"nuevo" | Client | null>(null);
   const [reassigning, setReassigning] = useState<Client | null>(null);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(COLUMNS.map((c) => c.id));
   /**
    * RF-C7 en lote: la seleccion es sobre la pagina visible, no sobre todo el
@@ -222,16 +221,18 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
   const somePageSelected = rows.some((client) => selectedIds.includes(client.id));
   const pageState: boolean | "mixed" = allPageSelected ? true : somePageSelected ? "mixed" : false;
 
+  const confirming = dialog !== null;
+
   useEffect(() => {
     if (selected.length === 0) return;
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !bulkReassigning && modal === null && reassigning === null && confirmation === null) {
+      if (event.key === "Escape" && !bulkReassigning && modal === null && reassigning === null && !confirming) {
         setSelectedIds([]);
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [selected.length, bulkReassigning, modal, reassigning, confirmation]);
+  }, [selected.length, bulkReassigning, modal, reassigning, confirming]);
 
   function toggleSelection(id: number) {
     setSelectedIds((previous) =>
@@ -248,19 +249,9 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
     });
   }
 
-  async function runOnRow(id: number, action: () => Promise<void>) {
-    setBusyId(id);
-    try {
-      await action();
-      refresh();
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   function askToggle(client: Client) {
     const willDeactivate = client.isActive;
-    setConfirmation({
+    confirm(client.id, {
       tone: "warn",
       icon: willDeactivate ? Ban : CheckCircle2,
       title: willDeactivate ? "Desactivar cliente" : "Reactivar cliente",
@@ -276,38 +267,38 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
         </>
       ),
       confirmLabel: willDeactivate ? "Desactivar" : "Reactivar",
-      onConfirm: () =>
-        runOnRow(client.id, async () => {
-          try {
-            if (client.isActive) {
-              await clientsApi.deactivate(client.id);
-              receipts.done({
-                action: "desactivar-cliente",
-                title: "Cliente desactivado",
-                detail: `${client.name} ya no recibirá tickets nuevos`,
-              });
-            } else {
-              await clientsApi.activate(client.id);
-              receipts.done({
-                action: "reactivar-cliente",
-                title: "Cliente reactivado",
-                detail: `${client.name} habilitado nuevamente`,
-              });
-            }
-          } catch (err) {
-            receipts.failed({
-              action: "toggle-cliente",
-              title: client.isActive ? "No se pudo desactivar el cliente" : "No se pudo reactivar el cliente",
-              detail: err instanceof Error ? err.message : undefined,
+      onConfirm: async () => {
+        try {
+          if (client.isActive) {
+            await clientsApi.deactivate(client.id);
+            receipts.done({
+              action: "desactivar-cliente",
+              title: "Cliente desactivado",
+              detail: `${client.name} ya no recibirá tickets nuevos`,
+            });
+          } else {
+            await clientsApi.activate(client.id);
+            receipts.done({
+              action: "reactivar-cliente",
+              title: "Cliente reactivado",
+              detail: `${client.name} habilitado nuevamente`,
             });
           }
-        }),
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-cliente",
+            title: client.isActive ? "No se pudo desactivar el cliente" : "No se pudo reactivar el cliente",
+            detail: err instanceof Error ? err.message : undefined,
+          });
+        }
+        refresh();
+      },
     });
   }
 
   /** RF-C4: el servidor rechaza con 409 si tiene contactos (o tickets, cuando exista esa tabla). */
   function askDelete(client: Client) {
-    setConfirmation({
+    confirm(client.id, {
       tone: "danger",
       icon: Trash2,
       title: "Eliminar cliente",
@@ -319,23 +310,23 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
         </>
       ),
       confirmLabel: "Eliminar",
-      onConfirm: () =>
-        runOnRow(client.id, async () => {
-          try {
-            await clientsApi.remove(client.id);
-            receipts.done({
-              action: "eliminar-cliente",
-              title: "Cliente eliminado",
-              detail: `${client.name} (${client.code})`,
-            });
-          } catch (err) {
-            receipts.failed({
-              action: "eliminar-cliente",
-              title: "No se pudo eliminar el cliente",
-              detail: err instanceof Error ? err.message : undefined,
-            });
-          }
-        }),
+      onConfirm: async () => {
+        try {
+          await clientsApi.remove(client.id);
+          receipts.done({
+            action: "eliminar-cliente",
+            title: "Cliente eliminado",
+            detail: `${client.name} (${client.code})`,
+          });
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-cliente",
+            title: "No se pudo eliminar el cliente",
+            detail: err instanceof Error ? err.message : undefined,
+          });
+        }
+        refresh();
+      },
     });
   }
 
@@ -344,53 +335,47 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
       <ModuleHeader
         title="Clientes"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "cliente" : "clientes"}
-                count={counts.all}
-                active={chip === "todos"}
-                onClick={() => { setChip("todos"); setPage(1); }}
-                tone="neutral"
-                title="Mostrar todos los clientes"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={chip === "activos"}
-                onClick={() => { setChip("activos"); setPage(1); }}
-                tone="emerald"
-                dot
-                title="Filtrar por clientes activos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                count={counts.inactive}
-                active={chip === "inactivos"}
-                onClick={() => { setChip("inactivos"); setPage(1); }}
-                tone="red"
-                dot
-                title="Filtrar por clientes inactivos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="sin vendedor"
-                count={counts.withoutSalesRep}
-                active={chip === "sinVendedor"}
-                onClick={() => { setChip("sinVendedor"); setPage(1); }}
-                tone="amber"
-                dot
-                title="Filtrar por clientes sin vendedor asignado"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando el directorio de clientes…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando el directorio de clientes…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "cliente" : "clientes"}
+                  count={counts.all}
+                  active={chip === "todos"}
+                  onClick={() => { setChip("todos"); setPage(1); }}
+                  tone="neutral"
+                  title="Mostrar todos los clientes"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={chip === "activos"}
+                  onClick={() => { setChip("activos"); setPage(1); }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por clientes activos"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                  count={counts.inactive}
+                  active={chip === "inactivos"}
+                  onClick={() => { setChip("inactivos"); setPage(1); }}
+                  tone="red"
+                  dot
+                  title="Filtrar por clientes inactivos"
+                />
+                <HeaderTag
+                  label="sin vendedor"
+                  count={counts.withoutSalesRep}
+                  active={chip === "sinVendedor"}
+                  onClick={() => { setChip("sinVendedor"); setPage(1); }}
+                  tone="amber"
+                  dot
+                  title="Filtrar por clientes sin vendedor asignado"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -501,17 +486,12 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
           </div>
         }
         footer={
-          data !== null && (
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="clientes"
-            />
-          )
+          <ServerPagination
+            data={data}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="clientes"
+          />
         }
       >
         {data === null ? (
@@ -736,7 +716,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
         />
       )}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </div>
   );
 }

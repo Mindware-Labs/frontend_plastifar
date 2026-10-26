@@ -5,7 +5,7 @@ import { colorIndex, useDashboard } from "../dashboardContext";
 import { useApplyFilter } from "../filters";
 import { C, FONT, NUM, T, hueFor } from "../styles";
 import { Avatar, Card, CardHead } from "./primitives";
-import { useFlip } from "./useFlip";
+import { useFlip } from "../../../hooks/useFlip";
 
 /** El estado es la única columna con semáforo: un segundo código de color en la
  *  misma fila obliga a leer dos leyendas a la vez. */

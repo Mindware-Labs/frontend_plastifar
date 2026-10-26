@@ -2,12 +2,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { ApiError } from "../../api/client";
 import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
+import { applyServerError } from "../../lib/formErrors";
 import type { Holiday } from "../../types/settings";
 
 /**
@@ -64,12 +64,16 @@ export function HolidayModal({ holiday, onClose, onSaved }: HolidayModalProps) {
       onSaved(saved);
       onClose();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setError("date", { message: err.message });
-        setFocus("date");
-        return;
-      }
-      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar el día");
+      setFormError(
+        applyServerError(err, {
+          setError,
+          setFocus,
+          rules: [{ field: "date" }],
+          statuses: [409],
+          focusable: ["date"],
+          fallback: "No se pudo guardar el día",
+        }),
+      );
     }
   }
 
@@ -79,14 +83,13 @@ export function HolidayModal({ holiday, onClose, onSaved }: HolidayModalProps) {
       description="Los días de esta lista se saltan al calcular vencimientos en las políticas con reloj de jornada."
       onClose={onClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="holiday-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear día"}
-          </Button>
-        </>
+        <FormModalFooter
+          formId="holiday-form"
+          isEdit={isEdit}
+          createLabel="Crear día"
+          isSubmitting={isSubmitting}
+          onCancel={onClose}
+        />
       }
     >
       <form id="holiday-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">

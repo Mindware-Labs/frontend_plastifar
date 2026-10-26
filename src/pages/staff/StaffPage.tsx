@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
@@ -14,10 +15,10 @@ import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
+import { ServerPagination } from "../../components/ui/ServerPagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
@@ -349,65 +350,59 @@ export function StaffPage() {
       <ModuleHeader
         title="Personal"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "colaborador" : "colaboradores"}
-                count={counts.all}
-                active={filter === "todos"}
-                onClick={() => {
-                  setFilter("todos");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todos los colaboradores"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={filter === "activos"}
-                onClick={() => {
-                  setFilter("activos");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por colaboradores activos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                count={counts.inactive}
-                active={filter === "inactivos"}
-                onClick={() => {
-                  setFilter("inactivos");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por colaboradores inactivos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="administradores"
-                count={counts.admins}
-                active={filter === "administradores"}
-                onClick={() => {
-                  setFilter("administradores");
-                  setPage(1);
-                }}
-                tone="blue"
-                dot
-                title="Filtrar por colaboradores con permisos de administrador"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando el personal con acceso al sistema…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando el personal con acceso al sistema…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "colaborador" : "colaboradores"}
+                  count={counts.all}
+                  active={filter === "todos"}
+                  onClick={() => {
+                    setFilter("todos");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todos los colaboradores"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={filter === "activos"}
+                  onClick={() => {
+                    setFilter("activos");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por colaboradores activos"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                  count={counts.inactive}
+                  active={filter === "inactivos"}
+                  onClick={() => {
+                    setFilter("inactivos");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por colaboradores inactivos"
+                />
+                <HeaderTag
+                  label="administradores"
+                  count={counts.admins}
+                  active={filter === "administradores"}
+                  onClick={() => {
+                    setFilter("administradores");
+                    setPage(1);
+                  }}
+                  tone="blue"
+                  dot
+                  title="Filtrar por colaboradores con permisos de administrador"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           isAdmin && (
@@ -493,17 +488,12 @@ export function StaffPage() {
             </>
           }
           footer={
-            data !== null && (
-              <Pagination
-                page={data.page}
-                pageSize={data.pageSize}
-                total={data.total}
-                totalPages={data.totalPages}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                noun="colaboradores"
-              />
-            )
+            <ServerPagination
+              data={data}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="colaboradores"
+            />
           }
         >
           {data === null ? (

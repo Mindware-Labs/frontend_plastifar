@@ -5,6 +5,7 @@ import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { permissionsApi } from "../../api/permissions";
 import { staffApi } from "../../api/staff";
+import { DetailLoadError } from "../../components/app/DetailLoadError";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
@@ -214,10 +215,9 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   // una mutacion se dice sobre la propia pagina.
   if (error !== null && staff === null) {
     return (
-      <div>
-        <ModuleHeader title="Colaborador" sections={sections} />
-        <ErrorRetry onRetry={() => void load()}>{error}</ErrorRetry>
-      </div>
+      <DetailLoadError title="Colaborador" sections={sections} onRetry={() => void load()}>
+        {error}
+      </DetailLoadError>
     );
   }
 

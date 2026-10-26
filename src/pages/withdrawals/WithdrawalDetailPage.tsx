@@ -2,12 +2,13 @@ import { Ban, PackageCheck, Pencil, Printer, ThumbsDown, ThumbsUp } from "lucide
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { withdrawalsApi } from "../../api/withdrawals";
+import { DetailLoadError } from "../../components/app/DetailLoadError";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ProductNameCode } from "../../components/app/ProductNameCode";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
-import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { PageSpinner } from "../../components/ui/PageSpinner";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useDetail } from "../../hooks/useDetail";
@@ -68,10 +69,9 @@ export function WithdrawalDetailPage() {
 
   if (error) {
     return (
-      <div className="max-w-[960px]">
-        <ModuleHeader title="Solicitud de retiro" />
-        <ErrorRetry onRetry={reload}>{error}</ErrorRetry>
-      </div>
+      <DetailLoadError className="max-w-[960px]" title="Solicitud de retiro" onRetry={reload}>
+        {error}
+      </DetailLoadError>
     );
   }
 
@@ -270,8 +270,7 @@ function LinesTable({ lines, currency, withdrawn }: { lines: WithdrawalLine[]; c
         {lines.map((line) => (
           <Row key={line.id}>
             <Td>
-              <span className="block text-[12.5px] text-ink">{line.productName}</span>
-              <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
+              <ProductNameCode name={line.productName} code={line.productCode} />
             </Td>
             <Td className="whitespace-nowrap text-right tabular-nums">
               {formatQuantity(line.quantity)} <span className="text-faint">{line.quantityUnit}</span>

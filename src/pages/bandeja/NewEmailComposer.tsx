@@ -1,4 +1,4 @@
-import { PenLine, Paperclip, X } from "lucide-react";
+import { PenLine, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
@@ -7,7 +7,7 @@ import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button as PfButton } from "../../components/ui/Button";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { useNoticeInset, useReceipts } from "../../context/useReceipts";
-import { useUploadFeedback } from "../../hooks/useUploadFeedback";
+import { useEmailAttachments } from "../../hooks/useEmailAttachments";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes } from "../../lib/format";
 import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
@@ -15,15 +15,13 @@ import { SendValidationButton } from "./SendValidationButton";
 import { CannedPicker } from "./CannedPicker";
 import { textToBlocks } from "./textToBlocks";
 import { RecipientInput } from "./RecipientInput";
+import { AttachFilesButton } from "./AttachFilesButton";
 import { type ValidationItem } from "./sendValidation";
 
 interface NewEmailComposerProps {
   onSent: () => void;
   onCancel: () => void;
 }
-
-const MAX_FILES = 5;
-const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
 
 export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const [to, setTo] = useState("");
@@ -35,21 +33,16 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const [blocks, setBlocks] = useState<unknown>(null);
   const [initialBlocks, setInitialBlocks] = useState<unknown>(null);
   const [editorKey, setEditorKey] = useState(0);
-  const [files, setFiles] = useState<File[]>([]);
-  const {
-    isShowing: showAttachedFeedback,
-    isExiting: attachedExiting,
-    trigger: triggerAttachedFeedback,
-  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const attachments = useEmailAttachments(setError);
+  const { files, setFiles, addFiles } = attachments;
   const receipts = useReceipts();
   const containerRef = useRef<HTMLDivElement>(null);
   const toRef = useRef<HTMLInputElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   // La marca del envio nace con el editor: un reintento la repite y no duplica el correo.
   const tokenRef = useRef(crypto.randomUUID());
 
@@ -74,27 +67,6 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   useEffect(() => {
     if (bccOpen) bccRef.current?.focus();
   }, [bccOpen]);
-
-  function addFiles(incoming: File[]) {
-    if (incoming.length === 0) return;
-
-    const merged = [...files, ...incoming];
-    const total = merged.reduce((sum, file) => sum + file.size, 0);
-
-    if (merged.length > MAX_FILES) {
-      setError(`No se pueden adjuntar más de ${MAX_FILES} archivos.`);
-      return;
-    }
-
-    if (total > MAX_TOTAL_BYTES) {
-      setError("Los adjuntos superan los 10 MB en total.");
-      return;
-    }
-
-    setError(null);
-    setFiles(merged);
-    triggerAttachedFeedback();
-  }
 
   async function handleSend() {
     if (sending || !ready) return;
@@ -320,45 +292,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       )}
 
       <div className="flex shrink-0 items-center gap-2 border-t border-zinc-100 px-4 py-2.5 bg-zinc-50/30">
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium shadow-2xs outline-none transition-all duration-300 cursor-pointer ${
-            showAttachedFeedback
-              ? attachedExiting
-                ? "border-emerald-200 bg-emerald-50/40 text-emerald-600 ring-1 ring-emerald-100/50"
-                : "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200/70 font-semibold"
-              : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20"
-          }`}
-        >
-          {showAttachedFeedback ? (
-            <span
-              className={`inline-flex items-center gap-1.5 ${
-                attachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
-              }`}
-            >
-              <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
-                <AnimatedCheckIcon size={11} strokeWidth={3} />
-              </span>
-              <span>¡Adjuntado!</span>
-            </span>
-          ) : (
-            <>
-              <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
-              Adjuntar
-            </>
-          )}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={(event) => {
-            addFiles(Array.from(event.target.files ?? []));
-            event.target.value = "";
-          }}
-        />
+        <AttachFilesButton attachments={attachments} />
         <CannedPicker onPick={insertCanned} />
         <span className="truncate text-[11px] font-medium text-zinc-400">
           Sale de la casilla de soporte, con tu nombre y tu firma.

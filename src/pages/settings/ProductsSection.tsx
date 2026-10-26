@@ -1,19 +1,19 @@
-import { Factory, FileUp, Layers, Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Factory, FileUp, Layers, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
-import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
-import { RowAction } from "../../components/ui/RowAction";
+import { ListPagination } from "../../components/ui/ListPagination";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -24,8 +24,9 @@ import {
   type Product,
   type ProductLine,
 } from "../../types/settings";
+import { CatalogRowActions } from "./CatalogRowActions";
 import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy, staleClass, useReferenceData } from "./catalogState";
+import { freshCopy, useReferenceData } from "./catalogState";
 import { ProductImportModal } from "./ProductImportModal";
 import { ProductModal } from "./ProductModal";
 
@@ -47,7 +48,7 @@ export function ProductsSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Product>();
 
   const [search, setSearch] = useState("");
   const [plantId, setPlantId] = useState(TODOS);
@@ -55,9 +56,7 @@ export function ProductsSection() {
   const [chip, setChip] = useState<ChipKey>("todos");
   const [pageSize, setPageSize] = useState(10);
 
-  const [modal, setModal] = useState<"nuevo" | Product | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -94,7 +93,7 @@ export function ProductsSection() {
     debouncedSearch !== "" || chip !== "todos" || plantId !== TODOS || productLineId !== TODOS;
 
   function askToggle(product: Product) {
-    setConfirmation({
+    confirm(product.id, {
       tone: "warn",
       icon: Power,
       title: product.isActive ? "Desactivar producto" : "Reactivar producto",
@@ -110,20 +109,15 @@ export function ProductsSection() {
       ),
       confirmLabel: product.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        setBusyId(product.id);
-        try {
-          const current = await freshCopy(settingsApi.products.get, product);
-          await settingsApi.products.update(current.id, {
-            code: current.code,
-            name: current.name,
-            productLineId: current.productLineId,
-            plantId: current.plantId,
-            isActive: !current.isActive,
-          });
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        const current = await freshCopy(settingsApi.products.get, product);
+        await settingsApi.products.update(current.id, {
+          code: current.code,
+          name: current.name,
+          productLineId: current.productLineId,
+          plantId: current.plantId,
+          isActive: !current.isActive,
+        });
+        refresh();
       },
     });
   }
@@ -131,7 +125,7 @@ export function ProductsSection() {
   /* El servidor es quien sabe si algun formulario ya nombra el producto: su 409
      sube al dialogo con el motivo, y la salida que ofrece es desactivarlo. */
   function askDelete(product: Product) {
-    setConfirmation({
+    confirm(product.id, {
       tone: "danger",
       icon: Trash2,
       title: "Eliminar producto",
@@ -146,13 +140,8 @@ export function ProductsSection() {
       ),
       confirmLabel: "Eliminar",
       onConfirm: async () => {
-        setBusyId(product.id);
-        try {
-          await settingsApi.products.remove(product.id);
-          refresh();
-        } finally {
-          setBusyId(null);
-        }
+        await settingsApi.products.remove(product.id);
+        refresh();
       },
     });
   }
@@ -162,52 +151,47 @@ export function ProductsSection() {
       <ModuleHeader
         title="Productos"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "producto" : "productos"}
-                count={counts.all}
-                active={chip === "todos"}
-                onClick={() => {
-                  setChip("todos");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todos los productos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.active === 1 ? "activo" : "activos"}
-                count={counts.active}
-                active={chip === "activos"}
-                onClick={() => {
-                  setChip("activos");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por productos activos"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                count={counts.inactive}
-                active={chip === "inactivos"}
-                onClick={() => {
-                  setChip("inactivos");
-                  setPage(1);
-                }}
-                tone="red"
-                dot
-                title="Filtrar por productos inactivos"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando el catálogo de productos…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando el catálogo de productos…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "producto" : "productos"}
+                  count={counts.all}
+                  active={chip === "todos"}
+                  onClick={() => {
+                    setChip("todos");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todos los productos"
+                />
+                <HeaderTag
+                  label={counts.active === 1 ? "activo" : "activos"}
+                  count={counts.active}
+                  active={chip === "activos"}
+                  onClick={() => {
+                    setChip("activos");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por productos activos"
+                />
+                <HeaderTag
+                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                  count={counts.inactive}
+                  active={chip === "inactivos"}
+                  onClick={() => {
+                    setChip("inactivos");
+                    setPage(1);
+                  }}
+                  tone="red"
+                  dot
+                  title="Filtrar por productos inactivos"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
         action={
           canWrite && (
@@ -290,97 +274,77 @@ export function ProductsSection() {
           </>
         }
         footer={
-          data !== null &&
-          data.total > 0 && (
-            <Pagination
-              page={page}
-              pageSize={pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="productos"
-            />
-          )
+          <ListPagination
+            data={data}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="productos"
+          />
         }
       >
-        {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={5} />
-        ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
+        <ListBody
+          data={data}
+          error={error}
+          isStale={isStale}
+          skeletonRows={pageSize}
+          skeletonColumns={5}
+          empty={
+            isFiltering
               ? "Ningún producto coincide con este filtro o búsqueda."
-              : "Todavía no hay ningún producto registrado. Crea uno o carga el catálogo desde un archivo."}
-          </p>
-        ) : (
-          <div className={staleClass(isStale)}>
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Código</Th>
-                  <Th>Descripción</Th>
-                  <Th>Línea de producto</Th>
-                  <Th>Planta</Th>
-                  <Th>Estado</Th>
-                  {canWrite && <Th className="w-32 text-right">Acciones</Th>}
-                </HeadRow>
-              </thead>
+              : "Todavía no hay ningún producto registrado. Crea uno o carga el catálogo desde un archivo."
+          }
+        >
+          <DataTable>
+            <thead>
+              <HeadRow>
+                <Th>Código</Th>
+                <Th>Descripción</Th>
+                <Th>Línea de producto</Th>
+                <Th>Planta</Th>
+                <Th>Estado</Th>
+                {canWrite && <Th className="w-32 text-right">Acciones</Th>}
+              </HeadRow>
+            </thead>
 
-              <tbody>
-                {rows.map((product) => (
-                  <Row key={product.id} busy={busyId === product.id}>
-                    <Td>
-                      <span className="font-mono text-[12px] text-brand-gray">{product.code}</span>
-                    </Td>
-                    <Td className="text-[12.5px] font-medium text-ink">{product.name}</Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      {product.productLineName ?? <span className="text-faint">Sin línea</span>}
-                    </Td>
-                    <Td className="text-[12.5px] text-subtle">
-                      {product.plantName !== null ? (
-                        plantLabel(product.plantName, product.plantCountry)
-                      ) : (
-                        <span className="text-faint">Sin planta</span>
-                      )}
-                    </Td>
-                    <Td>
-                      <StatusDot active={product.isActive} />
-                    </Td>
-                    {canWrite && (
-                      <Td>
-                        <div className="flex items-center justify-end gap-1">
-                          <RowAction
-                            label={`Editar ${product.name}`}
-                            icon={Pencil}
-                            onClick={() => setModal(product)}
-                            disabled={busyId === product.id}
-                          />
-                          <RowAction
-                            label={
-                              product.isActive
-                                ? `Desactivar ${product.name}`
-                                : `Reactivar ${product.name}`
-                            }
-                            icon={Power}
-                            onClick={() => askToggle(product)}
-                            disabled={busyId === product.id}
-                          />
-                          <RowAction
-                            label={`Eliminar ${product.name}`}
-                            icon={Trash2}
-                            danger
-                            onClick={() => askDelete(product)}
-                            disabled={busyId === product.id}
-                          />
-                        </div>
-                      </Td>
+            <tbody>
+              {rows.map((product) => (
+                <Row key={product.id} busy={busyId === product.id}>
+                  <Td>
+                    <span className="font-mono text-[12px] text-brand-gray">{product.code}</span>
+                  </Td>
+                  <Td className="text-[12.5px] font-medium text-ink">{product.name}</Td>
+                  <Td className="text-[12.5px] text-subtle">
+                    {product.productLineName ?? <span className="text-faint">Sin línea</span>}
+                  </Td>
+                  <Td className="text-[12.5px] text-subtle">
+                    {product.plantName !== null ? (
+                      plantLabel(product.plantName, product.plantCountry)
+                    ) : (
+                      <span className="text-faint">Sin planta</span>
                     )}
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          </div>
-        )}
+                  </Td>
+                  <Td>
+                    <StatusDot active={product.isActive} />
+                  </Td>
+                  {canWrite && (
+                    <Td>
+                      <CatalogRowActions
+                        name={product.name}
+                        isActive={product.isActive}
+                        busy={busyId === product.id}
+                        onEdit={() => setModal(product)}
+                        onToggle={() => askToggle(product)}
+                        onDelete={() => askDelete(product)}
+                      />
+                    </Td>
+                  )}
+                </Row>
+              ))}
+            </tbody>
+          </DataTable>
+        </ListBody>
       </ListPanel>
 
       {modal !== null && (
@@ -398,7 +362,7 @@ export function ProductsSection() {
         <ProductImportModal onClose={() => setIsImporting(false)} onImported={refresh} />
       )}
 
-      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
+      {dialog}
     </>
   );
 }

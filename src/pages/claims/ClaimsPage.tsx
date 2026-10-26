@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { claimsApi, type ClaimListResponse, type ClaimQuery } from "../../api/claims";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
@@ -15,9 +16,9 @@ import {
 } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { ServerPagination } from "../../components/ui/ServerPagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -114,65 +115,59 @@ export function ClaimsPage() {
       <ModuleHeader
         title="Reclamaciones"
         summary={
-          counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "reclamación" : "reclamaciones"}
-                count={counts.all}
-                active={chip === "todas"}
-                onClick={() => {
-                  setChip("todas");
-                  setPage(1);
-                }}
-                tone="neutral"
-                title="Mostrar todas las reclamaciones"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.registered === 1 ? "registrada" : "registradas"}
-                count={counts.registered}
-                active={chip === "Registrada"}
-                onClick={() => {
-                  setChip("Registrada");
-                  setPage(1);
-                }}
-                tone="blue"
-                dot
-                title="Filtrar por reclamaciones registradas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="en tratamiento"
-                count={counts.inTreatment}
-                active={chip === "En tratamiento"}
-                onClick={() => {
-                  setChip("En tratamiento");
-                  setPage(1);
-                }}
-                tone="amber"
-                dot
-                title="Filtrar por reclamaciones en tratamiento"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label={counts.closed === 1 ? "cerrada" : "cerradas"}
-                count={counts.closed}
-                active={chip === "Cerrada"}
-                onClick={() => {
-                  setChip("Cerrada");
-                  setPage(1);
-                }}
-                tone="emerald"
-                dot
-                title="Filtrar por reclamaciones cerradas"
-              />
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando las reclamaciones de clientes…
-            </span>
-          )
+          <HeaderCounts counts={counts} loadingLabel="Cargando las reclamaciones de clientes…">
+            {(counts) => (
+              <>
+                <HeaderTag
+                  label={counts.all === 1 ? "reclamación" : "reclamaciones"}
+                  count={counts.all}
+                  active={chip === "todas"}
+                  onClick={() => {
+                    setChip("todas");
+                    setPage(1);
+                  }}
+                  tone="neutral"
+                  title="Mostrar todas las reclamaciones"
+                />
+                <HeaderTag
+                  label={counts.registered === 1 ? "registrada" : "registradas"}
+                  count={counts.registered}
+                  active={chip === "Registrada"}
+                  onClick={() => {
+                    setChip("Registrada");
+                    setPage(1);
+                  }}
+                  tone="blue"
+                  dot
+                  title="Filtrar por reclamaciones registradas"
+                />
+                <HeaderTag
+                  label="en tratamiento"
+                  count={counts.inTreatment}
+                  active={chip === "En tratamiento"}
+                  onClick={() => {
+                    setChip("En tratamiento");
+                    setPage(1);
+                  }}
+                  tone="amber"
+                  dot
+                  title="Filtrar por reclamaciones en tratamiento"
+                />
+                <HeaderTag
+                  label={counts.closed === 1 ? "cerrada" : "cerradas"}
+                  count={counts.closed}
+                  active={chip === "Cerrada"}
+                  onClick={() => {
+                    setChip("Cerrada");
+                    setPage(1);
+                  }}
+                  tone="emerald"
+                  dot
+                  title="Filtrar por reclamaciones cerradas"
+                />
+              </>
+            )}
+          </HeaderCounts>
         }
       />
 
@@ -245,18 +240,13 @@ export function ClaimsPage() {
           </>
         }
         footer={
-          data !== null && (
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="reclamaciones"
-              nounSingular="reclamación"
-            />
-          )
+          <ServerPagination
+            data={data}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            noun="reclamaciones"
+            nounSingular="reclamación"
+          />
         }
       >
         {data === null ? (
