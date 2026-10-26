@@ -15,6 +15,7 @@ import {
   Printer,
   ShieldCheck,
   Truck,
+  Users,
   Wrench,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -33,11 +34,13 @@ import { Spinner } from "../../components/ui/Spinner";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDay } from "../../lib/dates";
+import { buildHcaHechoText, hcaProductLabel } from "../../lib/hcaForm109";
 import { formatAmount } from "../../lib/numbers";
+import { isPlanItemOverdue, isPlanItemSettled } from "../../lib/quality";
 import type { TicketDetailResponse } from "../../types/api";
 import type { CustomerClaim } from "../../types/claims";
 import type { DiscrepancyDetail, LoadDiscrepancy } from "../../types/discrepancies";
-import type { CorrectiveActionSheet } from "../../types/quality";
+import type { ActionPlanItem, CorrectiveActionSheet } from "../../types/quality";
 import type { ProductLine } from "../../types/settings";
 import type { MerchandiseWithdrawal } from "../../types/withdrawals";
 import { ClaimFormModal } from "../claims/ClaimFormModal";
@@ -45,7 +48,7 @@ import { ClaimStatusBadge } from "../claims/ClaimStatusBadge";
 import { DiscrepancyFormModal } from "../discrepancies/DiscrepancyFormModal";
 import { DiscrepancyStatusBadge } from "../discrepancies/DiscrepancyStatusBadge";
 import { HcaModal } from "../quality/HcaModal";
-import { HcaStatusBadge } from "../quality/StatusBadges";
+import { HcaStatusBadge, PlanItemStatusBadge } from "../quality/StatusBadges";
 import { WithdrawalFormModal } from "../withdrawals/WithdrawalFormModal";
 import { WithdrawalStatusBadge } from "../withdrawals/WithdrawalStatusBadge";
 
@@ -217,6 +220,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   const [hcaModalOpen, setHcaModalOpen] = useState(false);
   const [editingHca, setEditingHca] = useState<CorrectiveActionSheet | undefined>(undefined);
   const [hcaInitialDefaults, setHcaInitialDefaults] = useState<{ clientId: number; ticketId: number | null; description?: string } | undefined>(undefined);
+  const [hcaPlanBySheetId, setHcaPlanBySheetId] = useState<Record<number, ActionPlanItem[] | undefined>>({});
 
   // Migration modal state
   const [migrationModalOpen, setMigrationModalOpen] = useState(false);
@@ -255,6 +259,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       setWithdrawals(foundWith);
       setDiscrepancies(foundDisc);
       setSheets(foundSheets);
+      setHcaPlanBySheetId({});
 
       const hasAny = Boolean(foundClaim || foundWith.length > 0 || foundDisc.length > 0 || foundSheets.length > 0);
       onHasFormsChanged?.(hasAny);
@@ -342,6 +347,30 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     if (!selectedSubTabKey) return registeredForms[0] ?? null;
     return registeredForms.find((f) => f.key === selectedSubTabKey) ?? registeredForms[0] ?? null;
   }, [selectedSubTabKey, registeredForms]);
+
+  useEffect(() => {
+    if (activeForm?.type !== "hca") return;
+    const sheetId = (activeForm.data as CorrectiveActionSheet).id;
+    if (hcaPlanBySheetId[sheetId] !== undefined) return;
+
+    let cancelled = false;
+    qualityApi.planItems
+      .list(sheetId, { page: 1, pageSize: 50 })
+      .then((res) => {
+        if (!cancelled) {
+          setHcaPlanBySheetId((prev) => ({ ...prev, [sheetId]: res.items }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHcaPlanBySheetId((prev) => ({ ...prev, [sheetId]: [] }));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeForm?.key, activeForm?.type, hcaPlanBySheetId]);
 
   const getPrintPath = (form: NonNullable<typeof activeForm>): string => {
     if (form.type === "reclamacion") {
@@ -1451,46 +1480,239 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                   );
                 })()}
 
-                {/* 4. HCA DETAILS */}
+                {/* 4. HCA DETAILS — resumen ejecutivo (mismo lenguaje que discrepancia) */}
                 {activeForm.type === "hca" && (() => {
                   const s = activeForm.data as CorrectiveActionSheet;
+                  const planItems = hcaPlanBySheetId[s.id];
+                  const causes = [...(s.causes ?? [])].sort((a, b) => a.position - b.position);
+                  const participants = s.participants ?? [];
+                  const acknowledgedCount = participants.filter((p) => p.acknowledgedAt).length;
+                  const openPlanCount =
+                    planItems?.filter((item) => !isPlanItemSettled(item)).length ?? 0;
+                  const overduePlanCount =
+                    planItems?.filter((item) => isPlanItemOverdue(item) && !isPlanItemSettled(item)).length ?? 0;
+                  const productLabel = hcaProductLabel(s);
+
                   return (
                     <div className="space-y-4">
-                      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 rounded-lg bg-zinc-50 p-3.5 text-xs">
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Número HCA</dt>
-                          <dd className="mt-0.5 font-mono font-medium text-zinc-800">{s.number}</dd>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            No. HCA
+                          </span>
+                          <p className="mt-1 font-mono text-sm font-bold text-zinc-900">{s.number}</p>
+                          <span className="text-[10.5px] text-zinc-500">Formato oficial PF-FOR-109</span>
                         </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Línea de Producto</dt>
-                          <dd className="mt-0.5 font-medium text-zinc-800">{s.productLineName}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Fecha Detección</dt>
-                          <dd className="mt-0.5 font-medium text-zinc-800">{formatDay(s.detectedAt)}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Responsable</dt>
-                          <dd className="mt-0.5 font-medium text-zinc-800">{s.responsibleName}</dd>
-                        </div>
-                      </dl>
 
-                      <div className="rounded-lg border border-zinc-100 bg-zinc-50/50 p-3 text-xs">
-                        <span className="font-heading text-[10px] font-bold uppercase text-zinc-400">Hecho / No Conformidad:</span>
-                        <p className="mt-1 text-zinc-700 whitespace-pre-wrap">{s.description}</p>
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Fecha de registro
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900">{formatDay(s.detectedAt)}</p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            Elaborado por {s.createdByName || "—"}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Responsable HCA
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900 truncate">{s.responsibleName}</p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            Cierre comprometido {formatDay(s.dueDate)}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Producto & estado
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900 truncate" title={productLabel}>
+                            {productLabel}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            {s.plantName ? `Planta ${s.plantName}` : "Sin planta"}
+                            <span className="inline-flex">
+                              <HcaStatusBadge status={s.status} />
+                            </span>
+                          </span>
+                        </div>
                       </div>
 
-                      {s.causes && s.causes.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-zinc-800 mb-2">Causas identificadas (5 Porqués / Raíz)</h4>
-                          <ul className="space-y-1.5 text-xs text-zinc-700">
-                            {s.causes.map((c, idx) => (
-                              <li key={c.id} className="flex items-start gap-2 rounded border border-zinc-100 bg-zinc-50/40 p-2">
-                                <span className="font-mono font-bold text-zinc-400">#{idx + 1}</span>
-                                <span>{c.description}</span>
-                              </li>
+                      <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-2xs">
+                        <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500 font-heading">
+                          <FileText className="size-3.5 text-zinc-400" />
+                          <span>Hecho / no conformidad</span>
+                        </div>
+                        <p className="mt-2.5 text-xs text-zinc-800 leading-relaxed whitespace-pre-wrap">
+                          {buildHcaHechoText(s)}
+                        </p>
+                      </div>
+
+                      {s.comments?.trim() && (
+                        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-2xs">
+                          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500 font-heading">
+                            <FileText className="size-3.5 text-zinc-400" />
+                            <span>Comentarios de cierre</span>
+                          </div>
+                          <p className="mt-2.5 text-xs text-zinc-800 leading-relaxed whitespace-pre-wrap">
+                            {s.comments.trim()}
+                          </p>
+                        </div>
+                      )}
+
+                      {causes.length > 0 && (
+                        <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-2xs">
+                          <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5 flex items-center justify-between">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 font-heading">
+                              Causas identificadas ({causes.length})
+                            </h4>
+                            <span className="font-mono text-[10px] text-zinc-400 font-bold">PF-FOR-109</span>
+                          </div>
+                          <div className="divide-y divide-zinc-100">
+                            {causes.map((cause, index) => (
+                              <div
+                                key={cause.id}
+                                className="px-4 py-3 flex items-start gap-3 text-xs hover:bg-zinc-50/50 transition-colors"
+                              >
+                                <span className="flex size-5 shrink-0 items-center justify-center rounded bg-zinc-100 font-mono text-[10px] font-bold text-zinc-600">
+                                  {String(index + 1).padStart(2, "0")}
+                                </span>
+                                <p className="text-xs text-zinc-700 leading-relaxed">{cause.description}</p>
+                              </div>
                             ))}
-                          </ul>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-2xs">
+                        <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 font-heading">
+                              Plan de acción
+                              {planItems !== undefined ? ` (${planItems.length})` : ""}
+                            </h4>
+                            <span className="font-mono text-[10px] text-zinc-400 font-bold shrink-0">
+                              PF-FOR-109
+                            </span>
+                          </div>
+                          <span className="text-[11px] shrink-0">
+                            {planItems === undefined ? (
+                              <span className="text-zinc-400">Cargando…</span>
+                            ) : overduePlanCount > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 font-semibold text-amber-800">
+                                <AlertTriangle className="size-3 text-amber-600" />
+                                {overduePlanCount}{" "}
+                                {overduePlanCount === 1 ? "acción vencida" : "acciones vencidas"}
+                              </span>
+                            ) : openPlanCount > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2.5 py-0.5 font-medium text-zinc-600">
+                                {openPlanCount} pendiente{openPlanCount === 1 ? "" : "s"}
+                              </span>
+                            ) : planItems.length > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 font-semibold text-emerald-700">
+                                <Check className="size-3" strokeWidth={2.5} />
+                                Plan al día
+                              </span>
+                            ) : (
+                              <span className="text-zinc-400">Sin acciones</span>
+                            )}
+                          </span>
+                        </div>
+                        {planItems === undefined ? (
+                          <div className="flex justify-center py-8">
+                            <Spinner />
+                          </div>
+                        ) : planItems.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-zinc-50/80 text-[10.5px] uppercase font-bold text-zinc-500 border-b border-zinc-200/80">
+                                <tr>
+                                  <th className="p-3 w-[44%]">Acción (qué)</th>
+                                  <th className="p-3">Quién</th>
+                                  <th className="p-3">Cuándo</th>
+                                  <th className="p-3">Estado</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                                {planItems.map((item) => {
+                                  const itemOverdue = isPlanItemOverdue(item) && !isPlanItemSettled(item);
+                                  const hasEvidence =
+                                    Boolean(item.evidenceNotes?.trim()) || item.attachments.length > 0;
+                                  return (
+                                    <tr key={item.id} className="hover:bg-zinc-50/50 transition-colors">
+                                      <td className="p-3 align-top">
+                                        <p className="font-medium text-zinc-900 whitespace-pre-wrap">
+                                          {item.description}
+                                        </p>
+                                        {hasEvidence && (
+                                          <span className="mt-1 inline-flex items-center gap-1 text-[10.5px] text-zinc-500">
+                                            <CheckCircle2 className="size-3 text-emerald-600" />
+                                            Con evidencia registrada
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="p-3 align-top font-medium text-zinc-800">
+                                        {item.responsibleName}
+                                      </td>
+                                      <td className="p-3 align-top tabular-nums">{formatDay(item.dueDate)}</td>
+                                      <td className="p-3 align-top">
+                                        <PlanItemStatusBadge status={item.status} overdue={itemOverdue} />
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="px-4 py-6 text-xs text-zinc-500">No hay acciones en el plan.</p>
+                        )}
+                      </div>
+
+                      {participants.length > 0 && (
+                        <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-2xs">
+                          <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 font-heading">
+                                Participantes ({participants.length})
+                              </h4>
+                              <Users className="size-3.5 text-zinc-400" />
+                            </div>
+                            <span className="text-[11px]">
+                              {acknowledgedCount === participants.length ? (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 font-semibold text-emerald-700">
+                                  <Check className="size-3" strokeWidth={2.5} />
+                                  Todos confirmaron
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2.5 py-0.5 font-medium text-zinc-600">
+                                  {acknowledgedCount}/{participants.length} confirmados
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="divide-y divide-zinc-100">
+                            {participants.map((participant) => (
+                              <div
+                                key={participant.id}
+                                className="px-4 py-3 flex items-center justify-between gap-3 text-xs hover:bg-zinc-50/50 transition-colors"
+                              >
+                                <p className="font-medium text-zinc-800">{participant.name}</p>
+                                <div className="shrink-0">
+                                  {participant.acknowledgedAt ? (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                      <Check className="size-3" strokeWidth={2.5} />
+                                      {formatDay(participant.acknowledgedAt.slice(0, 10))}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-zinc-400">Pendiente de confirmación</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
