@@ -11,7 +11,6 @@ import {
   Flag,
   Gavel,
   History,
-  Image as ImageIcon,
   Lock,
   Mail,
   Package,
@@ -33,6 +32,7 @@ import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { ModuleHeader, type ModuleHeaderSection } from "../../components/app/ModuleHeader";
+import { TicketPendingFileList } from "../../components/app/TicketPendingFileList";
 import { TicketProductsField } from "../../components/app/TicketProductsField";
 import { Alert } from "../../components/ui/Alert";
 import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
@@ -233,27 +233,6 @@ const attachSuccessLabelClass =
 const attachExitingLabelClass =
   "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/40 px-2.5 " +
   "text-[11.5px] font-medium text-emerald-600 shadow-2xs ring-1 ring-emerald-100/50 transition-all duration-300 active:scale-95";
-
-/** Archivo elegido y aun no enviado: nombre, peso y la cruz para quitarlo. */
-function PendingFile({ file, onRemove }: { file: File; onRemove: () => void }) {
-  return (
-    <span className="animate-plf-check-in inline-flex h-7 items-center gap-1.5 rounded-lg border border-emerald-200/80 bg-emerald-50/50 px-2.5 text-[11.5px] font-medium text-emerald-950 shadow-2xs">
-      <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
-        <AnimatedCheckIcon size={10} strokeWidth={3} />
-      </span>
-      <span className="max-w-[180px] truncate">{file.name}</span>
-      <span className="text-[10.5px] tabular-nums text-emerald-700">{formatBytes(file.size)}</span>
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Quitar ${file.name}`}
-        className="ml-0.5 flex h-4.5 w-4.5 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-brand-red cursor-pointer"
-      >
-        <X className="h-3 w-3" />
-      </button>
-    </span>
-  );
-}
 
 /**
  * Cuerpo de tarjeta cuya altura se limita para que su borde inferior no pase
@@ -749,11 +728,6 @@ export function TicketDetailPage() {
     setTransitionError(null);
     setVerdictAttachments((prev) => [...prev, ...chosen]);
     triggerVerdictAttachedFeedback();
-  };
-
-  const handleRemoveVerdictFile = (index: number) => {
-    if (transitionError) setTransitionError(null);
-    setVerdictAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleConfirmUpdateStatus = async (event: React.FormEvent) => {
@@ -1903,17 +1877,13 @@ export function TicketDetailPage() {
           </div>
 
           <div className="shrink-0 space-y-2.5 border-t border-line bg-canvas/40 px-6 py-3">
-            {replyAttachments.length > 0 && (
-              <div className="mx-auto flex max-w-4xl flex-wrap gap-2">
-                {replyAttachments.map((file, index) => (
-                  <PendingFile
-                    key={`${file.name}-${index}`}
-                    file={file}
-                    onRemove={() => setReplyAttachments((prev) => prev.filter((_, i) => i !== index))}
-                  />
-                ))}
-              </div>
-            )}
+            <TicketPendingFileList
+              files={replyAttachments}
+              onChange={setReplyAttachments}
+              variant="inline"
+              layout="wrap"
+              className="mx-auto max-w-4xl"
+            />
 
             <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -2144,45 +2114,14 @@ export function TicketDetailPage() {
                 <span className="text-[11px] text-zinc-400">{SAVE_SHORTCUT} para guardar</span>
               </div>
 
-              {/* Lista de archivos seleccionados */}
-              {noteAttachments.length > 0 && (
-                <div className="space-y-1.5 pt-1">
-                  {noteAttachments.map((file, idx) => (
-                    <div
-                      key={`${file.name}-${idx}`}
-                      className="animate-plf-seal-pop flex items-center justify-between gap-2 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px] shadow-2xs"
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span
-                          className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-2xs animate-plf-check-in"
-                          title="Adjuntado correctamente"
-                        >
-                          <AnimatedCheckIcon size={12} strokeWidth={3} />
-                        </span>
-                        {file.type.startsWith("image/") ? (
-                          <ImageIcon className="size-3.5 shrink-0 text-brand-red" />
-                        ) : (
-                          <FileText className="size-3.5 shrink-0 text-zinc-400" />
-                        )}
-                        <span className="truncate font-medium text-zinc-800" title={file.name}>
-                          {file.name}
-                        </span>
-                        <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">
-                          ({formatBytes(file.size)})
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setNoteAttachments((prev) => prev.filter((_, i) => i !== idx))}
-                        title="Quitar archivo"
-                        className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <TicketPendingFileList
+                files={noteAttachments}
+                onChange={setNoteAttachments}
+                className="pt-1"
+                onRemove={() => {
+                  if (noteSendError) setNoteSendError(null);
+                }}
+              />
             </div>
           </div>
         </Modal>
@@ -2596,45 +2535,14 @@ export function TicketDetailPage() {
                         )}
                       </button>
 
-                      {/* Lista de archivos seleccionados */}
-                      {verdictAttachments.length > 0 && (
-                        <div className="space-y-1.5 pt-1">
-                          {verdictAttachments.map((file, idx) => (
-                            <div
-                              key={`${file.name}-${idx}`}
-                              className="animate-plf-seal-pop flex items-center justify-between gap-2 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px] shadow-2xs"
-                            >
-                              <div className="flex min-w-0 items-center gap-2">
-                                <span
-                                  className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-2xs animate-plf-check-in"
-                                  title="Adjuntado correctamente"
-                                >
-                                  <AnimatedCheckIcon size={12} strokeWidth={3} />
-                                </span>
-                                {file.type.startsWith("image/") ? (
-                                  <ImageIcon className="size-3.5 shrink-0 text-brand-red" />
-                                ) : (
-                                  <FileText className="size-3.5 shrink-0 text-zinc-400" />
-                                )}
-                                <span className="truncate font-medium text-zinc-800" title={file.name}>
-                                  {file.name}
-                                </span>
-                                <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">
-                                  ({formatBytes(file.size)})
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveVerdictFile(idx)}
-                                title="Quitar archivo"
-                                className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                              >
-                                <X className="size-3" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <TicketPendingFileList
+                        files={verdictAttachments}
+                        onChange={setVerdictAttachments}
+                        className="pt-1"
+                        onRemove={() => {
+                          if (transitionError) setTransitionError(null);
+                        }}
+                      />
                     </div>
                   </form>
                 )}

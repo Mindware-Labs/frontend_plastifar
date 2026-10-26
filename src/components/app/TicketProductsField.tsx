@@ -4,6 +4,9 @@ import { prefersReducedMotion } from "../../hooks/motion";
 import { resolveProductLabel } from "../../lib/lookups";
 import { ProductAddSearch } from "./ProductAddSearch";
 
+/** Alineado con `animate-plf-check-out` (0.36s) y chips de adjuntos en ticket. */
+const REMOVE_MS = 360;
+
 export interface TicketProductDraft {
   productId: number;
   productCode: string;
@@ -17,8 +20,6 @@ interface TicketProductsFieldProps {
   hint?: string;
   pickerLabel?: string;
 }
-
-const REMOVE_MS = 360;
 
 /**
  * Selector de uno o varios productos del catálogo para un ticket. Opcional al
@@ -178,7 +179,9 @@ export function TicketProductsField({
         </ul>
       ) : null}
 
-      {addError ? <p className="animate-plf-shake text-[11px] text-brand-red">{addError}</p> : null}
+      {addError ? (
+        <p className="animate-plf-shake text-[11px] text-brand-red">{addError}</p>
+      ) : null}
     </div>
   );
 }

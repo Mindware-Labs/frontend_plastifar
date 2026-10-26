@@ -4,6 +4,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { z } from "zod";
 import { Building2, Check, Flag, Info, Mail, MessageSquareText, Package, RotateCcw, Tag, X } from "lucide-react";
+import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { TicketProductsField, type TicketProductDraft } from "../../components/app/TicketProductsField";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
@@ -158,6 +159,7 @@ export function CreateTicketModal({
   const [departmentTree, setDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
   const [ticketProducts, setTicketProducts] = useState<TicketProductDraft[]>([]);
+  const [createAttachments, setCreateAttachments] = useState<File[]>([]);
   const [detectedMatch, setDetectedMatch] = useState<{ clientName: string; contactName: string } | null>(null);
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
@@ -301,7 +303,7 @@ export function CreateTicketModal({
     setFormError(null);
 
     try {
-      const created = await ticketsApi.create({
+      const payload = {
         clientId: values.clientId ? Number(values.clientId) : null,
         contactId: values.contactId ? Number(values.contactId) : null,
         topicId: values.topicId ? Number(values.topicId) : null,
@@ -312,7 +314,12 @@ export function CreateTicketModal({
         assignedStaffId: values.assignedStaffId ? Number(values.assignedStaffId) : null,
         initialMessage: values.initialMessage?.trim() || null,
         emailId: emailId ?? null,
-      });
+      };
+
+      const created = await ticketsApi.create(
+        payload,
+        createAttachments.length > 0 ? createAttachments : undefined,
+      );
 
 
       onCreated(created);
@@ -723,6 +730,15 @@ export function CreateTicketModal({
                 />
 
                 <p className="text-right text-[11px] tabular-nums text-zinc-400">{currentMessage.length} caracteres</p>
+
+                <TaskEvidenceUpload
+                  files={createAttachments}
+                  onFilesChange={setCreateAttachments}
+                  onReportError={setFormError}
+                  label="Archivos adjuntos (opcional)"
+                  dropzoneTitle="Haz clic o arrastra archivos al ticket"
+                  dropzoneHint="Imágenes, PDF u otros documentos · máx. 10 MB por archivo"
+                />
               </section>
             </form>
           )}

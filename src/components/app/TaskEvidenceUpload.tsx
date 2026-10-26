@@ -1,8 +1,8 @@
-import { FileText, Image as ImageIcon, Upload, X } from "lucide-react";
+import { Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { AnimatedCheckIcon } from "../ui/AnimatedCheckIcon";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
-import { formatBytes } from "../../lib/format";
+import { TicketPendingFileList } from "./TicketPendingFileList";
 
 export const MAX_TASK_EVIDENCE_SINGLE = 10 * 1024 * 1024;
 export const MAX_TASK_EVIDENCE_TOTAL = 25 * 1024 * 1024;
@@ -53,10 +53,6 @@ export function TaskEvidenceUpload({
 
     onFilesChange([...files, ...newFiles]);
     triggerUploadFeedback();
-  };
-
-  const handleRemoveFile = (index: number) => {
-    onFilesChange(files.filter((_, i) => i !== index));
   };
 
   return (
@@ -135,42 +131,7 @@ export function TaskEvidenceUpload({
         )}
       </button>
 
-      {files.length > 0 && (
-        <div className="space-y-1.5 pt-1">
-          {files.map((file, idx) => (
-            <div
-              key={`${file.name}-${idx}`}
-              className="animate-plf-seal-pop flex items-center justify-between gap-2 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px] shadow-2xs"
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-2xs animate-plf-check-in"
-                  title="Adjuntado correctamente"
-                >
-                  <AnimatedCheckIcon size={12} strokeWidth={3} />
-                </span>
-                {file.type.startsWith("image/") ? (
-                  <ImageIcon className="size-3.5 shrink-0 text-brand-red" />
-                ) : (
-                  <FileText className="size-3.5 shrink-0 text-zinc-400" />
-                )}
-                <span className="truncate font-medium text-zinc-800" title={file.name}>
-                  {file.name}
-                </span>
-                <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">({formatBytes(file.size)})</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleRemoveFile(idx)}
-                title="Quitar archivo"
-                className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-              >
-                <X className="size-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <TicketPendingFileList files={files} onChange={onFilesChange} className="pt-1" />
     </div>
   );
 }

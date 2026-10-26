@@ -64,11 +64,32 @@ export const ticketsApi = {
   createOptions: () =>
     apiRequest<import("../types/api").TicketCreateOptionsResponse>("/api/tickets/create-options"),
 
-  create: (input: import("../types/api").CreateManualTicketRequest) =>
-    apiRequest<import("../types/api").TicketSummaryResponse>("/api/tickets", {
+  create: (input: import("../types/api").CreateManualTicketRequest, attachments?: File[]) => {
+    if (attachments && attachments.length > 0) {
+      const body = new FormData();
+      body.append("Subject", input.subject);
+      if (input.initialMessage) body.append("InitialMessage", input.initialMessage);
+      if (input.priority) body.append("Priority", input.priority);
+      if (input.clientId != null) body.append("ClientId", String(input.clientId));
+      if (input.contactId != null) body.append("ContactId", String(input.contactId));
+      if (input.topicId != null) body.append("TopicId", String(input.topicId));
+      if (input.departmentId != null) body.append("DepartmentId", String(input.departmentId));
+      if (input.productLineId != null) body.append("ProductLineId", String(input.productLineId));
+      if (input.assignedStaffId != null) body.append("AssignedStaffId", String(input.assignedStaffId));
+      if (input.emailId != null) body.append("EmailId", String(input.emailId));
+      input.productIds?.forEach((id) => body.append("ProductIds", String(id)));
+      attachments.forEach((file) => body.append("Attachments", file));
+      return apiRequest<import("../types/api").TicketSummaryResponse>("/api/tickets", {
+        method: "POST",
+        body,
+      });
+    }
+
+    return apiRequest<import("../types/api").TicketSummaryResponse>("/api/tickets", {
       method: "POST",
       body: JSON.stringify(input),
-    }),
+    });
+  },
 
   update: (id: number, input: import("../types/api").UpdateTicketDetailsRequest) =>
     apiRequest<unknown>(`/api/tickets/${id}`, {
