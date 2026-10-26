@@ -64,8 +64,9 @@ export interface CorrectiveActionSheet {
   description: string;
   /** Contencion aplicada de inmediato. */
   immediateAction: string | null;
-  /** Dueño de la HCA. */
-  responsibleStaffId: number;
+  /** Dueño de la HCA; nulo si el responsable es solo nombre manual. */
+  responsibleStaffId: number | null;
+  responsibleManualName: string | null;
   responsibleName: string;
   /** Fecha comprometida de cierre, en ISO corto: es un dia, no un instante. */
   dueDate: string;

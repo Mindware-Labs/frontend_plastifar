@@ -745,6 +745,34 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     );
   }
 
+  if (hcaModalOpen) {
+    return (
+      <div className="mt-3.5 w-full">
+        <HcaModal
+          inline
+          sheet={editingHca}
+          productLines={productLines}
+          defaults={hcaInitialDefaults}
+          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
+          ticketClientName={ticket.clientName ?? undefined}
+          ticketProductLineId={ticket.productLineId}
+          ticketProducts={ticket.products}
+          onClose={() => {
+            setHcaModalOpen(false);
+            setEditingHca(undefined);
+            setHcaInitialDefaults(undefined);
+          }}
+          onSaved={() => {
+            setHcaModalOpen(false);
+            setEditingHca(undefined);
+            setHcaInitialDefaults(undefined);
+            fetchAllForms();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="mt-3.5 space-y-4 animate-plf-fade">
       {/* ZERO STATE: No forms registered yet */}
@@ -1595,20 +1623,6 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         />
       )}
 
-
-      {/* 4. HCA Modal */}
-      {hcaModalOpen && (
-        <HcaModal
-          sheet={editingHca}
-          productLines={productLines}
-          defaults={hcaInitialDefaults}
-          onClose={() => setHcaModalOpen(false)}
-          onSaved={() => {
-            setHcaModalOpen(false);
-            fetchAllForms();
-          }}
-        />
-      )}
 
       {/* 5. Modal para elegir nuevo formulario */}
       {newFormModalOpen && (

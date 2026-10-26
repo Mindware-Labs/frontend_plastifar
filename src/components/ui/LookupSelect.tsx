@@ -1,7 +1,8 @@
 import { Check, ChevronDown, Search, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import {
   controlBase,
   controlSizes,
@@ -123,6 +124,7 @@ export function LookupSelect({
     width: number;
     top?: number;
     bottom?: number;
+    originX: number;
   } | null>(null);
 
   const [result, setResult] = useState<LookupResult>({ options: [], hasMore: false });
@@ -134,8 +136,12 @@ export function LookupSelect({
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+
+  const dropUp = anchor?.bottom !== undefined;
+  const { mounted, exiting, ref: containerRef, snap } = useDisclosureMotion<HTMLDivElement>(open, {
+    direction: dropUp ? "up" : "down",
+  });
 
   const debouncedTerm = useDebouncedValue(term).trim();
   const recommended = recommendedOptions ?? [];
@@ -223,6 +229,7 @@ export function LookupSelect({
       width: rect.width,
       top: dropUp ? undefined : rect.bottom + 4,
       bottom: dropUp ? window.innerHeight - rect.top + 4 : undefined,
+      originX: rect.width / 2,
     });
   }
 
@@ -235,10 +242,15 @@ export function LookupSelect({
     setOpen(true);
   }
 
-  function closeList() {
-    setOpen(false);
-    onBlur?.();
-  }
+  const closeList = useCallback(
+    (immediate = false) => {
+      if (!open) return;
+      setOpen(false);
+      if (immediate) snap();
+      onBlur?.();
+    },
+    [open, snap, onBlur],
+  );
 
   function commit(index: number) {
     const option = options[index];
@@ -263,28 +275,35 @@ export function LookupSelect({
   useEffect(() => {
     if (!open) return;
 
-    function handlePointerDown(event: PointerEvent) {
+    function handlePointerDown(event: PointerEvent | MouseEvent) {
       const target = event.target as Node;
-      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      setOpen(false);
-      onBlur?.();
+      if (triggerRef.current?.contains(target) || containerRef.current?.contains(target)) return;
+      closeList();
     }
 
     function handleViewportChange(event: Event) {
       const target = event.target;
-      if (target instanceof Node && panelRef.current?.contains(target)) return;
-      setOpen(false);
+      if (target instanceof Node && containerRef.current?.contains(target)) return;
+      closeList(true);
     }
 
-    document.addEventListener("pointerdown", handlePointerDown);
+    function handleWindowBlur() {
+      closeList(true);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("mousedown", handlePointerDown, true);
     window.addEventListener("scroll", handleViewportChange, true);
     window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("blur", handleWindowBlur);
     return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("mousedown", handlePointerDown, true);
       window.removeEventListener("scroll", handleViewportChange, true);
       window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [open, onBlur]);
+  }, [open, closeList, containerRef]);
 
   useEffect(() => {
     if (!open || activeIndex < 0) return;
@@ -361,10 +380,6 @@ export function LookupSelect({
           ? "Hay más coincidencias. Seguí escribiendo para acotar la búsqueda."
           : null;
 
-  const panelSurface = ticketTabEnabled
-    ? "animate-plf-popover-in z-[60] rounded-edge border border-line bg-white"
-    : "animate-plf-popover-in z-[60] rounded-edge border border-line bg-white shadow-panel";
-
   return (
     <div className={`relative ${className}`}>
       <button
@@ -383,15 +398,17 @@ export function LookupSelect({
         onKeyDown={handleTriggerKeyDown}
         className={`${controlBase} ${stateClasses[resolvedState]} ${controlSizes[size]}
           flex items-center justify-between gap-2 pl-3 ${rightAction ? "pr-8" : "pr-2.5"} font-medium
-          transition-[box-shadow,border-color,transform] duration-200 ease-out
+          transition-colors duration-150 ease-out
           focus-visible:ring-3 focus-visible:ring-brand-red/25
-          ${open ? "ring-3 ring-brand-red/15 border-line-strong" : ""}
+          ${open ? "border-zinc-300 bg-zinc-50/80 text-zinc-900 shadow-2xs" : ""}
           ${currentLabel !== null ? "text-ink" : "text-faint"}`}
       >
         <span className="truncate">{currentLabel ?? (value === "" ? placeholder : value)}</span>
         <ChevronDown
           aria-hidden
-          className={`h-4 w-4 shrink-0 text-faint transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+            open ? "rotate-180 text-zinc-700" : ""
+          }`}
         />
       </button>
 
@@ -401,21 +418,34 @@ export function LookupSelect({
         </div>
       )}
 
-      {open &&
+      {mounted &&
         anchor &&
         createPortal(
-          <div
-            ref={panelRef}
-            style={{
-              position: "fixed",
-              left: anchor.left,
-              top: anchor.top,
-              bottom: anchor.bottom,
-              width: anchor.width,
-            }}
-            className={panelSurface}
-          >
-            <div className="relative border-b border-line p-1.5">
+          <>
+            {!exiting && (
+              <div
+                className="fixed inset-0 z-[70]"
+                aria-hidden="true"
+                onPointerDown={() => closeList()}
+              />
+            )}
+            <div
+              ref={containerRef}
+              aria-hidden={exiting}
+              style={{
+                position: "fixed",
+                left: anchor.left,
+                top: anchor.top,
+                bottom: anchor.bottom,
+                width: anchor.width,
+                maxHeight: PANEL_MAX_HEIGHT,
+                transformOrigin: `${anchor.originX}px ${dropUp ? "bottom" : "top"}`,
+              }}
+              className={`z-[80] flex flex-col overflow-hidden rounded-lg border border-zinc-200/90
+                bg-white/95 backdrop-blur-xs shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]
+                ${exiting ? "pointer-events-none" : ""}`}
+            >
+            <div data-motion-item className="relative shrink-0 border-b border-zinc-100 p-1.5">
               <Search
                 aria-hidden
                 className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint"
@@ -442,6 +472,7 @@ export function LookupSelect({
 
             {ticketTabEnabled && (
               <div
+                data-motion-item
                 className="flex gap-0.5 border-b border-line bg-zinc-50/80 p-1"
                 role="tablist"
               >
@@ -487,10 +518,11 @@ export function LookupSelect({
               role="listbox"
               aria-label={ariaLabel}
               style={{ maxHeight: LIST_MAX_HEIGHT }}
-              className={`overflow-y-auto p-1 ${ticketTabEnabled ? "animate-plf-apple-tab" : ""}`}
+              className="min-h-0 flex-1 overflow-y-auto p-1 outline-none"
             >
               {clearLabel !== undefined && value !== "" && (
                 <li
+                  data-motion-item
                   role="option"
                   aria-selected={false}
                   onClick={clear}
@@ -509,15 +541,16 @@ export function LookupSelect({
                 return (
                   <li
                     key={`${option.value}-${index}`}
+                    data-motion-item
                     id={`${listId}-${index}`}
                     role="option"
                     aria-selected={isSelected}
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => commit(index)}
-                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-edge px-2.5 py-2
+                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-2
                       text-[13px] transition-colors
-                      ${isActive ? "bg-fill text-ink" : "text-brand-gray"}
-                      ${isSelected ? "font-semibold text-ink" : ""}`}
+                      ${isActive ? "bg-zinc-100 text-zinc-900 font-medium" : "text-zinc-700 hover:bg-zinc-100/70"}
+                      ${isSelected ? "font-semibold text-zinc-900" : ""}`}
                   >
                     <span className="flex min-w-0 flex-col gap-0.5">
                       <span className="truncate leading-tight">{option.label}</span>
@@ -537,14 +570,16 @@ export function LookupSelect({
               <p
                 id={statusId}
                 role="status"
-                className={`border-t border-line px-2.5 py-2 text-[12px] leading-snug ${
+                data-motion-item
+                className={`shrink-0 border-t border-zinc-100 px-2.5 py-2 text-[12px] leading-snug ${
                   failed ? "text-brand-red-dark" : "text-faint"
                 }`}
               >
                 {status}
               </p>
             )}
-          </div>,
+          </div>
+          </>,
           document.body,
         )}
     </div>

@@ -1,42 +1,65 @@
-import type { ComponentProps } from "react";
+import { useMemo, type ComponentProps } from "react";
 import { resolveProductLabel, searchProducts } from "../../lib/lookups";
+import {
+  ticketProductLabelMap,
+  ticketProductsToLookupOptions,
+} from "../../lib/ticketProducts";
+import type { TicketProductResponse } from "../../types/api";
 import { LookupField } from "../ui/Field";
 
 type ProductLookupFieldProps = Omit<
   ComponentProps<typeof LookupField>,
-  "search" | "resolveSelectedLabel" | "searchPlaceholder"
+  "search" | "resolveSelectedLabel" | "searchPlaceholder" | "recommendedOptions"
 > & {
   searchPlaceholder?: string;
+  /** Productos ligados al ticket: activa «Producto(s) del ticket» / «Todos los productos» (PF-FOR-291). */
+  ticketProducts?: TicketProductResponse[];
+  recommendedOptions?: ComponentProps<typeof LookupField>["recommendedOptions"];
 };
 
 /**
  * Selector de producto (docs/plan/00, RF-B4).
  *
- * Es `LookupField` con la búsqueda de productos ya enchufada: consulta al
- * servidor por código parcial o por parte de la descripción, ofrece solo los
- * activos y muestra el código como segunda línea de cada opción. Un producto
- * que se desactivó después de elegirlo deja de salir en la búsqueda, pero el
- * campo sigue nombrándolo: la etiqueta de lo ya seleccionado se resuelve por id.
- *
- * Todavía no lo usa ninguna pantalla. Sus consumidores son las líneas de
- * producto de los formularios: reclamación de clientes (docs/plan/03), retiro
- * de mercancía (docs/plan/04), HCA ampliada (docs/plan/05) y discrepancia de
- * carga (docs/plan/06). El valor es el id del producto como texto, igual que en
- * los demás `LookupField`; cada formulario guarda además su propia copia del
- * código y la descripción (regla 3 del plan).
+ * Misma búsqueda que discrepancia de cargas: `searchProducts`, etiquetas por id
+ * y, si hay `ticketProducts`, pestañas de recomendados del caso.
  */
 export function ProductLookupField({
-  placeholder = "Elige un producto",
-  searchPlaceholder = "Buscar por código o descripción…",
+  placeholder,
+  searchPlaceholder = "Código o descripción…",
+  ticketProducts,
+  recommendedOptions,
+  selectedLabel,
+  value = "",
   ...props
 }: ProductLookupFieldProps) {
+  const ticketRecommended = useMemo(
+    () => ticketProductsToLookupOptions(ticketProducts),
+    [ticketProducts],
+  );
+  const ticketLabels = useMemo(() => ticketProductLabelMap(ticketProducts), [ticketProducts]);
+
+  const resolvedRecommended =
+    recommendedOptions ?? (ticketRecommended.length > 0 ? ticketRecommended : undefined);
+
+  const resolvedSelectedLabel =
+    selectedLabel ?? (value !== "" ? ticketLabels.get(value) : undefined);
+
+  const resolvedPlaceholder =
+    placeholder ??
+    (resolvedRecommended && resolvedRecommended.length > 0
+      ? "Buscar producto…"
+      : "Elige un producto");
+
   return (
     <LookupField
       {...props}
-      placeholder={placeholder}
+      value={value}
+      placeholder={resolvedPlaceholder}
       searchPlaceholder={searchPlaceholder}
       search={searchProducts}
       resolveSelectedLabel={resolveProductLabel}
+      recommendedOptions={resolvedRecommended}
+      selectedLabel={resolvedSelectedLabel}
     />
   );
 }

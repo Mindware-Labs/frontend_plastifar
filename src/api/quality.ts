@@ -63,7 +63,8 @@ export interface SaveSheetRequest {
   detectedAt: string;
   description: string;
   immediateAction: string | null;
-  responsibleStaffId: number;
+  responsibleStaffId: number | null;
+  responsibleManualName: string | null;
   dueDate: string;
   ticketId: number | null;
   productId: number | null;
