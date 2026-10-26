@@ -32,6 +32,8 @@ export interface Client {
   salesRepStaffId: number | null;
   phone: string | null;
   email: string | null;
+  /** Persona de referencia en la ficha (sección Contacto del modal). */
+  contactPersonName: string | null;
   address: string | null;
   notes: string | null;
   isActive: boolean;
@@ -90,6 +92,8 @@ export interface SaveClientRequest {
   salesRepStaffId: number | null;
   phone: string | null;
   email: string | null;
+  /** Persona de referencia en la ficha (sección Contacto del modal). */
+  contactPersonName: string | null;
   address: string | null;
   notes: string | null;
   isActive: boolean;

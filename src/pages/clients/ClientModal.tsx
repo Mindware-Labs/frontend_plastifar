@@ -55,6 +55,7 @@ const schema = z.object({
   type: z.string().min(1, "Elige el tipo de cliente"),
   territoryId: z.string().min(1, "Elige el territorio"),
   salesRepStaffId: z.string(),
+  contactPersonName: z.string().trim().max(120, "Máximo 120 caracteres"),
   phone: z
     .string()
     .trim()
@@ -131,6 +132,7 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
       type: client?.type ?? "Detallista",
       territoryId: client ? String(client.territoryId) : "",
       salesRepStaffId: client?.salesRepStaffId ? String(client.salesRepStaffId) : "",
+      contactPersonName: client?.contactPersonName ?? "",
       phone: client?.phone ? formatPhoneNumber(client.phone) : "",
       email: client?.email ?? "",
       address: client?.address ?? "",
@@ -157,6 +159,7 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
       type: values.type as ClientType,
       territoryId: Number(values.territoryId),
       salesRepStaffId: values.salesRepStaffId === "" ? null : Number(values.salesRepStaffId),
+      contactPersonName: values.contactPersonName.trim() === "" ? null : values.contactPersonName.trim(),
       phone: values.phone.trim() === "" ? null : values.phone.trim(),
       email: values.email.trim() === "" ? null : values.email.trim(),
       address: values.address.trim() === "" ? null : values.address.trim(),
@@ -363,6 +366,15 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
 
         {/* 4. CONTACTO Y UBICACIÓN */}
         <FormDivider title="Contacto" />
+
+        <TextField
+          size="sm"
+          label="Persona de contacto"
+          placeholder="Nombre de quien atiende pedidos o reclamos"
+          state={stateOf("contactPersonName")}
+          error={errors.contactPersonName?.message}
+          {...register("contactPersonName")}
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <Controller

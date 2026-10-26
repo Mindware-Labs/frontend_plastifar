@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { claimsApi } from "../../api/claims";
@@ -8,13 +8,22 @@ import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
+import { Logo } from "../../components/Logo";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { CheckboxField, SelectField, TextAreaField, TextField, type FieldState } from "../../components/ui/Field";
+import {
+  CheckboxField,
+  DateField,
+  SelectField,
+  TextAreaField,
+  TextField,
+  type FieldState,
+} from "../../components/ui/Field";
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { RowAction } from "../../components/ui/RowAction";
-import { computeLine, computeTotal } from "../../lib/claims";
+import { CLAIM_FORM_CONTROL, computeLine, computeTotal } from "../../lib/claims";
+import { formatPhoneNumber } from "../../lib/format";
 import { formatAmount, toNumberOrNull } from "../../lib/numbers";
 import { today } from "../../lib/quality";
 import {
@@ -29,6 +38,19 @@ import {
   type CustomerClaim,
 } from "../../types/claims";
 import type { Plant } from "../../types/settings";
+
+const PHONE_CHARS_REGEX = /^[0-9+\s\-().extx]+$/i;
+
+const optionalPhone = z
+  .string()
+  .trim()
+  .max(30, "Máximo 30 caracteres")
+  .refine((val) => {
+    if (!val) return true;
+    if (!PHONE_CHARS_REGEX.test(val)) return false;
+    const digits = val.replace(/\D/g, "");
+    return digits.length >= 10 && digits.length <= 15;
+  }, "Teléfono inválido (mín. 10 dígitos)");
 
 /** Número opcional: vacío vale, pero lo escrito tiene que ser un número de cero en adelante. */
 const quantity = (decimals: number, what: string) =>
@@ -49,6 +71,8 @@ const schema = z
       .min(1, "Indica la fecha de la reclamación")
       .refine((value) => value <= today(), "La fecha no puede ser posterior a hoy"),
     country: z.string().trim().max(80, "Máximo 80 caracteres"),
+    contactName: z.string().trim().max(120, "Máximo 120 caracteres"),
+    contactPhone: optionalPhone,
     reason: z.string().min(1, "Elige el motivo del reclamo"),
     reasonOther: z.string().trim().max(200, "Máximo 200 caracteres"),
     affectedAreas: z.array(z.string()).min(1, "Marca al menos un área afectada"),
@@ -113,11 +137,29 @@ const emptyLine = (): FormValues["lines"][number] => ({
   unitPrice: "",
 });
 
+const STEP2_FIELDS = [
+  "reason",
+  "reasonOther",
+  "affectedAreas",
+  "plantIds",
+  "productionLot",
+  "invoiceRef",
+  "poNumber",
+  "defectFoundDuring",
+] as const satisfies readonly (keyof FormValues)[];
+
+const STEP3_FIELDS = ["lines"] as const satisfies readonly (keyof FormValues)[];
+
 interface ClaimFormModalProps {
   /** Ticket al que se liga la reclamación (alta). */
   ticketId: number;
   ticketNumber: string;
   clientName: string;
+  /** Del ticket; en edición prevalece lo guardado en la reclamación. */
+  contactName?: string | null;
+  contactPhone?: string | null;
+  clientPhone?: string | null;
+  clientContactPersonName?: string | null;
   /** Ausente = alta. */
   claim?: CustomerClaim;
   initialData?: {
@@ -148,14 +190,28 @@ export function ClaimFormModal({
   ticketId,
   ticketNumber,
   clientName,
+  contactName: contactNameProp,
+  contactPhone: contactPhoneProp,
+  clientPhone: clientPhoneProp,
+  clientContactPersonName,
   claim,
   initialData,
   onClose,
   onSaved,
 }: ClaimFormModalProps) {
   const isEdit = claim !== undefined;
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [formError, setFormError] = useState<string | null>(null);
   const [plants, setPlants] = useState<Plant[] | null>(null);
+
+  const suggestedContactName =
+    claim?.contactName ?? contactNameProp ?? clientContactPersonName ?? "";
+  const suggestedPhone = pickPhone(
+    claim?.contactPhone,
+    claim?.clientPhone,
+    contactPhoneProp,
+    clientPhoneProp,
+  );
 
   // Las plantas son catálogo acotado (16 en la fuente): se recorren enteras.
   // Una planta desactivada después de marcarla sigue ofreciéndose en edición.
@@ -169,6 +225,7 @@ export function ClaimFormModal({
     control,
     register,
     handleSubmit,
+    trigger,
     formState: { errors, touchedFields, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -176,6 +233,8 @@ export function ClaimFormModal({
     defaultValues: {
       claimDate: claim?.claimDate ?? today(),
       country: claim?.country ?? "",
+      contactName: suggestedContactName,
+      contactPhone: suggestedPhone ? formatPhoneNumber(suggestedPhone) : "",
       reason: claim?.reason ?? "",
       reasonOther: claim?.reasonOther ?? "",
       affectedAreas: claim?.affectedAreas ?? [],
@@ -238,6 +297,164 @@ export function ClaimFormModal({
     return touchedFields[field] ? "valid" : "idle";
   }
 
+  async function handleNextStep() {
+    if (step === 1) {
+      const ok = await trigger(["claimDate", "country", "contactName", "contactPhone"]);
+      if (ok) setStep(2);
+      return;
+    }
+    if (step === 2) {
+      const ok = await trigger([...STEP2_FIELDS]);
+      if (ok) setStep(3);
+      return;
+    }
+    if (step === 3) {
+      const ok = await trigger([...STEP3_FIELDS]);
+      if (ok) setStep(4);
+    }
+  }
+
+  const stepLabels: Record<typeof step, { title: string; hint: string }> = {
+    1: { title: "Información general", hint: "Fecha, código y cliente" },
+    2: { title: "Sobre la reclamación", hint: "Motivo, plantas y referencias" },
+    3: { title: "Productos", hint: "Productos reclamados" },
+    4: { title: "Descripción", hint: "Relato y fechas de recepción" },
+  };
+
+  const renderStepper = () => (
+    <div className="flex w-full items-center justify-between max-w-3xl mx-auto select-none gap-0.5">
+      {([1, 2, 3, 4] as const).map((n, idx) => (
+        <Fragment key={n}>
+          <button
+            type="button"
+            onClick={() => {
+              if (n <= step) setStep(n);
+            }}
+            disabled={n > step}
+            className="flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed focus:outline-hidden group min-w-0"
+          >
+            <span
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
+                step === n
+                  ? "bg-brand-red text-white shadow-2xs ring-2 ring-brand-red/20"
+                  : step > n
+                  ? "bg-emerald-600 text-white"
+                  : "bg-zinc-200 text-zinc-600 group-hover:bg-zinc-300"
+              }`}
+            >
+              {step > n ? <Check className="h-3.5 w-3.5" /> : n}
+            </span>
+            <div className="hidden min-w-0 flex-col text-left md:flex">
+              <span
+                className={`truncate font-heading text-[12px] font-semibold transition-colors ${
+                  step === n ? "text-zinc-900" : step > n ? "text-zinc-700" : "text-zinc-400"
+                }`}
+              >
+                {stepLabels[n].title}
+              </span>
+              <span className="truncate text-[10px] text-zinc-400">{stepLabels[n].hint}</span>
+            </div>
+          </button>
+          {idx < 3 && (
+            <div
+              className={`mx-0.5 h-0.5 flex-1 rounded-full transition-colors ${
+                step > n ? "bg-emerald-600/40" : "bg-zinc-200"
+              }`}
+            />
+          )}
+        </Fragment>
+      ))}
+    </div>
+  );
+
+  const renderStep1 = () => (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 animate-plf-fade text-left">
+      <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs">
+        <div className="flex flex-col items-center gap-2 border-b border-zinc-100 bg-zinc-50/70 px-4 py-4 sm:flex-row sm:justify-between sm:px-5">
+          <div className="flex items-center gap-3">
+            <Logo height={24} />
+            <div className="min-w-0 text-left">
+              <p className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-500">
+                {CLAIM_FORM_CONTROL.code}
+              </p>
+              <p className="font-heading text-xs font-bold uppercase leading-snug tracking-wide text-zinc-900 sm:text-sm">
+                {CLAIM_FORM_CONTROL.title}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 px-4 py-4 sm:px-5 sm:py-5">
+          <ClaimFormDivider title="Identificación del caso" />
+
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <Controller
+              name="claimDate"
+              control={control}
+              render={({ field }) => (
+                <DateField
+                  label="Fecha de la reclamación"
+                  required
+                  maxDate={today()}
+                  value={field.value}
+                  onChange={field.onChange}
+                  name={field.name}
+                  state={stateOf("claimDate")}
+                  error={errors.claimDate?.message}
+                />
+              )}
+            />
+            <StaticField label="Código" value={ticketNumber} mono />
+          </div>
+
+          <ClaimFormDivider title="I. Información general" />
+
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <StaticField label="Empresa" value={clientName} />
+            <TextField
+              size="sm"
+              label="País"
+              placeholder="Opcional"
+              state={stateOf("country")}
+              error={errors.country?.message}
+              {...register("country")}
+            />
+            <TextField
+              size="sm"
+              label="Contacto"
+              placeholder="Nombre de la persona de contacto"
+              state={stateOf("contactName")}
+              error={errors.contactName?.message}
+              {...register("contactName")}
+            />
+            <Controller
+              name="contactPhone"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  size="sm"
+                  type="tel"
+                  label="Teléfonos"
+                  placeholder="Opcional"
+                  name={field.name}
+                  value={field.value}
+                  onChange={(e) => field.onChange(formatPhoneNumber(e.target.value))}
+                  onBlur={field.onBlur}
+                  state={stateOf("contactPhone")}
+                  error={errors.contactPhone?.message}
+                />
+              )}
+            />
+          </div>
+        </div>
+      </div>
+
+      <p className="text-center text-[11.5px] leading-relaxed text-faint">
+        Contacto y teléfono se sugieren desde el ticket y la ficha del cliente; puedes corregirlos antes de guardar.
+      </p>
+    </div>
+  );
+
   async function onSubmit(values: FormValues) {
     setFormError(null);
     const blank = (value: string) => (value.trim() === "" ? null : value.trim());
@@ -245,6 +462,9 @@ export function ClaimFormModal({
     const request = {
       claimDate: values.claimDate,
       country: blank(values.country),
+      contactName: blank(values.contactName),
+      contactPhone: blank(values.contactPhone),
+      clientPhone: null,
       reason: values.reason as ClaimReason,
       reasonOther: values.reason === "Otros" ? blank(values.reasonOther) : null,
       affectedAreas: values.affectedAreas as ClaimAffectedArea[],
@@ -283,59 +503,16 @@ export function ClaimFormModal({
 
   const lineErrors = errors.lines;
 
-  return (
-    <Modal
-      title={isEdit ? `Editar reclamación de ${ticketNumber}` : `Registrar reclamación de ${ticketNumber}`}
-      eyebrow="PF-FOR-034"
-      description={
-        isEdit
-          ? "Secciones I a III. El tratamiento de Calidad se edita aparte, desde la ficha."
-          : `Para ${clientName}. Empresa, contacto y teléfonos se toman del ticket; aquí va lo que el ticket no tiene: productos, lote, cantidades y monto.`
-      }
-      onClose={onClose}
-      maxWidth="max-w-3xl"
-      footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="claim-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Registrar reclamación"}
-          </Button>
-        </>
-      }
-    >
-      <form id="claim-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
-        {formError && <Alert variant="error">{formError}</Alert>}
-
-        <FormSection title="I. Información general" hint="Cuándo y desde dónde reclama el cliente.">
-          <div className="grid grid-cols-2 gap-3">
-            <TextField
-              label="Fecha de la reclamación"
-              type="date"
-              required
-              max={today()}
-              state={stateOf("claimDate")}
-              error={errors.claimDate?.message}
-              {...register("claimDate")}
-            />
-            <TextField
-              label="País"
-              placeholder="Opcional"
-              state={stateOf("country")}
-              error={errors.country?.message}
-              {...register("country")}
-            />
-          </div>
-        </FormSection>
-
+  const renderStep2 = () => (
+    <div className="flex flex-col gap-3 animate-plf-fade text-left">
         <FormSection title="II. Sobre la reclamación">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <Controller
               name="reason"
               control={control}
               render={({ field }) => (
                 <SelectField
+                  size="sm"
                   label="Motivo del reclamo"
                   required
                   name={field.name}
@@ -351,6 +528,7 @@ export function ClaimFormModal({
             />
             {reason === "Otros" ? (
               <TextField
+                size="sm"
                 label="Otros (especifique)"
                 required
                 placeholder="Qué se reclama"
@@ -364,6 +542,7 @@ export function ClaimFormModal({
                 control={control}
                 render={({ field }) => (
                   <SelectField
+                    size="sm"
                     label="Defecto identificado durante"
                     name={field.name}
                     value={field.value}
@@ -384,6 +563,7 @@ export function ClaimFormModal({
               control={control}
               render={({ field }) => (
                 <SelectField
+                  size="sm"
                   label="Defecto identificado durante"
                   name={field.name}
                   value={field.value}
@@ -473,8 +653,9 @@ export function ClaimFormModal({
             )}
           />
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
             <TextField
+              size="sm"
               label="Fecha de producción (# lote)"
               placeholder="Como viene en el empaque"
               state={stateOf("productionLot")}
@@ -482,6 +663,7 @@ export function ClaimFormModal({
               {...register("productionLot")}
             />
             <TextField
+              size="sm"
               label="Factura"
               placeholder="Ej. B0100004471"
               state={stateOf("invoiceRef")}
@@ -489,6 +671,7 @@ export function ClaimFormModal({
               {...register("invoiceRef")}
             />
             <TextField
+              size="sm"
               label="Número de PO"
               placeholder="Orden de compra"
               state={stateOf("poNumber")}
@@ -496,15 +679,17 @@ export function ClaimFormModal({
               {...register("poNumber")}
             />
           </div>
+        </FormSection>
+    </div>
+  );
 
-          {/* Líneas de producto: el papel trae tres renglones y admite ampliarlos (regla 7). */}
+  const renderStep3 = () => (
+    <div className="flex flex-col gap-3 animate-plf-fade text-left">
+        <FormSection
+          title="Productos reclamados"
+          hint="Diferencia = facturados − recibidos · Total = diferencia × precio"
+        >
           <div className="flex flex-col gap-2">
-            <div className="flex items-baseline justify-between">
-              <span className="font-heading text-[10.5px] font-medium uppercase tracking-[0.06em] text-faint">
-                Productos reclamados <span className="text-brand-red">*</span>
-              </span>
-              <span className="text-[11.5px] text-faint">Diferencia = facturados − recibidos · Total = diferencia × precio</span>
-            </div>
 
             {typeof lineErrors?.message === "string" && (
               <p className="text-[12px] text-brand-red">{lineErrors.message}</p>
@@ -526,6 +711,7 @@ export function ClaimFormModal({
                           control={control}
                           render={({ field: productField }) => (
                             <ProductLookupField
+                              size="sm"
                               label={`Producto ${index + 1}`}
                               required
                               name={productField.name}
@@ -549,8 +735,9 @@ export function ClaimFormModal({
                       )}
                     </div>
 
-                    <div className="mt-2 grid grid-cols-5 gap-2">
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
                       <TextField
+                        size="sm"
                         label="Compradas"
                         type="number"
                         min="0"
@@ -560,6 +747,7 @@ export function ClaimFormModal({
                         {...register(`lines.${index}.unitsPurchased`)}
                       />
                       <TextField
+                        size="sm"
                         label="Defectuosas"
                         type="number"
                         min="0"
@@ -569,6 +757,7 @@ export function ClaimFormModal({
                         {...register(`lines.${index}.defectiveQuantity`)}
                       />
                       <TextField
+                        size="sm"
                         label="Facturados"
                         type="number"
                         min="0"
@@ -578,6 +767,7 @@ export function ClaimFormModal({
                         {...register(`lines.${index}.invoicedQuantity`)}
                       />
                       <TextField
+                        size="sm"
                         label="Recibidos"
                         type="number"
                         min="0"
@@ -587,6 +777,7 @@ export function ClaimFormModal({
                         {...register(`lines.${index}.receivedQuantity`)}
                       />
                       <TextField
+                        size="sm"
                         label="Precio"
                         type="number"
                         min="0"
@@ -626,9 +817,16 @@ export function ClaimFormModal({
               </span>
             </div>
           </div>
+        </FormSection>
+    </div>
+  );
 
-          <div className="grid grid-cols-2 gap-3">
+  const renderStep4 = () => (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 animate-plf-fade text-left">
+        <FormSection title="III. Descripción de la reclamación">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <TextField
+              size="sm"
               label="Cantidad de unidades a retornar"
               type="number"
               min="0"
@@ -644,6 +842,7 @@ export function ClaimFormModal({
               control={control}
               render={({ field }) => (
                 <SelectField
+                  size="sm"
                   label="Moneda"
                   required={anyPrice}
                   name={field.name}
@@ -657,13 +856,11 @@ export function ClaimFormModal({
               )}
             />
           </div>
-        </FormSection>
-
-        <FormSection title="III. Descripción de la reclamación">
           <TextAreaField
             label="Descripción"
             required
             rows={4}
+            className="py-1.5 text-[12.5px]"
             placeholder="Qué recibió el cliente, qué esperaba y qué pide"
             error={errors.description?.message}
             {...register("description")}
@@ -671,12 +868,14 @@ export function ClaimFormModal({
           <TextAreaField
             label="Comentarios"
             rows={2}
+            className="py-1.5 text-[12.5px]"
             placeholder="Opcional"
             error={errors.comments?.message}
             {...register("comments")}
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <TextField
+              size="sm"
               label="Fecha de quien recibe"
               type="date"
               max={today()}
@@ -685,6 +884,7 @@ export function ClaimFormModal({
               {...register("receivedAt")}
             />
             <TextField
+              size="sm"
               label="Primer contacto con el cliente"
               type="date"
               hint="Opcional. No anterior a la reclamación."
@@ -693,7 +893,118 @@ export function ClaimFormModal({
             />
           </div>
         </FormSection>
+    </div>
+  );
+
+  return (
+    <Modal
+      title={isEdit ? `Editar · ${ticketNumber}` : `Registrar · ${ticketNumber}`}
+      eyebrow={`${CLAIM_FORM_CONTROL.code} · ${stepLabels[step].title}`}
+      onClose={onClose}
+      maxWidth="max-w-3xl"
+      footer={
+        <div className="flex w-full items-center gap-3">
+          {step === 4 ? (
+            <span className="hidden select-none items-center gap-1 text-[11px] text-zinc-400 sm:inline-flex">
+              <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[10px] text-zinc-500">
+                Ctrl
+              </kbd>
+              <span>+</span>
+              <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[10px] text-zinc-500">
+                Enter
+              </kbd>
+              <span className="ml-0.5">para guardar</span>
+            </span>
+          ) : (
+            <span className="text-[11.5px] text-zinc-400">Paso {step} de 4</span>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            {step > 1 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span>Anterior</span>
+              </Button>
+            ) : (
+              <Button type="button" variant="secondary" size="sm" onClick={onClose}>
+                Cancelar
+              </Button>
+            )}
+            {step < 4 ? (
+              <Button key={`claim-next-${step}`} type="button" size="sm" onClick={() => void handleNextStep()}>
+                <span>Siguiente paso</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <Button type="submit" form="claim-form" size="sm" isLoading={isSubmitting}>
+                {isEdit ? "Guardar cambios" : "Registrar reclamación"}
+              </Button>
+            )}
+          </div>
+        </div>
+      }
+    >
+      <div className="mb-4 -mt-2 border-b border-zinc-100 pb-3">{renderStepper()}</div>
+      <form
+        id="claim-form"
+        onSubmit={handleSubmit(onSubmit)}
+        onKeyDown={(e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            e.preventDefault();
+            if (step < 4) void handleNextStep();
+            else void handleSubmit(onSubmit)();
+          }
+        }}
+        noValidate
+        className="flex flex-col gap-3 text-left"
+      >
+        {formError && <Alert variant="error">{formError}</Alert>}
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
+        {step === 4 && renderStep4()}
       </form>
     </Modal>
+  );
+}
+
+function ClaimFormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 border-t border-zinc-100 pt-2 first:border-0 first:pt-0">
+      <span className="select-none font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
+
+/** Misma altura y etiqueta que `TextField size="sm"`, solo lectura. */
+function pickPhone(...candidates: (string | null | undefined)[]): string {
+  for (const raw of candidates) {
+    const value = raw?.trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function StaticField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  const display = value.trim() === "" || value === "—" ? "—" : value;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="font-heading text-[11.5px] font-semibold text-faint">{label}</span>
+      <div
+        className={`flex h-8 w-full items-center truncate rounded-edge border border-line-strong bg-canvas px-2.5 text-[12.5px] text-ink ${
+          mono ? "font-mono tabular-nums" : ""
+        }`}
+        title={display}
+      >
+        {display}
+      </div>
+    </div>
   );
 }

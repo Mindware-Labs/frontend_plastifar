@@ -146,6 +146,9 @@ export interface ClaimLineInput {
 export interface SaveClaimRequest {
   claimDate: string;
   country: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  clientPhone: string | null;
   reason: ClaimReason;
   reasonOther: string | null;
   affectedAreas: ClaimAffectedArea[];

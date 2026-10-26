@@ -587,6 +587,8 @@ export interface TicketDetailResponse {
   clientId: number | null;
   clientName: string | null;
   clientCode: string | null;
+  clientPhone: string | null;
+  clientContactPersonName: string | null;
   contactId: number | null;
   contactName: string | null;
   contactEmail: string | null;

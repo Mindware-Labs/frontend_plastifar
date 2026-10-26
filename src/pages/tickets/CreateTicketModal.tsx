@@ -7,6 +7,7 @@ import { Building2, Check, Flag, Info, Mail, MessageSquareText, Package, RotateC
 import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { TicketProductsField, type TicketProductDraft } from "../../components/app/TicketProductsField";
 import { ApiError } from "../../api/client";
+import { clientsApi } from "../../api/clients";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { Alert } from "../../components/ui/Alert";
@@ -161,6 +162,7 @@ export function CreateTicketModal({
   const [ticketProducts, setTicketProducts] = useState<TicketProductDraft[]>([]);
   const [createAttachments, setCreateAttachments] = useState<File[]>([]);
   const [detectedMatch, setDetectedMatch] = useState<{ clientName: string; contactName: string } | null>(null);
+  const [fetchedContacts, setFetchedContacts] = useState<TicketContactOption[]>([]);
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
   const normalizedInitialMessage = useMemo(
@@ -252,10 +254,44 @@ export function CreateTicketModal({
 
   // Al cambiar de cliente, poblar contactos
   const selectedClient = catalogs?.clients.find((c) => String(c.id) === selectedClientId);
+  const catalogContacts = selectedClient?.contacts ?? [];
   const contactOptions: TicketContactOption[] = useMemo(
-    () => selectedClient?.contacts ?? [],
-    [selectedClient],
+    () => (catalogContacts.length > 0 ? catalogContacts : fetchedContacts),
+    [catalogContacts, fetchedContacts],
   );
+
+  useEffect(() => {
+    if (!selectedClientId) {
+      setFetchedContacts([]);
+      return;
+    }
+    if (catalogContacts.length > 0) {
+      setFetchedContacts([]);
+      return;
+    }
+    let cancelled = false;
+    clientsApi
+      .get(Number(selectedClientId))
+      .then(({ contacts }) => {
+        if (cancelled) return;
+        setFetchedContacts(
+          contacts.map((c) => ({
+            id: c.id,
+            fullName: `${c.firstName} ${c.lastName}`.trim(),
+            email: c.email,
+            phone: c.phone,
+            position: c.position,
+            isPrimary: c.isPrimary,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedContacts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedClientId, catalogContacts.length]);
 
   useEffect(() => {
     if (selectedClient && contactOptions.length > 0) {

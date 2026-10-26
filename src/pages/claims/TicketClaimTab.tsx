@@ -16,6 +16,8 @@ interface TicketClaimTabProps {
   ticketId: number;
   ticketNumber: string;
   clientName: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
   /** `claims.write` sobre el departamento del ticket. */
   canCreate: boolean;
   onClaimChanged?: (claim: CustomerClaim | null) => void;
@@ -27,7 +29,15 @@ interface TicketClaimTabProps {
  * registra desde aquí (RF-R1, mientras el alta conjunta con el ticket se
  * acuerda con el responsable de la Bandeja).
  */
-export function TicketClaimTab({ ticketId, ticketNumber, clientName, canCreate, onClaimChanged }: TicketClaimTabProps) {
+export function TicketClaimTab({
+  ticketId,
+  ticketNumber,
+  clientName,
+  contactName,
+  contactPhone,
+  canCreate,
+  onClaimChanged,
+}: TicketClaimTabProps) {
   const [claim, setClaim] = useState<CustomerClaim | null | "cargando">("cargando");
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -116,6 +126,8 @@ export function TicketClaimTab({ ticketId, ticketNumber, clientName, canCreate, 
             ticketId={ticketId}
             ticketNumber={ticketNumber}
             clientName={clientName}
+            contactName={contactName}
+            contactPhone={contactPhone}
             onClose={() => setCreating(false)}
             onSaved={(detail) => {
               setClaim(detail.claim);

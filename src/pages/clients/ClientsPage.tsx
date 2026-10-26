@@ -627,13 +627,20 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
                     )}
                     {isVisible("contactos") && (
                       <Td>
-                        {client.contactCount === 0 ? (
-                          <span className="text-[12.5px] text-faint">Ninguno</span>
-                        ) : (
+                        {client.contactCount > 0 ? (
                           <span className="inline-flex items-center gap-1.5 text-[12.5px] tabular-nums text-brand-gray">
                             <Users aria-hidden className="h-3.5 w-3.5 text-faint" />
                             {client.contactCount}
                           </span>
+                        ) : client.contactPersonName || client.phone || client.email ? (
+                          <span
+                            className="text-[12.5px] text-brand-gray"
+                            title="Teléfono, correo o persona en la ficha del cliente"
+                          >
+                            En ficha
+                          </span>
+                        ) : (
+                          <span className="text-[12.5px] text-faint">Ninguno</span>
                         )}
                       </Td>
                     )}

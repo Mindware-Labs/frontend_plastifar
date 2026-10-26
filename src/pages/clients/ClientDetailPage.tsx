@@ -540,6 +540,13 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
                     <div className="px-4 py-1 divide-y divide-zinc-100">
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
+                        <span className="text-zinc-500 font-medium">Persona de contacto</span>
+                        <span className="text-zinc-900 font-medium truncate max-w-[55%] text-right">
+                          {client.contactPersonName ?? <span className="text-zinc-400 font-normal">—</span>}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between py-2 text-[12.5px]">
                         <div className="flex items-center gap-2 text-zinc-500 font-medium">
                           <Phone className="h-3.5 w-3.5 text-zinc-400" />
                           <span>Teléfono principal</span>

@@ -1692,6 +1692,10 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
           ticketId={ticket.id}
           ticketNumber={ticket.number}
           clientName={ticket.clientName ?? "Cliente"}
+          contactName={ticket.contactName ?? ticket.clientContactPersonName}
+          contactPhone={ticket.contactPhone}
+          clientPhone={ticket.clientPhone}
+          clientContactPersonName={ticket.clientContactPersonName}
           claim={editingClaim}
           initialData={claimInitialData}
           onClose={() => setClaimModalOpen(false)}
