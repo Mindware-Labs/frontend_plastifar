@@ -5,6 +5,7 @@ import { PrintPending, PrintSheet } from "../../components/print/PrintSheet";
 import { padRows } from "../../components/print/rows";
 import { usePrintRecord } from "../../components/print/usePrintRecord";
 import { formatDay } from "../../lib/dates";
+import { exportDiscrepancyToExcel } from "../../lib/discrepancyExcelExport";
 import { DISCREPANCY_FORM_CONTROL, NOTIFICATION_ITEM } from "../../lib/discrepancies";
 import { formatQuantity } from "../../lib/numbers";
 
@@ -47,7 +48,11 @@ export function DiscrepancyPrintPage() {
   const cell = "border border-black px-1.5 py-1 align-top";
 
   return (
-    <PrintSheet orientation="landscape" filename={`${DISCREPANCY_FORM_CONTROL.code}_${discrepancy.number}.pdf`}>
+    <PrintSheet
+      orientation="landscape"
+      filename={`${DISCREPANCY_FORM_CONTROL.code}_${discrepancy.number}.pdf`}
+      onExportExcel={() => exportDiscrepancyToExcel(discrepancy)}
+    >
       {/* Cabecera: filas 1 a 3, título y control documental */}
       <header className="avoid-break mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-4 border-2 border-black px-3 py-2">
         <Logo height={26} />

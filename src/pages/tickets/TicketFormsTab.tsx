@@ -12,7 +12,6 @@ import {
   Pencil,
   Plus,
   PlusCircle,
-  Printer,
   ShieldCheck,
   Truck,
   Users,
@@ -34,6 +33,9 @@ import { Spinner } from "../../components/ui/Spinner";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDay } from "../../lib/dates";
+import { DocumentDropdown } from "../../components/app/DocumentDropdown";
+import { exportDiscrepancyToExcel } from "../../lib/discrepancyExcelExport";
+import { exportHcaToExcel } from "../../lib/hcaExcelExport";
 import { buildHcaHechoText, hcaProductLabel } from "../../lib/hcaForm109";
 import { formatAmount } from "../../lib/numbers";
 import { isPlanItemOverdue, isPlanItemSettled } from "../../lib/quality";
@@ -114,9 +116,6 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   const actionsMenuContainerRef = useRef<HTMLDivElement>(null);
   const { mounted: menuMounted, exiting: menuExiting, ref: menuPanelRef } = useDisclosureMotion<HTMLDivElement>(actionsMenuOpen);
 
-  const [printMenuOpen, setPrintMenuOpen] = useState(false);
-  const printMenuContainerRef = useRef<HTMLDivElement>(null);
-  const { mounted: printMenuMounted, exiting: printMenuExiting, ref: printMenuPanelRef } = useDisclosureMotion<HTMLDivElement>(printMenuOpen);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -142,28 +141,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     };
   }, [actionsMenuOpen, menuPanelRef]);
 
-  useEffect(() => {
-    if (!printMenuOpen) return;
-    function handlePointerDown(e: PointerEvent) {
-      const target = e.target as Node;
-      if (
-        printMenuContainerRef.current?.contains(target) ||
-        printMenuPanelRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setPrintMenuOpen(false);
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setPrintMenuOpen(false);
-    }
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [printMenuOpen, printMenuPanelRef]);
+
 
   useEffect(() => {
     const formToOpen = searchParams.get("openForm");
@@ -395,58 +373,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       const wb = new ExcelJS.Workbook();
 
       if (form.type === "discrepancia") {
-        const d = form.data as DiscrepancyDetail;
-        const res = await fetch("/templates/PF-FOR-291.xlsx");
-        if (!res.ok) throw new Error("No se pudo cargar la plantilla PF-FOR-291.xlsx");
-        const arrayBuffer = await res.arrayBuffer();
-        await wb.xlsx.load(arrayBuffer);
-
-        const sheet = wb.getWorksheet("PF-FOR-291") || wb.worksheets[0];
-        if (!sheet) throw new Error("Hoja PF-FOR-291 no encontrada");
-
-        // Quitar vista de salto de página ("Page 1") y dejar vista normal
-        sheet.views = [{ state: "normal", showGridLines: true, zoomScale: 100, zoomScaleNormal: 100 }];
-
-        // Cabecera de control documental
-        sheet.getCell("B3").value = "PF-FOR-291";
-        sheet.getCell("D3").value = d.discrepancy.createdAt ? d.discrepancy.createdAt.slice(0, 10) : "";
-        sheet.getCell("F3").value = d.discrepancy.performedByName || "Williams Marte";
-        sheet.getCell("G3").value = d.discrepancy.approvedByName || "Santos Rosario";
-        sheet.getCell("I3").value = 1;
-        sheet.getCell("L3").value = (d.discrepancy.approvedAt || d.discrepancy.performedAt || d.discrepancy.createdAt || "").slice(0, 10);
-
-        // Líneas de la investigación (filas 7 a 13)
-        (d.discrepancy.lines || []).forEach((line, index) => {
-          const r = 7 + index;
-          sheet.getCell(`B${r}`).value = line.claimRef || "";
-          sheet.getCell(`C${r}`).value = line.invoiceRef || "";
-          sheet.getCell(`D${r}`).value = line.clientName || "";
-          sheet.getCell(`E${r}`).value = line.productCode || "";
-          sheet.getCell(`F${r}`).value = line.productName || "";
-          sheet.getCell(`G${r}`).value = line.surplusQuantity > 0 ? line.surplusQuantity : "";
-          sheet.getCell(`H${r}`).value = line.shortageQuantity > 0 ? line.shortageQuantity : "";
-          sheet.getCell(`I${r}`).value = line.qualifiesForCreditNote === true ? "X" : "";
-          sheet.getCell(`J${r}`).value = line.qualifiesForCreditNote === false ? "X" : "";
-          sheet.getCell(`K${r}`).value = line.creditNoteNumber || line.creditRequestNumber || "";
-          sheet.getCell(`L${r}`).value = line.dispatcherName || "";
-          sheet.getCell(`M${r}`).value = line.supervisorName || "";
-        });
-
-        // Firmas y nota
-        sheet.getCell("B14").value = `Realizado por: ${d.discrepancy.performedByName || "______________________________"}`;
-        sheet.getCell("B16").value = `Aprobado por: ${d.discrepancy.status === "Aprobada" ? (d.discrepancy.approvedByName || "") : "______________________________"}`;
-        sheet.getCell("G14").value = d.discrepancy.note || "";
-
-        // Puntos de seguridad (filas 21 a 29)
-        (d.discrepancy.checks || []).forEach((c) => {
-          const r = 20 + c.itemNumber;
-          if (r >= 21 && r <= 29) {
-            sheet.getCell(`J${r}`).value = c.result === "Positivo" ? "X" : "";
-            sheet.getCell(`L${r}`).value = c.result === "Negativo" ? "X" : "";
-          }
-        });
-
-        await downloadWorkbook(wb, `PF-FOR-291_${d.discrepancy.number}.xlsx`);
+        await exportDiscrepancyToExcel(form.data as DiscrepancyDetail);
       } else if (form.type === "reclamacion") {
         const c = form.data as CustomerClaim;
         const sheet = wb.addWorksheet("PF-FOR-034");
@@ -492,15 +419,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         await downloadWorkbook(wb, `PF-FOR-068_${w.number}.xlsx`);
       } else if (form.type === "hca") {
         const s = form.data as CorrectiveActionSheet;
-        const sheet = wb.addWorksheet("PF-FOR-109");
-        sheet.addRow(["PLASTIFAR, S.A."]);
-        sheet.addRow(["Hoja de Acción Correctiva (HCA) - PF-FOR-109"]);
-        sheet.addRow([`Número: ${s.number}`, `Estado: ${s.status}`, `Fecha: ${s.createdAt?.slice(0, 10) || ""}`]);
-        sheet.addRow([`Descripción: ${s.description || ""}`]);
-        sheet.addRow([`Acción Inmediata: ${s.immediateAction || ""}`]);
-        sheet.addRow([`Causas: ${(s.causes || []).map((c) => c.description).join("; ")}`]);
-        sheet.addRow([`Responsable: ${s.responsibleName || ""}`]);
-        await downloadWorkbook(wb, `PF-FOR-109_${s.number}.xlsx`);
+        await exportHcaToExcel(s, hcaPlanBySheetId[s.id]);
       }
     } catch (err) {
       console.error("Error al exportar Excel:", err);
@@ -786,6 +705,8 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
           ticketClientName={ticket.clientName ?? undefined}
           ticketProductLineId={ticket.productLineId}
           ticketProducts={ticket.products}
+          ticketStatus={ticket.status}
+          onTicketStatusChanged={onTicketStatusChanged}
           onClose={() => {
             setHcaModalOpen(false);
             setEditingHca(undefined);
@@ -956,80 +877,32 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                     Llenar otro formulario
                   </Button>
 
-                  {/* Print / Export Dropdown */}
-                  <div className="relative" ref={printMenuContainerRef}>
+                  {activeForm.type === "discrepancia" || activeForm.type === "hca" ? (
                     <Button
                       size="sm"
                       variant="secondary"
                       onClick={() => {
-                        setActionsMenuOpen(false);
-                        setPrintMenuOpen((prev) => !prev);
+                        const path = getPrintPath(activeForm);
+                        if (path) window.open(`${path}?mode=pdf`, "_blank");
                       }}
-                      className="gap-1.5"
-                      title="Opciones de impresión y exportación"
+                      title="Abrir la salida del documento oficial (Excel, PDF e impresión)"
                     >
-                      <Printer className="size-3.5 text-zinc-600" />
-                      <span>Imprimir</span>
-                      <ChevronDown
-                        className={`size-3 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
-                          printMenuOpen ? "rotate-180 text-zinc-700" : "group-hover:text-zinc-600"
-                        }`}
-                      />
+                      <FileText className="size-3.5 mr-1 text-zinc-600" />
+                      Documento
                     </Button>
-
-                    {printMenuMounted && (
-                      <div
-                        ref={printMenuPanelRef}
-                        style={printMenuExiting ? { pointerEvents: "none" } : undefined}
-                        aria-hidden={printMenuExiting}
-                        className="absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-zinc-200/90 bg-white/95 backdrop-blur-xs py-1 shadow-lg z-30"
-                      >
-                        {/* Option 1: Exportar doc Excel */}
-                        <button
-                          type="button"
-                          data-motion-item
-                          onClick={() => {
-                            setPrintMenuOpen(false);
-                            handleExportExcel(activeForm);
-                          }}
-                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
-                        >
-                          <FileSpreadsheet className="size-3.5 text-emerald-600" />
-                          <span>Exportar doc excel</span>
-                        </button>
-
-                        {/* Option 2: PDF */}
-                        <button
-                          type="button"
-                          data-motion-item
-                          onClick={() => {
-                            setPrintMenuOpen(false);
-                            const path = getPrintPath(activeForm);
-                            if (path) window.open(`${path}?mode=pdf`, "_blank");
-                          }}
-                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
-                        >
-                          <FileText className="size-3.5 text-rose-600" />
-                          <span>Guardar doc PDF</span>
-                        </button>
-
-                        {/* Option 3: Imprimir */}
-                        <button
-                          type="button"
-                          data-motion-item
-                          onClick={() => {
-                            setPrintMenuOpen(false);
-                            const path = getPrintPath(activeForm);
-                            if (path) window.open(`${path}?mode=print`, "_blank");
-                          }}
-                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
-                        >
-                          <Printer className="size-3.5 text-zinc-600" />
-                          <span>Imprimir</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <DocumentDropdown
+                      onExportExcel={() => handleExportExcel(activeForm)}
+                      onExportPdf={() => {
+                        const path = getPrintPath(activeForm);
+                        if (path) window.open(`${path}?mode=pdf`, "_blank");
+                      }}
+                      onPrint={() => {
+                        const path = getPrintPath(activeForm);
+                        if (path) window.open(`${path}?mode=print`, "_blank");
+                      }}
+                    />
+                  )}
 
                   {/* Dropdown with more options */}
                   <div className="relative" ref={actionsMenuContainerRef}>
@@ -1037,7 +910,6 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                       size="sm"
                       variant="secondary"
                       onClick={() => {
-                        setPrintMenuOpen(false);
                         setActionsMenuOpen((prev) => !prev);
                       }}
                       className="gap-1.5"

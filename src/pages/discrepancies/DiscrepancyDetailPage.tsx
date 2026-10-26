@@ -1,9 +1,11 @@
-import { AlertTriangle, Check, CreditCard, Pencil, Printer, RotateCcw, ShieldAlert, ShieldCheck, ThumbsDown, ThumbsUp } from "lucide-react";
+import { AlertTriangle, Check, CreditCard, Pencil, RotateCcw, ShieldAlert, ShieldCheck, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { DocumentDropdown } from "../../components/app/DocumentDropdown";
+import { exportDiscrepancyToExcel } from "../../lib/discrepancyExcelExport";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
@@ -137,10 +139,17 @@ export function DiscrepancyDetailPage() {
 
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button size="sm" variant="secondary" onClick={() => window.open(`/discrepancias/${discrepancy.id}/imprimir`, "_blank")}>
-        <Printer className="h-[15px] w-[15px]" />
-        Imprimir
-      </Button>
+      <DocumentDropdown
+        onExportExcel={async () => {
+          try {
+            await exportDiscrepancyToExcel(detail);
+          } catch {
+            setActionError("No se pudo exportar la investigación a Excel");
+          }
+        }}
+        onExportPdf={() => window.open(`/discrepancias/${discrepancy.id}/imprimir?mode=pdf`, "_blank")}
+        onPrint={() => window.open(`/discrepancias/${discrepancy.id}/imprimir?mode=print`, "_blank")}
+      />
       {canWrite && investigating && (
         <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
           <Pencil className="h-[15px] w-[15px]" />

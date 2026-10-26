@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   PenLine,
@@ -25,6 +26,8 @@ import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
 import { qualityApi } from "../../api/quality";
 import { settingsApi } from "../../api/settings";
+import { ticketsApi } from "../../api/tickets";
+import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Logo } from "../../components/Logo";
 import { Button } from "../../components/ui/Button";
@@ -33,6 +36,7 @@ import {
   DateField,
   SelectField,
   TextAreaField,
+  TextField,
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
@@ -448,6 +452,8 @@ export interface HcaFormModalProps {
   ticketProductLineId?: number | null;
   /** Productos del ticket: selector con pestañas como PF-FOR-291. */
   ticketProducts?: TicketProductResponse[];
+  ticketStatus?: string;
+  onTicketStatusChanged?: () => void;
   onClose: () => void;
   onSaved: (sheet: CorrectiveActionSheet) => void;
 }
@@ -465,6 +471,8 @@ export function HcaFormModal({
   ticketClientName,
   ticketProductLineId,
   ticketProducts,
+  ticketStatus,
+  onTicketStatusChanged,
   onClose,
   onSaved,
 }: HcaFormModalProps) {
@@ -476,6 +484,29 @@ export function HcaFormModal({
   const [loadingExtras, setLoadingExtras] = useState(isEdit);
   const originalParticipants = useRef<HcaParticipant[]>(sheet?.participants ?? []);
   const savedResultRef = useRef<CorrectiveActionSheet | null>(null);
+
+  const [showClosePrompt, setShowClosePrompt] = useState(false);
+  const [completedSheet, setCompletedSheet] = useState<CorrectiveActionSheet | null>(null);
+  const [closingTicket, setClosingTicket] = useState(false);
+  const [verdicts, setVerdicts] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedVerdictId, setSelectedVerdictId] = useState<string>("");
+  const [closeReason, setCloseReason] = useState<string>("");
+
+  useEffect(() => {
+    if (showClosePrompt && completedSheet) {
+      setCloseReason(`Cerrado tras completar HCA ${completedSheet.number}`);
+      ticketVerdictsApi
+        .list({ page: 1, pageSize: 100, status: "activos" })
+        .then((res) => {
+          const activeVerdicts = res.items.map((v) => ({ id: v.id, name: v.name }));
+          setVerdicts(activeVerdicts);
+          if (activeVerdicts.length > 0) {
+            setSelectedVerdictId(String(activeVerdicts[0].id));
+          }
+        })
+        .catch(() => setVerdicts([]));
+    }
+  }, [showClosePrompt, completedSheet]);
 
   const elaboradoLabel =
     sheet?.createdByName ??
@@ -1100,7 +1131,17 @@ export function HcaFormModal({
         title: isEdit ? "HCA actualizada" : "HCA creada",
         detail: `PF-FOR-109 · ${detail.sheet.number}`,
       });
-      finishModal(detail.sheet);
+
+      const isAlreadyClosed =
+        ticketStatus === "Solucionado" || ticketStatus === "Cancelado";
+      const effectiveTicketId = Number(detail.sheet.ticketId ?? defaults?.ticketId ?? 0);
+
+      if (!isAlreadyClosed && effectiveTicketId > 0) {
+        setCompletedSheet(detail.sheet);
+        setShowClosePrompt(true);
+      } else {
+        finishModal(detail.sheet);
+      }
     } catch (err) {
       const fallback = isEdit ? "No se pudo guardar la HCA" : "No se pudo crear la HCA";
       const msg = err instanceof ApiError ? err.message : fallback;
@@ -1786,6 +1827,111 @@ export function HcaFormModal({
     );
   };
 
+  const renderClosePromptModal = () => {
+    if (!showClosePrompt || !completedSheet) return null;
+    const effectiveTicketId = Number(completedSheet.ticketId ?? defaults?.ticketId ?? 0);
+
+    return (
+      <Modal
+        title="¿Deseas cerrar este ticket ahora?"
+        eyebrow="PF-FOR-109 · Resolución de Caso"
+        onClose={() => finishModal(completedSheet)}
+        maxWidth="max-w-md"
+        closeOnBackdropClick={false}
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => finishModal(completedSheet)}
+            >
+              Mantener ticket abierto
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              disabled={closingTicket || effectiveTicketId <= 0}
+              onClick={async () => {
+                setClosingTicket(true);
+                try {
+                  const finalVerdictId = selectedVerdictId
+                    ? Number(selectedVerdictId)
+                    : verdicts.length > 0
+                    ? verdicts[0].id
+                    : undefined;
+
+                  await ticketsApi.updateStatus(effectiveTicketId, {
+                    status: "Solucionado",
+                    verdictId: finalVerdictId,
+                    reason:
+                      closeReason.trim() ||
+                      `Cerrado tras completar HCA ${completedSheet.number}`,
+                  });
+                  receipts.done({
+                    action: "cerrar-ticket",
+                    title: "Ticket cerrado y solucionado",
+                    detail: `El ticket ha sido marcado como solucionado en base a ${completedSheet.number}.`,
+                  });
+                  onTicketStatusChanged?.();
+                } catch (err) {
+                  receipts.failed({
+                    action: "error-cerrar-ticket",
+                    title: "No se pudo cerrar el ticket",
+                    detail: err instanceof ApiError ? err.message : "Error al actualizar estado del ticket",
+                  });
+                } finally {
+                  setClosingTicket(false);
+                  finishModal(completedSheet);
+                }
+              }}
+            >
+              <CheckCircle2 className="size-3.5 mr-1" />
+              {closingTicket ? "Cerrando..." : "Sí, cerrar ticket"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3.5 py-1 text-left">
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3.5">
+            <p className="text-xs text-zinc-700 leading-relaxed">
+              La HCA{" "}
+              <strong className="font-semibold text-zinc-900 font-mono">{completedSheet.number}</strong> ha sido
+              registrada exitosamente.
+            </p>
+            <p className="mt-1.5 text-xs text-zinc-500 leading-relaxed">
+              Puedes dar por resuelto y cerrar este ticket indicando el veredicto oficial.
+            </p>
+          </div>
+
+          {verdicts.length > 0 && (
+            <SelectField
+              size="sm"
+              label="Veredicto de resolución"
+              required
+              value={selectedVerdictId}
+              onChange={setSelectedVerdictId}
+              options={verdicts.map((v) => ({
+                value: String(v.id),
+                label: v.name,
+              }))}
+            />
+          )}
+
+          <TextField
+            size="sm"
+            label="Comentario de cierre"
+            required
+            value={closeReason}
+            onChange={(e) => setCloseReason(e.target.value)}
+            placeholder="Motivo o comentario de resolución..."
+          />
+        </div>
+      </Modal>
+    );
+  };
+
   const renderFooterLeft = () => (
     <span className="text-[11px] text-zinc-400 select-none">
       Paso {step} de 4
@@ -1907,11 +2053,13 @@ export function HcaFormModal({
           {renderFooterLeft()}
           {renderFooterButtons()}
         </div>
+        {renderClosePromptModal()}
       </div>
     );
   }
 
   return (
+    <>
     <Modal
       closeOnBackdropClick={false}
       maxWidth={modalMaxWidth}
@@ -1933,6 +2081,8 @@ export function HcaFormModal({
       <div className="mb-4 -mt-2 border-b border-zinc-100 pb-3">{renderStepper()}</div>
       {formBody}
     </Modal>
+    {renderClosePromptModal()}
+    </>
   );
 }
 

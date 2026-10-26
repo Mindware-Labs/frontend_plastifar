@@ -8,7 +8,6 @@ import {
   Pencil,
   Play,
   Plus,
-  Printer,
   ShieldCheck,
   Trash2,
   UserCheck,
@@ -42,6 +41,8 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDay, formatInstant } from "../../lib/dates";
 import { formatBytes } from "../../lib/format";
+import { DocumentDropdown } from "../../components/app/DocumentDropdown";
+import { exportHcaToExcel } from "../../lib/hcaExcelExport";
 import { describeDue, isPlanItemOverdue, isPlanItemSettled, isSheetOverdue, nextStatus } from "../../lib/quality";
 import type { ActionPlanItem } from "../../types/quality";
 import type { ProductLine } from "../../types/settings";
@@ -256,13 +257,20 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
     });
   }
 
-  /** RF-H10: la impresión con el formato del PF-FOR-109, en pestaña nueva. */
-  const printAction = (
-    <Button size="sm" variant="secondary" onClick={() => window.open(`/calidad/hca/${sheetId}/imprimir`, "_blank")}>
-      <Printer className="h-[15px] w-[15px]" />
-      Imprimir
-    </Button>
-  );
+  const documentAction = sheet ? (
+    <DocumentDropdown
+      onExportExcel={async () => {
+        setActionError(null);
+        try {
+          await exportHcaToExcel(sheet);
+        } catch {
+          setActionError("No se pudo exportar la HCA a Excel");
+        }
+      }}
+      onExportPdf={() => window.open(`/calidad/hca/${sheetId}/imprimir?mode=pdf`, "_blank")}
+      onPrint={() => window.open(`/calidad/hca/${sheetId}/imprimir?mode=print`, "_blank")}
+    />
+  ) : null;
 
   async function removeParticipant(id: number, name: string) {
     setActionError(null);
@@ -296,13 +304,13 @@ export function HcaDetailPage({ section }: HcaDetailPageProps) {
 
   const primaryAction = (() => {
     if (!canWrite || isClosed) {
-      return section === "datos" ? printAction : undefined;
+      return section === "datos" ? documentAction : undefined;
     }
 
     if (section === "datos") {
       return (
         <div className="flex items-center gap-2">
-          {printAction}
+          {documentAction}
           <Button size="sm" onClick={() => setEditing(true)}>
             <Pencil className="h-[15px] w-[15px]" />
             Editar HCA
