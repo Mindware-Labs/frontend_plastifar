@@ -256,6 +256,14 @@ input:-webkit-autofill:focus {
   }
 }
 
+/* Edge pinta su propio ojo de «mostrar contraseña» (y una X de borrar) dentro
+   del input mientras se escribe. Los campos de contraseña ya traen el suyo, asi
+   que salian dos ojos: se apaga el nativo. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
 /* El buscador del tablero apaga el `outline` del input —el borde lo dibuja la
    caja de fuera, no el campo— y se quedaba sin ninguna señal de foco: quien
    navega con teclado llegaba al buscador y no veía dónde estaba. El anillo lo
