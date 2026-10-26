@@ -4,7 +4,6 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { AgentPerformance } from "./components/AgentPerformance";
 import { CallDetails } from "./components/CallDetails";
 import { KpiRow } from "./components/KpiRow";
-import { RecentTickets } from "./components/RecentTickets";
 import { TicketByState } from "./components/TicketByState";
 import { TicketByCategory } from "./components/TicketByCategory";
 import { TicketByStage } from "./components/TicketByStage";
@@ -65,7 +64,7 @@ const WIDE: CSSProperties = {
 /** La ventana, en días. Ver «LA VENTANA NO SE ELIGE» arriba. */
 const DIAS = 30;
 
-export function CXDashboard({ query }: { query?: string }) {
+export function CXDashboard() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -176,12 +175,7 @@ export function CXDashboard({ query }: { query?: string }) {
           <TicketByCategory />
         </div>
 
-        {/* 4 — LA COLA. El único panel desde el que se actúa: ancho completo. */}
-        <div className="plf-band">
-          <RecentTickets query={query} />
-        </div>
-
-        {/* 5 — POR DÓNDE ENTRA Y DE QUIÉN ES. */}
+        {/* 4 — POR DÓNDE ENTRA Y DE QUIÉN ES. */}
         <div className="cx-pair plf-band" style={WIDE}>
           <CallDetails />
           <AgentPerformance />
