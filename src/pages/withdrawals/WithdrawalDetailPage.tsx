@@ -1,4 +1,4 @@
-import { Ban, PackageCheck, Pencil, Printer, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Ban, PackageCheck, Pencil, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { withdrawalsApi } from "../../api/withdrawals";
@@ -7,12 +7,14 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
+import { DocumentDropdown } from "../../components/app/DocumentDropdown";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { PageSpinner } from "../../components/ui/PageSpinner";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useDetail } from "../../hooks/useDetail";
 import { formatDay, formatInstant } from "../../lib/dates";
 import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
+import { exportWithdrawalToExcel } from "../../lib/withdrawalExcelExport";
 import { describeStatus } from "../../lib/withdrawals";
 import type { WithdrawalDetail, WithdrawalLine } from "../../types/withdrawals";
 import { WithdrawalCancelModal } from "./WithdrawalCancelModal";
@@ -25,12 +27,6 @@ import { WithdrawalStatusBadge } from "./WithdrawalStatusBadge";
  * Ficha de la solicitud: datos, líneas con lo recogido y la diferencia, y las
  * tres firmas (vendedor, aprobación y almacén). Qué botón se ofrece lo decide
  * el servidor (`canEdit`, `canDecide`, `canComplete`, `canCancel`).
- *
- * Integración diferida (docs/plan/02, módulo de tickets y tareas): RF-W7 pide
- * esta misma información como pestaña «Retiro de mercancía» del detalle del
- * ticket, con GET /api/tickets/{id}/withdrawals. Esa pestaña vive en
- * TicketDetailPage, que es del módulo de tickets; por ahora la ficha enlaza
- * al ticket y no al revés.
  */
 export function WithdrawalDetailPage() {
   const { id } = useParams();
@@ -86,10 +82,11 @@ export function WithdrawalDetailPage() {
 
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button size="sm" variant="secondary" onClick={() => window.open(`/retiros/${withdrawal.id}/imprimir`, "_blank")}>
-        <Printer className="h-[15px] w-[15px]" />
-        Imprimir
-      </Button>
+      <DocumentDropdown
+        onExportExcel={() => exportWithdrawalToExcel(detail)}
+        onExportPdf={() => window.open(`/retiros/${withdrawal.id}/imprimir?mode=pdf`, "_blank")}
+        onPrint={() => window.open(`/retiros/${withdrawal.id}/imprimir?mode=print`, "_blank")}
+      />
       {canEdit && (
         <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
           <Pencil className="h-[15px] w-[15px]" />

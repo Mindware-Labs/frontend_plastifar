@@ -1,117 +1,51 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
-import { z } from "zod";
+import {
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
+import { fetchAllPages } from "../../api/paging";
+import { ticketsApi } from "../../api/tickets";
+import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { withdrawalsApi } from "../../api/withdrawals";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { LookupField, SelectField, TextField } from "../../components/ui/Field";
-import { FormSection } from "../../components/ui/FormSection";
+import { DateField, LookupField, SelectField, TextField } from "../../components/ui/Field";
+import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 import { Modal } from "../../components/ui/Modal";
-import { RowAction } from "../../components/ui/RowAction";
+import { useReceipts } from "../../context/useReceipts";
 import { resolveTicketLabel, searchTickets } from "../../lib/discrepancies";
-import { formatAmountOrPlain, toNumberOrNull } from "../../lib/numbers";
 import { today } from "../../lib/quality";
-import { computeLineValue, computeTotal, MAX_LINE_INPUT, MAX_WITHDRAWAL_AMOUNT } from "../../lib/withdrawals";
+import { WITHDRAWAL_FORM_CONTROL } from "../../lib/withdrawals";
+import type { TicketProductResponse } from "../../types/api";
 import {
   WITHDRAWAL_CURRENCIES,
   WITHDRAWAL_ERROR_ORIGINS,
   WITHDRAWAL_REASONS,
   type MerchandiseWithdrawal,
+  type SaveWithdrawalRequest,
   type WithdrawalDetail,
   type WithdrawalErrorOrigin,
   type WithdrawalReason,
 } from "../../types/withdrawals";
 
-const decimals = (places: number) => (value: string) =>
-  value === "" || Number((Number(value) * 10 ** places).toFixed(6)) % 1 === 0;
-
-// Espejo de WithdrawalRules.Validate (docs/plan/04, sección 13).
-const lineSchema = z.object({
-  productId: z.string().min(1, "Elige el producto"),
-  quantity: z
-    .string()
-    .trim()
-    .refine((value) => value !== "" && !Number.isNaN(Number(value)) && Number(value) > 0, "Mayor que cero")
-    .refine((value) => !(Number(value) > MAX_LINE_INPUT), "Máximo mil millones")
-    .refine(decimals(2), "Hasta dos decimales"),
-  quantityUnit: z.string().trim().min(1, "Indica la unidad").max(10, "Máximo 10 caracteres"),
-  packDetail: z.string().trim().max(20, "Máximo 20 caracteres"),
-  unitPrice: z
-    .string()
-    .trim()
-    .refine((value) => value === "" || (!Number.isNaN(Number(value)) && Number(value) >= 0), "Número de cero en adelante")
-    .refine((value) => value === "" || !(Number(value) > MAX_LINE_INPUT), "Máximo mil millones")
-    .refine(decimals(4), "Hasta cuatro decimales"),
-});
-
-const schema = z
-  .object({
-    ticketId: z.string().min(1, "Elige el ticket"),
-    requestDate: z
-      .string()
-      .min(1, "Indica la fecha de la solicitud")
-      .refine((value) => value <= today(), "La fecha no puede ser posterior a hoy"),
-    reason: z.string().min(1, "Elige el motivo del retiro"),
-    errorOrigin: z.string(),
-    currency: z.string(),
-    lines: z.array(lineSchema).min(1, "Agrega al menos un producto a retirar"),
-  })
-  .superRefine((values, ctx) => {
-    const seen = new Set<string>();
-    values.lines.forEach((line, index) => {
-      if (line.productId === "") return;
-      if (seen.has(line.productId)) {
-        ctx.addIssue({ code: "custom", path: ["lines", index, "productId"], message: "Un producto no puede repetirse" });
-      }
-      seen.add(line.productId);
-    });
-    if (values.lines.some((line) => line.unitPrice.trim() !== "") && values.currency === "") {
-      ctx.addIssue({ code: "custom", path: ["currency"], message: "Indica la moneda: alguna línea lleva precio" });
-    }
-
-    // Espejo de WithdrawalRules.MaxAmount: cantidad y precio caben por separado y su producto no.
-    const lineValues = values.lines.map((line) =>
-      computeLineValue(toNumberOrNull(line.quantity), toNumberOrNull(line.unitPrice)),
-    );
-    lineValues.forEach((value, index) => {
-      if (value !== null && value > MAX_WITHDRAWAL_AMOUNT) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["lines", index, "unitPrice"],
-          message: "El valor de la línea es demasiado grande: revisa la cantidad y el precio",
-        });
-      }
-    });
-    if (lineValues.every((value) => value === null || value <= MAX_WITHDRAWAL_AMOUNT) && computeTotal(lineValues) > MAX_WITHDRAWAL_AMOUNT) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["lines"],
-        message: "El valor total de la solicitud es demasiado grande: revisa las cantidades y los precios",
-      });
-    }
-  });
-
-type FormValues = z.infer<typeof schema>;
-type LineValues = FormValues["lines"][number];
-
-const emptyLine = (): LineValues => ({ productId: "", quantity: "", quantityUnit: "", packDetail: "", unitPrice: "" });
-
-const REASON_OPTIONS = WITHDRAWAL_REASONS.map((value) => ({ value, label: value }));
-const ORIGIN_OPTIONS = [
-  { value: "", label: "Sin error de origen" },
-  ...WITHDRAWAL_ERROR_ORIGINS.map((value) => ({ value, label: `Error de ${value === "Vendedor" ? "vendedor" : "almacén"}` })),
-];
-const CURRENCY_OPTIONS = [{ value: "", label: "Sin precio" }, ...WITHDRAWAL_CURRENCIES.map((value) => ({ value, label: value }))];
-
-interface WithdrawalFormModalProps {
-  /** Ausente = alta. */
-  withdrawal?: MerchandiseWithdrawal;
-  fixedTicketId?: number;
-  fixedTicketLabel?: string;
+interface Props {
+  /** Si viene de la ficha del ticket, el ticket queda fijo; desde el listado de retiros el usuario lo elige. */
+  ticketId?: number;
+  ticketNumber?: string;
+  ticketClientName?: string;
+  /** Productos registrados en el ticket para priorizar en la selección. */
+  ticketProducts?: TicketProductResponse[];
+  /** Líneas iniciales prellenadas al migrar de otro formulario del ticket. */
   initialLines?: Array<{
     productId: string;
     quantity: string;
@@ -119,317 +53,1132 @@ interface WithdrawalFormModalProps {
     packDetail: string;
     unitPrice: string;
   }>;
+  /** Solicitud existente cuando se entra por «Editar» (sólo en estado Solicitado, RF-W2). */
+  withdrawal?: MerchandiseWithdrawal;
+  /** Estado actual del ticket para preguntar si desea cerrarlo al crear la solicitud. */
+  ticketStatus?: string;
+  onTicketStatusChanged?: () => void;
+  /** Renderiza como vista embebida a página completa en lugar de ventana modal. */
+  inline?: boolean;
   onClose: () => void;
   onSaved: (detail: WithdrawalDetail) => void;
-  /**
-   * 409: la solicitud cambió en el servidor (otro la decidió, la retiró o la
-   * canceló). Quien abre el modal recarga la ficha y muestra el mensaje.
-   */
   onConflict?: (message: string) => void;
 }
 
+interface LineDraft {
+  key: number;
+  productId: string;
+  productLabel?: string;
+  quantity: string;
+  quantityUnit: string;
+  packDetail: string;
+  unitPrice: string;
+}
+
+interface LineErrors {
+  productId?: string;
+  quantity?: string;
+  quantityUnit?: string;
+  packDetail?: string;
+  unitPrice?: string;
+}
+
+interface FormErrors {
+  ticketId?: string;
+  requestDate?: string;
+  reason?: string;
+  errorOrigin?: string;
+  currency?: string;
+  lines?: string;
+  byLine: Record<number, LineErrors>;
+}
+
+const STEPS = [
+  { id: 1, label: "Solicitud", hint: "Motivo, fecha y moneda" },
+  { id: 2, label: "Productos", hint: "Renglones a retirar" },
+] as const;
+
+const ERROR_ORIGIN_OPTIONS = [
+  { value: "", label: "Ninguno (no requiere aprobación)" },
+  ...WITHDRAWAL_ERROR_ORIGINS.map((value) => ({ value, label: value })),
+];
+
+const CURRENCY_OPTIONS = WITHDRAWAL_CURRENCIES.map((value) => ({
+  value,
+  label: value === "DOP" ? "DOP (RD$)" : "USD (US$)",
+}));
+
+let nextKey = 1;
+
+function emptyLine(defaultProductId = "", productLabel?: string): LineDraft {
+  return {
+    key: nextKey++,
+    productId: defaultProductId,
+    productLabel,
+    quantity: "",
+    quantityUnit: "CAJ",
+    packDetail: "",
+    unitPrice: "",
+  };
+}
+
+function lineFromWithdrawal(withdrawal: MerchandiseWithdrawal): LineDraft[] {
+  if (withdrawal.lines.length === 0) return [emptyLine()];
+  return [...withdrawal.lines]
+    .sort((a, b) => a.position - b.position)
+    .map((line) => ({
+      key: nextKey++,
+      productId: String(line.productId),
+      productLabel: `${line.productCode} · ${line.productName}`,
+      quantity: String(line.quantity),
+      quantityUnit: line.quantityUnit,
+      packDetail: line.packDetail ?? "",
+      unitPrice: line.unitPrice !== null ? String(line.unitPrice) : "",
+    }));
+}
+
+function parsePositiveDecimal(raw: string): number | null {
+  const clean = raw.trim().replace(",", ".");
+  if (!clean) return null;
+  const num = Number(clean);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  return num;
+}
+
+function parseOptionalPrice(raw: string): { valid: boolean; value: number | null } {
+  const clean = raw.trim().replace(",", ".");
+  if (!clean) return { valid: true, value: null };
+  const num = Number(clean);
+  if (!Number.isFinite(num) || num < 0) return { valid: false, value: null };
+  return { valid: true, value: num };
+}
+
 /**
- * RF-W2: la solicitud con sus líneas. Se crea desde el listado eligiendo el
- * ticket; hereda el cliente del ticket.
- *
- * Integración diferida (docs/plan/02, módulo de tickets y tareas): RF-W1 pide
- * este mismo formulario como paso adicional del alta del ticket cuando aplica
- * la regla de enrutamiento «al crear el ticket». Ese paso vive en
- * CreateTicketModal, que es del módulo de tickets. Hoy el modal no recibe el
- * ticket: en alta lo elige el usuario con el campo «Ticket». Integrarlo pide
- * añadir una prop que fije ese campo, en lugar de duplicar el formulario.
+ * RF-W1 / RF-W2 / PF-FOR-068: asistente por pasos para registrar o editar la
+ * Solicitud de Retiro de Mercancía con el mismo formato editorial que
+ * Reclamación de Clientes, Discrepancia de Carga y HCA.
  */
 export function WithdrawalFormModal({
-  withdrawal,
-  fixedTicketId,
-  fixedTicketLabel,
+  ticketId: fixedTicketId,
+  ticketNumber: fixedTicketNumber,
+  ticketClientName: fixedClientName,
+  ticketProducts = [],
   initialLines,
+  withdrawal,
+  ticketStatus,
+  onTicketStatusChanged,
+  inline = false,
   onClose,
   onSaved,
   onConflict,
-}: WithdrawalFormModalProps) {
-  const isEdit = withdrawal !== undefined;
-  const [formError, setFormError] = useState<string | null>(null);
+}: Props) {
+  const baseId = useId();
+  const receipts = useReceipts();
+  const isEditing = Boolean(withdrawal);
+  const lockedTicketId = fixedTicketId ?? withdrawal?.ticketId;
+  const activeTicketId = lockedTicketId ?? 0;
+  const draftStorageKey = !isEditing && activeTicketId ? `pf068-draft:ticket:${activeTicketId}` : null;
 
-  const {
-    control,
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: "onTouched",
-    defaultValues: {
-      ticketId: withdrawal ? String(withdrawal.ticketId) : fixedTicketId ? String(fixedTicketId) : "",
-      requestDate: withdrawal?.requestDate ?? today(),
-      reason: withdrawal?.reason ?? "",
-      errorOrigin: withdrawal?.errorOrigin ?? "",
-      currency: withdrawal?.currency ?? "",
-      lines:
-        withdrawal && withdrawal.lines.length > 0
-          ? withdrawal.lines.map((line) => ({
-              productId: String(line.productId),
-              quantity: String(line.quantity),
-              quantityUnit: line.quantityUnit,
-              packDetail: line.packDetail ?? "",
-              unitPrice: line.unitPrice === null ? "" : String(line.unitPrice),
-            }))
-          : initialLines && initialLines.length > 0
-          ? initialLines
+  const [step, setStep] = useState<number>(1);
+  const [selectedTicketId, setSelectedTicketId] = useState<string>(lockedTicketId ? String(lockedTicketId) : "");
+  const [requestDate, setRequestDate] = useState(withdrawal?.requestDate ?? today());
+  const [reason, setReason] = useState<WithdrawalReason>(withdrawal?.reason ?? WITHDRAWAL_REASONS[0]);
+  const [errorOrigin, setErrorOrigin] = useState<string>(withdrawal?.errorOrigin ?? "");
+  const [currency, setCurrency] = useState<string>(withdrawal?.currency ?? WITHDRAWAL_CURRENCIES[0]);
+  const [lines, setLines] = useState<LineDraft[]>(() =>
+    withdrawal
+      ? lineFromWithdrawal(withdrawal)
+      : initialLines && initialLines.length > 0
+        ? initialLines.map((l) => ({
+            key: nextKey++,
+            productId: l.productId ?? "",
+            quantity: l.quantity ?? "",
+            quantityUnit: l.quantityUnit || "CAJ",
+            packDetail: l.packDetail ?? "",
+            unitPrice: l.unitPrice ?? "",
+          }))
+        : ticketProducts.length > 0
+          ? ticketProducts.map((tp) => emptyLine(String(tp.productId), `${tp.productCode} · ${tp.productName}`))
           : [emptyLine()],
-    },
-  });
+  );
+  const [activeLineIdx, setActiveLineIdx] = useState(0);
 
-  const { fields, append, remove } = useFieldArray({ control, name: "lines" });
-  const watchedLines = useWatch({ control, name: "lines" });
-  const watchedCurrency = useWatch({ control, name: "currency" });
+  const [resolvedClientName, setResolvedClientName] = useState<string>(
+    fixedClientName ?? withdrawal?.clientName ?? "",
+  );
+  const [resolvedTicketNumber, setResolvedTicketNumber] = useState<string>(
+    fixedTicketNumber ?? withdrawal?.ticketNumber ?? "",
+  );
 
-  const values = (watchedLines ?? []).map((line) => computeLineValue(toNumberOrNull(line.quantity), toNumberOrNull(line.unitPrice)));
-  const total = computeTotal(values);
-  const anyPrice = values.some((value) => value !== null);
+  const [errors, setErrors] = useState<FormErrors>({ byLine: {} });
+  const [banner, setBanner] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  async function onSubmit(form: FormValues) {
-    setFormError(null);
-    const blank = (value: string) => (value.trim() === "" ? null : value.trim());
+  // Confirmación al cerrar con cambios y prompt de cierre del ticket al terminar
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [completedWithdrawal, setCompletedWithdrawal] = useState<WithdrawalDetail | null>(null);
+  const [showClosePrompt, setShowClosePrompt] = useState(false);
+  const [verdicts, setVerdicts] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedVerdictId, setSelectedVerdictId] = useState<string>("");
+  const [closeReason, setCloseReason] = useState<string>("");
+  const [closingTicket, setClosingTicket] = useState(false);
+  const initialSnapshotRef = useRef<string>("");
 
-    const request = {
-      requestDate: form.requestDate,
-      reason: form.reason as WithdrawalReason,
-      errorOrigin: form.errorOrigin === "" ? null : (form.errorOrigin as WithdrawalErrorOrigin),
-      currency: blank(form.currency),
-      lines: form.lines.map((line) => ({
-        productId: Number(line.productId),
-        quantity: Number(line.quantity),
-        quantityUnit: line.quantityUnit.trim(),
-        packDetail: blank(line.packDetail),
-        unitPrice: toNumberOrNull(line.unitPrice),
-      })),
+  // Cargar veredictos activos para el prompt opcional de cierre de ticket
+  useEffect(() => {
+    fetchAllPages((page, pageSize) => ticketVerdictsApi.list({ page, pageSize, status: "activos" }))
+      .then((list) => {
+        setVerdicts(list);
+        if (list.length > 0) setSelectedVerdictId(String(list[0].id));
+      })
+      .catch(() => setVerdicts([]));
+  }, []);
+
+  // Resolver cliente y número de ticket cuando cambia el ticket elegido
+  useEffect(() => {
+    const idToLookup = lockedTicketId ?? (selectedTicketId ? Number(selectedTicketId) : 0);
+    if (!idToLookup) return;
+    if (lockedTicketId && fixedClientName && fixedTicketNumber) return;
+
+    let active = true;
+    ticketsApi
+      .getById(idToLookup)
+      .then((t) => {
+        if (!active) return;
+        if (t.clientName) setResolvedClientName(t.clientName);
+        if (t.number) setResolvedTicketNumber(t.number);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
     };
+  }, [lockedTicketId, selectedTicketId, fixedClientName, fixedTicketNumber]);
 
+  // Restaurar borrador si existe
+  useEffect(() => {
+    if (!draftStorageKey) return;
     try {
-      const saved = isEdit
-        ? await withdrawalsApi.update(withdrawal.id, request)
-        : await withdrawalsApi.create(Number(form.ticketId), request);
-      onSaved(saved);
-      onClose();
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409 && onConflict) {
-        // El diálogo se cierra y la ficha se recarga: lo escrito se pierde, y
-        // el aviso tiene que decirlo además del motivo del servidor.
-        onConflict(`Tus cambios no se guardaron. ${err.message}`);
-        onClose();
-        return;
+      const raw = localStorage.getItem(draftStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        if (typeof parsed.step === "number" && parsed.step >= 1 && parsed.step <= 2) setStep(parsed.step);
+        if (typeof parsed.requestDate === "string") setRequestDate(parsed.requestDate);
+        if (parsed.reason === "Por devolución" || parsed.reason === "Por cambio") setReason(parsed.reason);
+        if (typeof parsed.errorOrigin === "string") setErrorOrigin(parsed.errorOrigin);
+        if (typeof parsed.currency === "string") setCurrency(parsed.currency);
+        if (Array.isArray(parsed.lines) && parsed.lines.length > 0) {
+          setLines(
+            parsed.lines.map((l: Partial<LineDraft>) => ({
+              key: nextKey++,
+              productId: l.productId ?? "",
+              productLabel: l.productLabel,
+              quantity: l.quantity ?? "",
+              quantityUnit: l.quantityUnit ?? "CAJ",
+              packDetail: l.packDetail ?? "",
+              unitPrice: l.unitPrice ?? "",
+            })),
+          );
+        }
       }
-      setFormError(err instanceof ApiError ? err.message : isEdit ? "No se pudo guardar la solicitud" : "No se pudo crear la solicitud");
+    } catch {
+      /* ignorar borrador corrupto */
+    }
+  }, [draftStorageKey]);
+
+  const currentSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        selectedTicketId,
+        requestDate,
+        reason,
+        errorOrigin,
+        currency,
+        lines: lines.map((l) => ({
+          productId: l.productId,
+          quantity: l.quantity,
+          quantityUnit: l.quantityUnit,
+          packDetail: l.packDetail,
+          unitPrice: l.unitPrice,
+        })),
+      }),
+    [selectedTicketId, requestDate, reason, errorOrigin, currency, lines],
+  );
+
+  useEffect(() => {
+    if (!initialSnapshotRef.current) {
+      initialSnapshotRef.current = currentSnapshot;
+    }
+  }, [currentSnapshot]);
+
+  const isDirty = initialSnapshotRef.current !== "" && initialSnapshotRef.current !== currentSnapshot;
+
+  function saveDraftToStorage() {
+    if (!draftStorageKey) return;
+    try {
+      localStorage.setItem(
+        draftStorageKey,
+        JSON.stringify({
+          step,
+          requestDate,
+          reason,
+          errorOrigin,
+          currency,
+          lines,
+        }),
+      );
+    } catch {
+      /* sin espacio */
     }
   }
 
-  return (
-    <Modal
-      title={isEdit ? `Editar ${withdrawal.number}` : "Nueva solicitud de retiro"}
-      eyebrow="PF-FOR-068"
-      description={
-        isEdit
-          ? "Solo se edita mientras está solicitada. Firmas como vendedor quien la creó."
-          : "Ligada a un ticket con cliente: la empresa se toma del ticket. Firmas como vendedor."
-      }
-      onClose={onClose}
-      maxWidth="max-w-3xl"
-      footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="withdrawal-form" isLoading={isSubmitting}>
-            {isEdit ? "Guardar cambios" : "Crear solicitud"}
-          </Button>
-        </>
-      }
-    >
-      <form id="withdrawal-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
-        {formError && <Alert variant="error">{formError}</Alert>}
+  function clearDraftFromStorage() {
+    if (!draftStorageKey) return;
+    try {
+      localStorage.removeItem(draftStorageKey);
+    } catch {
+      /* ignorar */
+    }
+  }
 
-        <FormSection title="Solicitud">
-          <Controller
-            name="ticketId"
-            control={control}
-            render={({ field }) => (
+  function handleRequestClose() {
+    if (saving) return;
+    if (!isEditing && isDirty && draftStorageKey) {
+      setConfirmCloseOpen(true);
+      return;
+    }
+    onClose();
+  }
+
+  const inheritedClientName =
+    resolvedClientName || fixedClientName || withdrawal?.clientName || "Se toma del ticket al guardar";
+  const displayTicketNumber = resolvedTicketNumber || fixedTicketNumber || withdrawal?.ticketNumber;
+
+  function patchLine(key: number, patch: Partial<LineDraft>) {
+    setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+  }
+
+  function addLine() {
+    setLines((current) => {
+      const next = [...current, emptyLine()];
+      setActiveLineIdx(next.length - 1);
+      return next;
+    });
+  }
+
+  function removeLine(key: number) {
+    setLines((current) => {
+      if (current.length <= 1) return current;
+      const idx = current.findIndex((line) => line.key === key);
+      const next = current.filter((line) => line.key !== key);
+      setActiveLineIdx((curr) => {
+        if (curr >= next.length) return Math.max(0, next.length - 1);
+        if (idx >= 0 && idx < curr) return curr - 1;
+        return curr;
+      });
+      return next;
+    });
+  }
+
+  function validateStep(stepNumber: number): boolean {
+    const next: FormErrors = { ...errors, byLine: { ...errors.byLine } };
+    const todayIsoStr = today();
+
+    if (stepNumber === 1) {
+      delete next.ticketId;
+      delete next.requestDate;
+      delete next.reason;
+      delete next.errorOrigin;
+      delete next.currency;
+
+      if (!lockedTicketId && !selectedTicketId) {
+        next.ticketId = "Selecciona el ticket al que pertenece la solicitud.";
+      }
+      if (!requestDate) {
+        next.requestDate = "Indica la fecha de la solicitud.";
+      } else if (requestDate > todayIsoStr) {
+        next.requestDate = "La fecha de la solicitud no puede ser futura.";
+      }
+      if (!reason) {
+        next.reason = "Elige el motivo del retiro.";
+      }
+      if (!currency) {
+        next.currency = "Selecciona la moneda.";
+      }
+
+      setErrors(next);
+      return !next.ticketId && !next.requestDate && !next.reason && !next.currency;
+    }
+
+    if (stepNumber === 2) {
+      delete next.lines;
+      next.byLine = {};
+
+      if (lines.length === 0) {
+        next.lines = "Debes incluir al menos un renglón de producto.";
+      }
+
+      lines.forEach((line) => {
+        const bucket: LineErrors = {};
+        if (!line.productId) {
+          bucket.productId = "Elige el producto del catálogo.";
+        }
+        if (parsePositiveDecimal(line.quantity) === null) {
+          bucket.quantity = "Cantidad mayor que cero.";
+        }
+        if (!line.quantityUnit.trim()) {
+          bucket.quantityUnit = "Indica la unidad (p. ej. CAJ).";
+        } else if (line.quantityUnit.trim().length > 20) {
+          bucket.quantityUnit = "Máximo 20 caracteres.";
+        }
+        if (line.packDetail.trim().length > 60) {
+          bucket.packDetail = "Máximo 60 caracteres.";
+        }
+        if (!parseOptionalPrice(line.unitPrice).valid) {
+          bucket.unitPrice = "Precio cero o mayor.";
+        }
+        if (Object.keys(bucket).length > 0) {
+          next.byLine[line.key] = bucket;
+        }
+      });
+
+      setErrors(next);
+      if (Object.keys(next.byLine).length > 0) {
+        const firstBadIdx = lines.findIndex((l) => next.byLine[l.key]);
+        if (firstBadIdx >= 0) setActiveLineIdx(firstBadIdx);
+        return false;
+      }
+      return !next.lines;
+    }
+
+    return true;
+  }
+
+  function validateAll(): { errors: FormErrors; firstErrorStep: number | null } {
+    const next: FormErrors = { byLine: {} };
+    const todayIsoStr = today();
+
+    if (!lockedTicketId && !selectedTicketId) {
+      next.ticketId = "Selecciona el ticket al que pertenece la solicitud.";
+    }
+    if (!requestDate) {
+      next.requestDate = "Indica la fecha de la solicitud.";
+    } else if (requestDate > todayIsoStr) {
+      next.requestDate = "La fecha de la solicitud no puede ser futura.";
+    }
+    if (!reason) {
+      next.reason = "Elige el motivo del retiro.";
+    }
+    if (!currency) {
+      next.currency = "Selecciona la moneda.";
+    }
+
+    if (lines.length === 0) {
+      next.lines = "Debes incluir al menos un renglón de producto.";
+    }
+
+    lines.forEach((line) => {
+      const bucket: LineErrors = {};
+      if (!line.productId) bucket.productId = "Elige el producto del catálogo.";
+      if (parsePositiveDecimal(line.quantity) === null) bucket.quantity = "Cantidad mayor que cero.";
+      if (!line.quantityUnit.trim()) bucket.quantityUnit = "Indica la unidad (p. ej. CAJ).";
+      else if (line.quantityUnit.trim().length > 20) bucket.quantityUnit = "Máximo 20 caracteres.";
+      if (line.packDetail.trim().length > 60) bucket.packDetail = "Máximo 60 caracteres.";
+      if (!parseOptionalPrice(line.unitPrice).valid) bucket.unitPrice = "Precio cero o mayor.";
+      if (Object.keys(bucket).length > 0) {
+        next.byLine[line.key] = bucket;
+      }
+    });
+
+    const step1HasError = Boolean(next.ticketId || next.requestDate || next.reason || next.currency);
+    const step2HasError = Boolean(next.lines || Object.keys(next.byLine).length > 0);
+    const firstErrorStep = step1HasError ? 1 : step2HasError ? 2 : null;
+    return { errors: next, firstErrorStep };
+  }
+
+  function handleNextStep() {
+    setBanner(null);
+    if (!validateStep(step)) return;
+    setStep((s) => Math.min(STEPS.length, s + 1));
+  }
+
+  function handlePrevStep() {
+    setBanner(null);
+    setStep((s) => Math.max(1, s - 1));
+  }
+
+  function goToStep(target: number) {
+    if (target === step) return;
+    setBanner(null);
+    if (target > step && !validateStep(step)) return;
+    setStep(target);
+  }
+
+  async function handleSubmit() {
+    setBanner(null);
+    const { errors: validation, firstErrorStep } = validateAll();
+    setErrors(validation);
+    if (firstErrorStep !== null) {
+      setStep(firstErrorStep);
+      if (firstErrorStep === 2) {
+        const firstBadIdx = lines.findIndex((l) => validation.byLine[l.key]);
+        if (firstBadIdx >= 0) setActiveLineIdx(firstBadIdx);
+      }
+      return;
+    }
+
+    const hasAnyPrice = lines.some((l) => parseOptionalPrice(l.unitPrice).value !== null);
+    const resolvedOrigin: WithdrawalErrorOrigin | null =
+      errorOrigin === "Vendedor" || errorOrigin === "Almacén" ? errorOrigin : null;
+
+    const payload: SaveWithdrawalRequest = {
+      requestDate,
+      reason,
+      errorOrigin: resolvedOrigin,
+      currency: hasAnyPrice ? currency : null,
+      lines: lines.map((line) => ({
+        productId: Number(line.productId),
+        quantity: parsePositiveDecimal(line.quantity)!,
+        quantityUnit: line.quantityUnit.trim().toUpperCase(),
+        packDetail: line.packDetail.trim() ? line.packDetail.trim().toUpperCase() : null,
+        unitPrice: parseOptionalPrice(line.unitPrice).value,
+      })),
+    };
+
+    const targetTicketId = lockedTicketId ?? Number(selectedTicketId);
+
+    setSaving(true);
+    try {
+      const saved =
+        isEditing && withdrawal
+          ? await withdrawalsApi.update(withdrawal.id, payload)
+          : await withdrawalsApi.create(targetTicketId, payload);
+      clearDraftFromStorage();
+      receipts.done({
+        action: "guardar-retiro",
+        title: isEditing ? "Solicitud de retiro actualizada" : "Solicitud de retiro emitida",
+        detail: `${WITHDRAWAL_FORM_CONTROL.code} · ${saved.withdrawal.number}`,
+      });
+
+      const isAlreadyClosed = ticketStatus === "Solucionado" || ticketStatus === "Cancelado";
+      if (!isEditing && !isAlreadyClosed && targetTicketId > 0 && onTicketStatusChanged) {
+        setCompletedWithdrawal(saved);
+        setShowClosePrompt(true);
+      } else {
+        onSaved(saved);
+      }
+    } catch (e) {
+      if (e instanceof ApiError) {
+        if (e.status === 409 && onConflict) {
+          onConflict(e.message);
+          onClose();
+          return;
+        }
+        setBanner(e.message);
+      } else {
+        setBanner("No se pudo guardar la solicitud de retiro. Inténtalo de nuevo.");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const safeIdx = Math.min(activeLineIdx, Math.max(0, lines.length - 1));
+  const currentLine = lines[safeIdx] ?? lines[0];
+
+  const wizardFooter = (
+    <div className="flex w-full items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="secondary" onClick={handleRequestClose} disabled={saving}>
+          Cancelar
+        </Button>
+      </div>
+      <div className="flex items-center gap-2">
+        {step > 1 && (
+          <Button type="button" variant="secondary" onClick={handlePrevStep} disabled={saving}>
+            <ChevronLeft className="size-4" />
+            Anterior
+          </Button>
+        )}
+        {step < STEPS.length ? (
+          <Button type="button" onClick={handleNextStep}>
+            Siguiente
+            <ChevronRight className="size-4" />
+          </Button>
+        ) : (
+          <Button type="button" onClick={handleSubmit} disabled={saving}>
+            {saving ? "Guardando…" : isEditing ? "Guardar cambios" : "Emitir solicitud"}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  const wizardBody = (
+    <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-4">
+      {/* Stepper interactivo por pasos */}
+      <nav aria-label="Pasos del formulario" className="grid grid-cols-2 gap-2">
+        {STEPS.map((item) => {
+          const isCurrent = step === item.id;
+          const isCompleted = step > item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => goToStep(item.id)}
+              className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-all cursor-pointer ${
+                isCurrent
+                  ? "border-brand-red/40 bg-red-50/50 ring-2 ring-brand-red/10"
+                  : isCompleted
+                    ? "border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70"
+                    : "border-zinc-200 bg-zinc-50/60 hover:bg-zinc-100/70"
+              }`}
+            >
+              <span
+                className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
+                  isCurrent
+                    ? "bg-brand-red text-white"
+                    : isCompleted
+                      ? "bg-emerald-600 text-white"
+                      : "bg-zinc-200 text-zinc-700"
+                }`}
+              >
+                {isCompleted ? <Check className="size-3.5 stroke-[2.5]" /> : item.id}
+              </span>
+              <div className="min-w-0">
+                <p
+                  className={`truncate text-[12px] font-semibold leading-tight ${
+                    isCurrent ? "text-brand-red" : isCompleted ? "text-emerald-900" : "text-zinc-700"
+                  }`}
+                >
+                  {item.label}
+                </p>
+                <p className="truncate text-[10.5px] text-zinc-500">{item.hint}</p>
+              </div>
+            </button>
+          );
+        })}
+      </nav>
+
+      {banner && <Alert variant="error">{banner}</Alert>}
+
+      {/* PASO 1: Datos de la solicitud (Motivo, origen, fecha, moneda y empresa) */}
+      {step === 1 && (
+        <div className="space-y-4">
+          {/* Contexto del ticket y empresa heredada */}
+          {lockedTicketId ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-200/90 bg-zinc-50/70 px-3.5 py-2.5 text-[12px]">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                {displayTicketNumber && (
+                  <span className="text-zinc-600">
+                    Ticket: <span className="font-mono font-semibold text-zinc-900">{displayTicketNumber}</span>
+                  </span>
+                )}
+                <span className="text-zinc-600">
+                  Nombre Empresa: <span className="font-semibold text-zinc-900">{inheritedClientName}</span>
+                </span>
+              </div>
+              <span className="rounded bg-zinc-200/70 px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-zinc-700">
+                PF-FOR-068
+              </span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <LookupField
-                label="Ticket"
+                size="sm"
+                label="Ticket origen"
                 required
-                name={field.name}
-                value={field.value}
-                onChange={(value) => field.onChange(value)}
-                onBlur={field.onBlur}
-                placeholder="Elige el ticket del retiro"
-                searchPlaceholder="Número, asunto o cliente…"
+                value={selectedTicketId}
+                onChange={setSelectedTicketId}
+                placeholder="Buscar ticket por número o cliente…"
+                searchPlaceholder="Código TIC- o nombre del cliente…"
                 search={searchTickets}
-                resolveSelectedLabel={fixedTicketLabel ? async () => fixedTicketLabel : resolveTicketLabel}
-                disabled={isEdit || Boolean(fixedTicketId)}
-                error={errors.ticketId?.message}
+                resolveSelectedLabel={resolveTicketLabel}
+                error={errors.ticketId}
               />
-            )}
-          />
-          <div className="grid grid-cols-3 gap-3">
-            <TextField
-              label="Fecha"
-              type="date"
+              <TextField
+                size="sm"
+                label="Nombre Empresa (heredado del ticket)"
+                value={inheritedClientName}
+                disabled
+                readOnly
+              />
+            </div>
+          )}
+
+          {/* Selector de Motivo del retiro (Por Devolución / Por Cambio, igual a las casillas del PF-FOR-068) */}
+          <fieldset className="rounded-xl border border-zinc-200/90 bg-white p-3.5">
+            <legend className="px-1 font-heading text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+              Motivo del retiro (casilla PF-FOR-068) *
+            </legend>
+            <div className="mt-1 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {WITHDRAWAL_REASONS.map((option) => {
+                const active = reason === option;
+                const Icon = option === "Por devolución" ? RotateCcw : RefreshCw;
+                const subtitle =
+                  option === "Por devolución"
+                    ? "Retorno definitivo de mercancía al almacén"
+                    : "Retiro para reposición o cambio de producto";
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setReason(option)}
+                    className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all cursor-pointer ${
+                      active
+                        ? "border-brand-red bg-red-50/40 ring-2 ring-brand-red/10"
+                        : "border-zinc-200 bg-zinc-50/40 hover:border-zinc-300 hover:bg-zinc-50"
+                    }`}
+                  >
+                    <div
+                      className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border text-[12px] font-bold ${
+                        active
+                          ? "border-brand-red bg-brand-red text-white"
+                          : "border-zinc-300 bg-white text-zinc-500"
+                      }`}
+                    >
+                      {active ? "X" : <Icon className="size-3.5" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`text-[13px] font-semibold ${active ? "text-zinc-900" : "text-zinc-800"}`}>
+                        {option}
+                      </p>
+                      <p className="mt-0.5 text-[11.5px] text-zinc-500">{subtitle}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {errors.reason && <p className="mt-1.5 text-[12px] text-red-600">{errors.reason}</p>}
+          </fieldset>
+
+          {/* Fecha, Origen del error y Moneda */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <DateField
+              label="Fecha de solicitud (DIA / MES / AÑO)"
               required
-              max={today()}
-              error={errors.requestDate?.message}
-              {...register("requestDate")}
+              value={requestDate}
+              maxDate={today()}
+              onChange={setRequestDate}
+              error={errors.requestDate}
             />
-            <Controller
-              name="reason"
-              control={control}
-              render={({ field }) => (
-                <SelectField
-                  label="Motivo"
-                  required
-                  name={field.name}
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  placeholder="Elige el motivo"
-                  options={REASON_OPTIONS}
-                  error={errors.reason?.message}
-                />
-              )}
+
+            <SelectField
+              size="sm"
+              label="Origen del error"
+              value={errorOrigin}
+              onChange={setErrorOrigin}
+              options={ERROR_ORIGIN_OPTIONS}
+              error={errors.errorOrigin}
             />
-            <Controller
-              name="errorOrigin"
-              control={control}
-              render={({ field }) => (
-                <SelectField
-                  label="Origen del error"
-                  name={field.name}
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  options={ORIGIN_OPTIONS}
-                  hint="Con origen de error, la solicitud se aprueba antes del retiro."
-                />
-              )}
+
+            <SelectField
+              size="sm"
+              label="Moneda"
+              required
+              value={currency}
+              onChange={setCurrency}
+              options={CURRENCY_OPTIONS}
+              error={errors.currency}
             />
           </div>
-        </FormSection>
+        </div>
+      )}
 
-        <FormSection
-          title="Productos a retirar"
-          hint="Una línea por producto. El precio es opcional; sin precio la línea no suma al valor. El papel tiene 15 renglones y aquí no hay tope."
-        >
-          {errors.lines?.root?.message && <Alert variant="error">{errors.lines.root.message}</Alert>}
-          {errors.lines?.message && <Alert variant="error">{errors.lines.message}</Alert>}
-          <div className="flex flex-col gap-3">
-            {fields.map((field, index) => {
-              const lineError = errors.lines?.[index];
-              const value = values[index] ?? null;
-              return (
-                <div key={field.id} className="rounded-edge border border-line bg-canvas/60 p-3">
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <Controller
-                        name={`lines.${index}.productId`}
-                        control={control}
-                        render={({ field: productField }) => (
-                          <ProductLookupField
-                            label={`Producto ${index + 1}`}
-                            required
-                            name={productField.name}
-                            value={productField.value}
-                            onChange={(next) => productField.onChange(next)}
-                            onBlur={productField.onBlur}
-                            error={lineError?.productId?.message}
-                          />
-                        )}
+      {/* PASO 2: Productos a retirar */}
+      {step === 2 && currentLine && (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-1.5">
+            <FormLineTabStrip
+              activeIndex={safeIdx}
+              tabCount={lines.length}
+              trailing={
+                <Button type="button" size="sm" variant="secondary" onClick={addLine}>
+                  <Plus className="size-3.5" />
+                  <span>Otro producto</span>
+                </Button>
+              }
+            >
+              {lines.map((line, idx) => {
+                const isActive = idx === safeIdx;
+                const lineErr = errors.byLine[line.key];
+                const hasError = Boolean(
+                  lineErr &&
+                    (lineErr.productId ||
+                      lineErr.quantity ||
+                      lineErr.quantityUnit ||
+                      lineErr.packDetail ||
+                      lineErr.unitPrice),
+                );
+                return (
+                  <button
+                    key={line.key}
+                    type="button"
+                    {...formLineTabIndexAttr(idx)}
+                    onClick={() => setActiveLineIdx(idx)}
+                    className={`group relative inline-flex shrink-0 cursor-pointer select-none items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition-all duration-150 ${
+                      isActive
+                        ? "border-zinc-200/90 bg-white font-semibold text-zinc-900 shadow-2xs ring-1 ring-zinc-950/5"
+                        : "border-transparent bg-zinc-100/80 font-medium text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800"
+                    }`}
+                  >
+                    <span
+                      className={`flex size-4.5 items-center justify-center rounded-md font-heading text-[10px] font-bold ${
+                        isActive ? "bg-zinc-900 text-white" : "bg-zinc-200 text-zinc-600"
+                      }`}
+                    >
+                      {idx + 1}
+                    </span>
+                    <span>Producto #{idx + 1}</span>
+                    {hasError && (
+                      <span
+                        className="size-1.5 animate-pulse rounded-full bg-brand-red"
+                        title="Tiene campos pendientes"
+                      />
+                    )}
+                    {lines.length > 1 && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeLine(line.key);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            removeLine(line.key);
+                          }
+                        }}
+                        title={`Quitar producto #${idx + 1}`}
+                        className="-mr-1 ml-0.5 cursor-pointer rounded p-0.5 text-zinc-400 opacity-60 transition-all hover:bg-zinc-100 hover:text-brand-red group-hover:opacity-100"
+                      >
+                        <X className="size-3" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </FormLineTabStrip>
+          </div>
+
+          {errors.lines && <p className="text-[12px] text-red-600">{errors.lines}</p>}
+
+          {(() => {
+            const line = currentLine;
+            const index = safeIdx;
+            const lineErrors = errors.byLine[line.key] ?? {};
+
+            return (
+              <div key={line.key} className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs">
+                <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/70 px-4 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex size-5.5 items-center justify-center rounded-md bg-zinc-200/80 font-heading text-xs font-bold text-zinc-700">
+                      {index + 1}
+                    </span>
+                    <span className="font-heading text-xs font-bold text-zinc-800">
+                      Producto #{index + 1}
+                    </span>
+                  </div>
+                  {lines.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeLine(line.key)}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-[11.5px] font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-brand-red"
+                      title={`Quitar producto ${index + 1}`}
+                    >
+                      <Trash2 className="size-3.5" />
+                      <span>Quitar</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-4 p-4 sm:p-5">
+                  {/* Fila 1: Producto (3/4) + Precio unitario (1/4) */}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <ProductLookupField
+                        size="sm"
+                        label="Producto (CODIGO y DESCRICION)"
+                        required
+                        value={line.productId}
+                        selectedLabel={line.productLabel}
+                        ticketProducts={ticketProducts}
+                        onChange={(val) => patchLine(line.key, { productId: val, productLabel: undefined })}
+                        error={lineErrors.productId}
                       />
                     </div>
-                    {fields.length > 1 && (
-                      <div className="pt-6">
-                        <RowAction label={`Quitar la línea ${index + 1}`} icon={Trash2} danger onClick={() => remove(index)} />
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="mt-2 grid grid-cols-5 gap-2">
-                    <TextField
-                      label="Cantidad"
-                      required
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      inputMode="decimal"
-                      error={lineError?.quantity?.message}
-                      {...register(`lines.${index}.quantity`)}
-                    />
-                    <TextField
-                      label="Unidad"
-                      required
-                      placeholder="CAJ"
-                      error={lineError?.quantityUnit?.message}
-                      {...register(`lines.${index}.quantityUnit`)}
-                    />
-                    <TextField
-                      label="Empaque"
-                      placeholder="14PAQ"
-                      error={lineError?.packDetail?.message}
-                      {...register(`lines.${index}.packDetail`)}
-                    />
-                    <TextField
-                      label="Precio unitario"
-                      type="number"
-                      min="0"
-                      step="0.0001"
-                      inputMode="decimal"
-                      placeholder="Opcional"
-                      error={lineError?.unitPrice?.message}
-                      {...register(`lines.${index}.unitPrice`)}
-                    />
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[12.5px] font-medium text-ink">Valor</span>
-                      <span className="flex h-9 items-center justify-end text-[13px] tabular-nums text-brand-gray">
-                        {value === null ? "—" : formatAmountOrPlain(value, watchedCurrency)}
-                      </span>
+                    <div className="sm:col-span-1 lg:col-span-1">
+                      <TextField
+                        size="sm"
+                        label={`Precio unitario (${currency})`}
+                        type="number"
+                        min="0"
+                        step="0.0001"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={line.unitPrice}
+                        onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })}
+                        error={lineErrors.unitPrice}
+                      />
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
 
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <Button type="button" size="sm" variant="secondary" onClick={() => append(emptyLine())}>
-              <Plus className="h-[14px] w-[14px]" />
-              Otra línea
-            </Button>
-            <div className="flex items-end gap-3">
-              <div className="w-[140px]">
-                <Controller
-                  name="currency"
-                  control={control}
-                  render={({ field }) => (
-                    <SelectField
-                      label="Moneda"
-                      required={anyPrice}
+                  {/* Fila 2: Cantidad (CANT.), Unidad de cantidad y Empaque / UNID en 3 columnas */}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <TextField
                       size="sm"
-                      name={field.name}
-                      value={field.value}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      options={CURRENCY_OPTIONS}
-                      error={errors.currency?.message}
+                      label="Cantidad (CANT.)"
+                      required
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="Ej. 3"
+                      value={line.quantity}
+                      onChange={(e) => patchLine(line.key, { quantity: e.target.value })}
+                      error={lineErrors.quantity}
                     />
-                  )}
-                />
+
+                    <TextField
+                      size="sm"
+                      label="Unidad de cantidad"
+                      required
+                      maxLength={20}
+                      placeholder="CAJ, PAQ, UND"
+                      className="uppercase"
+                      value={line.quantityUnit}
+                      onChange={(e) => patchLine(line.key, { quantityUnit: e.target.value })}
+                      error={lineErrors.quantityUnit}
+                    />
+
+                    <TextField
+                      size="sm"
+                      label="Empaque / UNID"
+                      maxLength={60}
+                      placeholder="Ej. 14PAQ"
+                      className="uppercase"
+                      value={line.packDetail}
+                      onChange={(e) => patchLine(line.key, { packDetail: e.target.value })}
+                      error={lineErrors.packDetail}
+                    />
+                  </div>
+                </div>
               </div>
-              <p className="pb-1.5 text-[13px] text-brand-gray">
-                Total{" "}
-                <span className="font-semibold tabular-nums text-ink">{anyPrice ? formatAmountOrPlain(total, watchedCurrency) : "—"}</span>
+            );
+          })()}
+        </div>
+      )}
+    </form>
+  );
+
+  return (
+    <>
+      {inline ? (
+        <div className="mx-auto max-w-4xl overflow-hidden rounded-xl border border-zinc-200 bg-white">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/60 px-5 py-3.5">
+            <div className="flex items-center gap-3">
+              <span className="rounded-md border border-brand-red/20 bg-red-50 px-2 py-0.5 font-mono text-[11px] font-bold text-brand-red">
+                PF-FOR-068
+              </span>
+              <div>
+                <h3 className="font-heading text-[15px] font-bold text-zinc-900">
+                  {isEditing ? `Editar solicitud ${withdrawal?.number ?? ""}` : "Nueva solicitud de retiro de mercancía"}
+                </h3>
+                <p className="text-[11.5px] text-zinc-500">
+                  Paso {step} de {STEPS.length} · {STEPS[step - 1].label}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleRequestClose}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 cursor-pointer"
+            >
+              <ArrowLeft className="size-3.5" />
+              Volver a formularios
+            </button>
+          </header>
+          <div className="p-5">{wizardBody}</div>
+          <footer className="border-t border-zinc-100 bg-zinc-50/50 px-5 py-3.5">{wizardFooter}</footer>
+        </div>
+      ) : (
+        <Modal
+          title={
+            isEditing
+              ? `Editar solicitud ${withdrawal?.number ?? ""} (PF-FOR-068)`
+              : "Nueva solicitud de retiro de mercancía (PF-FOR-068)"
+          }
+          onClose={handleRequestClose}
+          maxWidth="max-w-4xl"
+          footer={wizardFooter}
+        >
+          {wizardBody}
+        </Modal>
+      )}
+
+      {/* Confirmación al salir con cambios sin guardar */}
+      {confirmCloseOpen && (
+        <Modal
+          title="¿Salir del formulario?"
+          onClose={() => setConfirmCloseOpen(false)}
+          maxWidth="max-w-md"
+          footer={
+            <div className="flex w-full items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  clearDraftFromStorage();
+                  setConfirmCloseOpen(false);
+                  onClose();
+                }}
+              >
+                Descartar
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="secondary" onClick={() => setConfirmCloseOpen(false)}>
+                  Seguir editando
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    saveDraftToStorage();
+                    setConfirmCloseOpen(false);
+                    onClose();
+                  }}
+                >
+                  Guardar borrador
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          <p className="text-[13px] text-zinc-600">
+            Tienes datos en progreso en esta solicitud PF-FOR-068. Puedes guardar un borrador para continuar más tarde o
+            descartar los cambios.
+          </p>
+        </Modal>
+      )}
+
+      {/* Prompt al completar para cerrar el ticket si corresponde */}
+      {showClosePrompt && completedWithdrawal && (
+        <Modal
+          title="Solicitud de retiro registrada"
+          onClose={() => {
+            const done = completedWithdrawal;
+            setShowClosePrompt(false);
+            setCompletedWithdrawal(null);
+            onSaved(done);
+          }}
+          maxWidth="max-w-md"
+          closeOnBackdropClick={false}
+          footer={
+            <div className="flex w-full items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const done = completedWithdrawal;
+                  setShowClosePrompt(false);
+                  setCompletedWithdrawal(null);
+                  onSaved(done);
+                }}
+              >
+                Mantener ticket abierto
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                disabled={closingTicket}
+                onClick={async () => {
+                  const done = completedWithdrawal;
+                  const targetTicketId = lockedTicketId ?? Number(selectedTicketId);
+                  setClosingTicket(true);
+                  try {
+                    const finalVerdictId = selectedVerdictId
+                      ? Number(selectedVerdictId)
+                      : verdicts.length > 0
+                        ? verdicts[0].id
+                        : undefined;
+                    await ticketsApi.updateStatus(targetTicketId, {
+                      status: "Solucionado",
+                      verdictId: finalVerdictId,
+                      reason:
+                        closeReason.trim() ||
+                        `Cerrado tras registrar solicitud de retiro ${WITHDRAWAL_FORM_CONTROL.code} · ${done.withdrawal.number}`,
+                    });
+                    receipts.done({
+                      action: "cerrar-ticket",
+                      title: "Ticket cerrado y solucionado",
+                      detail: `El ticket quedó solucionado tras el retiro ${done.withdrawal.number}.`,
+                    });
+                    onTicketStatusChanged?.();
+                  } catch (err) {
+                    receipts.failed({
+                      action: "error-cerrar-ticket",
+                      title: "No se pudo cerrar el ticket",
+                      detail: err instanceof ApiError ? err.message : "Error al actualizar estado del ticket",
+                    });
+                  } finally {
+                    setClosingTicket(false);
+                    setShowClosePrompt(false);
+                    setCompletedWithdrawal(null);
+                    onSaved(done);
+                  }
+                }}
+              >
+                <CheckCircle2 className="mr-1 size-3.5" />
+                {closingTicket ? "Cerrando..." : "Sí, cerrar ticket"}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3.5 py-1 text-left">
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3.5">
+              <p className="text-xs leading-relaxed text-zinc-700">
+                La solicitud{" "}
+                <strong className="font-mono font-semibold text-zinc-900">
+                  {completedWithdrawal.withdrawal.number}
+                </strong>{" "}
+                ({WITHDRAWAL_FORM_CONTROL.code}) quedó registrada correctamente.
+              </p>
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+                Puedes mantener el ticket abierto o darlo por resuelto indicando el veredicto oficial.
               </p>
             </div>
+
+            {verdicts.length > 0 && (
+              <SelectField
+                size="sm"
+                label="Veredicto de resolución"
+                required
+                value={selectedVerdictId}
+                onChange={setSelectedVerdictId}
+                options={verdicts.map((v) => ({
+                  value: String(v.id),
+                  label: v.name,
+                }))}
+              />
+            )}
+
+            <TextField
+              size="sm"
+              label="Comentario de cierre"
+              required
+              id={`${baseId}-close-reason`}
+              value={closeReason}
+              onChange={(e) => setCloseReason(e.target.value)}
+              placeholder="Motivo o comentario de resolución..."
+            />
           </div>
-        </FormSection>
-      </form>
-    </Modal>
+        </Modal>
+      )}
+    </>
   );
 }

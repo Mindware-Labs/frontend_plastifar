@@ -37,6 +37,7 @@ import { DocumentDropdown } from "../../components/app/DocumentDropdown";
 import { exportClaimToExcel } from "../../lib/claimExcelExport";
 import { exportDiscrepancyToExcel } from "../../lib/discrepancyExcelExport";
 import { exportHcaToExcel } from "../../lib/hcaExcelExport";
+import { exportWithdrawalToExcel } from "../../lib/withdrawalExcelExport";
 import { buildHcaHechoText, hcaProductLabel } from "../../lib/hcaForm109";
 import { formatAmount } from "../../lib/numbers";
 import { isPlanItemOverdue, isPlanItemSettled } from "../../lib/quality";
@@ -72,21 +73,6 @@ interface CommonExtractedData {
     unitPrice: string;
     productName?: string;
   }>;
-}
-
-async function downloadWorkbook(wb: any, filename: string) {
-  const buffer = await wb.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChanged }: TicketFormsTabProps) {
@@ -369,35 +355,12 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
 
   const handleExportExcel = async (form: NonNullable<typeof activeForm>) => {
     try {
-      const ExcelJSModule = await import("exceljs");
-      const ExcelJS = ExcelJSModule.default || ExcelJSModule;
-      const wb = new ExcelJS.Workbook();
-
       if (form.type === "discrepancia") {
         await exportDiscrepancyToExcel(form.data as DiscrepancyDetail);
       } else if (form.type === "reclamacion") {
         await exportClaimToExcel(form.data as CustomerClaim);
       } else if (form.type === "retiro") {
-        const w = form.data as MerchandiseWithdrawal;
-        const sheet = wb.addWorksheet("PF-FOR-068");
-        sheet.columns = [
-          { header: "Código", key: "code", width: 14 },
-          { header: "Descripción", key: "name", width: 34 },
-          { header: "Cantidad", key: "qty", width: 14 },
-          { header: "Unidad", key: "unit", width: 12 },
-          { header: "Empaque", key: "pack", width: 16 },
-          { header: "Precio", key: "price", width: 14 },
-        ];
-        sheet.addRow(["PLASTIFAR, S.A."]);
-        sheet.addRow(["Formulario de Retiro de Mercancía - PF-FOR-068"]);
-        sheet.addRow([`Número: ${w.number}`, `Fecha: ${w.requestDate?.slice(0, 10) || ""}`, `Cliente: ${w.clientName || ""}`]);
-        sheet.addRow([`Motivo: ${w.reason || ""}`]);
-        sheet.addRow([]);
-        sheet.addRow(["Código", "Descripción", "Cantidad", "Unidad", "Empaque", "Precio"]);
-        (w.lines || []).forEach((l) => {
-          sheet.addRow([l.productCode, l.productName, l.quantity, l.quantityUnit, l.packDetail, l.unitPrice]);
-        });
-        await downloadWorkbook(wb, `PF-FOR-068_${w.number}.xlsx`);
+        await exportWithdrawalToExcel(form.data as MerchandiseWithdrawal);
       } else if (form.type === "hca") {
         const s = form.data as CorrectiveActionSheet;
         await exportHcaToExcel(s, hcaPlanBySheetId[s.id]);
@@ -679,6 +642,37 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     );
   }
 
+  // RENDER MODO PÁGINA: Si el usuario inició o está editando el retiro de mercancía
+  if (withdrawalModalOpen) {
+    return (
+      <div className="mt-3.5 w-full">
+        <WithdrawalFormModal
+          inline
+          withdrawal={editingWithdrawal}
+          ticketId={ticket.id}
+          ticketNumber={ticket.number}
+          ticketClientName={ticket.clientName ?? undefined}
+          ticketProducts={ticket.products}
+          initialLines={withdrawalInitialLines}
+          ticketStatus={ticket.status}
+          onTicketStatusChanged={onTicketStatusChanged}
+          onClose={() => {
+            setWithdrawalModalOpen(false);
+            setEditingWithdrawal(undefined);
+            setWithdrawalInitialLines(undefined);
+          }}
+          onSaved={() => {
+            setWithdrawalModalOpen(false);
+            setEditingWithdrawal(undefined);
+            setWithdrawalInitialLines(undefined);
+            fetchAllForms();
+            onTicketStatusChanged?.();
+          }}
+        />
+      </div>
+    );
+  }
+
   // RENDER MODO PÁGINA: Si el usuario inició o está editando la discrepancia de cargas
   if (discrepancyModalOpen) {
     return (
@@ -896,6 +890,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                   </Button>
 
                   {activeForm.type === "reclamacion" ||
+                  activeForm.type === "retiro" ||
                   activeForm.type === "discrepancia" ||
                   activeForm.type === "hca" ? (
                     <Button
@@ -1149,54 +1144,122 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                   const w = activeForm.data as MerchandiseWithdrawal;
                   return (
                     <div className="space-y-4">
-                      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 rounded-lg bg-zinc-50 p-3.5 text-xs">
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Número</dt>
-                          <dd className="mt-0.5 font-mono font-medium text-zinc-800">{w.number}</dd>
+                      {/* Executive Summary Cards */}
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            No. Solicitud
+                          </span>
+                          <p className="mt-1 font-mono text-sm font-bold text-zinc-900">{w.number}</p>
+                          <span className="text-[10.5px] text-zinc-500">Formato oficial PF-FOR-068</span>
                         </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Fecha Solicitud</dt>
-                          <dd className="mt-0.5 font-medium text-zinc-800">{formatDay(w.requestDate)}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Motivo</dt>
-                          <dd className="mt-0.5 font-medium text-zinc-800">{w.reason}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Valor Total</dt>
-                          <dd className="mt-0.5 font-semibold text-zinc-900">
-                            {w.currency ? formatAmount(w.totalValue, w.currency) : w.totalValue}
-                          </dd>
-                        </div>
-                      </dl>
 
-                      <div>
-                        <h4 className="text-xs font-semibold text-zinc-800 mb-2">Productos a retirar ({w.lines.length})</h4>
-                        <div className="overflow-x-auto rounded-lg border border-zinc-200">
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Fecha & motivo
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900">{formatDay(w.requestDate)}</p>
+                          <span className="text-[10.5px] text-zinc-500 block truncate" title={w.reason}>
+                            {w.reason}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Vendedor & origen
+                          </span>
+                          <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{w.requestedByName}</p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            Origen: {w.errorOrigin ?? "Sin especificar"}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Valor total & estado
+                          </span>
+                          <p className="mt-1 text-sm font-semibold tabular-nums text-zinc-900">
+                            {w.currency ? formatAmount(w.totalValue, w.currency) : w.totalValue}
+                          </p>
+                          <span className="mt-0.5 inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-zinc-500">
+                            <WithdrawalStatusBadge status={w.status} />
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Productos a retirar */}
+                      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                        <div className="flex items-center justify-between border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5">
+                          <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-zinc-700">
+                            Productos a retirar ({w.lines.length})
+                          </h4>
+                          <span className="text-[11px] text-zinc-500">Renglones de la solicitud PF-FOR-068</span>
+                        </div>
+                        <div className="overflow-x-auto">
                           <table className="w-full text-left text-xs">
-                            <thead className="bg-zinc-50 text-[10.5px] uppercase font-bold text-zinc-500 border-b border-zinc-200">
+                            <thead className="border-b border-zinc-200/80 bg-zinc-50/80 text-[10.5px] font-bold uppercase text-zinc-500">
                               <tr>
-                                <th className="p-2.5">Código</th>
-                                <th className="p-2.5">Producto</th>
-                                <th className="p-2.5 text-right">Cant. Solicitada</th>
-                                <th className="p-2.5 text-right">Cant. Retirada</th>
-                                <th className="p-2.5 text-right">P. Unitario</th>
-                                <th className="p-2.5 text-right">Valor</th>
+                                <th className="p-3">Código</th>
+                                <th className="p-3">Descripción</th>
+                                <th className="p-3 text-right">Cant.</th>
+                                <th className="p-3">Unid / Empaque</th>
+                                <th className="p-3 text-right">P. Unit.</th>
+                                <th className="p-3 text-right">Valor</th>
+                                {w.status === "Retirado" && <th className="p-3 text-right">Retirado</th>}
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-100 text-zinc-700">
                               {w.lines.map((l) => (
-                                <tr key={l.id} className="hover:bg-zinc-50/50">
-                                  <td className="p-2.5 font-mono text-[11px] text-zinc-500">{l.productCode}</td>
-                                  <td className="p-2.5 font-medium text-zinc-800">{l.productName}</td>
-                                  <td className="p-2.5 text-right font-medium">{l.quantity} {l.quantityUnit}</td>
-                                  <td className="p-2.5 text-right">{l.withdrawnQuantity !== null ? `${l.withdrawnQuantity} ${l.quantityUnit}` : "—"}</td>
-                                  <td className="p-2.5 text-right">{l.unitPrice !== null ? formatAmount(l.unitPrice, w.currency ?? "DOP") : "—"}</td>
-                                  <td className="p-2.5 text-right font-semibold">{l.lineValue !== null ? formatAmount(l.lineValue, w.currency ?? "DOP") : "—"}</td>
+                                <tr key={l.id} className="transition-colors hover:bg-zinc-50/50">
+                                  <td className="p-3 font-mono text-[11px] font-semibold text-zinc-600">
+                                    {l.productCode}
+                                  </td>
+                                  <td className="p-3 font-semibold text-zinc-900">{l.productName}</td>
+                                  <td className="p-3 text-right font-medium tabular-nums">
+                                    {l.quantity} <span className="text-zinc-500">{l.quantityUnit}</span>
+                                  </td>
+                                  <td className="p-3 font-mono text-[11px] text-zinc-600">{l.packDetail || "—"}</td>
+                                  <td className="p-3 text-right tabular-nums">
+                                    {l.unitPrice !== null ? formatAmount(l.unitPrice, w.currency ?? "DOP") : "—"}
+                                  </td>
+                                  <td className="p-3 text-right font-semibold tabular-nums text-zinc-900">
+                                    {l.lineValue !== null ? formatAmount(l.lineValue, w.currency ?? "DOP") : "—"}
+                                  </td>
+                                  {w.status === "Retirado" && (
+                                    <td className="p-3 text-right tabular-nums">
+                                      {l.withdrawnQuantity !== null ? `${l.withdrawnQuantity} ${l.quantityUnit}` : "—"}
+                                    </td>
+                                  )}
                                 </tr>
                               ))}
                             </tbody>
                           </table>
+                        </div>
+                      </div>
+
+                      {/* Firmas del documento PF-FOR-068 */}
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="rounded-xl border border-zinc-200 bg-white p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Firma Vendedor
+                          </span>
+                          <p className="mt-1 text-xs font-semibold text-zinc-900">{w.requestedByName || "—"}</p>
+                        </div>
+                        <div className="rounded-xl border border-zinc-200 bg-white p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Firma Almacén
+                          </span>
+                          <p className="mt-1 text-xs font-semibold text-zinc-900">
+                            {w.warehouseStaffName || "Pendiente de retiro"}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-zinc-200 bg-white p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Firma Cliente
+                          </span>
+                          <p className="mt-1 text-xs font-semibold text-zinc-900">
+                            {w.customerSignerName || "Pendiente de retiro"}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -1395,11 +1458,15 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                                 }`}
                               >
                                 <div className="flex items-start gap-3 min-w-0 flex-1">
-                                  <span className={`flex size-5 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold ${
-                                    isPositive ? "bg-amber-200 text-amber-900" : "bg-zinc-100 text-zinc-600"
-                                  }`}>
-                                    {String(chk.itemNumber).padStart(2, "0")}
-                                  </span>
+                                  {isPositive ? (
+                                    <span className="flex size-5 shrink-0 items-center justify-center rounded bg-amber-100 font-mono text-[10px] font-bold text-amber-900">
+                                      {String(chk.itemNumber).padStart(2, "0")}
+                                    </span>
+                                  ) : (
+                                    <span className="flex size-5 shrink-0 items-center justify-center rounded bg-zinc-100 font-mono text-[10px] font-bold text-zinc-600">
+                                      {String(chk.itemNumber).padStart(2, "0")}
+                                    </span>
+                                  )}
                                   <p className="text-xs text-zinc-700 leading-relaxed">
                                     {chk.text}
                                   </p>
@@ -1762,20 +1829,6 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       )}
 
       {/* FORM MODALS */}
-      {/* 1. Retiro Modal */}
-      {withdrawalModalOpen && (
-        <WithdrawalFormModal
-          withdrawal={editingWithdrawal}
-          fixedTicketId={ticket.id}
-          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
-          initialLines={withdrawalInitialLines}
-          onClose={() => setWithdrawalModalOpen(false)}
-          onSaved={() => {
-            setWithdrawalModalOpen(false);
-            fetchAllForms();
-          }}
-        />
-      )}
 
 
       {/* 5. Modal para elegir nuevo formulario */}
