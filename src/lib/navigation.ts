@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Star,
   Tag,
+  ListTodo,
   Ticket as TicketIcon,
   Trash2,
   Users,
@@ -146,6 +147,13 @@ export const SIDEBAR_NAV: NavGroup[] = [
    * dias no cuentan, con que texto escribe y por que buzon—. Ninguno es un dato
    * que alguien consulte mientras hace su trabajo.
    */
+  {
+    label: "Tareas",
+    icon: ListTodo,
+    section: "Gestión",
+    permission: "tasks.read",
+    to: "/tareas",
+  },
   {
     label: "Clientes",
     icon: Building2,

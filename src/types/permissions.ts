@@ -58,6 +58,10 @@ export type PermissionKey =
   | "withdrawals.read"
   | "withdrawals.write"
   | "withdrawals.approve"
+  // Tareas independientes. Espejo de PermissionCatalog.Tasks*.
+  | "tasks.read"
+  | "tasks.write"
+  | "tasks.close"
   | "reports.read"
   | "settings.write";
 

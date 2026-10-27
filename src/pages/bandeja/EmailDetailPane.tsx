@@ -28,6 +28,7 @@ import { TicketChip } from "../../components/app/TicketChip";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useNoticeInset, useReceipts } from "../../context/useReceipts";
+import { usePermissions } from "../../hooks/usePermissions";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
 import { Button } from "../../components/shadcn/button";
 import { Separator } from "../../components/shadcn/separator";
@@ -48,6 +49,8 @@ import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { DELIVERY_LABELS, initialsFromName } from "../../lib/format";
 import { CreateTicketModal } from "../tickets/CreateTicketModal";
+import { CreateTaskChip } from "../tasks/CreateTaskChip";
+import { TaskFormModal } from "../tasks/TaskFormModal";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { CannedPicker } from "./CannedPicker";
 import { textToBlocks } from "./textToBlocks";
@@ -250,6 +253,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+  const canCreateTask = usePermissions().can("tasks.write");
   const [justCreatedTicketId, setJustCreatedTicketId] = useState<number | null>(null);
   const [moving, setMoving] = useState(false);
   const [starring, setStarring] = useState(false);
@@ -806,6 +811,13 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             active={isCreateTicketModalOpen}
             onCreate={() => setIsCreateTicketModalOpen(true)}
           />
+
+          {canCreateTask && (
+            <CreateTaskChip
+              active={isCreateTaskModalOpen}
+              onCreate={() => setIsCreateTaskModalOpen(true)}
+            />
+          )}
 
           <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-line" />
 
@@ -1507,6 +1519,34 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               title: "Ticket creado",
               detail: `${created.code} · ${created.subject}`,
             });
+          }}
+        />
+      )}
+
+      {isCreateTaskModalOpen && email && (
+        <TaskFormModal
+          prefill={{
+            emailId: email.id,
+            title: email.subject || "",
+            instructions: email.bodyText || "",
+            senderEmail: email.fromEmail,
+            attachments: email.attachments.map((file) => ({
+              id: file.id,
+              fileName: file.fileName,
+              sizeBytes: file.sizeBytes,
+              available: file.available,
+              dangerous: file.dangerous,
+            })),
+          }}
+          onClose={() => setIsCreateTaskModalOpen(false)}
+          onSaved={(task) => {
+            setIsCreateTaskModalOpen(false);
+            receipts.done({
+              action: "crear-tarea",
+              title: "Tarea creada",
+              detail: `${task.number} · ${task.title}`,
+            });
+            navigate(`/tareas/${task.id}`);
           }}
         />
       )}

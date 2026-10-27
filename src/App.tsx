@@ -6,6 +6,8 @@ import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ClaimDetailPage } from "./pages/claims/ClaimDetailPage";
+import { TaskDetailPage } from "./pages/tasks/TaskDetailPage";
+import { TasksPage } from "./pages/tasks/TasksPage";
 import { ClaimPrintPage } from "./pages/claims/ClaimPrintPage";
 import { ClaimsPage } from "./pages/claims/ClaimsPage";
 import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
@@ -119,6 +121,11 @@ export default function App() {
             settings.write y lo comprueba el servidor en cada endpoint. */}
         <Route path="/departamentos" element={<DepartmentsPage />} />
         <Route path="/sedes" element={<SedesPage />} />
+
+        <Route element={<PermissionRoute permission="tasks.read"><Outlet /></PermissionRoute>}>
+          <Route path="/tareas" element={<TasksPage />} />
+          <Route path="/tareas/:id" element={<TaskDetailPage />} />
+        </Route>
 
         <Route element={<PermissionRoute permission="clients.read"><Outlet /></PermissionRoute>}>
           <Route path="/clientes" element={<ClientsPage />} />
