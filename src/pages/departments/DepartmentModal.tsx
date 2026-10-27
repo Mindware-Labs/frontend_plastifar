@@ -16,7 +16,7 @@ import {
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { applyServerError, type ServerErrorRule } from "../../lib/formErrors";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
@@ -177,8 +177,7 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
 
   return (
     <Modal
-      maxWidth="max-w-xl"
-      eyebrow={isEdit ? `Departamento #${department.id}` : "Organización"}
+      size="lg"
       title={isEdit ? `Editar ${department.name}` : "Nuevo departamento"}
       description={
         isEdit
@@ -189,7 +188,8 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <ShortcutModalFooter
+        <FormModalFooter
+          shortcut
           formId="department-form"
           isEdit={isEdit}
           createLabel="Crear departamento"

@@ -212,13 +212,12 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      eyebrow="Configuración"
       title="Avisos y notificaciones"
       description="Cómo te enteras de lo que llega. Se guardan en este navegador y cada persona decide los suyos."
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={requestClose}
-      maxWidth="max-w-[500px]"
+      size="md"
       footer={
         <div className="flex w-full items-center justify-between">
           <span className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-400">
@@ -227,8 +226,8 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
             </kbd>
             <span>para cerrar</span>
           </span>
-          <Button size="sm" onClick={requestClose}>
-            Listo
+          <Button variant="secondary" onClick={requestClose}>
+            Cerrar
           </Button>
         </div>
       }

@@ -122,14 +122,13 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   if (step === "listo") {
     return (
       <Modal
-        eyebrow="Mi cuenta"
         title="Contraseña actualizada"
         onClose={onClose}
         isExiting={isExiting}
         onRequestClose={requestClose}
         footer={
-          <Button type="button" onClick={requestClose}>
-            Entendido
+          <Button type="button" variant="secondary" onClick={requestClose}>
+            Cerrar
           </Button>
         }
       >
@@ -144,9 +143,8 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   if (step === "actual") {
     return (
       <Modal
-        eyebrow="Mi cuenta · Paso 1 de 2"
         title="Confirma tu contraseña"
-        description="Antes de cambiarla, escribe la contraseña con la que entras hoy."
+        description="Paso 1 de 2 · Antes de cambiarla, escribe la contraseña con la que entras hoy."
         onClose={onClose}
         isExiting={isExiting}
         onRequestClose={requestClose}
@@ -194,9 +192,8 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      eyebrow="Mi cuenta · Paso 2 de 2"
       title="Crea una contraseña"
-      description="Debe cumplir todos los requisitos. Al guardar se cierran tus otras sesiones."
+      description="Paso 2 de 2 · Debe cumplir todos los requisitos. Al guardar se cierran tus otras sesiones."
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={requestClose}

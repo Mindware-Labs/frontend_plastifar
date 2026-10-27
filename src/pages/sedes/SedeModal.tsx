@@ -7,7 +7,7 @@ import { sedesApi } from "../../api/sedes";
 import { Alert } from "../../components/ui/Alert";
 import { CheckboxField, TextAreaField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { Sede } from "../../types/sedes";
 import { FormDivider } from "../../components/ui/FormDivider";
@@ -94,8 +94,7 @@ export function SedeModal({ sede, onClose, onSaved }: SedeModalProps) {
 
   return (
     <Modal
-      maxWidth="max-w-md"
-      eyebrow={isEdit ? `Sede #${sede.id}` : "Organización"}
+      size="sm"
       title={isEdit ? `Editar ${sede.name}` : "Nueva sede"}
       description={
         isEdit
@@ -106,7 +105,8 @@ export function SedeModal({ sede, onClose, onSaved }: SedeModalProps) {
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <ShortcutModalFooter
+        <FormModalFooter
+          shortcut
           formId="sede-form"
           isEdit={isEdit}
           createLabel="Crear sede"

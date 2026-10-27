@@ -1076,7 +1076,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       {confirmingDelete && (
         <ConfirmDialog
-          eyebrow="Papelera"
           icon={Trash2}
           title="Eliminar definitivamente"
           description={
@@ -1097,7 +1096,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       {dangerousToDownload && (
         <ConfirmDialog
-          eyebrow="Adjuntos"
           icon={ShieldAlert}
           title="Archivo potencialmente peligroso"
           description={

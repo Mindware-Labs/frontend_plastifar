@@ -37,7 +37,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 const DAYS_OPTIONS = [
-  { value: "indefinido", label: "Por definir (pregunta 1 de Plastifar)" },
+  { value: "indefinido", label: "Sin definir" },
   { value: "laborables", label: "Días laborables" },
   { value: "calendario", label: "Días calendario" },
 ];
@@ -121,9 +121,9 @@ export function TaskTypeModal({ taskType, onClose, onSaved }: TaskTypeModalProps
   return (
     <Modal
       title={isEdit ? "Editar tipo de tarea" : "Nuevo tipo de tarea"}
-      description="Una acción de la hoja SLA con su plazo. Lo que se guarde aquí lo heredará cada tarea que nazca con este tipo."
+      description="Acción con un plazo de días. Cada tarea de este tipo hereda lo que se guarde aquí."
       onClose={onClose}
-      maxWidth="max-w-2xl"
+      size="xl"
       footer={
         <FormModalFooter
           formId="task-type-form"
@@ -169,7 +169,7 @@ export function TaskTypeModal({ taskType, onClose, onSaved }: TaskTypeModalProps
                   onChange={field.onChange}
                   onBlur={field.onBlur}
                   options={DAYS_OPTIONS}
-                  hint="La hoja SLA dice solo «DIAS». Hasta que Plastifar responda, ningún vencimiento se calcula."
+                  hint="Mientras quede sin definir, las tareas de este tipo no tienen fecha de vencimiento."
                 />
               )}
             />

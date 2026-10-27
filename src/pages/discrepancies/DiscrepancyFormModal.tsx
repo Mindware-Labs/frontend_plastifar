@@ -441,8 +441,8 @@ export function DiscrepancyFormModal({
   }
 
   // Dinamismo de ancho para modal: amplio para la tabla editorial sin apretar columnas ni saltos bruscos
-  const modalMaxWidth =
-    step === 1 ? "max-w-2xl" : "max-w-[96vw] 2xl:max-w-[1720px] w-full";
+  const modalSize =
+    step === 1 ? "xl" : "full";
 
   const ticketInheritedLabel = effectiveTicketClientName
     ? effectiveTicketClientName
@@ -727,12 +727,7 @@ export function DiscrepancyFormModal({
     <>
       <Modal
         closeOnBackdropClick={false}
-        maxWidth={modalMaxWidth}
-        eyebrow={
-          isEdit
-            ? `Investigación #${discrepancy.id} · ${discrepancy.number}`
-            : "PF-FOR-291 · INVESTIGACIÓN DE DISCREPANCIA"
-        }
+        size={modalSize}
         title={isEdit ? `Editar ${discrepancy.number}` : "Nueva investigación de discrepancia"}
         description={
           step === 1

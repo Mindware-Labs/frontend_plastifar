@@ -907,7 +907,6 @@ export function TicketsPage() {
 
       {bulkModal === "asignar" && (
         <Modal
-          eyebrow="Tickets · Acciones en lote"
           title="Asignar tickets"
           description={`Elige quién atenderá los ${selectedIds.size} tickets seleccionados.`}
           onClose={() => {
@@ -964,7 +963,6 @@ export function TicketsPage() {
 
       {bulkModal === "prioridad" && (
         <Modal
-          eyebrow="Tickets · Acciones en lote"
           title="Cambiar prioridad"
           description={`Nueva prioridad para los ${selectedIds.size} tickets seleccionados.`}
           onClose={() => {

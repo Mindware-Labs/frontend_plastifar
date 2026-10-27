@@ -10,7 +10,6 @@ import type { TicketStatusUpdateFlow } from "./useTicketStatusUpdate";
 
 interface TicketStatusUpdateModalProps {
   flow: TicketStatusUpdateFlow;
-  ticketNumber: string;
   settle: boolean;
   availableTransitions: StatusTransitionOption[];
   recipientEmail: string | null;
@@ -19,7 +18,6 @@ interface TicketStatusUpdateModalProps {
 /** Flujo de 3 pasos para veredicto y 2 pasos para otras transiciones. */
 export function TicketStatusUpdateModal({
   flow,
-  ticketNumber,
   settle,
   availableTransitions,
   recipientEmail,
@@ -62,15 +60,6 @@ export function TicketStatusUpdateModal({
   return (
     <Modal
       settle={settle}
-      eyebrow={
-        updateSuccess
-          ? undefined
-          : updateCategory === "veredicto"
-            ? `${ticketNumber} · Paso ${updateStep} de 3`
-            : updateStep === 2
-              ? `${ticketNumber} · Paso 2 de 2`
-              : ticketNumber
-      }
       title={
         updateSuccess
           ? "¡Operación exitosa!"
@@ -93,13 +82,13 @@ export function TicketStatusUpdateModal({
             ? updateStep === 1
               ? "Elige qué hacer con este ticket."
               : updateStep === 2
-                ? "Selecciona el motivo y confirma si deseas notificar al cliente."
-                : "Redacta el comentario del veredicto y adjunta archivos de soporte."
+                ? "Paso 2 de 3 · Selecciona el motivo y confirma si deseas notificar al cliente."
+                : "Paso 3 de 3 · Redacta el comentario del veredicto y adjunta archivos de soporte."
             : updateStep === 1
               ? "Elige qué hacer con este ticket."
-              : "Completa los datos para confirmar."
+              : "Paso 2 de 2 · Completa los datos para confirmar."
       }
-      maxWidth={updateCategory === "veredicto" && updateStep === 3 ? "max-w-lg" : "max-w-md"}
+      size={updateCategory === "veredicto" && updateStep === 3 ? "md" : "sm"}
       onClose={() => {
         if (!transitioning) {
           dismissUpdateStatusModal();
@@ -110,11 +99,10 @@ export function TicketStatusUpdateModal({
           <Button
             key="btn-status-success-close"
             type="button"
-            size="sm"
-            variant="primary"
+            variant="secondary"
             onClick={dismissUpdateStatusModal}
           >
-            Entendido
+            Cerrar
           </Button>
         ) : updateStep === 1 ? (
           <div key="status-step-1" className="animate-plf-header-fade flex items-center justify-end gap-2">
@@ -122,7 +110,6 @@ export function TicketStatusUpdateModal({
               key="btn-status-cancel"
               type="button"
               variant="secondary"
-              size="sm"
               onClick={() => setShowUpdateStatusModal(false)}
             >
               Cancelar
@@ -130,7 +117,6 @@ export function TicketStatusUpdateModal({
             <Button
               key="btn-status-continue"
               type="button"
-              size="sm"
               disabled={!updateTargetStatus && !transitionError}
               tone={transitionError ? "ink" : "primary"}
               toneLabel={transitionError}
@@ -145,7 +131,6 @@ export function TicketStatusUpdateModal({
               key="btn-status-back-1"
               type="button"
               variant="secondary"
-              size="sm"
               disabled={transitioning}
               onClick={() => handleBackToStep(1)}
             >
@@ -155,7 +140,6 @@ export function TicketStatusUpdateModal({
               key="btn-status-continue-step2"
               type="submit"
               form="update-status-step2-form"
-              size="sm"
               disabled={!updateVerdictId && !transitionError}
               tone={transitionError ? "ink" : "primary"}
               toneLabel={transitionError}
@@ -169,7 +153,6 @@ export function TicketStatusUpdateModal({
               key="btn-status-back-2"
               type="button"
               variant="secondary"
-              size="sm"
               disabled={transitioning}
               onClick={() => handleBackToStep(2)}
             >
@@ -179,7 +162,6 @@ export function TicketStatusUpdateModal({
               key="btn-status-confirm-verdict"
               type="submit"
               form="update-status-form"
-              size="sm"
               variant="primary"
               isLoading={transitioning}
               tone={transitionError ? "ink" : "primary"}
@@ -196,7 +178,6 @@ export function TicketStatusUpdateModal({
               key="btn-status-back-other"
               type="button"
               variant="secondary"
-              size="sm"
               disabled={transitioning}
               onClick={() => handleBackToStep(1)}
             >
@@ -206,7 +187,6 @@ export function TicketStatusUpdateModal({
               key="btn-status-confirm-other"
               type="submit"
               form="update-status-form"
-              size="sm"
               variant={updateCategory === "cancelar" ? "danger" : "primary"}
               isLoading={transitioning}
               tone={transitionError ? "ink" : "primary"}

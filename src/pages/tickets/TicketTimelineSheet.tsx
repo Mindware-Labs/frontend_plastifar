@@ -159,7 +159,7 @@ export function TicketTimelineSheet({
       title="Historial"
       onClose={onClose}
       animated
-      panelClassName="relative h-full w-full bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[560px] will-change-[transform,opacity]"
+      size="lg"
       bodyClassName="min-h-0 flex-1 overflow-y-auto px-6 py-5"
       footerClassName="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3"
       footer={({ requestClose }) => (
@@ -194,10 +194,7 @@ export function TicketTimelineSheet({
         <>
           <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
             <div className="min-w-0">
-              <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
-                Tickets · Cronología
-              </p>
-              <h2 className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+              <h2 className="font-heading text-[16px] font-semibold leading-snug tracking-tight text-ink">
                 Historial
               </h2>
               <p className="mt-1 flex items-center gap-2 text-[12px] text-zinc-500">

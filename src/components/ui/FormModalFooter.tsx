@@ -11,6 +11,11 @@ interface FormModalFooterProps {
   cancelLabel?: string;
   isSubmitting: boolean;
   onCancel: () => void;
+  /**
+   * El dialogo guarda tambien con Ctrl + Enter. El atajo se anuncia en el
+   * tooltip y en `aria-keyshortcuts` del boton, no como texto en el pie.
+   */
+  shortcut?: boolean;
   /** Acciones secundarias antes de Cancelar (vista previa, etc.). */
   children?: ReactNode;
 }
@@ -24,6 +29,7 @@ export function FormModalFooter({
   cancelLabel = "Cancelar",
   isSubmitting,
   onCancel,
+  shortcut = false,
   children,
 }: FormModalFooterProps) {
   return (
@@ -32,7 +38,13 @@ export function FormModalFooter({
       <Button type="button" variant="secondary" onClick={onCancel}>
         {cancelLabel}
       </Button>
-      <Button type="submit" form={formId} isLoading={isSubmitting}>
+      <Button
+        type="submit"
+        form={formId}
+        isLoading={isSubmitting}
+        title={shortcut ? "Ctrl + Enter" : undefined}
+        aria-keyshortcuts={shortcut ? "Control+Enter" : undefined}
+      >
         {isEdit ? editLabel : createLabel}
       </Button>
     </>

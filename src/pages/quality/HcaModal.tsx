@@ -20,7 +20,7 @@ import {
 import { FormDivider } from "../../components/ui/FormDivider";
 import { Modal } from "../../components/ui/Modal";
 import { RowAction } from "../../components/ui/RowAction";
-import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { resolveClientLabel, resolveStaffLabel, searchActiveStaff, searchClients } from "../../lib/lookups";
 import { today } from "../../lib/quality";
@@ -197,18 +197,18 @@ export function HcaModal({
   return (
     <Modal
       title={isEdit ? `Editar ${sheet.number}` : "Nueva HCA"}
-      eyebrow={isEdit ? `HCA #${sheet.number} · PF-FOR-109` : "PF-FOR-109 · Hecho, Causa y Acción"}
       description={
         isEdit
-          ? "Actualiza los datos del hallazgo, plazos comprometidos o causas identificadas."
-          : "Documenta la no conformidad detectada. El plan de acción y verificación de eficacia se gestionan desde la ficha."
+          ? "PF-FOR-109 · Actualiza los datos del hallazgo, plazos comprometidos o causas identificadas."
+          : "PF-FOR-109 · Documenta la no conformidad detectada. El plan de acción y verificación de eficacia se gestionan desde la ficha."
       }
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={requestClose}
-      maxWidth="max-w-2xl"
+      size="xl"
       footer={
-        <ShortcutModalFooter
+        <FormModalFooter
+          shortcut
           formId="hca-form"
           isEdit={isEdit}
           createLabel="Crear HCA"

@@ -7,7 +7,6 @@ import { Modal } from "../../../components/ui/Modal";
 import { SAVE_SHORTCUT, pickFiles, textareaClass, validateAttachments } from "./ticketDetailShared";
 
 interface TicketNoteModalProps {
-  ticketNumber: string;
   settle: boolean;
   body: string;
   setBody: Dispatch<SetStateAction<string>>;
@@ -28,7 +27,6 @@ interface TicketNoteModalProps {
 
 /** Escribir una nota es un acto aparte: se pide, se escribe y se cierra. El borrador sobrevive si se cierra sin guardar. */
 export function TicketNoteModal({
-  ticketNumber,
   settle,
   body,
   setBody,
@@ -49,7 +47,6 @@ export function TicketNoteModal({
   return (
     <Modal
       settle={settle}
-      eyebrow={ticketNumber}
       title="Añadir nota interna"
       description={
         <span className="inline-flex flex-wrap items-center gap-2">

@@ -26,7 +26,6 @@ export function MigrateFormModal({
   return (
     <Modal
       title="Cambiar de Formulario"
-      eyebrow="Migración entre procesos de Plastifar"
       description="Selecciona el nuevo formulario empresarial al que deseas cambiar en este ticket."
       onClose={onClose}
     >

@@ -189,8 +189,8 @@ export function TaskTypesSection() {
       {undecided && (
         <div className="mb-3">
           <WarnNotice>
-            Algún tipo tiene el plazo «por definir»: Plastifar no ha dicho si los días son laborables o calendario. Mientras
-            tanto no se calcula ningún vencimiento.
+            Hay tipos sin definir si sus días son laborables o calendario. Sus tareas no tendrán fecha de vencimiento hasta
+            que se defina.
           </WarnNotice>
         </div>
       )}
@@ -238,7 +238,7 @@ export function TaskTypesSection() {
           skeletonRows={pageSize}
           skeletonColumns={6}
           empty={
-            isFiltering ? "Ningún tipo coincide con este filtro o búsqueda." : "Todavía no hay tipos de tarea. La carga inicial trae los 13 de la hoja SLA."
+            isFiltering ? "Ningún tipo coincide con este filtro o búsqueda." : "Todavía no hay tipos de tarea."
           }
           onClear={isFiltering ? clearFilters : undefined}
         >

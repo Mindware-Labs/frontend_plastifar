@@ -7,7 +7,7 @@ import { ticketTopicsApi } from "../../api/ticketTopics";
 import { Alert } from "../../components/ui/Alert";
 import { SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { departmentPathOptions } from "../../lib/departments";
 import { applyServerError } from "../../lib/formErrors";
@@ -120,8 +120,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
 
   return (
     <Modal
-      maxWidth="max-w-xl"
-      eyebrow={isEdit ? `Tickets · Motivo #${topic.id}` : "Tickets · Motivos"}
+      size="lg"
       title={isEdit ? `Editar ${topic.name}` : "Nuevo motivo"}
       description={
         isEdit
@@ -132,7 +131,8 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <ShortcutModalFooter
+        <FormModalFooter
+          shortcut
           formId="motivo-form"
           isEdit={isEdit}
           createLabel="Crear motivo"

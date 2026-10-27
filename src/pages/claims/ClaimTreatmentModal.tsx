@@ -83,14 +83,13 @@ export function ClaimTreatmentModal({ claim, onClose, onSaved }: ClaimTreatmentM
   return (
     <Modal
       title={`Tratamiento de ${claim.ticketNumber}`}
-      eyebrow="IV · Para uso exclusivo del Depto. de Calidad"
       description={
         claim.status === "Registrada"
-          ? "Al guardar por primera vez, la reclamación pasa a «En tratamiento»."
-          : "Para cerrar hacen falta la primera respuesta, la decisión sobre la acción correctiva y la satisfacción del cliente."
+          ? "Sección IV, uso exclusivo de Calidad. Al guardar por primera vez, la reclamación pasa a «En tratamiento»."
+          : "Sección IV, uso exclusivo de Calidad. Para cerrar hacen falta la primera respuesta, la decisión sobre la acción correctiva y la satisfacción del cliente."
       }
       onClose={onClose}
-      maxWidth="max-w-2xl"
+      size="xl"
       footer={
         <>
           <Button type="button" variant="secondary" onClick={onClose}>

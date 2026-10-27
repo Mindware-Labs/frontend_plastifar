@@ -599,7 +599,6 @@ export function TicketTasksTab({
         <ConfirmDialog
           tone="danger"
           icon={Trash2}
-          eyebrow="Tareas internas"
           title="Eliminar tarea"
           description={
             <>

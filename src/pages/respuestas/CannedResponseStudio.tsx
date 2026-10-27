@@ -108,9 +108,7 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={requestClose}
-      panelClassName={`relative h-full bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] transition-all duration-200 ease-out ${
-        isMaximized ? "w-full" : "w-full sm:w-[680px] md:w-[740px] lg:w-[800px]"
-      }`}
+      size={isMaximized ? "full" : "2xl"}
       bodyClassName="flex min-h-0 flex-1 flex-col overflow-y-auto"
       footerClassName="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3.5"
       footer={
@@ -147,13 +145,10 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
         /* Cabecera propia: lleva el conmutador de modo y el boton de maximizar */
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
           <div className="min-w-0">
-            <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
-              Correo · Respuestas rápidas
-            </p>
-            <h2 className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+            <h2 className="font-heading text-[16px] font-semibold leading-snug tracking-tight text-ink">
               {drawerTitle}
             </h2>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-subtle">
+            <p className="mt-1 text-[12.5px] leading-relaxed text-subtle">
               Estructura de correo corporativo para agilizar la atención por soporte.
             </p>
           </div>

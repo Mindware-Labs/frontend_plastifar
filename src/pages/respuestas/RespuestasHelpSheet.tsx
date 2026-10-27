@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
-  X,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/Button";
@@ -29,7 +28,7 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
         if (wantsNew) onNewResponse?.();
       }}
       animated
-      panelClassName="relative h-full w-full bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] transition-all duration-200 ease-out sm:w-[580px] md:w-[640px]"
+      size="xl"
       bodyClassName="flex-1 space-y-6 overflow-y-auto px-6 py-6 text-ink"
       footerClassName="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3.5"
       footer={({ requestClose }) => (
@@ -65,32 +64,7 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
           </div>
         </>
       )}
-      header={({ requestClose }) => (
-        /* Cabecera del Sheet con nueva jerarquía */
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
-          <div className="min-w-0">
-            <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
-              Correo · Respuestas predefinidas
-            </p>
-            <h2 className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
-              ¿Para qué sirven las respuestas rápidas?
-            </h2>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-subtle">
-              Guía de uso y mejores prácticas para el equipo de atención y soporte.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={requestClose}
-            aria-label="Cerrar guía (Esc)"
-            title="Cerrar (Esc)"
-            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      description="Guía de uso y mejores prácticas para el equipo de atención y soporte."
     >
       {/* Introducción / Propósito */}
       <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-4 shadow-2xs">

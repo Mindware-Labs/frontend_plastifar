@@ -86,7 +86,6 @@ export function RolesPage() {
     confirm(role.id, {
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Personal · Roles",
       title: "Eliminar rol",
       description: (
         <>

@@ -8,7 +8,7 @@ import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { ProductLine } from "../../types/settings";
 import { FormDivider } from "../../components/ui/FormDivider";
@@ -107,8 +107,7 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
 
   return (
     <Modal
-      maxWidth="max-w-md"
-      eyebrow={isEdit ? `Línea #${line.id} · ${line.code}` : "Línea de producto"}
+      size="sm"
       title={isEdit ? `Editar ${line.name}` : "Nueva línea de producto"}
       description={
         isEdit
@@ -119,7 +118,8 @@ export function ProductLineModal({ line, onClose, onSaved }: ProductLineModalPro
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <ShortcutModalFooter
+        <FormModalFooter
+          shortcut
           formId="line-form"
           isEdit={isEdit}
           createLabel="Crear línea"

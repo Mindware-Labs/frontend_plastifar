@@ -9,12 +9,11 @@ import type { TicketEditFlow } from "./useTicketEdit";
 
 interface TicketEditModalProps {
   flow: TicketEditFlow;
-  ticketNumber: string;
   settle: boolean;
 }
 
 /** Dialogo "Editar clasificación y detalles". */
-export function TicketEditModal({ flow, ticketNumber, settle }: TicketEditModalProps) {
+export function TicketEditModal({ flow, settle }: TicketEditModalProps) {
   const {
     setShowEditModal,
     editSubject,
@@ -39,22 +38,20 @@ export function TicketEditModal({ flow, ticketNumber, settle }: TicketEditModalP
   return (
     <Modal
       settle={settle}
-      eyebrow={ticketNumber}
       title="Editar clasificación y detalles"
       description="Ajusta el asunto y la clasificación. El SLA se recalcula automáticamente."
-      maxWidth="max-w-md"
+      size="sm"
       onClose={() => {
         if (!savingEdit) setShowEditModal(false);
       }}
       footer={
         <>
-          <Button type="button" variant="secondary" size="sm" disabled={savingEdit} onClick={() => setShowEditModal(false)}>
+          <Button type="button" variant="secondary" disabled={savingEdit} onClick={() => setShowEditModal(false)}>
             Cancelar
           </Button>
           <Button
             type="submit"
             form="edit-ticket-form"
-            size="sm"
             isLoading={savingEdit}
             tone={editError ? "ink" : "primary"}
             toneLabel={editError}

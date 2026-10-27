@@ -51,7 +51,7 @@ export function WithdrawalDecisionModal({ withdrawal, decision, onClose, onSaved
     >
       {withdrawal.errorOrigin && (
         <Alert variant="info">
-          Origen del error: {withdrawal.errorOrigin}. La hoja SLA asigna esta aprobación a{" "}
+          Origen del error: {withdrawal.errorOrigin}. Esta aprobación corresponde a{" "}
           {withdrawal.approvalArea === "ALMACEN" ? "Almacén" : "Ventas Locales"}.
         </Alert>
       )}

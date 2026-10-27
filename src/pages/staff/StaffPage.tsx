@@ -233,7 +233,6 @@ export function StaffPage() {
     setConfirmation({
       tone: "warn",
       icon: LogOut,
-      eyebrow: "Personal",
       title: `Cerrar sesiones de ${members.length} colaboradores`,
       description: (
         <>
@@ -256,7 +255,6 @@ export function StaffPage() {
     setConfirmation({
       tone: "warn",
       icon: UserX,
-      eyebrow: "Personal",
       title: `Desactivar ${members.length} colaboradores`,
       description: (
         <>
@@ -285,7 +283,6 @@ export function StaffPage() {
     setConfirmation({
       tone: "warn",
       icon: UserX,
-      eyebrow: "Personal",
       title: "Desactivar colaborador",
       description: (
         <>
@@ -303,7 +300,6 @@ export function StaffPage() {
     setConfirmation({
       tone: "warn",
       icon: UserCheck,
-      eyebrow: "Personal",
       title: "Reactivar colaborador",
       description: (
         <>
@@ -321,7 +317,6 @@ export function StaffPage() {
     setConfirmation({
       tone: "warn",
       icon: LogOut,
-      eyebrow: "Personal",
       title: "Cerrar sesiones",
       description: (
         <>
@@ -339,7 +334,6 @@ export function StaffPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Personal",
       title: "Eliminar colaborador",
       description: (
         <>

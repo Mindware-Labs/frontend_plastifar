@@ -7,7 +7,7 @@ import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { Alert } from "../../components/ui/Alert";
 import { TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { applyServerError } from "../../lib/formErrors";
 import type { SaveTicketVerdictRequest, TicketVerdictResponse } from "../../types/api";
@@ -97,8 +97,7 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
 
   return (
     <Modal
-      maxWidth="max-w-xl"
-      eyebrow={isEdit ? `Tickets · Veredicto #${verdict.id}` : "Tickets · Veredictos"}
+      size="lg"
       title={isEdit ? `Editar ${verdict.name}` : "Nuevo veredicto"}
       description={
         isEdit
@@ -109,7 +108,8 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <ShortcutModalFooter
+        <FormModalFooter
+          shortcut
           formId="veredicto-form"
           isEdit={isEdit}
           createLabel="Crear veredicto"

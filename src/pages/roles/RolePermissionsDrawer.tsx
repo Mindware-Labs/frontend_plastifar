@@ -246,9 +246,8 @@ export function RolePermissionsDrawer({
     <>
       <Drawer
         title={role.name}
-        eyebrow={`Personal · Rol #${role.id}`}
         onClose={handleCloseRequest}
-        maxWidth="max-w-2xl"
+        size="xl"
         footer={
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-[12px] text-zinc-500">

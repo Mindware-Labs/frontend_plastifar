@@ -408,7 +408,6 @@ export function ReportsPage() {
 
       {isPanelOpen && (
         <Drawer
-          eyebrow="Reportes"
           title="Generar reporte"
           description="Elige el reporte y acota lo que quieras medir."
           onClose={() => setPanelOpen(false)}

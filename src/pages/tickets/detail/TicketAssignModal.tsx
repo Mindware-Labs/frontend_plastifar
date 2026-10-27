@@ -6,12 +6,11 @@ import type { TicketAssignFlow } from "./useTicketAssign";
 
 interface TicketAssignModalProps {
   flow: TicketAssignFlow;
-  ticketNumber: string;
   settle: boolean;
 }
 
 /** Dialogo "Asignar ticket". */
-export function TicketAssignModal({ flow, ticketNumber, settle }: TicketAssignModalProps) {
+export function TicketAssignModal({ flow, settle }: TicketAssignModalProps) {
   const {
     setShowAssignModal,
     assignableStaff,
@@ -29,22 +28,20 @@ export function TicketAssignModal({ flow, ticketNumber, settle }: TicketAssignMo
   return (
     <Modal
       settle={settle}
-      eyebrow={ticketNumber}
       title="Asignar ticket"
       description="Solo aparecen colaboradores activos con acceso al departamento del ticket."
-      maxWidth="max-w-md"
+      size="sm"
       onClose={() => {
         if (!assigning) setShowAssignModal(false);
       }}
       footer={
         <>
-          <Button type="button" variant="secondary" size="sm" disabled={assigning} onClick={() => setShowAssignModal(false)}>
+          <Button type="button" variant="secondary" disabled={assigning} onClick={() => setShowAssignModal(false)}>
             Cancelar
           </Button>
           <Button
             type="submit"
             form="assign-ticket-form"
-            size="sm"
             isLoading={assigning}
             tone={assignError ? "ink" : "primary"}
             toneLabel={assignError}

@@ -100,14 +100,12 @@ export function CompleteTaskModal({
       }}
       title="Completar tarea y registrar evidencia"
       description="Deja tus comentarios de resolución y adjunta fotografías, documentos o reportes como evidencia del trabajo realizado."
-      eyebrow={`Tarea #${task.id}`}
-      maxWidth="max-w-lg"
+      size="md"
       footer={
         <>
           <Button
             type="button"
             variant="secondary"
-            size="sm"
             onClick={onClose}
             disabled={saving}
           >
@@ -115,15 +113,14 @@ export function CompleteTaskModal({
           </Button>
           <Button
             type="button"
-            size="sm"
-            disabled={saving}
+            isLoading={saving}
             onClick={handleSubmit}
             tone={error ? "ink" : "primary"}
             toneLabel={error}
             className={error ? "" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"}
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
-            {saving ? "Guardando..." : "Marcar como completada"}
+            Marcar como completada
           </Button>
         </>
       }

@@ -8,7 +8,7 @@ import { territoriesApi } from "../../api/territories";
 import { Alert } from "../../components/ui/Alert";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { Territory } from "../../types/clients";
 import { FormDivider } from "../../components/ui/FormDivider";
@@ -107,8 +107,7 @@ export function TerritoryModal({ territory, onClose, onSaved }: TerritoryModalPr
 
   return (
     <Modal
-      maxWidth="max-w-md"
-      eyebrow={isEdit ? `Territorio #${territory.id} · ${territory.code}` : "Zona comercial"}
+      size="sm"
       title={isEdit ? `Editar ${territory.name}` : "Nuevo territorio"}
       description={
         isEdit
@@ -119,7 +118,8 @@ export function TerritoryModal({ territory, onClose, onSaved }: TerritoryModalPr
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <ShortcutModalFooter
+        <FormModalFooter
+          shortcut
           formId="territory-form"
           isEdit={isEdit}
           createLabel="Crear territorio"

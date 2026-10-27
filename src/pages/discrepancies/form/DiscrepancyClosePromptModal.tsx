@@ -33,16 +33,14 @@ export function DiscrepancyClosePromptModal({
   return (
     <Modal
       title="¿Deseas cerrar este ticket ahora?"
-      eyebrow="PF-FOR-291 · Resolución de Caso"
       onClose={onKeepOpen}
-      maxWidth="max-w-md"
+      size="sm"
       closeOnBackdropClick={false}
       footer={
         <div className="flex items-center justify-end gap-2 w-full">
           <Button
             type="button"
             variant="secondary"
-            size="sm"
             onClick={onKeepOpen}
           >
             Mantener ticket abierto
@@ -50,12 +48,11 @@ export function DiscrepancyClosePromptModal({
           <Button
             type="button"
             variant="primary"
-            size="sm"
-            disabled={closingTicket}
+            isLoading={closingTicket}
             onClick={onCloseTicket}
           >
             <CheckCircle2 className="size-3.5 mr-1" />
-            {closingTicket ? "Cerrando..." : "Sí, cerrar ticket"}
+            Sí, cerrar ticket
           </Button>
         </div>
       }

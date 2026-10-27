@@ -13,9 +13,8 @@ export function NewFormPickerModal({ availableForms, suggestedFormRaw, ticketNum
   return (
     <Modal
       title="Seleccionar Formulario Oficial"
-      eyebrow="Ciclo de Vida del Ticket"
       onClose={onClose}
-      maxWidth="max-w-xl"
+      size="lg"
     >
       <div className="space-y-3 py-1">
         <p className="text-xs text-zinc-500">

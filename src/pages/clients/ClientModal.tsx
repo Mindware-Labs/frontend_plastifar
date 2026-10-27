@@ -22,7 +22,7 @@ import {
 } from "../../components/ui/Field";
 import { FormDivider } from "../../components/ui/FormDivider";
 import { Modal } from "../../components/ui/Modal";
-import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatPhoneNumber } from "../../lib/format";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
@@ -180,8 +180,7 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
 
   return (
     <Modal
-      maxWidth="max-w-xl"
-      eyebrow={isEdit ? `Cliente #${client.id} · ${client.code}` : "Código asignado automáticamente"}
+      size="lg"
       title={isEdit ? `Editar ${client.name}` : "Nuevo cliente"}
       description={
         isEdit
@@ -192,7 +191,8 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <ShortcutModalFooter
+        <FormModalFooter
+          shortcut
           formId="client-form"
           isEdit={isEdit}
           createLabel="Crear cliente"

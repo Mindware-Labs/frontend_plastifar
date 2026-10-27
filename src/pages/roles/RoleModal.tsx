@@ -7,7 +7,7 @@ import { rolesApi } from "../../api/roles";
 import { Alert } from "../../components/ui/Alert";
 import { TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { applyServerError } from "../../lib/formErrors";
 import type { RoleResponse } from "../../types/api";
@@ -95,8 +95,7 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
 
   return (
     <Modal
-      maxWidth="max-w-xl"
-      eyebrow={isEdit ? `Personal · Rol #${role.id}` : "Personal · Roles"}
+      size="lg"
       title={isEdit ? `Editar ${role.name}` : "Nuevo rol"}
       description={
         isEdit
@@ -107,7 +106,8 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <ShortcutModalFooter
+        <FormModalFooter
+          shortcut
           formId="role-form"
           isEdit={isEdit}
           createLabel="Crear rol"

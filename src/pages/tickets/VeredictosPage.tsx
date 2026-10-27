@@ -66,7 +66,6 @@ export function VeredictosPage() {
       ask({
         tone: "danger",
         icon: Ban,
-        eyebrow: "Tickets · Veredictos",
         title: "Desactivar veredicto",
         description: (
           <>
@@ -87,7 +86,6 @@ export function VeredictosPage() {
     ask({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Tickets · Veredictos",
       title: "Eliminar veredicto",
       description: (
         <>

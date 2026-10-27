@@ -385,7 +385,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     }
 
     setConfirmation({
-      eyebrow: "Papelera",
       title: "Eliminar definitivamente",
       description: (
         <>
@@ -406,7 +405,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     const total = counts?.trash.total ?? data?.total ?? 0;
 
     setConfirmation({
-      eyebrow: "Papelera",
       title: "Vaciar la papelera",
       description: (
         <>

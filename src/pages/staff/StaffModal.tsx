@@ -9,7 +9,7 @@ import { Alert } from "../../components/ui/Alert";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { FormDivider } from "../../components/ui/FormDivider";
 import { Modal } from "../../components/ui/Modal";
-import { ShortcutModalFooter } from "../../components/ui/ShortcutModalFooter";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { departmentPathOptions } from "../../lib/departments";
@@ -202,8 +202,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
 
   return (
     <Modal
-      maxWidth="max-w-xl"
-      eyebrow={isEdit ? `Colaborador #${staff.id}` : "Registro de personal"}
+      size="lg"
       title={isEdit ? `Editar ${staff.firstName} ${staff.lastName}` : "Nuevo colaborador"}
       description={
         isEdit
@@ -214,7 +213,8 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <ShortcutModalFooter
+        <FormModalFooter
+          shortcut
           formId="staff-form"
           isEdit={isEdit}
           createLabel="Crear colaborador"

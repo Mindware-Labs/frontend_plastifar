@@ -169,15 +169,13 @@ export function CreateTaskModal({
       }}
       title="Nueva tarea para este ticket"
       description="Asigna una acción interna (investigación, verificación, reclamo con fábrica) a ti o a otro colaborador."
-      eyebrow="Tareas internas"
-      maxWidth="max-w-xl"
+      size="lg"
       footer={
         <>
           {step === 0 ? (
             <Button
               type="button"
               variant="secondary"
-              size="sm"
               onClick={onClose}
               disabled={saving}
             >
@@ -187,7 +185,6 @@ export function CreateTaskModal({
             <Button
               type="button"
               variant="secondary"
-              size="sm"
               onClick={() => goTo(0)}
               disabled={saving}
             >
@@ -198,7 +195,6 @@ export function CreateTaskModal({
           {step === 0 ? (
             <Button
               type="button"
-              size="sm"
               tone={error ? "ink" : "primary"}
               toneLabel={error}
               onClick={handleNext}
@@ -209,14 +205,13 @@ export function CreateTaskModal({
           ) : (
             <Button
               type="submit"
-              size="sm"
-              disabled={saving}
+              isLoading={saving}
               tone={error ? "ink" : "primary"}
               toneLabel={error}
               onClick={handleSubmit}
             >
               <Plus className="h-3.5 w-3.5" />
-              {saving ? "Creando tarea..." : "Crear tarea"}
+              Crear tarea
             </Button>
           )}
         </>

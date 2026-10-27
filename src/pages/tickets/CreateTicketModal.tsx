@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
-import { Building2, Check, Flag, Info, Mail, MessageSquareText, RotateCcw, Tag, X } from "lucide-react";
+import { Building2, Check, Flag, Info, Mail, MessageSquareText, RotateCcw, Tag } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
@@ -272,7 +272,7 @@ export function CreateTicketModal({
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={requestClose}
-      panelClassName="relative h-full w-full bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] sm:w-[620px] md:w-[700px] lg:w-[760px]"
+      size="2xl"
       bodyClassName="flex min-h-0 flex-1 flex-col overflow-y-auto"
       footerClassName="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3.5"
       footer={
@@ -302,34 +302,10 @@ export function CreateTicketModal({
           </div>
         </>
       }
-      header={
-        /* Cabecera: sin baldosa; el pie en versalitas situa la accion y el titulo manda. */
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
-          <div className="min-w-0">
-            <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
-              {emailId ? "Bandeja · Nuevo ticket" : "Tickets · Alta manual"}
-            </p>
-            <h2 className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
-              Crear ticket
-            </h2>
-            <p className="mt-0.5 max-w-[52ch] text-[12px] leading-relaxed text-subtle">
-              {emailId
-                ? "Quedará vinculado a esta conversación. Solo el asunto es obligatorio."
-                : "Para dar seguimiento a una solicitud, consulta o incidencia. Solo el asunto es obligatorio."}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={requestClose}
-            aria-label="Cerrar"
-            title="Cerrar (Esc)"
-            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none
-              transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+      description={
+        emailId
+          ? "Quedará vinculado a esta conversación. Solo el asunto es obligatorio."
+          : "Para dar seguimiento a una solicitud, consulta o incidencia. Solo el asunto es obligatorio."
       }
     >
       {loadingCatalogs ? (

@@ -226,14 +226,13 @@ export function WithdrawalFormModal({
   return (
     <Modal
       title={isEdit ? `Editar ${withdrawal.number}` : "Nueva solicitud de retiro"}
-      eyebrow="PF-FOR-068"
       description={
         isEdit
-          ? "Solo se edita mientras está solicitada. Firmas como vendedor quien la creó."
-          : "Ligada a un ticket con cliente: la empresa se toma del ticket. Firmas como vendedor."
+          ? "PF-FOR-068 · Solo se edita mientras está solicitada. Firmas como vendedor quien la creó."
+          : "PF-FOR-068 · Ligada a un ticket con cliente: la empresa se toma del ticket. Firmas como vendedor."
       }
       onClose={onClose}
-      maxWidth="max-w-3xl"
+      size="2xl"
       footer={
         <FormModalFooter
           formId="withdrawal-form"

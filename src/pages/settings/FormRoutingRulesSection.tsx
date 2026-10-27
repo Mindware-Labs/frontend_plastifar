@@ -221,7 +221,7 @@ export function FormRoutingRulesSection() {
           skeletonRows={pageSize}
           skeletonColumns={5}
           empty={
-            isFiltering ? "Ninguna regla coincide con este filtro." : "Todavía no hay reglas. La carga inicial trae las de la hoja FORMULARIOS."
+            isFiltering ? "Ninguna regla coincide con este filtro." : "Todavía no hay reglas de formulario."
           }
           onClear={isFiltering ? clearFilters : undefined}
         >

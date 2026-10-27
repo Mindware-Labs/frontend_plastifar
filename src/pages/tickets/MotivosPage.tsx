@@ -115,7 +115,6 @@ export function MotivosPage() {
       ask({
         tone: "danger",
         icon: Ban,
-        eyebrow: "Tickets · Motivos",
         title: "Desactivar motivo",
         description: (
           <>
@@ -136,7 +135,6 @@ export function MotivosPage() {
     ask({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Tickets · Motivos",
       title: "Eliminar motivo",
       description: (
         <>

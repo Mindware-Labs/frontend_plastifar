@@ -47,7 +47,6 @@ function AssignWithNoteModal({
 
   return (
     <Modal
-      eyebrow="Asignación de conversación"
       title={`Asignar a ${targetStaffName}`}
       onClose={onClose}
       isExiting={isExiting}

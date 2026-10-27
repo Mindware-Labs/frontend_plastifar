@@ -159,7 +159,7 @@ export function ActionPlanItemModal({
           : `Del plan de ${sheetNumber}. La hoja no se cierra mientras quede una acción sin resolver.`
       }
       onClose={onClose}
-      maxWidth="max-w-xl"
+      size="lg"
       footer={
         <FormModalFooter
           formId="plan-item-form"

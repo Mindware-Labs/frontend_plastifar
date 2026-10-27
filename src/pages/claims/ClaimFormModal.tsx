@@ -285,14 +285,13 @@ export function ClaimFormModal({
   return (
     <Modal
       title={isEdit ? `Editar reclamación de ${ticketNumber}` : `Registrar reclamación de ${ticketNumber}`}
-      eyebrow="PF-FOR-034"
       description={
         isEdit
-          ? "Secciones I a III. El tratamiento de Calidad se edita aparte, desde la ficha."
-          : `Para ${clientName}. Empresa, contacto y teléfonos se toman del ticket; aquí va lo que el ticket no tiene: productos, lote, cantidades y monto.`
+          ? "PF-FOR-034 · Secciones I a III. El tratamiento de Calidad se edita aparte, desde la ficha."
+          : `PF-FOR-034 · Para ${clientName}. Empresa, contacto y teléfonos se toman del ticket; aquí va lo que el ticket no tiene: productos, lote, cantidades y monto.`
       }
       onClose={onClose}
-      maxWidth="max-w-3xl"
+      size="2xl"
       footer={
         <FormModalFooter
           formId="claim-form"

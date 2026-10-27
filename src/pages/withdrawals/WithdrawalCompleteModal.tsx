@@ -95,10 +95,9 @@ export function WithdrawalCompleteModal({ withdrawal, onClose, onSaved, onConfli
   return (
     <Modal
       title={`Registrar el retiro de ${withdrawal.number}`}
-      eyebrow="PF-FOR-068"
-      description={`${withdrawal.clientName}. Firmas como Almacén; la solicitud queda retirada y ya no se edita.`}
+      description={`PF-FOR-068 · ${withdrawal.clientName}. Firmas como Almacén; la solicitud queda retirada y ya no se edita.`}
       onClose={onClose}
-      maxWidth="max-w-2xl"
+      size="xl"
       footer={
         <>
           <Button type="button" variant="secondary" onClick={onClose}>

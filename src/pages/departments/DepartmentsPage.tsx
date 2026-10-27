@@ -634,7 +634,7 @@ export function DepartmentsPage() {
               </select>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setBulkSedeModalOpen(false)}>
+              <Button variant="secondary" onClick={() => setBulkSedeModalOpen(false)}>
                 Cancelar
               </Button>
               <Button

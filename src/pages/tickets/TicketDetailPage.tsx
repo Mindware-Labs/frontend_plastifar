@@ -586,7 +586,6 @@ export function TicketDetailPage() {
 
       {showNoteModal && (
         <TicketNoteModal
-          ticketNumber={ticket.number}
           settle={noteSettle}
           body={noteBody}
           setBody={setNoteBody}
@@ -609,16 +608,15 @@ export function TicketDetailPage() {
       {statusUpdate.showUpdateStatusModal && (
         <TicketStatusUpdateModal
           flow={statusUpdate}
-          ticketNumber={ticket.number}
           settle={updateSettle}
           availableTransitions={availableTransitions}
           recipientEmail={recipientEmail}
         />
       )}
 
-      {assign.showAssignModal && <TicketAssignModal flow={assign} ticketNumber={ticket.number} settle={assignSettle} />}
+      {assign.showAssignModal && <TicketAssignModal flow={assign} settle={assignSettle} />}
 
-      {edit.showEditModal && <TicketEditModal flow={edit} ticketNumber={ticket.number} settle={editSettle} />}
+      {edit.showEditModal && <TicketEditModal flow={edit} settle={editSettle} />}
 
       {/* El mismo visor de la bandeja: se ve dentro y, si hace falta, se descarga desde ahi. */}
       {preview && (

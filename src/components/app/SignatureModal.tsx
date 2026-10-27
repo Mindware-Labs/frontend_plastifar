@@ -86,7 +86,6 @@ export function SignatureModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      eyebrow="Correo"
       title="Tu firma"
       description="Se agrega al final de los correos que envías, debajo de tu nombre."
       onClose={onClose}
@@ -94,10 +93,10 @@ export function SignatureModal({ onClose }: { onClose: () => void }) {
       onRequestClose={requestClose}
       footer={
         <>
-          <Button variant="ghost" size="sm" onClick={requestClose}>
+          <Button variant="secondary" onClick={requestClose}>
             Cancelar
           </Button>
-          <Button size="sm" onClick={handleSave} isLoading={saving} disabled={fields === null}>
+          <Button onClick={handleSave} isLoading={saving} disabled={fields === null}>
             Guardar
           </Button>
         </>

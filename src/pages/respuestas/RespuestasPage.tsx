@@ -50,7 +50,6 @@ export function RespuestasPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Correo · Respuestas",
       title: "Eliminar respuesta",
       description: (
         <>
