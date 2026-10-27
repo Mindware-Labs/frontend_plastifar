@@ -43,6 +43,7 @@ import {
   type FieldState,
 } from "../../components/ui/Field";
 import { LookupSelect, type LookupOption } from "../../components/ui/LookupSelect";
+import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 import { Modal } from "../../components/ui/Modal";
 import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
@@ -1020,9 +1021,9 @@ export function DiscrepancyFormModal({
     const activeExistingLine = discrepancy?.lines?.[activeIndex];
 
     return (
-      <div className="flex flex-col gap-3.5 animate-plf-fade">
+      <div className="flex min-w-0 flex-col gap-3.5 animate-plf-fade">
         {/* Encabezado con divisor oficial y pestañas interactivas */}
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <div className="flex items-center justify-between">
             <FormDivider title="Líneas en discrepancia (Formato PF-FOR-291)" />
             <span className="text-xs font-medium text-zinc-400 select-none">
@@ -1031,8 +1032,22 @@ export function DiscrepancyFormModal({
           </div>
 
           {/* Barra de pestañas interactiva */}
-          <div className="flex items-center justify-between gap-2 border-b border-zinc-200/80 pb-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar flex-1 min-w-0">
+          <div className="animate-plf-tabs-in min-w-0 border-b border-zinc-200/80 pb-2">
+            <FormLineTabStrip
+              activeIndex={safeActiveLineIndex}
+              tabCount={fields.length}
+              trailing={
+                <button
+                  type="button"
+                  onClick={handleAddLine}
+                  className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-dashed border-zinc-300 bg-white/60 px-2.5 py-1.5 text-xs font-medium text-zinc-600 shadow-2xs transition-all hover:border-zinc-400 hover:bg-white hover:text-zinc-900"
+                  title="Agregar otra línea en discrepancia"
+                >
+                  <Plus className="size-3.5 text-zinc-500" />
+                  <span>Agregar línea</span>
+                </button>
+              }
+            >
               {fields.map((field, idx) => {
                 const lineDiscrepancyType = watchLines?.[idx]?.discrepancyType ?? "faltante";
                 const lineQty = Number(watchLines?.[idx]?.quantity) || 0;
@@ -1043,15 +1058,16 @@ export function DiscrepancyFormModal({
                   <button
                     key={field.id}
                     type="button"
+                    {...formLineTabIndexAttr(idx)}
                     onClick={() => setActiveLineIndex(idx)}
-                    className={`group relative inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-all duration-150 cursor-pointer select-none shrink-0 ${
+                    className={`group relative inline-flex shrink-0 cursor-pointer select-none items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition-all duration-150 ${
                       isActive
-                        ? "bg-white text-zinc-900 border border-zinc-200/90 shadow-2xs font-semibold ring-1 ring-zinc-950/5"
-                        : "bg-zinc-100/80 text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800 border border-transparent font-medium"
+                        ? "border-zinc-200/90 bg-white font-semibold text-zinc-900 shadow-2xs ring-1 ring-zinc-950/5"
+                        : "border-transparent bg-zinc-100/80 font-medium text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800"
                     }`}
                   >
                     <span
-                      className={`flex size-4.5 items-center justify-center rounded-md text-[10px] font-bold font-heading ${
+                      className={`flex size-4.5 items-center justify-center rounded-md font-heading text-[10px] font-bold ${
                         isActive ? "bg-zinc-900 text-white" : "bg-zinc-200 text-zinc-600"
                       }`}
                     >
@@ -1062,10 +1078,10 @@ export function DiscrepancyFormModal({
 
                     {lineQty > 0 && (
                       <span
-                        className={`px-1.5 py-0.5 text-[10px] rounded font-semibold tabular-nums leading-none ${
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums leading-none ${
                           lineDiscrepancyType === "sobrante"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                            : "bg-amber-50 text-amber-700 border border-amber-200/60"
+                            ? "border border-emerald-200/60 bg-emerald-50 text-emerald-700"
+                            : "border border-amber-200/60 bg-amber-50 text-amber-700"
                         }`}
                       >
                         {lineDiscrepancyType === "sobrante" ? `+${lineQty}` : `-${lineQty}`}
@@ -1074,7 +1090,7 @@ export function DiscrepancyFormModal({
 
                     {hasError && (
                       <span
-                        className="size-1.5 rounded-full bg-brand-red animate-pulse"
+                        className="size-1.5 animate-pulse rounded-full bg-brand-red"
                         title="Tiene campos pendientes"
                       />
                     )}
@@ -1088,7 +1104,7 @@ export function DiscrepancyFormModal({
                           handleRemoveLine(idx);
                         }}
                         title={`Quitar línea #${idx + 1}`}
-                        className="ml-0.5 -mr-1 p-0.5 rounded hover:bg-rose-100 hover:text-brand-red text-zinc-400 opacity-60 group-hover:opacity-100 transition-all cursor-pointer"
+                        className="-mr-1 ml-0.5 cursor-pointer rounded p-0.5 text-zinc-400 opacity-60 transition-all hover:bg-rose-100 hover:text-brand-red group-hover:opacity-100"
                       >
                         <X className="size-3" />
                       </span>
@@ -1096,18 +1112,7 @@ export function DiscrepancyFormModal({
                   </button>
                 );
               })}
-
-              {/* Botón rápido para agregar otra línea en la misma barra de pestañas */}
-              <button
-                type="button"
-                onClick={handleAddLine}
-                className="inline-flex items-center gap-1 rounded-lg border border-dashed border-zinc-300 hover:border-zinc-400 bg-white/60 hover:bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900 transition-all cursor-pointer shadow-2xs shrink-0"
-                title="Agregar otra línea en discrepancia"
-              >
-                <Plus className="size-3.5 text-zinc-500" />
-                <span>Agregar línea</span>
-              </button>
-            </div>
+            </FormLineTabStrip>
           </div>
         </div>
 

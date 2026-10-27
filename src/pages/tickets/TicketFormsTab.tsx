@@ -34,6 +34,7 @@ import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDay } from "../../lib/dates";
 import { DocumentDropdown } from "../../components/app/DocumentDropdown";
+import { exportClaimToExcel } from "../../lib/claimExcelExport";
 import { exportDiscrepancyToExcel } from "../../lib/discrepancyExcelExport";
 import { exportHcaToExcel } from "../../lib/hcaExcelExport";
 import { buildHcaHechoText, hcaProductLabel } from "../../lib/hcaForm109";
@@ -375,27 +376,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       if (form.type === "discrepancia") {
         await exportDiscrepancyToExcel(form.data as DiscrepancyDetail);
       } else if (form.type === "reclamacion") {
-        const c = form.data as CustomerClaim;
-        const sheet = wb.addWorksheet("PF-FOR-034");
-        sheet.columns = [
-          { header: "Código", key: "code", width: 14 },
-          { header: "Descripción del Producto", key: "name", width: 34 },
-          { header: "Cant. Facturada", key: "invoiced", width: 16 },
-          { header: "Cant. Defectuosa", key: "defective", width: 16 },
-          { header: "Precio Unitario", key: "price", width: 16 },
-          { header: "Monto", key: "total", width: 16 },
-        ];
-        sheet.addRow(["PLASTIFAR, S.A."]);
-        sheet.addRow(["Formulario de Reclamación de Clientes - PF-FOR-034"]);
-        sheet.addRow([`Número: ${c.ticketNumber || c.id}`, `Fecha: ${c.claimDate?.slice(0, 10) || ""}`, `Cliente: ${c.clientName || ""}`]);
-        sheet.addRow([]);
-        sheet.addRow(["Código", "Descripción del Producto", "Cant. Facturada", "Cant. Defectuosa", "Precio Unitario", "Monto"]);
-        (c.lines || []).forEach((l) => {
-          sheet.addRow([l.productCode, l.productName, l.invoicedQuantity, l.defectiveQuantity, l.unitPrice, l.lineTotal]);
-        });
-        sheet.addRow([]);
-        sheet.addRow([`Observaciones: ${c.description || ""}`]);
-        await downloadWorkbook(wb, `PF-FOR-034_${c.ticketNumber || c.id}.xlsx`);
+        await exportClaimToExcel(form.data as CustomerClaim);
       } else if (form.type === "retiro") {
         const w = form.data as MerchandiseWithdrawal;
         const sheet = wb.addWorksheet("PF-FOR-068");
@@ -661,6 +642,43 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     );
   }
 
+  // RENDER MODO PÁGINA: reclamación PF-FOR-034
+  if (claimModalOpen) {
+    return (
+      <div className="mt-3.5 w-full">
+        <ClaimFormModal
+          inline
+          ticketId={ticket.id}
+          ticketNumber={ticket.number}
+          ticketTopicId={ticket.topicId}
+          clientName={ticket.clientName ?? "Cliente"}
+          contactName={ticket.contactName ?? ticket.clientContactPersonName}
+          contactPhone={ticket.contactPhone}
+          clientPhone={ticket.clientPhone}
+          clientContactPersonName={ticket.clientContactPersonName}
+          ticketProducts={ticket.products}
+          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
+          ticketStatus={ticket.status}
+          onTicketStatusChanged={onTicketStatusChanged}
+          claim={editingClaim}
+          initialData={claimInitialData}
+          onClose={() => {
+            setClaimModalOpen(false);
+            setEditingClaim(undefined);
+            setClaimInitialData(undefined);
+          }}
+          onSaved={() => {
+            setClaimModalOpen(false);
+            setEditingClaim(undefined);
+            setClaimInitialData(undefined);
+            fetchAllForms();
+            onTicketStatusChanged?.();
+          }}
+        />
+      </div>
+    );
+  }
+
   // RENDER MODO PÁGINA: Si el usuario inició o está editando la discrepancia de cargas
   if (discrepancyModalOpen) {
     return (
@@ -877,7 +895,9 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                     Llenar otro formulario
                   </Button>
 
-                  {activeForm.type === "discrepancia" || activeForm.type === "hca" ? (
+                  {activeForm.type === "reclamacion" ||
+                  activeForm.type === "discrepancia" ||
+                  activeForm.type === "hca" ? (
                     <Button
                       size="sm"
                       variant="secondary"
@@ -1004,60 +1024,116 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                 {/* 1. RECLAMACIÓN DETAILS */}
                 {activeForm.type === "reclamacion" && (() => {
                   const c = activeForm.data as CustomerClaim;
+                  const reasonLabel = c.reasonOther ? `${c.reason} (${c.reasonOther})` : c.reason;
+
                   return (
                     <div className="space-y-4">
-                      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 rounded-lg bg-zinc-50 p-3.5 text-xs">
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Fecha Reclamo</dt>
-                          <dd className="mt-0.5 font-medium text-zinc-800">{formatDay(c.claimDate)}</dd>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Código reclamación
+                          </span>
+                          <p className="mt-1 font-mono text-sm font-bold text-zinc-900">{c.ticketNumber}</p>
+                          <span className="text-[10.5px] text-zinc-500">Formato oficial PF-FOR-034</span>
                         </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Factura</dt>
-                          <dd className="mt-0.5 font-medium text-zinc-800">{c.invoiceRef || "—"}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Motivo</dt>
-                          <dd className="mt-0.5 font-medium text-zinc-800">{c.reason} {c.reasonOther ? `(${c.reasonOther})` : ""}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-heading text-[10px] font-bold uppercase text-zinc-400">Monto Total</dt>
-                          <dd className="mt-0.5 font-semibold text-zinc-900">
-                            {c.currency ? formatAmount(c.totalAmount, c.currency) : c.totalAmount}
-                          </dd>
-                        </div>
-                      </dl>
 
-                      {c.description && (
-                        <div className="rounded-lg border border-zinc-100 bg-zinc-50/50 p-3 text-xs">
-                          <span className="font-heading text-[10px] font-bold uppercase text-zinc-400">Descripción:</span>
-                          <p className="mt-1 text-zinc-700 whitespace-pre-wrap">{c.description}</p>
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Fecha del caso
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900">{formatDay(c.claimDate)}</p>
+                          <span className="text-[10.5px] text-zinc-500 truncate block" title={reasonLabel}>
+                            Motivo: {reasonLabel}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Recepción
+                          </span>
+                          <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{c.receivedByName}</p>
+                          <span className="text-[10.5px] text-zinc-500">Recibida {formatDay(c.receivedAt)}</span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Monto & estado
+                          </span>
+                          <p className="mt-1 text-sm font-semibold tabular-nums text-zinc-900">
+                            {c.currency ? formatAmount(c.totalAmount, c.currency) : c.totalAmount}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500 inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            {c.invoiceRef ? `Factura ${c.invoiceRef}` : "Sin factura"}
+                            <ClaimStatusBadge status={c.status} />
+                          </span>
+                        </div>
+                      </div>
+
+                      {c.description?.trim() && (
+                        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-2xs">
+                          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                            <FileText className="size-3.5 text-zinc-400" />
+                            <span>Descripción de la reclamación</span>
+                          </div>
+                          <p className="mt-2.5 whitespace-pre-wrap text-xs leading-relaxed text-zinc-800">
+                            {c.description}
+                          </p>
                         </div>
                       )}
 
-                      {/* Lines preview */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-zinc-800 mb-2">Líneas de producto ({c.lines.length})</h4>
-                        <div className="overflow-x-auto rounded-lg border border-zinc-200">
+                      {c.comments?.trim() && (
+                        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-2xs">
+                          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                            <FileText className="size-3.5 text-zinc-400" />
+                            <span>Comentarios</span>
+                          </div>
+                          <p className="mt-2.5 whitespace-pre-wrap text-xs leading-relaxed text-zinc-800">
+                            {c.comments.trim()}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5">
+                          <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-zinc-700">
+                            Productos reclamados ({c.lines.length})
+                          </h4>
+                          <span className="text-[11px] text-zinc-500">Cantidades y montos por línea</span>
+                        </div>
+                        <div className="overflow-x-auto">
                           <table className="w-full text-left text-xs">
-                            <thead className="bg-zinc-50 text-[10.5px] uppercase font-bold text-zinc-500 border-b border-zinc-200">
+                            <thead className="border-b border-zinc-200/80 bg-zinc-50/80 text-[10.5px] font-bold uppercase text-zinc-500">
                               <tr>
-                                <th className="p-2.5">Código</th>
-                                <th className="p-2.5">Producto</th>
-                                <th className="p-2.5 text-right">Facturado</th>
-                                <th className="p-2.5 text-right">Recibido</th>
-                                <th className="p-2.5 text-right">Defectuoso</th>
-                                <th className="p-2.5 text-right">P. Unitario</th>
+                                <th className="p-3">Producto</th>
+                                <th className="p-3 text-right">Facturado</th>
+                                <th className="p-3 text-right">Recibido</th>
+                                <th className="p-3 text-right">Defectuoso</th>
+                                <th className="p-3 text-right">P. unitario</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-100 text-zinc-700">
                               {c.lines.map((l) => (
-                                <tr key={l.id} className="hover:bg-zinc-50/50">
-                                  <td className="p-2.5 font-mono text-[11px] text-zinc-500">{l.productCode}</td>
-                                  <td className="p-2.5 font-medium text-zinc-800">{l.productName}</td>
-                                  <td className="p-2.5 text-right">{l.invoicedQuantity ?? "—"}</td>
-                                  <td className="p-2.5 text-right">{l.receivedQuantity ?? "—"}</td>
-                                  <td className="p-2.5 text-right font-semibold text-brand-red">{l.defectiveQuantity ?? "—"}</td>
-                                  <td className="p-2.5 text-right">{l.unitPrice !== null ? formatAmount(l.unitPrice, c.currency ?? "DOP") : "—"}</td>
+                                <tr key={l.id} className="transition-colors hover:bg-zinc-50/50">
+                                  <td className="p-3">
+                                    <p className="font-semibold text-zinc-900">{l.productName}</p>
+                                    {l.productCode && (
+                                      <span className="font-mono text-[10.5px] text-zinc-400">{l.productCode}</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-right tabular-nums">{l.invoicedQuantity ?? "—"}</td>
+                                  <td className="p-3 text-right tabular-nums">{l.receivedQuantity ?? "—"}</td>
+                                  <td className="p-3 text-right">
+                                    {l.defectiveQuantity != null && l.defectiveQuantity > 0 ? (
+                                      <span className="inline-flex items-center rounded-md border border-rose-200/80 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-brand-red tabular-nums">
+                                        {l.defectiveQuantity}
+                                      </span>
+                                    ) : (
+                                      <span className="text-zinc-400">—</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-right tabular-nums">
+                                    {l.unitPrice !== null ? formatAmount(l.unitPrice, c.currency ?? "DOP") : "—"}
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1686,27 +1762,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       )}
 
       {/* FORM MODALS */}
-      {/* 1. Reclamación Modal */}
-      {claimModalOpen && (
-        <ClaimFormModal
-          ticketId={ticket.id}
-          ticketNumber={ticket.number}
-          clientName={ticket.clientName ?? "Cliente"}
-          contactName={ticket.contactName ?? ticket.clientContactPersonName}
-          contactPhone={ticket.contactPhone}
-          clientPhone={ticket.clientPhone}
-          clientContactPersonName={ticket.clientContactPersonName}
-          claim={editingClaim}
-          initialData={claimInitialData}
-          onClose={() => setClaimModalOpen(false)}
-          onSaved={() => {
-            setClaimModalOpen(false);
-            fetchAllForms();
-          }}
-        />
-      )}
-
-      {/* 2. Retiro Modal */}
+      {/* 1. Retiro Modal */}
       {withdrawalModalOpen && (
         <WithdrawalFormModal
           withdrawal={editingWithdrawal}

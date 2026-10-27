@@ -1,15 +1,20 @@
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
+import { fetchAllPages } from "../../api/paging";
+import { ticketTopicsApi } from "../../api/ticketTopics";
+import { Logo } from "../../components/Logo";
 import { PrintCell, PrintPending, PrintSheet } from "../../components/print/PrintSheet";
 import { padRows } from "../../components/print/rows";
 import { usePrintRecord } from "../../components/print/usePrintRecord";
+import { exportClaimToExcel } from "../../lib/claimExcelExport";
 import { CLAIM_FORM_CONTROL, yesNo } from "../../lib/claims";
 import { formatDay } from "../../lib/dates";
 import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
 import {
   CLAIM_AREAS,
   CLAIM_DEFECT_MOMENTS,
-  CLAIM_REASONS,
+  topicRequiresOther,
 } from "../../types/claims";
 
 /** Casilla dibujada, como en la plantilla: ☒ marcada, ☐ vacía. */
@@ -39,21 +44,41 @@ export function ClaimPrintPage() {
     documentTitle: (record) => `${CLAIM_FORM_CONTROL.code} · ${record.ticketNumber}`,
     failed: "No se pudo cargar la reclamación.",
   });
+  const [topicNames, setTopicNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (claim === null) return;
+    fetchAllPages((page, pageSize) => ticketTopicsApi.list({ page, pageSize, status: "activos" }))
+      .then((topics) => {
+        const names = topics.map((t) => t.name);
+        if (!names.some((name) => name === claim.reason)) names.unshift(claim.reason);
+        setTopicNames(names);
+      })
+      .catch(() => setTopicNames([claim.reason]));
+  }, [claim]);
+
   if (claim === null) return <PrintPending error={error} />;
 
   // El papel trae tres renglones; una reclamación larga sigue en más páginas (sección 15).
   const lines = padRows(claim.lines, 3);
   const money = (value: number) => (claim.currency ? formatAmount(value, claim.currency) : formatQuantity(value));
 
+  const sectionTitle = "bg-brand-red px-1.5 py-0.5 text-[11px] font-bold text-white";
+
   return (
-    <PrintSheet orientation="portrait" filename={`${CLAIM_FORM_CONTROL.code}_${claim.ticketNumber || claim.id}.pdf`}>
+    <PrintSheet
+      orientation="portrait"
+      filename={`${CLAIM_FORM_CONTROL.code}_${claim.ticketNumber || claim.id}.pdf`}
+      onExportExcel={() => exportClaimToExcel(claim)}
+    >
       {/* Cabecera: A1:I1 y F3:F4 */}
-      <header className="avoid-break mb-2 grid grid-cols-[1fr_auto] items-end gap-4 border-b-2 border-black pb-2">
-        <div>
-          <p className="text-[9px] font-semibold uppercase tracking-wide">Plastifar · Sistema de gestión de calidad</p>
-          <h1 className="text-[16px] font-bold uppercase">{CLAIM_FORM_CONTROL.title}</h1>
+      <header className="avoid-break mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b-2 border-brand-red pb-2">
+        <Logo height={28} />
+        <div className="text-center">
+          <p className="text-[9px] font-semibold uppercase tracking-wide text-zinc-600">Plastifar · Sistema de gestión de calidad</p>
+          <h1 className="text-[16px] font-bold uppercase text-brand-red">{CLAIM_FORM_CONTROL.title}</h1>
         </div>
-        <div className="text-right">
+        <div className="text-right text-[10px]">
           <p>
             <span className="font-semibold">Fecha de la Reclamación:</span> {formatDay(claim.claimDate)}
           </p>
@@ -65,7 +90,7 @@ export function ClaimPrintPage() {
 
       {/* I. Información General: A5, A6:I7 */}
       <section className="avoid-break mb-2">
-        <h2 className="bg-zinc-200 px-1.5 py-0.5 text-[11px] font-bold">I. Información General</h2>
+        <h2 className={sectionTitle}>I. Información General</h2>
         <div className="grid grid-cols-3">
           <PrintCell label="Empresa:">{claim.clientName}</PrintCell>
           <PrintCell label="Contacto:">{claim.contactName ?? ""}</PrintCell>
@@ -78,7 +103,7 @@ export function ClaimPrintPage() {
 
       {/* II. Información General sobre la Reclamación: A9, A10:H38 */}
       <section className="avoid-break mb-2">
-        <h2 className="bg-zinc-200 px-1.5 py-0.5 text-[11px] font-bold">II. Información General sobre la Reclamación:</h2>
+        <h2 className={sectionTitle}>II. Información General sobre la Reclamación:</h2>
         <div className="grid grid-cols-2 border border-black">
           <div className="border-r border-black p-1.5">
             <p className="font-semibold">Planta Involucrada:</p>
@@ -91,11 +116,11 @@ export function ClaimPrintPage() {
           <div className="p-1.5">
             <p className="font-semibold">Motivo del Reclamo:</p>
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-              {CLAIM_REASONS.map((reason) => (
-                <Box key={reason} checked={claim.reason === reason} label={reason} />
+              {topicNames.map((name) => (
+                <Box key={name} checked={claim.reason === name} label={name} />
               ))}
             </div>
-            {claim.reason === "Otros" && (
+            {topicRequiresOther(claim.reason) && (
               <p className="mt-1">
                 <span className="font-semibold">Otros (especifique):</span> {claim.reasonOther}
               </p>
@@ -189,7 +214,7 @@ export function ClaimPrintPage() {
 
       {/* III. Descripción: A39, filas 40-43, A45 */}
       <section className="avoid-break mb-2">
-        <h2 className="bg-zinc-200 px-1.5 py-0.5 text-[11px] font-bold">III. Descripción de la Reclamación</h2>
+        <h2 className={sectionTitle}>III. Descripción de la Reclamación</h2>
         <div className="min-h-[72px] whitespace-pre-line border border-black px-1.5 py-1">{claim.description}</div>
         <div className="border border-t-0 border-black px-1.5 py-1">
           <span className="font-semibold">Comentarios: </span>
@@ -204,7 +229,7 @@ export function ClaimPrintPage() {
 
       {/* IV. Tratamiento: A51:A62 */}
       <section className="avoid-break mb-2">
-        <h2 className="bg-zinc-200 px-1.5 py-0.5 text-[11px] font-bold">
+        <h2 className={sectionTitle}>
           IV. Tratamiento de la Reclamación{" "}
           <span className="font-normal italic">· Para uso exclusivo del Depto. de Calidad</span>
         </h2>

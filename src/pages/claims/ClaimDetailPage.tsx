@@ -20,7 +20,7 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { describeStatus, yesNo } from "../../lib/claims";
 import { formatDay, formatInstant } from "../../lib/dates";
 import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
-import type { ClaimClosureCondition, CustomerClaim } from "../../types/claims";
+import { topicRequiresOther, type ClaimClosureCondition, type CustomerClaim } from "../../types/claims";
 import type { ProductLine } from "../../types/settings";
 import { HcaModal } from "../quality/HcaModal";
 import { ClaimFormModal } from "./ClaimFormModal";
@@ -214,7 +214,9 @@ export function ClaimDetailPage() {
           <DetailGroup title="II. Sobre la reclamación">
             <DetailRow label="Motivo del reclamo">
               {claim.reason}
-              {claim.reason === "Otros" && claim.reasonOther && <span className="ml-1.5 text-faint">· {claim.reasonOther}</span>}
+              {topicRequiresOther(claim.reason) && claim.reasonOther && (
+                <span className="ml-1.5 text-faint">· {claim.reasonOther}</span>
+              )}
             </DetailRow>
             <DetailRow label="Planta involucrada">{claim.plants.map((plant) => plant.name).join(", ")}</DetailRow>
             <DetailRow label="Área afectada">{claim.affectedAreas.join(", ")}</DetailRow>

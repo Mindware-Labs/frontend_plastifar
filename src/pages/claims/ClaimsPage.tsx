@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { claimsApi, type ClaimListResponse, type ClaimQuery } from "../../api/claims";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { ticketTopicsApi } from "../../api/ticketTopics";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
@@ -26,7 +27,8 @@ import { useSort } from "../../hooks/useSort";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import { formatAmount } from "../../lib/numbers";
-import { CLAIM_REASONS, type ClaimStatus } from "../../types/claims";
+import { topicRequiresOther, type ClaimStatus } from "../../types/claims";
+import type { TicketTopicResponse } from "../../types/api";
 import type { Plant } from "../../types/settings";
 import { ClaimStatusBadge } from "./ClaimStatusBadge";
 
@@ -49,6 +51,7 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
 export function ClaimsPage() {
   const navigate = useNavigate();
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [topics, setTopics] = useState<TicketTopicResponse[]>([]);
 
   const [search, setSearch] = useState("");
   const [reason, setReason] = useState("todos");
@@ -69,10 +72,18 @@ export function ClaimsPage() {
       .catch(() => setPlants([]));
   }, []);
 
+  useEffect(() => {
+    fetchAllPages<TicketTopicResponse>((page, size) =>
+      ticketTopicsApi.list({ page, pageSize: size, status: "activos" }),
+    )
+      .then(setTopics)
+      .catch(() => setTopics([]));
+  }, []);
+
   const criteria: Omit<ClaimQuery, "page"> = {
     pageSize,
     search: debouncedSearch || undefined,
-    reason: reason === "todos" ? undefined : reason,
+    topicId: reason === "todos" ? undefined : Number(reason),
     plantId: plantId === "todas" ? undefined : Number(plantId),
     clientId: clientId === "todos" ? undefined : Number(clientId),
     from: from || undefined,
@@ -198,7 +209,7 @@ export function ClaimsPage() {
               defaultIcon={<Tag className="h-3.5 w-3.5 text-zinc-500" />}
               options={[
                 { value: "todos", label: "Todos los motivos" },
-                ...CLAIM_REASONS.map((value) => ({ value, label: value })),
+                ...topics.map((topic) => ({ value: String(topic.id), label: topic.name })),
               ]}
             />
 
@@ -316,7 +327,7 @@ export function ClaimsPage() {
                       {formatDay(claim.claimDate)}
                     </Td>
                     <Td className="text-[12.5px] text-brand-gray">
-                      {claim.reason === "Otros" && claim.reasonOther ? (
+                      {topicRequiresOther(claim.reason) && claim.reasonOther ? (
                         <span title={claim.reasonOther}>Otros · {claim.reasonOther}</span>
                       ) : (
                         claim.reason

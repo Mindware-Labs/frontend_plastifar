@@ -8,7 +8,8 @@ import { Button } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Spinner";
 import { formatDay } from "../../lib/dates";
 import { formatAmount, formatQuantity } from "../../lib/numbers";
-import type { CustomerClaim } from "../../types/claims";
+import { topicRequiresOther, type CustomerClaim } from "../../types/claims";
+import type { TicketProductResponse } from "../../types/api";
 import { ClaimFormModal } from "./ClaimFormModal";
 import { ClaimStatusBadge } from "./ClaimStatusBadge";
 
@@ -18,6 +19,8 @@ interface TicketClaimTabProps {
   clientName: string | null;
   contactName?: string | null;
   contactPhone?: string | null;
+  ticketTopicId?: number | null;
+  ticketProducts?: TicketProductResponse[];
   /** `claims.write` sobre el departamento del ticket. */
   canCreate: boolean;
   onClaimChanged?: (claim: CustomerClaim | null) => void;
@@ -35,6 +38,8 @@ export function TicketClaimTab({
   clientName,
   contactName,
   contactPhone,
+  ticketTopicId,
+  ticketProducts,
   canCreate,
   onClaimChanged,
 }: TicketClaimTabProps) {
@@ -125,6 +130,8 @@ export function TicketClaimTab({
           <ClaimFormModal
             ticketId={ticketId}
             ticketNumber={ticketNumber}
+            ticketTopicId={ticketTopicId}
+            ticketProducts={ticketProducts}
             clientName={clientName}
             contactName={contactName}
             contactPhone={contactPhone}
@@ -155,7 +162,9 @@ export function TicketClaimTab({
           </div>
           <p className="mt-1.5 text-[13px] text-zinc-800">
             <span className="font-semibold">{claim.reason}</span>
-            {claim.reason === "Otros" && claim.reasonOther && <span className="text-zinc-500"> · {claim.reasonOther}</span>}
+            {topicRequiresOther(claim.reason) && claim.reasonOther && (
+              <span className="text-zinc-500"> · {claim.reasonOther}</span>
+            )}
             <span className="text-zinc-500"> · {formatDay(claim.claimDate)}</span>
           </p>
           <p className="mt-0.5 text-[12px] text-zinc-500">

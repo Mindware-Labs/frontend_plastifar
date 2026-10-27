@@ -10,8 +10,8 @@ export interface ClaimQuery {
   page: number;
   pageSize: number;
   search?: string;
-  /** Texto del formulario: Sobrante, Faltante, Contaminación, Cruce, Otros. */
-  reason?: string;
+  /** Motivo del catálogo de tickets (TicketTopic). */
+  topicId?: number;
   plantId?: number;
   clientId?: number;
   /** ISO corto YYYY-MM-DD */
