@@ -1,8 +1,8 @@
 import { apiRequest, toQuery } from "./client";
 import type {
-  ApplicableForm,
+
   EmailTemplate,
-  FormRoutingRule,
+
   Holiday,
   Mailbox,
   Plant,
@@ -11,8 +11,8 @@ import type {
   ProductImportResult,
   ProductLine,
   ProductLookupItem,
-  RoutingMoment,
-  SaveFormRoutingRuleRequest,
+
+
   SavePlantRequest,
   SaveProductRequest,
   SaveTaskTypeRequest,
@@ -88,10 +88,6 @@ export interface TaskTypeQuery extends CatalogQuery {
   form?: string;
 }
 
-export interface FormRoutingRuleQuery extends CatalogQuery {
-  form?: string;
-  moment?: string;
-}
 
 export const settingsApi = {
   slaPolicies: {
@@ -201,20 +197,6 @@ export const settingsApi = {
     remove: (id: number) => apiRequest<void>(`/api/settings/task-types/${id}`, { method: "DELETE" }),
   },
 
-  // Reglas de enrutamiento de formularios (docs/plan/02, RF-S8).
-  formRoutingRules: {
-    list: (query: FormRoutingRuleQuery) =>
-      apiRequest<ListResponse<FormRoutingRule>>(`/api/settings/form-routing-rules${toQuery({ ...query })}`),
-    get: (id: number) => apiRequest<FormRoutingRule>(`/api/settings/form-routing-rules/${id}`),
-    create: (data: SaveFormRoutingRuleRequest) =>
-      apiRequest<FormRoutingRule>("/api/settings/form-routing-rules", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: number, data: SaveFormRoutingRuleRequest) =>
-      apiRequest<FormRoutingRule>(`/api/settings/form-routing-rules/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    remove: (id: number) => apiRequest<void>(`/api/settings/form-routing-rules/${id}`, { method: "DELETE" }),
-    /** Qué formularios tocan a quien pregunta desde ese departamento, en ese momento. */
-    applicable: (departmentId: number, moment?: RoutingMoment) =>
-      apiRequest<ApplicableForm[]>(`/api/settings/form-routing-rules/applicable${toQuery({ departmentId, moment })}`),
-  },
 
   templates: {
     list: (query: CatalogQuery) =>

@@ -121,13 +121,6 @@ export const REQUIRED_FORMS: { value: RequiredForm; label: string }[] = [
 ];
 export type RequiredForm = "Reclamacion" | "RetiroMercancia" | "Hca" | "DiscrepanciaCarga";
 
-export const ROUTING_MOMENTS: { value: RoutingMoment; label: string }[] = [
-  { value: "AlCrearTicket", label: "Al crear el ticket" },
-  { value: "AlCompletarTarea", label: "Al completar la tarea" },
-  { value: "ConsultaDesdeTarea", label: "Consulta desde la tarea" },
-];
-export type RoutingMoment = "AlCrearTicket" | "AlCompletarTarea" | "ConsultaDesdeTarea";
-
 /** Tipo de tarea: la columna ACCION de la hoja SLA, con su plazo. */
 export interface TaskType {
   id: number;
@@ -152,40 +145,6 @@ export interface SaveTaskTypeRequest {
   departmentIds: number[];
   assigneeStaffIds: number[];
   isActive: boolean;
-}
-
-/** Quién llena o consulta un formulario y en qué momento (hoja FORMULARIOS). */
-export interface FormRoutingRule {
-  id: number;
-  form: RequiredForm;
-  formLabel: string;
-  moment: RoutingMoment;
-  momentLabel: string;
-  departmentId: number | null;
-  departmentName: string | null;
-  teamId: number | null;
-  teamName: string | null;
-  /** Solo con el momento «Al completar la tarea». */
-  isBlocking: boolean;
-  isActive: boolean;
-}
-
-export interface SaveFormRoutingRuleRequest {
-  form: RequiredForm;
-  moment: RoutingMoment;
-  departmentId: number | null;
-  teamId: number | null;
-  isBlocking: boolean;
-  isActive: boolean;
-}
-
-/** Un formulario que aplica a quien pregunta desde un departamento, y por qué regla. */
-export interface ApplicableForm {
-  form: RequiredForm;
-  formLabel: string;
-  moment: RoutingMoment;
-  isBlocking: boolean;
-  source: string;
 }
 
 /** Producto: lo que se vende, se reclama o se retira. El código es único y es texto. */

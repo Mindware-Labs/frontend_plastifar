@@ -4,28 +4,26 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Plus,
   RefreshCw,
   RotateCcw,
-  Trash2,
-  X,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { withdrawalsApi } from "../../api/withdrawals";
-import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DateField, LookupField, SelectField, TextField } from "../../components/ui/Field";
-import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 import { Modal } from "../../components/ui/Modal";
 import { useReceipts } from "../../context/useReceipts";
+import { useDialogMotion } from "../../hooks/useDialogMotion";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { resolveTicketLabel, searchTickets } from "../../lib/discrepancies";
 import { today } from "../../lib/quality";
-import { WITHDRAWAL_FORM_CONTROL } from "../../lib/withdrawals";
+import { computeLineValue, computeTotal, WITHDRAWAL_FORM_CONTROL } from "../../lib/withdrawals";
+import { WithdrawalLinesSpreadsheet } from "./WithdrawalLinesSpreadsheet";
 import type { TicketProductResponse } from "../../types/api";
 import {
   WITHDRAWAL_CURRENCIES,
@@ -116,7 +114,7 @@ function emptyLine(defaultProductId = "", productLabel?: string): LineDraft {
     productId: defaultProductId,
     productLabel,
     quantity: "",
-    quantityUnit: "CAJ",
+    quantityUnit: "",
     packDetail: "",
     unitPrice: "",
   };
@@ -180,6 +178,7 @@ export function WithdrawalFormModal({
   const draftStorageKey = !isEditing && activeTicketId ? `pf068-draft:ticket:${activeTicketId}` : null;
 
   const [step, setStep] = useState<number>(1);
+  const [stepDirection, setStepDirection] = useState<"forward" | "backward">("forward");
   const [selectedTicketId, setSelectedTicketId] = useState<string>(lockedTicketId ? String(lockedTicketId) : "");
   const [requestDate, setRequestDate] = useState(withdrawal?.requestDate ?? today());
   const [reason, setReason] = useState<WithdrawalReason>(withdrawal?.reason ?? WITHDRAWAL_REASONS[0]);
@@ -193,7 +192,7 @@ export function WithdrawalFormModal({
             key: nextKey++,
             productId: l.productId ?? "",
             quantity: l.quantity ?? "",
-            quantityUnit: l.quantityUnit || "CAJ",
+            quantityUnit: l.quantityUnit || "",
             packDetail: l.packDetail ?? "",
             unitPrice: l.unitPrice ?? "",
           }))
@@ -201,7 +200,8 @@ export function WithdrawalFormModal({
           ? ticketProducts.map((tp) => emptyLine(String(tp.productId), `${tp.productCode} · ${tp.productName}`))
           : [emptyLine()],
   );
-  const [activeLineIdx, setActiveLineIdx] = useState(0);
+  const [highlightLineKey, setHighlightLineKey] = useState<number | null>(null);
+  const lineRowRefs = useRef(new Map<number, HTMLTableRowElement>());
 
   const [resolvedClientName, setResolvedClientName] = useState<string>(
     fixedClientName ?? withdrawal?.clientName ?? "",
@@ -209,7 +209,6 @@ export function WithdrawalFormModal({
   const [resolvedTicketNumber, setResolvedTicketNumber] = useState<string>(
     fixedTicketNumber ?? withdrawal?.ticketNumber ?? "",
   );
-
   const [errors, setErrors] = useState<FormErrors>({ byLine: {} });
   const [banner, setBanner] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -223,6 +222,19 @@ export function WithdrawalFormModal({
   const [closeReason, setCloseReason] = useState<string>("");
   const [closingTicket, setClosingTicket] = useState(false);
   const initialSnapshotRef = useRef<string>("");
+  const savedResultRef = useRef<WithdrawalDetail | null>(null);
+
+  const handleFinishedExit = () => {
+    if (savedResultRef.current) {
+      onSaved(savedResultRef.current);
+    } else {
+      onClose();
+    }
+  };
+
+  const modalAnimation = useModalAnimation();
+  const inlineMotion = useDialogMotion(handleFinishedExit);
+  const requestClose = inline ? inlineMotion.requestClose : modalAnimation.requestClose;
 
   // Cargar veredictos activos para el prompt opcional de cierre de ticket
   useEffect(() => {
@@ -275,7 +287,7 @@ export function WithdrawalFormModal({
               productId: l.productId ?? "",
               productLabel: l.productLabel,
               quantity: l.quantity ?? "",
-              quantityUnit: l.quantityUnit ?? "CAJ",
+              quantityUnit: l.quantityUnit ?? "",
               packDetail: l.packDetail ?? "",
               unitPrice: l.unitPrice ?? "",
             })),
@@ -348,37 +360,30 @@ export function WithdrawalFormModal({
       setConfirmCloseOpen(true);
       return;
     }
-    onClose();
+    requestClose();
+  }
+
+  function finishModal(saved: WithdrawalDetail) {
+    savedResultRef.current = saved;
+    requestClose();
   }
 
   const inheritedClientName =
     resolvedClientName || fixedClientName || withdrawal?.clientName || "Se toma del ticket al guardar";
   const displayTicketNumber = resolvedTicketNumber || fixedTicketNumber || withdrawal?.ticketNumber;
+  const hasTicketContext = Boolean(lockedTicketId || selectedTicketId);
 
   function patchLine(key: number, patch: Partial<LineDraft>) {
     setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
   }
 
   function addLine() {
-    setLines((current) => {
-      const next = [...current, emptyLine()];
-      setActiveLineIdx(next.length - 1);
-      return next;
-    });
+    setLines((current) => [...current, emptyLine()]);
   }
 
   function removeLine(key: number) {
-    setLines((current) => {
-      if (current.length <= 1) return current;
-      const idx = current.findIndex((line) => line.key === key);
-      const next = current.filter((line) => line.key !== key);
-      setActiveLineIdx((curr) => {
-        if (curr >= next.length) return Math.max(0, next.length - 1);
-        if (idx >= 0 && idx < curr) return curr - 1;
-        return curr;
-      });
-      return next;
-    });
+    setLines((current) => (current.length <= 1 ? current : current.filter((line) => line.key !== key)));
+    setHighlightLineKey((curr) => (curr === key ? null : curr));
   }
 
   function validateStep(stepNumber: number): boolean {
@@ -429,13 +434,15 @@ export function WithdrawalFormModal({
         }
         if (!line.quantityUnit.trim()) {
           bucket.quantityUnit = "Indica la unidad (p. ej. CAJ).";
-        } else if (line.quantityUnit.trim().length > 20) {
-          bucket.quantityUnit = "Máximo 20 caracteres.";
+        } else if (line.quantityUnit.trim().length > 5) {
+          bucket.quantityUnit = "Máximo 5 caracteres (p. ej. CAJ).";
         }
         if (line.packDetail.trim().length > 60) {
           bucket.packDetail = "Máximo 60 caracteres.";
         }
-        if (!parseOptionalPrice(line.unitPrice).valid) {
+        if (line.unitPrice.trim().length > 6) {
+          bucket.unitPrice = "Máximo 6 caracteres.";
+        } else if (!parseOptionalPrice(line.unitPrice).valid) {
           bucket.unitPrice = "Precio cero o mayor.";
         }
         if (Object.keys(bucket).length > 0) {
@@ -446,7 +453,7 @@ export function WithdrawalFormModal({
       setErrors(next);
       if (Object.keys(next.byLine).length > 0) {
         const firstBadIdx = lines.findIndex((l) => next.byLine[l.key]);
-        if (firstBadIdx >= 0) setActiveLineIdx(firstBadIdx);
+        if (firstBadIdx >= 0) setHighlightLineKey(lines[firstBadIdx]?.key ?? null);
         return false;
       }
       return !next.lines;
@@ -483,9 +490,10 @@ export function WithdrawalFormModal({
       if (!line.productId) bucket.productId = "Elige el producto del catálogo.";
       if (parsePositiveDecimal(line.quantity) === null) bucket.quantity = "Cantidad mayor que cero.";
       if (!line.quantityUnit.trim()) bucket.quantityUnit = "Indica la unidad (p. ej. CAJ).";
-      else if (line.quantityUnit.trim().length > 20) bucket.quantityUnit = "Máximo 20 caracteres.";
+      else if (line.quantityUnit.trim().length > 5) bucket.quantityUnit = "Máximo 5 caracteres (p. ej. CAJ).";
       if (line.packDetail.trim().length > 60) bucket.packDetail = "Máximo 60 caracteres.";
-      if (!parseOptionalPrice(line.unitPrice).valid) bucket.unitPrice = "Precio cero o mayor.";
+      if (line.unitPrice.trim().length > 6) bucket.unitPrice = "Máximo 6 caracteres.";
+      else if (!parseOptionalPrice(line.unitPrice).valid) bucket.unitPrice = "Precio cero o mayor.";
       if (Object.keys(bucket).length > 0) {
         next.byLine[line.key] = bucket;
       }
@@ -500,19 +508,14 @@ export function WithdrawalFormModal({
   function handleNextStep() {
     setBanner(null);
     if (!validateStep(step)) return;
+    setStepDirection("forward");
     setStep((s) => Math.min(STEPS.length, s + 1));
   }
 
   function handlePrevStep() {
     setBanner(null);
+    setStepDirection("backward");
     setStep((s) => Math.max(1, s - 1));
-  }
-
-  function goToStep(target: number) {
-    if (target === step) return;
-    setBanner(null);
-    if (target > step && !validateStep(step)) return;
-    setStep(target);
   }
 
   async function handleSubmit() {
@@ -520,10 +523,11 @@ export function WithdrawalFormModal({
     const { errors: validation, firstErrorStep } = validateAll();
     setErrors(validation);
     if (firstErrorStep !== null) {
+      setStepDirection(firstErrorStep >= step ? "forward" : "backward");
       setStep(firstErrorStep);
       if (firstErrorStep === 2) {
         const firstBadIdx = lines.findIndex((l) => validation.byLine[l.key]);
-        if (firstBadIdx >= 0) setActiveLineIdx(firstBadIdx);
+        if (firstBadIdx >= 0) setHighlightLineKey(lines[firstBadIdx]?.key ?? null);
       }
       return;
     }
@@ -566,13 +570,13 @@ export function WithdrawalFormModal({
         setCompletedWithdrawal(saved);
         setShowClosePrompt(true);
       } else {
-        onSaved(saved);
+        finishModal(saved);
       }
     } catch (e) {
       if (e instanceof ApiError) {
         if (e.status === 409 && onConflict) {
           onConflict(e.message);
-          onClose();
+          requestClose();
           return;
         }
         setBanner(e.message);
@@ -584,127 +588,159 @@ export function WithdrawalFormModal({
     }
   }
 
-  const safeIdx = Math.min(activeLineIdx, Math.max(0, lines.length - 1));
-  const currentLine = lines[safeIdx] ?? lines[0];
+  const linesTotal = useMemo(() => {
+    const values = lines.map((line) =>
+      computeLineValue(
+        parsePositiveDecimal(line.quantity),
+        parseOptionalPrice(line.unitPrice).value,
+      ),
+    );
+    return computeTotal(values);
+  }, [lines]);
+
+  useEffect(() => {
+    if (step !== 2 || highlightLineKey === null) return;
+    lineRowRefs.current.get(highlightLineKey)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [highlightLineKey, step, lines.length]);
+
+  const isWideStep = step === 2;
+
+  const renderStepper = () => (
+    <ol
+      className="mx-auto flex w-full max-w-2xl items-center select-none gap-1"
+      aria-label="Pasos del formulario"
+    >
+      {STEPS.map((item, idx) => {
+        const isCurrent = step === item.id;
+        const isCompleted = step > item.id;
+        return (
+          <Fragment key={item.id}>
+            <li
+              className="flex min-w-0 items-center gap-2"
+              aria-current={isCurrent ? "step" : undefined}
+            >
+              <span
+                className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
+                  isCurrent
+                    ? "bg-brand-red text-white shadow-2xs ring-2 ring-brand-red/20"
+                    : isCompleted
+                      ? "bg-emerald-600 text-white"
+                      : "bg-zinc-200 text-zinc-500"
+                }`}
+              >
+                {isCompleted ? <Check className="size-3.5 stroke-[2.5]" /> : item.id}
+              </span>
+              <div className="hidden min-w-0 flex-col text-left md:flex">
+                <span
+                  className={`truncate font-heading text-[12px] font-semibold ${
+                    isCurrent ? "text-zinc-900" : isCompleted ? "text-zinc-700" : "text-zinc-400"
+                  }`}
+                >
+                  {item.label}
+                </span>
+                <span className="truncate text-[10px] text-zinc-400">{item.hint}</span>
+              </div>
+            </li>
+            {idx < STEPS.length - 1 ? (
+              <li
+                aria-hidden
+                className={`mx-0.5 h-0.5 min-w-[1.5rem] flex-1 rounded-full transition-colors ${
+                  step > item.id ? "bg-emerald-600/40" : "bg-zinc-200"
+                }`}
+              />
+            ) : null}
+          </Fragment>
+        );
+      })}
+    </ol>
+  );
+
+  const renderFooterLeft = () => (
+    <span className="text-[11.5px] text-zinc-400 select-none">
+      Paso {step} de {STEPS.length}
+    </span>
+  );
 
   const wizardFooter = (
-    <div className="flex w-full items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <Button type="button" variant="secondary" onClick={handleRequestClose} disabled={saving}>
-          Cancelar
-        </Button>
-      </div>
-      <div className="flex items-center gap-2">
-        {step > 1 && (
-          <Button type="button" variant="secondary" onClick={handlePrevStep} disabled={saving}>
-            <ChevronLeft className="size-4" />
-            Anterior
+    <div className="flex w-full flex-wrap items-center justify-between gap-3">
+      {renderFooterLeft()}
+      <div className="ml-auto flex items-center gap-2">
+        {step > 1 ? (
+          <Button type="button" variant="secondary" size="sm" onClick={handlePrevStep} disabled={saving}>
+            <ChevronLeft className="size-3.5" />
+            <span>Anterior</span>
+          </Button>
+        ) : (
+          <Button type="button" variant="secondary" size="sm" onClick={handleRequestClose} disabled={saving}>
+            Cancelar
           </Button>
         )}
         {step < STEPS.length ? (
-          <Button type="button" onClick={handleNextStep}>
-            Siguiente
-            <ChevronRight className="size-4" />
+          <Button type="button" size="sm" onClick={handleNextStep}>
+            <span>Siguiente paso</span>
+            <ChevronRight className="size-3.5" />
           </Button>
         ) : (
-          <Button type="button" onClick={handleSubmit} disabled={saving}>
-            {saving ? "Guardando…" : isEditing ? "Guardar cambios" : "Emitir solicitud"}
+          <Button type="button" size="sm" onClick={handleSubmit} disabled={saving} isLoading={saving}>
+            {isEditing ? "Guardar cambios" : "Emitir solicitud"}
           </Button>
         )}
       </div>
     </div>
   );
 
-  const wizardBody = (
-    <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-4">
-      {/* Stepper interactivo por pasos */}
-      <nav aria-label="Pasos del formulario" className="grid grid-cols-2 gap-2">
-        {STEPS.map((item) => {
-          const isCurrent = step === item.id;
-          const isCompleted = step > item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => goToStep(item.id)}
-              className={`group flex items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-all cursor-pointer ${
-                isCurrent
-                  ? "border-brand-red/40 bg-red-50/50 ring-2 ring-brand-red/10"
-                  : isCompleted
-                    ? "border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70"
-                    : "border-zinc-200 bg-zinc-50/60 hover:bg-zinc-100/70"
-              }`}
-            >
-              <span
-                className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
-                  isCurrent
-                    ? "bg-brand-red text-white"
-                    : isCompleted
-                      ? "bg-emerald-600 text-white"
-                      : "bg-zinc-200 text-zinc-700"
-                }`}
-              >
-                {isCompleted ? <Check className="size-3.5 stroke-[2.5]" /> : item.id}
-              </span>
-              <div className="min-w-0">
-                <p
-                  className={`truncate text-[12px] font-semibold leading-tight ${
-                    isCurrent ? "text-brand-red" : isCompleted ? "text-emerald-900" : "text-zinc-700"
-                  }`}
-                >
-                  {item.label}
-                </p>
-                <p className="truncate text-[10.5px] text-zinc-500">{item.hint}</p>
-              </div>
-            </button>
-          );
-        })}
-      </nav>
+  const stepPanelClass =
+    stepDirection === "forward" ? "animate-plf-step-forward" : "animate-plf-step-backward";
 
+  const wizardBody = (
+    <form
+      onSubmit={(e) => e.preventDefault()}
+      noValidate
+      className={`flex w-full flex-col gap-4 text-left ${
+        isWideStep ? "max-w-none" : "mx-auto max-w-4xl"
+      }`}
+    >
       {banner && <Alert variant="error">{banner}</Alert>}
 
       {/* PASO 1: Datos de la solicitud (Motivo, origen, fecha, moneda y empresa) */}
       {step === 1 && (
-        <div className="space-y-4">
-          {/* Contexto del ticket y empresa heredada */}
-          {lockedTicketId ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-200/90 bg-zinc-50/70 px-3.5 py-2.5 text-[12px]">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                {displayTicketNumber && (
-                  <span className="text-zinc-600">
-                    Ticket: <span className="font-mono font-semibold text-zinc-900">{displayTicketNumber}</span>
-                  </span>
-                )}
-                <span className="text-zinc-600">
-                  Nombre Empresa: <span className="font-semibold text-zinc-900">{inheritedClientName}</span>
-                </span>
-              </div>
-              <span className="rounded bg-zinc-200/70 px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-zinc-700">
-                PF-FOR-068
-              </span>
+        <div key="withdrawal-step-1" className={`space-y-4 ${stepPanelClass}`}>
+          {/* Contexto del ticket y empresa (barra simétrica de dos mitades) */}
+          {hasTicketContext ? (
+            <div className="flex flex-col gap-2">
+              {!lockedTicketId && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTicketId("");
+                      setResolvedClientName("");
+                      setResolvedTicketNumber("");
+                    }}
+                    className="cursor-pointer text-[11px] font-medium text-zinc-500 underline-offset-2 transition-colors hover:text-brand-red hover:underline"
+                  >
+                    Elegir otro ticket
+                  </button>
+                </div>
+              )}
+              <WithdrawalTicketContextBar
+                ticketNumber={displayTicketNumber ?? "—"}
+                companyName={inheritedClientName}
+              />
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <LookupField
-                size="sm"
-                label="Ticket origen"
-                required
-                value={selectedTicketId}
-                onChange={setSelectedTicketId}
-                placeholder="Buscar ticket por número o cliente…"
-                searchPlaceholder="Código TIC- o nombre del cliente…"
-                search={searchTickets}
-                resolveSelectedLabel={resolveTicketLabel}
-                error={errors.ticketId}
-              />
-              <TextField
-                size="sm"
-                label="Nombre Empresa (heredado del ticket)"
-                value={inheritedClientName}
-                disabled
-                readOnly
-              />
-            </div>
+            <LookupField
+              size="sm"
+              label="Ticket origen"
+              required
+              value={selectedTicketId}
+              onChange={setSelectedTicketId}
+              placeholder="Buscar ticket por número o cliente…"
+              searchPlaceholder="Código TIC- o nombre del cliente…"
+              search={searchTickets}
+              resolveSelectedLabel={resolveTicketLabel}
+              error={errors.ticketId}
+            />
           )}
 
           {/* Selector de Motivo del retiro (Por Devolución / Por Cambio, igual a las casillas del PF-FOR-068) */}
@@ -786,190 +822,25 @@ export function WithdrawalFormModal({
         </div>
       )}
 
-      {/* PASO 2: Productos a retirar */}
-      {step === 2 && currentLine && (
-        <div className="space-y-3">
-          <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-1.5">
-            <FormLineTabStrip
-              activeIndex={safeIdx}
-              tabCount={lines.length}
-              trailing={
-                <Button type="button" size="sm" variant="secondary" onClick={addLine}>
-                  <Plus className="size-3.5" />
-                  <span>Otro producto</span>
-                </Button>
-              }
-            >
-              {lines.map((line, idx) => {
-                const isActive = idx === safeIdx;
-                const lineErr = errors.byLine[line.key];
-                const hasError = Boolean(
-                  lineErr &&
-                    (lineErr.productId ||
-                      lineErr.quantity ||
-                      lineErr.quantityUnit ||
-                      lineErr.packDetail ||
-                      lineErr.unitPrice),
-                );
-                return (
-                  <button
-                    key={line.key}
-                    type="button"
-                    {...formLineTabIndexAttr(idx)}
-                    onClick={() => setActiveLineIdx(idx)}
-                    className={`group relative inline-flex shrink-0 cursor-pointer select-none items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition-all duration-150 ${
-                      isActive
-                        ? "border-zinc-200/90 bg-white font-semibold text-zinc-900 shadow-2xs ring-1 ring-zinc-950/5"
-                        : "border-transparent bg-zinc-100/80 font-medium text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800"
-                    }`}
-                  >
-                    <span
-                      className={`flex size-4.5 items-center justify-center rounded-md font-heading text-[10px] font-bold ${
-                        isActive ? "bg-zinc-900 text-white" : "bg-zinc-200 text-zinc-600"
-                      }`}
-                    >
-                      {idx + 1}
-                    </span>
-                    <span>Producto #{idx + 1}</span>
-                    {hasError && (
-                      <span
-                        className="size-1.5 animate-pulse rounded-full bg-brand-red"
-                        title="Tiene campos pendientes"
-                      />
-                    )}
-                    {lines.length > 1 && (
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeLine(line.key);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            removeLine(line.key);
-                          }
-                        }}
-                        title={`Quitar producto #${idx + 1}`}
-                        className="-mr-1 ml-0.5 cursor-pointer rounded p-0.5 text-zinc-400 opacity-60 transition-all hover:bg-zinc-100 hover:text-brand-red group-hover:opacity-100"
-                      >
-                        <X className="size-3" />
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </FormLineTabStrip>
-          </div>
-
-          {errors.lines && <p className="text-[12px] text-red-600">{errors.lines}</p>}
-
-          {(() => {
-            const line = currentLine;
-            const index = safeIdx;
-            const lineErrors = errors.byLine[line.key] ?? {};
-
-            return (
-              <div key={line.key} className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs">
-                <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/70 px-4 py-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex size-5.5 items-center justify-center rounded-md bg-zinc-200/80 font-heading text-xs font-bold text-zinc-700">
-                      {index + 1}
-                    </span>
-                    <span className="font-heading text-xs font-bold text-zinc-800">
-                      Producto #{index + 1}
-                    </span>
-                  </div>
-                  {lines.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeLine(line.key)}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-[11.5px] font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-brand-red"
-                      title={`Quitar producto ${index + 1}`}
-                    >
-                      <Trash2 className="size-3.5" />
-                      <span>Quitar</span>
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-4 p-4 sm:p-5">
-                  {/* Fila 1: Producto (3/4) + Precio unitario (1/4) */}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                    <div className="sm:col-span-2 lg:col-span-3">
-                      <ProductLookupField
-                        size="sm"
-                        label="Producto (CODIGO y DESCRICION)"
-                        required
-                        value={line.productId}
-                        selectedLabel={line.productLabel}
-                        ticketProducts={ticketProducts}
-                        onChange={(val) => patchLine(line.key, { productId: val, productLabel: undefined })}
-                        error={lineErrors.productId}
-                      />
-                    </div>
-
-                    <div className="sm:col-span-1 lg:col-span-1">
-                      <TextField
-                        size="sm"
-                        label={`Precio unitario (${currency})`}
-                        type="number"
-                        min="0"
-                        step="0.0001"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={line.unitPrice}
-                        onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })}
-                        error={lineErrors.unitPrice}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Fila 2: Cantidad (CANT.), Unidad de cantidad y Empaque / UNID en 3 columnas */}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <TextField
-                      size="sm"
-                      label="Cantidad (CANT.)"
-                      required
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      inputMode="decimal"
-                      placeholder="Ej. 3"
-                      value={line.quantity}
-                      onChange={(e) => patchLine(line.key, { quantity: e.target.value })}
-                      error={lineErrors.quantity}
-                    />
-
-                    <TextField
-                      size="sm"
-                      label="Unidad de cantidad"
-                      required
-                      maxLength={20}
-                      placeholder="CAJ, PAQ, UND"
-                      className="uppercase"
-                      value={line.quantityUnit}
-                      onChange={(e) => patchLine(line.key, { quantityUnit: e.target.value })}
-                      error={lineErrors.quantityUnit}
-                    />
-
-                    <TextField
-                      size="sm"
-                      label="Empaque / UNID"
-                      maxLength={60}
-                      placeholder="Ej. 14PAQ"
-                      className="uppercase"
-                      value={line.packDetail}
-                      onChange={(e) => patchLine(line.key, { packDetail: e.target.value })}
-                      error={lineErrors.packDetail}
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+      {/* PASO 2: Renglones PF-FOR-068 (tabla tipo hoja de cálculo) */}
+      {step === 2 && (
+        <div key="withdrawal-step-2" className={stepPanelClass}>
+          <WithdrawalLinesSpreadsheet
+            lines={lines}
+            currency={currency}
+            ticketProducts={ticketProducts}
+            linesError={errors.lines}
+            byLine={errors.byLine}
+            totalValue={linesTotal}
+            highlightLineKey={highlightLineKey}
+            rowRef={(key, el) => {
+              if (el) lineRowRefs.current.set(key, el);
+              else lineRowRefs.current.delete(key);
+            }}
+            onPatch={patchLine}
+            onAddLine={addLine}
+            onRemoveLine={removeLine}
+          />
         </div>
       )}
     </form>
@@ -978,44 +849,50 @@ export function WithdrawalFormModal({
   return (
     <>
       {inline ? (
-        <div className="mx-auto max-w-4xl overflow-hidden rounded-xl border border-zinc-200 bg-white">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/60 px-5 py-3.5">
-            <div className="flex items-center gap-3">
-              <span className="rounded-md border border-brand-red/20 bg-red-50 px-2 py-0.5 font-mono text-[11px] font-bold text-brand-red">
-                PF-FOR-068
-              </span>
-              <div>
-                <h3 className="font-heading text-[15px] font-bold text-zinc-900">
-                  {isEditing ? `Editar solicitud ${withdrawal?.number ?? ""}` : "Nueva solicitud de retiro de mercancía"}
-                </h3>
-                <p className="text-[11.5px] text-zinc-500">
-                  Paso {step} de {STEPS.length} · {STEPS[step - 1].label}
-                </p>
-              </div>
-            </div>
+        <div
+          ref={inlineMotion.panelRef}
+          className={`mx-auto overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xs ${
+            isWideStep ? "w-full max-w-[min(96vw,88rem)]" : "max-w-4xl"
+          }`}
+        >
+          <header className="flex items-center gap-3 border-b border-zinc-200/80 bg-white px-4 py-3 sm:gap-4 sm:px-6">
             <button
               type="button"
               onClick={handleRequestClose}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 cursor-pointer"
+              className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50/60 text-zinc-600 shadow-2xs transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus:outline-hidden"
+              title="Volver a formularios"
+              aria-label="Volver a formularios"
             >
-              <ArrowLeft className="size-3.5" />
-              Volver a formularios
+              <ArrowLeft className="size-4 text-zinc-600" />
             </button>
+            <h2 className="min-w-0 flex-1 truncate font-heading text-base font-bold leading-none text-zinc-900 sm:text-lg">
+              {isEditing
+                ? `Editar solicitud · ${displayTicketNumber ?? ""}`
+                : "Solicitud de retiro de mercancía"}
+            </h2>
+            <span className="shrink-0 rounded border border-brand-red/20 bg-brand-red/10 px-1.5 py-0.5 font-heading text-[10px] font-bold uppercase tracking-wider text-brand-red">
+              {WITHDRAWAL_FORM_CONTROL.code}
+            </span>
           </header>
-          <div className="p-5">{wizardBody}</div>
-          <footer className="border-t border-zinc-100 bg-zinc-50/50 px-5 py-3.5">{wizardFooter}</footer>
+          <div className="border-b border-zinc-100 px-4 py-3 sm:px-6">{renderStepper()}</div>
+          <div className="p-4 sm:p-6">{wizardBody}</div>
+          <footer className="border-t border-zinc-200/80 bg-zinc-50/70 px-5 py-3.5 sm:px-6">{wizardFooter}</footer>
         </div>
       ) : (
         <Modal
           title={
             isEditing
-              ? `Editar solicitud ${withdrawal?.number ?? ""} (PF-FOR-068)`
-              : "Nueva solicitud de retiro de mercancía (PF-FOR-068)"
+              ? `Editar solicitud ${withdrawal?.number ?? ""}`
+              : "Solicitud de retiro de mercancía"
           }
+          eyebrow={WITHDRAWAL_FORM_CONTROL.code}
           onClose={handleRequestClose}
-          maxWidth="max-w-4xl"
+          maxWidth={
+            isWideStep ? "max-w-[96vw] 2xl:max-w-[1720px] w-full" : "max-w-4xl"
+          }
           footer={wizardFooter}
         >
+          <div className="mb-4 -mt-2 border-b border-zinc-100 pb-3">{renderStepper()}</div>
           {wizardBody}
         </Modal>
       )}
@@ -1034,7 +911,7 @@ export function WithdrawalFormModal({
                 onClick={() => {
                   clearDraftFromStorage();
                   setConfirmCloseOpen(false);
-                  onClose();
+                  requestClose();
                 }}
               >
                 Descartar
@@ -1048,7 +925,7 @@ export function WithdrawalFormModal({
                   onClick={() => {
                     saveDraftToStorage();
                     setConfirmCloseOpen(false);
-                    onClose();
+                    requestClose();
                   }}
                 >
                   Guardar borrador
@@ -1072,7 +949,7 @@ export function WithdrawalFormModal({
             const done = completedWithdrawal;
             setShowClosePrompt(false);
             setCompletedWithdrawal(null);
-            onSaved(done);
+            finishModal(done);
           }}
           maxWidth="max-w-md"
           closeOnBackdropClick={false}
@@ -1086,7 +963,7 @@ export function WithdrawalFormModal({
                   const done = completedWithdrawal;
                   setShowClosePrompt(false);
                   setCompletedWithdrawal(null);
-                  onSaved(done);
+                  finishModal(done);
                 }}
               >
                 Mantener ticket abierto
@@ -1129,7 +1006,7 @@ export function WithdrawalFormModal({
                     setClosingTicket(false);
                     setShowClosePrompt(false);
                     setCompletedWithdrawal(null);
-                    onSaved(done);
+                    finishModal(done);
                   }
                 }}
               >
@@ -1180,5 +1057,34 @@ export function WithdrawalFormModal({
         </Modal>
       )}
     </>
+  );
+}
+
+function WithdrawalTicketContextBar({
+  ticketNumber,
+  companyName,
+}: {
+  ticketNumber: string;
+  companyName: string;
+}) {
+  return (
+    <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-zinc-200/90 bg-zinc-50/70 sm:grid-cols-2 sm:divide-x sm:divide-zinc-200/90">
+      <div className="flex min-h-[3.25rem] min-w-0 flex-col justify-center gap-0.5 border-b border-zinc-200/90 px-4 py-3 sm:border-b-0">
+        <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+          Ticket
+        </span>
+        <span className="truncate font-mono text-[13px] font-semibold leading-snug text-zinc-900" title={ticketNumber}>
+          {ticketNumber}
+        </span>
+      </div>
+      <div className="flex min-h-[3.25rem] min-w-0 flex-col justify-center gap-0.5 px-4 py-3">
+        <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+          Nombre empresa
+        </span>
+        <span className="truncate text-[13px] font-semibold leading-snug text-zinc-900" title={companyName}>
+          {companyName}
+        </span>
+      </div>
+    </div>
   );
 }

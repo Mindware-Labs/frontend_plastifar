@@ -36,7 +36,7 @@ import { ProductsSection } from "./pages/settings/ProductsSection";
 import { SlaSection } from "./pages/settings/SlaSection";
 import { TeamsSection } from "./pages/settings/TeamsSection";
 import { TaskTypesSection } from "./pages/settings/TaskTypesSection";
-import { FormRoutingRulesSection } from "./pages/settings/FormRoutingRulesSection";
+
 import { TemplatesSection } from "./pages/settings/TemplatesSection";
 import { TerritoriesSection } from "./pages/settings/TerritoriesSection";
 import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
@@ -175,7 +175,7 @@ export default function App() {
         {/* Catalogo de tareas y enrutamiento de formularios (docs/plan/02,
             seccion 11): la parte del documento que no toca la Bandeja. */}
         <Route path="/configuracion/tipos-de-tarea" element={<TaskTypesSection />} />
-        <Route path="/configuracion/formularios" element={<FormRoutingRulesSection />} />
+
 
         {/* Territorios y lineas de producto se mudaron al modulo que las usa:
             el territorio es obligatorio al registrar un cliente y alimenta el
