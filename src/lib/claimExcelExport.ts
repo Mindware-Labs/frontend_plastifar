@@ -1,10 +1,14 @@
-import type { CustomerClaim } from "../types/claims";
+import type { ClaimSummary, CustomerClaim } from "../types/claims";
 import { topicRequiresOther } from "../types/claims";
 import { CLAIM_FORM_CONTROL } from "./claims";
 import { formatDay } from "./dates";
 import { downloadWorkbook } from "./hcaExcelExport";
 import { formatAmountOrPlain, formatPrice, formatQuantity } from "./numbers";
 
+const CLAIM_LIST_REPORT_TITLE = "REPORTE DE RECLAMACIONES DE CLIENTES";
+const PLASTIFAR_TAGLINE = "Plastifar · Sistema de gestión de calidad";
+const LIST_TABLE_HEADER_FILL = "FFF4F4F5";
+const LIST_ZEBRA_FILL = "FFF9FAFB";
 const COLS = 9;
 const BRAND_RED = "FFE4002B";
 const BORDER_THIN = { style: "thin" as const, color: { argb: "FF000000" } };
@@ -14,6 +18,125 @@ const BORDER_ALL = {
   bottom: BORDER_THIN,
   right: BORDER_THIN,
 };
+
+const CLAIM_LIST_HEADERS = [
+  "Ticket",
+  "Cliente",
+  "Fecha",
+  "Motivo",
+  "Detalle Motivo",
+  "Plantas",
+  "Moneda",
+  "Total Reclamado",
+  "Estado",
+] as const;
+
+function claimListSubtitle(count: number): string {
+  return `Generado el ${new Date().toLocaleDateString("es-DO")} · Total de registros: ${count}`;
+}
+
+function claimListRowValues(c: ClaimSummary): string[] {
+  return [
+    c.ticketNumber,
+    c.clientName,
+    c.claimDate ? formatDay(c.claimDate) : "",
+    c.reason,
+    c.reasonOther || "",
+    c.plants.join(", ") || "—",
+    c.currency || "DOP",
+    formatAmountOrPlain(c.totalAmount, c.currency),
+    c.status,
+  ];
+}
+
+function claimsListFilenameStem(): string {
+  return `Reclamaciones_Plastifar_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+}
+
+/** Pesos relativos de columnas; se escalan al ancho útil de la hoja. */
+const CLAIM_LIST_COL_WEIGHTS = [26, 46, 20, 34, 28, 34, 14, 28, 26];
+
+function scaleClaimListColumnWidths(tableWidth: number): number[] {
+  const total = CLAIM_LIST_COL_WEIGHTS.reduce((sum, weight) => sum + weight, 0);
+  const widths = CLAIM_LIST_COL_WEIGHTS.map((weight) => (weight / total) * tableWidth);
+  const drift = tableWidth - widths.reduce((sum, width) => sum + width, 0);
+  widths[widths.length - 1] += drift;
+  return widths;
+}
+
+async function loadPlastifarLogoBuffer(): Promise<ArrayBuffer | null> {
+  try {
+    const logoRes = await fetch("/brand/plastifar-logo.png");
+    if (!logoRes.ok) return null;
+    return await logoRes.arrayBuffer();
+  } catch {
+    return null;
+  }
+}
+
+async function loadPlastifarLogoDataUrl(): Promise<string | null> {
+  const buffer = await loadPlastifarLogoBuffer();
+  if (!buffer) return null;
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return `data:image/png;base64,${btoa(binary)}`;
+}
+
+async function embedPlastifarLogoOnSheet(
+  wb: import("exceljs").Workbook,
+  ws: import("exceljs").Worksheet,
+): Promise<void> {
+  const buffer = await loadPlastifarLogoBuffer();
+  if (!buffer) return;
+  const imageId = wb.addImage({ buffer, extension: "png" });
+  ws.addImage(imageId, {
+    tl: { col: 0.12, row: 0.12 },
+    ext: { width: 128, height: 34 },
+  });
+}
+
+const LIST_HEADER_ROWS = 5;
+const LIST_TABLE_HEADER_ROW = 6;
+const LIST_DATA_START_ROW = 7;
+
+function applyClaimsListCorporateHeader(ws: import("exceljs").Worksheet, count: number): void {
+  ws.mergeCells(1, 3, 1, 8);
+  const titleCell = ws.getCell(1, 3);
+  titleCell.value = CLAIM_LIST_REPORT_TITLE;
+  titleCell.font = { name: "Calibri", size: 15, bold: true, color: { argb: BRAND_RED } };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+
+  ws.mergeCells(2, 3, 2, 8);
+  const taglineCell = ws.getCell(2, 3);
+  taglineCell.value = PLASTIFAR_TAGLINE;
+  taglineCell.font = { name: "Calibri", size: 9, color: { argb: "FF515151" } };
+  taglineCell.alignment = { horizontal: "center", vertical: "middle" };
+
+  ws.getCell(1, 9).value = CLAIM_FORM_CONTROL.code;
+  ws.getCell(1, 9).font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF18181B" } };
+  ws.getCell(1, 9).alignment = { horizontal: "right", vertical: "middle" };
+
+  ws.getCell(2, 9).value = `Rev. ${CLAIM_FORM_CONTROL.revision}`;
+  ws.getCell(2, 9).font = { name: "Calibri", size: 9, color: { argb: "FF515151" } };
+  ws.getCell(2, 9).alignment = { horizontal: "right", vertical: "middle" };
+
+  ws.mergeCells(3, 1, 3, 9);
+  const metaCell = ws.getCell(3, 1);
+  metaCell.value = claimListSubtitle(count);
+  metaCell.font = { name: "Calibri", size: 10, italic: true, color: { argb: "FF515151" } };
+  metaCell.alignment = { horizontal: "center", vertical: "middle" };
+
+  ws.mergeCells(4, 1, 4, 9);
+  ws.getRow(4).height = 6;
+  ws.getCell(4, 1).border = {
+    bottom: { style: "medium", color: { argb: BRAND_RED } },
+  };
+
+  ws.getRow(1).height = 26;
+  ws.getRow(2).height = 16;
+  ws.getRow(3).height = 18;
+}
 
 const sectionTitleFont = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
 const sectionTitleFill = {
@@ -326,4 +449,249 @@ export async function exportClaimToExcel(claim: CustomerClaim): Promise<void> {
   footer.alignment = { wrapText: true };
 
   await downloadWorkbook(wb, `PF-FOR-034_${claim.ticketNumber || claim.id}.xlsx`);
+}
+
+
+export async function exportClaimsListToExcel(claims: ClaimSummary[]): Promise<void> {
+  const ExcelJS = await import("exceljs");
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Plastifar S.A.";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet("Reclamaciones", {
+    views: [{ state: "normal", showGridLines: false, zoomScale: 100 }],
+    pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1 },
+  });
+
+  ws.columns = [
+    { width: 15 },
+    { width: 30 },
+    { width: 14 },
+    { width: 26 },
+    { width: 22 },
+    { width: 22 },
+    { width: 10 },
+    { width: 16 },
+    { width: 16 },
+  ];
+
+  await embedPlastifarLogoOnSheet(wb, ws);
+  applyClaimsListCorporateHeader(ws, claims.length);
+  sectionHeader(ws, LIST_HEADER_ROWS, "Listado de reclamaciones");
+
+  const headerRow = ws.getRow(LIST_TABLE_HEADER_ROW);
+  headerRow.height = 22;
+  CLAIM_LIST_HEADERS.forEach((h, idx) => {
+    const cell = headerRow.getCell(idx + 1);
+    cell.value = h;
+    cell.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF18181B" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIST_TABLE_HEADER_FILL } };
+    cell.alignment = { vertical: "middle", horizontal: idx === 7 ? "right" : "left" };
+    cell.border = BORDER_ALL;
+  });
+
+  claims.forEach((c, i) => {
+    const row = ws.getRow(LIST_DATA_START_ROW + i);
+    row.height = 20;
+    const values = claimListRowValues(c);
+
+    values.forEach((v, idx) => {
+      const cell = row.getCell(idx + 1);
+      cell.value = idx === 7 ? c.totalAmount : v;
+      cell.font = { name: "Calibri", size: 10 };
+      cell.alignment = { vertical: "middle", horizontal: idx === 7 ? "right" : "left" };
+      if (idx === 7) {
+        cell.numFmt = "#,##0.00";
+      }
+      cell.border = BORDER_ALL;
+      if (i % 2 === 1) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIST_ZEBRA_FILL } };
+      }
+    });
+  });
+
+  await downloadWorkbook(wb, `${claimsListFilenameStem()}.xlsx`);
+}
+
+/** Mismo contenido y jerarquía visual que el Excel de listado (cabecera corporativa y tabla). */
+export async function exportClaimsListToPdf(claims: ClaimSummary[]): Promise<void> {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
+
+  const margin = 10;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const tableWidth = pageWidth - margin * 2;
+  const colWidths = scaleClaimListColumnWidths(tableWidth);
+  const lineHeight = 3.6;
+  const cellPadX = 1.2;
+  const cellPadY = 2.2;
+  const headerFontSize = 7.5;
+  const headerLineHeight = 3.1;
+  const brandRed: [number, number, number] = [228, 0, 43];
+  const tableHeaderFill: [number, number, number] = [244, 244, 245];
+  const zebraFill: [number, number, number] = [249, 250, 251];
+  const logoDataUrl = await loadPlastifarLogoDataUrl();
+
+  function drawCorporateHeader(startY: number): number {
+    const logoW = 36;
+    const logoH = 10;
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", margin, startY, logoW, logoH);
+    }
+
+    const centerX = pageWidth / 2;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(...brandRed);
+    doc.text(CLAIM_LIST_REPORT_TITLE, centerX, startY + 4.5, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(81, 81, 81);
+    doc.text(PLASTIFAR_TAGLINE.toUpperCase(), centerX, startY + 8.5, { align: "center" });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(24, 24, 27);
+    doc.text(CLAIM_FORM_CONTROL.code, pageWidth - margin, startY + 4, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(81, 81, 81);
+    doc.text(`Rev. ${CLAIM_FORM_CONTROL.revision}`, pageWidth - margin, startY + 8, { align: "right" });
+
+    let y = startY + logoH + 3;
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(81, 81, 81);
+    doc.text(claimListSubtitle(claims.length), centerX, y, { align: "center" });
+    y += 3;
+
+    doc.setDrawColor(...brandRed);
+    doc.setLineWidth(0.6);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 4;
+
+    doc.setFillColor(...brandRed);
+    doc.rect(margin, y, tableWidth, 7, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.text("Listado de reclamaciones", margin + 2, y + 4.8);
+    return y + 9;
+  }
+
+  function measureColumnHeaderHeight(): number {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(headerFontSize);
+    let maxLines = 1;
+    for (let i = 0; i < CLAIM_LIST_HEADERS.length; i++) {
+      const lines = doc.splitTextToSize(CLAIM_LIST_HEADERS[i], colWidths[i] - cellPadX * 2);
+      maxLines = Math.max(maxLines, lines.length);
+    }
+    return maxLines * headerLineHeight + cellPadY * 2;
+  }
+
+  function drawColumnHeader(y: number): number {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(headerFontSize);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.15);
+
+    const headerHeight = measureColumnHeaderHeight();
+    let x = margin;
+    for (let i = 0; i < CLAIM_LIST_HEADERS.length; i++) {
+      doc.setFillColor(...tableHeaderFill);
+      doc.rect(x, y, colWidths[i], headerHeight, "F");
+      doc.rect(x, y, colWidths[i], headerHeight, "S");
+      doc.setTextColor(24, 24, 27);
+      const lines = doc.splitTextToSize(CLAIM_LIST_HEADERS[i], colWidths[i] - cellPadX * 2);
+      doc.text(lines, x + cellPadX, y + cellPadY + headerLineHeight);
+      x += colWidths[i];
+    }
+    return y + headerHeight;
+  }
+
+  function drawPageFooter(page: number, totalPages: number) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(81, 81, 81);
+    doc.text(
+      `${CLAIM_FORM_CONTROL.code} · Rev. ${CLAIM_FORM_CONTROL.revision} · Plastifar S.A. · Página ${page} de ${totalPages}`,
+      pageWidth / 2,
+      pageHeight - 5,
+      { align: "center" },
+    );
+  }
+
+  let y = drawCorporateHeader(margin);
+  y = drawColumnHeader(y);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(0, 0, 0);
+
+  let rowIndex = 0;
+  for (const claim of claims) {
+    const values = claimListRowValues(claim);
+    const wrapped = values.map((value, idx) =>
+      doc.splitTextToSize(value || "—", colWidths[idx] - cellPadX * 2),
+    );
+    const rowLines = Math.max(...wrapped.map((lines) => lines.length), 1);
+    const rowHeight = rowLines * lineHeight + cellPadY * 2;
+
+    if (y + rowHeight > pageHeight - margin - 8) {
+      doc.addPage();
+      y = drawColumnHeader(margin);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
+    }
+
+    let x = margin;
+    for (let col = 0; col < values.length; col++) {
+      if (rowIndex % 2 === 1) {
+        doc.setFillColor(...zebraFill);
+        doc.rect(x, y, colWidths[col], rowHeight, "F");
+      }
+      doc.setDrawColor(0, 0, 0);
+      doc.rect(x, y, colWidths[col], rowHeight, "S");
+      const align = col === 7 ? "right" : "left";
+      const textX = align === "right" ? x + colWidths[col] - cellPadX : x + cellPadX;
+      doc.setTextColor(0, 0, 0);
+      doc.text(wrapped[col], textX, y + cellPadY + lineHeight, { align });
+      x += colWidths[col];
+    }
+    y += rowHeight;
+    rowIndex++;
+  }
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page++) {
+    doc.setPage(page);
+    drawPageFooter(page, totalPages);
+  }
+
+  doc.save(`${claimsListFilenameStem()}.pdf`);
+}
+
+export function exportClaimsListToCsv(claims: ClaimSummary[]): void {
+  const rows = claims.map((c) => {
+    const values = claimListRowValues(c);
+    return values.map((v, idx) =>
+      idx === 7 ? String(c.totalAmount) : `"${String(v).replace(/"/g, '""')}"`,
+    );
+  });
+
+  const csvContent =
+    "\uFEFF" + [CLAIM_LIST_HEADERS.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${claimsListFilenameStem()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

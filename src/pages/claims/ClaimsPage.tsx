@@ -1,6 +1,14 @@
-import { Building2, ClipboardList, Factory, FileText, Tag } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  Building2,
+  ClipboardList,
+  Eye,
+  Factory,
+  FileSpreadsheet,
+  FileText,
+  Tag,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { claimsApi, type ClaimListResponse, type ClaimQuery } from "../../api/claims";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
@@ -19,18 +27,24 @@ import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
+import { TableSelectionBar, type TableSelectionAction } from "../../components/ui/TableSelectionBar";
 import { Tooltip } from "../../components/ui/Tooltip";
+import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
+import { useTablePageSelection } from "../../hooks/useTablePageSelection";
+import { exportClaimsListToExcel, exportClaimsListToPdf } from "../../lib/claimExcelExport";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import { formatAmount } from "../../lib/numbers";
-import { topicRequiresOther, type ClaimStatus } from "../../types/claims";
 import type { TicketTopicResponse } from "../../types/api";
+import { topicRequiresOther, type ClaimStatus, type ClaimSummary } from "../../types/claims";
 import type { Plant } from "../../types/settings";
 import { ClaimStatusBadge } from "./ClaimStatusBadge";
+import { ClaimSummaryDrawer } from "./ClaimSummaryDrawer";
 
 type ChipKey = "todas" | ClaimStatus;
 type SortKey = "fecha" | "cliente" | "total" | "ticket";
@@ -43,13 +57,12 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
 ];
 
 /**
- * RF-R8: listado paginado de reclamaciones con pastillas por estado y filtros
- * por motivo, planta, cliente y rango de fechas. No hay «Nueva reclamación»
- * aquí a propósito: una reclamación nace de su ticket (RF-R1), desde la
- * pestaña «Reclamación» del detalle del ticket.
+ * RF-R8: listado paginado de reclamaciones con selección múltiple, exportación
+ * en común (Excel y PDF del listado), visor de resumen estilo formularios
+ * empresariales y filtros por motivo, planta, cliente y fecha.
  */
 export function ClaimsPage() {
-  const navigate = useNavigate();
+  const receipts = useReceipts();
   const [plants, setPlants] = useState<Plant[]>([]);
   const [topics, setTopics] = useState<TicketTopicResponse[]>([]);
 
@@ -62,6 +75,12 @@ export function ClaimsPage() {
   const [chip, setChip] = useState<ChipKey>("todas");
   const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
+
+  // Resumen modal/drawer
+  const [summaryClaimId, setSummaryClaimId] = useState<number | null>(null);
+
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [selectionCache, setSelectionCache] = useState<Map<number, ClaimSummary>>(() => new Map());
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -102,6 +121,31 @@ export function ClaimsPage() {
   const rows = data?.items ?? [];
   const counts = data?.counts;
 
+  // Multi-row selection
+  const pageIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
+
+  useEffect(() => {
+    setSelectionCache((prev) => {
+      const next = new Map(prev);
+      for (const id of next.keys()) {
+        if (!selectedIds.has(id)) next.delete(id);
+      }
+      for (const row of rows) {
+        if (selectedIds.has(row.id)) next.set(row.id, row);
+      }
+      return next;
+    });
+  }, [rows, selectedIds]);
+
+  const selectedClaims = useMemo(
+    () =>
+      Array.from(selectedIds)
+        .map((id) => selectionCache.get(id))
+        .filter((claim): claim is ClaimSummary => claim !== undefined),
+    [selectedIds, selectionCache],
+  );
+
   const filtrosPuestos =
     (reason !== "todos" ? 1 : 0) +
     (plantId !== "todas" ? 1 : 0) +
@@ -119,6 +163,64 @@ export function ClaimsPage() {
   }
 
   const unfiltered = chip === "todas" && filtrosPuestos === 0 && !debouncedSearch;
+
+  // Actividades en común (Bulk actions)
+  async function handleBulkExportExcel() {
+    if (selectedClaims.length === 0) return;
+    try {
+      setBulkBusy(true);
+      await exportClaimsListToExcel(selectedClaims);
+      const count = selectedClaims.length;
+      receipts.done({
+        action: "exportar-reclamaciones-excel",
+        title: "Excel descargado",
+        detail: `${count} ${count === 1 ? "reclamación en el archivo" : "reclamaciones en el archivo"}`,
+      });
+    } catch {
+      receipts.failed({
+        action: "exportar-reclamaciones-excel",
+        title: "No se pudo generar el Excel",
+      });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function handleBulkExportPdf() {
+    if (selectedClaims.length === 0) return;
+    try {
+      setBulkBusy(true);
+      await exportClaimsListToPdf(selectedClaims);
+      const count = selectedClaims.length;
+      receipts.done({
+        action: "exportar-reclamaciones-pdf",
+        title: "PDF descargado",
+        detail: `${count} ${count === 1 ? "reclamación en el archivo" : "reclamaciones en el archivo"}`,
+      });
+    } catch {
+      receipts.failed({
+        action: "exportar-reclamaciones-pdf",
+        title: "No se pudo generar el PDF",
+      });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  const bulkActions: TableSelectionAction[] = [
+    {
+      key: "excel",
+      label: "Exportar Excel",
+      icon: <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-700" />,
+      onClick: handleBulkExportExcel,
+    },
+    {
+      key: "pdf",
+      label: "Exportar PDF",
+      icon: <FileText className="h-3.5 w-3.5 text-rose-600" />,
+      onClick: handleBulkExportPdf,
+    },
+  ];
 
   return (
     <div>
@@ -193,67 +295,78 @@ export function ClaimsPage() {
 
       <ListPanel
         toolbar={
-          <>
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Ticket, cliente, factura, PO o producto…"
-              className="w-[280px]"
+          selectedIds.size > 0 ? (
+            <TableSelectionBar
+              count={selectedIds.size}
+              pageState={pageState}
+              busy={bulkBusy}
+              onTogglePage={togglePage}
+              onClear={clearSelection}
+              actions={bulkActions}
             />
-
-            <FilterDropdown
-              title="Seleccionar motivo"
-              aria-label="Filtrar por motivo del reclamo"
-              value={reason}
-              onChange={setReason}
-              defaultIcon={<Tag className="h-3.5 w-3.5 text-zinc-500" />}
-              options={[
-                { value: "todos", label: "Todos los motivos" },
-                ...topics.map((topic) => ({ value: String(topic.id), label: topic.name })),
-              ]}
-            />
-
-            <FilterDropdown
-              title="Seleccionar planta"
-              aria-label="Filtrar por planta involucrada"
-              value={plantId}
-              onChange={setPlantId}
-              defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
-              options={[
-                { value: "todas", label: "Todas las plantas" },
-                ...plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
-              ]}
-            />
-
-            <LookupFilterDropdown
-              title="Seleccionar cliente"
-              aria-label="Filtrar por cliente"
-              placeholder="Todos los clientes"
-              searchPlaceholder="Buscar cliente…"
-              defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
-              value={clientId === "todos" ? "" : clientId}
-              onChange={(value) => setClientId(value === "" ? "todos" : value)}
-              search={searchClients}
-              resolveSelectedLabel={resolveClientLabel}
-            />
-
-            <DateRangeFilterDropdown
-              from={from}
-              to={to}
-              onFromChange={setFrom}
-              onToChange={setTo}
-              aria-label="Filtrar por fecha"
-            />
-
-            {(search || filtrosPuestos > 0) && (
-              <ClearFiltersButton
-                onClick={() => {
-                  setSearch("");
-                  clearNarrowFilters();
-                }}
+          ) : (
+            <>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Ticket, cliente, factura, PO o producto…"
+                className="w-[280px]"
               />
-            )}
-          </>
+
+              <FilterDropdown
+                title="Seleccionar motivo"
+                aria-label="Filtrar por motivo del reclamo"
+                value={reason}
+                onChange={setReason}
+                defaultIcon={<Tag className="h-3.5 w-3.5 text-zinc-500" />}
+                options={[
+                  { value: "todos", label: "Todos los motivos" },
+                  ...topics.map((topic) => ({ value: String(topic.id), label: topic.name })),
+                ]}
+              />
+
+              <FilterDropdown
+                title="Seleccionar planta"
+                aria-label="Filtrar por planta involucrada"
+                value={plantId}
+                onChange={setPlantId}
+                defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
+                options={[
+                  { value: "todas", label: "Todas las plantas" },
+                  ...plants.map((plant) => ({ value: String(plant.id), label: plant.name })),
+                ]}
+              />
+
+              <LookupFilterDropdown
+                title="Seleccionar cliente"
+                aria-label="Filtrar por cliente"
+                placeholder="Todos los clientes"
+                searchPlaceholder="Buscar cliente…"
+                defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
+                value={clientId === "todos" ? "" : clientId}
+                onChange={(value) => setClientId(value === "" ? "todos" : value)}
+                search={searchClients}
+                resolveSelectedLabel={resolveClientLabel}
+              />
+
+              <DateRangeFilterDropdown
+                from={from}
+                to={to}
+                onFromChange={setFrom}
+                onToChange={setTo}
+                aria-label="Filtrar por fecha"
+              />
+
+              {(search || filtrosPuestos > 0) && (
+                <ClearFiltersButton
+                  onClick={() => {
+                    setSearch("");
+                    clearNarrowFilters();
+                  }}
+                />
+              )}
+            </>
+          )
         }
         footer={
           data !== null && (
@@ -271,7 +384,7 @@ export function ClaimsPage() {
         }
       >
         {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={7} />
+          error === null && <TableSkeleton rows={pageSize} columns={8} />
         ) : rows.length === 0 ? (
           <div className="py-14 text-center">
             <p className="text-[13.5px] text-faint">
@@ -290,6 +403,13 @@ export function ClaimsPage() {
             <DataTable>
               <thead>
                 <HeadRow>
+                  <Th className="w-9 px-2 text-center">
+                    <SelectBox
+                      checked={pageState}
+                      label={pageState === true ? "Quitar selección de la página" : "Seleccionar toda la página"}
+                      onToggle={togglePage}
+                    />
+                  </Th>
                   <Th sort={sortOf("ticket")}>Ticket</Th>
                   <Th sort={sortOf("cliente")}>Cliente</Th>
                   <Th sort={sortOf("fecha")}>Fecha</Th>
@@ -299,74 +419,94 @@ export function ClaimsPage() {
                     Total
                   </Th>
                   <Th>Estado</Th>
-                  <Th className="w-20 text-right">Acciones</Th>
+                  <Th className="w-24 text-right">Acciones</Th>
                 </HeadRow>
               </thead>
               <tbody>
-                {rows.map((claim) => (
-                  <Row
-                    key={claim.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/reclamaciones/${claim.id}`)}
-                  >
-                    <Td>
-                      <Link
-                        to={`/reclamaciones/${claim.id}`}
-                        onClick={(event) => event.stopPropagation()}
-                        className="whitespace-nowrap font-mono text-[12px] font-medium text-ink hover:text-brand-red"
-                      >
-                        {claim.ticketNumber}
-                      </Link>
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      <span title={claim.clientName} className="block max-w-[200px] truncate">
-                        {claim.clientName}
-                      </span>
-                    </Td>
-                    <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
-                      {formatDay(claim.claimDate)}
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      {topicRequiresOther(claim.reason) && claim.reasonOther ? (
-                        <span title={claim.reasonOther}>Otros · {claim.reasonOther}</span>
-                      ) : (
-                        claim.reason
-                      )}
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      <span title={claim.plants.join(", ")} className="block max-w-[180px] truncate">
-                        {claim.plants.join(", ") || "—"}
-                      </span>
-                    </Td>
-                    <Td className="whitespace-nowrap text-right text-[12.5px] font-medium tabular-nums text-ink">
-                      {claim.currency ? formatAmount(claim.totalAmount, claim.currency) : "—"}
-                    </Td>
-                    <Td>
-                      <span className="flex items-center gap-2">
-                        <ClaimStatusBadge status={claim.status} />
-                        {claim.hasHca && (
-                          <Tooltip content="Tiene una HCA ligada al ticket">
-                            <ClipboardList aria-hidden className="h-3.5 w-3.5 text-faint" />
-                          </Tooltip>
-                        )}
-                      </span>
-                    </Td>
-                    <Td>
-                      <div className="flex h-7 items-center justify-end" onClick={(event) => event.stopPropagation()}>
-                        <RowAction
-                          label={`Imprimir la reclamación de ${claim.ticketNumber}`}
-                          icon={FileText}
-                          onClick={() => window.open(`/reclamaciones/${claim.id}/imprimir`, "_blank")}
+                {rows.map((claim) => {
+                  const isChecked = selectedIds.has(claim.id);
+                  return (
+                    <Row
+                      key={claim.id}
+                      className={`cursor-pointer ${isChecked ? "bg-brand-red/[0.03]" : ""}`}
+                      onClick={() => setSummaryClaimId(claim.id)}
+                    >
+                      <Td className="w-9 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                        <SelectBox
+                          checked={isChecked}
+                          label={`Seleccionar reclamación ${claim.ticketNumber}`}
+                          onToggle={() => toggleSelect(claim.id)}
                         />
-                      </div>
-                    </Td>
-                  </Row>
-                ))}
+                      </Td>
+                      <Td>
+                        <Link
+                          to={`/reclamaciones/${claim.id}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="whitespace-nowrap font-mono text-[12px] font-medium text-ink hover:text-brand-red"
+                        >
+                          {claim.ticketNumber}
+                        </Link>
+                      </Td>
+                      <Td className="text-[12.5px] text-brand-gray">
+                        <span title={claim.clientName} className="block max-w-[200px] truncate">
+                          {claim.clientName}
+                        </span>
+                      </Td>
+                      <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
+                        {formatDay(claim.claimDate)}
+                      </Td>
+                      <Td className="text-[12.5px] text-brand-gray">
+                        {topicRequiresOther(claim.reason) && claim.reasonOther ? (
+                          <span title={claim.reasonOther}>Otros · {claim.reasonOther}</span>
+                        ) : (
+                          claim.reason
+                        )}
+                      </Td>
+                      <Td className="text-[12.5px] text-brand-gray">
+                        <span title={claim.plants.join(", ")} className="block max-w-[180px] truncate">
+                          {claim.plants.join(", ") || "—"}
+                        </span>
+                      </Td>
+                      <Td className="whitespace-nowrap text-right text-[12.5px] font-medium tabular-nums text-ink">
+                        {claim.currency ? formatAmount(claim.totalAmount, claim.currency) : "—"}
+                      </Td>
+                      <Td>
+                        <span className="flex items-center gap-2">
+                          <ClaimStatusBadge status={claim.status} />
+                          {claim.hasHca && (
+                            <Tooltip content="Tiene una HCA ligada al ticket">
+                              <ClipboardList aria-hidden className="h-3.5 w-3.5 text-faint" />
+                            </Tooltip>
+                          )}
+                        </span>
+                      </Td>
+                      <Td>
+                        <div className="flex h-7 items-center justify-end gap-1" onClick={(event) => event.stopPropagation()}>
+                          <RowAction
+                            label={`Ver resumen ejecutivo de ${claim.ticketNumber}`}
+                            icon={Eye}
+                            onClick={() => setSummaryClaimId(claim.id)}
+                          />
+                          <RowAction
+                            label={`Imprimir la reclamación de ${claim.ticketNumber}`}
+                            icon={FileText}
+                            onClick={() => window.open(`/reclamaciones/${claim.id}/imprimir`, "_blank")}
+                          />
+                        </div>
+                      </Td>
+                    </Row>
+                  );
+                })}
               </tbody>
             </DataTable>
           </div>
         )}
       </ListPanel>
+
+      {/* Drawer con el Resumen Ejecutivo al hacer clic */}
+      {summaryClaimId !== null && (
+        <ClaimSummaryDrawer claimId={summaryClaimId} onClose={() => setSummaryClaimId(null)} />
+      )}
     </div>
   );
 }

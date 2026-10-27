@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { createPortal } from "react-dom";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
+import { DateRangePicker } from "./DateRangePicker";
 import type { LookupOption, LookupResult } from "./LookupSelect";
 
 export interface FilterOption {
@@ -658,7 +659,9 @@ export function DateRangeFilterDropdown({
 
   const displayLabel =
     from && to
-      ? `${formatShortDate(from)} – ${formatShortDate(to)}`
+      ? from === to
+        ? formatShortDate(from)
+        : `${formatShortDate(from)} – ${formatShortDate(to)}`
       : from
         ? `Desde ${formatShortDate(from)}`
         : to
@@ -669,7 +672,7 @@ export function DateRangeFilterDropdown({
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    const width = 240;
+    const width = 310;
     const left = Math.max(
       VIEWPORT_GUTTER,
       Math.min(rect.left, window.innerWidth - width - VIEWPORT_GUTTER),
@@ -760,42 +763,44 @@ export function DateRangeFilterDropdown({
               width: anchor.width,
               transformOrigin: `${anchor.originX}px top`,
             }}
-            className={`${panelClasses(exiting)} p-2.5 gap-2`}
+            className={`${panelClasses(exiting)} p-3 flex flex-col gap-2.5`}
           >
-            <div className="select-none text-[11px] font-medium text-zinc-400">{title}</div>
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-medium text-zinc-600">Desde</span>
-              <input
-                type="date"
-                value={from}
-                onChange={(event) => onFromChange(event.target.value)}
-                className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12.5px] text-zinc-800 outline-none focus:border-zinc-400"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-medium text-zinc-600">Hasta</span>
-              <input
-                type="date"
-                value={to}
-                onChange={(event) => onToChange(event.target.value)}
-                className="h-8 w-full rounded-md border border-zinc-200 bg-white px-2 text-[12.5px] text-zinc-800 outline-none focus:border-zinc-400"
-              />
-            </label>
-            {(from || to) && (
+            {title && (
+              <div className="select-none text-[10.5px] font-heading font-bold uppercase tracking-wider text-zinc-400">
+                {title}
+              </div>
+            )}
+            <DateRangePicker
+              since={from}
+              until={to}
+              onChange={(since, until) => {
+                onFromChange(since);
+                onToChange(until);
+              }}
+            />
+            <div className="mt-1 flex items-center justify-between border-t border-zinc-100 pt-2">
               <button
                 type="button"
+                disabled={!from && !to}
                 onClick={() => {
                   onFromChange("");
                   onToChange("");
+                }}
+                className="rounded px-2 py-1 text-[11.5px] font-medium text-zinc-500 hover:text-zinc-800 disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-colors"
+              >
+                Limpiar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   closeDropdown();
                   triggerRef.current?.focus();
                 }}
-                className="mt-0.5 inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 text-[12px] font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 cursor-pointer"
+                className="rounded-md bg-zinc-900 px-3 py-1 text-[11.5px] font-semibold text-white hover:bg-zinc-800 cursor-pointer shadow-2xs transition-colors"
               >
-                <X className="h-3 w-3" />
-                <span>Limpiar fechas</span>
+                Listo
               </button>
-            )}
+            </div>
           </div>,
           document.body,
         )}

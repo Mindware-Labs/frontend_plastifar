@@ -1,30 +1,29 @@
 import { X } from "lucide-react";
-import { useId, useRef, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
+import { useDialogMotion } from "../../hooks/useDialogMotion";
 
-interface DrawerProps {
+export interface DrawerProps {
   title: string;
-  /** Linea corta sobre el titulo: situa la accion dentro del modulo. */
+  /** Línea corta sobre el título: sitúa la acción dentro del módulo. */
   eyebrow?: string;
   description?: ReactNode;
   onClose: () => void;
   /** Acciones del pie, separadas del cuerpo por un filete. */
-  footer?: ReactNode;
+  footer?: ReactNode | ((helpers: { requestClose: () => void; close: () => void }) => ReactNode);
   children: ReactNode;
   maxWidth?: string;
+  /** Si el padre ya controla la animación de salida */
+  isExiting?: boolean;
+  onRequestClose?: () => void;
+  closeOnBackdropClick?: boolean;
 }
 
 /**
- * Panel lateral. Mismo contrato y mismo comportamiento que `Modal` —portal
- * sobre document.body, Esc, trampa de foco, cierre al pulsar el velo— pero
- * anclado al borde derecho y a la altura completa.
- *
- * Existe para formularios largos que el dialogo centrado no aguanta. El
- * generador de reportes tiene hasta siete criterios; en un `Modal` de 512px de
- * ancho quedaban apretados en dos columnas o desbordaban en un scroll interno
- * que escondia el boton de generar. El panel lateral les da altura, que es
- * justo lo que sobra en una pantalla ancha.
+ * Panel lateral (Sheet). Mismo contrato y mismo comportamiento que `Modal` —portal
+ * sobre document.body, Esc, trampa de foco, cierre suave con animación al pulsar
+ * el velo o botón de salida— anclado al borde derecho y a la altura completa.
  */
 export function Drawer({
   title,
@@ -34,18 +33,30 @@ export function Drawer({
   footer,
   children,
   maxWidth = "max-w-[460px]",
+  isExiting: externalIsExiting,
+  onRequestClose: externalRequestClose,
+  closeOnBackdropClick = true,
 }: DrawerProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
+  const motion = useDialogMotion(onClose, { variant: "drawer", exiting: externalIsExiting });
+  const { isExiting, requestClose, scrimRef, panelRef } = motion;
+  const doRequestClose = externalRequestClose ?? requestClose;
+
   const titleId = useId();
   const descriptionId = useId();
 
-  useDialogBehavior(panelRef, onClose);
+  useDialogBehavior(panelRef, doRequestClose);
 
   return createPortal(
     <div
-      className="animate-plf-scrim-in fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px]"
+      ref={scrimRef}
+      inert={isExiting ? true : undefined}
+      className={`fixed inset-0 z-50 flex justify-end bg-ink/45 backdrop-blur-[2px] will-change-[opacity] ${
+        isExiting ? "pointer-events-none" : ""
+      }`}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (closeOnBackdropClick && event.target === event.currentTarget && !isExiting) {
+          doRequestClose();
+        }
       }}
     >
       <div
@@ -54,15 +65,10 @@ export function Drawer({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        /* Panel flotante y no pared: separado del borde por un margen y con
-           radio completo, igual que el carril lateral y las tarjetas. Pegado al
-           canto derecho, el drawer era la unica superficie del sistema que
-           todavia se comportaba como un bloque de cromo.
-
-           El `border-l` se fue con el mismo argumento que en el carril: un
-           borde de un solo lado contra una esquina redondeada deja muesca. */
-        className={`animate-plf-drawer-in m-2.5 flex h-[calc(100%-1.25rem)] w-full ${maxWidth}
-          flex-col overflow-hidden rounded-card border border-line bg-white shadow-dialog`}
+        className={`m-2.5 flex h-[calc(100%-1.25rem)] w-full ${maxWidth}
+          flex-col overflow-hidden rounded-card border border-line bg-white shadow-dialog will-change-[transform,opacity] ${
+            isExiting ? "pointer-events-none" : ""
+          }`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 pb-4 pt-5">
           <div>
@@ -86,11 +92,11 @@ export function Drawer({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={doRequestClose}
             aria-label="Cerrar"
             className="-mr-1.5 -mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-edge
               text-subtle transition-colors hover:bg-fill hover:text-ink
-              focus-visible:ring-3 focus-visible:ring-brand-red/20 outline-none"
+              focus-visible:ring-3 focus-visible:ring-brand-red/20 outline-none cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -100,7 +106,7 @@ export function Drawer({
 
         {footer && (
           <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-line bg-fill px-6 py-3.5">
-            {footer}
+            {typeof footer === "function" ? footer({ requestClose: doRequestClose, close: onClose }) : footer}
           </div>
         )}
       </div>

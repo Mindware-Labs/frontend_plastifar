@@ -308,6 +308,16 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     }
   }, [registeredForms, selectedSubTabKey]);
 
+  useEffect(() => {
+    const formKey = searchParams.get("form");
+    if (!formKey || registeredForms.length === 0) return;
+    if (!registeredForms.some((f) => f.key === formKey)) return;
+    setSelectedSubTabKey(formKey);
+    const next = new URLSearchParams(searchParams);
+    next.delete("form");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, registeredForms, setSearchParams]);
+
   const activeForm = useMemo(() => {
     if (!selectedSubTabKey) return registeredForms[0] ?? null;
     return registeredForms.find((f) => f.key === selectedSubTabKey) ?? registeredForms[0] ?? null;
