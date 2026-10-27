@@ -1,11 +1,11 @@
-import { X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { resolveProductLabel } from "../../lib/lookups";
 import { ProductAddSearch } from "./ProductAddSearch";
 
-/** Alineado con `animate-plf-check-out` (0.36s) y chips de adjuntos en ticket. */
-const REMOVE_MS = 360;
+/** Salida del chip: un poco más ágil que adjuntos (0.36s). */
+const REMOVE_MS = 190;
 
 export interface TicketProductDraft {
   productId: number;
@@ -22,8 +22,8 @@ interface TicketProductsFieldProps {
 }
 
 /**
- * Selector de uno o varios productos del catálogo para un ticket. Opcional al
- * crear; se puede ampliar después en la ficha.
+ * Selector de productos del catálogo para tickets:
+ * buscador único + chips debajo con los artículos vinculados.
  */
 export function TicketProductsField({
   value,
@@ -36,8 +36,10 @@ export function TicketProductsField({
   const [addError, setAddError] = useState<string | null>(null);
   const [labels, setLabels] = useState<Record<number, string>>({});
   const [removingIds, setRemovingIds] = useState<Set<number>>(() => new Set());
-  const [pickerPulse, setPickerPulse] = useState(false);
-  const removeTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+
+  const removeTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
   const valueRef = useRef(value);
   valueRef.current = value;
 
@@ -50,7 +52,9 @@ export function TicketProductsField({
 
   useEffect(() => {
     let cancelled = false;
-    const missing = value.filter((row) => !row.productName && !labels[row.productId]);
+    const missing = value.filter(
+      (row) => !row.productName && !labels[row.productId],
+    );
     if (missing.length === 0) return;
 
     void (async () => {
@@ -94,6 +98,10 @@ export function TicketProductsField({
     removeTimers.current.set(productId, timer);
   }
 
+  function handleClearAll() {
+    onChange([]);
+  }
+
   function handlePick(option: { value: string; label: string; hint?: string }) {
     setAddError(null);
     const numericId = Number(option.value);
@@ -109,78 +117,106 @@ export function TicketProductsField({
         productName: option.label,
       },
     ]);
-    if (!prefersReducedMotion()) {
-      setPickerPulse(true);
-      window.setTimeout(() => setPickerPulse(false), 450);
-    }
   }
 
   function rowLabel(row: TicketProductDraft): string {
-    if (row.productCode && row.productName) return `${row.productCode} · ${row.productName}`;
+    if (row.productCode && row.productName)
+      return `${row.productCode} · ${row.productName}`;
     if (row.productName) return row.productName;
     return labels[row.productId] ?? `#${row.productId}`;
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {hint ? <p className="text-[11px] leading-snug text-zinc-400">{hint}</p> : null}
+      {hint ? (
+        <p className="text-[11px] leading-snug text-zinc-400">{hint}</p>
+      ) : null}
 
-      {!disabled && (
-        <div
-          className={`transition-[box-shadow] duration-300 ease-out ${pickerPulse ? "rounded-lg ring-2 ring-emerald-200/70" : ""}`}
-        >
-          <ProductAddSearch
-            id={addFieldId}
-            label={pickerLabel}
-            disabled={disabled}
-            excludeProductIds={value.map((r) => r.productId)}
-            onPick={handlePick}
-            onDuplicate={() => setAddError("Ese producto ya está en el ticket.")}
-          />
-        </div>
-      )}
+      {!disabled ? (
+        <ProductAddSearch
+          id={addFieldId}
+          label={pickerLabel}
+          disabled={disabled}
+          selectedProducts={value}
+          excludeProductIds={value.map((r) => r.productId)}
+          onPick={handlePick}
+          onRemove={handleRemove}
+          onDuplicate={() =>
+            setAddError("Ese producto ya está en el ticket.")
+          }
+        />
+      ) : null}
 
       {value.length > 0 ? (
-        <ul className="flex flex-wrap gap-1.5" aria-label="Productos seleccionados">
-          {value.map((row) => {
-            const exiting = removingIds.has(row.productId);
-            return (
-              <li
-                key={row.productId}
-                className={`inline-flex max-w-full items-center gap-0.5 rounded-md border border-zinc-200 bg-zinc-50 py-0.5 pl-2 pr-0.5 text-[11.5px] text-zinc-800 shadow-2xs ${
-                  exiting ? "animate-plf-check-out" : "animate-plf-seal-pop"
-                }`}
+        <div className="flex flex-col gap-2 rounded-lg border border-line-soft bg-zinc-50/40 p-2.5">
+          <div className="flex items-center justify-between gap-2 px-0.5">
+            <span className="text-[11px] font-medium text-zinc-600">
+              {value.length === 1
+                ? "1 artículo vinculado"
+                : `${value.length} artículos vinculados`}
+            </span>
+            {!disabled && value.length > 1 ? (
+              <button
+                type="button"
+                onClick={handleClearAll}
+                className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-zinc-400 transition-colors hover:text-brand-red cursor-pointer"
               >
-                <span className="truncate font-medium" title={rowLabel(row)}>
-                  {row.productCode ? (
-                    <>
-                      <span className="font-mono text-[10.5px] font-semibold text-zinc-500">{row.productCode}</span>
-                      <span className="mx-1 text-zinc-300">·</span>
-                      <span>{row.productName || labels[row.productId]}</span>
-                    </>
-                  ) : (
-                    rowLabel(row)
+                <Trash2 className="size-3" />
+                Vaciar
+              </button>
+            ) : null}
+          </div>
+
+          <ul
+            className="flex flex-wrap gap-1.5"
+            aria-label="Productos seleccionados"
+          >
+            {value.map((row) => {
+              const exiting = removingIds.has(row.productId);
+              return (
+                <li
+                  key={row.productId}
+                  className={`inline-flex max-w-full items-center gap-1 rounded-md border border-zinc-200/90 bg-white py-1 pl-2 pr-1 text-[11.5px] text-zinc-800 shadow-2xs transition-[border-color,opacity] hover:border-zinc-300 ${
+                    exiting
+                      ? "animate-plf-check-out [animation-duration:190ms]"
+                      : "animate-plf-seal-pop"
+                  }`}
+                >
+                  <span className="truncate font-medium" title={rowLabel(row)}>
+                    {row.productCode ? (
+                      <>
+                        <span className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-[10px] font-semibold text-zinc-600">
+                          {row.productCode}
+                        </span>
+                        <span className="mx-1.5 text-zinc-300">·</span>
+                        <span>{row.productName || labels[row.productId]}</span>
+                      </>
+                    ) : (
+                      rowLabel(row)
+                    )}
+                  </span>
+                  {!disabled && (
+                    <button
+                      type="button"
+                      className="flex size-5 shrink-0 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
+                      aria-label={`Quitar ${row.productName || row.productCode || row.productId}`}
+                      disabled={exiting}
+                      onClick={() => handleRemove(row.productId)}
+                    >
+                      <X className="size-3" strokeWidth={2.25} />
+                    </button>
                   )}
-                </span>
-                {!disabled && (
-                  <button
-                    type="button"
-                    className="flex size-6 shrink-0 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-200/80 hover:text-zinc-700"
-                    aria-label="Quitar producto"
-                    disabled={exiting}
-                    onClick={() => handleRemove(row.productId)}
-                  >
-                    <X className="size-3.5" strokeWidth={2.25} />
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ) : null}
 
       {addError ? (
-        <p className="animate-plf-shake text-[11px] text-brand-red">{addError}</p>
+        <p className="animate-plf-shake text-[11px] font-medium text-brand-red">
+          {addError}
+        </p>
       ) : null}
     </div>
   );

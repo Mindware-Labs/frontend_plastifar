@@ -49,9 +49,9 @@ import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/Form
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
-import { CLAIM_FORM_CONTROL, computeLine, computeTotal } from "../../lib/claims";
+import { CLAIM_FORM_CONTROL } from "../../lib/claims";
 import { formatPhoneNumber } from "../../lib/format";
-import { formatAmount, toNumberOrNull } from "../../lib/numbers";
+import { toNumberOrNull } from "../../lib/numbers";
 import { today } from "../../lib/quality";
 import {
   CLAIM_CURRENCIES,
@@ -488,22 +488,9 @@ export function ClaimFormModal({
         })),
     [plants, claim?.plants],
   );
-  const currency = useWatch({ control, name: "currency" });
+
   const lines = useWatch({ control, name: "lines" });
 
-  /** Diferencia y total por línea mientras se escribe, con la misma fórmula del servidor. */
-  const figures = useMemo(
-    () =>
-      (lines ?? []).map((line) =>
-        computeLine(
-          toNumberOrNull(line.invoicedQuantity),
-          toNumberOrNull(line.receivedQuantity),
-          toNumberOrNull(line.unitPrice),
-        ),
-      ),
-    [lines],
-  );
-  const total = computeTotal(figures);
   const anyPrice = (lines ?? []).some((line) => line.unitPrice.trim() !== "");
 
   function stateOf(field: keyof FormValues): FieldState {
@@ -561,7 +548,7 @@ export function ClaimFormModal({
   };
 
   const renderStepper = () => (
-    <div className="flex w-full items-center justify-between max-w-3xl mx-auto select-none gap-0.5">
+    <div className="flex w-full items-center justify-between max-w-4xl mx-auto select-none gap-0.5">
       {([1, 2, 3, 4] as const).map((n, idx) => (
         <Fragment key={n}>
           <button
@@ -607,7 +594,7 @@ export function ClaimFormModal({
   );
 
   const renderStep1 = () => (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 animate-plf-fade text-left">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 animate-plf-fade text-left">
       <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs">
         <div className="flex flex-col items-center gap-2 border-b border-zinc-100 bg-zinc-50/70 px-4 py-4 sm:flex-row sm:justify-between sm:px-5">
           <div className="flex items-center gap-3">
@@ -929,10 +916,9 @@ export function ClaimFormModal({
     const activeField = fields[safeActiveLineIndex] ?? fields[0];
     const activeIndex = activeField ? fields.indexOf(activeField) : 0;
     const activeLineError = lineErrors?.[activeIndex];
-    const activeFigure = figures[activeIndex] ?? { difference: 0, lineTotal: 0 };
 
     return (
-      <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-3.5 animate-plf-fade text-left">
+      <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-4 animate-plf-fade text-left">
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
             <ClaimFormDivider title="Productos reclamados" />
@@ -940,9 +926,6 @@ export function ClaimFormModal({
               {fields.length} {fields.length === 1 ? "producto" : "productos"}
             </span>
           </div>
-          <p className="text-[11px] text-zinc-400">
-            Diferencia = facturados − recibidos · Total = diferencia × precio
-          </p>
 
           {typeof lineErrors?.message === "string" && (
             <p className="text-[12px] text-brand-red">{lineErrors.message}</p>
@@ -967,11 +950,6 @@ export function ClaimFormModal({
               {fields.map((field, idx) => {
                 const hasError = Boolean(errors.lines?.[idx]);
                 const isActive = idx === safeActiveLineIndex;
-                const figure = figures[idx] ?? { difference: 0, lineTotal: 0 };
-                const line = lines?.[idx];
-                const showDiff =
-                  Boolean(line?.invoicedQuantity?.trim() || line?.receivedQuantity?.trim()) ||
-                  Boolean(line?.productId?.trim());
 
                 return (
                   <button
@@ -993,11 +971,6 @@ export function ClaimFormModal({
                       {idx + 1}
                     </span>
                     <span>Producto #{idx + 1}</span>
-                    {showDiff && (
-                      <span className="rounded border border-zinc-200/80 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums leading-none text-zinc-700">
-                        Dif. {figure.difference}
-                      </span>
-                    )}
                     {hasError && (
                       <span
                         className="size-1.5 animate-pulse rounded-full bg-brand-red"
@@ -1020,7 +993,7 @@ export function ClaimFormModal({
                           }
                         }}
                         title={`Quitar producto #${idx + 1}`}
-                        className="-mr-1 ml-0.5 cursor-pointer rounded p-0.5 text-zinc-400 opacity-60 transition-all hover:bg-rose-100 hover:text-brand-red group-hover:opacity-100"
+                        className="-mr-1 ml-0.5 cursor-pointer rounded p-0.5 text-zinc-400 opacity-60 transition-all hover:bg-zinc-100 hover:text-brand-red group-hover:opacity-100"
                       >
                         <X className="size-3" />
                       </span>
@@ -1035,7 +1008,7 @@ export function ClaimFormModal({
         {activeField && (
           <div key={activeField.id} className="animate-plf-apple-tab">
             <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs transition-all hover:border-zinc-300">
-              <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/70 px-4 py-2">
+              <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/70 px-4 py-2.5">
                 <div className="flex items-center gap-2.5">
                   <span className="flex size-5.5 items-center justify-center rounded-md bg-zinc-200/80 font-heading text-xs font-bold text-zinc-700">
                     {activeIndex + 1}
@@ -1043,21 +1016,12 @@ export function ClaimFormModal({
                   <span className="font-heading text-xs font-bold text-zinc-800">
                     Producto #{activeIndex + 1}
                   </span>
-                  <span className="text-[11px] tabular-nums text-zinc-500">
-                    Dif.{" "}
-                    <strong className="font-semibold text-zinc-800">{activeFigure.difference}</strong>
-                    {" · "}
-                    Total{" "}
-                    <strong className="font-semibold text-zinc-800">
-                      {currency ? formatAmount(activeFigure.lineTotal, currency) : activeFigure.lineTotal}
-                    </strong>
-                  </span>
                 </div>
                 {fields.length > 1 && (
                   <button
                     type="button"
                     onClick={() => handleRemoveProductLine(activeIndex)}
-                    className="inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-[11.5px] font-medium text-zinc-400 transition-colors hover:bg-rose-50 hover:text-brand-red"
+                    className="inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-[11.5px] font-medium text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-brand-red"
                     title={`Quitar producto ${activeIndex + 1}`}
                   >
                     <Trash2 className="size-3.5" />
@@ -1066,27 +1030,48 @@ export function ClaimFormModal({
                 )}
               </div>
 
-              <div className="flex flex-col gap-3 p-3.5 sm:p-4">
-                <Controller
-                  name={`lines.${activeIndex}.productId`}
-                  control={control}
-                  render={({ field: productField }) => (
-                    <ProductLookupField
-                      size="sm"
-                      label="Producto"
-                      required
-                      name={productField.name}
-                      value={productField.value}
-                      ticketProducts={ticketProducts}
-                      onChange={(value) => productField.onChange(value)}
-                      onBlur={productField.onBlur}
-                      state={lineFieldState(activeIndex, "productId")}
-                      error={activeLineError?.productId?.message}
+              <div className="flex flex-col gap-4 p-4 sm:p-5">
+                {/* Fila 1: Selector de producto (aprovecha el ancho) y Precio unitario */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <Controller
+                      name={`lines.${activeIndex}.productId`}
+                      control={control}
+                      render={({ field: productField }) => (
+                        <ProductLookupField
+                          size="sm"
+                          label="Producto"
+                          required
+                          name={productField.name}
+                          value={productField.value}
+                          ticketProducts={ticketProducts}
+                          onChange={(value) => productField.onChange(value)}
+                          onBlur={productField.onBlur}
+                          state={lineFieldState(activeIndex, "productId")}
+                          error={activeLineError?.productId?.message}
+                        />
+                      )}
                     />
-                  )}
-                />
+                  </div>
 
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="sm:col-span-1 lg:col-span-1">
+                    <TextField
+                      size="sm"
+                      label="Precio unitario"
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      state={lineFieldState(activeIndex, "unitPrice")}
+                      error={activeLineError?.unitPrice?.message}
+                      {...register(`lines.${activeIndex}.unitPrice`)}
+                    />
+                  </div>
+                </div>
+
+                {/* Fila 2: Cuadrícula equilibrada de 4 columnas para las cantidades */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <TextField
                     size="sm"
                     label="Compradas"
@@ -1094,6 +1079,7 @@ export function ClaimFormModal({
                     min="0"
                     step="0.01"
                     inputMode="decimal"
+                    placeholder="0"
                     state={lineFieldState(activeIndex, "unitsPurchased")}
                     error={activeLineError?.unitsPurchased?.message}
                     {...register(`lines.${activeIndex}.unitsPurchased`)}
@@ -1105,6 +1091,7 @@ export function ClaimFormModal({
                     min="0"
                     step="0.01"
                     inputMode="decimal"
+                    placeholder="0"
                     state={lineFieldState(activeIndex, "defectiveQuantity")}
                     error={activeLineError?.defectiveQuantity?.message}
                     {...register(`lines.${activeIndex}.defectiveQuantity`)}
@@ -1116,6 +1103,7 @@ export function ClaimFormModal({
                     min="0"
                     step="0.01"
                     inputMode="decimal"
+                    placeholder="0"
                     state={lineFieldState(activeIndex, "invoicedQuantity")}
                     error={activeLineError?.invoicedQuantity?.message}
                     {...register(`lines.${activeIndex}.invoicedQuantity`)}
@@ -1127,41 +1115,22 @@ export function ClaimFormModal({
                     min="0"
                     step="0.01"
                     inputMode="decimal"
+                    placeholder="0"
                     state={lineFieldState(activeIndex, "receivedQuantity")}
                     error={activeLineError?.receivedQuantity?.message}
                     {...register(`lines.${activeIndex}.receivedQuantity`)}
-                  />
-                  <TextField
-                    size="sm"
-                    label="Precio unitario"
-                    type="number"
-                    min="0"
-                    step="0.0001"
-                    inputMode="decimal"
-                    state={lineFieldState(activeIndex, "unitPrice")}
-                    error={activeLineError?.unitPrice?.message}
-                    {...register(`lines.${activeIndex}.unitPrice`)}
                   />
                 </div>
               </div>
             </div>
           </div>
         )}
-
-        <div className="flex items-center justify-end border-t border-zinc-100 pt-2">
-          <span className="text-[13px] text-brand-gray">
-            Total de la reclamación{" "}
-            <strong className="font-heading text-[14px] font-bold tabular-nums text-ink">
-              {currency ? formatAmount(total, currency) : total}
-            </strong>
-          </span>
-        </div>
       </div>
     );
   };
 
   const renderStep4 = () => (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 animate-plf-fade text-left">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 animate-plf-fade text-left">
         <FormSection title="III. Descripción de la reclamación">
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <TextField
@@ -1491,7 +1460,7 @@ export function ClaimFormModal({
         onClose={onClose}
         isExiting={isExiting}
         onRequestClose={requestClose}
-        maxWidth="max-w-3xl"
+        maxWidth="max-w-4xl"
         footer={
           <div className="flex w-full items-center gap-3">
             {renderFooterLeft()}
