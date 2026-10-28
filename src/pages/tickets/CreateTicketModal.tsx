@@ -3,12 +3,10 @@ import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type R
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { z } from "zod";
-import { Building2, Check, Clock, Info, Mail, MessageSquareText, Package, RotateCcw, Tag, X } from "lucide-react";
-import { fetchAllPages } from "../../api/paging";
-import { settingsApi } from "../../api/settings";
+import { Building2, Check, Info, Mail, MessageSquareText, Package, RotateCcw, Tag, X } from "lucide-react";
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
-import { pickDefaultSlaPolicyId, sortSlaPolicies } from "../../lib/slaPolicyUi";
-import type { SlaPolicy } from "../../types/settings";
+import { pickDefaultSlaPolicyId } from "../../lib/slaPolicyUi";
+import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
 import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { TicketProductsField, type TicketProductDraft } from "../../components/app/TicketProductsField";
 import { ApiError } from "../../api/client";
@@ -174,12 +172,8 @@ export function CreateTicketModal({
     },
   });
 
-  const [slaPolicies, setSlaPolicies] = useState<SlaPolicy[] | null>(null);
-  const [slaPoliciesLoading, setSlaPoliciesLoading] = useState(true);
-  const sortedTicketPolicies = useMemo(
-    () => (slaPolicies ? sortSlaPolicies(slaPolicies) : []),
-    [slaPolicies],
-  );
+  const { policies: slaPolicies, loading: slaPoliciesLoading } = useActiveSlaPolicies("Ticket");
+  const sortedTicketPolicies = useMemo(() => slaPolicies ?? [], [slaPolicies]);
 
   const selectedClientId = useWatch({ control, name: "clientId" });
   const selectedTopicId = useWatch({ control, name: "topicId" });
@@ -291,29 +285,12 @@ export function CreateTicketModal({
   }, [selectedClientId, selectedClient, contactOptions, setValue, getValues]);
 
   useEffect(() => {
-    let cancelled = false;
-    setSlaPoliciesLoading(true);
-    fetchAllPages<SlaPolicy>((page, pageSize) =>
-      settingsApi.slaPolicies.list({ page, pageSize, status: "activas", type: "Ticket" }),
-    )
-      .then((items) => {
-        if (cancelled) return;
-        setSlaPolicies(items);
-        const current = getValues("slaPolicyId");
-        if (!current) {
-          setValue("slaPolicyId", pickDefaultSlaPolicyId(items), { shouldValidate: true });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setSlaPolicies([]);
-      })
-      .finally(() => {
-        if (!cancelled) setSlaPoliciesLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [getValues, setValue]);
+    if (!slaPolicies?.length) return;
+    const current = getValues("slaPolicyId");
+    if (!current) {
+      setValue("slaPolicyId", pickDefaultSlaPolicyId(slaPolicies), { shouldValidate: true });
+    }
+  }, [slaPolicies, getValues, setValue]);
 
   const selectedTopic = catalogs?.topics.find((t) => String(t.id) === selectedTopicId);
   useEffect(() => {
@@ -590,13 +567,14 @@ export function CreateTicketModal({
                 />
               </section>
 
-              <section className="flex flex-col gap-3 border-t border-line-soft px-6 py-5">
-                <SectionHeading icon={Clock} title="Compromiso SLA" aside="Define plazos de atención" />
+              <section className="flex flex-col border-t border-line-soft px-6 py-5">
                 <Controller
                   name="slaPolicyId"
                   control={control}
                   render={({ field }) => (
                     <SlaPolicyField
+                      embeddedSection
+                      required
                       policies={sortedTicketPolicies}
                       loading={slaPoliciesLoading}
                       value={field.value}

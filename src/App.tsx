@@ -27,14 +27,12 @@ import { SedesPage } from "./pages/sedes/SedesPage";
 import { MotivosPage } from "./pages/tickets/MotivosPage";
 import { RolesPage } from "./pages/roles/RolesPage";
 import { VeredictosPage } from "./pages/tickets/VeredictosPage";
-import { HolidaysSection } from "./pages/settings/HolidaysSection";
 import { MailboxesSection } from "./pages/settings/MailboxesSection";
 import { PlantsSection } from "./pages/settings/PlantsSection";
 import { ProductLinesSection } from "./pages/settings/ProductLinesSection";
 import { ProductsSection } from "./pages/settings/ProductsSection";
 import { SlaSection } from "./pages/settings/SlaSection";
 import { TeamsSection } from "./pages/settings/TeamsSection";
-import { TaskTypesSection } from "./pages/settings/TaskTypesSection";
 
 import { TerritoriesSection } from "./pages/settings/TerritoriesSection";
 import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
@@ -163,7 +161,6 @@ export default function App() {
             exige settings.write para escribir, que es lo que cada seccion ya gatea. */}
         <Route path="/configuracion" element={<Navigate to="/configuracion/sla" replace />} />
         <Route path="/configuracion/sla" element={<SlaSection />} />
-        <Route path="/configuracion/feriados" element={<HolidaysSection />} />
         <Route path="/configuracion/buzones" element={<MailboxesSection />} />
         <Route path="/configuracion/lineas" element={<ProductLinesSection />} />
         {/* Rutas propuestas en docs/plan/00, seccion 11. Si los productos y las
@@ -174,7 +171,6 @@ export default function App() {
         <Route path="/configuracion/equipos" element={<TeamsSection />} />
         {/* Catalogo de tareas y enrutamiento de formularios (docs/plan/02,
             seccion 11): la parte del documento que no toca la Bandeja. */}
-        <Route path="/configuracion/tipos-de-tarea" element={<TaskTypesSection />} />
 
 
         {/* Territorios y lineas de producto se mudaron al modulo que las usa:

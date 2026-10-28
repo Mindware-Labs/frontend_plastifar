@@ -15,23 +15,29 @@ import {
   BarChart3,
   Building,
   Building2,
+  Factory,
   FileWarning,
-  PackageMinus,
-  PackageSearch,
   Gavel,
   Inbox,
+  Layers,
   LayoutDashboard,
+  ListTodo,
+  Mail,
   MapPin,
   MessageSquareText,
+  Package,
+  PackageMinus,
+  PackageSearch,
   Send,
   Settings,
   ShieldCheck,
   Star,
   Tag,
-  ListTodo,
   Ticket as TicketIcon,
+  Timer,
   Trash2,
   Users,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import type { PermissionKey } from "./permissions";
@@ -128,24 +134,6 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
     ],
   },
-  /*
-   * EL CATALOGO VIVE DONDE SE USA.
-   *
-   * «Configuracion» habia crecido hasta siete hijos y se habia convertido en el
-   * cajon donde va lo que no se sabe donde poner. Dos de ellos no eran
-   * configuracion del sistema sino datos del negocio, y su sitio estaba en el
-   * modulo que los consume:
-   *
-   *   - Territorios alimenta el ranking comercial por zona y es obligatorio al
-   *     registrar un cliente. Lo consulta quien trabaja con clientes.
-   *   - Lineas de producto es el eje por el que Calidad sigue las
-   *     reclamaciones. Lo consulta quien trabaja con Calidad.
-   *
-   * Lo que queda en Configuracion es homogeneo: cinco catalogos que definen
-   * COMO SE COMPORTA el sistema —a que cola entra un ticket, cuando vence, que
-   * dias no cuentan, con que texto escribe y por que buzon—. Ninguno es un dato
-   * que alguien consulte mientras hace su trabajo.
-   */
   {
     label: "Tareas",
     icon: ListTodo,
@@ -186,21 +174,12 @@ export const SIDEBAR_NAV: NavGroup[] = [
     icon: Settings,
     section: "Otros",
     children: [
-      { label: "SLA", to: "/configuracion/sla" },
-      { label: "Días no laborables", to: "/configuracion/feriados" },
-      {
-      label: "Buzones",
-      to: "/configuracion/buzones",
-    },
-    {
-      label: "Líneas de productos",
-      to: "/configuracion/lineas",
-    },
-      { label: "Productos", to: "/configuracion/productos" },
-      { label: "Plantas", to: "/configuracion/plantas" },
-      { label: "Equipos", to: "/configuracion/equipos" },
-      { label: "Tipos de tarea", to: "/configuracion/tipos-de-tarea" },
-
+      { label: "SLA", to: "/configuracion/sla", icon: Timer },
+      { label: "Buzones", to: "/configuracion/buzones", icon: Mail },
+      { label: "Líneas de productos", to: "/configuracion/lineas", icon: Layers },
+      { label: "Productos", to: "/configuracion/productos", icon: Package },
+      { label: "Plantas", to: "/configuracion/plantas", icon: Factory },
+      { label: "Equipos", to: "/configuracion/equipos", icon: UsersRound },
     ],
   },
 ];

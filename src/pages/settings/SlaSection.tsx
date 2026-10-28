@@ -1,4 +1,4 @@
-import { Flag, Layers, ListTodo, Pencil, Plus, Power, Star, Ticket } from "lucide-react";
+import { Ban, CheckCircle2, Flag, Layers, ListTodo, Pencil, Plus, Power, Star, Ticket } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
@@ -14,54 +14,21 @@ import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Pagination } from "../../components/ui/Pagination";
+import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import {
-  useActionErrorReceipt,
-  useConfigNoticeReceipt,
-  useLoadErrorReceipt,
-} from "../../hooks/useNoticeReceipts";
+import { useTablePageSelection } from "../../hooks/useTablePageSelection";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { humanizeMinutes, workdayMinutes } from "../../lib/sla";
+import { invalidateActiveSlaPoliciesCache } from "../../lib/useActiveSlaPolicies";
 import { PRIORITIES, type Holiday, type Priority, type SlaPolicy, type SlaPolicyType } from "../../types/settings";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { SlaModal } from "./SlaModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
-
-interface UncoveredItem {
-  priority: Priority;
-  type: SlaPolicyType;
-}
-
-/**
- * Consulta las políticas activas completas para detectar combinaciones (Tipo + Prioridad)
- * que carezcan de una política predeterminada.
- */
-async function loadUncovered(): Promise<UncoveredItem[]> {
-  try {
-    const policies = await fetchAllPages<SlaPolicy>((page, pageSize) =>
-      settingsApi.slaPolicies.list({ page, pageSize, status: "activas" }),
-    );
-
-    const missing: UncoveredItem[] = [];
-    for (const type of ["Ticket", "Tarea"] as SlaPolicyType[]) {
-      for (const priority of PRIORITIES) {
-        const hasDefault = policies.some(
-          (p) => p.type === type && p.priority === priority && p.isDefault && p.isActive,
-        );
-        if (!hasDefault) {
-          missing.push({ priority, type });
-        }
-      }
-    }
-    return missing;
-  } catch {
-    return [];
-  }
-}
 
 const loadHolidays = () =>
   fetchAllPages<Holiday>((page, pageSize) =>
@@ -89,6 +56,7 @@ export function SlaSection() {
   const canWrite = can("settings.write");
 
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -114,9 +82,6 @@ export function SlaSection() {
     fallbackError: "No se pudieron cargar las políticas de SLA",
   });
 
-  const uncoveredRef = useReferenceData<UncoveredItem[]>(loadUncovered, []);
-  const uncovered = uncoveredRef.data;
-
   const holidaysRef = useReferenceData<Holiday[]>(loadHolidays, []);
   const holidays = holidaysRef.data;
 
@@ -124,25 +89,16 @@ export function SlaSection() {
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todas" || priority !== "todas" || typeFilter !== "todas";
 
-  const uncoveredDetail = useMemo(() => {
-    if (uncovered.length === 0) return undefined;
-    return `Sin predeterminada activa para: ${uncovered
-      .map((u) => `${u.priority} (${u.type === "Tarea" ? "Tareas" : "Tickets"})`)
-      .join(", ")}. Un registro que nazca con esa combinación no tendría compromiso de tiempo automático.`;
-  }, [uncovered]);
+  const pageIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
+  const tableBusy = busyId !== null || bulkBusy;
 
   useLoadErrorReceipt(error, "settings-sla-list", refresh);
   useActionErrorReceipt(actionError, "settings-sla-action");
-  useConfigNoticeReceipt(
-    uncovered.length > 0,
-    "settings-sla-defaults",
-    "Políticas SLA incompletas",
-    uncoveredDetail,
-  );
 
   function reloadAll() {
+    invalidateActiveSlaPoliciesCache();
     refresh();
-    uncoveredRef.reload();
   }
 
   async function makeDefault(policy: SlaPolicy) {
@@ -159,6 +115,78 @@ export function SlaSection() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  async function runBulkSetActive(nextActive: boolean) {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    setActionError(null);
+    const ids = Array.from(selectedIds);
+    let updated = 0;
+    let skipped = 0;
+    let failed = 0;
+    let lastMessage = "No se pudo completar la acción en lote";
+
+    for (const id of ids) {
+      try {
+        const current = await freshCopy(settingsApi.slaPolicies.get, { id } as SlaPolicy);
+        if (current.isActive === nextActive) {
+          skipped += 1;
+          continue;
+        }
+        await settingsApi.slaPolicies.update(current.id, {
+          ...toRequest(current),
+          isActive: nextActive,
+          isDefault: nextActive ? current.isDefault : false,
+        });
+        updated += 1;
+      } catch (err) {
+        failed += 1;
+        lastMessage = err instanceof ApiError ? err.message : lastMessage;
+      }
+    }
+
+    clearSelection();
+    reloadAll();
+
+    if (failed > 0) {
+      setActionError(
+        updated > 0 || skipped > 0
+          ? `${lastMessage} (${updated} actualizadas, ${failed} con error).`
+          : lastMessage,
+      );
+    }
+
+    setBulkBusy(false);
+  }
+
+  function askBulkActivate() {
+    setConfirmation({
+      tone: "warn",
+      icon: CheckCircle2,
+      title: `Reactivar ${selectedIds.size} políticas`,
+      description: "Volverán a estar disponibles para asignarse en tickets y tareas nuevos.",
+      confirmLabel: "Reactivar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulkSetActive(true);
+      },
+    });
+  }
+
+  function askBulkDeactivate() {
+    setConfirmation({
+      tone: "warn",
+      icon: Ban,
+      title: `Desactivar ${selectedIds.size} políticas`,
+      description:
+        "Dejarán de ofrecerse en registros nuevos. Si alguna era predeterminada, pierde ese rol. Los abiertos conservan sus plazos.",
+      confirmLabel: "Desactivar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulkSetActive(false);
+      },
+    });
   }
 
   function askToggle(policy: SlaPolicy) {
@@ -239,10 +267,6 @@ export function SlaSection() {
                 dot
                 title="Filtrar por políticas inactivas"
               />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <span className="text-[12px] text-zinc-500 font-medium">
-                {8 - uncovered.length} de 8 predeterminadas asignadas
-              </span>
             </div>
           ) : (
             <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
@@ -253,7 +277,7 @@ export function SlaSection() {
         }
         action={
           canWrite && (
-            <Button size="sm" onClick={() => setModal("nueva")} disabled={busyId !== null}>
+            <Button size="sm" onClick={() => setModal("nueva")} disabled={tableBusy}>
               <Plus className="h-[15px] w-[15px]" />
               Nueva política
             </Button>
@@ -262,6 +286,31 @@ export function SlaSection() {
       />
 
       <ListPanel
+        selection={
+          canWrite
+            ? {
+                count: selectedIds.size,
+                pageState,
+                busy: tableBusy,
+                onTogglePage: togglePage,
+                onClear: clearSelection,
+                actions: [
+                  {
+                    key: "activate",
+                    label: "Reactivar",
+                    icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
+                    onClick: askBulkActivate,
+                  },
+                  {
+                    key: "deactivate",
+                    label: "Desactivar",
+                    icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
+                    onClick: askBulkDeactivate,
+                  },
+                ],
+              }
+            : undefined
+        }
         toolbar={
           <>
             <SearchInput
@@ -330,7 +379,7 @@ export function SlaSection() {
         }
       >
         {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={9} />
+          error === null && <TableSkeleton rows={pageSize} columns={canWrite ? 10 : 9} />
         ) : rows.length === 0 ? (
           <p className="py-14 text-center text-[13.5px] text-faint">
             {isFiltering
@@ -342,6 +391,21 @@ export function SlaSection() {
             <DataTable>
               <thead>
                 <HeadRow>
+                  {canWrite && (
+                    <Th className="w-10 text-center">
+                      <div className="flex items-center justify-center">
+                        <SelectBox
+                          checked={pageState}
+                          onToggle={togglePage}
+                          label={
+                            pageState === true
+                              ? "Quitar la selección de esta página"
+                              : "Seleccionar toda la página"
+                          }
+                        />
+                      </div>
+                    </Th>
+                  )}
                   <Th>Política</Th>
                   <Th>Tipo</Th>
                   <Th>Prioridad</Th>
@@ -355,8 +419,21 @@ export function SlaSection() {
               </thead>
 
               <tbody>
-                {rows.map((policy) => (
-                  <Row key={policy.id} busy={busyId === policy.id}>
+                {rows.map((policy) => {
+                  const checked = selectedIds.has(policy.id);
+                  return (
+                  <Row key={policy.id} busy={busyId === policy.id || bulkBusy} data-checked={checked}>
+                    {canWrite && (
+                      <Td className="w-10 text-center">
+                        <div className="flex items-center justify-center">
+                          <SelectBox
+                            checked={checked}
+                            onToggle={() => toggleSelect(policy.id)}
+                            label={`Seleccionar ${policy.name}`}
+                          />
+                        </div>
+                      </Td>
+                    )}
                     <Td className="text-[12.5px] font-medium text-ink">{policy.name}</Td>
                     <Td>
                       <span
@@ -422,14 +499,14 @@ export function SlaSection() {
                               label={`Hacer predeterminada de ${policy.priority.toLowerCase()} (${policy.type.toLowerCase()}): ${policy.name}`}
                               icon={Star}
                               onClick={() => makeDefault(policy)}
-                              disabled={busyId === policy.id}
+                              disabled={tableBusy}
                             />
                           )}
                           <RowAction
                             label={`Editar ${policy.name}`}
                             icon={Pencil}
                             onClick={() => setModal(policy)}
-                            disabled={busyId === policy.id}
+                            disabled={tableBusy}
                           />
                           <RowAction
                             label={
@@ -439,13 +516,14 @@ export function SlaSection() {
                             }
                             icon={Power}
                             onClick={() => askToggle(policy)}
-                            disabled={busyId === policy.id}
+                            disabled={tableBusy}
                           />
                         </div>
                       </Td>
                     )}
                   </Row>
-                ))}
+                  );
+                })}
               </tbody>
             </DataTable>
           </div>

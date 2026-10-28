@@ -39,4 +39,26 @@ export function findSlaPolicyById(policies: SlaPolicy[], id: string): SlaPolicy 
   return policies.find((p) => p.id === num);
 }
 
+export function filterSlaPolicies(
+  policies: SlaPolicy[],
+  term: string,
+  options?: { alwaysIncludeId?: string },
+): SlaPolicy[] {
+  const q = term.trim().toLowerCase();
+  if (!q) return policies;
+  const pinned = options?.alwaysIncludeId;
+  return policies.filter((policy) => {
+    if (pinned && String(policy.id) === pinned) return true;
+    const haystack = [
+      policy.name,
+      policy.priority,
+      slaPolicyPlazoLabel(policy),
+      policy.isDefault ? "predeterminada" : "",
+    ]
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(q);
+  });
+}
+
 export type SlaPickerKind = SlaPolicyType;

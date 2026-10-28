@@ -1,9 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { fetchAllPages } from "../../api/paging";
-import { settingsApi } from "../../api/settings";
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
 import { pickDefaultSlaPolicyId, sortSlaPolicies } from "../../lib/slaPolicyUi";
-import type { SlaPolicy } from "../../types/settings";
+import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch, type UseFormRegisterReturn } from "react-hook-form";
 import { ApiError } from "../../api/client";
@@ -117,12 +115,8 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   );
   const [departmentTouched, setDepartmentTouched] = useState(isEdit);
   const [contactTouched, setContactTouched] = useState(isEdit);
-  const [slaPolicies, setSlaPolicies] = useState<SlaPolicy[] | null>(null);
-  const [slaPoliciesLoading, setSlaPoliciesLoading] = useState(true);
-  const sortedTaskPolicies = useMemo(
-    () => (slaPolicies ? sortSlaPolicies(slaPolicies) : []),
-    [slaPolicies],
-  );
+  const { policies: slaPolicies, loading: slaPoliciesLoading } = useActiveSlaPolicies("Tarea");
+  const sortedTaskPolicies = useMemo(() => slaPolicies ?? [], [slaPolicies]);
   const { isExiting, requestClose } = useModalAnimation();
   const instructionsTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -178,42 +172,25 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   }, [instructions]);
 
   useEffect(() => {
-    let cancelled = false;
-    setSlaPoliciesLoading(true);
-    fetchAllPages<SlaPolicy>((page, pageSize) =>
-      settingsApi.slaPolicies.list({ page, pageSize, status: "activas", type: "Tarea" }),
-    )
-      .then((items) => {
-        if (cancelled) return;
-        setSlaPolicies(items);
-        const sorted = sortSlaPolicies(items);
-        const current = getValues("slaPolicyId");
-        if (current) return;
-        if (task?.slaPolicyId && sorted.some((p) => p.id === task.slaPolicyId)) {
-          setValue("slaPolicyId", String(task.slaPolicyId), { shouldValidate: true });
-          return;
-        }
-        if (task) {
-          const match =
-            sorted.find((p) => p.priority === task.priority && p.isDefault) ??
-            sorted.find((p) => p.priority === task.priority);
-          if (match) {
-            setValue("slaPolicyId", String(match.id), { shouldValidate: true });
-            return;
-          }
-        }
-        setValue("slaPolicyId", pickDefaultSlaPolicyId(items), { shouldValidate: true });
-      })
-      .catch(() => {
-        if (!cancelled) setSlaPolicies([]);
-      })
-      .finally(() => {
-        if (!cancelled) setSlaPoliciesLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [getValues, setValue, task?.id, task?.priority, task?.slaPolicyId]);
+    if (!slaPolicies?.length) return;
+    const sorted = sortSlaPolicies(slaPolicies);
+    const current = getValues("slaPolicyId");
+    if (current) return;
+    if (task?.slaPolicyId && sorted.some((p) => p.id === task.slaPolicyId)) {
+      setValue("slaPolicyId", String(task.slaPolicyId), { shouldValidate: true });
+      return;
+    }
+    if (task) {
+      const match =
+        sorted.find((p) => p.priority === task.priority && p.isDefault) ??
+        sorted.find((p) => p.priority === task.priority);
+      if (match) {
+        setValue("slaPolicyId", String(match.id), { shouldValidate: true });
+        return;
+      }
+    }
+    setValue("slaPolicyId", pickDefaultSlaPolicyId(slaPolicies), { shouldValidate: true });
+  }, [slaPolicies, getValues, setValue, task?.id, task?.priority, task?.slaPolicyId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -475,13 +452,14 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
           })}
         />
 
-        <FormDivider title="Compromiso SLA" />
-
         <Controller
           name="slaPolicyId"
           control={control}
           render={({ field }) => (
             <SlaPolicyField
+              embeddedSection
+              sectionBorder
+              required
               policies={sortedTaskPolicies}
               loading={slaPoliciesLoading}
               value={field.value}

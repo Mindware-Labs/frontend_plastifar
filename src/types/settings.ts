@@ -120,40 +120,6 @@ export interface TeamMember {
   createdAt: string;
 }
 
-/** Formularios que una tarea puede exigir (docs/plan/02). Viajan por el nombre del enum. */
-export const REQUIRED_FORMS: { value: RequiredForm; label: string }[] = [
-  { value: "Reclamacion", label: "Reclamación de clientes" },
-  { value: "RetiroMercancia", label: "Retiro de mercancía" },
-  { value: "Hca", label: "HCA" },
-  { value: "DiscrepanciaCarga", label: "Discrepancia de carga" },
-];
-export type RequiredForm = "Reclamacion" | "RetiroMercancia" | "Hca" | "DiscrepanciaCarga";
-
-/** Tipo de tarea: la columna ACCION de la hoja SLA, con su plazo. */
-export interface TaskType {
-  id: number;
-  name: string;
-  /** Plazo en días, 1 a 365. */
-  slaDays: number;
-  /** Verdadero: laborables; falso: calendario; nulo: sin decidir (pregunta 1). */
-  businessDaysOnly: boolean | null;
-  requiredForm: RequiredForm | null;
-  requiredFormLabel: string | null;
-  isActive: boolean;
-  departments: { id: number; name: string }[];
-  /** `isActive` es el de la persona. */
-  assignees: { staffId: number; name: string; isActive: boolean }[];
-}
-
-export interface SaveTaskTypeRequest {
-  name: string;
-  slaDays: number;
-  businessDaysOnly: boolean | null;
-  requiredForm: RequiredForm | null;
-  departmentIds: number[];
-  assigneeStaffIds: number[];
-  isActive: boolean;
-}
 
 /** Producto: lo que se vende, se reclama o se retira. El código es único y es texto. */
 export interface Product {
