@@ -12,6 +12,7 @@ import type {
   EmailThreadMessageResponse,
   EmptyTrashResponse,
 } from "../types/api";
+import type { EmailLinkedTask } from "../types/tasks";
 
 export interface EmailQuery {
   page: number;
@@ -73,6 +74,8 @@ export const emailsApi = {
   markAssignmentSeen: (id: number) => apiRequest<void>(`/api/emails/${id}/assign/seen`, { method: "POST" }),
 
   get: (id: number) => apiRequest<EmailDetailResponse>(`/api/emails/${id}`),
+
+  linkedTasks: (id: number) => apiRequest<EmailLinkedTask[]>(`/api/emails/${id}/tasks`),
 
   // download fuerza la descarga: sin el, los tipos que el navegador sabe mostrar se abren.
   attachmentLink: (emailId: number, attachmentId: number, download = false) =>

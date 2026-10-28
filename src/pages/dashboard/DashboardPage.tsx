@@ -12,8 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { reportsApi, type ClientsReport, type QualityReport } from "../../api/reports";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Board, KpiRow, PeriodTabs, RefreshButton, type KpiItem } from "./board";
 import { CategoryBars, HealthGauge, SeriesLegend, TrendArea } from "./boardCharts";
 import { TerritoriesTable } from "./TerritoriesTable";
@@ -170,6 +169,8 @@ export function DashboardPage() {
 
   useEffect(load, [load]);
 
+  useLoadErrorReceipt(error, "dashboard-calidad", load);
+
   /**
    * El periodo por defecto se ajusta UNA vez a la data que existe. Doce meses
    * fijos en una operacion que arranco hace dos dejaban diez columnas en cero y
@@ -316,17 +317,6 @@ export function DashboardPage() {
           `visible` y el anillo de foco de una ficha quedaba cortado contra el
           borde; el relleno le da sitio y el margen negativo lo devuelve. */}
       <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 pt-4 pb-8">
-        {error && (
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-[240px] flex-1">
-              <Alert variant="error">{error}</Alert>
-            </div>
-            <Button size="sm" variant="secondary" onClick={load} disabled={isLoading}>
-              Reintentar
-            </Button>
-          </div>
-        )}
-
         {!ready ? (
           error === null && <DashboardSkeleton />
         ) : (

@@ -39,7 +39,7 @@ import type {
   DepartmentResponse,
   DepartmentType,
 } from "../../types/api";
-import { LoadErrorAlert } from "../settings/catalogSection";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { useReferenceData } from "../settings/catalogState";
 import { DepartmentModal } from "./DepartmentModal";
 
@@ -93,6 +93,8 @@ export function DepartmentsPage() {
     },
     fallbackError: "No se pudieron cargar los departamentos",
   });
+
+  useLoadErrorReceipt(error, "departments-list", refresh);
 
   const { data: sedesList } = useReferenceData(
     () => sedesApi.list({ includeInactive: false, pageSize: 100 }),
@@ -371,10 +373,6 @@ export function DepartmentsPage() {
           )
         }
       />
-
-      {error && (
-        <LoadErrorAlert message={error} onRetry={refresh} />
-      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         <ListPanel

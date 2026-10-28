@@ -24,6 +24,7 @@ import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button as PfButton } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Spinner } from "../../components/ui/Spinner";
+import { TaskChip } from "../../components/app/TaskChip";
 import { TicketChip } from "../../components/app/TicketChip";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
@@ -49,7 +50,7 @@ import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { DELIVERY_LABELS, initialsFromName } from "../../lib/format";
 import { CreateTicketModal } from "../tickets/CreateTicketModal";
-import { CreateTaskChip } from "../tasks/CreateTaskChip";
+import type { EmailLinkedTask } from "../../types/tasks";
 import { TaskFormModal } from "../tasks/TaskFormModal";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
 import { CannedPicker } from "./CannedPicker";
@@ -254,8 +255,13 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [error, setError] = useState<string | null>(null);
   const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
-  const canCreateTask = usePermissions().can("tasks.write");
+  const permissions = usePermissions();
+  const canCreateTask = permissions.can("tasks.write");
+  const canSeeLinkedTasks = permissions.can("tasks.read") || permissions.can("tasks.write");
   const [justCreatedTicketId, setJustCreatedTicketId] = useState<number | null>(null);
+  const [linkedTasks, setLinkedTasks] = useState<EmailLinkedTask[]>([]);
+  const [linkedTasksKey, setLinkedTasksKey] = useState(0);
+  const [justCreatedTaskId, setJustCreatedTaskId] = useState<number | null>(null);
   const [moving, setMoving] = useState(false);
   const [starring, setStarring] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -344,6 +350,27 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
       cancelled = true;
     };
   }, [emailId, reloadKey]);
+
+  useEffect(() => {
+    if (!canSeeLinkedTasks) {
+      setLinkedTasks([]);
+      return;
+    }
+
+    let cancelled = false;
+    emailsApi
+      .linkedTasks(emailId)
+      .then((items) => {
+        if (!cancelled) setLinkedTasks(items);
+      })
+      .catch(() => {
+        if (!cancelled) setLinkedTasks([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emailId, linkedTasksKey, canSeeLinkedTasks]);
 
   useEffect(() => onInboxChanged(() => setReloadKey((current) => current + 1)), [onInboxChanged]);
 
@@ -812,10 +839,13 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             onCreate={() => setIsCreateTicketModalOpen(true)}
           />
 
-          {canCreateTask && (
-            <CreateTaskChip
+          {canSeeLinkedTasks && (
+            <TaskChip
+              tasks={linkedTasks}
+              justCreatedId={justCreatedTaskId}
+              onSettled={() => setJustCreatedTaskId(null)}
               active={isCreateTaskModalOpen}
-              onCreate={() => setIsCreateTaskModalOpen(true)}
+              onCreate={canCreateTask ? () => setIsCreateTaskModalOpen(true) : undefined}
             />
           )}
 
@@ -1541,12 +1571,13 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           onClose={() => setIsCreateTaskModalOpen(false)}
           onSaved={(task) => {
             setIsCreateTaskModalOpen(false);
+            setJustCreatedTaskId(task.id);
+            setLinkedTasksKey((k) => k + 1);
             receipts.done({
               action: "crear-tarea",
               title: "Tarea creada",
               detail: `${task.number} · ${task.title}`,
             });
-            navigate("/tareas");
           }}
         />
       )}

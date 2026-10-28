@@ -17,7 +17,6 @@ import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { ticketTopicsApi, type TicketTopicQuery } from "../../api/ticketTopics";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -30,6 +29,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { TableSelectionBar } from "../../components/ui/TableSelectionBar";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
@@ -86,6 +86,9 @@ export function MotivosPage() {
     },
     fallbackError: "No se pudieron cargar los motivos",
   });
+
+  useLoadErrorReceipt(error, "motivos-list", refresh);
+  useActionErrorReceipt(actionError, "motivos-action");
 
   useEffect(() => {
     departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
@@ -385,12 +388,6 @@ export function MotivosPage() {
           </div>
           )}
         </div>
-
-        {(error || actionError) && (
-          <div className="mb-3">
-            <Alert variant="error">{error ?? actionError}</Alert>
-          </div>
-        )}
 
         {!data ? (
           <div className="flex justify-center py-16">

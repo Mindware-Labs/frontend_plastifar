@@ -50,6 +50,7 @@ export interface CatalogQuery {
 
 export interface SlaQuery extends CatalogQuery {
   priority?: string;
+  type?: string;
 }
 
 /** El calendario filtra por año completo, no por texto de fecha. */

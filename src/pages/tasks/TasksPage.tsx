@@ -45,7 +45,7 @@ const COLUMNS: ColumnOption[] = [
   { id: "estado", label: "Estado" },
   { id: "cliente", label: "Cliente" },
   { id: "limite", label: "Fecha límite" },
-  { id: "origen", label: "Origen" },
+  { id: "origen", label: "Canal" },
 ];
 
 function formatDue(value: string | null) {
@@ -385,7 +385,7 @@ export function TasksPage() {
                   {isVisible("estado") && <Th sort={sortOf("estado")}>Estado</Th>}
                   {isVisible("cliente") && <Th>Cliente</Th>}
                   {isVisible("limite") && <Th sort={sortOf("limite")}>Fecha límite</Th>}
-                  {isVisible("origen") && <Th>Origen</Th>}
+                  {isVisible("origen") && <Th>Canal</Th>}
                 </HeadRow>
               </thead>
               <tbody>

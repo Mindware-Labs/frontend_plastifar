@@ -16,10 +16,10 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useConfigNoticeReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { REQUIRED_FORMS, type TaskType } from "../../types/settings";
-import { LoadErrorAlert, WarnNotice } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
 import { TaskTypeModal } from "./TaskTypeModal";
 
@@ -65,6 +65,14 @@ export function TaskTypesSection() {
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos" || form !== "todos";
   const undecided = rows.some((type) => type.businessDaysOnly === null);
+
+  useLoadErrorReceipt(error, "settings-task-types-list", refresh);
+  useConfigNoticeReceipt(
+    undecided,
+    "settings-task-types-days",
+    "Plazos sin definir",
+    "Algún tipo tiene el plazo «por definir»: Plastifar no ha dicho si los días son laborables o calendario. Mientras tanto no se calcula ningún vencimiento.",
+  );
 
   function askDelete(type: TaskType) {
     setConfirmation({
@@ -188,17 +196,6 @@ export function TaskTypesSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
-
-      {undecided && (
-        <div className="mb-3">
-          <WarnNotice>
-            Algún tipo tiene el plazo «por definir»: Plastifar no ha dicho si los días son laborables o calendario. Mientras
-            tanto no se calcula ningún vencimiento.
-          </WarnNotice>
-        </div>
-      )}
 
       <ListPanel
         toolbar={

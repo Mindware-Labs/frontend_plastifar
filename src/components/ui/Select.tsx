@@ -34,6 +34,8 @@ interface SelectProps {
   matchTriggerWidth?: boolean;
   /** Valor en varias líneas: rutas largas y sede sin truncar en columnas estrechas. */
   wrapValue?: boolean;
+  /** Centra el contenido (icono, etiqueta y flecha) simétricamente en el botón. */
+  centered?: boolean;
   id?: string;
   className?: string;
   buttonClassName?: string;
@@ -76,6 +78,7 @@ export function Select({
   searchable,
   matchTriggerWidth = false,
   wrapValue = false,
+  centered = false,
   id,
   className = "",
   buttonClassName = "",
@@ -340,14 +343,16 @@ export function Select({
         disabled={disabled}
         onClick={() => (open ? closeList() : openList())}
         onKeyDown={handleKeyDown}
-        className={`w-full rounded-lg border text-left outline-none transition-colors duration-150 cursor-pointer select-none
+        className={`w-full rounded-lg border outline-none transition-colors duration-150 cursor-pointer select-none
           disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-400
           ${triggerVariantClass} ${sizeHeight} ${sizeTypography} ${paddingClass} ${wrapValue ? "items-start" : "items-center"}
-          flex justify-between font-medium
+          ${centered ? "flex items-center justify-center gap-1.5" : "flex justify-between text-left"} font-medium
           ${selected ? "text-zinc-900" : "text-zinc-400"} ${buttonClassName}`}
       >
         <div
-          className={`flex min-w-0 flex-1 gap-2 ${wrapValue ? "flex-wrap items-start overflow-visible" : "items-center overflow-hidden"}`}
+          className={`flex min-w-0 ${centered ? "flex-none justify-center" : "flex-1"} gap-1.5 ${
+            wrapValue ? "flex-wrap items-start overflow-visible" : "items-center overflow-hidden"
+          }`}
           title={
             !wrapValue && selected
               ? selected.hint
@@ -363,7 +368,7 @@ export function Select({
           ) : (
             leftIcon
           )}
-          <span className={wrapValue ? "min-w-0 whitespace-normal break-words" : "min-w-0 truncate"}>
+          <span className={`${wrapValue ? "min-w-0 whitespace-normal break-words" : "min-w-0 truncate"} leading-none`}>
             {selected?.label ?? placeholder}
           </span>
           {selected?.hint && (

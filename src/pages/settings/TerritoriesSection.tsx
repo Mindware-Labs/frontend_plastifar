@@ -16,10 +16,10 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { Territory } from "../../types/clients";
-import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
 import { TerritoryModal } from "./TerritoryModal";
 
@@ -58,6 +58,8 @@ export function TerritoriesSection() {
     },
     fallbackError: "No se pudieron cargar los territorios",
   });
+
+  useLoadErrorReceipt(error, "settings-territories-list", refresh);
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -178,8 +180,6 @@ export function TerritoriesSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
         toolbar={

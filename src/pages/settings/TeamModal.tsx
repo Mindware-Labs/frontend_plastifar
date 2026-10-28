@@ -15,7 +15,7 @@ import { Modal } from "../../components/ui/Modal";
 import { RowAction } from "../../components/ui/RowAction";
 import { searchActiveStaff } from "../../lib/lookups";
 import { PLANT_COUNTRIES, type Plant, type Team, type TeamMember } from "../../types/settings";
-import { LoadErrorAlert } from "./catalogSection";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { useReferenceData } from "./catalogState";
 
 /**
@@ -238,6 +238,13 @@ function TeamMembers({ teamId, onChanged }: TeamMembersProps) {
 
   const members = membersRef.data;
 
+  useLoadErrorReceipt(
+    membersRef.failed ? "No se pudieron cargar los integrantes" : null,
+    "settings-team-members",
+    membersRef.reload,
+  );
+  useActionErrorReceipt(error, "settings-team-member-action");
+
   async function write(action: () => Promise<unknown>, fallback: string) {
     setBusy(true);
     setError(null);
@@ -263,8 +270,6 @@ function TeamMembers({ teamId, onChanged }: TeamMembersProps) {
           Solo se puede agregar personal activo. Cada cambio se guarda al momento.
         </p>
       </div>
-
-      {error && <Alert variant="error">{error}</Alert>}
 
       <div className="flex items-start gap-2">
         <LookupSelect
@@ -294,7 +299,7 @@ function TeamMembers({ teamId, onChanged }: TeamMembersProps) {
       </div>
 
       {membersRef.failed ? (
-        <LoadErrorAlert message="No se pudieron cargar los integrantes" onRetry={membersRef.reload} />
+        <p className="py-3 text-[12.5px] text-faint">No se pudieron cargar los integrantes.</p>
       ) : members === null ? (
         <p className="py-3 text-[12.5px] text-faint" role="status">
           Cargando integrantes…

@@ -11,7 +11,7 @@ import { TicketByStage } from "./components/TicketByStage";
 import { TicketTrend } from "./components/TicketTrend";
 import { dashboardApi, type DashboardResponse } from "../../api/dashboard";
 import { DashboardContext } from "./dashboardContext";
-import { LoadErrorAlert } from "../../pages/settings/catalogSection";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { S } from "./styles";
 import { usePageChrome } from "../../layouts/usePageChrome";
@@ -90,6 +90,8 @@ export function CXDashboard({ query }: { query?: string }) {
     };
   }, [reloadKey]);
 
+  useLoadErrorReceipt(error, "cx-dashboard", () => setReloadKey((k) => k + 1));
+
   /* Lo que la barra de aplicación muestra cuando esta pantalla ya scrolleó. El
      ítem `danger` es el único que sobrevive al condensado, así que lleva lo
      único que exige una acción.
@@ -111,7 +113,6 @@ export function CXDashboard({ query }: { query?: string }) {
     return (
       <div className="cxhub" style={{ padding: "2px 3px" }}>
         <ModuleHeader title="Dashboard" summary="Tablero de operaciones" />
-        <LoadErrorAlert message={error} onRetry={() => setReloadKey((k) => k + 1)} />
       </div>
     );
   }

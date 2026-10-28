@@ -9,6 +9,7 @@ import {
   FileText,
   History,
   Lock,
+  Paperclip,
   Pencil,
   Plus,
   RotateCcw,
@@ -23,6 +24,7 @@ import { tasksApi } from "../../api/tasks";
 import { ModuleHeader, type ModuleHeaderSection } from "../../components/app/ModuleHeader";
 import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { Alert } from "../../components/ui/Alert";
+import { TextAreaField } from "../../components/ui/Field";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -165,6 +167,17 @@ function AlignedClampBody({
   );
 }
 
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-1 pb-0.5">
+      <span className="font-heading text-[10.5px] font-bold uppercase tracking-wider text-zinc-400">
+        {title}
+      </span>
+      <span className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
+
 export function TaskDetailPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -188,6 +201,7 @@ export function TaskDetailPage() {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
   const noteModalAnimation = useModalAnimation();
+  const fullInstructionsAnimation = useModalAnimation();
   const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -889,13 +903,16 @@ export function TaskDetailPage() {
                           <Lock className="size-4" strokeWidth={2.25} />
                         </div>
                         <p className="mt-2.5 font-heading text-[14px] font-semibold text-zinc-800">
-                          Nada anotado todavía
+                          {isClosed ? "Sin notas registradas" : "Nada anotado todavía"}
                         </p>
                         <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-zinc-500">
-                          Aquí queda lo que el equipo necesita saber sobre el avance de la tarea: cómo fue la llamada, qué
-                          se intentó ya, con quién quedó pendiente.
+                          {isClosed
+                            ? task.status === "Completada"
+                              ? "Esta tarea se completó sin registrar notas de seguimiento durante su ciclo de vida."
+                              : "Esta tarea fue cancelada sin registrar notas de seguimiento durante su ciclo de vida."
+                            : "Aquí queda lo que el equipo necesita saber sobre el avance de la tarea: cómo fue la llamada, qué se intentó ya, con quién quedó pendiente."}
                         </p>
-                        {task.canComment && (
+                        {!isClosed && task.canComment && (
                           <Button
                             type="button"
                             size="sm"
@@ -921,7 +938,7 @@ export function TaskDetailPage() {
                             </span>
                           </div>
                           <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
-                          {task.canComment && (
+                          {!isClosed && task.canComment && (
                             <Button
                               type="button"
                               size="sm"
@@ -980,97 +997,154 @@ export function TaskDetailPage() {
                     TAB 3: ADJUNTOS
                 ─────────────────────────────────────────────────────────────── */}
                 {activeTab === "adjuntos" && (
-                  <div className="rounded-card border border-line bg-white shadow-card p-6 space-y-6">
-                    <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
-                      <div>
-                        <h2 className="font-heading text-[15px] font-bold text-zinc-900">
-                          Archivos Adjuntos y Evidencias
-                        </h2>
-                        <p className="text-[12.5px] text-zinc-500">
-                          Documentos, imágenes y respaldos asociados a esta tarea.
-                        </p>
-                      </div>
-                      <span className="inline-flex h-5 items-center rounded-full bg-zinc-100 px-2.5 text-[11px] font-semibold text-zinc-600">
-                        {task.attachments.length} {task.attachments.length === 1 ? "archivo" : "archivos"}
-                      </span>
-                    </div>
-
-                    {uploadError && <Alert variant="error">{uploadError}</Alert>}
-
-                    <TaskEvidenceUpload
-                      files={pendingFiles}
-                      onFilesChange={setPendingFiles}
-                      onReportError={setUploadError}
-                      label="Cargar nuevos archivos a la tarea"
-                      dropzoneTitle="Haz clic o arrastra archivos para adjuntarlos"
-                      dropzoneHint="Soporta imágenes, PDFs, hojas de cálculo o documentos (máx. 10 MB por archivo)"
-                    />
-
-                    {pendingFiles.length > 0 && (
-                      <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setPendingFiles([])}
-                          disabled={isUploading}
-                        >
-                          Limpiar seleccionados
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => void handleUploadFiles()}
-                          isLoading={isUploading}
-                        >
-                          <Upload className="h-3.5 w-3.5" />
-                          Subir {pendingFiles.length} {pendingFiles.length === 1 ? "archivo" : "archivos"}
-                        </Button>
-                      </div>
-                    )}
-
-                    <div className="pt-4 border-t border-zinc-100">
-                      <h3 className="font-heading text-[12px] font-bold uppercase tracking-wider text-zinc-600 mb-3">
-                        Archivos ya guardados
-                      </h3>
-                      {task.attachments.length === 0 ? (
-                        <p className="text-[12.5px] text-zinc-400 italic">No hay archivos registrados.</p>
+                  <div className="space-y-3">
+                    {isClosed ? (
+                      task.attachments.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-zinc-200/90 bg-zinc-50/50 px-6 py-6 text-center">
+                          <div className="mx-auto flex size-8 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500">
+                            <Paperclip className="size-4" strokeWidth={2.25} />
+                          </div>
+                          <p className="mt-2 font-heading text-[13.5px] font-semibold text-zinc-800">
+                            Sin evidencias adjuntas
+                          </p>
+                          <p className="mx-auto mt-0.5 max-w-sm text-[12px] leading-relaxed text-zinc-500">
+                            {task.status === "Completada"
+                              ? "Esta tarea se completó sin adjuntar evidencias ni archivos durante su ciclo de vida."
+                              : "Esta tarea fue cancelada sin adjuntar evidencias ni archivos durante su ciclo de vida."}
+                          </p>
+                        </div>
                       ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {task.attachments.map((att) => (
-                            <div
-                              key={att.id}
-                              className="flex items-center justify-between gap-3 p-3 rounded-lg border border-zinc-200 bg-white hover:border-zinc-300 transition-all shadow-2xs"
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500">
-                                  <FileText className="size-4" />
-                                </span>
-                                <div className="min-w-0">
-                                  <span className="block truncate text-[12.5px] font-bold text-zinc-900" title={att.fileName}>
-                                    {att.fileName}
+                        <>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
+                              <Paperclip className="h-3 w-3 text-zinc-500" />
+                              <span>
+                                {task.attachments.length} {task.attachments.length === 1 ? "archivo adjunto" : "archivos adjuntos"}
+                              </span>
+                            </div>
+                            <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {task.attachments.map((att) => (
+                              <div
+                                key={att.id}
+                                className="flex items-center justify-between gap-3 p-3 rounded-lg border border-zinc-200/80 bg-white hover:border-zinc-300 transition-all shadow-2xs"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500">
+                                    <FileText className="size-4" />
                                   </span>
-                                  <span className="block text-[11px] text-zinc-400 tabular-nums">
-                                    {formatBytes(att.sizeBytes)} · {att.uploadedByName ?? "Sistema"}
-                                  </span>
+                                  <div className="min-w-0">
+                                    <span className="block truncate text-[12.5px] font-bold text-zinc-900" title={att.fileName}>
+                                      {att.fileName}
+                                    </span>
+                                    <span className="block text-[11px] text-zinc-400 tabular-nums">
+                                      {formatBytes(att.sizeBytes)} · {att.uploadedByName ?? "Sistema"}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => void openAttachment(att.id, false)}
+                                  >
+                                    <Eye className="size-3" />
+                                    Ver
+                                  </Button>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => void openAttachment(att.id, false)}
-                                >
-                                  <Eye className="size-3" />
-                                  Ver
-                                </Button>
+                            ))}
+                          </div>
+                        </>
+                      )
+                    ) : (
+                      <>
+                        {uploadError && <Alert variant="error">{uploadError}</Alert>}
+
+                        <TaskEvidenceUpload
+                          files={pendingFiles}
+                          onFilesChange={setPendingFiles}
+                          onReportError={setUploadError}
+                          label="Cargar nuevos archivos a la tarea"
+                          dropzoneTitle="Haz clic o arrastra archivos para adjuntarlos"
+                          dropzoneHint="Soporta imágenes, PDFs, hojas de cálculo o documentos (máx. 10 MB por archivo)"
+                        />
+
+                        {pendingFiles.length > 0 && (
+                          <div className="flex justify-end gap-2 pt-1">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setPendingFiles([])}
+                              disabled={isUploading}
+                            >
+                              Limpiar seleccionados
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => void handleUploadFiles()}
+                              isLoading={isUploading}
+                            >
+                              <Upload className="h-3.5 w-3.5" />
+                              Subir {pendingFiles.length} {pendingFiles.length === 1 ? "archivo" : "archivos"}
+                            </Button>
+                          </div>
+                        )}
+
+                        {task.attachments.length > 0 && (
+                          <div className="pt-2 space-y-2.5">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-1.5 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
+                                <Paperclip className="h-3 w-3 text-zinc-500" />
+                                <span>
+                                  {task.attachments.length} {task.attachments.length === 1 ? "archivo guardado" : "archivos guardados"}
+                                </span>
                               </div>
+                              <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {task.attachments.map((att) => (
+                                <div
+                                  key={att.id}
+                                  className="flex items-center justify-between gap-3 p-3 rounded-lg border border-zinc-200/80 bg-white hover:border-zinc-300 transition-all shadow-2xs"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500">
+                                      <FileText className="size-4" />
+                                    </span>
+                                    <div className="min-w-0">
+                                      <span className="block truncate text-[12.5px] font-bold text-zinc-900" title={att.fileName}>
+                                        {att.fileName}
+                                      </span>
+                                      <span className="block text-[11px] text-zinc-400 tabular-nums">
+                                        {formatBytes(att.sizeBytes)} · {att.uploadedByName ?? "Sistema"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => void openAttachment(att.id, false)}
+                                    >
+                                      <Eye className="size-3" />
+                                      Ver
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -1135,7 +1209,7 @@ export function TaskDetailPage() {
 
       {showNoteModal && (
         <Modal
-          maxWidth="max-w-2xl"
+          maxWidth="max-w-xl"
           eyebrow={task.number}
           title="Añadir nota interna"
           description={
@@ -1187,21 +1261,23 @@ export function TaskDetailPage() {
             </div>
           }
         >
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3 text-left">
             {commentError && <Alert variant="error">{commentError}</Alert>}
-            <textarea
-              ref={(el) => {
-                noteTextareaRef.current = el;
-                if (el) autoResizeTextarea(el, 40);
-              }}
+
+            <FormDivider title="Nota de seguimiento" />
+
+            <TextAreaField
+              label="Mensaje interno"
+              required
               autoFocus
               rows={1}
+              maxLength={4000}
               value={newComment}
               placeholder="Escribe lo que el equipo deba saber: cómo fue la llamada, qué se intentó ya, con quién quedó pendiente…"
               onChange={(e) => {
                 setNewComment(e.target.value);
                 if (commentError) setCommentError(null);
-                autoResizeTextarea(e.target, 40);
+                autoResizeTextarea(e.target, 52);
               }}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -1209,7 +1285,19 @@ export function TaskDetailPage() {
                   void handleSaveNote();
                 }
               }}
-              className="w-full resize-none overflow-hidden rounded-edge border border-line-strong bg-white px-3 py-2 text-[13px] leading-relaxed text-ink outline-none transition-colors placeholder:text-faint hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
+              className="min-h-0 resize-none overflow-hidden text-[12.5px] py-2 leading-relaxed [field-sizing:content]"
+              hint={
+                <span className="flex items-center justify-between text-[11px] text-zinc-400">
+                  <span>Nota para el equipo y registro del avance</span>
+                  <span className={`tabular-nums ${newComment.length > 3800 ? "text-brand-red font-medium" : ""}`}>
+                    {newComment.length} / 4000
+                  </span>
+                </span>
+              }
+              ref={(el) => {
+                noteTextareaRef.current = el;
+                if (el) autoResizeTextarea(el, 52);
+              }}
             />
           </div>
         </Modal>
@@ -1217,23 +1305,25 @@ export function TaskDetailPage() {
 
       {showFullInstructions && (
         <Modal
-          title="Instrucciones de la Tarea"
+          maxWidth="max-w-xl"
+          title="Instrucciones de la tarea"
           eyebrow={`${task.number} · Apertura`}
           description={`Registrado por ${task.createdByName} el ${formatDateTime(task.createdAt)}`}
           onClose={() => setShowFullInstructions(false)}
-          maxWidth="max-w-2xl"
+          isExiting={fullInstructionsAnimation.isExiting}
+          onRequestClose={fullInstructionsAnimation.requestClose}
           footer={
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[12px] text-zinc-400">
-                Instrucciones completas registradas en la tarea.
+            <div className="flex w-full items-center justify-between gap-3">
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+                Instrucciones registradas en la apertura
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-auto">
                 <CopyButton text={task.instructions} label="Copiar texto completo" />
                 <Button
                   type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={() => setShowFullInstructions(false)}
+                  onClick={fullInstructionsAnimation.requestClose}
                 >
                   Cerrar
                 </Button>
@@ -1241,10 +1331,13 @@ export function TaskDetailPage() {
             </div>
           }
         >
-          <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-4">
-            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-zinc-800 selection:bg-brand-red/10">
-              {task.instructions}
-            </p>
+          <div className="flex flex-col gap-3 text-left">
+            <FormDivider title="Texto de las instrucciones" />
+            <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-zinc-200/90 bg-zinc-50/60 p-3.5 text-left">
+              <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-zinc-800 selection:bg-brand-red/10 font-normal">
+                {task.instructions}
+              </p>
+            </div>
           </div>
         </Modal>
       )}

@@ -13,7 +13,7 @@ import {
 } from "../../api/reports";
 import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { Pagination } from "../../components/ui/Pagination";
@@ -195,6 +195,9 @@ export function ReportsPage() {
     [],
   );
 
+  useLoadErrorReceipt(error, "reports-generate", () => generate(report, criteria, page, pageSize));
+  useActionErrorReceipt(exportError, "reports-export");
+
   // Solo al abrir un enlace que ya trae reporte. Entrar al modulo sin `?reporte=`
   // deja la pantalla vacia, que es el primer paso del recorrido.
   useEffect(() => {
@@ -352,28 +355,6 @@ export function ReportsPage() {
 
       {hasRun && (
         <>
-          {error && (
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <div className="min-w-[240px] flex-1">
-                <Alert variant="error">{error}</Alert>
-              </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => generate(report, criteria, page, pageSize)}
-                disabled={isGenerating}
-              >
-                Reintentar
-              </Button>
-            </div>
-          )}
-
-          {exportError && (
-            <div className="mb-4">
-              <Alert variant="error">{exportError}</Alert>
-            </div>
-          )}
-
           {payload === null && error === null && (
             <div aria-hidden className="h-[220px] animate-pulse rounded-edge bg-fill" />
           )}

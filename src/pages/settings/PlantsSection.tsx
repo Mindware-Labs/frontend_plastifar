@@ -15,10 +15,10 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { PLANT_COUNTRIES, type Plant, type PlantCountry } from "../../types/settings";
-import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
 import { PlantModal } from "./PlantModal";
 
@@ -60,6 +60,8 @@ export function PlantsSection() {
     },
     fallbackError: "No se pudieron cargar las plantas",
   });
+
+  useLoadErrorReceipt(error, "settings-plants-list", refresh);
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -202,8 +204,6 @@ export function PlantsSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
         toolbar={

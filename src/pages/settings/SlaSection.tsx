@@ -1,10 +1,9 @@
-import { Flag, Pencil, Plus, Power, Star } from "lucide-react";
-import { useState } from "react";
+import { Flag, Layers, ListTodo, Pencil, Plus, Power, Star, Ticket } from "lucide-react";
+import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -18,48 +17,61 @@ import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import {
+  useActionErrorReceipt,
+  useConfigNoticeReceipt,
+  useLoadErrorReceipt,
+} from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { humanizeMinutes, workdayMinutes } from "../../lib/sla";
-import { PRIORITIES, type Holiday, type Priority, type SlaPolicy } from "../../types/settings";
-import { LoadErrorAlert, WarnNotice } from "./catalogSection";
+import { PRIORITIES, type Holiday, type Priority, type SlaPolicy, type SlaPolicyType } from "../../types/settings";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { SlaModal } from "./SlaModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
 
-/**
- * Prioridades sin política predeterminada activa. Se pregunta por prioridad y se
- * recorre el catálogo entero: con el tope fijo de cien, la política
- * predeterminada de una prioridad con muchas activas caía fuera de la consulta y
- * la sección avisaba de una falta que no existía.
- */
-async function loadUncovered(): Promise<Priority[]> {
-  const covered = await Promise.all(
-    PRIORITIES.map((priority) =>
-      fetchAllPages((page, pageSize) =>
-        settingsApi.slaPolicies.list({ page, pageSize, priority, status: "activas" }),
-      ).then((items) => items.some((policy) => policy.isDefault)),
-    ),
-  );
-
-  return PRIORITIES.filter((_, index) => !covered[index]);
+interface UncoveredItem {
+  priority: Priority;
+  type: SlaPolicyType;
 }
 
 /**
- * El calendario que el diálogo usa para previsualizar vencimientos. Se pide
- * entero: un feriado que no cupiera en la primera página desaparecía del
- * cálculo sin decirlo, y el vencimiento previsto salía mal.
+ * Consulta las políticas activas completas para detectar combinaciones (Tipo + Prioridad)
+ * que carezcan de una política predeterminada.
  */
+async function loadUncovered(): Promise<UncoveredItem[]> {
+  try {
+    const policies = await fetchAllPages<SlaPolicy>((page, pageSize) =>
+      settingsApi.slaPolicies.list({ page, pageSize, status: "activas" }),
+    );
+
+    const missing: UncoveredItem[] = [];
+    for (const type of ["Ticket", "Tarea"] as SlaPolicyType[]) {
+      for (const priority of PRIORITIES) {
+        const hasDefault = policies.some(
+          (p) => p.type === type && p.priority === priority && p.isDefault && p.isActive,
+        );
+        if (!hasDefault) {
+          missing.push({ priority, type });
+        }
+      }
+    }
+    return missing;
+  } catch {
+    return [];
+  }
+}
+
 const loadHolidays = () =>
   fetchAllPages<Holiday>((page, pageSize) =>
     settingsApi.holidays.list({ page, pageSize, status: "activos" }),
   );
 
-/** Cuerpo del PUT: el identificador viaja en la ruta, nunca en el DTO. */
 function toRequest(policy: SlaPolicy): Omit<SlaPolicy, "id"> {
   return {
     name: policy.name,
+    type: policy.type,
     priority: policy.priority,
     firstResponseMinutes: policy.firstResponseMinutes,
     resolutionMinutes: policy.resolutionMinutes,
@@ -80,6 +92,7 @@ export function SlaSection() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<SlaPolicyType | "todas">("todas");
   const [priority, setPriority] = useState<Priority | "todas">("todas");
   const [chip, setChip] = useState<ChipKey>("todas");
   const [pageSize, setPageSize] = useState(10);
@@ -89,8 +102,6 @@ export function SlaSection() {
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  // Seccion 4.1: la pagina, el filtro, la busqueda y los contadores los resuelve
-  // SQL. La vista solo dibuja lo que llega.
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
     fetch: settingsApi.slaPolicies.list,
     criteria: {
@@ -98,11 +109,12 @@ export function SlaSection() {
       search: debouncedSearch || undefined,
       status: chip === "todas" ? undefined : chip,
       priority: priority === "todas" ? undefined : priority,
+      type: typeFilter === "todas" ? undefined : typeFilter,
     },
     fallbackError: "No se pudieron cargar las políticas de SLA",
   });
 
-  const uncoveredRef = useReferenceData<Priority[]>(loadUncovered, []);
+  const uncoveredRef = useReferenceData<UncoveredItem[]>(loadUncovered, []);
   const uncovered = uncoveredRef.data;
 
   const holidaysRef = useReferenceData<Holiday[]>(loadHolidays, []);
@@ -110,12 +122,24 @@ export function SlaSection() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  // Sin criterio activo, una pagina vacia significa catalogo vacio; con
-  // criterio, que nada coincide. Los contadores no distinguen ese caso: se
-  // calculan sobre el filtro base, no sobre la tabla entera.
-  const isFiltering = debouncedSearch !== "" || chip !== "todas" || priority !== "todas";
+  const isFiltering = debouncedSearch !== "" || chip !== "todas" || priority !== "todas" || typeFilter !== "todas";
 
-  /** Marcar o desactivar una predeterminada cambia la cobertura: se relee. */
+  const uncoveredDetail = useMemo(() => {
+    if (uncovered.length === 0) return undefined;
+    return `Sin predeterminada activa para: ${uncovered
+      .map((u) => `${u.priority} (${u.type === "Tarea" ? "Tareas" : "Tickets"})`)
+      .join(", ")}. Un registro que nazca con esa combinación no tendría compromiso de tiempo automático.`;
+  }, [uncovered]);
+
+  useLoadErrorReceipt(error, "settings-sla-list", refresh);
+  useActionErrorReceipt(actionError, "settings-sla-action");
+  useConfigNoticeReceipt(
+    uncovered.length > 0,
+    "settings-sla-defaults",
+    "Políticas SLA incompletas",
+    uncoveredDetail,
+  );
+
   function reloadAll() {
     refresh();
     uncoveredRef.reload();
@@ -137,12 +161,6 @@ export function SlaSection() {
     }
   }
 
-  /**
-   * RF-K5: cada prioridad necesita una política predeterminada. Desactivar la
-   * última de su prioridad dejaría sin compromiso de tiempo a todo ticket que
-   * nazca con ella — el servidor lo rechaza con 409 y ese mensaje es el que se
-   * muestra, sin duplicar la regla aquí.
-   */
   function askToggle(policy: SlaPolicy) {
     setConfirmation({
       tone: "warn",
@@ -151,12 +169,12 @@ export function SlaSection() {
       description: policy.isActive ? (
         <>
           <strong className="font-semibold text-ink">{policy.name}</strong> deja de aplicarse a
-          tickets nuevos. Los ya abiertos conservan las fechas que se les calcularon al crearlos.
+          nuevos registros. Los ya abiertos conservan las fechas que se les calcularon al crearse.
         </>
       ) : (
         <>
           <strong className="font-semibold text-ink">{policy.name}</strong> vuelve a estar disponible
-          para asignarse a motivos y a tickets nuevos.
+          para asignarse a {policy.type === "Tarea" ? "tareas" : "tickets"} nuevos.
         </>
       ),
       confirmLabel: policy.isActive ? "Desactivar" : "Reactivar",
@@ -223,7 +241,7 @@ export function SlaSection() {
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <span className="text-[12px] text-zinc-500 font-medium">
-                {4 - uncovered.length} de 4 prioridades cubiertas
+                {8 - uncovered.length} de 8 predeterminadas asignadas
               </span>
             </div>
           ) : (
@@ -243,24 +261,6 @@ export function SlaSection() {
         }
       />
 
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
-
-      {actionError && (
-        <div className="mb-3">
-          <Alert variant="error">{actionError}</Alert>
-        </div>
-      )}
-
-      {uncovered.length > 0 && (
-        <div className="mb-3">
-          <WarnNotice>
-            Sin política predeterminada activa para{" "}
-            {uncovered.map((value) => value.toLowerCase()).join(", ")}. Un ticket que nazca con esa
-            prioridad no tendría compromiso de tiempo.
-          </WarnNotice>
-        </div>
-      )}
-
       <ListPanel
         toolbar={
           <>
@@ -268,14 +268,33 @@ export function SlaSection() {
               value={search}
               onChange={setSearch}
               placeholder="Buscar política…"
-              className="w-[240px]"
+              className="w-[220px]"
             />
 
             <FilterDropdown
-              title="Seleccionar prioridad"
+              title="Tipo de política"
+              aria-label="Filtrar por tipo"
+              value={typeFilter}
+              onChange={(value) => {
+                setTypeFilter(value as SlaPolicyType | "todas");
+                setPage(1);
+              }}
+              defaultIcon={<Layers className="h-3.5 w-3.5 text-zinc-500" />}
+              options={[
+                { value: "todas", label: "Todos los tipos" },
+                { value: "Ticket", label: "Tickets" },
+                { value: "Tarea", label: "Tareas" },
+              ]}
+            />
+
+            <FilterDropdown
+              title="Prioridad"
               aria-label="Filtrar por prioridad"
               value={priority}
-              onChange={(value) => setPriority(value as Priority | "todas")}
+              onChange={(value) => {
+                setPriority(value as Priority | "todas");
+                setPage(1);
+              }}
               defaultIcon={<Flag className="h-3.5 w-3.5 text-zinc-500" />}
               options={[
                 { value: "todas", label: "Todas las prioridades" },
@@ -283,11 +302,13 @@ export function SlaSection() {
               ]}
             />
 
-            {(search || priority !== "todas") && (
+            {(search || priority !== "todas" || typeFilter !== "todas") && (
               <ClearFiltersButton
                 onClick={() => {
                   setSearch("");
                   setPriority("todas");
+                  setTypeFilter("todas");
+                  setPage(1);
                 }}
               />
             )}
@@ -309,7 +330,7 @@ export function SlaSection() {
         }
       >
         {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={8} />
+          error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
           <p className="py-14 text-center text-[13.5px] text-faint">
             {isFiltering
@@ -322,6 +343,7 @@ export function SlaSection() {
               <thead>
                 <HeadRow>
                   <Th>Política</Th>
+                  <Th>Tipo</Th>
                   <Th>Prioridad</Th>
                   <Th>1ª respuesta</Th>
                   <Th>Resolución</Th>
@@ -337,12 +359,32 @@ export function SlaSection() {
                   <Row key={policy.id} busy={busyId === policy.id}>
                     <Td className="text-[12.5px] font-medium text-ink">{policy.name}</Td>
                     <Td>
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold tracking-wide border ${
+                          policy.type === "Tarea"
+                            ? "border-blue-200/80 bg-blue-50/70 text-blue-700"
+                            : "border-purple-200/80 bg-purple-50/70 text-purple-700"
+                        }`}
+                      >
+                        {policy.type === "Tarea" ? (
+                          <ListTodo className="h-3 w-3 shrink-0" />
+                        ) : (
+                          <Ticket className="h-3 w-3 shrink-0" />
+                        )}
+                        <span>{policy.type === "Tarea" ? "Tarea" : "Ticket"}</span>
+                      </span>
+                    </Td>
+                    <Td>
                       <Badge tone={policy.priority === "Emergencia" ? "red" : "neutral"}>
                         {policy.priority}
                       </Badge>
                     </Td>
                     <Td className="text-[12.5px] tabular-nums text-brand-gray">
-                      {humanizeMinutes(policy.firstResponseMinutes, workdayMinutes(policy))}
+                      {policy.type === "Tarea" && policy.firstResponseMinutes === policy.resolutionMinutes ? (
+                        <span className="text-zinc-400 text-[11.5px]">—</span>
+                      ) : (
+                        humanizeMinutes(policy.firstResponseMinutes, workdayMinutes(policy))
+                      )}
                     </Td>
                     <Td className="text-[12.5px] tabular-nums text-brand-gray">
                       {humanizeMinutes(policy.resolutionMinutes, workdayMinutes(policy))}
@@ -356,16 +398,14 @@ export function SlaSection() {
                           </span>
                         </span>
                       ) : (
-                        "Continuo"
+                        "Continuo (24/7)"
                       )}
                     </Td>
                     <Td>
                       {policy.isDefault ? (
-                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
-                          {/* Marcador de estado, no accion: el rojo 185 C esta
-                              reservado a la primaria y al estado activo. */}
-                          <Star aria-hidden className="h-3.5 w-3.5 fill-subtle text-subtle" />
-                          De {policy.priority.toLowerCase()}
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-ink">
+                          <Star aria-hidden className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+                          De {policy.priority.toLowerCase()} ({policy.type.toLowerCase()})
                         </span>
                       ) : (
                         <span className="text-[12.5px] text-faint">—</span>
@@ -379,7 +419,7 @@ export function SlaSection() {
                         <div className="flex items-center justify-end gap-1">
                           {!policy.isDefault && policy.isActive && (
                             <RowAction
-                              label={`Hacer predeterminada de ${policy.priority.toLowerCase()}: ${policy.name}`}
+                              label={`Hacer predeterminada de ${policy.priority.toLowerCase()} (${policy.type.toLowerCase()}): ${policy.name}`}
                               icon={Star}
                               onClick={() => makeDefault(policy)}
                               disabled={busyId === policy.id}

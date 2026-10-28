@@ -19,6 +19,17 @@ interface TaskCompleteModalProps {
   onCompleted: (task: TaskDetail) => void;
 }
 
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-1 pb-0.5">
+      <span className="font-heading text-[10.5px] font-bold uppercase tracking-wider text-zinc-400">
+        {title}
+      </span>
+      <span className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
+
 function bindAutoResizeTextarea(
   field: UseFormRegisterReturn,
   minHeightPx: number,
@@ -65,6 +76,13 @@ export function TaskCompleteModal({ task, onClose, onCompleted }: TaskCompleteMo
     }
   }, [comment]);
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLFormElement>) {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      void handleSubmit(onSubmit)();
+    }
+  }
+
   async function onSubmit(values: { comment: string }) {
     setFormError(null);
     const form = new FormData();
@@ -81,7 +99,7 @@ export function TaskCompleteModal({ task, onClose, onCompleted }: TaskCompleteMo
 
   return (
     <Modal
-      maxWidth="max-w-2xl"
+      maxWidth="max-w-xl"
       eyebrow={task.number}
       title="Completar tarea"
       description="El cierre queda sellado con tu usuario y la hora. Después solo se puede reabrir de forma explícita."
@@ -89,24 +107,44 @@ export function TaskCompleteModal({ task, onClose, onCompleted }: TaskCompleteMo
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-end gap-2">
-          <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-            Volver
-          </Button>
-          <Button
-            type="submit"
-            form="task-complete-form"
-            size="sm"
-            isLoading={isSubmitting}
-            disabled={!comment.trim()}
-          >
-            Completar tarea
-          </Button>
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para completar</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="task-complete-form"
+              size="sm"
+              isLoading={isSubmitting}
+              disabled={!comment.trim()}
+            >
+              Completar tarea
+            </Button>
+          </div>
         </div>
       }
     >
-      <form id="task-complete-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+      <form
+        id="task-complete-form"
+        onSubmit={handleSubmit(onSubmit)}
+        onKeyDown={handleKeyDown}
+        noValidate
+        className="flex flex-col gap-3 text-left"
+      >
         {formError && <Alert variant="error">{formError}</Alert>}
+
+        <FormDivider title="Resolución" />
 
         <TextAreaField
           label="Comentario de cierre"
@@ -114,7 +152,7 @@ export function TaskCompleteModal({ task, onClose, onCompleted }: TaskCompleteMo
           rows={1}
           maxLength={4000}
           placeholder="Escribe qué se ejecutó, el resultado obtenido y cómo quedó la tarea…"
-          className="resize-none overflow-hidden"
+          className="min-h-0 resize-none overflow-hidden text-[12.5px] py-2 leading-relaxed [field-sizing:content]"
           hint={
             <span className="flex items-center justify-between text-[11px] text-zinc-400">
               <span className={errors.comment ? "text-brand-red font-medium" : ""}>
@@ -126,24 +164,20 @@ export function TaskCompleteModal({ task, onClose, onCompleted }: TaskCompleteMo
             </span>
           }
           error={errors.comment?.message}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-              e.preventDefault();
-              void handleSubmit(onSubmit)();
-            }
-          }}
           {...bindAutoResizeTextarea(commentField, 52, (el) => {
             textareaRef.current = el;
           })}
         />
 
+        <FormDivider title="Evidencias y respaldos" />
+
         <TaskEvidenceUpload
           files={files}
           onFilesChange={setFiles}
           onReportError={setFormError}
-          label="Evidencias y respaldos"
-          dropzoneTitle="Adjuntar entregables o comprobantes de cierre"
-          dropzoneHint="Capturas, documentos o lo que demuestre que la tarea quedó concluida (máx. 10 MB por archivo)."
+          label="Entregables o comprobantes de cierre"
+          dropzoneTitle="Adjuntar archivos de evidencia"
+          dropzoneHint="Capturas, reportes o documentos (máx. 10 MB por archivo)"
         />
       </form>
     </Modal>

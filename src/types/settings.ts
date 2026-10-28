@@ -18,9 +18,17 @@ export const WEEKDAYS: { key: Weekday; label: string; jsDay: number }[] = [
   { key: "D", label: "Domingo", jsDay: 0 },
 ];
 
+export type SlaPolicyType = 'Ticket' | 'Tarea';
+
+export const SLA_POLICY_TYPES: { value: SlaPolicyType; label: string; description: string }[] = [
+  { value: 'Ticket', label: 'Tickets', description: 'Para solicitudes y atenciones de clientes' },
+  { value: 'Tarea', label: 'Tareas', description: 'Para tareas internas operativas y de seguimiento' },
+];
+
 export interface SlaPolicy {
   id: number;
   name: string;
+  type: SlaPolicyType;
   priority: Priority;
   firstResponseMinutes: number;
   resolutionMinutes: number;

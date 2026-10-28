@@ -1,4 +1,3 @@
-import { AlertTriangle } from "lucide-react";
 import type {
   AuditReport,
   AuditSliceReport,
@@ -9,6 +8,7 @@ import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { formatAmount } from "../../lib/numbers";
 import type { ReportDefinition } from "../../types/reports";
 import type { ReportCriteria } from "./ReportFilters";
+import { useConfigNoticeReceipt } from "../../hooks/useNoticeReceipts";
 import { StatTile } from "./StatTile";
 
 /**
@@ -30,14 +30,10 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="py-8 text-center text-[13.5px] text-faint">{children}</p>;
 }
 
-/** El bloque no honra todos los filtros activos y hay que decirlo. */
-function ScopeWarning({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-3 flex items-start gap-2 border-l-[3px] border-warn bg-warn/[0.06] px-3 py-2 text-[12.5px] text-warn">
-      <AlertTriangle aria-hidden className="mt-px h-3.5 w-3.5 shrink-0" />
-      <span className="max-w-[76ch] text-brand-gray">{children}</span>
-    </p>
-  );
+/** Aviso de alcance del reporte: toast, no banner en la página. */
+function ReportScopeNotice({ action, detail }: { action: string; detail: string }) {
+  useConfigNoticeReceipt(true, action, "Alcance del reporte", detail);
+  return null;
 }
 
 /** El movimiento mes a mes. Lo comparten «HCA por período» y «Tiempo de cierre». */
@@ -161,11 +157,10 @@ export function QualityResult({
     return (
       <>
         {!data.credits.scoped && (
-          <ScopeWarning>
-            Una nota de crédito se emite contra un cliente, no contra una línea de producto ni
-            contra el responsable de una HCA. Esas dos columnas no existen en la solicitud, así que
-            estas cifras cubren todo el período sin ese recorte.
-          </ScopeWarning>
+          <ReportScopeNotice
+            action="report-creditos-scope"
+            detail="Una nota de crédito se emite contra un cliente, no contra una línea de producto ni contra el responsable de una HCA. Estas cifras cubren todo el período sin ese recorte."
+          />
         )}
         {data.credits.count === 0 ? (
           <Empty>No se aprobó ninguna nota de crédito con estos criterios.</Empty>

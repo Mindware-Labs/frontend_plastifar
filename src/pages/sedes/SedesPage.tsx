@@ -26,7 +26,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { Sede, SedeQuery } from "../../types/sedes";
-import { LoadErrorAlert } from "../settings/catalogSection";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { SedeModal } from "./SedeModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -59,6 +59,8 @@ export function SedesPage() {
     },
     fallbackError: "No se pudieron cargar las sedes",
   });
+
+  useLoadErrorReceipt(error, "sedes-list", refresh);
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -185,8 +187,6 @@ export function SedesPage() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         <ListPanel

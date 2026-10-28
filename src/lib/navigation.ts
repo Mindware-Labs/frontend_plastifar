@@ -15,7 +15,6 @@ import {
   BarChart3,
   Building,
   Building2,
-  ClipboardCheck,
   FileWarning,
   PackageMinus,
   PackageSearch,
@@ -165,13 +164,6 @@ export const SIDEBAR_NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Calidad",
-    icon: ClipboardCheck,
-    section: "Gestión",
-    permission: "quality.read",
-    children: [{ label: "Líneas de producto", to: "/calidad/lineas" }],
-  },
-  {
     label: "Personal",
     icon: Users,
     section: "Gestión",
@@ -197,7 +189,14 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "SLA", to: "/configuracion/sla" },
       { label: "Días no laborables", to: "/configuracion/feriados" },
       { label: "Plantillas", to: "/configuracion/plantillas" },
-      { label: "Buzones", to: "/configuracion/buzones" },
+      {
+      label: "Buzones",
+      to: "/configuracion/buzones",
+    },
+    {
+      label: "Líneas de productos",
+      to: "/configuracion/lineas",
+    },
       { label: "Productos", to: "/configuracion/productos" },
       { label: "Plantas", to: "/configuracion/plantas" },
       { label: "Equipos", to: "/configuracion/equipos" },

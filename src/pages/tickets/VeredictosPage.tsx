@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { ticketVerdictsApi, type TicketVerdictQuery } from "../../api/ticketVerdicts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -17,6 +16,7 @@ import { StatusDot } from "../../components/ui/StatusDot";
 import { TableSelectionBar } from "../../components/ui/TableSelectionBar";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { formatDateTime } from "../../lib/format";
@@ -49,6 +49,9 @@ export function VeredictosPage() {
     criteria: { pageSize, search: debouncedSearch || undefined, status },
     fallbackError: "No se pudieron cargar los veredictos",
   });
+
+  useLoadErrorReceipt(error, "veredictos-list", refresh);
+  useActionErrorReceipt(actionError, "veredictos-action");
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -291,12 +294,6 @@ export function VeredictosPage() {
           </div>
           )}
         </div>
-
-        {(error || actionError) && (
-          <div className="mb-3">
-            <Alert variant="error">{error ?? actionError}</Alert>
-          </div>
-        )}
 
         {!data ? (
           <div className="flex justify-center py-16">

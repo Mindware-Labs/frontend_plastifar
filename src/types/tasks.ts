@@ -21,6 +21,16 @@ export interface TaskCounts {
   overdue: number;
 }
 
+/** Tarea ligada a un correo en bandeja (cualquier estado). */
+export interface EmailLinkedTask {
+  id: number;
+  number: string;
+  title: string;
+  status: TaskStatus;
+  origin: TaskOrigin;
+  createdAt: string;
+}
+
 export interface TaskListItem {
   id: number;
   number: string;

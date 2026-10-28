@@ -15,10 +15,10 @@ import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { WEEKDAYS, type Holiday, type SlaPolicy } from "../../types/settings";
-import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { HolidayModal } from "./HolidayModal";
 
@@ -104,6 +104,15 @@ export function HolidaysSection() {
 
   const policiesRef = useReferenceData<SlaPolicy[]>(loadWorkdayPolicies, []);
   const policies = policiesRef.data;
+
+  useLoadErrorReceipt(error, "settings-holidays-list", refresh);
+  useLoadErrorReceipt(
+    policiesRef.failed
+      ? "No se pudieron cargar las políticas: la columna «mueve vencimientos» queda sin calcular."
+      : null,
+    "settings-holidays-policies",
+    policiesRef.reload,
+  );
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -226,15 +235,6 @@ export function HolidaysSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
-
-      {policiesRef.failed && (
-        <LoadErrorAlert
-          message="No se pudieron cargar las políticas: la columna «mueve vencimientos» queda sin calcular."
-          onRetry={policiesRef.reload}
-        />
-      )}
 
       <ListPanel
         toolbar={

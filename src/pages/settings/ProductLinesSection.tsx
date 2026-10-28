@@ -15,10 +15,10 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { ProductLine } from "../../types/settings";
-import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
 import { ProductLineModal } from "./ProductLineModal";
 
@@ -51,6 +51,8 @@ export function ProductLinesSection() {
     },
     fallbackError: "No se pudieron cargar las líneas de producto",
   });
+
+  useLoadErrorReceipt(error, "settings-product-lines-list", refresh);
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -115,7 +117,7 @@ export function ProductLinesSection() {
   return (
     <>
       <ModuleHeader
-        title="Líneas de producto"
+        title="Líneas de productos"
         summary={
           counts ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
@@ -173,8 +175,6 @@ export function ProductLinesSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
         toolbar={

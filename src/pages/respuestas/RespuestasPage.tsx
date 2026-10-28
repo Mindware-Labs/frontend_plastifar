@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { cannedApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -36,6 +36,8 @@ export function RespuestasPage() {
   }
 
   useEffect(load, []);
+
+  useLoadErrorReceipt(error, "respuestas-list", load);
 
   const term = search.trim().toLowerCase();
   const rows = (items ?? []).filter(
@@ -104,12 +106,6 @@ export function RespuestasPage() {
             <span>¿Para qué sirve?</span>
           </button>
         </div>
-
-        {error && (
-          <div className="mb-3">
-            <Alert variant="error">{error}</Alert>
-          </div>
-        )}
 
         {items === null ? (
           <div className="flex justify-center py-16">

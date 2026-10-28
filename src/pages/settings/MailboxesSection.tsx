@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -16,12 +15,13 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
+import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { DepartmentResponse } from "../../types/api";
 import { providerLabel, type Mailbox } from "../../types/settings";
-import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { MailboxModal } from "./MailboxModal";
 import { departmentPath } from "../../lib/departments";
@@ -57,6 +57,7 @@ function TestingRing({ className = "" }: { className?: string }) {
 export function MailboxesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
+  const receipts = useReceipts();
 
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -88,6 +89,13 @@ export function MailboxesSection() {
   const departmentsRef = useReferenceData<DepartmentResponse[]>(departmentsApi.list, []);
   const departments = departmentsRef.data;
 
+  useLoadErrorReceipt(error, "settings-mailboxes-list", refresh);
+  useLoadErrorReceipt(
+    departmentsRef.failed ? "No se pudieron cargar los departamentos: la columna queda sin nombre." : null,
+    "settings-mailboxes-departments",
+    departmentsRef.reload,
+  );
+
   const rows = data?.items ?? [];
   const counts = data?.counts;
   // Sin criterio activo, una pagina vacia significa catalogo vacio; con
@@ -112,9 +120,14 @@ export function MailboxesSection() {
 
   useEffect(() => {
     if (!testResult) return;
+    if (testResult.result.ok) {
+      receipts.done({ action: "mailbox-test", title: testResult.result.message });
+    } else {
+      receipts.failed({ action: "mailbox-test", title: testResult.result.message });
+    }
     const timer = window.setTimeout(() => setTestResult(null), TEST_RESULT_TTL);
     return () => window.clearTimeout(timer);
-  }, [testResult]);
+  }, [testResult, receipts]);
 
   function askToggle(mailbox: Mailbox) {
     setConfirmation({
@@ -231,23 +244,6 @@ export function MailboxesSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
-
-      {departmentsRef.failed && (
-        <LoadErrorAlert
-          message="No se pudieron cargar los departamentos: la columna queda sin nombre."
-          onRetry={departmentsRef.reload}
-        />
-      )}
-
-      {testResult && (
-        <div className="mb-3">
-          <Alert variant={testResult.result.ok ? "success" : "error"}>
-            {testResult.result.message}
-          </Alert>
-        </div>
-      )}
 
       <ListPanel
         toolbar={

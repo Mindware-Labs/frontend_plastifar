@@ -131,10 +131,11 @@ export default function App() {
           <Route path="/clientes/:id/historial" element={<ClientDetailPage section="historial" />} />
         </Route>
 
-        <Route path="/calidad" element={<Navigate to="/calidad/lineas" replace />} />
-        <Route path="/calidad/hca" element={<Navigate to="/calidad/lineas" replace />} />
-        <Route path="/calidad/hca/*" element={<Navigate to="/calidad/lineas" replace />} />
-        <Route path="/calidad/creditos" element={<Navigate to="/calidad/lineas" replace />} />
+        <Route path="/calidad" element={<Navigate to="/configuracion/lineas" replace />} />
+        <Route path="/calidad/hca" element={<Navigate to="/configuracion/lineas" replace />} />
+        <Route path="/calidad/hca/*" element={<Navigate to="/configuracion/lineas" replace />} />
+        <Route path="/calidad/creditos" element={<Navigate to="/configuracion/lineas" replace />} />
+        <Route path="/calidad/lineas" element={<Navigate to="/configuracion/lineas" replace />} />
 
         {/* Reclamación de clientes, PF-FOR-034 (docs/plan/03). Clave propia:
             la llena Ventas y la trata Calidad, y ninguna de las dos es
@@ -166,6 +167,7 @@ export default function App() {
         <Route path="/configuracion/feriados" element={<HolidaysSection />} />
         <Route path="/configuracion/plantillas" element={<TemplatesSection />} />
         <Route path="/configuracion/buzones" element={<MailboxesSection />} />
+        <Route path="/configuracion/lineas" element={<ProductLinesSection />} />
         {/* Rutas propuestas en docs/plan/00, seccion 11. Si los productos y las
             plantas deben seguir a las lineas de producto al grupo de Calidad
             esta por decidir en la revision cruzada. */}
@@ -183,14 +185,12 @@ export default function App() {
             sigue las reclamaciones. Ninguna de las dos es configuracion del
             sistema, y en «Configuracion» solo estaban porque era el cajon. */}
         <Route path="/clientes/territorios" element={<TerritoriesSection />} />
-        <Route path="/calidad/lineas" element={<ProductLinesSection />} />
 
         {/* Las rutas viejas siguen respondiendo. Estan en marcadores, en
             correos y en la memoria de quien lleva un año usando el panel;
             moverlas sin dejar el rastro convierte una reorganizacion del menu
             en un enlace roto. */}
         <Route path="/configuracion/territorios" element={<Navigate to="/clientes/territorios" replace />} />
-        <Route path="/configuracion/lineas" element={<Navigate to="/calidad/lineas" replace />} />
 
         {/* El servidor ya exige reports.read en los tres endpoints; sin este
             guard la pantalla se pintaba entera y se llenaba de 403. */}

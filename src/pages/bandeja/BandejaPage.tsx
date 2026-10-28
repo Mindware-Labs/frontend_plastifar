@@ -19,7 +19,6 @@ import { emailsApi, type EmailQuery } from "../../api/emails";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { NotificationsModal } from "../../components/app/NotificationsModal";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -33,6 +32,7 @@ import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useHasOpenedNotifications, useNotifyPrefs } from "../../hooks/useNotifyPrefs";
 import { markNotificationsOpened } from "../../lib/notifications";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import type { EmailBulkAction, EmailListResponse, EmailSummaryResponse } from "../../types/api";
 import { ConversationRow } from "./ConversationRow";
@@ -363,6 +363,8 @@ export function BandejaPage({ folder }: BandejaPageProps) {
       fallbackError: "No se pudo cargar la bandeja",
     },
   );
+
+  useLoadErrorReceipt(error, "bandeja-list", refresh);
 
   // El aviso llega en cualquier momento: se guarda la recarga vigente para no resuscribirse.
   const refreshRef = useRef(refresh);
@@ -816,12 +818,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
             </div>
           }
         />
-
-        {error && (
-          <div className="mb-3 shrink-0">
-            <Alert variant="error">{error}</Alert>
-          </div>
-        )}
 
         {data === null ? (
           <div className="flex flex-1 items-center justify-center">

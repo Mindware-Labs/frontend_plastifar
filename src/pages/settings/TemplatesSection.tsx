@@ -15,11 +15,11 @@ import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { usedVariables } from "../../lib/templates";
 import type { EmailTemplate } from "../../types/settings";
-import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
 import { TemplateModal } from "./TemplateModal";
 
@@ -51,6 +51,8 @@ export function TemplatesSection() {
     },
     fallbackError: "No se pudieron cargar las plantillas",
   });
+
+  useLoadErrorReceipt(error, "settings-templates-list", refresh);
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -156,8 +158,6 @@ export function TemplatesSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
         toolbar={

@@ -15,6 +15,7 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import {
@@ -24,7 +25,6 @@ import {
   type Product,
   type ProductLine,
 } from "../../types/settings";
-import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { ProductImportModal } from "./ProductImportModal";
 import { ProductModal } from "./ProductModal";
@@ -87,6 +87,18 @@ export function ProductsSection() {
     },
     fallbackError: "No se pudieron cargar los productos",
   });
+
+  useLoadErrorReceipt(error, "settings-products-list", refresh);
+  useLoadErrorReceipt(
+    referencesFailed
+      ? "No se pudieron cargar las plantas o las líneas de producto para los filtros"
+      : null,
+    "settings-products-references",
+    () => {
+      plantsRef.reload();
+      linesRef.reload();
+    },
+  );
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -229,17 +241,6 @@ export function ProductsSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
-      {referencesFailed && (
-        <LoadErrorAlert
-          message="No se pudieron cargar las plantas o las líneas de producto para los filtros"
-          onRetry={() => {
-            plantsRef.reload();
-            linesRef.reload();
-          }}
-        />
-      )}
 
       <ListPanel
         toolbar={

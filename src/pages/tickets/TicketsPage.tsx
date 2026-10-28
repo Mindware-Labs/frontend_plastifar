@@ -24,7 +24,6 @@ import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
 import { Modal } from "../../components/ui/Modal";
@@ -36,6 +35,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { formatActivityDate, formatSlaRemaining } from "../../lib/format";
 import type {
@@ -327,6 +327,8 @@ export function TicketsPage() {
     },
     fallbackError: "No se pudieron cargar los tickets",
   });
+
+  useLoadErrorReceipt(error, "tickets-list", refresh);
 
   useEffect(() => onTicketsChanged(refresh), [onTicketsChanged, refresh]);
 
@@ -704,12 +706,6 @@ export function TicketsPage() {
             </div>
           )}
         </div>
-
-        {error && (
-          <div className="mb-3">
-            <Alert variant="error">{error}</Alert>
-          </div>
-        )}
 
         {!data ? (
           <div className="flex justify-center py-16">

@@ -4,7 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -22,6 +21,7 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
@@ -96,6 +96,9 @@ export function StaffPage() {
     },
     fallbackError: "No se pudo cargar el personal",
   });
+
+  useLoadErrorReceipt(error, "staff-list", refresh);
+  useActionErrorReceipt(bulkError, "staff-bulk");
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -420,17 +423,6 @@ export function StaffPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {error && (
-          <div className="mb-3">
-            <Alert variant="error">{error}</Alert>
-          </div>
-        )}
-
-        {bulkError && (
-          <div className="mb-3">
-            <Alert variant="error">{bulkError}</Alert>
-          </div>
-        )}
 
         <ListPanel
           selection={

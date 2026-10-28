@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { rolesApi, type RoleQuery } from "../../api/roles";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -17,6 +16,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import type { RoleListResponse, RoleResponse } from "../../types/api";
 import type { PermissionMatrixResponse } from "../../types/permissions";
@@ -80,6 +80,8 @@ export function RolesPage() {
     criteria: { pageSize, search: debouncedSearch || undefined, status: filter },
     fallbackError: "No se pudieron cargar los roles",
   });
+
+  useLoadErrorReceipt(error, "roles-list", refresh);
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -276,12 +278,6 @@ export function RolesPage() {
             )}
           </div>
         </div>
-
-        {error && (
-          <div className="mb-3">
-            <Alert variant="error">{error}</Alert>
-          </div>
-        )}
 
         {data === null ? (
           <div className="flex justify-center py-16">

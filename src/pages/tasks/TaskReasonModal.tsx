@@ -19,6 +19,17 @@ interface TaskReasonModalProps {
   onSaved: (task: TaskDetail) => void;
 }
 
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-1 pb-0.5">
+      <span className="font-heading text-[10.5px] font-bold uppercase tracking-wider text-zinc-400">
+        {title}
+      </span>
+      <span className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
+
 function bindAutoResizeTextarea(
   field: UseFormRegisterReturn,
   minHeightPx: number,
@@ -65,6 +76,13 @@ export function TaskReasonModal({ task, mode, onClose, onSaved }: TaskReasonModa
     }
   }, [reason]);
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLFormElement>) {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      void handleSubmit(onSubmit)();
+    }
+  }
+
   async function onSubmit(values: { reason: string }) {
     setFormError(null);
     try {
@@ -92,40 +110,68 @@ export function TaskReasonModal({ task, mode, onClose, onSaved }: TaskReasonModa
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-end gap-2">
-          <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-            Volver
-          </Button>
-          <Button type="submit" form="task-reason-form" size="sm" variant={isCancel ? "danger" : "primary"} isLoading={isSubmitting}>
-            {isCancel ? "Cancelar tarea" : "Reabrir tarea"}
-          </Button>
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para {isCancel ? "cancelar" : "reabrir"}</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="task-reason-form"
+              size="sm"
+              variant={isCancel ? "danger" : "primary"}
+              isLoading={isSubmitting}
+              disabled={!reason.trim()}
+            >
+              {isCancel ? "Cancelar tarea" : "Reabrir tarea"}
+            </Button>
+          </div>
         </div>
       }
     >
-      <form id="task-reason-form" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3">
+      <form
+        id="task-reason-form"
+        onSubmit={handleSubmit(onSubmit)}
+        onKeyDown={handleKeyDown}
+        noValidate
+        className="flex flex-col gap-3 text-left"
+      >
         {formError && <Alert variant="error">{formError}</Alert>}
+
+        <FormDivider title="Justificación" />
+
         <TextAreaField
           label={isCancel ? "Motivo de la cancelación" : "Motivo de la reapertura"}
           required
           rows={1}
           maxLength={500}
-          placeholder={isCancel ? "Indica la razón por la que se cancela esta tarea…" : "Indica por qué se reactiva esta tarea…"}
-          className="resize-none overflow-hidden"
+          placeholder={
+            isCancel
+              ? "Indica la razón por la que se cancela esta tarea…"
+              : "Indica por qué se reactiva esta tarea…"
+          }
+          className="min-h-0 resize-none overflow-hidden text-[12.5px] py-2 leading-relaxed [field-sizing:content]"
           hint={
             <span className="flex items-center justify-between text-[11px] text-zinc-400">
-              <span>Se requiere un motivo explicativo de al menos 5 caracteres</span>
+              <span className={errors.reason ? "text-brand-red font-medium" : ""}>
+                {errors.reason?.message ?? "Se requiere un motivo explicativo de al menos 5 caracteres"}
+              </span>
               <span className={`tabular-nums ${reason.length > 450 ? "text-brand-red font-medium" : ""}`}>
                 {reason.length} / 500
               </span>
             </span>
           }
           error={errors.reason?.message}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-              e.preventDefault();
-              void handleSubmit(onSubmit)();
-            }
-          }}
           {...bindAutoResizeTextarea(reasonField, 52, (el) => {
             textareaRef.current = el;
           })}

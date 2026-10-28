@@ -14,10 +14,10 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { Team } from "../../types/settings";
-import { LoadErrorAlert } from "./catalogSection";
 import { freshCopy, staleClass } from "./catalogState";
 import { TeamModal } from "./TeamModal";
 
@@ -53,6 +53,8 @@ export function TeamsSection() {
     },
     fallbackError: "No se pudieron cargar los equipos",
   });
+
+  useLoadErrorReceipt(error, "settings-teams-list", refresh);
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -193,8 +195,6 @@ export function TeamsSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
         toolbar={
