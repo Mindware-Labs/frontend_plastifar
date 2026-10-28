@@ -1,11 +1,22 @@
-import { Calendar as CalendarIcon, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  Calendar as CalendarIcon,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Clock,
+  X,
+} from "lucide-react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 
 export interface DatePickerProps {
   value: string; // Formato "YYYY-MM-DD" o cadena vacía
   onChange: (value: string) => void;
+  showTime?: boolean;
+  timeValue?: string; // Formato "HH:mm" o cadena vacía
+  onTimeChange?: (value: string) => void;
   placeholder?: string;
   id?: string;
   disabled?: boolean;
@@ -66,6 +77,200 @@ function formatFriendlyDate(str: string): string {
   return `${day} ${monthShort}`;
 }
 
+function formatTime12h(timeStr?: string): string {
+  if (!timeStr) return "";
+  const [hStr, mStr] = timeStr.split(":");
+  const h = Number(hStr);
+  const m = Number(mStr);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+  const period = h >= 12 ? "p.m." : "a.m.";
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  const displayM = String(m).padStart(2, "0");
+  return `${displayH}:${displayM} ${period}`;
+}
+
+function formatDisplayValue(dateStr: string, showTime?: boolean, timeStr?: string): string {
+  const d = formatDisplayDate(dateStr);
+  if (!d) return "";
+  if (showTime && timeStr) {
+    return `${d} · ${formatTime12h(timeStr)}`;
+  }
+  return d;
+}
+
+function parseTime24(timeStr: string): { h24: number; minute: number } | null {
+  if (!timeStr) return null;
+  const [hStr, mStr] = timeStr.split(":");
+  const h24 = Number(hStr);
+  const minute = Number(mStr);
+  if (isNaN(h24) || isNaN(minute) || h24 < 0 || h24 > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+  return { h24, minute };
+}
+
+function toTime24(h24: number, minute: number): string {
+  const h = ((h24 % 24) + 24) % 24;
+  const m = ((minute % 60) + 60) % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function to12hParts(h24: number): { hour12: number; period: "am" | "pm" } {
+  const period: "am" | "pm" = h24 >= 12 ? "pm" : "am";
+  const hour12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return { hour12, period };
+}
+
+function from12h(hour12: number, period: "am" | "pm"): number {
+  if (period === "am") return hour12 === 12 ? 0 : hour12;
+  return hour12 === 12 ? 12 : hour12 + 12;
+}
+
+const TIME_QUICK_PRESETS: { label: string; value: string }[] = [
+  { label: "9:00 a.m.", value: "09:00" },
+  { label: "12:00 m.", value: "12:00" },
+  { label: "5:00 p.m.", value: "17:00" },
+  { label: "Fin de día", value: "23:59" },
+];
+
+function TimeStepButton({
+  direction,
+  label,
+  onClick,
+}: {
+  direction: "up" | "down";
+  label: string;
+  onClick: () => void;
+}) {
+  const Icon = direction === "up" ? ChevronUp : ChevronDown;
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="flex h-5 w-full items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
+    >
+      <Icon className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+function InlineTimePicker({
+  timeValue,
+  onTimeChange,
+  onNeedDate,
+}: {
+  timeValue: string;
+  onTimeChange: (value: string) => void;
+  onNeedDate: () => void;
+}) {
+  const parsed = parseTime24(timeValue);
+  const hasTime = Boolean(parsed);
+  const { h24, minute } = parsed ?? { h24: 12, minute: 0 };
+  const { hour12, period } = to12hParts(h24);
+
+  function commit(nextH24: number, nextMinute: number) {
+    onTimeChange(toTime24(nextH24, nextMinute));
+    onNeedDate();
+  }
+
+  function bumpHour(delta: number) {
+    const nextH24 = ((h24 + delta) % 24 + 24) % 24;
+    commit(nextH24, minute);
+  }
+
+  function bumpMinute(delta: number) {
+    let total = h24 * 60 + minute + delta * 5;
+    total = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+    commit(Math.floor(total / 60), total % 60);
+  }
+
+  function setPeriod(next: "am" | "pm") {
+    if (next === period && hasTime) return;
+    commit(from12h(hour12, next), minute);
+  }
+
+  function applyPreset(value: string) {
+    onTimeChange(value);
+    onNeedDate();
+  }
+
+  const valueClass = hasTime
+    ? "text-[15px] font-bold text-zinc-900"
+    : "text-[15px] font-semibold text-zinc-400";
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-[1fr_auto_1fr_1.15fr] items-stretch gap-1.5">
+        <div className="flex flex-col items-center rounded-md border border-zinc-200 bg-white px-1 py-0.5 shadow-2xs">
+          <TimeStepButton direction="up" label="Aumentar hora" onClick={() => bumpHour(1)} />
+          <span className={`tabular-nums leading-none py-0.5 ${valueClass}`}>
+            {String(hour12).padStart(2, "0")}
+          </span>
+          <TimeStepButton direction="down" label="Disminuir hora" onClick={() => bumpHour(-1)} />
+          <span className="pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">Hora</span>
+        </div>
+
+        <span className="flex items-center justify-center text-[14px] font-bold text-zinc-300 pb-4">:</span>
+
+        <div className="flex flex-col items-center rounded-md border border-zinc-200 bg-white px-1 py-0.5 shadow-2xs">
+          <TimeStepButton direction="up" label="Aumentar minutos" onClick={() => bumpMinute(1)} />
+          <span className={`tabular-nums leading-none py-0.5 ${valueClass}`}>
+            {String(minute).padStart(2, "0")}
+          </span>
+          <TimeStepButton direction="down" label="Disminuir minutos" onClick={() => bumpMinute(-1)} />
+          <span className="pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">Min</span>
+        </div>
+
+        <div
+          role="group"
+          aria-label="Periodo del día"
+          className="flex flex-col gap-1 rounded-md border border-zinc-200 bg-white p-1 shadow-2xs"
+        >
+          {(["am", "pm"] as const).map((p) => {
+            const selected = hasTime && period === p;
+            const label = p === "am" ? "a.m." : "p.m.";
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPeriod(p)}
+                className={`flex-1 rounded-md px-2 py-1.5 text-[11.5px] font-semibold transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 ${
+                  selected
+                    ? "border border-zinc-200 bg-zinc-100 text-zinc-900 shadow-2xs"
+                    : "border border-transparent text-zinc-500 hover:bg-zinc-50 hover:text-zinc-800"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        {TIME_QUICK_PRESETS.map((preset) => {
+          const isSelected = timeValue === preset.value;
+          return (
+            <button
+              key={preset.value}
+              type="button"
+              onClick={() => applyPreset(preset.value)}
+              className={`h-7.5 rounded-md text-[11px] font-medium transition-all cursor-pointer shadow-2xs ${
+                isSelected
+                  ? "border border-zinc-300 bg-zinc-200/80 font-semibold text-zinc-900"
+                  : "border border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+              }`}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const PRESETS = [
   {
     label: "Hoy",
@@ -99,10 +304,16 @@ const PRESETS = [
 
 const PANEL_WIDTH = 310;
 const PANEL_HEIGHT = 380;
+const PANEL_HEIGHT_WITH_TIME = 580;
+const VIEWPORT_PAD = 12;
+const TRIGGER_GAP = 6;
 
 export function DatePicker({
   value,
   onChange,
+  showTime = false,
+  timeValue = "",
+  onTimeChange,
   placeholder = "Seleccionar fecha...",
   id,
   disabled = false,
@@ -116,10 +327,12 @@ export function DatePicker({
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{
-    top?: number;
-    bottom?: number;
+    top: number;
     left: number;
     originX: number;
+    width: number;
+    maxHeight: number;
+    dropUp: boolean;
   } | null>(null);
 
   const initialDate = parseDate(value) ?? new Date();
@@ -128,11 +341,12 @@ export function DatePicker({
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const measureRafRef = useRef<number | null>(null);
   const generatedId = useId();
   const pickerId = id ?? generatedId;
 
-  const dropUp = anchor?.bottom !== undefined;
-  const { mounted, exiting, ref: motionRef, snap } = useDisclosureMotion<HTMLDivElement>(open, {
+  const dropUp = anchor?.dropUp ?? false;
+  const { mounted, exiting, ref: motionRef } = useDisclosureMotion<HTMLDivElement>(open, {
     direction: dropUp ? "up" : "down",
   });
 
@@ -153,34 +367,83 @@ export function DatePicker({
     setOpen(false);
   }
 
-  function measure() {
+  function measure(contentHeight?: number) {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const shouldDropUp = spaceBelow < PANEL_HEIGHT && rect.top > spaceBelow;
+    const panelWidth = showTime ? 340 : PANEL_WIDTH;
+    const estimatedHeight = contentHeight ?? (showTime ? PANEL_HEIGHT_WITH_TIME : PANEL_HEIGHT);
+    const viewportMax = window.innerHeight - 2 * VIEWPORT_PAD;
+
+    let top: number;
+    let maxHeight: number;
+    let dropUp: boolean;
+
+    if (estimatedHeight <= viewportMax) {
+      maxHeight = estimatedHeight;
+      top = rect.bottom + TRIGGER_GAP;
+      const maxTop = window.innerHeight - VIEWPORT_PAD - estimatedHeight;
+      if (top > maxTop) {
+        top = maxTop;
+      }
+      if (top < VIEWPORT_PAD) {
+        top = VIEWPORT_PAD;
+      }
+      dropUp = top + estimatedHeight / 2 < rect.top + rect.height / 2;
+    } else {
+      top = VIEWPORT_PAD;
+      maxHeight = viewportMax;
+      dropUp = false;
+    }
 
     let left = rect.left;
     if (align === "center") {
-      left = rect.left + (rect.width - PANEL_WIDTH) / 2;
+      left = rect.left + (rect.width - panelWidth) / 2;
     } else if (align === "end") {
-      left = rect.right - PANEL_WIDTH;
+      left = rect.right - panelWidth;
     }
 
-    if (left + PANEL_WIDTH > window.innerWidth - 12) {
-      left = Math.max(12, window.innerWidth - PANEL_WIDTH - 12);
+    if (left + panelWidth > window.innerWidth - VIEWPORT_PAD) {
+      left = Math.max(VIEWPORT_PAD, window.innerWidth - panelWidth - VIEWPORT_PAD);
     }
-    if (left < 12) {
-      left = 12;
+    if (left < VIEWPORT_PAD) {
+      left = VIEWPORT_PAD;
     }
 
     setAnchor({
       left,
-      top: shouldDropUp ? undefined : rect.bottom + 6,
-      bottom: shouldDropUp ? window.innerHeight - rect.top + 6 : undefined,
+      top,
       originX: rect.left + rect.width / 2 - left,
+      width: panelWidth,
+      maxHeight,
+      dropUp,
     });
   }
+
+  const measureRef = useRef(measure);
+  measureRef.current = measure;
+
+  function scheduleMeasure() {
+    if (measureRafRef.current != null) return;
+    measureRafRef.current = requestAnimationFrame(() => {
+      measureRafRef.current = null;
+      const naturalHeight = panelRef.current?.scrollHeight;
+      measureRef.current(naturalHeight);
+    });
+  }
+
+  useLayoutEffect(() => {
+    if (!open || !panelRef.current) return;
+    scheduleMeasure();
+  }, [open, showTime, value, timeValue]);
+
+  useEffect(() => {
+    return () => {
+      if (measureRafRef.current != null) {
+        cancelAnimationFrame(measureRafRef.current);
+      }
+    };
+  }, []);
 
   function toggle() {
     if (disabled) return;
@@ -202,20 +465,54 @@ export function DatePicker({
       }
     }
 
-    function handleViewportChange() {
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) {
+        return;
+      }
+      if (
+        target instanceof Element &&
+        target.closest("[data-datepicker-portal]") !== null
+      ) {
+        return;
+      }
       close();
-      snap();
+    }
+
+    function handleScroll(event: Event) {
+      const target = event.target;
+      if (panelRef.current?.contains(target as Node)) {
+        return;
+      }
+
+      if (
+        target !== document &&
+        target !== document.documentElement &&
+        target !== document.body &&
+        target !== window
+      ) {
+        scheduleMeasure();
+        return;
+      }
+
+      scheduleMeasure();
+    }
+
+    function handleResize() {
+      scheduleMeasure();
     }
 
     document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("scroll", handleViewportChange, true);
-    window.addEventListener("resize", handleViewportChange);
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleResize);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("scroll", handleViewportChange, true);
-      window.removeEventListener("resize", handleViewportChange);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleResize);
     };
-  }, [open, snap]);
+  }, [open]);
 
   function prevMonth() {
     if (viewMonth === 0) {
@@ -240,12 +537,17 @@ export function DatePicker({
     if (maxDate && dateStr > maxDate) return;
 
     onChange(dateStr);
-    close();
-    triggerRef.current?.focus();
+    if (!showTime) {
+      close();
+      triggerRef.current?.focus();
+    }
   }
 
   function handleClear() {
     onChange("");
+    if (showTime && onTimeChange) {
+      onTimeChange("");
+    }
   }
 
   function applyPreset(preset: (typeof PRESETS)[number]) {
@@ -256,8 +558,10 @@ export function DatePicker({
       setViewYear(parsed.getFullYear());
       setViewMonth(parsed.getMonth());
     }
-    close();
-    triggerRef.current?.focus();
+    if (!showTime) {
+      close();
+      triggerRef.current?.focus();
+    }
   }
 
   // Generar cuadrícula de días comenzando en lunes
@@ -323,9 +627,11 @@ export function DatePicker({
       >
         <span className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
           <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-          <span className="min-w-[5.65rem] shrink-0 whitespace-nowrap tabular-nums">
+          <span className="truncate whitespace-nowrap tabular-nums">
             {hasSelection ? (
-              <span className="font-semibold text-zinc-900">{formatDisplayDate(value)}</span>
+              <span className="font-semibold text-zinc-900">
+                {formatDisplayValue(value, showTime, timeValue)}
+              </span>
             ) : (
               <span className="font-normal text-zinc-400">{placeholder}</span>
             )}
@@ -365,9 +671,8 @@ export function DatePicker({
           <>
             {!exiting && (
               <div
-                className="fixed inset-0 z-[70]"
+                className="fixed inset-0 z-[70] pointer-events-none"
                 aria-hidden="true"
-                onPointerDown={close}
               />
             )}
             <div
@@ -375,29 +680,34 @@ export function DatePicker({
                 panelRef.current = node;
                 motionRef.current = node;
               }}
+              data-datepicker-portal
+              role="dialog"
+              aria-modal="false"
               style={{
                 position: "fixed",
                 left: anchor.left,
                 top: anchor.top,
-                bottom: anchor.bottom,
-                width: PANEL_WIDTH,
+                width: anchor.width,
+                maxHeight: anchor.maxHeight,
                 transformOrigin: `${anchor.originX}px ${dropUp ? "bottom" : "top"}`,
               }}
               className={`${
                 exiting ? "pointer-events-none" : ""
-              } z-[80] flex flex-col gap-2.5 rounded-lg border border-zinc-200/90
-                bg-white p-3 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] select-none`}
+              } z-[80] flex flex-col gap-2 rounded-lg border border-zinc-200/90
+                bg-white p-3 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] select-none overflow-y-auto overscroll-contain`}
             >
               {/* Cabecera y estado de selección */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="font-heading text-[10.5px] font-bold uppercase tracking-wider text-zinc-400">
                   {headerLabel}
                 </span>
 
                 {hasSelection ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-md border border-red-200/90 bg-red-50/80 px-2 py-0.5 text-[11px] font-semibold text-brand-red shadow-2xs">
+                  <span className="inline-flex max-w-[58%] items-center gap-1.5 rounded-md border border-red-200/90 bg-red-50/80 px-2 py-0.5 text-[11px] font-semibold text-brand-red shadow-2xs">
                     <CalendarIcon className="h-3 w-3 shrink-0 text-brand-red" />
-                    <span className="tabular-nums">{formatDisplayDate(value)}</span>
+                    <span className="truncate tabular-nums">
+                      {formatDisplayValue(value, showTime, timeValue)}
+                    </span>
                     <button
                       type="button"
                       onClick={handleClear}
@@ -409,7 +719,9 @@ export function DatePicker({
                     </button>
                   </span>
                 ) : (
-                  <span className="text-[11px] font-medium text-zinc-400">Sin fecha límite</span>
+                  <span className="text-[11px] font-medium text-zinc-400">
+                    {showTime ? "Sin fecha ni hora" : "Sin fecha límite"}
+                  </span>
                 )}
               </div>
 
@@ -516,22 +828,70 @@ export function DatePicker({
 
                 {/* Mensaje de guía inferior */}
                 <div className="mt-2 flex items-center justify-between border-t border-zinc-100 pt-2 text-[10.5px]">
-                  <span className="font-medium text-zinc-400">
+                  <span className="font-medium text-zinc-500 truncate mr-2">
                     {hasSelection
-                      ? `${formatFriendlyDate(value)} seleccionada`
+                      ? `${formatFriendlyDate(value)}${
+                          showTime && timeValue ? ` a las ${formatTime12h(timeValue)}` : " seleccionada"
+                        }`
                       : "Elige un día del calendario"}
                   </span>
                   {hasSelection && (
                     <button
                       type="button"
                       onClick={handleClear}
-                      className="font-medium text-brand-red hover:underline cursor-pointer"
+                      className="shrink-0 font-medium text-brand-red hover:underline cursor-pointer"
                     >
                       Borrar
                     </button>
                   )}
                 </div>
               </div>
+
+              {/* Sección de hora y minutos cuando showTime está habilitado */}
+              {showTime && (
+                <div className="flex flex-col gap-2 rounded-lg border border-zinc-200/90 bg-zinc-50/70 p-2.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 font-heading text-[11px] font-semibold text-zinc-700">
+                      <Clock className="h-3.5 w-3.5 text-zinc-400" />
+                      Hora y minutos
+                    </span>
+                    {timeValue ? (
+                      <button
+                        type="button"
+                        onClick={() => onTimeChange?.("")}
+                        className="text-[10.5px] font-medium text-zinc-400 hover:text-brand-red transition-colors cursor-pointer"
+                      >
+                        Quitar hora
+                      </button>
+                    ) : (
+                      <span className="text-[10.5px] text-zinc-400">Opcional</span>
+                    )}
+                  </div>
+
+                  <InlineTimePicker
+                    timeValue={timeValue ?? ""}
+                    onTimeChange={(next) => onTimeChange?.(next)}
+                    onNeedDate={() => {
+                      if (!value) onChange(todayStr);
+                    }}
+                  />
+                </div>
+              )}
+
+              {showTime && (
+                <div className="flex items-center justify-end border-t border-zinc-100 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      close();
+                      triggerRef.current?.focus();
+                    }}
+                    className="inline-flex h-8 min-w-[5.5rem] items-center justify-center rounded-md bg-zinc-900 px-4 text-[12px] font-semibold text-white shadow-2xs hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
+                  >
+                    Listo
+                  </button>
+                </div>
+              )}
             </div>
           </>,
           document.body,

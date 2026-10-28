@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { taskCommentSchema, taskFormSchema, taskReasonSchema } from "./taskSchema.ts";
+import {
+  dueDateToApi,
+  parseDueDateFromApi,
+  taskCommentSchema,
+  taskFormSchema,
+  taskReasonSchema,
+} from "./taskSchema.ts";
 
 const valid = {
   title: "Reimprimir guías",
@@ -34,6 +40,18 @@ describe("taskFormSchema", () => {
   it("solo acepta una fecha de calendario o vacío", () => {
     assert.equal(taskFormSchema.safeParse({ ...valid, dueDate: "2026-10-27" }).success, true);
     assert.equal(taskFormSchema.safeParse({ ...valid, dueDate: "mañana" }).success, false);
+    assert.equal(taskFormSchema.safeParse({ ...valid, dueDate: "2026-10-27", dueTime: "14:30" }).success, true);
+    assert.equal(taskFormSchema.safeParse({ ...valid, dueDate: "2026-10-27", dueTime: "invalido" }).success, false);
+  });
+
+  it("convierte y analiza fecha con hora a formato ISO", () => {
+    assert.equal(dueDateToApi(""), null);
+    assert.equal(dueDateToApi("2026-10-27"), "2026-10-27T00:00:00Z");
+    const isoWithTime = dueDateToApi("2026-10-27", "14:30");
+    assert.match(isoWithTime!, /^2026-10-27T/);
+    const parsed = parseDueDateFromApi(isoWithTime);
+    assert.equal(parsed.date, "2026-10-27");
+    assert.equal(parsed.time, "14:30");
   });
 });
 

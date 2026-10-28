@@ -47,7 +47,19 @@ const COLUMNS: ColumnOption[] = [
 
 function formatDue(value: string | null) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric" });
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "—";
+  const hasTime = !value.includes("T00:00:00") && !value.includes("T23:59:59");
+  return hasTime
+    ? date.toLocaleString("es-DO", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+    : date.toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function TasksPage() {

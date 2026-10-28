@@ -7,6 +7,13 @@ const calendarDate = z
   .string()
   .refine((value) => value === "" || /^\d{4}-\d{2}-\d{2}$/.test(value), "Fecha inválida");
 
+const timeFormat = z
+  .string()
+  .refine(
+    (value) => value === "" || value === undefined || /^\d{2}:\d{2}$/.test(value),
+    "Hora inválida",
+  );
+
 /** Alta y edición. El estado solo se ofrece mientras la tarea sigue abierta. */
 export const taskFormSchema = z.object({
   title: z.string().trim().min(1, "El título es obligatorio").max(200, "Máximo 200 caracteres"),
@@ -22,6 +29,7 @@ export const taskFormSchema = z.object({
   clientId: z.string(),
   contactId: z.string(),
   dueDate: calendarDate,
+  dueTime: timeFormat.optional(),
 });
 
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
@@ -34,10 +42,33 @@ export const taskReasonSchema = z.object({
   reason: z.string().trim().min(1, "El motivo es obligatorio").max(500, "Máximo 500 caracteres"),
 });
 
-export function dueDateToApi(value: string): string | null {
-  return value === "" ? null : `${value}T00:00:00Z`;
+export function dueDateToApi(date: string, time?: string): string | null {
+  if (!date || date.trim() === "") return null;
+  const cleanTime = time?.trim();
+  if (cleanTime && /^\d{2}:\d{2}$/.test(cleanTime)) {
+    const [h, m] = cleanTime.split(":").map(Number);
+    const [year, month, day] = date.split("-").map(Number);
+    const localDate = new Date(year, month - 1, day, h, m, 0);
+    return localDate.toISOString();
+  }
+  return `${date}T00:00:00Z`;
+}
+
+export function parseDueDateFromApi(iso: string | null): { date: string; time: string } {
+  if (!iso) return { date: "", time: "" };
+  if (iso.includes("T00:00:00") || iso.includes("T23:59:59")) {
+    return { date: iso.slice(0, 10), time: "" };
+  }
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return { date: "", time: "" };
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
 }
 
 export function dueDateFromApi(value: string | null): string {
-  return value ? value.slice(0, 10) : "";
+  return parseDueDateFromApi(value).date;
 }
