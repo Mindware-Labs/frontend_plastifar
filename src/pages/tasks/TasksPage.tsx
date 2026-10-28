@@ -1,4 +1,4 @@
-import { Building2, Flag, ListTodo, Plus, Pencil } from "lucide-react";
+import { Building2, Check, Flag, ListTodo, Pencil, Plus, Slash, Timer, UserCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
@@ -17,11 +17,14 @@ import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { SelectBox } from "../../components/ui/SelectBox";
+import { type TableSelectionAction } from "../../components/ui/TableSelectionBar";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useSort } from "../../hooks/useSort";
+import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
@@ -29,6 +32,7 @@ import { useReceipts } from "../../context/useReceipts";
 import { PriorityCell } from "../tickets/ticketCells";
 import type { DepartmentResponse } from "../../types/api";
 import type { TaskDetail, TaskListItem, TaskListResponse } from "../../types/tasks";
+import { BulkTaskModal, type BulkModalMode } from "./BulkTaskModal";
 import { TaskFormModal } from "./TaskFormModal";
 import { TaskStatusCell, TASK_STATUS_FILTER_OPTIONS } from "./taskCells";
 
@@ -68,6 +72,7 @@ export function TasksPage() {
   const receipts = useReceipts();
   const { can } = usePermissions();
   const canWrite = can("tasks.write");
+  const canClose = can("tasks.close");
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [referenceError, setReferenceError] = useState<string | null>(null);
@@ -82,6 +87,9 @@ export function TasksPage() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<TaskDetail | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Bulk actions state
+  const [bulkModal, setBulkModal] = useState<BulkModalMode | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -127,6 +135,11 @@ export function TasksPage() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
+
+  // Multi-row selection
+  const pageIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
+
   const narrowFilters =
     (departmentId !== "todos" ? 1 : 0) + (priority !== "todos" ? 1 : 0) + (status !== "todos" ? 1 : 0);
   const unfiltered = chip === "todas" && narrowFilters === 0 && !debouncedSearch;
@@ -152,6 +165,50 @@ export function TasksPage() {
       setEditError(err instanceof Error ? err.message : "No se pudo abrir la tarea");
     }
   }
+
+  // Bulk actions definition
+  const bulkActions: TableSelectionAction[] = useMemo(() => {
+    const actions: TableSelectionAction[] = [];
+    if (canWrite) {
+      actions.push(
+        {
+          key: "asignar",
+          label: "Asignar",
+          icon: <UserCheck className="h-3.5 w-3.5 text-zinc-600" />,
+          onClick: () => setBulkModal("asignar"),
+        },
+        {
+          key: "prioridad",
+          label: "Prioridad",
+          icon: <Flag className="h-3.5 w-3.5 text-zinc-600" />,
+          onClick: () => setBulkModal("prioridad"),
+        },
+        {
+          key: "estado",
+          label: "Estado",
+          icon: <Timer className="h-3.5 w-3.5 text-zinc-600" />,
+          onClick: () => setBulkModal("estado"),
+        },
+      );
+    }
+    if (canClose) {
+      actions.push(
+        {
+          key: "completar",
+          label: "Completar",
+          icon: <Check className="h-3.5 w-3.5 text-emerald-600" />,
+          onClick: () => setBulkModal("completar"),
+        },
+        {
+          key: "cancelar",
+          label: "Cancelar",
+          icon: <Slash className="h-3.5 w-3.5 text-red-600" />,
+          onClick: () => setBulkModal("cancelar"),
+        },
+      );
+    }
+    return actions;
+  }, [canWrite, canClose]);
 
   return (
     <>
@@ -242,6 +299,18 @@ export function TasksPage() {
       {error && <ErrorRetry className="mb-3" onRetry={refresh}>{error}</ErrorRetry>}
 
       <ListPanel
+        selection={
+          selectedIds.size > 0
+            ? {
+                count: selectedIds.size,
+                pageState,
+                busy: Boolean(bulkModal),
+                onTogglePage: togglePage,
+                onClear: clearSelection,
+                actions: bulkActions,
+              }
+            : undefined
+        }
         toolbar={
           <div className="flex w-full flex-wrap items-center gap-2">
             <SearchInput
@@ -305,7 +374,7 @@ export function TasksPage() {
         }
       >
         {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={8} />
+          error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
           <EmptyResult
             message={unfiltered ? "Todavía no hay tareas registradas." : "Ninguna tarea coincide con este filtro o búsqueda."}
@@ -316,6 +385,13 @@ export function TasksPage() {
             <DataTable>
               <thead>
                 <HeadRow>
+                  <Th className="w-9 px-2 text-center">
+                    <SelectBox
+                      checked={pageState}
+                      label={pageState === true ? "Quitar selección de la página" : "Seleccionar toda la página"}
+                      onToggle={togglePage}
+                    />
+                  </Th>
                   <Th sort={sortOf("titulo")}>Tarea</Th>
                   {isVisible("asignado") && <Th>Asignado</Th>}
                   {isVisible("departamento") && <Th sort={sortOf("departamento")}>Departamento</Th>}
@@ -330,12 +406,20 @@ export function TasksPage() {
               <tbody>
                 {rows.map((task) => {
                   const open = task.status === "Pendiente" || task.status === "EnProgreso";
+                  const isChecked = selectedIds.has(task.id);
                   return (
                     <Row
                       key={task.id}
                       onClick={() => navigate(`/tareas/${task.id}`)}
-                      className="cursor-pointer"
+                      className={`cursor-pointer ${isChecked ? "bg-brand-red/[0.03]" : ""}`}
                     >
+                      <Td className="w-9 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                        <SelectBox
+                          checked={isChecked}
+                          label={`Seleccionar tarea ${task.number}`}
+                          onToggle={() => toggleSelect(task.id)}
+                        />
+                      </Td>
                       <Td>
                         <Link
                           to={`/tareas/${task.id}`}
@@ -402,6 +486,19 @@ export function TasksPage() {
         )}
       </ListPanel>
 
+      {bulkModal && (
+        <BulkTaskModal
+          mode={bulkModal}
+          taskIds={Array.from(selectedIds)}
+          onClose={() => setBulkModal(null)}
+          onSuccess={() => {
+            setBulkModal(null);
+            clearSelection();
+            refresh();
+          }}
+        />
+      )}
+
       {creating && (
         <TaskFormModal
           onClose={() => setCreating(false)}
@@ -412,7 +509,7 @@ export function TasksPage() {
               title: "Tarea creada",
               detail: `${saved.number} · ${saved.title}`,
             });
-            navigate("/tareas");
+            navigate(`/tareas/${saved.id}`);
             refresh();
           }}
         />

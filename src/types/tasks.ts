@@ -153,3 +153,33 @@ export interface EmailTaskPrefill {
   senderEmail: string;
   attachments: { id: number; fileName: string; sizeBytes: number; available: boolean; dangerous: boolean }[];
 }
+
+export interface BulkAssignTasksRequest {
+  taskIds: number[];
+  staffId: number | null;
+}
+
+export interface BulkPriorityTasksRequest {
+  taskIds: number[];
+  priority: TaskPriority;
+}
+
+export interface BulkStatusTasksRequest {
+  taskIds: number[];
+  status: "Pendiente" | "EnProgreso";
+}
+
+export interface BulkCompleteTasksRequest {
+  taskIds: number[];
+  comment?: string;
+}
+
+export interface BulkCancelTasksRequest {
+  taskIds: number[];
+  reason: string;
+}
+
+export interface BulkActionResult {
+  updatedCount: number;
+  totalRequested: number;
+}

@@ -1,5 +1,11 @@
 import { apiRequest, toQuery } from "./client";
 import type {
+  BulkActionResult,
+  BulkAssignTasksRequest,
+  BulkCancelTasksRequest,
+  BulkCompleteTasksRequest,
+  BulkPriorityTasksRequest,
+  BulkStatusTasksRequest,
   SenderMatch,
   TaskComment,
   TaskDetail,
@@ -63,4 +69,34 @@ export const tasksApi = {
     apiRequest<AttachmentLinkResponse>(
       `/api/tasks/${id}/attachments/${attachmentId}${toQuery({ download: download || undefined })}`,
     ),
+
+  bulkAssign: (data: BulkAssignTasksRequest) =>
+    apiRequest<BulkActionResult>("/api/tasks/bulk/assign", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  bulkPriority: (data: BulkPriorityTasksRequest) =>
+    apiRequest<BulkActionResult>("/api/tasks/bulk/priority", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  bulkStatus: (data: BulkStatusTasksRequest) =>
+    apiRequest<BulkActionResult>("/api/tasks/bulk/status", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  bulkComplete: (data: BulkCompleteTasksRequest) =>
+    apiRequest<BulkActionResult>("/api/tasks/bulk/complete", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  bulkCancel: (data: BulkCancelTasksRequest) =>
+    apiRequest<BulkActionResult>("/api/tasks/bulk/cancel", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
