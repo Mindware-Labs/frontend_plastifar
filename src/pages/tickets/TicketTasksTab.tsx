@@ -17,7 +17,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ticketsApi } from "../../api/tickets";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { Avatar } from "../../components/ui/Avatar";
-import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
@@ -33,6 +32,7 @@ import type {
 } from "../../types/api";
 import { CompleteTaskModal } from "./CompleteTaskModal";
 import { CreateTaskModal } from "./CreateTaskModal";
+import { TaskStatusCell } from "../tasks/taskCells";
 
 interface TicketTasksTabProps {
   ticketId: number;
@@ -395,13 +395,7 @@ export function TicketTasksTab({
                         </h4>
 
                         {/* Status Badge */}
-                        {isCompleted ? (
-                          <Badge tone="completed">Completada</Badge>
-                        ) : task.status === "EnProgreso" ? (
-                          <Badge tone="amber">En progreso</Badge>
-                        ) : (
-                          <Badge tone="neutral">Pendiente</Badge>
-                        )}
+                        <TaskStatusCell status={isCompleted ? "Completada" : task.status} />
 
                         {/* Due date tag */}
                         {task.dueDate && (

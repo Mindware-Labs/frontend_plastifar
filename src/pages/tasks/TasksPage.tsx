@@ -1,5 +1,5 @@
-import { Building2, Flag, Plus, Pencil, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Building2, Flag, ListTodo, Plus, Pencil } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { tasksApi, type TaskQuery } from "../../api/tasks";
@@ -22,11 +22,14 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useSort } from "../../hooks/useSort";
+import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
+import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
 import { PriorityCell } from "../tickets/ticketCells";
+import type { DepartmentResponse } from "../../types/api";
 import type { TaskDetail, TaskListItem, TaskListResponse } from "../../types/tasks";
 import { TaskFormModal } from "./TaskFormModal";
-import { TaskStatusCell } from "./taskCells";
+import { TaskStatusCell, TASK_STATUS_FILTER_OPTIONS } from "./taskCells";
 
 type ChipKey = "todas" | "mias" | "pendientes" | "enprogreso" | "completadas" | "vencidas";
 type SortKey = "titulo" | "departamento" | "prioridad" | "estado" | "limite" | "fecha";
@@ -52,7 +55,7 @@ export function TasksPage() {
   const { can } = usePermissions();
   const canWrite = can("tasks.write");
 
-  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [departmentId, setDepartmentId] = useState("todos");
@@ -76,13 +79,22 @@ export function TasksPage() {
     setReferenceError(null);
     return departmentsApi
       .list()
-      .then((rows) => setDepartments(rows.filter((row) => row.isActive).map((row) => ({ id: row.id, name: row.name }))))
+      .then((rows) => setDepartments(rows.filter((row) => row.isActive)))
       .catch(() => setReferenceError("No se pudieron cargar los departamentos: el filtro de área queda vacío."));
   }
 
   useEffect(() => {
     void loadDepartments();
   }, []);
+
+  const departmentOptions = useMemo(
+    () => buildDepartmentFilterOptions(departments),
+    [departments],
+  );
+  const departmentPathById = useMemo(
+    () => departmentPaths(departments),
+    [departments],
+  );
 
   const { data, isStale, error, setPage, refresh } = usePagedList<TaskQuery, TaskListResponse>({
     fetch: tasksApi.list,
@@ -200,17 +212,12 @@ export function TasksPage() {
           )
         }
         action={
-          <div className="flex items-center gap-1.5">
-            <Button variant="ghost" size="sm" onClick={refresh} aria-label="Actualizar">
-              <RefreshCw className="h-[15px] w-[15px]" />
+          canWrite ? (
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva tarea
             </Button>
-            {canWrite && (
-              <Button size="sm" onClick={() => setCreating(true)}>
-                <Plus className="h-[15px] w-[15px]" />
-                Nueva tarea
-              </Button>
-            )}
-          </div>
+          ) : undefined
         }
       />
 
@@ -237,10 +244,7 @@ export function TasksPage() {
               searchable
               searchPlaceholder="Buscar departamento…"
               defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
-              options={[
-                { value: "todos", label: "Todos los departamentos" },
-                ...departments.map((department) => ({ value: String(department.id), label: department.name })),
-              ]}
+              options={departmentOptions}
             />
             <FilterDropdown
               title="Seleccionar prioridad"
@@ -261,13 +265,8 @@ export function TasksPage() {
               aria-label="Filtrar por estado"
               value={status}
               onChange={setStatus}
-              options={[
-                { value: "todos", label: "Todos los estados" },
-                { value: "Pendiente", label: "Pendiente" },
-                { value: "EnProgreso", label: "En progreso" },
-                { value: "Completada", label: "Completada" },
-                { value: "Cancelada", label: "Cancelada" },
-              ]}
+              defaultIcon={<ListTodo className="h-3.5 w-3.5 text-zinc-500" />}
+              options={TASK_STATUS_FILTER_OPTIONS}
             />
             {(search || narrowFilters > 0) && (
               <ClearFiltersButton onClick={() => { setSearch(""); clearNarrowFilters(); }} />
@@ -344,7 +343,13 @@ export function TasksPage() {
                           )}
                         </Td>
                       )}
-                      {isVisible("departamento") && <Td><span className="text-[12.5px] text-zinc-700">{task.departmentName}</span></Td>}
+                      {isVisible("departamento") && (
+                        <Td>
+                          <span className="text-[12.5px] text-zinc-700">
+                            {departmentPathById.get(task.departmentId) ?? task.departmentName}
+                          </span>
+                        </Td>
+                      )}
                       {isVisible("prioridad") && <Td><PriorityCell priority={task.priority} /></Td>}
                       {isVisible("estado") && <Td><TaskStatusCell status={task.status} /></Td>}
                       {isVisible("cliente") && (

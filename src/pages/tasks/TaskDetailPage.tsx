@@ -18,7 +18,7 @@ import type { TaskDetail, TaskEventType } from "../../types/tasks";
 import { TaskCompleteModal } from "./TaskCompleteModal";
 import { TaskFormModal } from "./TaskFormModal";
 import { TaskReasonModal } from "./TaskReasonModal";
-import { TaskStatusCell, taskStatusLabel } from "./taskCells";
+import { TaskStatusCell } from "./taskCells";
 import { taskCommentSchema } from "./taskSchema";
 
 const eventLabel: Record<TaskEventType, string> = {
@@ -257,7 +257,7 @@ export function TaskDetailPage() {
             <section className="rounded-card border border-line bg-white p-4 shadow-card">
               <div className="grid grid-cols-1 gap-3">
                 <Fact label="Prioridad"><PriorityCell priority={task.priority} /></Fact>
-                <Fact label="Estado">{taskStatusLabel(task.status)}</Fact>
+                <Fact label="Estado"><TaskStatusCell status={task.status} /></Fact>
                 <Fact label="Departamento">{task.departmentName}</Fact>
                 <Fact label="Asignado a">
                   {task.assignedStaffName ? (

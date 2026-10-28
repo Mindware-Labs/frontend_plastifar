@@ -14,6 +14,7 @@ export interface SelectOption {
   hint?: string;
   disabled?: boolean;
   hidden?: boolean;
+  icon?: React.ReactNode;
 }
 
 interface SelectProps {
@@ -355,7 +356,13 @@ export function Select({
               : undefined
           }
         >
-          {leftIcon}
+          {selected?.icon ? (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500">
+              {selected.icon}
+            </span>
+          ) : (
+            leftIcon
+          )}
           <span className={wrapValue ? "min-w-0 whitespace-normal break-words" : "min-w-0 truncate"}>
             {selected?.label ?? placeholder}
           </span>
@@ -468,7 +475,14 @@ export function Select({
                       } ${isSelected ? (matchTriggerWidth ? "font-semibold text-brand-red" : "font-semibold text-zinc-900") : ""}`}
                     >
                       <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                        <span className="truncate">{option.label}</span>
+                        <div className="flex min-w-0 items-center gap-2">
+                          {option.icon && (
+                            <span className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500">
+                              {option.icon}
+                            </span>
+                          )}
+                          <span className="truncate">{option.label}</span>
+                        </div>
                         {option.hint && (
                           <span className="inline-flex min-w-0 shrink-[4] items-center gap-1 rounded-[5px] bg-zinc-100/90 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-500 border border-zinc-200/60">
                             <Building className="h-2.5 w-2.5 shrink-0 text-zinc-400" />

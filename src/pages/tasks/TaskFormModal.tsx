@@ -11,11 +11,16 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DateField, LookupField, SelectField, TextAreaField, TextField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import type { SelectOption } from "../../components/ui/Select";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { usePermissions } from "../../hooks/usePermissions";
+import { getDepartmentIcon } from "../../lib/departmentFilterOptions";
+import { buildDepartmentTree } from "../../lib/departments";
 import { resolveClientLabel, resolveStaffLabel, searchActiveStaff, searchClients } from "../../lib/lookups";
+import type { DepartmentResponse } from "../../types/api";
 import type { Contact } from "../../types/clients";
 import type { EmailTaskPrefill, TaskDetail, TaskPriority, UpdateTaskRequest } from "../../types/tasks";
+import { TASK_STATUS_EDIT_OPTIONS } from "./taskCells";
 import { dueDateFromApi, dueDateToApi, taskFormSchema, type TaskFormValues } from "./taskSchema";
 
 interface TaskFormModalProps {
@@ -33,7 +38,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   const isEdit = task !== undefined;
   const { can, isAdmin } = usePermissions();
   const [formError, setFormError] = useState<string | null>(null);
-  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [inherited, setInherited] = useState<number[]>(() =>
@@ -78,7 +83,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
       .list()
       .then((rows) => {
         if (cancelled) return;
-        setDepartments(rows.filter((row) => row.isActive).map((row) => ({ id: row.id, name: row.name })));
+        setDepartments(rows.filter((row) => row.isActive));
       })
       .catch(() => {
         if (!cancelled) setFormError("No se pudieron cargar los departamentos.");
@@ -195,13 +200,22 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     setInherited((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
   }
 
-  const departmentOptions = writable.map((department) => ({
-    value: String(department.id),
-    label: department.name,
-  }));
-  if (task && !departmentOptions.some((option) => option.value === String(task.departmentId))) {
-    departmentOptions.unshift({ value: String(task.departmentId), label: task.departmentName });
-  }
+  const departmentOptions: SelectOption[] = useMemo(() => {
+    const options: SelectOption[] = buildDepartmentTree(writable).map((d) => ({
+      value: String(d.id),
+      label: d.path,
+      hint: d.sedeName ?? undefined,
+      icon: getDepartmentIcon(d.name),
+    }));
+    if (task && !options.some((option) => option.value === String(task.departmentId))) {
+      options.unshift({
+        value: String(task.departmentId),
+        label: task.departmentName,
+        icon: getDepartmentIcon(task.departmentName),
+      });
+    }
+    return options;
+  }, [writable, task]);
 
   return (
     <Modal
@@ -333,10 +347,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
                   value={field.value}
                   onChange={field.onChange}
                   onBlur={field.onBlur}
-                  options={[
-                    { value: "Pendiente", label: "Pendiente" },
-                    { value: "EnProgreso", label: "En progreso" },
-                  ]}
+                  options={TASK_STATUS_EDIT_OPTIONS}
                   hint="Completar o cancelar se hace desde la ficha."
                   state={stateOf("status")}
                   error={errors.status?.message}
