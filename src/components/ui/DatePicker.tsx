@@ -127,10 +127,10 @@ function from12h(hour12: number, period: "am" | "pm"): number {
 }
 
 const TIME_QUICK_PRESETS: { label: string; value: string }[] = [
-  { label: "9:00 a.m.", value: "09:00" },
-  { label: "12:00 m.", value: "12:00" },
-  { label: "5:00 p.m.", value: "17:00" },
-  { label: "Fin de día", value: "23:59" },
+  { label: "9 a.m.", value: "09:00" },
+  { label: "12 m.", value: "12:00" },
+  { label: "5 p.m.", value: "17:00" },
+  { label: "Fin día", value: "23:59" },
 ];
 
 function TimeStepButton({
@@ -148,9 +148,9 @@ function TimeStepButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="flex h-5 w-full items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
+      className="flex h-4 w-full items-center justify-center rounded text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
     >
-      <Icon className="h-3.5 w-3.5" />
+      <Icon className="h-3 w-3" />
     </button>
   );
 }
@@ -196,36 +196,40 @@ function InlineTimePicker({
   }
 
   const valueClass = hasTime
-    ? "text-[15px] font-bold text-zinc-900"
-    : "text-[15px] font-semibold text-zinc-400";
+    ? "text-[13px] font-bold text-zinc-900"
+    : "text-[13px] font-semibold text-zinc-400";
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-[1fr_auto_1fr_1.15fr] items-stretch gap-1.5">
-        <div className="flex flex-col items-center rounded-md border border-zinc-200 bg-white px-1 py-0.5 shadow-2xs">
+    <div className="flex flex-col gap-1">
+      <div className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-1">
+        <div
+          className="flex flex-col items-center rounded-md border border-zinc-200 bg-white px-0.5 shadow-2xs"
+          aria-label="Hora"
+        >
           <TimeStepButton direction="up" label="Aumentar hora" onClick={() => bumpHour(1)} />
-          <span className={`tabular-nums leading-none py-0.5 ${valueClass}`}>
+          <span className={`tabular-nums leading-none ${valueClass}`}>
             {String(hour12).padStart(2, "0")}
           </span>
           <TimeStepButton direction="down" label="Disminuir hora" onClick={() => bumpHour(-1)} />
-          <span className="pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">Hora</span>
         </div>
 
-        <span className="flex items-center justify-center text-[14px] font-bold text-zinc-300 pb-4">:</span>
+        <span className="text-[12px] font-bold text-zinc-300">:</span>
 
-        <div className="flex flex-col items-center rounded-md border border-zinc-200 bg-white px-1 py-0.5 shadow-2xs">
+        <div
+          className="flex flex-col items-center rounded-md border border-zinc-200 bg-white px-0.5 shadow-2xs"
+          aria-label="Minutos"
+        >
           <TimeStepButton direction="up" label="Aumentar minutos" onClick={() => bumpMinute(1)} />
-          <span className={`tabular-nums leading-none py-0.5 ${valueClass}`}>
+          <span className={`tabular-nums leading-none ${valueClass}`}>
             {String(minute).padStart(2, "0")}
           </span>
           <TimeStepButton direction="down" label="Disminuir minutos" onClick={() => bumpMinute(-1)} />
-          <span className="pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">Min</span>
         </div>
 
         <div
           role="group"
           aria-label="Periodo del día"
-          className="flex flex-col gap-1 rounded-md border border-zinc-200 bg-white p-1 shadow-2xs"
+          className="flex flex-col gap-0.5 rounded-md border border-zinc-200 bg-white p-0.5 shadow-2xs"
         >
           {(["am", "pm"] as const).map((p) => {
             const selected = hasTime && period === p;
@@ -235,10 +239,10 @@ function InlineTimePicker({
                 key={p}
                 type="button"
                 onClick={() => setPeriod(p)}
-                className={`flex-1 rounded-md px-2 py-1.5 text-[11.5px] font-semibold transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 ${
+                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-all cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20 ${
                   selected
-                    ? "border border-zinc-200 bg-zinc-100 text-zinc-900 shadow-2xs"
-                    : "border border-transparent text-zinc-500 hover:bg-zinc-50 hover:text-zinc-800"
+                    ? "bg-zinc-100 text-zinc-900 shadow-2xs"
+                    : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-800"
                 }`}
               >
                 {label}
@@ -248,7 +252,7 @@ function InlineTimePicker({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+      <div className="grid grid-cols-4 gap-1">
         {TIME_QUICK_PRESETS.map((preset) => {
           const isSelected = timeValue === preset.value;
           return (
@@ -256,7 +260,7 @@ function InlineTimePicker({
               key={preset.value}
               type="button"
               onClick={() => applyPreset(preset.value)}
-              className={`h-7.5 rounded-md text-[11px] font-medium transition-all cursor-pointer shadow-2xs ${
+              className={`h-6 rounded-md text-[10px] font-medium transition-all cursor-pointer shadow-2xs ${
                 isSelected
                   ? "border border-zinc-300 bg-zinc-200/80 font-semibold text-zinc-900"
                   : "border border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
@@ -285,7 +289,7 @@ const PRESETS = [
     },
   },
   {
-    label: "En 3 días",
+    label: "+3 días",
     getDate: () => {
       const d = new Date();
       d.setDate(d.getDate() + 3);
@@ -293,7 +297,7 @@ const PRESETS = [
     },
   },
   {
-    label: "En 1 sem.",
+    label: "+1 sem.",
     getDate: () => {
       const d = new Date();
       d.setDate(d.getDate() + 7);
@@ -302,9 +306,9 @@ const PRESETS = [
   },
 ];
 
-const PANEL_WIDTH = 310;
-const PANEL_HEIGHT = 380;
-const PANEL_HEIGHT_WITH_TIME = 580;
+const PANEL_WIDTH = 276;
+const PANEL_HEIGHT = 310;
+const PANEL_HEIGHT_WITH_TIME = 430;
 const VIEWPORT_PAD = 12;
 const TRIGGER_GAP = 6;
 
@@ -371,7 +375,7 @@ export function DatePicker({
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    const panelWidth = showTime ? 340 : PANEL_WIDTH;
+    const panelWidth = PANEL_WIDTH;
     const estimatedHeight = contentHeight ?? (showTime ? PANEL_HEIGHT_WITH_TIME : PANEL_HEIGHT);
     const viewportMax = window.innerHeight - 2 * VIEWPORT_PAD;
 
@@ -693,40 +697,29 @@ export function DatePicker({
               }}
               className={`${
                 exiting ? "pointer-events-none" : ""
-              } z-[80] flex flex-col gap-2 rounded-lg border border-zinc-200/90
-                bg-white p-3 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] select-none overflow-y-auto overscroll-contain`}
+              } no-scrollbar z-[80] flex flex-col gap-1.5 rounded-lg border border-zinc-200/90
+                bg-white p-2 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] select-none overflow-y-auto overscroll-contain`}
             >
-              {/* Cabecera y estado de selección */}
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-heading text-[10.5px] font-bold uppercase tracking-wider text-zinc-400">
+              <div className="flex items-center justify-between gap-1">
+                <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                   {headerLabel}
                 </span>
-
                 {hasSelection ? (
-                  <span className="inline-flex max-w-[58%] items-center gap-1.5 rounded-md border border-red-200/90 bg-red-50/80 px-2 py-0.5 text-[11px] font-semibold text-brand-red shadow-2xs">
-                    <CalendarIcon className="h-3 w-3 shrink-0 text-brand-red" />
-                    <span className="truncate tabular-nums">
-                      {formatDisplayValue(value, showTime, timeValue)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleClear}
-                      aria-label="Quitar fecha"
-                      title="Quitar fecha"
-                      className="ml-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded text-brand-red hover:bg-red-200/50 transition-colors cursor-pointer"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="shrink-0 text-[10px] font-medium text-brand-red hover:underline cursor-pointer"
+                  >
+                    Borrar
+                  </button>
                 ) : (
-                  <span className="text-[11px] font-medium text-zinc-400">
-                    {showTime ? "Sin fecha ni hora" : "Sin fecha límite"}
+                  <span className="text-[10px] text-zinc-400 truncate">
+                    {showTime ? "Sin fecha/hora" : "Sin fecha"}
                   </span>
                 )}
               </div>
 
-              {/* Accesos rápidos de un solo clic */}
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-4 gap-1">
                 {PRESETS.map((preset) => {
                   const target = preset.getDate();
                   const isSelected = value === target;
@@ -735,7 +728,7 @@ export function DatePicker({
                       key={preset.label}
                       type="button"
                       onClick={() => applyPreset(preset)}
-                      className={`h-7.5 rounded-lg text-[11.5px] font-medium transition-all outline-none select-none cursor-pointer active:scale-[0.98] shadow-2xs ${
+                      className={`h-6 rounded-md text-[10.5px] font-medium transition-all outline-none select-none cursor-pointer active:scale-[0.98] shadow-2xs ${
                         isSelected
                           ? "border border-zinc-300 bg-zinc-100 font-semibold text-zinc-900"
                           : "border border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
@@ -747,47 +740,43 @@ export function DatePicker({
                 })}
               </div>
 
-              {/* Calendario interactivo Plastifar */}
-              <div className="rounded-lg border border-zinc-200/90 bg-white p-2.5 shadow-2xs">
-                {/* Navegación de mes */}
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="font-heading text-[12px] font-bold tracking-tight text-zinc-900 capitalize">
-                    {MONTH_NAMES[viewMonth]} {viewYear}
+              <div className="rounded-md border border-zinc-200/90 bg-white p-1.5 shadow-2xs">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="font-heading text-[11px] font-bold tracking-tight text-zinc-900 capitalize">
+                    {MONTH_NAMES[viewMonth].slice(0, 3)} {viewYear}
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     <button
                       type="button"
                       onClick={prevMonth}
                       aria-label="Mes anterior"
-                      className="flex h-6.5 w-6.5 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
+                      className="flex h-6 w-6 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
                     >
-                      <ChevronLeft className="h-3.5 w-3.5" />
+                      <ChevronLeft className="h-3 w-3" />
                     </button>
                     <button
                       type="button"
                       onClick={nextMonth}
                       aria-label="Mes siguiente"
-                      className="flex h-6.5 w-6.5 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
+                      className="flex h-6 w-6 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
                     >
-                      <ChevronRight className="h-3.5 w-3.5" />
+                      <ChevronRight className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
 
-                {/* Encabezados de días */}
-                <div className="mb-1 grid grid-cols-7 text-center">
+                <div className="mb-0.5 grid grid-cols-7 text-center">
                   {WEEKDAY_NAMES.map((name) => (
                     <span
                       key={name}
-                      className="font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-400 py-0.5"
+                      className="font-heading text-[9px] font-semibold uppercase tracking-wide text-zinc-400"
                     >
                       {name}
                     </span>
                   ))}
                 </div>
 
-                {/* Cuadrícula de días */}
-                <div className="grid grid-cols-7 gap-y-0.5 text-center">
+                <div className="grid grid-cols-7 text-center">
                   {days.map(({ dateStr, dayNum, isCurrentMonth }) => {
                     const isSelected = dateStr === value;
                     const isToday = dateStr === todayStr;
@@ -818,7 +807,7 @@ export function DatePicker({
                         disabled={Boolean(isDisabled)}
                         onClick={() => handleDateClick(dateStr)}
                         aria-label={dateStr}
-                        className={`flex h-7 w-full items-center justify-center text-[11px] tabular-nums outline-none transition-colors select-none active:scale-95 ${dayClass}`}
+                        className={`flex h-6 w-full items-center justify-center text-[10px] tabular-nums outline-none transition-colors select-none active:scale-95 ${dayClass}`}
                       >
                         {dayNum}
                       </button>
@@ -826,45 +815,32 @@ export function DatePicker({
                   })}
                 </div>
 
-                {/* Mensaje de guía inferior */}
-                <div className="mt-2 flex items-center justify-between border-t border-zinc-100 pt-2 text-[10.5px]">
-                  <span className="font-medium text-zinc-500 truncate mr-2">
+                {!showTime && (
+                  <p className="mt-1 border-t border-zinc-100 pt-1 text-[9.5px] font-medium text-zinc-400 truncate">
                     {hasSelection
-                      ? `${formatFriendlyDate(value)}${
-                          showTime && timeValue ? ` a las ${formatTime12h(timeValue)}` : " seleccionada"
-                        }`
-                      : "Elige un día del calendario"}
-                  </span>
-                  {hasSelection && (
-                    <button
-                      type="button"
-                      onClick={handleClear}
-                      className="shrink-0 font-medium text-brand-red hover:underline cursor-pointer"
-                    >
-                      Borrar
-                    </button>
-                  )}
-                </div>
+                      ? `${formatFriendlyDate(value)} seleccionada`
+                      : "Elige un día"}
+                  </p>
+                )}
               </div>
 
-              {/* Sección de hora y minutos cuando showTime está habilitado */}
               {showTime && (
-                <div className="flex flex-col gap-2 rounded-lg border border-zinc-200/90 bg-zinc-50/70 p-2.5 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 font-heading text-[11px] font-semibold text-zinc-700">
-                      <Clock className="h-3.5 w-3.5 text-zinc-400" />
-                      Hora y minutos
+                <div className="flex flex-col gap-1 rounded-md border border-zinc-200/90 bg-zinc-50/70 p-1.5 shadow-2xs">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="flex items-center gap-1 font-heading text-[10px] font-semibold text-zinc-600">
+                      <Clock className="h-3 w-3 text-zinc-400" />
+                      Hora
                     </span>
                     {timeValue ? (
                       <button
                         type="button"
                         onClick={() => onTimeChange?.("")}
-                        className="text-[10.5px] font-medium text-zinc-400 hover:text-brand-red transition-colors cursor-pointer"
+                        className="text-[9.5px] font-medium text-zinc-400 hover:text-brand-red transition-colors cursor-pointer"
                       >
-                        Quitar hora
+                        Quitar
                       </button>
                     ) : (
-                      <span className="text-[10.5px] text-zinc-400">Opcional</span>
+                      <span className="text-[9.5px] text-zinc-400">Opc.</span>
                     )}
                   </div>
 
@@ -879,14 +855,14 @@ export function DatePicker({
               )}
 
               {showTime && (
-                <div className="flex items-center justify-end border-t border-zinc-100 pt-2">
+                <div className="flex items-center justify-end border-t border-zinc-100 pt-1.5">
                   <button
                     type="button"
                     onClick={() => {
                       close();
                       triggerRef.current?.focus();
                     }}
-                    className="inline-flex h-8 min-w-[5.5rem] items-center justify-center rounded-md bg-zinc-900 px-4 text-[12px] font-semibold text-white shadow-2xs hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
+                    className="inline-flex h-7 items-center justify-center rounded-md bg-zinc-900 px-3 text-[11px] font-semibold text-white shadow-2xs hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
                   >
                     Listo
                   </button>

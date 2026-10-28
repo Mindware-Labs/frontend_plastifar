@@ -25,6 +25,7 @@ import { useSort } from "../../hooks/useSort";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
+import { useReceipts } from "../../context/useReceipts";
 import { PriorityCell } from "../tickets/ticketCells";
 import type { DepartmentResponse } from "../../types/api";
 import type { TaskDetail, TaskListItem, TaskListResponse } from "../../types/tasks";
@@ -64,6 +65,7 @@ function formatDue(value: string | null) {
 
 export function TasksPage() {
   const navigate = useNavigate();
+  const receipts = useReceipts();
   const { can } = usePermissions();
   const canWrite = can("tasks.write");
 
@@ -405,8 +407,13 @@ export function TasksPage() {
           onClose={() => setCreating(false)}
           onSaved={(saved) => {
             setCreating(false);
+            receipts.done({
+              action: "crear-tarea",
+              title: "Tarea creada",
+              detail: `${saved.number} · ${saved.title}`,
+            });
+            navigate("/tareas");
             refresh();
-            navigate(`/tareas/${saved.id}`);
           }}
         />
       )}

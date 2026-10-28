@@ -102,6 +102,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     (prefill?.attachments ?? []).filter((file) => file.available && !file.dangerous).map((file) => file.id),
   );
   const [departmentTouched, setDepartmentTouched] = useState(isEdit);
+  const [contactTouched, setContactTouched] = useState(isEdit);
   const { isExiting, requestClose } = useModalAnimation();
   const instructionsTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -120,6 +121,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     register,
     handleSubmit,
     setValue,
+    getValues,
     formState: { errors, touchedFields, isSubmitting },
   } = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -194,7 +196,14 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     clientsApi.contacts
       .list(Number(clientId), { page: 1, pageSize: 100, status: "activos" })
       .then((page) => {
-        if (!cancelled) setContacts(page.items);
+        if (cancelled) return;
+        setContacts(page.items);
+        if (contactTouched || getValues("contactId") !== "") return;
+        const primary = page.items.find((contact) => contact.isPrimary);
+        const suggested = primary ?? (page.items.length === 1 ? page.items[0] : undefined);
+        if (suggested) {
+          setValue("contactId", String(suggested.id), { shouldValidate: true });
+        }
       })
       .catch(() => {
         if (!cancelled) setContacts([]);
@@ -202,7 +211,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     return () => {
       cancelled = true;
     };
-  }, [clientId]);
+  }, [clientId, contactTouched, getValues, setValue]);
 
   function stateOf(field: keyof TaskFormValues): FieldState {
     if (errors[field]) return "error";
@@ -461,7 +470,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
             render={({ field }) => (
               <SelectField
                 size="sm"
-                label="Departamento / área"
+                label="Departamento"
                 required
                 value={field.value}
                 onChange={(value) => {
@@ -470,7 +479,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
                 }}
                 onBlur={field.onBlur}
                 options={departmentOptions}
-                placeholder="Elige el área"
+                placeholder="Elige departamento"
                 searchable
                 state={stateOf("departmentId")}
                 error={errors.departmentId?.message}
@@ -545,6 +554,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
                 value={field.value}
                 onChange={(value) => {
                   field.onChange(value);
+                  setContactTouched(false);
                   setValue("contactId", "");
                 }}
                 onBlur={field.onBlur}
@@ -567,7 +577,10 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
                 size="sm"
                 label="Contacto del cliente"
                 value={field.value}
-                onChange={field.onChange}
+                onChange={(value) => {
+                  setContactTouched(true);
+                  field.onChange(value);
+                }}
                 onBlur={field.onBlur}
                 disabled={clientId === ""}
                 placeholder={clientId === "" ? "Primero elige el cliente" : "Sin contacto seleccionado"}

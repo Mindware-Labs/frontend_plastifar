@@ -1546,7 +1546,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               title: "Tarea creada",
               detail: `${task.number} · ${task.title}`,
             });
-            navigate(`/tareas/${task.id}`);
+            navigate("/tareas");
           }}
         />
       )}
