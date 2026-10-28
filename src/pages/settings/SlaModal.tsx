@@ -11,8 +11,11 @@ import {
   ListTodo,
   Ticket,
   Timer,
+  Activity,
+  X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
@@ -114,6 +117,8 @@ const schema = z
     priority: z.string().min(1, "Elige la prioridad"),
     resolutionQty: z
       .string()
+      .trim()
+      .min(1, "Indica el plazo de resolución")
       .regex(/^\d+$/, "Solo números enteros")
       .refine((value) => Number(value) > 0, "Mayor que cero"),
     resolutionUnit: z.enum(["minutos", "horas", "dias", "semanas", "meses"]),
@@ -174,6 +179,179 @@ function skippedPhrase(leg: DeadlineResult): string {
     .join(" y ");
 }
 
+function SimulationRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 py-2.5">
+      <span className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+        {label}
+      </span>
+      <span className="text-[13px] font-semibold tabular-nums leading-snug text-zinc-900">{value}</span>
+    </div>
+  );
+}
+
+interface SlaLiveSimulationPanelProps {
+  policyType: SlaPolicyType;
+  now: Date;
+  resolution: DeadlineResult;
+  plazoLabel: string;
+  onClose: () => void;
+}
+
+function SlaLiveSimulationPanel({
+  policyType,
+  now,
+  resolution,
+  plazoLabel,
+  onClose,
+}: SlaLiveSimulationPanelProps) {
+  const resolutionLabel =
+    policyType === "Tarea" ? "Fecha límite estimada" : "Resolución estimada";
+  const skipped = skippedPhrase(resolution);
+
+  return (
+    <div aria-labelledby="sla-sim-title" className="flex w-full flex-col">
+      <div className="flex items-start justify-between gap-2 border-b border-zinc-200/90 pb-3">
+        <div className="min-w-0">
+          <p
+            id="sla-sim-title"
+            className="font-heading text-[11px] font-bold uppercase tracking-[0.08em] text-zinc-500"
+          >
+            Simulación en vivo
+          </p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+            Supone un {policyType === "Tarea" ? "registro de tarea" : "ticket"} creado ahora mismo.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-200/60 hover:text-zinc-700 cursor-pointer"
+          aria-label="Ocultar simulación"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {resolution.impossible ? (
+        <p className="py-3 text-[12px] leading-relaxed text-brand-red-dark">
+          Con esta jornada no hay minutos laborables computables: el vencimiento nunca llegaría. Revisa
+          horario y días marcados.
+        </p>
+      ) : (
+        <dl className="divide-y divide-zinc-200/90" aria-live="polite">
+          <SimulationRow label="Fecha de creación" value={timeFormat.format(now)} />
+          <SimulationRow label={resolutionLabel} value={timeFormat.format(resolution.at)} />
+          <SimulationRow label="Plazo configurado" value={plazoLabel} />
+        </dl>
+      )}
+
+      {!resolution.impossible && skipped && (
+        <p className="mt-3 border-t border-zinc-200/90 pt-3 text-[11px] leading-relaxed text-zinc-500">
+          Hasta el cumplimiento se omiten {skipped}.
+        </p>
+      )}
+    </div>
+  );
+}
+
+const SIM_PANEL_WIDTH = 320;
+const SIM_PANEL_GAP = 16;
+
+function SlaSimulationModal({
+  anchorRef,
+  onClose,
+  children,
+}: {
+  anchorRef: RefObject<HTMLElement | null>;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const anchor = anchorRef.current;
+      const panel = panelRef.current;
+      if (!anchor || !panel) return;
+
+      const anchorRect = anchor.getBoundingClientRect();
+      const hostDialog = anchor.closest('[role="dialog"]');
+      const hostRect = hostDialog?.getBoundingClientRect();
+      const panelHeight = panel.getBoundingClientRect().height;
+      if (panelHeight <= 0) return;
+
+      const anchorCenterY = anchorRect.top + anchorRect.height / 2;
+      const margin = 16;
+      let top = anchorCenterY - panelHeight / 2;
+      top = Math.min(Math.max(top, margin), window.innerHeight - panelHeight - margin);
+
+      const preferredLeft = (hostRect?.right ?? anchorRect.right) + SIM_PANEL_GAP;
+      const maxLeft = window.innerWidth - SIM_PANEL_WIDTH - margin;
+      const left = Math.min(Math.max(preferredLeft, margin), maxLeft);
+
+      setCoords({ top, left });
+    };
+
+    measure();
+    const raf1 = requestAnimationFrame(measure);
+    const raf2 = requestAnimationFrame(() => requestAnimationFrame(measure));
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => measure()) : null;
+    if (anchorRef.current) resizeObserver?.observe(anchorRef.current);
+    if (panelRef.current) resizeObserver?.observe(panelRef.current);
+
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [anchorRef]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] pointer-events-none">
+      <button
+        type="button"
+        aria-label="Cerrar simulación"
+        className="absolute inset-0 bg-black/20 pointer-events-auto cursor-default"
+        onClick={onClose}
+      />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        className="pointer-events-auto fixed w-[min(100vw-2rem,320px)] overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-[0_12px_36px_rgba(27,27,29,0.18)] transition-opacity duration-150"
+        style={{
+          left: coords?.left ?? -9999,
+          top: coords?.top ?? -9999,
+          opacity: coords ? 1 : 0,
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="animate-plf-side-panel-in p-4">{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 interface DurationFieldProps {
   label: string;
   required?: boolean;
@@ -183,6 +361,12 @@ interface DurationFieldProps {
   onUnitChange: (unit: SlaTimeUnit) => void;
   error?: string;
   equivalenceText?: string;
+  simulationControl?: {
+    active: boolean;
+    disabled?: boolean;
+    onToggle: () => void;
+  };
+  inputAnchorRef?: RefObject<HTMLDivElement | null>;
 }
 
 function DurationField({
@@ -194,14 +378,36 @@ function DurationField({
   onUnitChange,
   error,
   equivalenceText,
+  simulationControl,
+  inputAnchorRef,
 }: DurationFieldProps) {
   return (
     <div className="flex flex-col gap-1 text-left">
-      <label className="font-heading text-[11.5px] font-semibold text-faint">
-        {label} {required && <span className="text-brand-red">*</span>}
-      </label>
+      <div className="flex items-center justify-between gap-2">
+        <label className="font-heading text-[11.5px] font-semibold text-faint">
+          {label} {required && <span className="text-brand-red">*</span>}
+        </label>
+        {simulationControl && (
+          <button
+            type="button"
+            aria-label="Simulación en vivo"
+            aria-pressed={simulationControl.active}
+            title="Ver simulación en vivo"
+            disabled={simulationControl.disabled}
+            onClick={simulationControl.onToggle}
+            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
+              simulationControl.active
+                ? "border-brand-red/35 bg-brand-red/10 text-brand-red shadow-2xs"
+                : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-800"
+            }`}
+          >
+            <Activity className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        )}
+      </div>
 
       <div
+        ref={inputAnchorRef}
         className={`flex h-9 rounded-lg border bg-white transition-colors overflow-hidden ${
           error
             ? "border-brand-red ring-1 ring-brand-red/20"
@@ -250,11 +456,13 @@ function DurationField({
 export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) {
   const isEdit = policy !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
+  const [simulationOpen, setSimulationOpen] = useState(false);
+  const plazoInputAnchorRef = useRef<HTMLDivElement>(null);
   const { isExiting, requestClose } = useModalAnimation();
 
   // Initial duration decomposition
   const initialResDuration = useMemo(() => {
-    if (!policy) return { value: 8, unit: "horas" as SlaTimeUnit };
+    if (!policy) return { value: "", unit: "horas" as SlaTimeUnit };
     const perDay = workdayMinutes(policy);
     return minutesToDuration(policy.resolutionMinutes, policy.businessHoursOnly, perDay, policy.workDays.length);
   }, [policy]);
@@ -273,7 +481,8 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
       name: policy?.name ?? "",
       type: (policy?.type ?? "Ticket") as SlaPolicyType,
       priority: policy?.priority ?? "Normal",
-      resolutionQty: String(initialResDuration.value),
+      resolutionQty:
+        initialResDuration.value === "" ? "" : String(initialResDuration.value),
       resolutionUnit: initialResDuration.unit,
       businessHoursOnly: policy?.businessHoursOnly ?? true,
       workdayStart: policy?.workdayStart ?? "08:00",
@@ -315,12 +524,18 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
     );
   }, [resolutionQty, resolutionUnit, businessHoursOnly, perWorkday, workDays]);
 
-  // Live timer for simulation
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
+    if (!simulationOpen) return;
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [simulationOpen]);
+
+  useEffect(() => {
+    if (simulationOpen && computedResolutionMinutes <= 0) {
+      setSimulationOpen(false);
+    }
+  }, [simulationOpen, computedResolutionMinutes]);
 
   // Evitar que el foco se coloque automáticamente en el primer campo al entrar
   useEffect(() => {
@@ -351,6 +566,13 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
       resolution: addWorkingMinutes(now, computedResolutionMinutes, shape, holidays),
     };
   }, [now, businessHoursOnly, workdayStart, workdayEnd, workDays, holidays, computedResolutionMinutes]);
+
+  const plazoSummary = formatEquivalence(
+    Number(resolutionQty) || 0,
+    resolutionUnit,
+    computedResolutionMinutes,
+    businessHoursOnly,
+  );
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -396,7 +618,8 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
   }
 
   return (
-    <Modal
+    <>
+      <Modal
       maxWidth="max-w-xl"
       eyebrow={isEdit ? `Política #${policy.id} · ${policy.type}` : "Configuración de nivel de servicio"}
       title={isEdit ? `Editar ${policy.name}` : "Nueva política de SLA"}
@@ -548,12 +771,12 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
               onValueChange={(val) => field.onChange(val)}
               onUnitChange={(u) => setValue("resolutionUnit", u, { shouldValidate: true })}
               error={errors.resolutionQty?.message}
-              equivalenceText={formatEquivalence(
-                Number(resolutionQty) || 0,
-                resolutionUnit,
-                computedResolutionMinutes,
-                businessHoursOnly,
-              )}
+              inputAnchorRef={plazoInputAnchorRef}
+              simulationControl={{
+                active: simulationOpen,
+                disabled: computedResolutionMinutes <= 0,
+                onToggle: () => setSimulationOpen((open) => !open),
+              }}
             />
           )}
         />
@@ -689,48 +912,7 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
           </div>
         </div>
 
-        {/* 4. SIMULADOR */}
-        {simulation && (
-          <div
-            aria-live="polite"
-            className="rounded-lg border border-zinc-200/90 bg-zinc-50/70 px-3.5 py-2.5 text-left"
-          >
-            <p className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-zinc-500">
-              Simulación en vivo · {timeFormat.format(simulation.now)}
-            </p>
-
-            {simulation.resolution.impossible ? (
-              <p className="mt-1.5 text-[12px] leading-relaxed text-brand-red-dark">
-                Con esta jornada no hay minutos laborables computables: el vencimiento nunca
-                llegaría. Revisa el horario y los días marcados.
-              </p>
-            ) : (
-              <dl className="mt-2 flex flex-col gap-1.5">
-                <div className="flex items-baseline justify-between gap-3 text-[12px]">
-                  <dt className="text-zinc-500">
-                    {selectedType === "Tarea" ? "Fecha límite estimada" : "Resolución estimada"}
-                  </dt>
-                  <dd className="font-semibold tabular-nums text-zinc-900">
-                    {timeFormat.format(simulation.resolution.at)}
-                  </dd>
-                </div>
-
-                {(() => {
-                  const targetPhrase = skippedPhrase(simulation.resolution);
-                  if (!targetPhrase) return null;
-
-                  return (
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
-                      Hasta el cumplimiento salta {targetPhrase}.
-                    </p>
-                  );
-                })()}
-              </dl>
-            )}
-          </div>
-        )}
-
-        {/* 5. CONFIGURACIÓN */}
+        {/* 4. CONFIGURACIÓN */}
         <FormDivider title="Comportamiento" />
 
         <div className="flex flex-col gap-2">
@@ -749,6 +931,19 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
           )}
         </div>
       </form>
-    </Modal>
+      </Modal>
+
+      {simulationOpen && simulation ? (
+        <SlaSimulationModal anchorRef={plazoInputAnchorRef} onClose={() => setSimulationOpen(false)}>
+          <SlaLiveSimulationPanel
+            policyType={selectedType}
+            now={simulation.now}
+            resolution={simulation.resolution}
+            plazoLabel={plazoSummary}
+            onClose={() => setSimulationOpen(false)}
+          />
+        </SlaSimulationModal>
+      ) : null}
+    </>
   );
 }
