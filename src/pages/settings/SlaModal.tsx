@@ -22,6 +22,7 @@ import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { Select } from "../../components/ui/Select";
+import { TimePicker } from "../../components/ui/TimePicker";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import {
   addWorkingMinutes,
@@ -62,6 +63,21 @@ const PRIORITY_OPTIONS = [
     icon: <Flag className="h-3.5 w-3.5 text-zinc-400 shrink-0" />,
   },
 ];
+
+/** Cuatro aperturas y cuatro cierres en pareja (misma separación típica de jornada). */
+const WORKDAY_OPEN_PRESETS = [
+  { label: "07:00 a.m.", value: "07:00" },
+  { label: "08:00 a.m.", value: "08:00" },
+  { label: "08:30 a.m.", value: "08:30" },
+  { label: "09:00 a.m.", value: "09:00" },
+] as const;
+
+const WORKDAY_CLOSE_PRESETS = [
+  { label: "04:00 p.m.", value: "16:00" },
+  { label: "05:00 p.m.", value: "17:00" },
+  { label: "05:30 p.m.", value: "17:30" },
+  { label: "06:00 p.m.", value: "18:00" },
+] as const;
 
 const TIME_UNIT_OPTIONS: { value: SlaTimeUnit; label: string; icon: React.ReactNode }[] = [
   {
@@ -551,84 +567,127 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
           {...register("businessHoursOnly")}
         />
 
-        {businessHoursOnly && (
-          <div className="flex flex-col gap-3 rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-3">
-            <div className="grid grid-cols-2 gap-3">
-              <TextField
-                size="sm"
-                label="Apertura"
-                type="time"
-                required
-                data-skip-autofocus
-                state={stateOf("workdayStart")}
-                error={errors.workdayStart?.message}
-                {...register("workdayStart")}
-              />
-              <TextField
-                size="sm"
-                label="Cierre"
-                type="time"
-                required
-                data-skip-autofocus
-                state={stateOf("workdayEnd")}
-                error={errors.workdayEnd?.message}
-                {...register("workdayEnd")}
+        <div
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            businessHoursOnly ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0 pointer-events-none"
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="flex flex-col gap-3 rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-3 pt-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1 text-left">
+                  <label className="font-heading text-[11.5px] font-semibold text-faint">
+                    Apertura <span className="text-brand-red">*</span>
+                  </label>
+                  <Controller
+                    name="workdayStart"
+                    control={control}
+                    render={({ field }) => (
+                      <TimePicker
+                        value={field.value}
+                        onChange={field.onChange}
+                        state={stateOf("workdayStart")}
+                        error={errors.workdayStart?.message}
+                        preferDropUp
+                        presets={[...WORKDAY_OPEN_PRESETS]}
+                      />
+                    )}
+                  />
+                  {errors.workdayStart?.message && (
+                    <p className="flex items-center gap-1 text-[11px] font-medium text-brand-red-dark">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{errors.workdayStart.message}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1 text-left">
+                  <label className="font-heading text-[11.5px] font-semibold text-faint">
+                    Cierre <span className="text-brand-red">*</span>
+                  </label>
+                  <Controller
+                    name="workdayEnd"
+                    control={control}
+                    render={({ field }) => (
+                      <TimePicker
+                        value={field.value}
+                        onChange={field.onChange}
+                        state={stateOf("workdayEnd")}
+                        error={errors.workdayEnd?.message}
+                        preferDropUp
+                        presets={[...WORKDAY_CLOSE_PRESETS]}
+                      />
+                    )}
+                  />
+                  {errors.workdayEnd?.message && (
+                    <p className="flex items-center gap-1 text-[11px] font-medium text-brand-red-dark">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{errors.workdayEnd.message}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <Controller
+                name="workDays"
+                control={control}
+                render={({ field }) => (
+                  <div
+                    role="group"
+                    aria-labelledby="sla-workdays-label"
+                    className="flex w-full flex-col gap-1 text-left"
+                  >
+                    <span
+                      id="sla-workdays-label"
+                      className="font-heading text-[11.5px] font-semibold text-faint"
+                    >
+                      Días laborables
+                    </span>
+                    <div className="grid w-full grid-cols-7 gap-2">
+                      {WEEKDAYS.map((day) => {
+                        const checked = (field.value as string[]).includes(day.key);
+
+                        return (
+                          <label
+                            key={day.key}
+                            className={`flex h-9 w-full cursor-pointer items-center justify-center rounded-lg border font-heading text-[12.5px] font-bold transition-all select-none
+                              has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-red/30 ${
+                                checked
+                                  ? "border-brand-red bg-brand-red text-white shadow-xs"
+                                  : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900 shadow-2xs"
+                              }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={checked}
+                              aria-label={day.label}
+                              aria-invalid={errors.workDays !== undefined}
+                              aria-describedby={errors.workDays ? "workdays-error" : undefined}
+                              onChange={(event) =>
+                                field.onChange(
+                                  event.target.checked
+                                    ? [...(field.value as string[]), day.key]
+                                    : (field.value as string[]).filter((value) => value !== day.key),
+                                )
+                              }
+                            />
+                            {day.key}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {errors.workDays?.message && (
+                      <span id="workdays-error" className="text-[11px] font-medium text-brand-red-dark animate-plf-shake">
+                        {errors.workDays.message}
+                      </span>
+                    )}
+                  </div>
+                )}
               />
             </div>
-
-            <Controller
-              name="workDays"
-              control={control}
-              render={({ field }) => (
-                <fieldset className="flex flex-col gap-1.5">
-                  <legend className="font-heading text-[11px] font-semibold text-faint">
-                    Días laborables
-                  </legend>
-                  <div className="flex flex-wrap gap-1.5">
-                    {WEEKDAYS.map((day) => {
-                      const checked = (field.value as string[]).includes(day.key);
-
-                      return (
-                        <label
-                          key={day.key}
-                          className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border
-                            font-heading text-[12px] font-semibold transition-all
-                            has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-red/30 ${
-                              checked
-                                ? "border-brand-red bg-brand-red text-white shadow-2xs"
-                                : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900"
-                            }`}
-                        >
-                          <input
-                            type="checkbox"
-                            className="sr-only"
-                            checked={checked}
-                            aria-label={day.label}
-                            aria-invalid={errors.workDays !== undefined}
-                            aria-describedby={errors.workDays ? "workdays-error" : undefined}
-                            onChange={(event) =>
-                              field.onChange(
-                                event.target.checked
-                                  ? [...(field.value as string[]), day.key]
-                                  : (field.value as string[]).filter((value) => value !== day.key),
-                              )
-                            }
-                          />
-                          {day.key}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {errors.workDays?.message && (
-                    <span id="workdays-error" className="text-[11px] font-medium text-brand-red-dark animate-plf-shake">
-                      {errors.workDays.message}
-                    </span>
-                  )}
-                </fieldset>
-              )}
-            />
           </div>
-        )}
+        </div>
 
         {/* 4. SIMULADOR */}
         {simulation && (
