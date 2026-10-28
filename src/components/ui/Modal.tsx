@@ -110,7 +110,7 @@ export function Modal({
         </div>
 
         {/* Cuerpo del modal */}
-        <div className="overflow-y-auto px-6 py-5">{children}</div>
+        <div className="overflow-y-auto px-6 py-5 overscroll-contain">{children}</div>
 
         {/* Pie de acción */}
         {footer && (

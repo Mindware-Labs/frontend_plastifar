@@ -363,18 +363,6 @@ export function TaskDetailPage() {
               <span className="tabular-nums text-subtle">{timeline.length}</span>
             </Button>
 
-            {task.canEdit && (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setEditing(true)}
-              >
-                <Pencil className="h-[15px] w-[15px]" />
-                Editar
-              </Button>
-            )}
-
             {task.canComplete && (
               <Button
                 type="button"

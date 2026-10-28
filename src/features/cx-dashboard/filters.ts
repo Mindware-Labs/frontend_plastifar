@@ -35,7 +35,7 @@ export function pathFor(filter: DashboardFilter): string {
     case "estado":
       return `/tickets?estado=${encodeURIComponent(filter.value)}`;
     case "hca":
-      return `/calidad/hca?estado=${encodeURIComponent(filter.value)}`;
+      return `/reportes?reporte=hca-por-periodo`;
     default:
       // Tema, canal y responsable: la bandeja sin acotar, todavía.
       return "/tickets";

@@ -1,17 +1,14 @@
 import {
   AlertTriangle,
   Check,
-  CheckCheck,
   CircleDashed,
   CircleDot,
-  Hourglass,
   Search,
   ShieldCheck,
   Slash,
-  X,
 } from "lucide-react";
 import { IconBadge, StatusBadge, type StatusStyles } from "../../components/ui/StatusBadge";
-import type { CreditStatus, HcaStatus, PlanItemStatus } from "../../types/quality";
+import type { HcaStatus, PlanItemStatus } from "../../types/quality";
 
 const hcaStyles: StatusStyles<HcaStatus> = {
   Abierta: { tone: "neutral", icon: CircleDashed },
@@ -26,13 +23,6 @@ const planStyles: StatusStyles<PlanItemStatus> = {
   "En curso": { tone: "neutral", icon: CircleDot },
   Cumplida: { tone: "green", icon: Check },
   Anulada: { tone: "neutral", icon: Slash },
-};
-
-const creditStyles: StatusStyles<CreditStatus> = {
-  Solicitada: { tone: "warn", icon: Hourglass },
-  Aprobada: { tone: "green", icon: Check },
-  Rechazada: { tone: "red", icon: X },
-  Aplicada: { tone: "neutral", icon: CheckCheck },
 };
 
 function OverdueBadge() {
@@ -60,8 +50,4 @@ export function HcaStatusBadge({ status, overdue }: { status: HcaStatus; overdue
 
 export function PlanItemStatusBadge({ status, overdue }: { status: PlanItemStatus; overdue?: boolean }) {
   return overdue ? <OverdueBadge /> : <StatusBadge status={status} styles={planStyles} />;
-}
-
-export function CreditStatusBadge({ status }: { status: CreditStatus }) {
-  return <StatusBadge status={status} styles={creditStyles} />;
 }

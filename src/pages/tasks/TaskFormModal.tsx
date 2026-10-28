@@ -32,6 +32,7 @@ import type { EmailTaskPrefill, TaskDetail, TaskPriority, UpdateTaskRequest } fr
 import { TASK_STATUS_EDIT_OPTIONS } from "./taskCells";
 import {
   dueDateToApi,
+  isPastDueDate,
   parseDueDateFromApi,
   taskFormSchema,
   type TaskFormValues,
@@ -71,6 +72,8 @@ function FormDivider({ title }: { title: string }) {
   );
 }
 
+const contactsCache = new Map<number, Contact[]>();
+
 function bindAutoResizeTextarea(
   field: UseFormRegisterReturn,
   minHeightPx: number,
@@ -86,7 +89,6 @@ function bindAutoResizeTextarea(
     ref: (element: HTMLTextAreaElement | null) => {
       field.ref(element);
       storeRef?.(element);
-      autoResizeTextarea(element, minHeightPx);
     },
   };
 }
@@ -96,7 +98,27 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   const { can, isAdmin } = usePermissions();
   const [formError, setFormError] = useState<string | null>(null);
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>(() => {
+    if (task?.contactId && task?.contactName) {
+      return [
+        {
+          id: task.contactId,
+          clientId: task.clientId ?? 0,
+          firstName: task.contactName,
+          lastName: "",
+          email: null,
+          phone: null,
+          position: null,
+          isPrimary: true,
+          isActive: true,
+        },
+      ];
+    }
+    if (task?.clientId && contactsCache.has(task.clientId)) {
+      return contactsCache.get(task.clientId)!;
+    }
+    return [];
+  });
   const [files, setFiles] = useState<File[]>([]);
   const [inherited, setInherited] = useState<number[]>(() =>
     (prefill?.attachments ?? []).filter((file) => file.available && !file.dangerous).map((file) => file.id),
@@ -111,6 +133,11 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     [task?.dueDate],
   );
 
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+
   const writable = useMemo(
     () => departments.filter((department) => isAdmin || can("tasks.write", department.id)),
     [departments, isAdmin, can],
@@ -122,6 +149,8 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     handleSubmit,
     setValue,
     getValues,
+    setError,
+    clearErrors,
     formState: { errors, touchedFields, isSubmitting },
   } = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -192,11 +221,28 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
       setContacts([]);
       return;
     }
+    const numClientId = Number(clientId);
+    if (!Number.isFinite(numClientId) || numClientId <= 0) return;
+
+    // Si ya está en caché, actualizar contacts inmediatamente para respuesta instantánea (0ms)
+    if (contactsCache.has(numClientId)) {
+      const cached = contactsCache.get(numClientId)!;
+      setContacts(cached);
+      if (!contactTouched && getValues("contactId") === "") {
+        const primary = cached.find((contact) => contact.isPrimary);
+        const suggested = primary ?? (cached.length === 1 ? cached[0] : undefined);
+        if (suggested) {
+          setValue("contactId", String(suggested.id), { shouldValidate: true });
+        }
+      }
+    }
+
     let cancelled = false;
     clientsApi.contacts
-      .list(Number(clientId), { page: 1, pageSize: 100, status: "activos" })
+      .list(numClientId, { page: 1, pageSize: 100, status: "activos" })
       .then((page) => {
         if (cancelled) return;
+        contactsCache.set(numClientId, page.items);
         setContacts(page.items);
         if (contactTouched || getValues("contactId") !== "") return;
         const primary = page.items.find((contact) => contact.isPrimary);
@@ -206,7 +252,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
         }
       })
       .catch(() => {
-        if (!cancelled) setContacts([]);
+        if (!cancelled && !contactsCache.has(numClientId)) setContacts([]);
       });
     return () => {
       cancelled = true;
@@ -231,6 +277,13 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
 
   async function onSubmit(values: TaskFormValues) {
     setFormError(null);
+    if (!isEdit && values.dueDate && isPastDueDate(values.dueDate, values.dueTime)) {
+      setError("dueDate", {
+        type: "manual",
+        message: "La fecha límite no puede ser una fecha que ya pasó.",
+      });
+      return;
+    }
     try {
       const saved = isEdit ? await tasksApi.update(task.id, toUpdate(values)) : await tasksApi.create(toCreate(values));
       onSaved(saved);
@@ -370,7 +423,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
           required
           rows={1}
           maxLength={8000}
-          className="min-h-0 resize-none overflow-hidden text-[12.5px] py-2 leading-relaxed"
+          className="min-h-0 resize-none overflow-hidden text-[12.5px] py-2 leading-relaxed [field-sizing:content]"
           placeholder="Detalla qué debe ejecutarse, pasos específicos o criterios de aceptación…"
           hint={
             <span className="flex items-center justify-between text-[11px] text-zinc-400">
@@ -500,13 +553,35 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
                 label="Fecha y hora límite"
                 placeholder="Sin fecha límite"
                 value={field.value}
+                minDate={!isEdit ? todayStr : undefined}
                 onChange={(date) => {
                   field.onChange(date);
-                  if (!date) setValue("dueTime", "");
+                  if (!date) {
+                    setValue("dueTime", "");
+                    clearErrors(["dueDate", "dueTime"]);
+                  } else if (!isEdit && isPastDueDate(date, dueTimeValue)) {
+                    setError("dueDate", {
+                      type: "manual",
+                      message: "La fecha límite no puede ser una fecha que ya pasó.",
+                    });
+                  } else if (errors.dueDate?.message === "La fecha límite no puede ser una fecha que ya pasó.") {
+                    clearErrors("dueDate");
+                  }
                 }}
                 showTime
                 timeValue={dueTimeValue}
-                onTimeChange={(time) => setValue("dueTime", time, { shouldValidate: true })}
+                onTimeChange={(time) => {
+                  setValue("dueTime", time, { shouldValidate: true });
+                  const currentDate = getValues("dueDate");
+                  if (!isEdit && currentDate && isPastDueDate(currentDate, time)) {
+                    setError("dueDate", {
+                      type: "manual",
+                      message: "La fecha límite no puede ser una fecha que ya pasó.",
+                    });
+                  } else if (errors.dueDate?.message === "La fecha límite no puede ser una fecha que ya pasó.") {
+                    clearErrors("dueDate");
+                  }
+                }}
                 error={errors.dueDate?.message ?? errors.dueTime?.message}
                 state={errors.dueDate || errors.dueTime ? "error" : stateOf("dueDate")}
                 hint={<span className="block whitespace-nowrap">Opcional. Fecha y hora compromiso.</span>}
@@ -555,7 +630,15 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
                 onChange={(value) => {
                   field.onChange(value);
                   setContactTouched(false);
-                  setValue("contactId", "");
+                  const num = Number(value);
+                  if (num && contactsCache.has(num)) {
+                    const cached = contactsCache.get(num)!;
+                    setContacts(cached);
+                    const primary = cached.find((c) => c.isPrimary) ?? (cached.length === 1 ? cached[0] : undefined);
+                    setValue("contactId", primary ? String(primary.id) : "");
+                  } else {
+                    setValue("contactId", "");
+                  }
                 }}
                 onBlur={field.onBlur}
                 search={searchClients}

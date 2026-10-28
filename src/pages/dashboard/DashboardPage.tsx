@@ -227,7 +227,7 @@ export function DashboardPage() {
       {
         icon: ClipboardList,
         label: "HCA abiertas",
-        to: "/calidad/hca",
+        to: "/reportes?reporte=hca-por-periodo",
         value: formatInteger(quality.openedInRange),
         hint: "Contra el período anterior",
         delta: openedDelta,
@@ -239,7 +239,7 @@ export function DashboardPage() {
       {
         icon: CheckCircle2,
         label: "HCA cerradas",
-        to: "/calidad/hca?estado=cerradas",
+        to: "/reportes?reporte=hca-por-periodo",
         value: formatInteger(quality.closedInRange),
         hint: "Contra el período anterior",
         delta: closedDelta,
@@ -262,7 +262,7 @@ export function DashboardPage() {
       {
         icon: Clock,
         label: "Cierre promedio",
-        to: "/calidad/hca?estado=cerradas",
+        to: "/reportes?reporte=hca-por-periodo",
         value:
           quality.averageClosureDays === null
             ? "Sin datos"

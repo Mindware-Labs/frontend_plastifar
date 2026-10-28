@@ -51,13 +51,10 @@ export function ClaimExecutiveSummary({
               <h3 className="text-base font-bold text-zinc-900">Reclamación de clientes</h3>
               <ClaimStatusBadge status={claim.status} />
               {claim.hcaNumber && (
-                <Link
-                  to={`/calidad/hca/${claim.hcaId}`}
-                  className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-700 hover:border-zinc-300 hover:text-brand-red transition-colors"
-                >
+                <span className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-700">
                   <ClipboardList className="h-3 w-3 text-zinc-400" />
                   {claim.hcaNumber}
-                </Link>
+                </span>
               )}
             </div>
             <p className="mt-1 text-[11.5px] text-zinc-500">
@@ -313,13 +310,10 @@ export function ClaimExecutiveSummary({
                 </span>
 
                 {claim.hcaNumber ? (
-                  <Link
-                    to={`/calidad/hca/${claim.hcaId}`}
-                    className="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-zinc-700 border border-zinc-200 hover:text-brand-red"
-                  >
+                  <span className="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-zinc-700 border border-zinc-200">
                     <ClipboardList className="h-3 w-3 text-zinc-400" />
                     HCA {claim.hcaNumber}
-                  </Link>
+                  </span>
                 ) : claim.requiresCorrectiveAction === true && canOpenHca && !isClosed && onStartHca ? (
                   <Button size="sm" variant="secondary" onClick={onStartHca} isLoading={isOpeningHca}>
                     <ClipboardList className="h-3 w-3 mr-1" />

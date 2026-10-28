@@ -435,9 +435,7 @@ function LinesTable({ lines, canCredit, onCredit }: { lines: DiscrepancyLine[]; 
                 <span className="flex flex-wrap items-center gap-1.5">
                   <span className="text-brand-green">Sí</span>
                   {line.creditRequestNumber ? (
-                    <Link to="/calidad/creditos" className="font-mono text-[11.5px] text-ink hover:text-brand-red">
-                      {line.creditRequestNumber}
-                    </Link>
+                    <span className="font-mono text-[11.5px] text-ink">{line.creditRequestNumber}</span>
                   ) : canCredit ? (
                     <Button size="sm" variant="ghost" onClick={() => onCredit(line)}>
                       <CreditCard className="h-[14px] w-[14px]" />

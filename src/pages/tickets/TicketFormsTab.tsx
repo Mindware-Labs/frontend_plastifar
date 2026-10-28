@@ -998,26 +998,41 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
 
                         <div className="my-1 border-t border-zinc-100" />
 
-                        {/* View Details Link */}
-                        <Link
-                          to={
-                            activeForm.type === "reclamacion"
-                              ? `/reclamaciones/${(activeForm.data as CustomerClaim).id}`
-                              : activeForm.type === "retiro"
-                              ? `/retiros/${(activeForm.data as MerchandiseWithdrawal).id}`
-                              : activeForm.type === "discrepancia"
-                              ? `/discrepancias/${(activeForm.data as DiscrepancyDetail).discrepancy.id}`
-                              : `/calidad/hca/${(activeForm.data as CorrectiveActionSheet).id}`
-                          }
-                          data-motion-item
-                          onClick={() => setActionsMenuOpen(false)}
-                          className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <ArrowUpRight className="size-3.5 text-zinc-500" />
-                            <span>Ver ficha completa</span>
-                          </span>
-                        </Link>
+                        {activeForm.type === "hca" ? (
+                          <button
+                            type="button"
+                            data-motion-item
+                            onClick={() => {
+                              setEditingHca(activeForm.data as CorrectiveActionSheet);
+                              setHcaModalOpen(true);
+                              setActionsMenuOpen(false);
+                            }}
+                            className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <ArrowUpRight className="size-3.5 text-zinc-500" />
+                              <span>Editar HCA</span>
+                            </span>
+                          </button>
+                        ) : (
+                          <Link
+                            to={
+                              activeForm.type === "reclamacion"
+                                ? `/reclamaciones/${(activeForm.data as CustomerClaim).id}`
+                                : activeForm.type === "retiro"
+                                ? `/retiros/${(activeForm.data as MerchandiseWithdrawal).id}`
+                                : `/discrepancias/${(activeForm.data as DiscrepancyDetail).discrepancy.id}`
+                            }
+                            data-motion-item
+                            onClick={() => setActionsMenuOpen(false)}
+                            className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <ArrowUpRight className="size-3.5 text-zinc-500" />
+                              <span>Ver ficha completa</span>
+                            </span>
+                          </Link>
+                        )}
                       </div>
                     )}
                   </div>

@@ -3,45 +3,9 @@ import type { AttachmentLinkResponse } from "../types/api";
 import type {
   ActionPlanItem,
   CorrectiveActionSheet,
-  CreditRequest,
   HcaCause,
   HcaParticipant,
 } from "../types/quality";
-
-export interface SheetQuery {
-  page: number;
-  pageSize: number;
-  search?: string;
-  productLineId?: number;
-  responsibleId?: number;
-  clientId?: number;
-  /** RF-H9: filtros por planta y producto. */
-  plantId?: number;
-  productId?: number;
-  /** ISO corto YYYY-MM-DD */
-  from?: string;
-  to?: string;
-  /** todas | abiertas | vencidas | cerradas */
-  status?: string;
-  sort?: "compromiso" | "cliente";
-  dir?: "asc" | "desc";
-}
-
-export interface SheetCounts {
-  all: number;
-  open: number;
-  overdue: number;
-  closed: number;
-}
-
-export interface SheetListResponse {
-  items: CorrectiveActionSheet[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-  counts: SheetCounts;
-}
 
 export interface ClosureCondition {
   id: string;
@@ -117,34 +81,6 @@ export interface ActionPlanListResponse {
   counts: PlanItemCounts;
 }
 
-export interface CreditQuery {
-  page: number;
-  pageSize: number;
-  search?: string;
-  clientId?: number;
-  minAmount?: number;
-  /** Solicitada | Aprobada | Rechazada | Aplicada */
-  status?: string;
-  dir?: "asc" | "desc";
-}
-
-export interface CreditCounts {
-  all: number;
-  requested: number;
-  approved: number;
-  rejected: number;
-  applied: number;
-}
-
-export interface CreditListResponse {
-  items: CreditRequest[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-  counts: CreditCounts;
-}
-
 export interface SaveCreditRequestRequest {
   clientId: number;
   amount: number;
@@ -156,9 +92,6 @@ export interface SaveCreditRequestRequest {
 
 export const qualityApi = {
   sheets: {
-    list: (query: SheetQuery) =>
-      apiRequest<SheetListResponse>(`/api/quality/sheets${toQuery({ ...query })}`),
-
     listByTicket: (ticketId: number) =>
       apiRequest<CorrectiveActionSheet[]>(`/api/tickets/${ticketId}/sheets`),
 
@@ -280,33 +213,5 @@ export const qualityApi = {
     remove: (id: number) => apiRequest<void>(`/api/quality/participants/${id}`, { method: "DELETE" }),
     acknowledge: (id: number) =>
       apiRequest<HcaParticipant>(`/api/quality/participants/${id}/acknowledge`, { method: "POST" }),
-  },
-
-  creditRequests: {
-    list: (query: CreditQuery) =>
-      apiRequest<CreditListResponse>(`/api/quality/credit-requests${toQuery({ ...query })}`),
-
-    get: (id: number) => apiRequest<CreditRequest>(`/api/quality/credit-requests/${id}`),
-
-    create: (data: SaveCreditRequestRequest) =>
-      apiRequest<CreditRequest>("/api/quality/credit-requests", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-
-    approve: (id: number, decisionNote: string | null) =>
-      apiRequest<CreditRequest>(`/api/quality/credit-requests/${id}/approve`, {
-        method: "POST",
-        body: JSON.stringify({ decisionNote }),
-      }),
-
-    reject: (id: number, decisionNote: string | null) =>
-      apiRequest<CreditRequest>(`/api/quality/credit-requests/${id}/reject`, {
-        method: "POST",
-        body: JSON.stringify({ decisionNote }),
-      }),
-
-    apply: (id: number) =>
-      apiRequest<CreditRequest>(`/api/quality/credit-requests/${id}/apply`, { method: "POST" }),
   },
 };

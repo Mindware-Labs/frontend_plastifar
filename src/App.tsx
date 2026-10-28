@@ -20,9 +20,6 @@ import { DiscrepancyPrintPage } from "./pages/discrepancies/DiscrepancyPrintPage
 import { WithdrawalDetailPage } from "./pages/withdrawals/WithdrawalDetailPage";
 import { WithdrawalPrintPage } from "./pages/withdrawals/WithdrawalPrintPage";
 import { WithdrawalsPage } from "./pages/withdrawals/WithdrawalsPage";
-import { CreditRequestsPage } from "./pages/quality/CreditRequestsPage";
-import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
-import { HcaPage } from "./pages/quality/HcaPage";
 import { HcaPrintPage } from "./pages/quality/HcaPrintPage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { DepartmentsPage } from "./pages/departments/DepartmentsPage";
@@ -134,14 +131,10 @@ export default function App() {
           <Route path="/clientes/:id/historial" element={<ClientDetailPage section="historial" />} />
         </Route>
 
-        <Route element={<PermissionRoute permission="quality.read"><Outlet /></PermissionRoute>}>
-          <Route path="/calidad" element={<Navigate to="/calidad/hca" replace />} />
-          <Route path="/calidad/hca" element={<HcaPage />} />
-          <Route path="/calidad/hca/:id" element={<HcaDetailPage section="datos" />} />
-          <Route path="/calidad/hca/:id/plan" element={<HcaDetailPage section="plan" />} />
-          <Route path="/calidad/hca/:id/cierre" element={<HcaDetailPage section="cierre" />} />
-          <Route path="/calidad/creditos" element={<CreditRequestsPage />} />
-        </Route>
+        <Route path="/calidad" element={<Navigate to="/calidad/lineas" replace />} />
+        <Route path="/calidad/hca" element={<Navigate to="/calidad/lineas" replace />} />
+        <Route path="/calidad/hca/*" element={<Navigate to="/calidad/lineas" replace />} />
+        <Route path="/calidad/creditos" element={<Navigate to="/calidad/lineas" replace />} />
 
         {/* Reclamación de clientes, PF-FOR-034 (docs/plan/03). Clave propia:
             la llena Ventas y la trata Calidad, y ninguna de las dos es

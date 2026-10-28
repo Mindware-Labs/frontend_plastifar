@@ -1,11 +1,10 @@
-import { Building2, Check, Flag, ListTodo, Pencil, Plus, Slash, Timer, UserCheck } from "lucide-react";
+import { Building2, Check, Flag, ListTodo, Plus, Slash, Timer, UserCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { tasksApi, type TaskQuery } from "../../api/tasks";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Avatar } from "../../components/ui/Avatar";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -15,7 +14,6 @@ import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDr
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
-import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { type TableSelectionAction } from "../../components/ui/TableSelectionBar";
@@ -31,7 +29,7 @@ import { formatDateTime } from "../../lib/format";
 import { useReceipts } from "../../context/useReceipts";
 import { PriorityCell } from "../tickets/ticketCells";
 import type { DepartmentResponse } from "../../types/api";
-import type { TaskDetail, TaskListItem, TaskListResponse } from "../../types/tasks";
+import type { TaskListResponse } from "../../types/tasks";
 import { BulkTaskModal, type BulkModalMode } from "./BulkTaskModal";
 import { TaskFormModal } from "./TaskFormModal";
 import { TaskStatusCell, TASK_STATUS_FILTER_OPTIONS } from "./taskCells";
@@ -85,8 +83,6 @@ export function TasksPage() {
   const [pageSize, setPageSize] = useState(10);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(COLUMNS.map((column) => column.id));
   const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<TaskDetail | null>(null);
-  const [editError, setEditError] = useState<string | null>(null);
 
   // Bulk actions state
   const [bulkModal, setBulkModal] = useState<BulkModalMode | null>(null);
@@ -155,15 +151,6 @@ export function TasksPage() {
     setSearch("");
     setChip("todas");
     clearNarrowFilters();
-  }
-
-  async function openEdit(row: TaskListItem) {
-    setEditError(null);
-    try {
-      setEditing(await tasksApi.get(row.id));
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : "No se pudo abrir la tarea");
-    }
   }
 
   // Bulk actions definition
@@ -295,7 +282,6 @@ export function TasksPage() {
       {referenceError !== null && (
         <ErrorRetry className="mb-3" onRetry={() => void loadDepartments()}>{referenceError}</ErrorRetry>
       )}
-      {editError && <Alert variant="error" className="mb-3">{editError}</Alert>}
       {error && <ErrorRetry className="mb-3" onRetry={refresh}>{error}</ErrorRetry>}
 
       <ListPanel
@@ -400,12 +386,10 @@ export function TasksPage() {
                   {isVisible("cliente") && <Th>Cliente</Th>}
                   {isVisible("limite") && <Th sort={sortOf("limite")}>Fecha límite</Th>}
                   {isVisible("origen") && <Th>Origen</Th>}
-                  <Th className="w-16 text-right">Acciones</Th>
                 </HeadRow>
               </thead>
               <tbody>
                 {rows.map((task) => {
-                  const open = task.status === "Pendiente" || task.status === "EnProgreso";
                   const isChecked = selectedIds.has(task.id);
                   return (
                     <Row
@@ -470,13 +454,6 @@ export function TasksPage() {
                           </span>
                         </Td>
                       )}
-                      <Td className="text-right" onClick={(event) => event.stopPropagation()}>
-                        {canWrite && open && can("tasks.write", task.departmentId) && (
-                          <span className="inline-flex justify-end">
-                            <RowAction label="Editar" icon={Pencil} onClick={() => void openEdit(task)} />
-                          </span>
-                        )}
-                      </Td>
                     </Row>
                   );
                 })}
@@ -510,16 +487,6 @@ export function TasksPage() {
               detail: `${saved.number} · ${saved.title}`,
             });
             navigate(`/tareas/${saved.id}`);
-            refresh();
-          }}
-        />
-      )}
-      {editing && (
-        <TaskFormModal
-          task={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
             refresh();
           }}
         />

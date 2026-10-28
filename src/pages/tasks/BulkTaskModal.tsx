@@ -129,6 +129,14 @@ export function BulkTaskModal({ mode, taskIds, onClose, onSuccess }: BulkTaskMod
       return;
     }
 
+    if (mode === "completar") {
+      const trimmed = comment.trim();
+      if (!trimmed) {
+        setFieldError("El comentario de cierre es obligatorio.");
+        return;
+      }
+    }
+
     if (mode === "cancelar") {
       const trimmed = reason.trim();
       if (!trimmed || trimmed.length < 5) {
@@ -244,6 +252,10 @@ export function BulkTaskModal({ mode, taskIds, onClose, onSuccess }: BulkTaskMod
               size="sm"
               variant={submitVariant}
               isLoading={isSubmitting}
+              disabled={
+                (mode === "completar" && !comment.trim()) ||
+                (mode === "cancelar" && reason.trim().length < 5)
+              }
             >
               {submitLabel}
             </Button>
@@ -380,14 +392,27 @@ export function BulkTaskModal({ mode, taskIds, onClose, onSuccess }: BulkTaskMod
             <TextAreaField
               ref={textareaRef}
               rows={1}
-              label="Nota de cierre (opcional)"
-              placeholder="Añade notas o comentarios del trabajo realizado…"
+              required
+              label="Comentario de cierre"
+              placeholder="Indica qué se ejecutó y cómo quedaron las tareas seleccionadas…"
               value={comment}
+              error={fieldError ?? undefined}
+              className="resize-none overflow-hidden"
               onChange={(e) => {
                 setComment(e.target.value);
+                if (fieldError && e.target.value.trim().length > 0) setFieldError(null);
                 autoResizeTextarea(e.target, 56);
               }}
-              hint="Opcional. Se registrará en el historial de eventos de cada tarea seleccionada."
+              hint={
+                <span className="flex items-center justify-between text-[11px] text-zinc-400">
+                  <span className={fieldError ? "text-brand-red font-medium" : ""}>
+                    {fieldError ?? "El comentario de cierre es obligatorio para registrar la resolución"}
+                  </span>
+                  <span className={`tabular-nums ${comment.length > 3800 ? "text-brand-red font-medium" : ""}`}>
+                    {comment.length} / 4000
+                  </span>
+                </span>
+              }
             />
           </>
         )}

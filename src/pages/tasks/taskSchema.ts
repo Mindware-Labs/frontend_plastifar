@@ -35,7 +35,11 @@ export const taskFormSchema = z.object({
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
 
 export const taskCommentSchema = z.object({
-  comment: z.string().trim().min(1, "El comentario es obligatorio").max(4000, "Máximo 4000 caracteres"),
+  comment: z
+    .string()
+    .trim()
+    .min(1, "El comentario de cierre es obligatorio")
+    .max(4000, "Máximo 4000 caracteres"),
 });
 
 export const taskReasonSchema = z.object({
@@ -67,6 +71,24 @@ export function parseDueDateFromApi(iso: string | null): { date: string; time: s
   const hours = String(d.getHours()).padStart(2, "0");
   const minutes = String(d.getMinutes()).padStart(2, "0");
   return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
+}
+
+/** Verifica si una fecha y hora límite ya expiró con respecto al momento de referencia. */
+export function isPastDueDate(date: string, time?: string, referenceNow: Date = new Date()): boolean {
+  if (!date || date.trim() === "") return false;
+  const todayStr = `${referenceNow.getFullYear()}-${String(referenceNow.getMonth() + 1).padStart(2, "0")}-${String(referenceNow.getDate()).padStart(2, "0")}`;
+  if (date < todayStr) return true;
+  if (date > todayStr) return false;
+  const cleanTime = time?.trim();
+  if (cleanTime && /^\d{2}:\d{2}$/.test(cleanTime)) {
+    const [h, m] = cleanTime.split(":").map(Number);
+    const nowH = referenceNow.getHours();
+    const nowM = referenceNow.getMinutes();
+    if (h < nowH || (h === nowH && m < nowM)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function dueDateFromApi(value: string | null): string {

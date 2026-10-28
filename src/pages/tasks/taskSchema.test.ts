@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   dueDateToApi,
+  isPastDueDate,
   parseDueDateFromApi,
   taskCommentSchema,
   taskFormSchema,
@@ -52,6 +53,29 @@ describe("taskFormSchema", () => {
     const parsed = parseDueDateFromApi(isoWithTime);
     assert.equal(parsed.date, "2026-10-27");
     assert.equal(parsed.time, "14:30");
+  });
+
+  it("detecta si una fecha o fecha/hora límite ya pasó", () => {
+    // 2026-10-28 a las 15:00
+    const now = new Date(2026, 9, 28, 15, 0, 0);
+
+    // Vacío no es pasado
+    assert.equal(isPastDueDate("", undefined, now), false);
+
+    // Días anteriores son pasados
+    assert.equal(isPastDueDate("2026-10-27", undefined, now), true);
+
+    // Días posteriores no son pasados
+    assert.equal(isPastDueDate("2026-10-29", undefined, now), false);
+
+    // Mismo día sin hora se permite
+    assert.equal(isPastDueDate("2026-10-28", undefined, now), false);
+
+    // Mismo día con hora pasada es pasado
+    assert.equal(isPastDueDate("2026-10-28", "14:30", now), true);
+
+    // Mismo día con hora futura es válido
+    assert.equal(isPastDueDate("2026-10-28", "16:00", now), false);
   });
 });
 

@@ -154,10 +154,10 @@ export function TicketClaimTab({
             <span className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">PF-FOR-034</span>
             <ClaimStatusBadge status={claim.status} />
             {claim.hcaNumber && (
-              <Link to={`/calidad/hca/${claim.hcaId}`} className="inline-flex items-center gap-1 font-mono text-[11.5px] text-zinc-600 hover:text-brand-red">
+              <span className="inline-flex items-center gap-1 font-mono text-[11.5px] text-zinc-600">
                 <ClipboardList aria-hidden className="h-3.5 w-3.5" />
                 {claim.hcaNumber}
-              </Link>
+              </span>
             )}
           </div>
           <p className="mt-1.5 text-[13px] text-zinc-800">

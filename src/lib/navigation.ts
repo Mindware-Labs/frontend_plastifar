@@ -169,11 +169,7 @@ export const SIDEBAR_NAV: NavGroup[] = [
     icon: ClipboardCheck,
     section: "Gestión",
     permission: "quality.read",
-    children: [
-      { label: "HCA", to: "/calidad/hca" },
-      { label: "Solicitudes de crédito", to: "/calidad/creditos" },
-      { label: "Líneas de producto", to: "/calidad/lineas" },
-    ],
+    children: [{ label: "Líneas de producto", to: "/calidad/lineas" }],
   },
   {
     label: "Personal",
