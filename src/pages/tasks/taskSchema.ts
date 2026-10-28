@@ -24,7 +24,7 @@ export const taskFormSchema = z.object({
     .max(8000, "Máximo 8000 caracteres"),
   departmentId: z.string().trim().min(1, "Elige el departamento"),
   assignedStaffId: z.string(),
-  priority: z.enum(TASK_PRIORITIES),
+  slaPolicyId: z.string().trim().min(1, "Elige una política SLA"),
   status: z.enum(OPEN_TASK_STATUSES),
   clientId: z.string(),
   contactId: z.string(),

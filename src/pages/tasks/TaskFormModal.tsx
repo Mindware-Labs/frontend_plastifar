@@ -1,5 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, AlertOctagon, AlertTriangle, Flag } from "lucide-react";
+import { fetchAllPages } from "../../api/paging";
+import { settingsApi } from "../../api/settings";
+import { SlaPolicyField } from "../../components/app/SlaPolicyField";
+import { pickDefaultSlaPolicyId, sortSlaPolicies } from "../../lib/slaPolicyUi";
+import type { SlaPolicy } from "../../types/settings";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch, type UseFormRegisterReturn } from "react-hook-form";
 import { ApiError } from "../../api/client";
@@ -28,7 +32,7 @@ import { buildDepartmentTree } from "../../lib/departments";
 import { resolveClientLabel, resolveStaffLabel, searchActiveStaff, searchClients } from "../../lib/lookups";
 import type { DepartmentResponse } from "../../types/api";
 import type { Contact } from "../../types/clients";
-import type { EmailTaskPrefill, TaskDetail, TaskPriority, UpdateTaskRequest } from "../../types/tasks";
+import type { EmailTaskPrefill, TaskDetail, UpdateTaskRequest } from "../../types/tasks";
 import { TASK_STATUS_EDIT_OPTIONS } from "./taskCells";
 import {
   dueDateToApi,
@@ -44,18 +48,6 @@ interface TaskFormModalProps {
   onClose: () => void;
   onSaved: (task: TaskDetail) => void;
 }
-
-const PRIORITY_ITEMS: {
-  value: TaskPriority;
-  label: string;
-  icon: typeof Flag;
-  activeColor: string;
-}[] = [
-  { value: "Emergencia", label: "Emergencia", icon: AlertOctagon, activeColor: "text-brand-red" },
-  { value: "Alta", label: "Alta", icon: AlertTriangle, activeColor: "text-amber-500" },
-  { value: "Normal", label: "Normal", icon: Flag, activeColor: "text-blue-500" },
-  { value: "Baja", label: "Baja", icon: Flag, activeColor: "text-zinc-400" },
-];
 
 function optionalId(value: string): number | null {
   return value === "" ? null : Number(value);
@@ -125,6 +117,12 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   );
   const [departmentTouched, setDepartmentTouched] = useState(isEdit);
   const [contactTouched, setContactTouched] = useState(isEdit);
+  const [slaPolicies, setSlaPolicies] = useState<SlaPolicy[] | null>(null);
+  const [slaPoliciesLoading, setSlaPoliciesLoading] = useState(true);
+  const sortedTaskPolicies = useMemo(
+    () => (slaPolicies ? sortSlaPolicies(slaPolicies) : []),
+    [slaPolicies],
+  );
   const { isExiting, requestClose } = useModalAnimation();
   const instructionsTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -160,7 +158,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
       instructions: task?.instructions ?? prefill?.instructions ?? "",
       departmentId: task ? String(task.departmentId) : "",
       assignedStaffId: task?.assignedStaffId ? String(task.assignedStaffId) : "",
-      priority: task?.priority ?? "Normal",
+      slaPolicyId: task?.slaPolicyId ? String(task.slaPolicyId) : "",
       status: task?.status === "EnProgreso" ? "EnProgreso" : "Pendiente",
       clientId: task?.clientId ? String(task.clientId) : "",
       contactId: task?.contactId ? String(task.contactId) : "",
@@ -178,6 +176,44 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   useEffect(() => {
     autoResizeTextarea(instructionsTextareaRef.current, 38);
   }, [instructions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSlaPoliciesLoading(true);
+    fetchAllPages<SlaPolicy>((page, pageSize) =>
+      settingsApi.slaPolicies.list({ page, pageSize, status: "activas", type: "Tarea" }),
+    )
+      .then((items) => {
+        if (cancelled) return;
+        setSlaPolicies(items);
+        const sorted = sortSlaPolicies(items);
+        const current = getValues("slaPolicyId");
+        if (current) return;
+        if (task?.slaPolicyId && sorted.some((p) => p.id === task.slaPolicyId)) {
+          setValue("slaPolicyId", String(task.slaPolicyId), { shouldValidate: true });
+          return;
+        }
+        if (task) {
+          const match =
+            sorted.find((p) => p.priority === task.priority && p.isDefault) ??
+            sorted.find((p) => p.priority === task.priority);
+          if (match) {
+            setValue("slaPolicyId", String(match.id), { shouldValidate: true });
+            return;
+          }
+        }
+        setValue("slaPolicyId", pickDefaultSlaPolicyId(items), { shouldValidate: true });
+      })
+      .catch(() => {
+        if (!cancelled) setSlaPolicies([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSlaPoliciesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getValues, setValue, task?.id, task?.priority, task?.slaPolicyId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -306,7 +342,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
       instructions: values.instructions.trim(),
       departmentId: Number(values.departmentId),
       assignedStaffId: optionalId(values.assignedStaffId),
-      priority: values.priority,
+      slaPolicyId: Number(values.slaPolicyId),
       status: values.status,
       clientId: optionalId(values.clientId),
       contactId: optionalId(values.clientId) == null ? null : optionalId(values.contactId),
@@ -319,7 +355,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     form.set("Title", values.title.trim());
     form.set("Instructions", values.instructions.trim());
     form.set("DepartmentId", values.departmentId);
-    form.set("Priority", values.priority);
+    form.set("SlaPolicyId", values.slaPolicyId);
     const assignee = optionalId(values.assignedStaffId);
     const client = optionalId(values.clientId);
     const contact = client == null ? null : optionalId(values.contactId);
@@ -439,53 +475,20 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
           })}
         />
 
-        {/* 2. PRIORIDAD */}
-        <FormDivider title="Prioridad" />
+        <FormDivider title="Compromiso SLA" />
 
         <Controller
-          name="priority"
+          name="slaPolicyId"
           control={control}
           render={({ field }) => (
-            <div className="flex flex-col gap-1">
-              <label className="font-heading text-[11.5px] font-semibold text-faint">
-                Nivel de prioridad <span className="text-brand-red">*</span>
-              </label>
-              <div
-                role="radiogroup"
-                aria-label="Nivel de prioridad"
-                className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-lg border border-zinc-200 bg-zinc-50/70 p-0.5"
-              >
-                {PRIORITY_ITEMS.map((item) => {
-                  const isSelected = field.value === item.value;
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      onClick={() => field.onChange(item.value)}
-                      className={`inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] transition-all cursor-pointer select-none ${
-                        isSelected
-                          ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                          : "border border-transparent font-medium text-zinc-600 hover:text-zinc-900 hover:bg-white/50"
-                      }`}
-                    >
-                      <Icon
-                        className={`h-3 w-3 shrink-0 ${isSelected ? item.activeColor : "text-zinc-400"}`}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {errors.priority?.message && (
-                <p className="animate-plf-shake flex items-center gap-1 text-[11px] font-medium text-brand-red-dark leading-none truncate">
-                  <AlertCircle className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{errors.priority.message}</span>
-                </p>
-              )}
-            </div>
+            <SlaPolicyField
+              policies={sortedTaskPolicies}
+              loading={slaPoliciesLoading}
+              value={field.value}
+              onChange={field.onChange}
+              error={errors.slaPolicyId?.message}
+              state={stateOf("slaPolicyId")}
+            />
           )}
         />
 

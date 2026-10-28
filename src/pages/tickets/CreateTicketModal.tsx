@@ -3,7 +3,12 @@ import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type R
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { z } from "zod";
-import { Building2, Check, Flag, Info, Mail, MessageSquareText, Package, RotateCcw, Tag, X } from "lucide-react";
+import { Building2, Check, Clock, Info, Mail, MessageSquareText, Package, RotateCcw, Tag, X } from "lucide-react";
+import { fetchAllPages } from "../../api/paging";
+import { settingsApi } from "../../api/settings";
+import { SlaPolicyField } from "../../components/app/SlaPolicyField";
+import { pickDefaultSlaPolicyId, sortSlaPolicies } from "../../lib/slaPolicyUi";
+import type { SlaPolicy } from "../../types/settings";
 import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { TicketProductsField, type TicketProductDraft } from "../../components/app/TicketProductsField";
 import { ApiError } from "../../api/client";
@@ -34,7 +39,7 @@ const schema = z.object({
     .trim()
     .min(3, "El asunto debe tener al menos 3 caracteres")
     .max(200, "El asunto no puede superar los 200 caracteres"),
-  priority: z.string().optional(),
+  slaPolicyId: z.string().trim().min(1, "Elige una política SLA"),
   departmentId: z.string().optional(),
   assignedStaffId: z.string().optional(),
   initialMessage: z.string().optional(),
@@ -53,34 +58,6 @@ interface CreateTicketModalProps {
   senderName?: string;
   initialAssignedStaffId?: number | null;
 }
-
-/** Como en la tabla de tickets: solo Alta y Emergencia llevan color, lo demás va en neutro. */
-const PRIORITIES = [
-  {
-    value: "Baja",
-    label: "Baja",
-    desc: "Rutinario",
-    dot: "bg-zinc-300",
-  },
-  {
-    value: "Normal",
-    label: "Normal",
-    desc: "SLA estándar",
-    dot: "bg-zinc-500",
-  },
-  {
-    value: "Alta",
-    label: "Alta",
-    desc: "Prioritario",
-    dot: "bg-amber-500",
-  },
-  {
-    value: "Emergencia",
-    label: "Emergencia",
-    desc: "Inmediato",
-    dot: "bg-brand-red",
-  },
-] as const;
 
 const FORM_ID = "create-ticket-form";
 
@@ -190,16 +167,22 @@ export function CreateTicketModal({
       contactId: "",
       topicId: "",
       subject: initialSubject ?? "",
-      priority: "Normal",
+      slaPolicyId: "",
       departmentId: "",
       assignedStaffId: initialAssignedStaffId ? String(initialAssignedStaffId) : "",
       initialMessage: normalizedInitialMessage,
     },
   });
 
+  const [slaPolicies, setSlaPolicies] = useState<SlaPolicy[] | null>(null);
+  const [slaPoliciesLoading, setSlaPoliciesLoading] = useState(true);
+  const sortedTicketPolicies = useMemo(
+    () => (slaPolicies ? sortSlaPolicies(slaPolicies) : []),
+    [slaPolicies],
+  );
+
   const selectedClientId = useWatch({ control, name: "clientId" });
   const selectedTopicId = useWatch({ control, name: "topicId" });
-  const selectedPriority = useWatch({ control, name: "priority" }) || "Normal";
   const currentSubject = useWatch({ control, name: "subject" }) || "";
   const currentMessage = useWatch({ control, name: "initialMessage" }) || "";
   const initialMessageField = register("initialMessage");
@@ -307,18 +290,51 @@ export function CreateTicketModal({
     }
   }, [selectedClientId, selectedClient, contactOptions, setValue, getValues]);
 
-  // Al cambiar de motivo, sugerir departamento por defecto y prioridad si están definidos
+  useEffect(() => {
+    let cancelled = false;
+    setSlaPoliciesLoading(true);
+    fetchAllPages<SlaPolicy>((page, pageSize) =>
+      settingsApi.slaPolicies.list({ page, pageSize, status: "activas", type: "Ticket" }),
+    )
+      .then((items) => {
+        if (cancelled) return;
+        setSlaPolicies(items);
+        const current = getValues("slaPolicyId");
+        if (!current) {
+          setValue("slaPolicyId", pickDefaultSlaPolicyId(items), { shouldValidate: true });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSlaPolicies([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSlaPoliciesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getValues, setValue]);
+
   const selectedTopic = catalogs?.topics.find((t) => String(t.id) === selectedTopicId);
   useEffect(() => {
-    if (selectedTopic) {
-      if (selectedTopic.defaultDepartmentId) {
-        setValue("departmentId", String(selectedTopic.defaultDepartmentId));
-      }
-      if (selectedTopic.defaultPriority) {
-        setValue("priority", selectedTopic.defaultPriority);
+    if (!selectedTopic || sortedTicketPolicies.length === 0) return;
+    if (selectedTopic.defaultDepartmentId) {
+      setValue("departmentId", String(selectedTopic.defaultDepartmentId));
+    }
+    if (selectedTopic.slaPolicyId) {
+      const linked = sortedTicketPolicies.some((p) => p.id === selectedTopic.slaPolicyId);
+      if (linked) {
+        setValue("slaPolicyId", String(selectedTopic.slaPolicyId), { shouldValidate: true });
+        return;
       }
     }
-  }, [selectedTopic, setValue]);
+    const byPriority = sortedTicketPolicies.find(
+      (p) => p.priority === selectedTopic.defaultPriority && p.isDefault,
+    );
+    if (byPriority) {
+      setValue("slaPolicyId", String(byPriority.id), { shouldValidate: true });
+    }
+  }, [selectedTopic, sortedTicketPolicies, setValue]);
 
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
@@ -345,7 +361,7 @@ export function CreateTicketModal({
         topicId: values.topicId ? Number(values.topicId) : null,
         productIds: ticketProducts.length > 0 ? ticketProducts.map((p) => p.productId) : null,
         subject: values.subject.trim(),
-        priority: values.priority || "Normal",
+        slaPolicyId: Number(values.slaPolicyId),
         departmentId: values.departmentId ? Number(values.departmentId) : null,
         assignedStaffId: values.assignedStaffId ? Number(values.assignedStaffId) : null,
         initialMessage: values.initialMessage?.trim() || null,
@@ -574,44 +590,22 @@ export function CreateTicketModal({
                 />
               </section>
 
-              {/* Prioridad: control segmentado; el color solo en el punto, la elección en papel. */}
               <section className="flex flex-col gap-3 border-t border-line-soft px-6 py-5">
-                <SectionHeading icon={Flag} title="Nivel de prioridad" />
-                <div
-                  role="radiogroup"
-                  aria-label="Nivel de prioridad"
-                  className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 sm:grid-cols-4"
-                >
-                  {PRIORITIES.map((p) => {
-                    const isSelected = selectedPriority === p.value;
-                    return (
-                      <button
-                        key={p.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={isSelected}
-                        onClick={() => setValue("priority", p.value, { shouldValidate: true })}
-                        className={`flex cursor-pointer flex-col items-start gap-1 rounded-md border px-2.5 py-2 text-left outline-none
-                          transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out
-                          focus-visible:ring-2 focus-visible:ring-brand-red/25 active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 ${
-                            isSelected
-                              ? "border-zinc-200 bg-white text-zinc-900 shadow-2xs"
-                              : "border-transparent text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-                          }`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <span
-                            className={`size-2 shrink-0 rounded-full transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${p.dot} ${
-                              isSelected ? "scale-100" : "scale-75"
-                            }`}
-                          />
-                          <span className="font-heading text-[12px] font-semibold leading-none">{p.label}</span>
-                        </span>
-                        <span className="text-[10.5px] leading-none text-zinc-400">{p.desc}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                <SectionHeading icon={Clock} title="Compromiso SLA" aside="Define plazos de atención" />
+                <Controller
+                  name="slaPolicyId"
+                  control={control}
+                  render={({ field }) => (
+                    <SlaPolicyField
+                      policies={sortedTicketPolicies}
+                      loading={slaPoliciesLoading}
+                      value={field.value}
+                      onChange={field.onChange}
+                      error={errors.slaPolicyId?.message}
+                      state={stateOf("slaPolicyId")}
+                    />
+                  )}
+                />
               </section>
 
               {/* Cliente y contacto */}

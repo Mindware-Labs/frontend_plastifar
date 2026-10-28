@@ -69,6 +69,7 @@ export const ticketsApi = {
       const body = new FormData();
       body.append("Subject", input.subject);
       if (input.initialMessage) body.append("InitialMessage", input.initialMessage);
+      if (input.slaPolicyId != null) body.append("SlaPolicyId", String(input.slaPolicyId));
       if (input.priority) body.append("Priority", input.priority);
       if (input.clientId != null) body.append("ClientId", String(input.clientId));
       if (input.contactId != null) body.append("ContactId", String(input.contactId));

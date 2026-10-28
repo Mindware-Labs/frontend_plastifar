@@ -14,7 +14,7 @@ const valid = {
   instructions: "Dejarlas en recepción.",
   departmentId: "4",
   assignedStaffId: "",
-  priority: "Normal" as const,
+  slaPolicyId: "12",
   status: "Pendiente" as const,
   clientId: "",
   contactId: "",

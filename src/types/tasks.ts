@@ -149,7 +149,7 @@ export interface UpdateTaskRequest {
   instructions: string;
   departmentId: number;
   assignedStaffId: number | null;
-  priority: TaskPriority;
+  slaPolicyId: number;
   status: TaskStatus | null;
   clientId: number | null;
   contactId: number | null;

@@ -36,7 +36,6 @@ import { SlaSection } from "./pages/settings/SlaSection";
 import { TeamsSection } from "./pages/settings/TeamsSection";
 import { TaskTypesSection } from "./pages/settings/TaskTypesSection";
 
-import { TemplatesSection } from "./pages/settings/TemplatesSection";
 import { TerritoriesSection } from "./pages/settings/TerritoriesSection";
 import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
 import { StaffPage } from "./pages/staff/StaffPage";
@@ -165,7 +164,6 @@ export default function App() {
         <Route path="/configuracion" element={<Navigate to="/configuracion/sla" replace />} />
         <Route path="/configuracion/sla" element={<SlaSection />} />
         <Route path="/configuracion/feriados" element={<HolidaysSection />} />
-        <Route path="/configuracion/plantillas" element={<TemplatesSection />} />
         <Route path="/configuracion/buzones" element={<MailboxesSection />} />
         <Route path="/configuracion/lineas" element={<ProductLinesSection />} />
         {/* Rutas propuestas en docs/plan/00, seccion 11. Si los productos y las

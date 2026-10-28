@@ -828,6 +828,7 @@ export interface CreateManualTicketRequest {
   productIds?: number[] | null;
   subject: string;
   initialMessage?: string | null;
+  slaPolicyId?: number | null;
   priority?: string | null;
   departmentId?: number | null;
   assignedStaffId?: number | null;

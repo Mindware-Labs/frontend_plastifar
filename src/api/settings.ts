@@ -1,8 +1,7 @@
 import { apiRequest, toQuery } from "./client";
 import type {
 
-  EmailTemplate,
-
+  
   Holiday,
   Mailbox,
   Plant,
@@ -199,16 +198,6 @@ export const settingsApi = {
   },
 
 
-  templates: {
-    list: (query: CatalogQuery) =>
-      apiRequest<ListResponse<EmailTemplate>>(`/api/settings/templates${toQuery({ ...query })}`),
-    get: (id: number) => apiRequest<EmailTemplate>(`/api/settings/templates/${id}`),
-    create: (data: Omit<EmailTemplate, "id">) =>
-      apiRequest<EmailTemplate>("/api/settings/templates", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: number, data: Omit<EmailTemplate, "id">) =>
-      apiRequest<EmailTemplate>(`/api/settings/templates/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    remove: (id: number) => apiRequest<void>(`/api/settings/templates/${id}`, { method: "DELETE" }),
-  },
 
   mailboxes: {
     list: (query: CatalogQuery) =>

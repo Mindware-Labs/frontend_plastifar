@@ -207,25 +207,6 @@ export interface ProductImportResult {
   rejectionsTruncated: boolean;
 }
 
-/** Variables permitidas en una plantilla. Una desconocida se rechaza al guardar. */
-export const TEMPLATE_VARIABLES = [
-  { key: "contacto", label: "Nombre del contacto", sample: "María Reyes" },
-  { key: "ticket", label: "Número de ticket", sample: "000482" },
-  { key: "agente", label: "Nombre del agente", sample: "Yordy Acosta" },
-  { key: "cliente", label: "Nombre del cliente", sample: "Distribuidora del Este" },
-] as const;
-
-export type TemplateVariable = (typeof TEMPLATE_VARIABLES)[number]["key"];
-
-export interface EmailTemplate {
-  id: number;
-  /** Clave estable con la que el sistema la invoca. */
-  key: string;
-  name: string;
-  subject: string;
-  body: string;
-  isActive: boolean;
-}
 
 /** Valor de cable, tal como lo emite y espera el enum del servidor. */
 export type MailboxProvider = "IMAP" | "Gmail" | "Office365";
