@@ -8,7 +8,6 @@ import {
   CornerUpLeft,
   Eye,
   FileText,
-  Flag,
   Gavel,
   History,
   Lock,
@@ -26,13 +25,14 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { ModuleHeader, type ModuleHeaderSection } from "../../components/app/ModuleHeader";
 import { TicketPendingFileList } from "../../components/app/TicketPendingFileList";
+import { SlaPolicyField } from "../../components/app/SlaPolicyField";
 import { TicketProductsField } from "../../components/app/TicketProductsField";
 import { Alert } from "../../components/ui/Alert";
 import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
@@ -50,6 +50,8 @@ import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { departmentPath, departmentPathOptions } from "../../lib/departments";
+import { resolveSlaPolicyIdForPriority, sortSlaPolicies } from "../../lib/slaPolicyUi";
+import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes, formatDateTime, formatPhoneNumber, formatSlaRemaining } from "../../lib/format";
 import { formatTicketProductsSummary } from "../../lib/ticketProducts";
@@ -93,14 +95,6 @@ function validateAttachments(chosen: File[], existing: File[]): string | null {
   }
   return null;
 }
-
-/** Misma escala que al crear ticket: color solo en Alta y Emergencia. */
-const EDIT_TICKET_PRIORITIES = [
-  { value: "Baja", label: "Baja", desc: "Rutinario", dot: "bg-zinc-300" },
-  { value: "Normal", label: "Normal", desc: "SLA estándar", dot: "bg-zinc-500" },
-  { value: "Alta", label: "Alta", desc: "Prioritario", dot: "bg-amber-500" },
-  { value: "Emergencia", label: "Emergencia", desc: "Inmediato", dot: "bg-brand-red" },
-] as const;
 
 function EditTicketFormDivider({ title }: { title: string }) {
   return (
@@ -839,7 +833,15 @@ export function TicketDetailPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSubject, setEditSubject] = useState("");
   const [editTopicId, setEditTopicId] = useState<number | null>(null);
-  const [editPriority, setEditPriority] = useState("Normal");
+  const { policies: ticketSlaPolicies, loading: ticketSlaPoliciesLoading } = useActiveSlaPolicies("Ticket");
+  const sortedTicketSlaPolicies = useMemo(
+    () => (ticketSlaPolicies ? sortSlaPolicies(ticketSlaPolicies) : []),
+    [ticketSlaPolicies],
+  );
+  const initialTicketSlaPolicyId = useMemo(() => {
+    if (!ticket || sortedTicketSlaPolicies.length === 0) return "";
+    return resolveSlaPolicyIdForPriority(sortedTicketSlaPolicies, ticket.priority);
+  }, [ticket, sortedTicketSlaPolicies]);
   const [editDepartmentId, setEditDepartmentId] = useState<number | null>(null);
   const [editProducts, setEditProducts] = useState<
     { productId: number; productCode: string; productName: string }[]
@@ -866,7 +868,6 @@ export function TicketDetailPage() {
     if (!ticket) return;
     setEditSubject(ticket.subject);
     setEditTopicId(ticket.topicId ?? null);
-    setEditPriority(ticket.priority);
     setEditDepartmentId(ticket.departmentId ?? null);
     setEditProducts(
       (ticket.products ?? []).map((p) => ({
@@ -911,7 +912,6 @@ export function TicketDetailPage() {
       await ticketsApi.update(ticketId, {
         subject: editSubject.trim(),
         topicId: editTopicId,
-        priority: editPriority,
         departmentId: editDepartmentId,
         productIds: editProducts.map((p) => p.productId),
       });
@@ -2774,7 +2774,6 @@ export function TicketDetailPage() {
                         if (editError) setEditError(null);
                         const topic = nextId ? editCatalogs?.topics.find((t) => t.id === nextId) : undefined;
                         if (topic?.defaultDepartmentId) setEditDepartmentId(topic.defaultDepartmentId);
-                        if (topic?.defaultPriority) setEditPriority(topic.defaultPriority);
                       }}
                       placeholder="Aún sin motivo"
                       options={[
@@ -2815,47 +2814,17 @@ export function TicketDetailPage() {
                   />
                 </div>
 
-                <EditTicketFormDivider title="Prioridad" />
-
-                <div className="flex flex-col gap-3">
-                  <EditTicketSectionHeading icon={Flag} title="Nivel de prioridad" />
-                  <div
-                    role="radiogroup"
-                    aria-label="Nivel de prioridad"
-                    className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50 p-1 sm:grid-cols-4"
-                  >
-                    {EDIT_TICKET_PRIORITIES.map((p) => {
-                      const isSelected = editPriority === p.value;
-                      return (
-                        <button
-                          key={p.value}
-                          type="button"
-                          role="radio"
-                          aria-checked={isSelected}
-                          onClick={() => {
-                            setEditPriority(p.value);
-                            if (editError) setEditError(null);
-                          }}
-                          className={`flex cursor-pointer flex-col items-start gap-1 rounded-md border px-2.5 py-2 text-left outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:ring-2 focus-visible:ring-brand-red/25 active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 ${
-                            isSelected
-                              ? "border-zinc-200 bg-white text-zinc-900 shadow-2xs"
-                              : "border-transparent text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-                          }`}
-                        >
-                          <span className="flex items-center gap-1.5">
-                            <span
-                              className={`size-2 shrink-0 rounded-full transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${p.dot} ${
-                                isSelected ? "scale-100" : "scale-75"
-                              }`}
-                            />
-                            <span className="font-heading text-[12px] font-semibold leading-none">{p.label}</span>
-                          </span>
-                          <span className="text-[10.5px] leading-none text-zinc-400">{p.desc}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <SlaPolicyField
+                  embeddedSection
+                  sectionBorder
+                  readOnly
+                  policies={sortedTicketSlaPolicies}
+                  loading={ticketSlaPoliciesLoading}
+                  value={initialTicketSlaPolicyId}
+                  onChange={() => {}}
+                  fieldLabel="Compromiso SLA inicial"
+                  readOnlyHint="Quedó fijado al abrir el ticket; no se cambia al editar la clasificación."
+                />
               </>
             )}
           </form>

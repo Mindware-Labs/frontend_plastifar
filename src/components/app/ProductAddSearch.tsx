@@ -1,16 +1,21 @@
 import { Check, Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
+import {
+  useDisclosureMotion,
+  type DisclosureDirection,
+} from "../../hooks/useDisclosureMotion";
 import { searchProducts } from "../../lib/lookups";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import type { LookupOption } from "../ui/LookupSelect";
 import { controlBase, controlSizes } from "../ui/fieldStyles";
-import { Spinner } from "../ui/Spinner";
 import type { TicketProductDraft } from "./TicketProductsField";
 
-const LIST_MAX = 260;
-const PANEL_MAX_HEIGHT = 320;
+/** Filas visibles antes de scroll interno (~52px por fila con código + nombre). */
+const VISIBLE_ROWS_MAX = 4;
+const LIST_ROW_PX = 52;
+const LIST_MAX = LIST_ROW_PX * VISIBLE_ROWS_MAX + 8;
+const PANEL_MAX_HEIGHT = LIST_MAX + 120;
 
 interface PanelAnchor {
   left: number;
@@ -62,11 +67,19 @@ export function ProductAddSearch({
   const [options, setOptions] = useState<LookupOption[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [anchor, setAnchor] = useState<PanelAnchor | null>(null);
+  const [panelDirection, setPanelDirection] = useState<DisclosureDirection>("down");
+  const [backdropLit, setBackdropLit] = useState(false);
 
-  const dropUp = anchor?.bottom !== undefined;
+  const dropUp = panelDirection === "up";
   const { mounted, exiting, ref: containerRef, snap } = useDisclosureMotion<HTMLDivElement>(
     open,
-    { direction: dropUp ? "up" : "down" },
+    {
+      direction: panelDirection,
+      openMs: 320,
+      closeMs: 220,
+      symmetricEasing: true,
+      itemStagger: false,
+    },
   );
 
   const debouncedTerm = useDebouncedValue(term).trim();
@@ -79,14 +92,21 @@ export function ProductAddSearch({
 
   const selectedCount = selectedProducts.length;
 
-  function measure() {
+  function measure(opts?: { lockDirection?: boolean }) {
     const rect = anchorRef.current?.getBoundingClientRect();
     if (!rect) return;
 
     const viewportHeight = window.innerHeight;
     const spaceBelow = viewportHeight - rect.bottom;
     const spaceAbove = rect.top;
-    const opensUp = spaceBelow < PANEL_MAX_HEIGHT && spaceAbove > spaceBelow;
+
+    let opensUp: boolean;
+    if (opts?.lockDirection) {
+      opensUp = panelDirection === "up";
+    } else {
+      opensUp = spaceBelow < PANEL_MAX_HEIGHT && spaceAbove > spaceBelow;
+      setPanelDirection(opensUp ? "up" : "down");
+    }
 
     const width = Math.min(Math.max(rect.width, 320), window.innerWidth - 32);
     const left = Math.min(
@@ -123,6 +143,17 @@ export function ProductAddSearch({
     setTerm("");
     inputRef.current?.focus();
   }
+
+  useEffect(() => {
+    if (!mounted) {
+      setBackdropLit(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setBackdropLit(true));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [mounted]);
 
   useEffect(() => {
     if (!open) return;
@@ -173,10 +204,10 @@ export function ProductAddSearch({
         return;
       }
       if (event.type === "resize") {
-        measure();
+        measure({ lockDirection: true });
         return;
       }
-      closePanel(true);
+      closePanel();
     }
 
     document.addEventListener("pointerdown", onPointerDown, true);
@@ -225,18 +256,25 @@ export function ProductAddSearch({
 
   const status = failed
     ? "No se pudo buscar en el catálogo. Intenta de nuevo."
-    : isLoading
-      ? "Buscando productos…"
-      : options.length === 0
-        ? debouncedTerm === ""
-          ? "Escribe para buscar o elige de la lista."
-          : "Sin coincidencias en el catálogo."
-        : hasMore
-          ? "Hay más resultados; escribe para filtrar."
-          : null;
+    : options.length === 0
+      ? debouncedTerm === ""
+        ? "Escribe para buscar o elige de la lista."
+        : "Sin coincidencias en el catálogo."
+      : hasMore
+        ? "Hay más resultados; escribe para filtrar."
+        : null;
+
+  const liveStatus = isLoading
+    ? "Buscando productos…"
+    : failed
+      ? "No se pudo buscar en el catálogo."
+      : null;
 
   return (
     <div className="flex flex-col gap-1.5">
+      <p id={statusId} role="status" aria-live="polite" className="sr-only">
+        {liveStatus ?? ""}
+      </p>
       {label ? (
         <label
           htmlFor={fieldId}
@@ -265,7 +303,7 @@ export function ProductAddSearch({
           aria-activedescendant={
             activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined
           }
-          aria-describedby={status ? statusId : undefined}
+          aria-describedby={liveStatus || status ? statusId : undefined}
           value={term}
           placeholder="Buscar por código o descripción…"
           onFocus={openPanel}
@@ -302,54 +340,54 @@ export function ProductAddSearch({
               closePanel();
             }
           }}
-          className={`${controlBase} ${controlSizes.sm} pl-8 font-medium text-ink placeholder:font-normal placeholder:text-zinc-400
+          className={`${controlBase} ${controlSizes.sm} pl-8 pr-[4.75rem] font-medium text-ink placeholder:font-normal placeholder:text-zinc-400
             border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10
-            ${open ? "border-zinc-300 bg-zinc-50/80 pr-[4.75rem] shadow-2xs" : term.length > 0 ? "pr-8" : "pr-3"}`}
+            transition-[border-color,background-color,box-shadow] duration-280 ease-plf-spring motion-reduce:transition-none
+            ${open ? "border-zinc-300 bg-zinc-50/80 shadow-2xs" : ""}`}
         />
 
-        <div
-          className={`pointer-events-none absolute inset-y-0 right-1.5 flex items-center justify-end gap-0.5 ${
-            open ? "w-[4.25rem]" : ""
-          }`}
-        >
+        <div className="pointer-events-none absolute inset-y-0 right-1.5 flex w-[4.25rem] items-center justify-end gap-0.5">
           {term.length > 0 ? (
             <button
               type="button"
               aria-label="Limpiar búsqueda"
               title="Limpiar búsqueda"
               onClick={clearSearch}
-              className="pointer-events-auto flex size-5.5 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors cursor-pointer"
+              className="pointer-events-auto flex size-5.5 items-center justify-center rounded-full text-zinc-400 transition-[color,background-color,opacity] duration-200 hover:bg-zinc-100 hover:text-zinc-600 cursor-pointer"
             >
               <X className="size-3" strokeWidth={2.5} />
             </button>
-          ) : open ? (
+          ) : (
             <span className="size-5.5 shrink-0" aria-hidden />
-          ) : null}
+          )}
 
-          {open ? (
-            <button
-              type="button"
-              onClick={() => closePanel()}
-              title="Cerrar lista (Esc)"
-              className="pointer-events-auto inline-flex min-w-[2.75rem] items-center justify-center gap-0.5 rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-200 cursor-pointer"
-            >
-              <Check className="size-2.5" strokeWidth={2.5} />
-              Listo
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => closePanel()}
+            title="Cerrar lista (Esc)"
+            aria-hidden={!open}
+            tabIndex={open ? 0 : -1}
+            className={`pointer-events-auto inline-flex min-w-[2.75rem] origin-center items-center justify-center gap-0.5 rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-700
+              transition-[opacity,transform,background-color] duration-200 ease-plf-spring motion-reduce:transition-none
+              hover:bg-zinc-200 cursor-pointer
+              ${open ? "pointer-events-auto scale-100 opacity-100" : "pointer-events-none scale-[0.94] opacity-0"}`}
+          >
+            <Check className="size-2.5" strokeWidth={2.5} />
+            Listo
+          </button>
         </div>
       </div>
 
       {mounted && anchor
         ? createPortal(
             <>
-              {!exiting && (
-                <div
-                  className="fixed inset-0 z-[70]"
-                  aria-hidden="true"
-                  onPointerDown={() => closePanel()}
-                />
-              )}
+              <div
+                aria-hidden="true"
+                onPointerDown={() => closePanel()}
+                className={`fixed inset-0 z-[70] bg-transparent transition-[background-color] duration-280 ease-out motion-reduce:transition-none ${
+                  exiting || !backdropLit ? "pointer-events-none bg-transparent" : "bg-zinc-900/[0.04]"
+                }`}
+              />
               <div
                 ref={containerRef}
                 aria-hidden={exiting}
@@ -364,6 +402,7 @@ export function ProductAddSearch({
                 }}
                 className={`z-[80] flex flex-col overflow-hidden rounded-lg border border-zinc-200/90
                   bg-white/95 backdrop-blur-xs shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]
+                  will-change-[transform,opacity] motion-reduce:will-change-auto
                   ${exiting ? "pointer-events-none" : ""}`}
               >
               <ul
@@ -371,8 +410,8 @@ export function ProductAddSearch({
                 id={listId}
                 role="listbox"
                 aria-label={label ?? "Catálogo de productos"}
-                style={{ maxHeight: LIST_MAX }}
-                className="min-h-0 flex-1 overflow-y-auto p-1"
+                style={{ maxHeight: options.length > 0 ? LIST_MAX : undefined }}
+                className="shrink-0 overflow-y-auto p-1"
               >
                 {options.map((option, index) => {
                   const active = index === activeIndex;
@@ -382,7 +421,6 @@ export function ProductAddSearch({
                   return (
                     <li
                       key={option.value}
-                      data-motion-item
                       id={`${listId}-${index}`}
                       role="option"
                       aria-selected={isSelected}
@@ -427,16 +465,6 @@ export function ProductAddSearch({
                 })}
               </ul>
 
-              {isLoading && (
-                <div
-                  data-motion-item
-                  className="flex shrink-0 items-center justify-center gap-2 border-t border-zinc-100 py-2.5 text-xs text-zinc-400"
-                >
-                  <Spinner size="sm" />
-                  <span>Buscando…</span>
-                </div>
-              )}
-
               {!isLoading && options.length === 0 && (
                 <div
                   data-motion-item
@@ -458,7 +486,6 @@ export function ProductAddSearch({
               {status && !isLoading && options.length > 0 ? (
                 <p
                   data-motion-item
-                  id={statusId}
                   role="status"
                   className={`shrink-0 border-t border-zinc-100 px-2.5 py-1.5 text-[10.5px] leading-snug ${
                     failed ? "font-medium text-brand-red" : "text-zinc-400"

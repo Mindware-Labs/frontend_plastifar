@@ -23,6 +23,15 @@ export function slaPolicyPlazoLabel(policy: SlaPolicy): string {
   return policy.businessHoursOnly ? `${plazo} · horario laboral` : `${plazo} · 24/7`;
 }
 
+/** Política que mejor representa la prioridad del ticket (p. ej. al mostrar el SLA inicial). */
+export function resolveSlaPolicyIdForPriority(policies: SlaPolicy[], priority: string): string {
+  const ranked = sortSlaPolicies(policies);
+  const match =
+    ranked.find((p) => p.priority === priority && p.isDefault) ??
+    ranked.find((p) => p.priority === priority);
+  return match ? String(match.id) : pickDefaultSlaPolicyId(ranked);
+}
+
 export function pickDefaultSlaPolicyId(policies: SlaPolicy[]): string {
   if (policies.length === 0) return "";
   const normalDefault = policies.find((p) => p.isDefault && p.priority === "Normal");

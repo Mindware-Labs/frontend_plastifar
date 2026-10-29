@@ -20,6 +20,7 @@ import { controlBase, stateClasses } from "../../components/ui/fieldStyles";
 import { Spinner } from "../../components/ui/Spinner";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
+import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { departmentPathOptions } from "../../lib/departments";
 import type {
   DepartmentResponse,
@@ -59,6 +60,9 @@ interface CreateTicketModalProps {
 
 const FORM_ID = "create-ticket-form";
 
+/** Una línea inicial; crece con el contenido (reclamaciones / tareas). */
+const INITIAL_MESSAGE_LINE_MIN_PX = 42;
+
 /** Normaliza saltos de línea suaves en correos pegados para aprovechar el ancho. */
 function reflowPlainText(text: string): string {
   return text
@@ -72,14 +76,6 @@ function reflowPlainText(text: string): string {
         .trim(),
     )
     .join("\n\n");
-}
-
-/** Crece o encoge con el contenido: nunca queda con scroll propio. */
-function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
-  if (!textarea) return;
-  textarea.style.height = "auto";
-  const borderOffset = textarea.offsetHeight - textarea.clientHeight;
-  textarea.style.height = `${Math.max(textarea.scrollHeight + borderOffset, 96)}px`;
 }
 
 interface SectionHeadingProps {
@@ -183,7 +179,7 @@ export function CreateTicketModal({
 
   // Recalcula altura ante cambios manuales o programáticos del texto.
   useEffect(() => {
-    autoResizeTextarea(messageTextareaRef.current);
+    autoResizeTextarea(messageTextareaRef.current, INITIAL_MESSAGE_LINE_MIN_PX);
   }, [currentMessage]);
 
   useEffect(() => {
@@ -498,6 +494,7 @@ export function CreateTicketModal({
                       <SelectField
                         label="Motivo del ticket"
                         size="sm"
+                        searchable
                         value={field.value ?? ""}
                         onChange={field.onChange}
                         state={stateOf("topicId")}
@@ -521,6 +518,7 @@ export function CreateTicketModal({
                       <SelectField
                         label="Asignar a colaborador"
                         size="sm"
+                        searchable
                         value={field.value ?? ""}
                         onChange={field.onChange}
                         placeholder="Sin asignar, en cola general"
@@ -721,19 +719,20 @@ export function CreateTicketModal({
 
                 <textarea
                   id="ticket-initial-message"
+                  rows={1}
                   placeholder="Detalles de la incidencia, antecedentes o instrucciones para el equipo que atenderá el caso…"
-                  className={`${controlBase} ${stateClasses.idle} min-h-[96px] resize-none overflow-hidden px-3 py-2.5 text-[12.5px] leading-relaxed placeholder:text-zinc-400`}
+                  className={`${controlBase} ${stateClasses.idle} min-h-0 resize-none overflow-hidden px-3 py-2.5 text-[12.5px] leading-relaxed [field-sizing:content] placeholder:text-zinc-400`}
                   name={initialMessageField.name}
                   onChange={(event) => {
                     initialMessageField.onChange(event);
-                    autoResizeTextarea(event.target);
+                    autoResizeTextarea(event.target, INITIAL_MESSAGE_LINE_MIN_PX);
                   }}
                   onBlur={initialMessageField.onBlur}
                   ref={(el) => {
                     initialMessageField.ref(el);
                     messageTextareaRef.current = el;
                     // Ajuste de altura inicial tras carga diferida de catálogos.
-                    autoResizeTextarea(el);
+                    autoResizeTextarea(el, INITIAL_MESSAGE_LINE_MIN_PX);
                   }}
                 />
 

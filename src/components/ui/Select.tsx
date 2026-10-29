@@ -345,13 +345,13 @@ export function Select({
         onKeyDown={handleKeyDown}
         className={`w-full rounded-lg border outline-none transition-colors duration-150 cursor-pointer select-none
           disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-400
-          ${triggerVariantClass} ${sizeHeight} ${sizeTypography} ${paddingClass} ${wrapValue ? "items-start" : "items-center"}
+          ${triggerVariantClass} ${sizeHeight} ${sizeTypography} ${paddingClass} items-center
           ${centered ? "flex items-center justify-center gap-1.5" : "flex justify-between text-left"} font-medium
           ${selected ? "text-zinc-900" : "text-zinc-400"} ${buttonClassName}`}
       >
         <div
           className={`flex min-w-0 ${centered ? "flex-none justify-center" : "flex-1"} gap-1.5 ${
-            wrapValue ? "flex-wrap items-start overflow-visible" : "items-center overflow-hidden"
+            wrapValue ? "flex-wrap items-center overflow-visible" : "items-center overflow-hidden"
           }`}
           title={
             !wrapValue && selected
@@ -368,13 +368,13 @@ export function Select({
           ) : (
             leftIcon
           )}
-          <span className={`${wrapValue ? "min-w-0 whitespace-normal break-words" : "min-w-0 truncate"} leading-none`}>
+          <span className={`${wrapValue ? "min-w-0 whitespace-normal break-words" : "min-w-0 truncate"} leading-snug`}>
             {selected?.label ?? placeholder}
           </span>
           {selected?.hint && (
             <span
-              className={`inline-flex items-center gap-1 rounded-[5px] bg-zinc-100 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-600 border border-zinc-200/80 ${
-                wrapValue ? "max-w-full shrink-0 whitespace-normal break-words" : "min-w-0 shrink-[4]"
+              className={`inline-flex shrink-0 items-center gap-1 self-center rounded-[5px] bg-zinc-100 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase leading-none tracking-wider text-zinc-600 border border-zinc-200/80 ${
+                wrapValue ? "max-w-full whitespace-normal break-words" : "min-w-0 max-w-[55%] shrink-[4]"
               }`}
             >
               <Building className="h-2.5 w-2.5 shrink-0 text-zinc-400" />
@@ -386,9 +386,7 @@ export function Select({
           aria-hidden
           className={`${
             size === "xs" ? "h-3 w-3" : "h-4 w-4"
-          } shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
-            wrapValue ? "mt-0.5" : ""
-          } ${open ? "rotate-180 text-zinc-700" : ""}`}
+          } shrink-0 self-center text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-zinc-700" : ""}`}
         />
       </button>
 

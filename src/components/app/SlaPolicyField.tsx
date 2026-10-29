@@ -2,7 +2,7 @@ import { AlertCircle, Loader2, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FieldState } from "../ui/Field";
 import type { Priority, SlaPolicy } from "../../types/settings";
-import { filterSlaPolicies, slaPolicyPlazoLabel } from "../../lib/slaPolicyUi";
+import { filterSlaPolicies, findSlaPolicyById, slaPolicyPlazoLabel } from "../../lib/slaPolicyUi";
 
 const PRIORITY_DOT: Record<Priority, string> = {
   Emergencia: "bg-brand-red",
@@ -38,6 +38,9 @@ export interface SlaPolicyFieldProps {
   fieldLabel?: string;
   /** Borde superior tipo FormDivider (formulario de tareas). */
   sectionBorder?: boolean;
+  /** Solo lectura: muestra la política seleccionada sin permitir cambiarla. */
+  readOnly?: boolean;
+  readOnlyHint?: string;
 }
 
 export function SlaPolicyField({
@@ -56,6 +59,8 @@ export function SlaPolicyField({
   sectionTitle = "Política SLA",
   fieldLabel = "Compromiso SLA",
   sectionBorder = false,
+  readOnly = false,
+  readOnlyHint = "Compromiso fijado al crear el ticket; no se modifica desde aquí.",
 }: SlaPolicyFieldProps) {
   const [search, setSearch] = useState("");
   const [searchExpanded, setSearchExpanded] = useState(false);
@@ -79,7 +84,7 @@ export function SlaPolicyField({
 
   const listNeedsScroll = visiblePolicies.length > LIST_VIEWPORT_ITEMS;
 
-  const showSearchControl = Boolean(policies && policies.length > 0 && !loading);
+  const showSearchControl = Boolean(policies && policies.length > 0 && !loading && !readOnly);
   const compactSearch = embeddedSection;
 
   useEffect(() => {
@@ -259,47 +264,68 @@ export function SlaPolicyField({
     );
   }
 
+  const policiesToShow = readOnly
+    ? (() => {
+        const selected = findSlaPolicyById(policies ?? [], value);
+        return selected ? [selected] : [];
+      })()
+    : visiblePolicies;
+
+  function renderPolicyRow(policy: SlaPolicy, isSelected: boolean) {
+    const body = (
+      <>
+        <span className="flex w-full min-w-0 items-center gap-2">
+          <span
+            className={`size-2 shrink-0 rounded-full ${PRIORITY_DOT[policy.priority]}`}
+            aria-hidden
+          />
+          <span className="truncate font-heading text-[12px] leading-snug">{policy.name}</span>
+          {policy.isDefault && (
+            <span className="ml-auto shrink-0 rounded border border-zinc-200/90 bg-zinc-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-zinc-500">
+              Predeterminada
+            </span>
+          )}
+        </span>
+        <span
+          className={`pl-4 text-[10.5px] leading-snug ${isSelected ? "text-zinc-500" : "text-zinc-400"}`}
+        >
+          Prioridad {policy.priority.toLowerCase()} · {slaPolicyPlazoLabel(policy)}
+        </span>
+      </>
+    );
+
+    if (readOnly) {
+      return (
+        <div
+          key={policy.id}
+          className="flex w-full flex-col items-start gap-0.5 rounded-md border border-zinc-300 bg-white px-2.5 py-2 font-semibold text-zinc-900 shadow-2xs ring-1 ring-zinc-900/[0.07]"
+        >
+          {body}
+        </div>
+      );
+    }
+
+    return (
+      <button
+        key={policy.id}
+        type="button"
+        role="radio"
+        aria-checked={isSelected}
+        onClick={() => onChange(String(policy.id))}
+        className={`group flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-md border px-2.5 py-2 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 select-none outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/35 ${
+          isSelected
+            ? "border-zinc-300 bg-white font-semibold text-zinc-900 shadow-2xs ring-1 ring-zinc-900/[0.07] hover:border-zinc-400 hover:bg-white hover:shadow-md hover:ring-2 hover:ring-zinc-900/12 active:scale-[0.998]"
+            : "border-transparent font-medium text-zinc-600 hover:border-zinc-200/90 hover:bg-white hover:text-zinc-900 hover:shadow-2xs active:bg-zinc-50/80"
+        }`}
+      >
+        {body}
+      </button>
+    );
+  }
+
   const policyList = (
-    <div className="grid gap-1" role="presentation">
-      {visiblePolicies.map((policy) => {
-        const isSelected = value === String(policy.id);
-        return (
-          <button
-            key={policy.id}
-            type="button"
-            role="radio"
-            aria-checked={isSelected}
-            onClick={() => onChange(String(policy.id))}
-            className={`group flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-md border px-2.5 py-2 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 select-none outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/35 ${
-              isSelected
-                ? "border-zinc-300 bg-white font-semibold text-zinc-900 shadow-2xs ring-1 ring-zinc-900/[0.07] hover:border-zinc-400 hover:bg-white hover:shadow-md hover:ring-2 hover:ring-zinc-900/12 active:scale-[0.998]"
-                : "border-transparent font-medium text-zinc-600 hover:border-zinc-200/90 hover:bg-white hover:text-zinc-900 hover:shadow-2xs active:bg-zinc-50/80"
-            }`}
-          >
-            <span className="flex w-full min-w-0 items-center gap-2">
-              <span
-                className={`size-2 shrink-0 rounded-full ${PRIORITY_DOT[policy.priority]}`}
-                aria-hidden
-              />
-              <span className="truncate font-heading text-[12px] leading-snug">{policy.name}</span>
-              {policy.isDefault && (
-                <span className="ml-auto shrink-0 rounded border border-zinc-200/90 bg-zinc-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-zinc-500">
-                  Predeterminada
-                </span>
-              )}
-            </span>
-            <span
-              className={`pl-4 text-[10.5px] leading-snug transition-colors ${
-                isSelected
-                  ? "text-zinc-500 group-hover:text-zinc-600"
-                  : "text-zinc-400 group-hover:text-zinc-500"
-              }`}
-            >
-              Prioridad {policy.priority.toLowerCase()} · {slaPolicyPlazoLabel(policy)}
-            </span>
-          </button>
-        );
-      })}
+    <div className="grid gap-1" role={readOnly ? undefined : "presentation"}>
+      {policiesToShow.map((policy) => renderPolicyRow(policy, value === String(policy.id)))}
     </div>
   );
 
@@ -308,25 +334,29 @@ export function SlaPolicyField({
       {renderHeader()}
 
       <div
-        role="radiogroup"
-        aria-label={ariaLabel}
-        className={`rounded-lg border bg-zinc-50/70 p-1 ${ring}`}
+        role={readOnly ? undefined : "radiogroup"}
+        aria-label={readOnly ? undefined : ariaLabel}
+        className={`rounded-lg border bg-zinc-50/70 p-1 ${readOnly ? "border-zinc-200" : ring}`}
       >
-        {visiblePolicies.length === 0 ? (
+        {policiesToShow.length === 0 ? (
           <p className="px-2.5 py-3 text-center text-[12px] text-zinc-500">
-            Ninguna política coincide con la búsqueda.
+            {readOnly ? "No se pudo mostrar la política SLA inicial." : "Ninguna política coincide con la búsqueda."}
           </p>
-        ) : listNeedsScroll ? (
+        ) : readOnly || !listNeedsScroll ? (
+          policyList
+        ) : (
           <div
             className="no-scrollbar min-h-0 overflow-y-auto overscroll-contain"
             style={{ maxHeight: listScrollCapHeight }}
           >
             {policyList}
           </div>
-        ) : (
-          policyList
         )}
       </div>
+
+      {readOnly && readOnlyHint ? (
+        <p className="text-[11px] leading-snug text-zinc-400">{readOnlyHint}</p>
+      ) : null}
 
       {error && (
         <p className="flex items-center gap-1 text-[11px] font-medium text-brand-red-dark animate-plf-shake">

@@ -19,6 +19,12 @@ export type DisclosureDirection = "down" | "up";
 interface DisclosureMotionOptions {
   /** Hacia dónde se despliega el panel respecto a su disparador. */
   direction?: DisclosureDirection;
+  openMs?: number;
+  closeMs?: number;
+  /** Misma curva spring en cierre que en apertura (más coherente en popovers densos). */
+  symmetricEasing?: boolean;
+  /** Escalonado de `[data-motion-item]`; desactivar si el contenido cambia de alto al abrir. */
+  itemStagger?: boolean;
 }
 
 interface DisclosureMotion<T extends HTMLElement> {
@@ -38,7 +44,13 @@ function closedFrame(direction: DisclosureDirection, distance: number, scale: nu
 
 export function useDisclosureMotion<T extends HTMLElement>(
   open: boolean,
-  { direction = "down" }: DisclosureMotionOptions = {},
+  {
+    direction = "down",
+    openMs = OPEN_MS,
+    closeMs = CLOSE_MS,
+    symmetricEasing = false,
+    itemStagger = true,
+  }: DisclosureMotionOptions = {},
 ): DisclosureMotion<T> {
   const [exiting, setExiting] = useState(false);
   const [snapping, setSnapping] = useState(false);
@@ -46,12 +58,17 @@ export function useDisclosureMotion<T extends HTMLElement>(
   const ref = useRef<T>(null);
   const panelAnim = useRef<Animation | null>(null);
   const itemAnims = useRef<Animation[]>([]);
+  /** Evita reiniciar la animación si el anclaje cambia de arriba/abajo con el panel abierto. */
+  const directionRef = useRef(direction);
 
   // La salida se decide en el propio render del cierre: si esperase al efecto, el panel ya estaría desmontado.
   if (open !== prevOpen) {
+    if (open) directionRef.current = direction;
     setPrevOpen(open);
     setExiting(!open && !snapping);
     if (snapping) setSnapping(false);
+  } else if (!open && !exiting) {
+    directionRef.current = direction;
   }
 
   const snap = useCallback(() => {
@@ -67,23 +84,26 @@ export function useDisclosureMotion<T extends HTMLElement>(
     const el = ref.current;
     if (!el) return;
 
+    const dir = directionRef.current;
     const reduced = prefersReducedMotion();
     const running = panelAnim.current;
-    const from = running ? capture(el) : open ? closedFrame(direction, 6, 0.965, reduced) : OPEN_FRAME;
+    const from = running ? capture(el) : open ? closedFrame(dir, 5, 0.972, reduced) : OPEN_FRAME;
     // La opacidad pintada mide cuánto camino queda: la duración se escala con él.
     const progress = Number(from.opacity);
     running?.cancel();
 
+    const closeEasing = symmetricEasing && !reduced ? getSpringEasing() : CLOSE_EASING;
+
     if (open) {
       const anim = el.animate([from, OPEN_FRAME], {
-        duration: reduced ? REDUCED_OPEN_MS : Math.max(120, Math.round(OPEN_MS * (1 - progress))),
+        duration: reduced ? REDUCED_OPEN_MS : Math.max(120, Math.round(openMs * (1 - progress))),
         easing: reduced ? "ease-out" : getSpringEasing(),
         fill: "both",
       });
       panelAnim.current = anim;
       releaseOnFinish(anim, panelAnim);
 
-      if (!running && !reduced) {
+      if (itemStagger && !running && !reduced) {
         const items = el.querySelectorAll<HTMLElement>("[data-motion-item]");
         itemAnims.current = Array.from(items, (item, index) =>
           item.animate([{ opacity: 0, transform: "translateY(-3px)" }, OPEN_FRAME], {
@@ -101,9 +121,9 @@ export function useDisclosureMotion<T extends HTMLElement>(
     for (const anim of itemAnims.current) anim.finish();
     itemAnims.current = [];
 
-    const anim = el.animate([from, closedFrame(direction, 4, 0.98, reduced)], {
-      duration: reduced ? REDUCED_CLOSE_MS : Math.max(60, Math.round(CLOSE_MS * progress)),
-      easing: CLOSE_EASING,
+    const anim = el.animate([from, closedFrame(dir, 3, 0.985, reduced)], {
+      duration: reduced ? REDUCED_CLOSE_MS : Math.max(80, Math.round(closeMs * progress)),
+      easing: closeEasing,
       fill: "both",
     });
     panelAnim.current = anim;
@@ -112,7 +132,7 @@ export function useDisclosureMotion<T extends HTMLElement>(
       panelAnim.current = null;
       setExiting(false);
     };
-  }, [open, direction]);
+  }, [open, closeMs, itemStagger, openMs, symmetricEasing]);
 
   return { mounted: open || exiting, exiting, ref, snap };
 }
