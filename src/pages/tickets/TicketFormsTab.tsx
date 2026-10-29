@@ -33,11 +33,6 @@ import { Spinner } from "../../components/ui/Spinner";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDay } from "../../lib/dates";
-import { DocumentDropdown } from "../../components/app/DocumentDropdown";
-import { exportClaimToExcel } from "../../lib/claimExcelExport";
-import { exportDiscrepancyToExcel } from "../../lib/discrepancyExcelExport";
-import { exportHcaToExcel } from "../../lib/hcaExcelExport";
-import { exportWithdrawalToExcel } from "../../lib/withdrawalExcelExport";
 import { buildHcaHechoText, hcaProductLabel } from "../../lib/hcaForm109";
 import { formatAmount } from "../../lib/numbers";
 import { isPlanItemOverdue, isPlanItemSettled } from "../../lib/quality";
@@ -130,25 +125,6 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
 
 
 
-  useEffect(() => {
-    const formToOpen = searchParams.get("openForm");
-    if (!formToOpen) return;
-
-    const next = new URLSearchParams(searchParams);
-    next.delete("openForm");
-    setSearchParams(next, { replace: true });
-
-    if (formToOpen === "Reclamacion" || formToOpen.toLowerCase() === "reclamacion") {
-      handleOpenNewClaim();
-    } else if (formToOpen === "RetiroMercancia" || formToOpen.toLowerCase().includes("retiro")) {
-      handleOpenNewWithdrawal();
-    } else if (formToOpen === "DiscrepanciaCarga" || formToOpen.toLowerCase().includes("discrepancia")) {
-      handleOpenNewDiscrepancy();
-    } else if (formToOpen === "Hca" || formToOpen.toLowerCase() === "hca") {
-      handleOpenNewHca();
-    }
-  }, [searchParams]);
-
   // Modal open states
   const [claimModalOpen, setClaimModalOpen] = useState(false);
   const [editingClaim, setEditingClaim] = useState<CustomerClaim | undefined>(undefined);
@@ -187,6 +163,54 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   const [hcaInitialDefaults, setHcaInitialDefaults] = useState<{ clientId: number; ticketId: number | null; description?: string } | undefined>(undefined);
   const [hcaPlanBySheetId, setHcaPlanBySheetId] = useState<Record<number, ActionPlanItem[] | undefined>>({});
 
+  // Helpers to start new forms
+  const handleOpenNewClaim = (initData?: typeof claimInitialData) => {
+    setEditingClaim(undefined);
+    setClaimInitialData(initData);
+    setClaimModalOpen(true);
+  };
+
+  const handleOpenNewWithdrawal = (initLines?: typeof withdrawalInitialLines) => {
+    setEditingWithdrawal(undefined);
+    setWithdrawalInitialLines(initLines);
+    setWithdrawalModalOpen(true);
+  };
+
+  const handleOpenNewDiscrepancy = (initData?: typeof discrepancyInitialData) => {
+    setEditingDiscrepancy(undefined);
+    setDiscrepancyInitialData(initData);
+    setDiscrepancyModalOpen(true);
+  };
+
+  const handleOpenNewHca = (initDefaults?: typeof hcaInitialDefaults) => {
+    setEditingHca(undefined);
+    setHcaInitialDefaults(initDefaults ?? {
+      clientId: ticket.clientId ?? 0,
+      ticketId: ticket.id,
+      description: ticket.subject,
+    });
+    setHcaModalOpen(true);
+  };
+
+  useEffect(() => {
+    const formToOpen = searchParams.get("openForm");
+    if (!formToOpen) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("openForm");
+    setSearchParams(next, { replace: true });
+
+    if (formToOpen === "Reclamacion" || formToOpen.toLowerCase() === "reclamacion") {
+      handleOpenNewClaim();
+    } else if (formToOpen === "RetiroMercancia" || formToOpen.toLowerCase().includes("retiro")) {
+      handleOpenNewWithdrawal();
+    } else if (formToOpen === "DiscrepanciaCarga" || formToOpen.toLowerCase().includes("discrepancia")) {
+      handleOpenNewDiscrepancy();
+    } else if (formToOpen === "Hca" || formToOpen.toLowerCase() === "hca") {
+      handleOpenNewHca();
+    }
+  }, [searchParams]);
+
   // Migration modal state
   const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const [migratingFromSource, setMigratingFromSource] = useState<{
@@ -197,12 +221,13 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   const [migrationTargetType, setMigrationTargetType] = useState<EnterpriseFormType>("reclamacion");
   const [migrateCommonFields, setMigrateCommonFields] = useState(true);
 
-  // Load product lines for HCA
+  // Load product lines for HCA only when HCA sheets exist
   useEffect(() => {
+    if (sheets.length === 0 || productLines.length > 0) return;
     fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize }))
       .then(setProductLines)
       .catch(() => setProductLines([]));
-  }, []);
+  }, [sheets.length, productLines.length]);
 
   const fetchAllForms = async () => {
     setLoading(true);
@@ -363,23 +388,6 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     return "";
   };
 
-  const handleExportExcel = async (form: NonNullable<typeof activeForm>) => {
-    try {
-      if (form.type === "discrepancia") {
-        await exportDiscrepancyToExcel(form.data as DiscrepancyDetail);
-      } else if (form.type === "reclamacion") {
-        await exportClaimToExcel(form.data as CustomerClaim);
-      } else if (form.type === "retiro") {
-        await exportWithdrawalToExcel(form.data as MerchandiseWithdrawal);
-      } else if (form.type === "hca") {
-        const s = form.data as CorrectiveActionSheet;
-        await exportHcaToExcel(s, hcaPlanBySheetId[s.id]);
-      }
-    } catch (err) {
-      console.error("Error al exportar Excel:", err);
-    }
-  };
-
   // Suggested form from ticket topic
   const suggestedFormRaw = ticket.topicSuggestedForm; // "Reclamacion" | "RetiroMercancia" | "DiscrepanciaCarga" | "Hca" | null
 
@@ -448,35 +456,6 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       return 0;
     });
   }, [suggestedFormRaw, canWriteClaims, canWriteWithdrawals, canWriteDiscrepancies, canWriteQuality]);
-
-    // Helpers to start new forms
-  const handleOpenNewClaim = (initData?: typeof claimInitialData) => {
-    setEditingClaim(undefined);
-    setClaimInitialData(initData);
-    setClaimModalOpen(true);
-  };
-
-  const handleOpenNewWithdrawal = (initLines?: typeof withdrawalInitialLines) => {
-    setEditingWithdrawal(undefined);
-    setWithdrawalInitialLines(initLines);
-    setWithdrawalModalOpen(true);
-  };
-
-  const handleOpenNewDiscrepancy = (initData?: typeof discrepancyInitialData) => {
-    setEditingDiscrepancy(undefined);
-    setDiscrepancyInitialData(initData);
-    setDiscrepancyModalOpen(true);
-  };
-
-  const handleOpenNewHca = (initDefaults?: typeof hcaInitialDefaults) => {
-    setEditingHca(undefined);
-    setHcaInitialDefaults(initDefaults ?? {
-      clientId: ticket.clientId ?? 0,
-      ticketId: ticket.id,
-      description: ticket.subject,
-    });
-    setHcaModalOpen(true);
-  };
 
   // Helper to trigger form migration
   const handleTriggerMigration = (currentForm: NonNullable<typeof activeForm>) => {
@@ -899,35 +878,18 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                     Llenar otro formulario
                   </Button>
 
-                  {activeForm.type === "reclamacion" ||
-                  activeForm.type === "retiro" ||
-                  activeForm.type === "discrepancia" ||
-                  activeForm.type === "hca" ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        const path = getPrintPath(activeForm);
-                        if (path) window.open(`${path}?mode=pdf`, "_blank");
-                      }}
-                      title="Abrir la salida del documento oficial (Excel, PDF e impresión)"
-                    >
-                      <FileText className="size-3.5 mr-1 text-zinc-600" />
-                      Documento
-                    </Button>
-                  ) : (
-                    <DocumentDropdown
-                      onExportExcel={() => handleExportExcel(activeForm)}
-                      onExportPdf={() => {
-                        const path = getPrintPath(activeForm);
-                        if (path) window.open(`${path}?mode=pdf`, "_blank");
-                      }}
-                      onPrint={() => {
-                        const path = getPrintPath(activeForm);
-                        if (path) window.open(`${path}?mode=print`, "_blank");
-                      }}
-                    />
-                  )}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      const path = getPrintPath(activeForm);
+                      if (path) window.open(`${path}?mode=pdf`, "_blank");
+                    }}
+                    title="Abrir la salida del documento oficial (Excel, PDF e impresión)"
+                  >
+                    <FileText className="size-3.5 mr-1 text-zinc-600" />
+                    Documento
+                  </Button>
 
                   {/* Dropdown with more options */}
                   <div className="relative" ref={actionsMenuContainerRef}>

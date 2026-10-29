@@ -4,9 +4,7 @@ import { downloadWorkbook } from "./hcaExcelExport";
 import { formatQuantity } from "./numbers";
 import { splitIsoDate } from "./withdrawals";
 
-/**
- * Exporta una solicitud de retiro de mercancía en la plantilla oficial PF-FOR-068 (FR-Retiro de Mercancia).
- */
+/** Exporta una solicitud de retiro de mercancía en la plantilla oficial PF-FOR-068 (FR-Retiro de Mercancia). */
 export async function exportWithdrawalToExcel(
   input: WithdrawalDetail | MerchandiseWithdrawal | number,
 ): Promise<void> {

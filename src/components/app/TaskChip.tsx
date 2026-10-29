@@ -213,7 +213,7 @@ export function TaskChip({
       </Tooltip>
 
       <PopoverContent align="end" sideOffset={6} className="w-80 p-3.5">
-        <LinkedTasksPanel tasks={tasks} onCreate={onCreate} compact />
+        <LinkedTasksPanel tasks={tasks} onCreate={onCreate} />
       </PopoverContent>
     </Popover>
   );
@@ -222,15 +222,14 @@ export function TaskChip({
 interface LinkedTasksPanelProps {
   tasks: EmailLinkedTask[];
   onCreate?: () => void;
-  compact?: boolean;
 }
 
-function LinkedTasksPanel({ tasks, onCreate, compact = false }: LinkedTasksPanelProps) {
+function LinkedTasksPanel({ tasks, onCreate }: LinkedTasksPanelProps) {
   const allClosed = tasks.every((t) => !isOpenStatus(t.status));
 
   return (
     <div className="space-y-3">
-      <div className={`flex items-center gap-2.5 ${compact ? "" : "border-b border-line-soft pb-2.5"}`}>
+      <div className="flex items-center gap-2.5">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-brand-red/20 bg-brand-red/8 text-brand-red shadow-2xs">
           <ListTodo className="h-4 w-4" />
         </span>

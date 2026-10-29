@@ -1,5 +1,4 @@
 import { Check, Clock, ListTodo, Slash, Timer } from "lucide-react";
-import type { ReactNode } from "react";
 import { Badge } from "../../components/ui/Badge";
 import type { FilterOption } from "../../components/ui/FilterDropdown";
 import type { SelectOption } from "../../components/ui/Select";
@@ -14,22 +13,6 @@ const statusLabel: Record<string, string> = {
 
 export function taskStatusLabel(status: TaskStatus | string) {
   return statusLabel[status] ?? status;
-}
-
-export function getTaskStatusIcon(status: TaskStatus | string, className = "size-3"): ReactNode {
-  switch (status) {
-    case "Pendiente":
-      return <Clock aria-hidden className={`${className} text-zinc-400`} strokeWidth={2} />;
-    case "EnProgreso":
-    case "En progreso":
-      return <Timer aria-hidden className={`${className} text-amber-600`} strokeWidth={2} />;
-    case "Completada":
-      return <Check aria-hidden className={`${className} text-emerald-600`} strokeWidth={2.5} />;
-    case "Cancelada":
-      return <Slash aria-hidden className={`${className} text-zinc-400`} strokeWidth={2} />;
-    default:
-      return <ListTodo aria-hidden className={`${className} text-zinc-400`} strokeWidth={2} />;
-  }
 }
 
 /** Pastillas de estado con icono distintivo para cada estado. */

@@ -39,15 +39,13 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
   const titleId = useId();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Métricas del cuerpo
   const stats = useMemo(() => {
     const trimmed = body.trim();
     const words = trimmed ? trimmed.split(/\s+/).length : 0;
     const chars = body.length;
-    const paragraphs = trimmed ? trimmed.split(/\n{2,}/).length : 0;
-    return { words, chars, paragraphs };
+    return { words, chars };
   }, [body]);
 
   const handleSave = useCallback(async () => {
@@ -191,7 +189,6 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
 
             {/* Cerrar */}
             <button
-              ref={closeButtonRef}
               type="button"
               onClick={requestClose}
               aria-label="Cerrar estudio"

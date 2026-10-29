@@ -1,8 +1,4 @@
-// Espejo de api/Dtos/ClaimDtos.cs (docs/plan/03, sección 6).
-//
-// Las enumeraciones viajan como texto legible, tal como las escribe el
-// PF-FOR-034. Los nombres de cliente, contacto y departamento llegan resueltos
-// desde el ticket: el formulario no los duplica.
+// Espejo de api/Dtos/ClaimDtos.cs; las enumeraciones viajan como texto legible del PF-FOR-034.
 
 export const CLAIM_AREAS = ["Calidad", "Almacén", "Ventas"] as const;
 

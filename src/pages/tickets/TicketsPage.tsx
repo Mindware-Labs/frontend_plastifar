@@ -463,8 +463,7 @@ export function TicketsPage() {
     const allowed = departmentOptions.some((option) => Number(option.value) === departmentId);
     if (!allowed) setDepartmentId("todos");
   }, [departmentId, departmentOptions]);
-  // Dos departamentos pueden llamarse igual bajo padres distintos: la columna
-  // rotula con el camino, como el filtro, y cae al nombre si el id no está.
+  // Rotula cada departamento con su ruta jerárquica para distinguir nombres repetidos y cae al nombre si falta el id.
   const departmentPathById = departmentPaths(departments);
 
   const priorityFilterOpts = priorityFilterOptions() as TicketFilterOption[];
@@ -874,9 +873,9 @@ export function TicketsPage() {
       {createModalOpen && (
         <CreateTicketModal
           onClose={() => setCreateModalOpen(false)}
-          onCreated={(created, targetUrl) => {
+          onCreated={(created) => {
             refresh();
-            navigate(targetUrl || `/tickets/${created.id}`);
+            navigate(`/tickets/${created.id}`);
             receipts.done({
               action: "crear-ticket",
               title: "Ticket creado",

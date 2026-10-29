@@ -23,11 +23,13 @@ export function SendValidationButton({
   onFocusField,
   label = "Enviar",
   icon = <Send className="h-[14px] w-[14px]" />,
+  size,
   className = "",
 }: SendValidationButtonProps) {
   return (
     <SubmitValidationButton
       appearance="send"
+      size={size}
       ready={ready}
       busy={sending}
       missingItems={missingItems}

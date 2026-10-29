@@ -115,40 +115,13 @@ export interface DepartmentResponse {
   id: number;
   name: string;
   isActive: boolean;
-  /**
-   * Departamento padre, o `null` en los de primer nivel.
-   *
-   * La operación real no tiene cuatro departamentos planos sino más de
-   * veinticinco en dos niveles —«VENTAS INTERNACIONALES / Florida»,
-   * «PLASTIFAR CENTROAMERICA / Compras»—, y el sistema al que este panel
-   * reemplaza ya los modela así.
-   *
-   * Es OPCIONAL a propósito: mientras el servidor no lo envíe, todo el panel
-   * sigue funcionando exactamente como hoy, con la lista plana. El día que
-   * empiece a enviarlo, la jerarquía aparece sola en los selectores y en los
-   * filtros. Así el frontend deja de ser lo que bloquea el cambio.
-   */
+  /** Departamento padre, o `null` en los de primer nivel (opcional mientras el servidor no lo envíe). */
   parentId?: number | null;
-  /**
-   * Colaboradores cuyo departamento primario es este.
-   *
-   * Opcional por la misma razón que `parentId`: un desplegable no lo necesita y
-   * no debe romperse si algún día llega recortado. La pantalla de
-   * administración sí lo usa, porque es la mitad de la consecuencia de un
-   * departamento —a cuánta gente afecta lo que se decida sobre él— y enterarse
-   * por un 409 después de pulsar «Eliminar» es enterarse tarde.
-   */
+  /** Colaboradores cuyo departamento primario es este (usado en la pantalla de administración). */
   staffCount?: number;
-  /**
-   * Tipo del departamento en la operación real. Se guarda y se muestra; todavía
-   * no cambia ninguna regla de visibilidad. Opcional por la misma razón que el
-   * resto: un desplegable no lo necesita.
-   */
+  /** Tipo del departamento en la operación real (opcional en desplegables). */
   type?: DepartmentType;
-  /**
-   * Rol que la operación asigna al departamento. Es un dato guardado, no un
-   * permiso: lo que cada persona puede sale del rol de su acceso.
-   */
+  /** Rol por defecto asignado al departamento (dato informativo, no permiso efectivo). */
   defaultRoleId?: number | null;
   defaultRoleName?: string | null;
   mailboxId?: number | null;
@@ -200,14 +173,7 @@ export const DEPARTMENT_TYPES: { value: DepartmentType; label: string }[] = [
   { value: "Privado", label: "Privado" },
 ];
 
-/**
- * Alta o movimiento de un departamento.
- *
- * `parentId` es el campo con consecuencias: no reordena un renglón del
- * organigrama, redefine sobre qué puede la gente que tiene un rol en el nuevo
- * padre. El servidor lo valida de nuevo —que el padre exista y que el
- * movimiento no cierre un ciclo— porque esta capa es una cortesía.
- */
+/** Alta o movimiento de un departamento (`parentId` redefine la jerarquía de permisos). */
 export interface SaveDepartmentRequest {
   name: string;
   parentId: number | null;
@@ -486,8 +452,6 @@ export interface TicketListItemResponse {
   createdAt: string;
   updatedAt: string;
   products?: TicketProductResponse[];
-  topicSuggestedForm?: string | null;
-  topicSuggestedFormLabel?: string | null;
   /** full | readOnly — alcance sobre este ticket según departamento y reglas transversales. */
   accessLevel?: "full" | "readOnly" | null;
 }
@@ -631,9 +595,6 @@ export interface TicketDetailResponse {
   topicSuggestedForm?: string | null;
   topicSuggestedFormLabel?: string | null;
   accessLevel?: "full" | "readOnly" | null;
-  // Campos retrocompatibles
-  code?: string;
-  source?: string;
 }
 
 export interface TicketInboxTabResponse {
@@ -719,13 +680,6 @@ export interface TicketTaskResponse {
   updatedAt: string;
   attachments: TicketTaskAttachmentResponse[];
   comments: TicketTaskCommentResponse[];
-}
-
-export interface CreateTicketTaskRequest {
-  title: string;
-  description?: string | null;
-  assignedStaffId?: number | null;
-  dueDate?: string | null;
 }
 
 export interface UpdateTicketTaskRequest {

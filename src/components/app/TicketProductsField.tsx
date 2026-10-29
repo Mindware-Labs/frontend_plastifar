@@ -21,10 +21,7 @@ interface TicketProductsFieldProps {
   pickerLabel?: string;
 }
 
-/**
- * Selector de productos del catálogo para tickets:
- * buscador único + chips debajo con los artículos vinculados.
- */
+/** Selector de productos del catálogo para tickets: buscador único + chips con los artículos vinculados. */
 export function TicketProductsField({
   value,
   onChange,

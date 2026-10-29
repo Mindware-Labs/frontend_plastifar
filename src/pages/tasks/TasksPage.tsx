@@ -131,7 +131,7 @@ export function TasksPage() {
     fallbackError: "No se pudieron cargar las tareas",
   });
 
-  const rows = data?.items ?? [];
+  const rows = useMemo(() => data?.items ?? [], [data?.items]);
   const counts = data?.counts;
 
   // Multi-row selection
@@ -489,7 +489,6 @@ export function TasksPage() {
               detail: `${saved.number} · ${saved.title}`,
             });
             navigate(`/tareas/${saved.id}`);
-            refresh();
           }}
         />
       )}

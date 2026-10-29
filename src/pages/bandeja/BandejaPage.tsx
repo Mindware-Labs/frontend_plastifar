@@ -340,7 +340,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const [editingAlerts, setEditingAlerts] = useState(false);
   const lastToggled = useRef<number | null>(null);
   const [params, setParams] = useSearchParams();
-  const { counts, refresh: refreshCounts, onInboxChanged } = useEmailCounts();
+  const { counts, setFolderCounts, onInboxChanged } = useEmailCounts();
   const receipts = useReceipts();
   const { can } = usePermissions();
   const canMailSend = can("mail.send");
@@ -371,6 +371,10 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   );
 
   useLoadErrorReceipt(error, "bandeja-list", refresh);
+
+  useEffect(() => {
+    if (data?.folderCounts) setFolderCounts(data.folderCounts);
+  }, [data?.folderCounts, setFolderCounts]);
 
   // El aviso llega en cualquier momento: se guarda la recarga vigente para no resuscribirse.
   const refreshRef = useRef(refresh);
@@ -414,7 +418,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
   function refreshAll() {
     refresh();
-    refreshCounts();
   }
 
   // Un correo movido a otra carpeta ya no pertenece a esta vista: se cierra el panel de lectura.
@@ -449,7 +452,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     try {
       await emailsApi.toggleStar(id, nextStarred);
       refresh();
-      refreshCounts();
     } catch {
       receipts.failed({
         action: "destacar",
@@ -1009,7 +1011,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                     onMoved={handleMoved}
                     onStarred={(starred) => {
                       refresh();
-                      refreshCounts();
                       if (folder === "starred" && !starred) {
                         setSelectedId(null);
                       }

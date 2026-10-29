@@ -51,7 +51,7 @@ type FormValues = z.infer<typeof schema>;
 
 interface CreateTicketModalProps {
   onClose: () => void;
-  onCreated: (ticket: TicketSummaryResponse, targetUrl?: string) => void;
+  onCreated: (ticket: TicketSummaryResponse) => void;
   emailId?: number;
   initialSubject?: string;
   initialMessage?: string;
@@ -237,11 +237,7 @@ export function CreateTicketModal({
       .finally(() => setLoadingCatalogs(false));
   }, [senderEmail, initialClientId, setValue]);
 
-  /* El catálogo trae sólo los departamentos a los que la persona tiene alcance,
-     con id y nombre. El nombre ya no es único —hay un «ALMACEN» de primer nivel
-     y otro bajo PLASTIFAR CENTROAMERICA—, así que el camino se resuelve contra
-     el árbol entero, inactivos incluidos para no cortar la cadena de padres.
-     Si esta lectura falla, las opciones siguen saliendo con su nombre. */
+  // Carga el árbol completo de departamentos (incluidos inactivos) para resolver rutas jerárquicas de nombres repetidos.
   useEffect(() => {
     departmentsApi
       .list({ includeInactive: true })

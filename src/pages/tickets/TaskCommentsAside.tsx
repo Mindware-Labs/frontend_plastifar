@@ -17,11 +17,7 @@ const APPLE_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
 const ENTER_MS = 480;
 const EXIT_MS = 320;
 
-/**
- * Fotogramas cerrado/abierto del panel. En escritorio el panel es una columna: se anima su
- * ancho y su margen para que la lista de tareas ceda y recupere el espacio de forma continua,
- * en lugar de saltar. En pantallas estrechas (apilado) solo se desliza y se desvanece.
- */
+/** Fotogramas cerrado/abierto del panel: anima ancho y margen en escritorio, o desplazamiento y opacidad en móvil. */
 function panelFrames(el: HTMLElement): [Keyframe, Keyframe] {
   if (window.matchMedia("(min-width: 1024px)").matches) {
     const style = getComputedStyle(el);
@@ -46,7 +42,6 @@ interface TaskCommentsAsideProps {
   onClose: () => void;
   onCommentAdded: (taskId: number, comment: TicketTaskCommentResponse) => void;
   className?: string;
-  targetHeight?: number | null;
 }
 
 export interface TaskCommentsAsideHandle {
@@ -64,7 +59,6 @@ export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskComment
       onClose,
       onCommentAdded,
       className = "",
-      targetHeight,
     },
     ref,
   ) {
@@ -162,10 +156,7 @@ export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskComment
       aria-label="Comentarios de la tarea"
       className={className}
     >
-      <div
-        style={targetHeight ? { height: `${targetHeight}px` } : undefined}
-        className="flex flex-col h-[520px] max-h-[calc(100vh-6rem)] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xs lg:min-w-[360px]"
-      >
+      <div className="flex flex-col h-[520px] max-h-[calc(100vh-6rem)] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xs lg:min-w-[360px]">
         {/* Cabecera del panel lateral: Comentarios al extremo izquierdo, X al extremo derecho */}
         <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-zinc-100 px-3.5 bg-white">
           <div className="flex items-center gap-2 min-w-0">

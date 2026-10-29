@@ -40,10 +40,7 @@ export function getCachedTicketInfo(id: number) {
   return ticketCache.get(id);
 }
 
-/**
- * Búsqueda de tickets para ligar la investigación. Mismo adaptador que el
- * resto de los `LookupField`: veinte como mucho, y se invita a acotar.
- */
+/** Búsqueda de tickets para ligar la investigación (hasta 20 resultados). */
 export async function searchTickets(term: string): Promise<LookupResult> {
   const { items, total } = await ticketsApi.list({ page: 1, pageSize: 20, search: term || undefined });
   items.forEach((ticket) => {

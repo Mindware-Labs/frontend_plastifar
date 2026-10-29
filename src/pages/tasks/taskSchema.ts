@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-export const TASK_PRIORITIES = ["Emergencia", "Alta", "Normal", "Baja"] as const;
 export const OPEN_TASK_STATUSES = ["Pendiente", "EnProgreso"] as const;
 
 const calendarDate = z
@@ -89,8 +88,4 @@ export function isPastDueDate(date: string, time?: string, referenceNow: Date = 
     }
   }
   return false;
-}
-
-export function dueDateFromApi(value: string | null): string {
-  return parseDueDateFromApi(value).date;
 }

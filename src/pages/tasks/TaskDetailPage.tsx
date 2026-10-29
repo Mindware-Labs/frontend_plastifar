@@ -83,11 +83,7 @@ function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }
   );
 }
 
-/**
- * Limita la altura del cuerpo al borde inferior de otro elemento (`alignToId`).
- * Si el contenido no excede ese límite se muestra completo; si lo excede, se recorta
- * con un aviso para hacer clic y ver las instrucciones completas (`onExpand`).
- */
+/** Limita la altura del cuerpo al borde inferior de otro elemento y ofrece expandir si excede. */
 function AlignedClampBody({
   alignToId,
   onExpand,
@@ -450,9 +446,6 @@ export function TaskDetailPage() {
 
             <div className="mt-3.5">
               <div key={activeTab} className="animate-plf-apple-tab">
-                {/* ─────────────────────────────────────────────────────────────
-                    TAB 1: DATOS / RESUMEN
-                ─────────────────────────────────────────────────────────────── */}
                 {activeTab === "datos" && (
                   <div className="space-y-3.5">
                     {/* 1. Métricas rápidas superiores (4 tarjetas compactas tipo SaaS) */}
@@ -892,9 +885,6 @@ export function TaskDetailPage() {
                   </div>
                 )}
 
-                {/* ─────────────────────────────────────────────────────────────
-                    TAB 2: NOTAS
-                ─────────────────────────────────────────────────────────────── */}
                 {activeTab === "notas" && (
                   <div className="space-y-2.5">
                     {task.comments.length === 0 ? (
@@ -993,9 +983,6 @@ export function TaskDetailPage() {
                   </div>
                 )}
 
-                {/* ─────────────────────────────────────────────────────────────
-                    TAB 3: ADJUNTOS
-                ─────────────────────────────────────────────────────────────── */}
                 {activeTab === "adjuntos" && (
                   <div className="space-y-3">
                     {isClosed ? (
@@ -1153,7 +1140,6 @@ export function TaskDetailPage() {
         </div>
       </div>
 
-      {/* Modales de Edición, Cierre y Cancelación/Reapertura */}
       {editing && (
         <TaskFormModal
           task={task}
@@ -1166,7 +1152,6 @@ export function TaskDetailPage() {
               title: "Tarea actualizada",
               detail: `${saved.number} · ${saved.title}`,
             });
-            void load();
           }}
         />
       )}
@@ -1183,7 +1168,6 @@ export function TaskDetailPage() {
               title: "Tarea completada",
               detail: `${saved.number} quedó registrada como completada.`,
             });
-            void load();
           }}
         />
       )}
@@ -1202,7 +1186,6 @@ export function TaskDetailPage() {
               title: isReopen ? "Tarea reabierta" : "Tarea cancelada",
               detail: `${saved.number} actualizada correctamente.`,
             });
-            void load();
           }}
         />
       )}

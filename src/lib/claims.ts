@@ -1,9 +1,4 @@
-// Cálculo y texto de la reclamación de clientes, sin React dentro.
-//
-// Las fórmulas son las del PF-FOR-034 (docs/plan/03, sección 8, regla 2):
-// diferencia = facturados − recibidos, total = diferencia × precio. La pantalla
-// las muestra mientras se escribe; el valor guardado es el que calcula el
-// servidor (regla 6). Espejo de `ClaimRules.Compute` en el backend.
+// Cálculo y texto de la reclamación de clientes (PF-FOR-034), espejo de ClaimRules.Compute.
 
 import type { ClaimStatus } from "../types/claims";
 

@@ -1,22 +1,11 @@
-// Cálculo y texto de la solicitud de retiro de mercancía, sin React dentro.
-//
-// Valor = cantidad × precio; sin precio, sin valor; total = suma de las líneas
-// con valor (docs/plan/04, regla 5). La pantalla lo muestra mientras se
-// escribe; el valor guardado es el que calcula el servidor. Espejo de
-// `WithdrawalRules.Compute` y `WithdrawalRules.Total` en el backend.
+// Cálculo y texto de la solicitud de retiro de mercancía (PF-FOR-068), espejo de WithdrawalRules.
 
 import type { WithdrawalStatus } from "../types/withdrawals";
 
-/**
- * Lo más que cabe en el valor de una línea y en el total: numeric(14,2) en
- * la base, `WithdrawalRules.MaxAmount` en el servidor.
- */
+/** Máximo admisible en el valor de una línea y en el total: numeric(14,2) en la base. */
 export const MAX_WITHDRAWAL_AMOUNT = 999_999_999_999.99;
 
-/**
- * Tope de cantidad solicitada, cantidad retirada y precio unitario por línea.
- * Espejo de `WithdrawalRules.MaxLineInput` en el servidor.
- */
+/** Tope de cantidad solicitada, cantidad retirada y precio unitario por línea. */
 export const MAX_LINE_INPUT = 1_000_000_000;
 
 /** La cantidad se escala a centésimas (2 decimales). */

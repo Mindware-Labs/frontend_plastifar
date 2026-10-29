@@ -78,8 +78,7 @@ export function CreateTaskModal({
     }
   }, [open]);
 
-  // Entrada del paso nuevo: el contenido se desliza desde el lado de avance y la caja
-  // cambia de altura de forma continua, para que el modal no dé un salto.
+  // Desliza el paso nuevo y anima la altura de forma continua para evitar saltos en el modal.
   useLayoutEffect(() => {
     const pending = transitionRef.current;
     const wrap = wrapRef.current;

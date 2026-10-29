@@ -21,6 +21,7 @@ export type TicketSlaListener = (notice: TicketSlaNotice) => void;
 
 export interface EmailCountsValue {
   counts: EmailFolderCounts | null;
+  setFolderCounts: (counts: EmailFolderCounts) => void;
   refresh: () => void;
   /** Avisos del servidor cuando la bandeja cambia. Devuelve la baja de la suscripcion. */
   onInboxChanged: (listener: Listener) => () => void;
@@ -48,6 +49,7 @@ export interface EmailCountsValue {
 
 export const EmailCountsContext = createContext<EmailCountsValue>({
   counts: null,
+  setFolderCounts: () => undefined,
   refresh: () => undefined,
   onInboxChanged: () => () => undefined,
   onInboxReceived: () => () => undefined,

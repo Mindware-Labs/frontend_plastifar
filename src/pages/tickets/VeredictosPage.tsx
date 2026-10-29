@@ -53,7 +53,7 @@ export function VeredictosPage() {
   useLoadErrorReceipt(error, "veredictos-list", refresh);
   useActionErrorReceipt(actionError, "veredictos-action");
 
-  const rows = data?.items ?? [];
+  const rows = useMemo(() => data?.items ?? [], [data?.items]);
   const counts = data?.counts;
   const pageIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);

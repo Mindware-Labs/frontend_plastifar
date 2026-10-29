@@ -2,9 +2,7 @@ import { discrepanciesApi } from "../api/discrepancies";
 import type { DiscrepancyDetail, LoadDiscrepancy } from "../types/discrepancies";
 import { downloadWorkbook } from "./hcaExcelExport";
 
-/**
- * Exporta una investigación de discrepancia de carga en la plantilla oficial PF-FOR-291.
- */
+/** Exporta una investigación de discrepancia de carga en la plantilla oficial PF-FOR-291. */
 export async function exportDiscrepancyToExcel(
   input: DiscrepancyDetail | LoadDiscrepancy | number,
 ): Promise<void> {

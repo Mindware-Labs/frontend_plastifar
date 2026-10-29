@@ -231,12 +231,7 @@ const attachExitingLabelClass =
   "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/40 px-2.5 " +
   "text-[11.5px] font-medium text-emerald-600 shadow-2xs ring-1 ring-emerald-100/50 transition-all duration-300 active:scale-95";
 
-/**
- * Cuerpo de tarjeta cuya altura se limita para que su borde inferior no pase
- * del borde inferior del elemento `alignToId` (cuando están en columnas paralelas).
- * Si el contenido no excede ese límite se muestra completo; si lo excede, se recorta
- * con un aviso para hacer clic y ver el mensaje completo (`onExpand`).
- */
+/** Cuerpo de tarjeta con altura acotada al borde inferior de `alignToId` en escritorio; si excede, permite expandir (`onExpand`). */
 function AlignedClampBody({
   alignToId,
   onExpand,
@@ -272,8 +267,7 @@ function AlignedClampBody({
     const ro = new ResizeObserver(measure);
     ro.observe(inner);
     ro.observe(target);
-    // Cualquier ancestro (hasta el que contiene al objetivo) puede mover la posición
-    // vertical del cuerpo o del objetivo sin cambiar su tamaño: observarlos todos.
+    // Observa todos los ancestros hasta el contenedor común porque pueden desplazar la posición vertical sin cambiar tamaño.
     for (let el: HTMLElement | null = body.parentElement; el && !el.contains(target); el = el.parentElement) {
       ro.observe(el);
     }
@@ -463,16 +457,11 @@ export function TicketDetailPage() {
     if (!ticketId) return;
     let active = true;
 
-    Promise.all([
-      ticketsApi.getById(ticketId),
-      ticketsApi.getTasks(ticketId).catch(() => null),
-    ])
-      .then(([ticketData, tasksData]) => {
+    ticketsApi
+      .getById(ticketId)
+      .then((ticketData) => {
         if (!active) return;
         setTicket(ticketData);
-        if (tasksData) {
-          setTasksCount(tasksData.length);
-        }
         setError(null);
       })
       .catch((err: unknown) => {
@@ -920,10 +909,7 @@ export function TicketDetailPage() {
   // Arbol entero, para rotular con el camino: el catalogo trae solo id y nombre.
   const [editDepartmentTree, setEditDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
 
-  /* Se lee al entrar y no solo al abrir el formulario: la ficha tambien rotula
-     el departamento con su camino, porque dos pueden llamarse igual. Es la misma
-     lectura que ya hacia esta pantalla, antes; si falla, el formulario la
-     reintenta al abrirse y la ficha muestra el nombre que mando el servidor. */
+  // Carga el árbol de departamentos al entrar para mostrar la ruta jerárquica en la ficha y en el formulario de edición.
   useEffect(() => {
     departmentsApi
       .list({ includeInactive: true })

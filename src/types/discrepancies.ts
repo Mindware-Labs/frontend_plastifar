@@ -1,7 +1,4 @@
-// Espejo de api/Dtos/DiscrepancyDtos.cs (docs/plan/06, sección 6).
-//
-// Estados y resultados viajan como texto legible. Cliente, ticket y nombres
-// llegan resueltos desde el servidor.
+// Espejo de api/Dtos/DiscrepancyDtos.cs; estados y resultados viajan como texto legible.
 
 /** Estados de la investigación, en el orden en que avanzan (8.1). */
 export const DISCREPANCY_STATUSES = ["En investigación", "Completada", "Aprobada", "Devuelta"] as const;

@@ -4,6 +4,7 @@ import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { useAuth } from "../../context/useAuth";
+import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { formatDateTime } from "../../lib/format";
 import type { EmailNoteResponse } from "../../types/api";
 
@@ -26,21 +27,6 @@ function formatNoteTime(iso: string): string {
   if (diffDays === 1) return "ayer";
   if (diffDays < 7) return `hace ${diffDays}d`;
   return date.toLocaleDateString("es-419", { day: "2-digit", month: "short" });
-}
-
-/** Auto-ajuste de altura del área de texto para notas internas. */
-function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
-  if (!textarea) return;
-  textarea.style.height = "auto";
-  const borderOffset = textarea.offsetHeight - textarea.clientHeight;
-  const targetHeight = Math.max(textarea.scrollHeight + borderOffset, 54);
-  if (targetHeight >= 340) {
-    textarea.style.height = "340px";
-    textarea.style.overflowY = "auto";
-  } else {
-    textarea.style.height = `${targetHeight}px`;
-    textarea.style.overflowY = "hidden";
-  }
 }
 
 export function ConversationNotes({ emailId, onNotesCountChange }: ConversationNotesProps) {
@@ -117,14 +103,14 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
     if (open && (notes?.length === 0 || showAddForm)) {
       setTimeout(() => {
         textareaRef.current?.focus();
-        autoResizeTextarea(textareaRef.current);
+        autoResizeTextarea(textareaRef.current, 54);
       }, 80);
     }
   }, [open, showAddForm, notes]);
 
   useEffect(() => {
     if (open && (notes?.length === 0 || showAddForm)) {
-      autoResizeTextarea(textareaRef.current);
+      autoResizeTextarea(textareaRef.current, 54);
     }
   }, [open, showAddForm, notes, draft]);
 
@@ -335,7 +321,7 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
                 value={draft}
                 onChange={(event) => {
                   setDraft(event.target.value);
-                  autoResizeTextarea(event.target);
+                  autoResizeTextarea(event.target, 54);
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder="Escribe una nota para el equipo… (Ctrl+Enter para guardar)"
@@ -397,14 +383,14 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
     if (open) {
       setTimeout(() => {
         textareaRef.current?.focus();
-        autoResizeTextarea(textareaRef.current);
+        autoResizeTextarea(textareaRef.current, 54);
       }, 80);
     }
   }, [open]);
 
   useEffect(() => {
     if (open) {
-      autoResizeTextarea(textareaRef.current);
+      autoResizeTextarea(textareaRef.current, 54);
     }
   }, [open, draft]);
 
@@ -450,7 +436,7 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
             value={draft}
             onChange={(event) => {
               setDraft(event.target.value);
-              autoResizeTextarea(event.target);
+              autoResizeTextarea(event.target, 54);
             }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {

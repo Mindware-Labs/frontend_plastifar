@@ -255,6 +255,7 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
     <EmailCountsContext.Provider
       value={{
         counts,
+        setFolderCounts: setCounts,
         refresh,
         onInboxChanged,
         onInboxReceived,

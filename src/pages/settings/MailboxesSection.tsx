@@ -29,8 +29,7 @@ import { departmentPath } from "../../lib/departments";
 type ChipKey = "todos" | "activos" | "inactivos";
 type TestResult = { ok: boolean; message: string };
 
-/** Una prueba de conexión caduca: un visto verde de hace tres minutos ya no
- *  describe el buzón, solo tranquiliza sin motivo. */
+/** El resultado de la prueba de conexión caduca a los 15 segundos. */
 const TEST_RESULT_TTL = 15_000;
 
 const syncFormat = new Intl.DateTimeFormat("es-DO", {
@@ -40,11 +39,7 @@ const syncFormat = new Intl.DateTimeFormat("es-DO", {
   minute: "2-digit",
 });
 
-/**
- * Anillo de espera para la accion de fila. No usa `Spinner` porque aquel lleva
- * su propio `role="status"` y anidarlo dentro de un boton que ya tiene etiqueta
- * hace que el lector de pantalla anuncie dos cosas por un solo control.
- */
+/** Anillo de espera sin role="status" propio para no duplicar anuncios en el botón. */
 function TestingRing({ className = "" }: { className?: string }) {
   return (
     <span
@@ -72,8 +67,6 @@ export function MailboxesSection() {
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  // Seccion 4.1: la pagina, el filtro, la busqueda y los contadores los resuelve
-  // SQL. La vista solo dibuja lo que llega.
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
     fetch: settingsApi.mailboxes.list,
     criteria: {
@@ -84,8 +77,6 @@ export function MailboxesSection() {
     fallbackError: "No se pudieron cargar los buzones",
   });
 
-  // Los departamentos nombran una columna y llenan el desplegable del dialogo:
-  // es catalogo de apoyo, no el listado que se pagina.
   const departmentsRef = useReferenceData<DepartmentResponse[]>(departmentsApi.list, []);
   const departments = departmentsRef.data;
 
@@ -98,21 +89,14 @@ export function MailboxesSection() {
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  // Sin criterio activo, una pagina vacia significa catalogo vacio; con
-  // criterio, que nada coincide. Los contadores no distinguen ese caso: se
-  // calculan sobre el filtro base, no sobre la tabla entera.
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
 
-  /* El camino completo, no el nombre suelto: hay tres departamentos llamados
-     «Calidad» —el propio, el de Centroamérica y el de otra planta— y en una
-     tabla, «Calidad» a secas no dice a cuál pertenece la fila. */
+  // Muestra la ruta jerárquica para distinguir departamentos homónimos entre sedes.
   function departmentName(id: number) {
     return departmentPath(departments, id) ?? "—";
   }
 
-  // El resultado pertenece a una fila concreta y a un instante concreto: si
-  // cambia lo que se esta mirando, deja de describir nada. Se limpia desde el
-  // gesto que lo invalida, no desde un efecto que persiga a los criterios.
+  // Limpia el resultado de prueba al cambiar filtros o paginación.
   function changeCriteria(apply: () => void) {
     setTestResult(null);
     apply();
@@ -151,8 +135,7 @@ export function MailboxesSection() {
         setTestResult(null);
         try {
           const current = await freshCopy(settingsApi.mailboxes.get, mailbox);
-          // La referencia al secreto solo baja a quien puede escribir. Sin ella
-          // el PUT la borraria: mejor detenerse y decirlo.
+          // Sin secretRef el PUT borraría la referencia: se detiene si no está disponible.
           if (current.secretRef === null) {
             throw new Error("No se pudo leer la referencia al secreto de este buzón.");
           }
