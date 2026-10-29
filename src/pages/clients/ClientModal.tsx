@@ -6,7 +6,9 @@ import {
   Store,
   Truck,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
@@ -142,6 +144,33 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
   });
 
   const notesValue = useWatch({ control, name: "notes" }) ?? "";
+  const clientName = useWatch({ control, name: "name" }) ?? "";
+  const clientType = useWatch({ control, name: "type" }) ?? "";
+  const clientTerritory = useWatch({ control, name: "territoryId" }) ?? "";
+  const clientFormMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "name",
+          label: "Falta el nombre del cliente",
+          short: "el nombre",
+          valid: clientName.trim().length >= 2,
+        },
+        {
+          id: "type",
+          label: "Falta el tipo de cliente",
+          short: "el tipo",
+          valid: clientType.trim().length > 0,
+        },
+        {
+          id: "territoryId",
+          label: "Falta elegir el territorio",
+          short: "el territorio",
+          valid: clientTerritory.trim().length > 0,
+        },
+      ]),
+    [clientName, clientType, clientTerritory],
+  );
 
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
@@ -220,9 +249,16 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
             <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
               Cancelar
             </Button>
-            <Button type="submit" form="client-form" size="sm" isLoading={isSubmitting}>
+            <SubmitValidationButton
+              formId="client-form"
+              ready={clientFormMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={clientFormMissing}
+              onFocusField={focusFormField}
+              hintText="Para guardar el cliente, completa lo siguiente:"
+            >
               {isEdit ? "Guardar cambios" : "Crear cliente"}
-            </Button>
+            </SubmitValidationButton>
           </div>
         </div>
       }

@@ -1,7 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Gavel, Power } from "lucide-react";
-import React, { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import React, { useMemo, useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
@@ -61,6 +63,20 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
       isActive: verdict?.isActive ?? true,
     },
   });
+
+  const veredictoName = useWatch({ control, name: "name" }) ?? "";
+  const veredictoMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "veredicto-name",
+          label: "Falta el nombre del veredicto",
+          short: "el nombre",
+          valid: veredictoName.trim().length >= 2,
+        },
+      ]),
+    [veredictoName],
+  );
 
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
@@ -130,9 +146,16 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
             <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
               Cancelar
             </Button>
-            <Button type="submit" form="veredicto-form" size="sm" isLoading={isSubmitting}>
+            <SubmitValidationButton
+              formId="veredicto-form"
+              ready={veredictoMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={veredictoMissing}
+              onFocusField={focusFormField}
+              hintText="Para guardar el veredicto, completa lo siguiente:"
+            >
               {isEdit ? "Guardar cambios" : "Crear veredicto"}
-            </Button>
+            </SubmitValidationButton>
           </div>
         </div>
       }
@@ -150,6 +173,7 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
         <FormDivider title="Identificación" />
 
         <TextField
+          id="veredicto-name"
           size="sm"
           label="Nombre del veredicto"
           placeholder="Ej. Procedente, Reemplazo de producto, No procede…"

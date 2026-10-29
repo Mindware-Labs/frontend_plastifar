@@ -5,10 +5,12 @@ import {
   ListTodo,
   Timer,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { tasksApi } from "../../api/tasks";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { LookupField, TextAreaField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { useReceipts } from "../../context/useReceipts";
@@ -84,6 +86,30 @@ export function BulkTaskModal({ mode, taskIds, onClose, onSuccess }: BulkTaskMod
 
   const count = taskIds.length;
   const countLabel = `${count} ${count === 1 ? "tarea seleccionada" : "tareas seleccionadas"}`;
+
+  const bulkMissing = useMemo(() => {
+    if (mode === "completar") {
+      return buildValidationItems([
+        {
+          id: "bulk-task-comment",
+          label: "Falta el comentario de cierre",
+          short: "el comentario",
+          valid: comment.trim().length > 0,
+        },
+      ]);
+    }
+    if (mode === "cancelar") {
+      return buildValidationItems([
+        {
+          id: "bulk-task-reason",
+          label: "Falta el motivo de cancelación (mín. 5 caracteres)",
+          short: "el motivo",
+          valid: reason.trim().length >= 5,
+        },
+      ]);
+    }
+    return [];
+  }, [mode, comment, reason]);
 
   let title = "";
   let description = "";
@@ -246,19 +272,17 @@ export function BulkTaskModal({ mode, taskIds, onClose, onSuccess }: BulkTaskMod
             <Button type="button" variant="secondary" size="sm" onClick={requestClose} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              form="bulk-task-form"
-              size="sm"
+            <SubmitValidationButton
+              formId="bulk-task-form"
+              ready={bulkMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={bulkMissing}
+              onFocusField={focusFormField}
               variant={submitVariant}
-              isLoading={isSubmitting}
-              disabled={
-                (mode === "completar" && !comment.trim()) ||
-                (mode === "cancelar" && reason.trim().length < 5)
-              }
+              hintText="Para aplicar la acción en lote, completa lo siguiente:"
             >
               {submitLabel}
-            </Button>
+            </SubmitValidationButton>
           </div>
         </div>
       }
@@ -390,6 +414,7 @@ export function BulkTaskModal({ mode, taskIds, onClose, onSuccess }: BulkTaskMod
           <>
             <FormDivider title="Resolución" />
             <TextAreaField
+              id="bulk-task-comment"
               ref={textareaRef}
               rows={1}
               required
@@ -422,6 +447,7 @@ export function BulkTaskModal({ mode, taskIds, onClose, onSuccess }: BulkTaskMod
           <>
             <FormDivider title="Motivo de cancelación" />
             <TextAreaField
+              id="bulk-task-reason"
               ref={textareaRef}
               rows={1}
               required

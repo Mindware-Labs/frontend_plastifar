@@ -1,7 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertOctagon, AlertTriangle, Check, Clock, Flag, Power } from "lucide-react";
-import React, { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import React, { useMemo, useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { ticketTopicsApi } from "../../api/ticketTopics";
@@ -82,6 +84,27 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
     },
   });
 
+  const motivoName = useWatch({ control, name: "name" }) ?? "";
+  const motivoDepartment = useWatch({ control, name: "departmentId" }) ?? "";
+  const motivoMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "motivo-name",
+          label: "Falta el nombre del motivo",
+          short: "el nombre",
+          valid: motivoName.trim().length >= 2,
+        },
+        {
+          id: "motivo-department",
+          label: "Falta elegir el departamento",
+          short: "el departamento",
+          valid: motivoDepartment.trim().length > 0,
+        },
+      ]),
+    [motivoName, motivoDepartment],
+  );
+
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
     return touchedFields[field] ? "valid" : "idle";
@@ -153,9 +176,16 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
             <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
               Cancelar
             </Button>
-            <Button type="submit" form="motivo-form" size="sm" isLoading={isSubmitting}>
+            <SubmitValidationButton
+              formId="motivo-form"
+              ready={motivoMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={motivoMissing}
+              onFocusField={focusFormField}
+              hintText="Para guardar el motivo, completa lo siguiente:"
+            >
               {isEdit ? "Guardar cambios" : "Crear motivo"}
-            </Button>
+            </SubmitValidationButton>
           </div>
         </div>
       }
@@ -173,6 +203,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
         <FormDivider title="Identificación" />
 
         <TextField
+          id="motivo-name"
           size="sm"
           label="Nombre del motivo"
           placeholder="Ej. Reclamación de calidad, Devolución, Faltante de despacho…"
@@ -188,6 +219,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
           control={control}
           render={({ field }) => (
             <SelectField
+              id="motivo-department"
               size="sm"
               label="Departamento predeterminado"
               required

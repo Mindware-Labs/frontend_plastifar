@@ -33,6 +33,7 @@ import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { ModuleHeader, type ModuleHeaderSection } from "../../components/app/ModuleHeader";
 import { TicketPendingFileList } from "../../components/app/TicketPendingFileList";
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { TicketProductsField } from "../../components/app/TicketProductsField";
 import { Alert } from "../../components/ui/Alert";
 import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
@@ -52,6 +53,7 @@ import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { departmentPath, departmentPathOptions } from "../../lib/departments";
 import { resolveSlaPolicyIdForPriority, sortSlaPolicies } from "../../lib/slaPolicyUi";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes, formatDateTime, formatPhoneNumber, formatSlaRemaining } from "../../lib/format";
@@ -684,6 +686,60 @@ export function TicketDetailPage() {
   const updateCategory = getAvailableTransitions(ticket?.status ?? "").find(
     (t) => t.target === updateTargetStatus,
   )?.category;
+
+  const updateStatusStep1Missing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "update-status-radiogroup",
+          label: "Falta elegir la nueva situación del ticket",
+          short: "una opción",
+          valid: updateTargetStatus.length > 0,
+        },
+      ]),
+    [updateTargetStatus],
+  );
+
+  const updateStatusVerdictStep2Missing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "update-verdict",
+          label: "Falta elegir el veredicto",
+          short: "el veredicto",
+          valid: updateVerdictId.length > 0,
+        },
+      ]),
+    [updateVerdictId],
+  );
+
+  const updateStatusVerdictStep3Missing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "update-comment",
+          label: "Falta el comentario del veredicto",
+          short: "el comentario",
+          valid: updateComment.trim().length > 0,
+        },
+      ]),
+    [updateComment],
+  );
+
+  const updateStatusOtherStep2Missing = useMemo(() => {
+    if (updateCategory !== "cancelar" && updateCategory !== "pausar") return [];
+    return buildValidationItems([
+      {
+        id: "update-comment",
+        label:
+          updateCategory === "cancelar"
+            ? "Falta el motivo de cancelación"
+            : "Falta el motivo de la pausa",
+        short: "el motivo",
+        valid: updateComment.trim().length > 0,
+      },
+    ]);
+  }, [updateCategory, updateComment]);
 
   const handleContinueUpdateStatus = (event?: React.MouseEvent) => {
     event?.preventDefault();
@@ -1980,21 +2036,31 @@ export function TicketDetailPage() {
               <Button type="button" variant="secondary" disabled={noteSending} onClick={() => setShowNoteModal(false)}>
                 Cancelar
               </Button>
-              <Button
-                type="button"
-                isLoading={noteSending}
-                disabled={!noteBody.trim() && !noteSendError}
+              <SubmitValidationButton
+                ready={noteBody.trim().length > 0}
+                busy={noteSending}
+                missingItems={buildValidationItems([
+                  {
+                    id: "ticket-note-body",
+                    label: "Falta el texto de la nota",
+                    short: "el texto de la nota",
+                    valid: noteBody.trim().length > 0,
+                  },
+                ])}
+                onSubmit={() => void saveNote()}
+                onFocusField={focusFormField}
                 tone={noteSendError ? "ink" : "primary"}
                 toneLabel={noteSendError}
-                onClick={() => void saveNote()}
+                hintText="Para guardar la nota interna, completa lo siguiente:"
               >
                 Guardar nota
-              </Button>
+              </SubmitValidationButton>
             </>
           }
         >
           <div className="space-y-3">
             <textarea
+              id="ticket-note-body"
               autoFocus
               rows={7}
               value={noteBody}
@@ -2209,17 +2275,18 @@ export function TicketDetailPage() {
                 >
                   Cancelar
                 </Button>
-                <Button
+                <SubmitValidationButton
                   key="btn-status-continue"
-                  type="button"
-                  size="sm"
-                  disabled={!updateTargetStatus && !transitionError}
+                  ready={updateStatusStep1Missing.length === 0}
+                  missingItems={updateStatusStep1Missing}
+                  onSubmit={() => handleContinueUpdateStatus()}
+                  onFocusField={focusFormField}
                   tone={transitionError ? "ink" : "primary"}
                   toneLabel={transitionError}
-                  onClick={handleContinueUpdateStatus}
+                  hintText="Para continuar, completa lo siguiente:"
                 >
                   Continuar
-                </Button>
+                </SubmitValidationButton>
               </div>
             ) : updateStep === 2 && updateCategory === "veredicto" ? (
               <div key="status-step-2-verdict" className="animate-plf-header-fade flex items-center justify-end gap-2">
@@ -2237,17 +2304,18 @@ export function TicketDetailPage() {
                 >
                   Atrás
                 </Button>
-                <Button
+                <SubmitValidationButton
                   key="btn-status-continue-step2"
-                  type="submit"
-                  form="update-status-step2-form"
-                  size="sm"
-                  disabled={!updateVerdictId && !transitionError}
+                  formId="update-status-step2-form"
+                  ready={updateStatusVerdictStep2Missing.length === 0}
+                  missingItems={updateStatusVerdictStep2Missing}
+                  onFocusField={focusFormField}
                   tone={transitionError ? "ink" : "primary"}
                   toneLabel={transitionError}
+                  hintText="Para continuar, completa lo siguiente:"
                 >
                   Continuar
-                </Button>
+                </SubmitValidationButton>
               </div>
             ) : updateStep === 3 && updateCategory === "veredicto" ? (
               <div key="status-step-3-verdict" className="animate-plf-header-fade flex items-center justify-end gap-2">
@@ -2265,20 +2333,23 @@ export function TicketDetailPage() {
                 >
                   Atrás
                 </Button>
-                <Button
+                <SubmitValidationButton
                   key="btn-status-confirm-verdict"
-                  type="submit"
-                  form="update-status-form"
-                  size="sm"
-                  variant="primary"
-                  isLoading={transitioning}
+                  formId="update-status-form"
+                  ready={updateStatusVerdictStep3Missing.length === 0}
+                  busy={transitioning}
+                  missingItems={updateStatusVerdictStep3Missing}
+                  onFocusField={focusFormField}
                   tone={transitionError ? "ink" : "primary"}
                   toneLabel={transitionError}
-                  className={transitionError ? "" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"}
+                  hintText="Para confirmar el veredicto, completa lo siguiente:"
+                  className={
+                    transitionError ? "" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"
+                  }
                 >
                   <Gavel className="h-3.5 w-3.5" />
                   Confirmar veredicto
-                </Button>
+                </SubmitValidationButton>
               </div>
             ) : (
               <div key="status-step-2-other" className="animate-plf-header-fade flex items-center justify-end gap-2">
@@ -2296,18 +2367,20 @@ export function TicketDetailPage() {
                 >
                   Atrás
                 </Button>
-                <Button
+                <SubmitValidationButton
                   key="btn-status-confirm-other"
-                  type="submit"
-                  form="update-status-form"
-                  size="sm"
+                  formId="update-status-form"
+                  ready={updateStatusOtherStep2Missing.length === 0}
+                  busy={transitioning}
+                  missingItems={updateStatusOtherStep2Missing}
+                  onFocusField={focusFormField}
                   variant={updateCategory === "cancelar" ? "danger" : "primary"}
-                  isLoading={transitioning}
                   tone={transitionError ? "ink" : "primary"}
                   toneLabel={transitionError}
+                  hintText="Para confirmar el cambio, completa lo siguiente:"
                 >
                   {updateCategory === "cancelar" ? "Cancelar ticket" : "Confirmar"}
-                </Button>
+                </SubmitValidationButton>
               </div>
             )
           }
@@ -2342,7 +2415,13 @@ export function TicketDetailPage() {
             >
               {updateStep === 1 && (
                 <div className="space-y-3">
-                  <div role="radiogroup" aria-label="Nueva situación" className="space-y-1.5">
+                  <div
+                    id="update-status-radiogroup"
+                    role="radiogroup"
+                    aria-label="Nueva situación"
+                    className="space-y-1.5"
+                    tabIndex={-1}
+                  >
                     {availableTransitions.map((option) => {
                       const isSelected = updateTargetStatus === option.target;
                       const OptionIcon = option.icon;
@@ -2707,16 +2786,25 @@ export function TicketDetailPage() {
                 >
                   Cancelar
                 </Button>
-                <Button
-                  type="submit"
-                  form="edit-ticket-form"
-                  size="sm"
-                  isLoading={savingEdit}
+                <SubmitValidationButton
+                  formId="edit-ticket-form"
+                  ready={editSubject.trim().length > 0}
+                  busy={savingEdit}
+                  missingItems={buildValidationItems([
+                    {
+                      id: "edit-subject",
+                      label: "Falta el asunto del ticket",
+                      short: "el asunto",
+                      valid: editSubject.trim().length > 0,
+                    },
+                  ])}
+                  onFocusField={focusFormField}
                   tone={editError ? "ink" : "primary"}
                   toneLabel={editError}
+                  hintText="Para guardar la clasificación, completa lo siguiente:"
                 >
                   Guardar cambios
-                </Button>
+                </SubmitValidationButton>
               </div>
             </div>
           }

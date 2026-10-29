@@ -7,6 +7,7 @@ import { Building2, Check, Info, Mail, MessageSquareText, Package, RotateCcw, Ta
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
 import { pickDefaultSlaPolicyId } from "../../lib/slaPolicyUi";
 import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { TicketProductsField, type TicketProductDraft } from "../../components/app/TicketProductsField";
 import { ApiError } from "../../api/client";
@@ -23,6 +24,7 @@ import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { departmentPathOptions } from "../../lib/departments";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import type {
   DepartmentResponse,
   TicketContactOption,
@@ -175,6 +177,27 @@ export function CreateTicketModal({
   const selectedClientId = useWatch({ control, name: "clientId" });
   const selectedTopicId = useWatch({ control, name: "topicId" });
   const currentSubject = useWatch({ control, name: "subject" }) || "";
+  const currentSlaPolicyId = useWatch({ control, name: "slaPolicyId" }) || "";
+  const createTicketMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "ticket-subject",
+          label: "Falta el asunto (mínimo 3 caracteres)",
+          short: "el asunto",
+          valid: currentSubject.trim().length >= 3,
+        },
+        {
+          id: "create-ticket-sla",
+          label: "Falta elegir la política SLA",
+          short: "la política SLA",
+          valid: currentSlaPolicyId.trim().length > 0,
+        },
+      ]),
+    [currentSubject, currentSlaPolicyId],
+  );
+  const createTicketReady =
+    createTicketMissing.length === 0 && !loadingCatalogs && !catalogsError;
   const currentMessage = useWatch({ control, name: "initialMessage" }) || "";
   const initialMessageField = register("initialMessage");
 
@@ -566,7 +589,7 @@ export function CreateTicketModal({
                 />
               </section>
 
-              <section className="flex flex-col border-t border-line-soft px-6 py-5">
+              <section id="create-ticket-sla" className="flex flex-col border-t border-line-soft px-6 py-5">
                 <Controller
                   name="slaPolicyId"
                   control={control}
@@ -768,14 +791,23 @@ export function CreateTicketModal({
             <Button type="button" variant="secondary" onClick={requestClose} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              form={FORM_ID}
-              isLoading={isSubmitting}
-              disabled={isSubmitting || loadingCatalogs || Boolean(catalogsError)}
+            <SubmitValidationButton
+              formId={FORM_ID}
+              ready={createTicketReady}
+              busy={isSubmitting || loadingCatalogs}
+              missingItems={createTicketMissing}
+              onFocusField={(id) => {
+                if (id === "create-ticket-sla") {
+                  document.getElementById("create-ticket-sla")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                  return;
+                }
+                focusFormField(id);
+              }}
+              hintText="Para crear el ticket, completa los siguientes requisitos:"
+              blockTitle="No se puede crear"
             >
               {isSubmitting ? "Creando ticket…" : "Crear ticket"}
-            </Button>
+            </SubmitValidationButton>
           </div>
         </div>
       </div>

@@ -1,11 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { ApiError } from "../../api/client";
 import { tasksApi } from "../../api/tasks";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { TextAreaField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
@@ -69,6 +71,18 @@ export function TaskCompleteModal({ task, onClose, onCompleted }: TaskCompleteMo
 
   const comment = watch("comment") ?? "";
   const commentField = register("comment");
+  const completeMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "task-complete-comment",
+          label: "Falta el comentario de cierre",
+          short: "el comentario",
+          valid: comment.trim().length > 0,
+        },
+      ]),
+    [comment],
+  );
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -122,15 +136,16 @@ export function TaskCompleteModal({ task, onClose, onCompleted }: TaskCompleteMo
             <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              form="task-complete-form"
-              size="sm"
-              isLoading={isSubmitting}
-              disabled={!comment.trim()}
+            <SubmitValidationButton
+              formId="task-complete-form"
+              ready={completeMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={completeMissing}
+              onFocusField={focusFormField}
+              hintText="Para completar la tarea, completa lo siguiente:"
             >
               Completar tarea
-            </Button>
+            </SubmitValidationButton>
           </div>
         </div>
       }
@@ -147,6 +162,7 @@ export function TaskCompleteModal({ task, onClose, onCompleted }: TaskCompleteMo
         <FormDivider title="Resolución" />
 
         <TextAreaField
+          id="task-complete-comment"
           label="Comentario de cierre"
           required
           rows={1}

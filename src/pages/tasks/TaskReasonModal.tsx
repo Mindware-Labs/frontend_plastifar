@@ -1,10 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { ApiError } from "../../api/client";
 import { tasksApi } from "../../api/tasks";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { TextAreaField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
@@ -69,6 +71,18 @@ export function TaskReasonModal({ task, mode, onClose, onSaved }: TaskReasonModa
 
   const reason = watch("reason") ?? "";
   const reasonField = register("reason");
+  const reasonMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "task-reason",
+          label: isCancel ? "Falta el motivo de la cancelación" : "Falta el motivo de la reapertura",
+          short: "el motivo",
+          valid: reason.trim().length > 0,
+        },
+      ]),
+    [isCancel, reason],
+  );
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -125,16 +139,21 @@ export function TaskReasonModal({ task, mode, onClose, onSaved }: TaskReasonModa
             <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              form="task-reason-form"
-              size="sm"
+            <SubmitValidationButton
+              formId="task-reason-form"
+              ready={reasonMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={reasonMissing}
+              onFocusField={focusFormField}
               variant={isCancel ? "danger" : "primary"}
-              isLoading={isSubmitting}
-              disabled={!reason.trim()}
+              hintText={
+                isCancel
+                  ? "Para cancelar la tarea, completa lo siguiente:"
+                  : "Para reabrir la tarea, completa lo siguiente:"
+              }
             >
               {isCancel ? "Cancelar tarea" : "Reabrir tarea"}
-            </Button>
+            </SubmitValidationButton>
           </div>
         </div>
       }
@@ -151,6 +170,7 @@ export function TaskReasonModal({ task, mode, onClose, onSaved }: TaskReasonModa
         <FormDivider title="Justificación" />
 
         <TextAreaField
+          id="task-reason"
           label={isCancel ? "Motivo de la cancelación" : "Motivo de la reapertura"}
           required
           rows={1}

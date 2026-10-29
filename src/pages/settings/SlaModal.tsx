@@ -23,7 +23,9 @@ import { settingsApi } from "../../api/settings";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { Modal } from "../../components/ui/Modal";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { Select } from "../../components/ui/Select";
 import { TimePicker } from "../../components/ui/TimePicker";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
@@ -507,6 +509,49 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
 
   const resolutionQty = useWatch({ control, name: "resolutionQty" });
   const resolutionUnit = useWatch({ control, name: "resolutionUnit" });
+  const policyName = useWatch({ control, name: "name" }) ?? "";
+
+  const slaFormMissing = useMemo(() => {
+    const qty = Number(resolutionQty);
+    const qtyValid = resolutionQty.trim().length > 0 && Number.isFinite(qty) && qty > 0;
+    const hoursValid =
+      !businessHoursOnly ||
+      (workdayEnd > workdayStart && (workDays?.length ?? 0) > 0);
+    return buildValidationItems([
+      {
+        id: "name",
+        label: "Falta el nombre de la política",
+        short: "el nombre",
+        valid: policyName.trim().length >= 2,
+      },
+      {
+        id: "priority",
+        label: "Falta elegir la prioridad",
+        short: "la prioridad",
+        valid: Boolean(selectedPriority),
+      },
+      {
+        id: "resolutionQty",
+        label: "Falta el plazo de resolución",
+        short: "el plazo de resolución",
+        valid: qtyValid,
+      },
+      {
+        id: "workdayStart",
+        label: "Revisa la jornada laboral (apertura, cierre o días)",
+        short: "la jornada laboral",
+        valid: hoursValid,
+      },
+    ]);
+  }, [
+    policyName,
+    selectedPriority,
+    resolutionQty,
+    businessHoursOnly,
+    workdayEnd,
+    workdayStart,
+    workDays,
+  ]);
 
   const perWorkday = workdayMinutes({
     businessHoursOnly,
@@ -647,9 +692,16 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
             <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
               Cancelar
             </Button>
-            <Button type="submit" form="sla-form" size="sm" isLoading={isSubmitting}>
+            <SubmitValidationButton
+              formId="sla-form"
+              ready={slaFormMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={slaFormMissing}
+              onFocusField={focusFormField}
+              hintText="Para guardar la política SLA, completa lo siguiente:"
+            >
               {isEdit ? "Guardar cambios" : "Crear política"}
-            </Button>
+            </SubmitValidationButton>
           </div>
         </div>
       }

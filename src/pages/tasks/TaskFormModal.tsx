@@ -1,6 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
 import { pickDefaultSlaPolicyId, sortSlaPolicies } from "../../lib/slaPolicyUi";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch, type UseFormRegisterReturn } from "react-hook-form";
@@ -162,7 +164,40 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   });
 
   const clientId = useWatch({ control, name: "clientId" }) ?? "";
+  const titleValue = useWatch({ control, name: "title" }) ?? "";
+  const departmentValue = useWatch({ control, name: "departmentId" }) ?? "";
+  const slaPolicyValue = useWatch({ control, name: "slaPolicyId" }) ?? "";
   const instructions = useWatch({ control, name: "instructions" }) ?? "";
+  const taskFormMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "title",
+          label: "Falta el título de la tarea",
+          short: "el título",
+          valid: titleValue.trim().length > 0,
+        },
+        {
+          id: "instructions",
+          label: "Faltan las instrucciones",
+          short: "las instrucciones",
+          valid: instructions.trim().length > 0,
+        },
+        {
+          id: "departmentId",
+          label: "Falta elegir el departamento",
+          short: "el departamento",
+          valid: departmentValue.trim().length > 0,
+        },
+        {
+          id: "task-form-sla",
+          label: "Falta elegir la política SLA",
+          short: "la política SLA",
+          valid: slaPolicyValue.trim().length > 0,
+        },
+      ]),
+    [titleValue, instructions, departmentValue, slaPolicyValue],
+  );
   const dueTimeValue = useWatch({ control, name: "dueTime" }) ?? "";
 
   const instructionsField = register("instructions");
@@ -401,9 +436,22 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
             <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
               Cancelar
             </Button>
-            <Button type="submit" form="task-form" size="sm" isLoading={isSubmitting}>
+            <SubmitValidationButton
+              formId="task-form"
+              ready={taskFormMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={taskFormMissing}
+              onFocusField={(id) => {
+                if (id === "task-form-sla") {
+                  document.getElementById("task-form-sla")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                  return;
+                }
+                focusFormField(id);
+              }}
+              hintText="Para guardar la tarea, completa lo siguiente:"
+            >
               {isEdit ? "Guardar cambios" : "Crear tarea"}
-            </Button>
+            </SubmitValidationButton>
           </div>
         </div>
       }
@@ -422,6 +470,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
 
         <TextField
           size="sm"
+          id="title"
           label="Título de la tarea"
           required
           maxLength={200}
@@ -432,6 +481,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
         />
 
         <TextAreaField
+          id="instructions"
           label="Instrucciones"
           required
           rows={1}
@@ -452,6 +502,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
           })}
         />
 
+        <div id="task-form-sla">
         <Controller
           name="slaPolicyId"
           control={control}
@@ -469,6 +520,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
             />
           )}
         />
+        </div>
 
         {/* 3. ASIGNACIÓN */}
         <FormDivider title="Asignación y área" />
@@ -503,6 +555,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
             name="departmentId"
             render={({ field }) => (
               <SelectField
+                id="departmentId"
                 size="sm"
                 label="Departamento"
                 required

@@ -1,6 +1,8 @@
 import { ArrowLeft, ArrowRight, Calendar, FileText, Plus, UserCheck } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { Button } from "../../components/ui/Button";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { DatePicker } from "../../components/ui/DatePicker";
 import { TextField } from "../../components/ui/Field";
 import { Select } from "../../components/ui/Select";
@@ -43,6 +45,18 @@ export function CreateTaskModal({
   const [error, setError] = useState<string | null>(null);
   const [settle, triggerSettle] = useSettle();
   const [step, setStep] = useState<0 | 1>(0);
+  const createTaskMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "task-title",
+          label: "Falta el título de la tarea",
+          short: "el título",
+          valid: title.trim().length > 0,
+        },
+      ]),
+    [title],
+  );
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -209,28 +223,33 @@ export function CreateTaskModal({
             </Button>
           )}
           {step === 0 ? (
-            <Button
-              type="button"
-              size="sm"
+            <SubmitValidationButton
+              ready={createTaskMissing.length === 0}
+              busy={false}
+              missingItems={createTaskMissing}
+              onSubmit={handleNext}
+              onFocusField={focusFormField}
               tone={error ? "ink" : "primary"}
               toneLabel={error}
-              onClick={handleNext}
+              hintText="Para continuar, completa lo siguiente:"
             >
               Continuar
               <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
+            </SubmitValidationButton>
           ) : (
-            <Button
-              type="submit"
-              size="sm"
-              disabled={saving}
+            <SubmitValidationButton
+              ready={createTaskMissing.length === 0}
+              busy={saving}
+              missingItems={createTaskMissing}
+              onSubmit={() => void handleSubmit({ preventDefault: () => {} } as FormEvent)}
+              onFocusField={focusFormField}
               tone={error ? "ink" : "primary"}
               toneLabel={error}
-              onClick={handleSubmit}
+              hintText="Para crear la tarea en el ticket, completa lo siguiente:"
             >
               <Plus className="h-3.5 w-3.5" />
               {saving ? "Creando tarea..." : "Crear tarea"}
-            </Button>
+            </SubmitValidationButton>
           )}
         </>
       }
