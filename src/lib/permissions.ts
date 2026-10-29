@@ -98,6 +98,19 @@ export function can(
 
 function grants(access: DepartmentAccessClaim, permission: PermissionKey) {
   if (access.permissions.includes(permission)) return true;
+  const perms = access.permissions as string[];
+  if (permission === "tickets.create" && (perms.includes("tickets.create") || perms.includes("tickets.write")))
+    return true;
+  if (permission === "tickets.edit" && (perms.includes("tickets.edit") || perms.includes("tickets.write")))
+    return true;
+  if (permission === "tickets.reply" && (perms.includes("tickets.reply") || perms.includes("tickets.write")))
+    return true;
+  if (permission === "tasks.create" && (perms.includes("tasks.create") || perms.includes("tasks.write")))
+    return true;
+  if (permission === "tasks.edit" && (perms.includes("tasks.edit") || perms.includes("tasks.write")))
+    return true;
+  if (permission === "tasks.comment" && (perms.includes("tasks.comment") || perms.includes("tasks.write")))
+    return true;
   return permission === WIDENED_BY_READ_ALL && access.permissions.includes(READ_ALL);
 }
 

@@ -30,19 +30,13 @@ export type PermissionKey =
   | "clients.read"
   | "clients.write"
   | "tickets.read"
-  | "tickets.write"
+  | "tickets.create"
+  | "tickets.edit"
+  | "tickets.reply"
+  | "tickets.delete"
   | "tickets.assign"
   | "tickets.close"
   | "tickets.read_all"
-  // Reservadas: la función todavía no existe y nada las comprueba (docs/plan/01,
-  // sección 8 regla 7). Se pueden conceder por adelantado; `reserved` lo dice.
-  | "tickets.edit_thread"
-  | "tickets.link"
-  | "tickets.mark_answered"
-  | "tickets.merge"
-  | "tickets.refer"
-  | "tickets.release"
-  | "tickets.transfer"
   | "quality.read"
   | "quality.write"
   | "quality.approve"
@@ -60,8 +54,12 @@ export type PermissionKey =
   | "withdrawals.approve"
   // Tareas independientes. Espejo de PermissionCatalog.Tasks*.
   | "tasks.read"
-  | "tasks.write"
+  | "tasks.create"
+  | "tasks.edit"
+  | "tasks.comment"
+  | "tasks.assign"
   | "tasks.close"
+  | "tasks.delete"
   | "reports.read"
   | "settings.write";
 

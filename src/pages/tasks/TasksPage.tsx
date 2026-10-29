@@ -69,7 +69,9 @@ export function TasksPage() {
   const navigate = useNavigate();
   const receipts = useReceipts();
   const { can } = usePermissions();
-  const canWrite = can("tasks.write");
+  const canCreate = can("tasks.create");
+  const canEdit = can("tasks.edit");
+  const canWrite = canCreate || canEdit;
   const canClose = can("tasks.close");
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);

@@ -4,6 +4,7 @@ import type {
   AssignTicketResponse,
   AttachmentLinkResponse,
   TicketDetailResponse,
+  TicketInboxTabsResponse,
   TicketListResponse,
   TicketMessageResponse,
   TicketQuery,
@@ -13,6 +14,8 @@ import type {
 } from "../types/api";
 
 export const ticketsApi = {
+  inboxTabs: () => apiRequest<TicketInboxTabsResponse>("/api/tickets/inbox-tabs"),
+
   list: (query: TicketQuery) =>
     apiRequest<TicketListResponse>(`/api/tickets${toQuery({ ...query })}`),
 

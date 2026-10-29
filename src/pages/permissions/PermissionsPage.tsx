@@ -417,6 +417,10 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
           con scroll despega justamente eso. */}
       <section className="overflow-hidden rounded-card border border-line bg-white shadow-card">
       <div className="px-4 pt-3">
+      <p className="mb-3 text-[12.5px] leading-relaxed text-subtle">
+        Las capacidades de tickets, tareas y formularios se configuran <span className="font-medium text-zinc-800">solo aquí</span>.
+        Los cambios se aplican a cada rol y al personal cuando renueva sesión; no hace falta desplegar código.
+      </p>
 
       {matrix === null ? (
         // Con un error de carga no queda nada que esperar: el aviso de arriba ya

@@ -133,7 +133,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   }, []);
 
   const writable = useMemo(
-    () => departments.filter((department) => isAdmin || can("tasks.write", department.id)),
+    () => departments.filter((department) => isAdmin || can("tasks.create", department.id)),
     [departments, isAdmin, can],
   );
 

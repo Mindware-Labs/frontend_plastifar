@@ -488,6 +488,8 @@ export interface TicketListItemResponse {
   products?: TicketProductResponse[];
   topicSuggestedForm?: string | null;
   topicSuggestedFormLabel?: string | null;
+  /** full | readOnly — alcance sobre este ticket según departamento y reglas transversales. */
+  accessLevel?: "full" | "readOnly" | null;
 }
 
 export interface TicketCounts {
@@ -514,6 +516,8 @@ export interface TicketQuery {
   search?: string;
   /** todos | abiertos | por-vencer | vencidos | espera | cerrados */
   status?: string;
+  /** Pestaña de bandeja (GET /api/tickets/inbox-tabs). */
+  inboxTabId?: string;
   departmentId?: number;
   assignedStaffId?: number;
   priority?: string;
@@ -626,9 +630,23 @@ export interface TicketDetailResponse {
   verdictName: string | null;
   topicSuggestedForm?: string | null;
   topicSuggestedFormLabel?: string | null;
+  accessLevel?: "full" | "readOnly" | null;
   // Campos retrocompatibles
   code?: string;
   source?: string;
+}
+
+export interface TicketInboxTabResponse {
+  id: string;
+  departmentId: number | null;
+  label: string;
+  /** full | readOnly | global */
+  mode: string;
+  ticketCount?: number | null;
+}
+
+export interface TicketInboxTabsResponse {
+  tabs: TicketInboxTabResponse[];
 }
 
 export interface AssignTicketRequest {
@@ -876,6 +894,7 @@ export interface TicketTopicResponse {
   /** Cuántos tickets lo usan: con uno solo ya no se puede borrar, solo desactivar. */
   ticketCount: number;
   updatedAt: string;
+  sharedDepartmentIds: number[];
 }
 
 /** Contadores de las pastillas: los calcula la busqueda, no la pagina que se ve. */
@@ -901,6 +920,7 @@ export interface SaveTicketTopicRequest {
   defaultPriority?: string;
   suggestedForm?: string | null;
   isActive?: boolean;
+  sharedDepartmentIds?: number[];
 }
 
 /** Opción de veredicto para el selector del diálogo "Actualizar ticket". */

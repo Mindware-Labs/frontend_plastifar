@@ -256,8 +256,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const permissions = usePermissions();
-  const canCreateTask = permissions.can("tasks.write");
-  const canSeeLinkedTasks = permissions.can("tasks.read") || permissions.can("tasks.write");
+  const canCreateTask = permissions.can("tasks.create");
+  const canSeeLinkedTasks =
+    permissions.can("tasks.read") ||
+    permissions.can("tasks.create") ||
+    permissions.can("tasks.edit");
   const [justCreatedTicketId, setJustCreatedTicketId] = useState<number | null>(null);
   const [linkedTasks, setLinkedTasks] = useState<EmailLinkedTask[]>([]);
   const [linkedTasksKey, setLinkedTasksKey] = useState(0);

@@ -350,8 +350,14 @@ export function TicketDetailPage() {
   const { user } = useAuth();
   // Formularios empresariales del ciclo de vida del ticket (PF-FOR-034, 068, 291, 109)
   const { can } = usePermissions();
+  const readOnlyTicket = ticket?.accessLevel === "readOnly";
+  const deptId = ticket?.departmentId ?? undefined;
+  const canEditTicket = !readOnlyTicket && can("tickets.edit", deptId);
+  const canReplyTicket = !readOnlyTicket && can("tickets.reply", deptId);
+  const canUpdateStatus = !readOnlyTicket && can("tickets.close", deptId);
+
   const canReadForms =
-    can("claims.read", ticket?.departmentId ?? undefined) ||
+    can("claims.read", deptId) ||
     can("withdrawals.read") ||
     can("discrepancies.read") ||
     can("quality.read");
@@ -1129,7 +1135,7 @@ export function TicketDetailPage() {
               Historial
               <span className="tabular-nums text-subtle">{timeline.length}</span>
             </Button>
-            {availableTransitions.length > 0 ? (
+            {availableTransitions.length > 0 && canUpdateStatus ? (
               <Button
                 type="button"
                 size="sm"
@@ -1158,6 +1164,13 @@ export function TicketDetailPage() {
           </div>
         }
       />
+
+      {readOnlyTicket && (
+        <div className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3.5 py-2.5 text-[12.5px] text-amber-950">
+          Estás viendo este ticket en <span className="font-semibold">solo lectura</span>: puedes consultar el hilo y las
+          tareas, pero no editar el caso ni responder al cliente desde aquí.
+        </div>
+      )}
 
       {/* Zona de contenido con scroll vertical asegurado */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-8">
@@ -1301,7 +1314,7 @@ export function TicketDetailPage() {
                                 Clasificación y Enrutamiento
                               </h3>
                             </div>
-                            {!isClosed && (
+                            {!isClosed && canEditTicket && (
                               <button
                                 type="button"
                                 onClick={() => void handleOpenEditModal()}
@@ -1759,16 +1772,18 @@ export function TicketDetailPage() {
                         {clientThread.length} {clientThread.length === 1 ? "mensaje" : "mensajes"}
                       </span>
                       <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => setReplyOpen(true)}
-                        disabled={!recipientEmail}
-                        title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
-                      >
-                        <CornerUpLeft className="h-[14px] w-[14px]" />
-                        Responder
-                      </Button>
+                      {canReplyTicket && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => setReplyOpen(true)}
+                          disabled={!recipientEmail}
+                          title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
+                        >
+                          <CornerUpLeft className="h-[14px] w-[14px]" />
+                          Responder
+                        </Button>
+                      )}
                     </div>
 
                     {clientThread.length === 0 ? (
