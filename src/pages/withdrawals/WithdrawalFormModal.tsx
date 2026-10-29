@@ -37,7 +37,7 @@ import {
 } from "../../types/withdrawals";
 
 interface Props {
-  /** Si viene de la ficha del ticket, el ticket queda fijo; desde el listado de retiros el usuario lo elige. */
+  /** Si viene de la ficha del ticket, el ticket queda fijo; desde el listado de retiros el u... */
   ticketId?: number;
   ticketNumber?: string;
   ticketClientName?: string;
@@ -151,11 +151,7 @@ function parseOptionalPrice(raw: string): { valid: boolean; value: number | null
   return { valid: true, value: num };
 }
 
-/**
- * RF-W1 / RF-W2 / PF-FOR-068: asistente por pasos para registrar o editar la
- * Solicitud de Retiro de Mercancía con el mismo formato editorial que
- * Reclamación de Clientes, Discrepancia de Carga y HCA.
- */
+/** RF-W1 / RF-W2 / PF-FOR-068: asistente por pasos para registrar o editar la Solicitud de... */
 export function WithdrawalFormModal({
   ticketId: fixedTicketId,
   ticketNumber: fixedTicketNumber,
@@ -295,7 +291,7 @@ export function WithdrawalFormModal({
         }
       }
     } catch {
-      /* ignorar borrador corrupto */
+      /** ignorar borrador corrupto */
     }
   }, [draftStorageKey]);
 
@@ -341,7 +337,7 @@ export function WithdrawalFormModal({
         }),
       );
     } catch {
-      /* sin espacio */
+      /** sin espacio */
     }
   }
 
@@ -350,7 +346,7 @@ export function WithdrawalFormModal({
     try {
       localStorage.removeItem(draftStorageKey);
     } catch {
-      /* ignorar */
+      /** ignorar */
     }
   }
 
@@ -702,10 +698,10 @@ export function WithdrawalFormModal({
     >
       {banner && <Alert variant="error">{banner}</Alert>}
 
-      {/* PASO 1: Datos de la solicitud (Motivo, origen, fecha, moneda y empresa) */}
+      {/** PASO 1: Datos de la solicitud (Motivo, origen, fecha, moneda y empresa) */}
       {step === 1 && (
         <div key="withdrawal-step-1" className={`space-y-4 ${stepPanelClass}`}>
-          {/* Contexto del ticket y empresa (barra simétrica de dos mitades) */}
+          {/** Contexto del ticket y empresa (barra simétrica de dos mitades) */}
           {hasTicketContext ? (
             <div className="flex flex-col gap-2">
               {!lockedTicketId && (
@@ -743,7 +739,7 @@ export function WithdrawalFormModal({
             />
           )}
 
-          {/* Selector de Motivo del retiro (Por Devolución / Por Cambio, igual a las casillas del PF-FOR-068) */}
+          {/** Selector de Motivo del retiro (Por Devolución / Por Cambio, igual a las casillas del PF... */}
           <fieldset className="rounded-xl border border-zinc-200/90 bg-white p-3.5">
             <legend className="px-1 font-heading text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
               Motivo del retiro (casilla PF-FOR-068) *
@@ -789,7 +785,7 @@ export function WithdrawalFormModal({
             {errors.reason && <p className="mt-1.5 text-[12px] text-red-600">{errors.reason}</p>}
           </fieldset>
 
-          {/* Fecha, Origen del error y Moneda */}
+          {/** Fecha, Origen del error y Moneda */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <DateField
               label="Fecha de solicitud (DIA / MES / AÑO)"
@@ -822,7 +818,7 @@ export function WithdrawalFormModal({
         </div>
       )}
 
-      {/* PASO 2: Renglones PF-FOR-068 (tabla tipo hoja de cálculo) */}
+      {/** PASO 2: Renglones PF-FOR-068 (tabla tipo hoja de cálculo) */}
       {step === 2 && (
         <div key="withdrawal-step-2" className={stepPanelClass}>
           <WithdrawalLinesSpreadsheet
@@ -897,7 +893,7 @@ export function WithdrawalFormModal({
         </Modal>
       )}
 
-      {/* Confirmación al salir con cambios sin guardar */}
+      {/** Confirmación al salir con cambios sin guardar */}
       {confirmCloseOpen && (
         <Modal
           title="¿Salir del formulario?"
@@ -941,7 +937,7 @@ export function WithdrawalFormModal({
         </Modal>
       )}
 
-      {/* Prompt al completar para cerrar el ticket si corresponde */}
+      {/** Prompt al completar para cerrar el ticket si corresponde */}
       {showClosePrompt && completedWithdrawal && (
         <Modal
           title="Solicitud de retiro registrada"

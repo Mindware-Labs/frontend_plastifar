@@ -86,7 +86,7 @@ export function WithdrawalsPage() {
     fallbackError: "No se pudieron cargar las solicitudes de retiro. Vuelve a intentarlo.",
   });
 
-  const rows = data?.items ?? [];
+  const rows = useMemo(() => data?.items ?? [], [data?.items]);
   const counts = data?.counts;
   const pageIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);

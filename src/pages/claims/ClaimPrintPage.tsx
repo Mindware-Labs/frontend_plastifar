@@ -31,12 +31,7 @@ function Box({ checked, label }: { checked: boolean; label: string }) {
   );
 }
 
-/**
- * RF-R9: la reclamación con la distribución y el control documental del
- * PF-FOR-034, en una página propia con hoja de estilos de impresión y sin
- * dependencias nuevas. Fuera del armazón de la aplicación a propósito: la
- * barra lateral no se imprime.
- */
+/** RF-R9: la reclamación con la distribución y el control documental del PF-FOR-034, en un... */
 export function ClaimPrintPage() {
   const { id } = useParams();
   const claimId = Number(id);
@@ -71,7 +66,7 @@ export function ClaimPrintPage() {
       filename={`${CLAIM_FORM_CONTROL.code}_${claim.ticketNumber || claim.id}.pdf`}
       onExportExcel={() => exportClaimToExcel(claim)}
     >
-      {/* Cabecera: A1:I1 y F3:F4 */}
+      {/** Cabecera: A1:I1 y F3:F4 */}
       <header className="avoid-break mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b-2 border-brand-red pb-2">
         <Logo height={28} />
         <div className="text-center">
@@ -88,7 +83,7 @@ export function ClaimPrintPage() {
         </div>
       </header>
 
-      {/* I. Información General: A5, A6:I7 */}
+      {/** I. Información General: A5, A6:I7 */}
       <section className="avoid-break mb-2">
         <h2 className={sectionTitle}>I. Información General</h2>
         <div className="grid grid-cols-3">
@@ -101,7 +96,7 @@ export function ClaimPrintPage() {
         </div>
       </section>
 
-      {/* II. Información General sobre la Reclamación: A9, A10:H38 */}
+      {/** II. Información General sobre la Reclamación: A9, A10:H38 */}
       <section className="avoid-break mb-2">
         <h2 className={sectionTitle}>II. Información General sobre la Reclamación:</h2>
         <div className="grid grid-cols-2 border border-black">
@@ -179,7 +174,7 @@ export function ClaimPrintPage() {
           </div>
         </div>
 
-        {/* A34:H37: Facturados / Recibidos / Dif / Precio / Total */}
+        {/** A34:H37: Facturados / Recibidos / Dif / Precio / Total */}
         <table className="mt-1 w-full border-collapse">
           <thead>
             <tr className="bg-zinc-100">
@@ -212,7 +207,7 @@ export function ClaimPrintPage() {
         </table>
       </section>
 
-      {/* III. Descripción: A39, filas 40-43, A45 */}
+      {/** III. Descripción: A39, filas 40-43, A45 */}
       <section className="avoid-break mb-2">
         <h2 className={sectionTitle}>III. Descripción de la Reclamación</h2>
         <div className="min-h-[72px] whitespace-pre-line border border-black px-1.5 py-1">{claim.description}</div>
@@ -227,7 +222,7 @@ export function ClaimPrintPage() {
         </div>
       </section>
 
-      {/* IV. Tratamiento: A51:A62 */}
+      {/** IV. Tratamiento: A51:A62 */}
       <section className="avoid-break mb-2">
         <h2 className={sectionTitle}>
           IV. Tratamiento de la Reclamación{" "}
@@ -287,7 +282,7 @@ export function ClaimPrintPage() {
         </div>
       </section>
 
-      {/* Pie: control documental */}
+      {/** Pie: control documental */}
       <footer className="mt-3 flex flex-wrap justify-between gap-x-4 gap-y-0.5 border-t border-black pt-1 text-[9px]">
         <span className="font-semibold">{CLAIM_FORM_CONTROL.code}</span>
         <span>Revisión No.: {CLAIM_FORM_CONTROL.revision}</span>

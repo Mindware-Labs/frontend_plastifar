@@ -8,11 +8,7 @@ import { formatPrice, formatQuantity } from "../../lib/numbers";
 import { exportWithdrawalToExcel } from "../../lib/withdrawalExcelExport";
 import { splitIsoDate, WITHDRAWAL_FORM_CONTROL } from "../../lib/withdrawals";
 
-/**
- * RF-M8: la solicitud con la distribución exacta del PF-FOR-068 (FR-Retiro de Mercancia),
- * en horizontal, con 15 renglones de producto, la fecha partida en DIA/MES/AÑO y las
- * tres líneas de firma (Vendedor, Almacén, Cliente) dentro del marco oficial.
- */
+/** RF-M8: la solicitud con la distribución exacta del PF-FOR-068 (FR-Retiro de Mercancia),... */
 export function WithdrawalPrintPage() {
   const { id } = useParams();
   const withdrawalId = Number(id);
@@ -37,9 +33,9 @@ export function WithdrawalPrintPage() {
       filename={`${WITHDRAWAL_FORM_CONTROL.code}_${withdrawal.number || withdrawal.id}.pdf`}
       onExportExcel={() => exportWithdrawalToExcel(withdrawal)}
     >
-      {/* Marco exterior completo A1:N32 del formato oficial FR-Retiro de Mercancia */}
+      {/** Marco exterior completo A1:N32 del formato oficial FR-Retiro de Mercancia */}
       <div className="avoid-break border border-black font-sans text-[11px] text-black">
-        {/* Filas 1 a 4: Recuadro superior con logo a la izquierda */}
+        {/** Filas 1 a 4: Recuadro superior con logo a la izquierda */}
         <div className="flex min-h-[68px] items-center justify-between border-b border-black px-4 py-2.5">
           <Logo height={42} />
           <div className="text-right text-[10px] text-zinc-700">
@@ -50,15 +46,15 @@ export function WithdrawalPrintPage() {
           </div>
         </div>
 
-        {/* Fila 5: Barra de título centrada */}
+        {/** Fila 5: Barra de título centrada */}
         <div className="border-b border-black py-1 text-center text-[12px] font-bold uppercase tracking-wide">
           SOLICITUD RETIRO DE MERCANCIA
         </div>
 
-        {/* Filas 6 a 10: Nombre Empresa, Por Devolución / Por Cambio y cuadro FECHA (DIA / MES / AÑO) */}
+        {/** Filas 6 a 10: Nombre Empresa, Por Devolución / Por Cambio y cuadro FECHA (DIA / MES / AÑO) */}
         <div className="border-b border-black px-3 py-2.5">
           <div className="grid grid-cols-[1fr_260px] items-start gap-6">
-            {/* Columna izquierda: Nombre Empresa y casillas de motivo */}
+            {/** Columna izquierda: Nombre Empresa y casillas de motivo */}
             <div className="space-y-2.5">
               <div className="flex items-end gap-3 pt-1">
                 <span className="shrink-0 font-bold">Nombre Empresa</span>
@@ -81,7 +77,7 @@ export function WithdrawalPrintPage() {
               </div>
             </div>
 
-            {/* Columna derecha: Línea superior + Tabla FECHA (DIA / MES / AÑO) */}
+            {/** Columna derecha: Línea superior + Tabla FECHA (DIA / MES / AÑO) */}
             <div className="flex flex-col">
               <div className="mb-1.5 h-[22px] border-b border-black" />
               <table className="w-full border-collapse text-center text-[11px]">
@@ -111,10 +107,10 @@ export function WithdrawalPrintPage() {
           </div>
         </div>
 
-        {/* Fila 11: Franja separadora de la plantilla */}
+        {/** Fila 11: Franja separadora de la plantilla */}
         <div className="h-3 border-b border-black" />
 
-        {/* Filas 12 a 27: Tabla de productos (15 renglones mínimo) */}
+        {/** Filas 12 a 27: Tabla de productos (15 renglones mínimo) */}
         <table className="w-full border-collapse">
           <thead>
             <tr>
@@ -144,7 +140,7 @@ export function WithdrawalPrintPage() {
           </tbody>
         </table>
 
-        {/* Filas 28 a 32: Bloque de firmas (Vendedor, Almacén, Cliente) */}
+        {/** Filas 28 a 32: Bloque de firmas (Vendedor, Almacén, Cliente) */}
         <div className="px-8 pt-8 pb-4">
           <div className="grid grid-cols-3 gap-12 text-center">
             <div>

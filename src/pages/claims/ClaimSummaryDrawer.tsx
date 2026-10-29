@@ -104,7 +104,6 @@ export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps
           <ClaimExecutiveSummary
             claim={detail.claim}
             closureConditions={detail.closureConditions}
-            canClose={detail.canClose}
           />
         </div>
       ) : null}

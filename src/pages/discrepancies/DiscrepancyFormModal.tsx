@@ -238,7 +238,7 @@ interface DiscrepancyFormModalProps {
   };
   onClose: () => void;
   onSaved: (detail: DiscrepancyDetail) => void;
-  /** Si es true, se renderiza como una página completa dentro de la pestaña en vez de una ventana emergente modal */
+  /** Si es true, se renderiza como una página completa dentro de la pestaña en vez de una ve... */
   inline?: boolean;
 }
 
@@ -266,13 +266,7 @@ function FormDivider({ title }: { title: string }) {
   );
 }
 
-/**
- * Formulario de Investigación de Discrepancia de Carga (PF-FOR-291)
- * Reestructurado en 3 pasos con diseño editorial y simetría perfecta:
- * 1. Identificación y Origen (Ticket + Fecha de despacho)
- * 2. Tabla editorial de Líneas en discrepancia + Nota operativa
- * 3. Checklist de Puntos de Seguridad (Positivo / Negativo con 'X')
- */
+/** Formulario de Investigación de Discrepancia de Carga (PF-FOR-291) Reestructurado en 3 p... */
 export function DiscrepancyFormModal({
   discrepancy,
   ticketId,
@@ -711,7 +705,7 @@ export function DiscrepancyFormModal({
     }
   }
 
-  // Dinamismo de ancho para modal: amplio para la tabla editorial sin apretar columnas ni saltos bruscos
+  // Dinamismo de ancho para modal: amplio para la tabla editorial sin apretar columnas ni s...
   const modalMaxWidth =
     step === 1 ? "max-w-2xl" : "max-w-[96vw] 2xl:max-w-[1720px] w-full";
 
@@ -722,7 +716,7 @@ export function DiscrepancyFormModal({
   // Stepper Header
   const renderStepper = () => (
     <div className="flex w-full items-center justify-between max-w-lg mx-auto select-none">
-      {/* Paso 1 */}
+      {/** Paso 1 */}
       <button
         type="button"
         onClick={() => setStep(1)}
@@ -757,7 +751,7 @@ export function DiscrepancyFormModal({
         }`}
       />
 
-      {/* Paso 2 */}
+      {/** Paso 2 */}
       <button
         type="button"
         onClick={() => {
@@ -795,7 +789,7 @@ export function DiscrepancyFormModal({
         }`}
       />
 
-      {/* Paso 3 */}
+      {/** Paso 3 */}
       <button
         type="button"
         onClick={() => {
@@ -830,11 +824,11 @@ export function DiscrepancyFormModal({
   // Paso 1: Origen e Identificación (Diseño Editorial Simétrico de 2 Columnas)
   const renderStep1 = () => (
     <div className="flex flex-col gap-5 animate-plf-fade">
-      {/* Grilla simétrica de 2 paneles principales */}
+      {/** Grilla simétrica de 2 paneles principales */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
-        {/* Panel 1 (Izquierda): Identificación del Caso & Ticket */}
+        {/** Panel 1 (Izquierda): Identificación del Caso & Ticket */}
         <div className="flex flex-col justify-between rounded-xl border border-zinc-200/90 bg-white shadow-2xs overflow-hidden">
-          {/* Cabecera del panel */}
+          {/** Cabecera del panel */}
           <div className="border-b border-zinc-100 bg-zinc-50/70 px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="flex size-6 items-center justify-center rounded-md bg-zinc-200/60 text-zinc-700 font-heading text-xs font-bold">
@@ -849,7 +843,7 @@ export function DiscrepancyFormModal({
             </span>
           </div>
 
-          {/* Cuerpo del panel */}
+          {/** Cuerpo del panel */}
           <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4">
             <Controller
               name="ticketId"
@@ -883,7 +877,7 @@ export function DiscrepancyFormModal({
               )}
             />
 
-            {/* Ficha sintética del ticket seleccionado */}
+            {/** Ficha sintética del ticket seleccionado */}
             {ticketLabel ? (
               <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-3.5 space-y-2.5">
                 <div className="flex items-start justify-between gap-2">
@@ -918,16 +912,16 @@ export function DiscrepancyFormModal({
             )}
           </div>
 
-          {/* Pie informativo del panel */}
+          {/** Pie informativo del panel */}
           <div className="bg-zinc-50/50 px-4 py-2.5 border-t border-zinc-100 text-[11px] text-zinc-400 flex items-center gap-1.5">
             <Info className="size-3.5 shrink-0 text-zinc-400" />
             <span>Documenta diferencias entre la carga facturada y la despachada.</span>
           </div>
         </div>
 
-        {/* Panel 2 (Derecha): Fecha de Despacho & Parámetros Operativos */}
+        {/** Panel 2 (Derecha): Fecha de Despacho & Parámetros Operativos */}
         <div className="flex flex-col justify-between rounded-xl border border-zinc-200/90 bg-white shadow-2xs overflow-hidden">
-          {/* Cabecera del panel */}
+          {/** Cabecera del panel */}
           <div className="border-b border-zinc-100 bg-zinc-50/70 px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="flex size-6 items-center justify-center rounded-md bg-zinc-200/60 text-zinc-700 font-heading text-xs font-bold">
@@ -942,7 +936,7 @@ export function DiscrepancyFormModal({
             </span>
           </div>
 
-          {/* Cuerpo del panel */}
+          {/** Cuerpo del panel */}
           <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4">
             <DateField
               label="Fecha del despacho"
@@ -954,7 +948,7 @@ export function DiscrepancyFormModal({
               align="end"
             />
 
-            {/* Pauta operativa */}
+            {/** Pauta operativa */}
             <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-3.5 space-y-2">
               <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-zinc-400 block">
                 Criterios de verificación inicial
@@ -976,7 +970,7 @@ export function DiscrepancyFormModal({
             </div>
           </div>
 
-          {/* Pie informativo del panel */}
+          {/** Pie informativo del panel */}
           <div className="bg-zinc-50/50 px-4 py-2.5 border-t border-zinc-100 text-[11px] text-zinc-400 flex items-center gap-1.5">
             <Truck className="size-3.5 shrink-0 text-zinc-400" />
             <span>Fecha oficial para trazabilidad de precinto y contenedor.</span>
@@ -984,7 +978,7 @@ export function DiscrepancyFormModal({
         </div>
       </div>
 
-      {/* Banner de Flujo de Investigación (3 Fases) */}
+      {/** Banner de Flujo de Investigación (3 Fases) */}
       <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
@@ -1022,7 +1016,7 @@ export function DiscrepancyFormModal({
 
     return (
       <div className="flex min-w-0 flex-col gap-3.5 animate-plf-fade">
-        {/* Encabezado con divisor oficial y pestañas interactivas */}
+        {/** Encabezado con divisor oficial y pestañas interactivas */}
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex items-center justify-between">
             <FormDivider title="Líneas en discrepancia (Formato PF-FOR-291)" />
@@ -1031,7 +1025,7 @@ export function DiscrepancyFormModal({
             </span>
           </div>
 
-          {/* Barra de pestañas interactiva */}
+          {/** Barra de pestañas interactiva */}
           <div className="animate-plf-tabs-in min-w-0 border-b border-zinc-200/80 pb-2">
             <FormLineTabStrip
               activeIndex={safeActiveLineIndex}
@@ -1116,7 +1110,7 @@ export function DiscrepancyFormModal({
           </div>
         </div>
 
-        {/* Ficha de la Línea Activa en la misma posición con animación fluida oficial del módulo */}
+        {/** Ficha de la Línea Activa en la misma posición con animación fluida oficial del módulo */}
         {activeField && (
           <div key={activeField.id} className="animate-plf-apple-tab">
             <DiscrepancyLineCard
@@ -1137,7 +1131,7 @@ export function DiscrepancyFormModal({
           </div>
         )}
 
-        {/* SECCIÓN DE LA NOTA (según PF-FOR-291) */}
+        {/** SECCIÓN DE LA NOTA (según PF-FOR-291) */}
         <div className="mt-2 flex flex-col gap-1.5">
         <FormDivider title="Uso interno" />
         <TextAreaField
@@ -1205,7 +1199,7 @@ export function DiscrepancyFormModal({
         </div>
       </div>
 
-      {/* TABLA DE PUNTOS DE SEGURIDAD */}
+      {/** TABLA DE PUNTOS DE SEGURIDAD */}
       <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xs">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -1248,7 +1242,7 @@ export function DiscrepancyFormModal({
                       </span>
                     )}
                   </td>
-                  {/* Checkbox / Botón POSITIVO */}
+                  {/** Checkbox / Botón POSITIVO */}
                   <td className="py-2 px-2 text-center">
                     <button
                       type="button"
@@ -1264,7 +1258,7 @@ export function DiscrepancyFormModal({
                       <X className="size-3.5 stroke-[3]" />
                     </button>
                   </td>
-                  {/* Checkbox / Botón NEGATIVO */}
+                  {/** Checkbox / Botón NEGATIVO */}
                   <td className="py-2 px-2 text-center">
                     <button
                       type="button"
@@ -1477,10 +1471,10 @@ export function DiscrepancyFormModal({
         ref={inlineMotion.panelRef}
         className="rounded-xl border border-zinc-200 bg-white shadow-2xs overflow-hidden"
       >
-        {/* Encabezado Editorial Limpio, Simétrico y Organizado */}
+        {/** Encabezado Editorial Limpio, Simétrico y Organizado */}
         <div className="border-b border-zinc-200/80 bg-white px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-4">
-            {/* Lado Izquierdo: Botón volver + Identidad Estructurada */}
+            {/** Lado Izquierdo: Botón volver + Identidad Estructurada */}
             <div className="flex items-center gap-3.5 min-w-0">
               <button
                 type="button"
@@ -1511,7 +1505,7 @@ export function DiscrepancyFormModal({
               </div>
             </div>
 
-            {/* Lado Derecho: Metadatos del Caso con balance visual y simetría */}
+            {/** Lado Derecho: Metadatos del Caso con balance visual y simetría */}
             {ticketLabel && (
               <div className="shrink-0 flex items-center gap-2 rounded-lg border border-zinc-200/90 bg-zinc-50/70 px-3 py-1.5 text-xs text-zinc-700 shadow-2xs">
                 <span className="font-heading font-semibold text-zinc-500 text-xs">
@@ -1534,12 +1528,12 @@ export function DiscrepancyFormModal({
           </div>
         </div>
 
-        {/* Stepper centrado en su propia barra limpia */}
+        {/** Stepper centrado en su propia barra limpia */}
         <div className="border-b border-zinc-100 bg-white py-3 px-4 sm:px-6">
           {renderStepper()}
         </div>
 
-        {/* Cuerpo del formulario según el paso */}
+        {/** Cuerpo del formulario según el paso */}
         <div className="p-4 sm:p-6">
           <form
             id="discrepancy-form"
@@ -1547,21 +1541,21 @@ export function DiscrepancyFormModal({
             noValidate
             className="flex flex-col gap-3 text-left"
           >
-            {/* Paso 1: Reformulado con máxima simetría y balance editorial */}
+            {/** Paso 1: Reformulado con máxima simetría y balance editorial */}
             {step === 1 && (
               <div className="max-w-5xl mx-auto w-full py-2">
                 {renderStep1()}
               </div>
             )}
 
-            {/* Paso 2: Todo el ancho de la página para la tabla editorial */}
+            {/** Paso 2: Todo el ancho de la página para la tabla editorial */}
             {step === 2 && (
               <div className="w-full">
                 {renderStep2()}
               </div>
             )}
 
-            {/* Paso 3: Centrado de manera cómoda para los 9 puntos */}
+            {/** Paso 3: Centrado de manera cómoda para los 9 puntos */}
             {step === 3 && (
               <div className="max-w-4xl mx-auto w-full py-2">
                 {renderStep3()}
@@ -1570,7 +1564,7 @@ export function DiscrepancyFormModal({
           </form>
         </div>
 
-        {/* Barra inferior de navegación y guardado */}
+        {/** Barra inferior de navegación y guardado */}
         <div className="border-t border-zinc-200/80 bg-zinc-50/70 px-5 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
           {renderFooterLeft()}
           {renderFooterButtons()}
@@ -1629,7 +1623,7 @@ export function DiscrepancyFormModal({
   );
 }
 
-/** Ficha estructurada de línea en discrepancia con 2 filas organizadas (CERO SCROLL HORIZONTAL) */
+/** Ficha estructurada de línea en discrepancia con 2 filas organizadas (CERO SCROLL HORIZO... */
 interface DiscrepancyLineCardProps {
   index: number;
   control: Control<FormValues>;
@@ -1678,7 +1672,7 @@ function DiscrepancyLineCard({
 
   return (
     <div className="rounded-xl border border-zinc-200/90 bg-white shadow-2xs overflow-hidden transition-all hover:border-zinc-300">
-      {/* Cabecera de la línea con número, estado de balance y acción quitar */}
+      {/** Cabecera de la línea con número, estado de balance y acción quitar */}
       <div className="border-b border-zinc-100 bg-zinc-50/70 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <span className="flex size-5.5 items-center justify-center rounded-md bg-zinc-200/80 text-zinc-700 font-heading text-xs font-bold">
@@ -1717,11 +1711,11 @@ function DiscrepancyLineCard({
         )}
       </div>
 
-      {/* Cuerpo en 2 sub-filas 100% responsivas sin scroll */}
+      {/** Cuerpo en 2 sub-filas 100% responsivas sin scroll */}
       <div className="p-3.5 sm:p-4 flex flex-col gap-3">
-        {/* Fila 1: Documentos & Producto (12 columnas) */}
+        {/** Fila 1: Documentos & Producto (12 columnas) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-start">
-          {/* 1. # Reclamo */}
+          {/** 1. # Reclamo */}
           <div className="lg:col-span-2">
             <TextField
               size="sm"
@@ -1732,7 +1726,7 @@ function DiscrepancyLineCard({
             />
           </div>
 
-          {/* 2. Factura * */}
+          {/** 2. Factura * */}
           <div className="lg:col-span-2">
             <TextField
               size="sm"
@@ -1744,7 +1738,7 @@ function DiscrepancyLineCard({
             />
           </div>
 
-          {/* 3. Cliente */}
+          {/** 3. Cliente */}
           <div className="lg:col-span-3">
             <Controller
               name={`lines.${index}.clientId`}
@@ -1781,7 +1775,7 @@ function DiscrepancyLineCard({
             />
           </div>
 
-          {/* 4. Producto * */}
+          {/** 4. Producto * */}
           <div className="lg:col-span-5">
             <Controller
               name={`lines.${index}.productId`}
@@ -1808,9 +1802,9 @@ function DiscrepancyLineCard({
           </div>
         </div>
 
-        {/* Fila 2: Problemática, Cantidad, Nota de Crédito y Personal (12 columnas) */}
+        {/** Fila 2: Problemática, Cantidad, Nota de Crédito y Personal (12 columnas) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-12 gap-3 items-start pt-2 border-t border-zinc-100/90">
-          {/* 5. Problemática (Faltante / Sobrante) */}
+          {/** 5. Problemática (Faltante / Sobrante) */}
           <div className="lg:col-span-2">
             <Controller
               name={`lines.${index}.discrepancyType`}
@@ -1837,7 +1831,7 @@ function DiscrepancyLineCard({
             />
           </div>
 
-          {/* 6. Cantidad */}
+          {/** 6. Cantidad */}
           <div className="lg:col-span-2">
             <TextField
               size="sm"
@@ -1854,7 +1848,7 @@ function DiscrepancyLineCard({
             />
           </div>
 
-          {/* 7. ¿Cumple para N/C? */}
+          {/** 7. ¿Cumple para N/C? */}
           <div className="lg:col-span-2">
             <Controller
               name={`lines.${index}.qualifies`}
@@ -1879,7 +1873,7 @@ function DiscrepancyLineCard({
             />
           </div>
 
-          {/* 8. # N/C */}
+          {/** 8. # N/C */}
           <div className="lg:col-span-2">
             <Controller
               name={`lines.${index}.qualifies`}
@@ -1900,7 +1894,7 @@ function DiscrepancyLineCard({
             />
           </div>
 
-          {/* 9. Despachador * */}
+          {/** 9. Despachador * */}
           <div className="lg:col-span-2 flex flex-col gap-1.5">
             <label
               htmlFor={
@@ -1997,7 +1991,7 @@ function DiscrepancyLineCard({
             )}
           </div>
 
-          {/* 10. Supervisor */}
+          {/** 10. Supervisor */}
           <div className="lg:col-span-2">
             <TextField
               size="sm"

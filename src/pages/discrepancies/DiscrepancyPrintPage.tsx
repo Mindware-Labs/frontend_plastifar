@@ -26,11 +26,7 @@ function Mark({ on }: { on: boolean }) {
   return <span className="inline-block w-4 text-center font-bold">{on ? "X" : " "}</span>;
 }
 
-/**
- * RF-D8: la investigación con la distribución del PF-FOR-291 en horizontal,
- * el control documental y las dos líneas de firma. Fuera del armazón para
- * que la barra lateral no salga en el papel.
- */
+/** RF-D8: la investigación con la distribución del PF-FOR-291 en horizontal, el control do... */
 export function DiscrepancyPrintPage() {
   const { id } = useParams();
   const discrepancyId = Number(id);
@@ -53,7 +49,7 @@ export function DiscrepancyPrintPage() {
       filename={`${DISCREPANCY_FORM_CONTROL.code}_${discrepancy.number}.pdf`}
       onExportExcel={() => exportDiscrepancyToExcel(discrepancy)}
     >
-      {/* Cabecera: filas 1 a 3, título y control documental */}
+      {/** Cabecera: filas 1 a 3, título y control documental */}
       <header className="avoid-break mb-2 grid grid-cols-[auto_1fr_auto] items-center gap-4 border-2 border-black px-3 py-2">
         <Logo height={26} />
         <h1 className="text-center text-[14px] font-bold uppercase">{DISCREPANCY_FORM_CONTROL.title}</h1>
@@ -84,7 +80,7 @@ export function DiscrepancyPrintPage() {
         </span>
       </p>
 
-      {/* Líneas: filas 5 a 12 */}
+      {/** Líneas: filas 5 a 12 */}
       <table className="avoid-break mb-2 w-full border-collapse">
         <thead>
           <tr className="bg-zinc-100">
@@ -129,7 +125,7 @@ export function DiscrepancyPrintPage() {
         </tbody>
       </table>
 
-      {/* Firmas y nota: filas 14 a 17 */}
+      {/** Firmas y nota: filas 14 a 17 */}
       <section className="avoid-break mb-2 grid grid-cols-[1fr_1.4fr] gap-3">
         <div className="flex flex-col gap-3">
           <div className="border-b border-black pb-1">
@@ -151,7 +147,7 @@ export function DiscrepancyPrintPage() {
         </div>
       </section>
 
-      {/* Puntos de seguridad: filas 19 a 29 */}
+      {/** Puntos de seguridad: filas 19 a 29 */}
       <table className="avoid-break w-full border-collapse">
         <thead>
           <tr className="bg-zinc-100">

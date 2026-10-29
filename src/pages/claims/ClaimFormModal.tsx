@@ -244,12 +244,7 @@ function bindAutoResizeTextarea(
   };
 }
 
-/**
- * RF-R1, RF-R2 y RF-R3: las secciones I a III del PF-FOR-034, con las líneas
- * de producto y el cálculo en vivo de diferencia y total. El valor que se
- * guarda es el que calcula el servidor; lo de aquí es para ver mientras se
- * escribe (regla 6).
- */
+/** RF-R1, RF-R2 y RF-R3: las secciones I a III del PF-FOR-034, con las líneas de producto ... */
 export function ClaimFormModal({
   ticketId,
   ticketNumber,
@@ -340,8 +335,7 @@ export function ClaimFormModal({
     clientPhoneProp,
   );
 
-  // Las plantas son catálogo acotado (16 en la fuente): se recorren enteras.
-  // Una planta desactivada después de marcarla sigue ofreciéndose en edición.
+  // Las plantas son catálogo acotado (16 en la fuente): se recorren enteras. Una planta des...
   useEffect(() => {
     fetchAllPages<Plant>((page, pageSize) => settingsApi.plants.list({ page, pageSize }))
       .then(setPlants)
@@ -1031,7 +1025,7 @@ export function ClaimFormModal({
               </div>
 
               <div className="flex flex-col gap-4 p-4 sm:p-5">
-                {/* Fila 1: Selector de producto (aprovecha el ancho) y Precio unitario */}
+                {/** Fila 1: Selector de producto (aprovecha el ancho) y Precio unitario */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   <div className="sm:col-span-2 lg:col-span-3">
                     <Controller
@@ -1070,7 +1064,7 @@ export function ClaimFormModal({
                   </div>
                 </div>
 
-                {/* Fila 2: Cuadrícula equilibrada de 4 columnas para las cantidades */}
+                {/** Fila 2: Cuadrícula equilibrada de 4 columnas para las cantidades */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <TextField
                     size="sm"

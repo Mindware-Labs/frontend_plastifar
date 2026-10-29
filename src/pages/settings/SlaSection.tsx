@@ -86,7 +86,7 @@ export function SlaSection() {
   const holidaysRef = useReferenceData<Holiday[]>(loadHolidays, []);
   const holidays = holidaysRef.data;
 
-  const rows = data?.items ?? [];
+  const rows = useMemo(() => data?.items ?? [], [data?.items]);
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todas" || priority !== "todas" || typeFilter !== "todas";
 

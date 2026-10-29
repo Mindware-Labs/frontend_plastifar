@@ -33,11 +33,7 @@ import { DiscrepancyStatusBadge, SecurityFindingBadge } from "./DiscrepancyStatu
 
 type CheckChoice = "" | SecurityCheckResult;
 
-/**
- * Detalle de la investigación: líneas, nota, puntos de seguridad y la ficha
- * de realización y aprobación. Un hallazgo de seguridad se muestra destacado
- * en la cabecera (sección 11 y 15).
- */
+/** Detalle de la investigación: líneas, nota, puntos de seguridad y la ficha de realizació... */
 export function DiscrepancyDetailPage() {
   const { id } = useParams();
   const discrepancyId = Number(id);

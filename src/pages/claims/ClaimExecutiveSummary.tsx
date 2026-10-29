@@ -18,7 +18,6 @@ import { ClaimStatusBadge } from "./ClaimStatusBadge";
 interface ClaimExecutiveSummaryProps {
   claim: CustomerClaim;
   closureConditions?: ClaimClosureCondition[];
-  canClose?: boolean;
   canOpenHca?: boolean;
   onStartHca?: () => void;
   isOpeningHca?: boolean;
@@ -43,7 +42,7 @@ export function ClaimExecutiveSummary({
 
   return (
     <div className="space-y-4 text-xs">
-      {/* 1. Header Card / Seal */}
+      {/** 1. Header Card / Seal */}
       <div className="rounded-xl border border-zinc-200/90 bg-white p-4.5 shadow-2xs">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1 text-left">
@@ -83,7 +82,7 @@ export function ClaimExecutiveSummary({
         </div>
       </div>
 
-      {/* 2. Four KPI Metric Cards */}
+      {/** 2. Four KPI Metric Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5 shadow-3xs">
           <span className={kpiLabelClass}>Código de reclamación</span>
@@ -117,7 +116,7 @@ export function ClaimExecutiveSummary({
         </div>
       </div>
 
-      {/* 3. General Information Card */}
+      {/** 3. General Information Card */}
       <div className="rounded-xl border border-zinc-200/90 bg-white p-4 shadow-2xs">
         <div className="flex items-center gap-2 border-b border-zinc-100 pb-2.5">
           <Building2 className="h-4 w-4 text-zinc-500" />
@@ -188,7 +187,7 @@ export function ClaimExecutiveSummary({
         </div>
       </div>
 
-      {/* 4. Description and Comments */}
+      {/** 4. Description and Comments */}
       {claim.description?.trim() && (
         <div className="rounded-xl border border-zinc-200/90 bg-white p-4 shadow-2xs">
           <div className="flex items-center gap-2 border-b border-zinc-100 pb-2">
@@ -213,7 +212,7 @@ export function ClaimExecutiveSummary({
         </div>
       )}
 
-      {/* 5. Claimed Products Table */}
+      {/** 5. Claimed Products Table */}
       <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xs">
         <div className="flex items-center justify-between border-b border-zinc-200/80 bg-zinc-50/70 px-4 py-2.5">
           <div className="flex items-center gap-2">
@@ -273,7 +272,7 @@ export function ClaimExecutiveSummary({
         </div>
       </div>
 
-      {/* 6. Section IV: Quality Treatment */}
+      {/** 6. Section IV: Quality Treatment */}
       <div className="rounded-xl border border-zinc-200/90 bg-white p-4 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-2.5">
           <div className="flex items-center gap-2">

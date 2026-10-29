@@ -56,11 +56,7 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
   { key: "Cerrada", label: "Cerradas", status: "Cerrada", countKey: "closed" },
 ];
 
-/**
- * RF-R8: listado paginado de reclamaciones con selección múltiple, exportación
- * en común (Excel y PDF del listado), visor de resumen estilo formularios
- * empresariales y filtros por motivo, planta, cliente y fecha.
- */
+/** RF-R8: listado paginado de reclamaciones con selección múltiple, exportación en común (... */
 export function ClaimsPage() {
   const receipts = useReceipts();
   const [plants, setPlants] = useState<Plant[]>([]);
@@ -118,7 +114,7 @@ export function ClaimsPage() {
     fallbackError: "No se pudieron cargar las reclamaciones. Vuelve a intentarlo.",
   });
 
-  const rows = data?.items ?? [];
+  const rows = useMemo(() => data?.items ?? [], [data?.items]);
   const counts = data?.counts;
 
   // Multi-row selection
@@ -503,7 +499,7 @@ export function ClaimsPage() {
         )}
       </ListPanel>
 
-      {/* Drawer con el Resumen Ejecutivo al hacer clic */}
+      {/** Drawer con el Resumen Ejecutivo al hacer clic */}
       {summaryClaimId !== null && (
         <ClaimSummaryDrawer claimId={summaryClaimId} onClose={() => setSummaryClaimId(null)} />
       )}

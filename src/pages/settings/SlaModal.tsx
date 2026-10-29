@@ -715,7 +715,7 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        {/* 1. TIPO Y ALCANCE */}
+        {/** 1. TIPO Y ALCANCE */}
         <FormDivider title="Tipo y alcance" />
 
         <Controller
@@ -808,7 +808,7 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
           </div>
         </div>
 
-        {/* 2. COMPROMISO DE TIEMPO */}
+        {/** 2. COMPROMISO DE TIEMPO */}
         <FormDivider title="Compromiso de tiempo" />
 
         <Controller
@@ -833,7 +833,7 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
           )}
         />
 
-        {/* 3. HORARIO Y JORNADA */}
+        {/** 3. HORARIO Y JORNADA */}
         <FormDivider title="Jornada y cómputo" />
 
         <CheckboxField
@@ -964,7 +964,7 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
           </div>
         </div>
 
-        {/* 4. CONFIGURACIÓN */}
+        {/** 4. CONFIGURACIÓN */}
         <FormDivider title="Comportamiento" />
 
         <div className="flex flex-col gap-2">

@@ -23,11 +23,7 @@ import { WithdrawalDecisionModal } from "./WithdrawalDecisionModal";
 import { WithdrawalFormModal } from "./WithdrawalFormModal";
 import { WithdrawalStatusBadge } from "./WithdrawalStatusBadge";
 
-/**
- * Ficha de la solicitud: datos, líneas con lo recogido y la diferencia, y las
- * tres firmas (vendedor, aprobación y almacén). Qué botón se ofrece lo decide
- * el servidor (`canEdit`, `canDecide`, `canComplete`, `canCancel`).
- */
+/** Ficha de la solicitud: datos, líneas con lo recogido y la diferencia, y las tres firmas... */
 export function WithdrawalDetailPage() {
   const { id } = useParams();
   const withdrawalId = Number(id);

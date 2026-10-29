@@ -23,10 +23,7 @@ import { ClaimFormModal } from "./ClaimFormModal";
 import { ClaimTreatmentModal } from "./ClaimTreatmentModal";
 import { ReopenClaimModal } from "./ReopenClaimModal";
 
-/**
- * RF-R4 a RF-R7: la ficha ejecutiva de una reclamación.
- * Estilo visual unificado idéntico al que se ve en la pestaña de Formularios en los tickets.
- */
+/** RF-R4 a RF-R7: la ficha ejecutiva de una reclamación. Estilo visual unificado idéntico ... */
 export function ClaimDetailPage() {
   const { id } = useParams();
   const claimId = Number(id);
@@ -173,7 +170,6 @@ export function ClaimDetailPage() {
         <ClaimExecutiveSummary
           claim={claim}
           closureConditions={closureConditions}
-          canClose={canClose}
           canOpenHca={canOpenHca}
           onStartHca={startHca}
           isOpeningHca={openingHca === "cargando"}

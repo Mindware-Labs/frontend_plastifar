@@ -39,24 +39,11 @@ interface WithdrawalCompleteModalProps {
   withdrawal: MerchandiseWithdrawal;
   onClose: () => void;
   onSaved: (detail: WithdrawalDetail) => void;
-  /**
-   * 409: la solicitud cambió en el servidor (otro la decidió, la retiró o la
-   * canceló). Quien abre el modal recarga la ficha y muestra el mensaje.
-   */
+  /** 409: la solicitud cambió en el servidor (otro la decidió, la retiró o la canceló). Quie... */
   onConflict?: (message: string) => void;
 }
 
-/**
- * RF-W5: registrar el retiro efectuado. Cada línea lleva la cantidad que se
- * recogió de verdad; si difiere de la solicitada, la diferencia queda visible
- * en la ficha (regla 10). Quien registra firma como Almacén; la firma del
- * cliente va en el papel y aquí se guarda su nombre (pregunta 6).
- *
- * Integración diferida (docs/plan/02, módulo de tickets y tareas): RF-W4 pide
- * llegar aquí desde la tarea de retiro de Almacén, con «Imprimir» y
- * «Registrar retiro». Ese acceso vive en el detalle de la tarea, que es del
- * módulo de tickets; por ahora se registra desde la ficha de la solicitud.
- */
+/** RF-W5: registrar el retiro efectuado. Cada línea lleva la cantidad que se recogió de ve... */
 export function WithdrawalCompleteModal({ withdrawal, onClose, onSaved, onConflict }: WithdrawalCompleteModalProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
