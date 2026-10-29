@@ -4,6 +4,10 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import "./index.css";
+
+if (import.meta.env.DEV) {
+  void import("@locator/runtime").then(({ default: setupLocator }) => setupLocator());
+}
 // .
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
