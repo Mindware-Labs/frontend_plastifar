@@ -1,4 +1,4 @@
-import { Ban, CheckCircle2, Layers, ListTodo, Pencil, Plus, Power, Star, Ticket } from "lucide-react";
+import { Ban, CheckCircle2, Clock, Layers, ListTodo, Pencil, Plus, Power, Star, Ticket } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
@@ -15,6 +15,7 @@ import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Pagination } from "../../components/ui/Pagination";
 import { SelectBox } from "../../components/ui/SelectBox";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -379,11 +380,20 @@ export function SlaSection() {
         {data === null ? (
           error === null && <TableSkeleton rows={pageSize} columns={canWrite ? 10 : 9} />
         ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
-              ? "Ninguna política coincide con este filtro o búsqueda."
-              : "Todavía no hay ninguna política de SLA configurada."}
-          </p>
+          <ListEmptyState
+            icon={Clock}
+            isFiltered={isFiltering}
+            filteredTitle="Ninguna política coincide con este filtro o búsqueda."
+            onClearFilters={() => {
+              setSearch("");
+              setPriority("todas");
+              setTypeFilter("todas");
+              setChip("todas");
+              setPage(1);
+            }}
+            emptyTitle="Todavía no hay ninguna política de SLA configurada."
+            emptyDescription="Crea una política para definir plazos de respuesta y resolución en tickets y tareas."
+          />
         ) : (
           <div className={staleClass(isStale)}>
             <DataTable>

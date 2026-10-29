@@ -17,6 +17,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { TableSelectionBar, type TableSelectionAction } from "../../components/ui/TableSelectionBar";
 import { Tooltip } from "../../components/ui/Tooltip";
@@ -346,16 +347,17 @@ export function DiscrepanciesPage() {
         {data === null ? (
           error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
-          <div className="py-14 text-center">
-            <p className="text-[13.5px] text-faint">
-              {unfiltered ? "Todavía no hay investigaciones registradas." : "Ninguna investigación coincide con este filtro o búsqueda."}
-            </p>
-            {unfiltered && (
-              <p className="mx-auto mt-1.5 max-w-md text-[12.5px] text-faint">
-                Se registran desde el ticket: abre el ticket y entra a la pestaña «Discrepancia de carga».
-              </p>
-            )}
-          </div>
+          <ListEmptyState
+            icon={ShieldAlert}
+            isFiltered={!unfiltered}
+            filteredTitle="Ninguna investigación coincide con este filtro o búsqueda."
+            onClearFilters={() => {
+              setSearch("");
+              clearNarrowFilters();
+            }}
+            emptyTitle="Todavía no hay investigaciones registradas."
+            emptyDescription="Se registran desde el ticket: abre el ticket y entra a la pestaña «Discrepancia de carga»."
+          />
         ) : (
           <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
             <DataTable>

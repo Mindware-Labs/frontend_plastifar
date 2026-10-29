@@ -11,7 +11,8 @@ import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { SelectBox } from "../../components/ui/SelectBox";
-import { Spinner } from "../../components/ui/Spinner";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { TableSelectionBar } from "../../components/ui/TableSelectionBar";
 import { useAuth } from "../../context/useAuth";
@@ -296,9 +297,7 @@ export function VeredictosPage() {
         </div>
 
         {!data ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
+          <TableSkeleton rows={pageSize} columns={isAdmin ? 6 : 5} />
         ) : (
           // Atenuada mientras llega la página nueva: la anterior se queda para no dar un salto en blanco.
           <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
@@ -384,14 +383,17 @@ export function VeredictosPage() {
             </DataTable>
 
             {rows.length === 0 && (
-              <div className="flex flex-col items-center gap-2 py-14 text-center">
-                <Gavel className="h-6 w-6 text-faint" />
-                <p className="text-[13.5px] text-faint">
-                  {debouncedSearch || status !== "todos"
-                    ? "Ningún veredicto coincide con el filtro."
-                    : "Todavía no hay veredictos en el catálogo."}
-                </p>
-              </div>
+              <ListEmptyState
+                icon={Gavel}
+                isFiltered={Boolean(debouncedSearch || status !== "todos")}
+                filteredTitle="Ningún veredicto coincide con el filtro."
+                onClearFilters={() => {
+                  setSearch("");
+                  setStatus("todos");
+                }}
+                emptyTitle="Todavía no hay veredictos en el catálogo."
+                emptyDescription="Los veredictos cierran tickets con una resolución estandarizada para reportes y seguimiento."
+              />
             )}
 
             <Pagination

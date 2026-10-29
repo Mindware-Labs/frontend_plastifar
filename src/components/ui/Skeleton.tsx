@@ -85,3 +85,46 @@ export function TableSkeleton({
     </div>
   );
 }
+
+/** Lista de conversaciones en la bandeja (columna izquierda). */
+export function InboxListSkeleton({ rows = 8 }: { rows?: number }) {
+  return (
+    <div role="status" aria-label="Cargando conversaciones" className="flex flex-col gap-1 p-3 pt-0">
+      {Array.from({ length: rows }).map((_, row) => (
+        <div
+          key={row}
+          className="flex gap-2.5 rounded-lg border border-transparent px-2.5 py-2.5"
+        >
+          <Skeleton className="mt-0.5 size-4 shrink-0 rounded-full" delay={row * 40} />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Skeleton className="h-3 w-[42%]" delay={row * 40 + 20} />
+              <Skeleton className="h-2.5 w-10 shrink-0" delay={row * 40 + 30} />
+            </div>
+            <Skeleton className="h-3 w-[88%]" delay={row * 40 + 50} />
+            <Skeleton className="h-2.5 w-[65%]" delay={row * 40 + 70} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Panel de lectura mientras llega el hilo seleccionado. */
+export function MailReadingPaneSkeleton() {
+  return (
+    <div role="status" aria-label="Cargando mensaje" className="flex h-full flex-col p-6">
+      <div className="space-y-3 border-b border-line pb-5">
+        <Skeleton className="h-5 w-[70%]" />
+        <Skeleton className="h-3 w-[45%]" />
+        <Skeleton className="h-3 w-[32%]" delay={80} />
+      </div>
+      <div className="mt-6 space-y-3 flex-1">
+        {Array.from({ length: 6 }).map((_, row) => (
+          <Skeleton key={row} className="h-3 w-full" delay={120 + row * 45} />
+        ))}
+        <Skeleton className="h-3 w-[80%]" delay={400} />
+      </div>
+    </div>
+  );
+}

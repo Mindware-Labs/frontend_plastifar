@@ -20,7 +20,8 @@ import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { SelectBox } from "../../components/ui/SelectBox";
-import { Spinner } from "../../components/ui/Spinner";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -691,9 +692,7 @@ export function TicketsPage() {
         </div>
 
         {!data ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
+          <TableSkeleton rows={8} columns={10} />
         ) : (
           // Atenuada mientras llega la pagina nueva: la anterior se queda para no dar un salto en blanco.
           <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
@@ -832,29 +831,14 @@ export function TicketsPage() {
             </DataTable>
 
             {rows.length === 0 && (
-              <div className="flex flex-col items-center gap-3 py-14 text-center">
-                <span
-                  aria-hidden
-                  className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
-                >
-                  <TicketIcon className="size-4" strokeWidth={2.25} />
-                </span>
-                {hasCriteria ? (
-                  <>
-                    <p className="text-[13px] font-medium text-zinc-700">Ningún ticket coincide con estos criterios.</p>
-                    <Button variant="secondary" size="sm" onClick={clearCriteria}>
-                      Quitar filtros
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-[13px] font-medium text-zinc-700">Todavía no hay tickets.</p>
-                    <p className="max-w-xs text-[12px] leading-relaxed text-zinc-400">
-                      Se crean desde un correo de la bandeja o a mano con «Nuevo ticket».
-                    </p>
-                  </>
-                )}
-              </div>
+              <ListEmptyState
+                icon={TicketIcon}
+                isFiltered={hasCriteria}
+                filteredTitle="Ningún ticket coincide con estos criterios."
+                onClearFilters={clearCriteria}
+                emptyTitle="Todavía no hay tickets."
+                emptyDescription="Se crean desde un correo de la bandeja o a mano con «Nuevo ticket»."
+              />
             )}
 
             <Pagination

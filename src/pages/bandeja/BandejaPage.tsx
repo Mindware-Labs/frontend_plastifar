@@ -22,7 +22,8 @@ import { NotificationsModal } from "../../components/app/NotificationsModal";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Spinner } from "../../components/ui/Spinner";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { InboxListSkeleton, MailReadingPaneSkeleton, Skeleton } from "../../components/ui/Skeleton";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../components/shadcn/resizable";
 import { ScrollArea } from "../../components/shadcn/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/shadcn/tooltip";
@@ -830,8 +831,21 @@ export function BandejaPage({ folder }: BandejaPageProps) {
         />
 
         {data === null ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Spinner />
+          <div className="min-h-0 flex-1">
+            <ResizablePanelGroup className="h-full rounded-xl border border-zinc-200/80 bg-white shadow-2xs overflow-hidden">
+              <ResizablePanel defaultSize="26%" minSize="20%" maxSize="45%" className="flex flex-col">
+                <div className="flex shrink-0 flex-col gap-2.5 px-3.5 pt-3 pb-2.5">
+                  <Skeleton className="h-8 w-full rounded-lg" />
+                </div>
+                <ScrollArea className="min-h-0 flex-1">
+                  <InboxListSkeleton rows={9} />
+                </ScrollArea>
+              </ResizablePanel>
+              <ResizableHandle withHandle className="bg-zinc-200/80" />
+              <ResizablePanel minSize="35%" className="flex flex-col">
+                <MailReadingPaneSkeleton />
+              </ResizablePanel>
+            </ResizablePanelGroup>
           </div>
         ) : (
           <div className={`min-h-0 flex-1 transition-opacity ${isStale ? "opacity-60" : ""}`}>
@@ -940,12 +954,16 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
                 <ScrollArea className="min-h-0 flex-1">
                   {rows.length === 0 ? (
-                    <div className="flex h-48 flex-col items-center justify-center gap-2 px-6 text-center">
-                      <Inbox className="h-7 w-7 text-zinc-300" />
-                      <p className="text-[12.5px] text-zinc-500">
-                        {unfiltered ? meta.emptyText : "Ningún correo coincide con esta búsqueda."}
-                      </p>
-                    </div>
+                    <ListEmptyState
+                      icon={Inbox}
+                      isFiltered={!unfiltered}
+                      filteredTitle="Ningún correo coincide con esta búsqueda."
+                      onClearFilters={() => {
+                        setSearch("");
+                        setFilters(EMPTY_FILTERS);
+                      }}
+                      emptyTitle={meta.emptyText}
+                    />
                   ) : (
                     <div className="flex flex-col gap-1 p-3 pt-0">
                       {rows.map((email) => (

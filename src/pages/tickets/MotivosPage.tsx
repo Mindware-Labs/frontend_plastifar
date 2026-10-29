@@ -25,7 +25,8 @@ import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { SelectBox } from "../../components/ui/SelectBox";
-import { Spinner } from "../../components/ui/Spinner";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { TableSelectionBar } from "../../components/ui/TableSelectionBar";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -390,9 +391,7 @@ export function MotivosPage() {
         </div>
 
         {!data ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
+          <TableSkeleton rows={pageSize} columns={isAdmin ? 8 : 7} />
         ) : (
           // Atenuada mientras llega la página nueva: la anterior se queda para no dar un salto en blanco.
           <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
@@ -512,14 +511,21 @@ export function MotivosPage() {
             </DataTable>
 
             {rows.length === 0 && (
-              <div className="flex flex-col items-center gap-2 py-14 text-center">
-                <Tag className="h-6 w-6 text-faint" />
-                <p className="text-[13.5px] text-faint">
-                  {debouncedSearch || status !== "todos" || departmentId !== "todos" || priority !== "todas"
-                    ? "Ningún motivo coincide con el filtro."
-                    : "Todavía no hay motivos en el catálogo."}
-                </p>
-              </div>
+              <ListEmptyState
+                icon={Tag}
+                isFiltered={Boolean(
+                  debouncedSearch || status !== "todos" || departmentId !== "todos" || priority !== "todas",
+                )}
+                filteredTitle="Ningún motivo coincide con el filtro."
+                onClearFilters={() => {
+                  setSearch("");
+                  setStatus("todos");
+                  setDepartmentId("todos");
+                  setPriority("todas");
+                }}
+                emptyTitle="Todavía no hay motivos en el catálogo."
+                emptyDescription="Los motivos clasifican los tickets y sugieren el formulario a usar en cada caso."
+              />
             )}
 
             <Pagination

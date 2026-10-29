@@ -1,4 +1,4 @@
-import { Building2, Eye, FileSpreadsheet, FileText, Tag, UserCheck } from "lucide-react";
+import { Building2, Eye, FileSpreadsheet, FileText, PackageMinus, Tag, UserCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { withdrawalsApi, type WithdrawalCounts, type WithdrawalListResponse, type WithdrawalQuery } from "../../api/withdrawals";
@@ -17,6 +17,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { TableSelectionBar, type TableSelectionAction } from "../../components/ui/TableSelectionBar";
 import { useReceipts } from "../../context/useReceipts";
@@ -361,16 +362,17 @@ export function WithdrawalsPage() {
         {data === null ? (
           error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
-          <div className="py-14 text-center">
-            <p className="text-[13.5px] text-faint">
-              {unfiltered ? "Todavía no hay solicitudes de retiro registradas." : "Ninguna solicitud coincide con este filtro o búsqueda."}
-            </p>
-            {unfiltered && (
-              <p className="mx-auto mt-1.5 max-w-md text-[12.5px] text-faint">
-                Se registran desde el ticket: abre el ticket y entra a la pestaña «Retiro de mercancía».
-              </p>
-            )}
-          </div>
+          <ListEmptyState
+            icon={PackageMinus}
+            isFiltered={!unfiltered}
+            filteredTitle="Ninguna solicitud coincide con este filtro o búsqueda."
+            onClearFilters={() => {
+              setSearch("");
+              clearNarrowFilters();
+            }}
+            emptyTitle="Todavía no hay solicitudes de retiro registradas."
+            emptyDescription="Se registran desde el ticket: abre el ticket y entra a la pestaña «Retiro de mercancía»."
+          />
         ) : (
           <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
             <DataTable>

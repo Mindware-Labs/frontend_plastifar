@@ -23,7 +23,7 @@ import { Alert } from "../../components/ui/Alert";
 import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button as PfButton } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { Spinner } from "../../components/ui/Spinner";
+import { MailReadingPaneSkeleton } from "../../components/ui/Skeleton";
 import { TaskChip } from "../../components/app/TaskChip";
 import { TicketChip } from "../../components/app/TicketChip";
 import { useAuth } from "../../context/useAuth";
@@ -717,11 +717,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   }
 
   if (!email) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Spinner />
-      </div>
-    );
+    return <MailReadingPaneSkeleton />;
   }
 
   const displayName = email.fromName ?? email.fromEmail;
