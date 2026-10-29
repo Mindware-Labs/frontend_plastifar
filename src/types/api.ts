@@ -894,7 +894,6 @@ export interface TicketTopicResponse {
   /** Cuántos tickets lo usan: con uno solo ya no se puede borrar, solo desactivar. */
   ticketCount: number;
   updatedAt: string;
-  sharedDepartmentIds: number[];
 }
 
 /** Contadores de las pastillas: los calcula la busqueda, no la pagina que se ve. */
@@ -920,7 +919,6 @@ export interface SaveTicketTopicRequest {
   defaultPriority?: string;
   suggestedForm?: string | null;
   isActive?: boolean;
-  sharedDepartmentIds?: number[];
 }
 
 /** Opción de veredicto para el selector del diálogo "Actualizar ticket". */

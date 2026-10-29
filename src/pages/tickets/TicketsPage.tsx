@@ -1,9 +1,9 @@
 import { Building2, ChevronDown, Plus, SlidersHorizontal, Ticket as TicketIcon, X } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
@@ -30,7 +30,6 @@ import { formatActivityDate, formatSlaRemaining } from "../../lib/format";
 import type {
   DepartmentResponse,
   TicketCounts,
-  TicketInboxTabResponse,
   TicketListItemResponse,
   TicketListResponse,
   TicketQuery,
@@ -38,7 +37,6 @@ import type {
 } from "../../types/api";
 import { usePermissions } from "../../hooks/usePermissions";
 import { CreateTicketModal } from "./CreateTicketModal";
-import { TicketInboxTabs } from "./TicketInboxTabs";
 import { AssigneeCell, PriorityCell, SlaCell, StatusCell } from "./ticketCells";
 import { TicketSelectionBar } from "./TicketSelectionBar";
 
@@ -282,13 +280,10 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
 /** Bandeja de tickets: cada fila abre el detalle; marcar filas cambia la barra de criterios por la de acciones. */
 export function TicketsPage() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const receipts = useReceipts();
   const { onTicketsChanged } = useEmailCounts();
-  const { can } = usePermissions();
-
-  const [inboxTabs, setInboxTabs] = useState<TicketInboxTabResponse[]>([]);
-  const inboxTabId = searchParams.get("tab") ?? inboxTabs[0]?.id ?? undefined;
+  const { can, isAdmin } = usePermissions();
+  const canReadAllDepartments = isAdmin || can("tickets.read_all");
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [search, setSearch] = useState("");
@@ -311,21 +306,6 @@ export function TicketsPage() {
     departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
   }, []);
 
-  useEffect(() => {
-    ticketsApi
-      .inboxTabs()
-      .then((res) => {
-        setInboxTabs(res.tabs);
-        setSearchParams((prev) => {
-          if (prev.get("tab") || !res.tabs[0]?.id) return prev;
-          const next = new URLSearchParams(prev);
-          next.set("tab", res.tabs[0].id);
-          return next;
-        }, { replace: true });
-      })
-      .catch(() => setInboxTabs([]));
-  }, [setSearchParams]);
-
   const canCreateTicket = can("tickets.create");
 
   const { data, isStale, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
@@ -333,7 +313,6 @@ export function TicketsPage() {
     criteria: {
       pageSize,
       search: debouncedSearch || undefined,
-      inboxTabId,
       departmentId: departmentId === "todos" ? undefined : departmentId,
       priority: priority === "todas" ? undefined : priority,
       status: filter,
@@ -342,15 +321,6 @@ export function TicketsPage() {
     },
     fallbackError: "No se pudieron cargar los tickets",
   });
-
-  function selectInboxTab(tabId: string) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set("tab", tabId);
-      return next;
-    });
-    setPage(1);
-  }
 
   useLoadErrorReceipt(error, "tickets-list", refresh);
 
@@ -478,7 +448,21 @@ export function TicketsPage() {
 
   const bulkIds = () => Array.from(selectedIds);
 
-  const departmentOptions = buildDepartmentFilterOptions(departments);
+  const departmentOptions = useMemo(
+    () =>
+      buildDepartmentFilterOptions(
+        canReadAllDepartments
+          ? departments
+          : departments.filter((department) => can("tickets.read", department.id)),
+      ),
+    [can, canReadAllDepartments, departments],
+  );
+
+  useEffect(() => {
+    if (departmentId === "todos") return;
+    const allowed = departmentOptions.some((option) => Number(option.value) === departmentId);
+    if (!allowed) setDepartmentId("todos");
+  }, [departmentId, departmentOptions]);
   // Dos departamentos pueden llamarse igual bajo padres distintos: la columna
   // rotula con el camino, como el filtro, y cae al nombre si el id no está.
   const departmentPathById = departmentPaths(departments);
@@ -597,9 +581,6 @@ export function TicketsPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {inboxTabs.length > 0 && inboxTabId && (
-          <TicketInboxTabs tabs={inboxTabs} activeTabId={inboxTabId} onSelect={selectInboxTab} />
-        )}
         {/* Barra de herramientas en una sola línea: búsqueda y filtros a la izquierda, vistas de estado a la derecha */}
         <div className="mb-3 grid min-h-8">
           {showCriteria && (

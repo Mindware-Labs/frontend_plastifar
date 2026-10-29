@@ -63,9 +63,6 @@ interface MotivoModalProps {
 export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModalProps) {
   const isEdit = topic !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
-  const [sharedDepartmentIds, setSharedDepartmentIds] = useState<number[]>(
-    () => topic?.sharedDepartmentIds ?? [],
-  );
   const { isExiting, requestClose } = useModalAnimation();
 
   const {
@@ -122,7 +119,6 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
       defaultPriority: values.priority,
       suggestedForm: values.suggestedForm || null,
       isActive: values.isActive,
-      sharedDepartmentIds,
     };
 
     try {
@@ -239,39 +235,6 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
             />
           )}
         />
-
-        <div className="flex flex-col gap-2">
-          <span className="font-heading text-[11.5px] font-semibold text-faint">
-            Departamentos observadores
-          </span>
-          <p className="text-[12px] leading-relaxed text-zinc-500">
-            Quienes tengan acceso a estos departamentos verán tickets con este motivo aunque la cola sea otra (solo
-            lectura).
-          </p>
-          <div className="max-h-36 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50/50 p-2 space-y-1">
-            {departments.map((d) => {
-              const checked = sharedDepartmentIds.includes(d.id);
-              return (
-                <label
-                  key={d.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[12px] text-zinc-700 hover:bg-white"
-                >
-                  <input
-                    type="checkbox"
-                    className="size-3.5 rounded border-zinc-300 text-brand-red focus:ring-brand-red/30"
-                    checked={checked}
-                    onChange={() => {
-                      setSharedDepartmentIds((prev) =>
-                        checked ? prev.filter((id) => id !== d.id) : [...prev, d.id],
-                      );
-                    }}
-                  />
-                  <span className="truncate">{d.name}</span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
 
         {/* 2. COMPORTAMIENTO Y SLA */}
         <FormDivider title="Comportamiento y Reglas" />

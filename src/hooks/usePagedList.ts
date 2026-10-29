@@ -11,6 +11,8 @@ interface Options<TQuery extends { page: number }, TData extends PagedData> {
   /** Todo lo que no es la pagina. Cambiar cualquier criterio vuelve a la primera. */
   criteria: Omit<TQuery, "page">;
   fallbackError: string;
+  /** Si es false, no se dispara la peticion (p. ej. esperar pestañas de bandeja). */
+  enabled?: boolean;
 }
 
 /** Listado paginado con descarte de respuestas obsoletas y persistencia de vista. */
@@ -18,6 +20,7 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
   fetch,
   criteria,
   fallbackError,
+  enabled = true,
 }: Options<TQuery, TData>) {
   const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
@@ -41,6 +44,8 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
   });
 
   useEffect(() => {
+    if (!enabled) return;
+
     let cancelled = false;
 
     fetchRef
@@ -58,7 +63,7 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
     return () => {
       cancelled = true;
     };
-  }, [queryJson, reloadKey, fallbackError]);
+  }, [queryJson, reloadKey, fallbackError, enabled]);
 
   const data = snapshot?.data ?? null;
   const isStale = snapshot !== null && snapshot.key !== queryKey;
