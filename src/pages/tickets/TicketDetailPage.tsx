@@ -355,6 +355,10 @@ export function TicketDetailPage() {
   const canEditTicket = !readOnlyTicket && can("tickets.edit", deptId);
   const canReplyTicket = !readOnlyTicket && can("tickets.reply", deptId);
   const canUpdateStatus = !readOnlyTicket && can("tickets.close", deptId);
+  const canCreateTask = !readOnlyTicket && can("tasks.create", deptId);
+  const canEditTask = !readOnlyTicket && can("tasks.edit", deptId);
+  const canCommentTask = !readOnlyTicket && can("tasks.comment", deptId);
+  const canDeleteTask = !readOnlyTicket && can("tasks.delete", deptId);
 
   const canReadForms =
     can("claims.read", deptId) ||
@@ -1122,9 +1126,19 @@ export function TicketDetailPage() {
         backLabel="Volver al listado de tickets"
         title={ticket.number}
         badge={
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <StatusCell status={ticket.status} />
             {!isClosed && <PriorityCell priority={ticket.priority} />}
+            {readOnlyTicket && (
+              <Badge
+                tone="slate"
+                title="Consulta sin edición: el alcance de tu rol o departamento limita los cambios en este ticket."
+                className="gap-1 px-2"
+              >
+                <Eye className="size-3 shrink-0 opacity-80" strokeWidth={2.25} aria-hidden />
+                Solo lectura
+              </Badge>
+            )}
           </div>
         }
         sections={sections}
@@ -1164,13 +1178,6 @@ export function TicketDetailPage() {
           </div>
         }
       />
-
-      {readOnlyTicket && (
-        <div className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3.5 py-2.5 text-[12.5px] text-amber-950">
-          Estás viendo este ticket en <span className="font-semibold">solo lectura</span>: puedes consultar el hilo y las
-          tareas, pero no editar el caso ni responder al cliente desde aquí.
-        </div>
-      )}
 
       {/* Zona de contenido con scroll vertical asegurado */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-8">
@@ -1815,6 +1822,10 @@ export function TicketDetailPage() {
                         isClosed={isClosed}
                         assignableStaff={assignableStaff}
                         currentStaffId={user?.staffId ?? 0}
+                        canCreateTask={canCreateTask}
+                        canEditTask={canEditTask}
+                        canCommentTask={canCommentTask}
+                        canDeleteTask={canDeleteTask}
                         onTasksCountChanged={setTasksCount}
                         activeCommentsTaskId={activeCommentsTask?.id}
                         onToggleTaskComments={handleToggleTaskComments}
@@ -1833,6 +1844,7 @@ export function TicketDetailPage() {
                         currentStaffName={
                           [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Usuario"
                         }
+                        canComment={canCommentTask}
                         onClose={() => setActiveCommentsTask(null)}
                         onCommentAdded={(taskId, newComment) => {
                           setActiveCommentsTask((prev) =>
@@ -1871,10 +1883,12 @@ export function TicketDetailPage() {
                           Aquí queda lo que el equipo necesita saber y el cliente no: cómo fue la llamada, qué se intentó
                           ya, con quién quedó pendiente. Nunca sale por correo.
                         </p>
-                        <Button type="button" size="sm" onClick={() => setShowNoteModal(true)} className="mt-4">
-                          <Plus className="h-[14px] w-[14px]" />
-                          Añadir nota
-                        </Button>
+                        {canEditTicket && (
+                          <Button type="button" size="sm" onClick={() => setShowNoteModal(true)} className="mt-4">
+                            <Plus className="h-[14px] w-[14px]" />
+                            Añadir nota
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       <>
@@ -1884,10 +1898,12 @@ export function TicketDetailPage() {
                             <span>{internalNotes.length} {internalNotes.length === 1 ? "nota interna" : "notas internas"}</span>
                           </div>
                           <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
-                          <Button type="button" size="sm" onClick={() => setShowNoteModal(true)}>
-                            <Plus className="h-[14px] w-[14px]" />
-                            Añadir nota
-                          </Button>
+                          {canEditTicket && (
+                            <Button type="button" size="sm" onClick={() => setShowNoteModal(true)}>
+                              <Plus className="h-[14px] w-[14px]" />
+                              Añadir nota
+                            </Button>
+                          )}
                         </div>
                         {renderThread(internalNotes)}
                       </>
@@ -2029,7 +2045,7 @@ export function TicketDetailPage() {
       )}
 
       {/* Escribir una nota es un acto aparte: se pide, se escribe y se cierra. El borrador sobrevive si se cierra sin guardar. */}
-      {showNoteModal && (
+      {showNoteModal && canEditTicket && (
         <Modal
           settle={noteSettle}
           eyebrow={ticket.number}

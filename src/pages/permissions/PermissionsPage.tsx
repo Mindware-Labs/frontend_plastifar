@@ -52,9 +52,6 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   const [isSaving, setIsSaving] = useState(false);
   /** Relectura de la matriz sobre una pagina ya pintada: se atenua, no se vacia. */
   const [isRefetching, setIsRefetching] = useState(true);
-  // Contador, no marca de tiempo: el instante nunca se lee, solo hace falta
-  // saber que hubo un guardado y reiniciar el temporizador si hay otro encima.
-  const [saveAck, setSaveAck] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
@@ -99,14 +96,6 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   useEffect(() => {
     load();
   }, [load]);
-
-  // El aviso de guardado se retira solo: no es un estado, es un acuse.
-  useEffect(() => {
-    if (saveAck === 0) return;
-    receipts.done({ action: "permissions-save", title: "Cambios guardados" });
-    const timer = window.setTimeout(() => setSaveAck(0), 4000);
-    return () => window.clearTimeout(timer);
-  }, [saveAck, receipts]);
 
   const catalog = useMemo(() => (matrix ? flattenPermissions(matrix.groups) : []), [matrix]);
   const editableRoles = useMemo(
@@ -220,7 +209,7 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
       // ningun permiso cambiado que mostrar. Se vuelve a «Todos» para que el
       // acuse de guardado no llegue junto a una pagina en blanco.
       if (chip === "conCambios") setChip("todos");
-      setSaveAck((previous) => previous + 1);
+      receipts.done({ action: "permissions-save", title: "Cambios guardados" });
     } catch (err) {
       setError(
         err instanceof ApiError

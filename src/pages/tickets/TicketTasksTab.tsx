@@ -39,6 +39,10 @@ interface TicketTasksTabProps {
   isClosed: boolean;
   assignableStaff: TicketStaffOptionResponse[];
   currentStaffId: number;
+  canCreateTask: boolean;
+  canEditTask: boolean;
+  canCommentTask: boolean;
+  canDeleteTask: boolean;
   onTasksCountChanged?: (count: number) => void;
   activeCommentsTaskId?: number | null;
   onToggleTaskComments?: (task: TicketTaskResponse) => void;
@@ -54,6 +58,10 @@ export function TicketTasksTab({
   isClosed,
   assignableStaff,
   currentStaffId,
+  canCreateTask,
+  canEditTask,
+  canCommentTask,
+  canDeleteTask,
   onTasksCountChanged,
   activeCommentsTaskId,
   onToggleTaskComments,
@@ -283,16 +291,18 @@ export function TicketTasksTab({
           ]}
         />
 
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => setShowCreateModal(true)}
-          disabled={isClosed}
-          title={isClosed ? "No se pueden crear tareas en un ticket cerrado." : undefined}
-        >
-          <Plus className="h-[14px] w-[14px]" />
-          Nueva tarea
-        </Button>
+        {canCreateTask && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => setShowCreateModal(true)}
+            disabled={isClosed}
+            title={isClosed ? "No se pueden crear tareas en un ticket cerrado." : undefined}
+          >
+            <Plus className="h-[14px] w-[14px]" />
+            Nueva tarea
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -317,7 +327,7 @@ export function TicketTasksTab({
             Asigna acciones a colaboradores o a ti mismo para investigar el caso, contactar a fábrica o
             verificar inventario con evidencia documentada.
           </p>
-          {!isClosed && (
+          {!isClosed && canCreateTask && (
             <Button
               type="button"
               size="sm"
@@ -364,16 +374,25 @@ export function TicketTasksTab({
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     {/* Botón interactivo de estado / Checkbox */}
                     {isCompleted ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleReopenTask(task.id)}
-                        disabled={isClosed || reopeningId === task.id}
-                        title="Tarea completada. Haz clic para reabrir"
-                        className="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-emerald-600 border border-emerald-600 text-white shadow-2xs transition-all active:scale-90 cursor-pointer"
-                      >
-                        <Check className="size-2.5 stroke-[2.75]" />
-                      </button>
-                    ) : (
+                      canEditTask ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleReopenTask(task.id)}
+                          disabled={isClosed || reopeningId === task.id}
+                          title="Tarea completada. Haz clic para reabrir"
+                          className="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-emerald-600 border border-emerald-600 text-white shadow-2xs transition-all active:scale-90 cursor-pointer"
+                        >
+                          <Check className="size-2.5 stroke-[2.75]" />
+                        </button>
+                      ) : (
+                        <span
+                          aria-hidden
+                          className="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-emerald-600 border border-emerald-600 text-white shadow-2xs"
+                        >
+                          <Check className="size-2.5 stroke-[2.75]" />
+                        </span>
+                      )
+                    ) : canEditTask ? (
                       <button
                         type="button"
                         onClick={() => setTaskToComplete(task)}
@@ -381,6 +400,11 @@ export function TicketTasksTab({
                         title="Abrir formulario para completar la tarea"
                         aria-label="Completar tarea"
                         className="flex size-4 shrink-0 items-center justify-center rounded-[4px] border-2 border-zinc-300 bg-white shadow-2xs transition-all hover:border-zinc-500 hover:bg-zinc-50 cursor-pointer active:scale-90"
+                      />
+                    ) : (
+                      <span
+                        aria-hidden
+                        className="flex size-4 shrink-0 items-center justify-center rounded-[4px] border-2 border-zinc-300 bg-white shadow-2xs"
                       />
                     )}
 
@@ -420,38 +444,41 @@ export function TicketTasksTab({
 
                   {/* Acciones de la cabecera del mismo tamaño que las etiquetas */}
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {isCompleted ? (
+                    {canEditTask &&
+                      (isCompleted ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleReopenTask(task.id)}
+                          disabled={isClosed || reopeningId === task.id}
+                          title="Reabrir esta tarea para continuar trabajando en ella"
+                          className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer disabled:opacity-50"
+                        >
+                          <RotateCcw className="size-3 text-zinc-400" />
+                          <span>{reopeningId === task.id ? "Reabriendo..." : "Reabrir"}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setTaskToComplete(task)}
+                          disabled={isClosed}
+                          className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer disabled:opacity-50"
+                          title="Registrar conclusión y evidencia (la tarea sigue pendiente hasta confirmar)"
+                        >
+                          <ListChecks className="size-3 text-zinc-500" />
+                          <span>Completar tarea</span>
+                        </button>
+                      ))}
+
+                    {canDeleteTask && (
                       <button
                         type="button"
-                        onClick={() => void handleReopenTask(task.id)}
-                        disabled={isClosed || reopeningId === task.id}
-                        title="Reabrir esta tarea para continuar trabajando en ella"
-                        className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer disabled:opacity-50"
+                        onClick={() => setTaskToDelete(task)}
+                        title="Eliminar tarea"
+                        className="flex size-[22px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-red-600 transition-colors cursor-pointer active:scale-95"
                       >
-                        <RotateCcw className="size-3 text-zinc-400" />
-                        <span>{reopeningId === task.id ? "Reabriendo..." : "Reabrir"}</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setTaskToComplete(task)}
-                        disabled={isClosed}
-                        className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer disabled:opacity-50"
-                        title="Registrar conclusión y evidencia (la tarea sigue pendiente hasta confirmar)"
-                      >
-                        <ListChecks className="size-3 text-zinc-500" />
-                        <span>Completar tarea</span>
+                        <Trash2 className="size-3" />
                       </button>
                     )}
-
-                    <button
-                      type="button"
-                      onClick={() => setTaskToDelete(task)}
-                      title="Eliminar tarea"
-                      className="flex size-[22px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-red-600 transition-colors cursor-pointer active:scale-95"
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
                   </div>
                 </div>
 
@@ -551,7 +578,9 @@ export function TicketTasksTab({
                     title={
                       isCommentsActive
                         ? "Cerrar panel de comentarios"
-                        : `Ver y escribir comentarios (${task.comments.length})`
+                        : canCommentTask
+                          ? `Ver y escribir comentarios (${task.comments.length})`
+                          : `Ver comentarios (${task.comments.length})`
                     }
                   >
                     <MessageSquare
@@ -583,7 +612,7 @@ export function TicketTasksTab({
 
       {/* Modales */}
       <CreateTaskModal
-        open={showCreateModal}
+        open={showCreateModal && canCreateTask}
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateTask}
         assignableStaff={assignableStaff}

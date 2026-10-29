@@ -41,6 +41,8 @@ interface TaskCommentsAsideProps {
   ticketId: number;
   currentStaffId: number;
   currentStaffName?: string;
+  /** Sin permiso o ticket de solo lectura: ver comentarios, no redactar. */
+  canComment?: boolean;
   onClose: () => void;
   onCommentAdded: (taskId: number, comment: TicketTaskCommentResponse) => void;
   className?: string;
@@ -58,6 +60,7 @@ export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskComment
       ticketId,
       currentStaffId,
       currentStaffName,
+      canComment = true,
       onClose,
       onCommentAdded,
       className = "",
@@ -241,6 +244,7 @@ export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskComment
         </div>
 
         {/* Input para redactar nuevo comentario: fijo en la parte inferior */}
+        {canComment ? (
         <div className="shrink-0 bg-white border-t border-zinc-100 p-3">
           {error && (
             <div className="mb-2 rounded-md bg-red-50 border border-red-200/80 p-2 text-[11px] text-red-600">
@@ -323,6 +327,11 @@ export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskComment
             </div>
           </div>
         </div>
+        ) : (
+          <div className="shrink-0 border-t border-zinc-100 bg-zinc-50/60 px-3 py-2.5 text-center text-[11px] text-zinc-500">
+            Solo lectura: no puedes añadir comentarios en este ticket.
+          </div>
+        )}
       </div>
     </aside>
   );
