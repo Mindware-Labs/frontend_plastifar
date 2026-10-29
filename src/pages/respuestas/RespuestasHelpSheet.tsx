@@ -4,9 +4,7 @@ import {
   FileText,
   Lightbulb,
   MessageSquareText,
-  ShieldCheck,
   Sparkles,
-  Users,
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
@@ -25,7 +23,6 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Auto-focus en el botón de cerrar y escucha de tecla Escape
   useEffect(() => {
     closeButtonRef.current?.focus();
 
@@ -58,17 +55,16 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
           isExiting ? "pointer-events-none" : ""
         }`}
       >
-        {/* Cabecera del Sheet con nueva jerarquía */}
         <div className={dialogHeaderShellClass}>
           <div className={dialogHeaderStackClass}>
             <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
-              Correo · Respuestas predefinidas
+              Correo
             </p>
             <h2 id={titleId} className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
-              ¿Para qué sirven las respuestas rápidas?
+              Respuestas rápidas
             </h2>
             <p className="text-[12px] leading-relaxed text-subtle">
-              Guía de uso y mejores prácticas para el equipo de atención y soporte.
+              Guarda un texto una vez y úsalo cuando lo necesites al escribir un correo.
             </p>
           </div>
 
@@ -76,7 +72,7 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
             ref={closeButtonRef}
             type="button"
             onClick={requestClose}
-            aria-label="Cerrar guía (Esc)"
+            aria-label="Cerrar (Esc)"
             title="Cerrar (Esc)"
             className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25"
           >
@@ -84,9 +80,7 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
           </button>
         </div>
 
-        {/* Contenido formativo */}
-        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6 text-ink">
-          {/* Introducción / Propósito */}
+        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5 text-ink">
           <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-4 shadow-2xs">
             <div className="flex items-start gap-3.5">
               <span
@@ -96,17 +90,15 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
                 <Sparkles className="size-4" strokeWidth={2.25} />
               </span>
               <div>
-                <h3 className="font-heading text-[13.5px] font-bold text-ink">
-                  Estandariza la comunicación con tus clientes
-                </h3>
+                <h3 className="font-heading text-[13.5px] font-bold text-ink">Para qué sirve</h3>
                 <p className="mt-1 text-[12.5px] leading-relaxed text-subtle">
-                  Las respuestas rápidas son <strong>estructuras de correo predefinidas</strong> que guardas una sola vez para utilizarlas cuantas veces sea necesario. En lugar de redactar repetidamente las mismas instrucciones sobre cuentas bancarias, políticas de envío, garantías o confirmaciones de órdenes, las insertas en tu correo con dos clics.
+                  Sirve para no escribir lo mismo una y otra vez: datos de pago, plazos de entrega, garantías…
+                  Eliges la respuesta en el editor, completas lo que falte y envías.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Bloque: Ejemplo visual concreto */}
           <section className="space-y-3">
             <div className="flex items-center gap-2">
               <span
@@ -116,266 +108,127 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
                 <FileText className="size-3" strokeWidth={2.25} />
               </span>
               <h3 className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink">
-                Anatomía de una plantilla efectiva
+                Cómo se ve una respuesta
               </h3>
             </div>
 
             <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xs">
-              <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-4 py-2.5 text-[11.5px]">
-                <span className="font-heading font-semibold text-ink">Ejemplo: Confirmación de Pedido</span>
-                <span className="rounded-md border border-zinc-200 bg-white px-2 py-0.5 font-heading text-[9.5px] font-bold uppercase tracking-[0.06em] text-zinc-500">
-                  Plantilla
-                </span>
+              <div className="border-b border-zinc-100 bg-zinc-50/80 px-4 py-2.5 text-[11.5px] font-heading font-semibold text-ink">
+                Ejemplo: confirmación de pedido
               </div>
 
               <div className="p-4 font-sans text-[12.5px] leading-relaxed text-ink">
                 <p className="font-medium">
                   Estimado/a{" "}
                   <span className="rounded-md border border-brand-red/20 bg-brand-red/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-red">
-                    [Nombre del Cliente]
+                    [Nombre del cliente]
                   </span>
                   ,
                 </p>
                 <p className="mt-2.5">
-                  Confirmamos la recepción de su solicitud para el pedido{" "}
+                  Confirmamos su pedido{" "}
                   <span className="rounded-md border border-brand-red/20 bg-brand-red/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-red">
-                    [N° Pedido]
+                    [N° pedido]
                   </span>
-                  . Su orden ha ingresado a nuestra línea de preparación en planta.
-                </p>
-                <p className="mt-2.5">
-                  El tiempo estimado de entrega en su dirección es de{" "}
+                  . El envío estimado es de{" "}
                   <span className="rounded-md border border-brand-red/20 bg-brand-red/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-red">
                     [Días hábiles]
                   </span>
                   .
                 </p>
-                <p className="mt-2.5 text-subtle">
-                  Quedamos a su entera disposición ante cualquier requerimiento.
-                </p>
               </div>
 
               <div className="border-t border-zinc-100 bg-zinc-50/50 px-4 py-2.5 text-[11.5px] text-zinc-500">
-                <span className="font-semibold text-zinc-700">Tip de personalización:</span> Los corchetes{" "}
-                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono font-medium text-brand-red">[...]</code> le indican
-                al colaborador qué partes del texto debe completar con los datos particulares del caso antes de enviar.
+                Lo que va entre{" "}
+                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono font-medium text-brand-red">[ ]</code> lo
+                completas tú con los datos de ese cliente antes de enviar.
               </div>
             </div>
           </section>
 
-          {/* Bloque: 4 Beneficios Operativos */}
-          <section className="space-y-3">
+          <section className="space-y-2.5">
             <h3 className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">
-              Beneficios para el equipo de atención
+              En la práctica
             </h3>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border border-zinc-200/80 bg-white p-3.5 shadow-2xs">
+            <ul className="grid gap-2 sm:grid-cols-3">
+              <li className="rounded-lg border border-zinc-200/80 bg-white p-3 shadow-2xs">
                 <div className="flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
-                  >
-                    <Clock className="size-3.5" strokeWidth={2.25} />
-                  </span>
-                  <span className="font-heading text-[12.5px] font-bold text-ink">Ahorro de tiempo</span>
+                  <Clock className="size-3.5 text-brand-red" strokeWidth={2.25} />
+                  <span className="font-heading text-[12px] font-bold text-ink">Menos tiempo</span>
                 </div>
-                <p className="mt-2 text-[12px] leading-relaxed text-subtle">
-                  Reduce el tiempo promedio de redacción de 5 minutos a menos de 30 segundos por correo.
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-zinc-200/80 bg-white p-3.5 shadow-2xs">
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-subtle">Respondes en segundos, no desde cero.</p>
+              </li>
+              <li className="rounded-lg border border-zinc-200/80 bg-white p-3 shadow-2xs">
                 <div className="flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
-                  >
-                    <CheckCircle2 className="size-3.5" strokeWidth={2.25} />
-                  </span>
-                  <span className="font-heading text-[12.5px] font-bold text-ink">Cero errores críticos</span>
+                  <CheckCircle2 className="size-3.5 text-brand-red" strokeWidth={2.25} />
+                  <span className="font-heading text-[12px] font-bold text-ink">Menos errores</span>
                 </div>
-                <p className="mt-2 text-[12px] leading-relaxed text-subtle">
-                  Asegura que números de RNC, cuentas bancarias, direcciones y políticas se envíen siempre exactos.
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-subtle">
+                  Cuentas, RNC y direcciones salen siempre iguales.
                 </p>
-              </div>
-
-              <div className="rounded-lg border border-zinc-200/80 bg-white p-3.5 shadow-2xs">
+              </li>
+              <li className="rounded-lg border border-zinc-200/80 bg-white p-3 shadow-2xs">
                 <div className="flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
-                  >
-                    <Users className="size-3.5" strokeWidth={2.25} />
-                  </span>
-                  <span className="font-heading text-[12.5px] font-bold text-ink">Consistencia institucional</span>
+                  <Sparkles className="size-3.5 text-brand-red" strokeWidth={2.25} />
+                  <span className="font-heading text-[12px] font-bold text-ink">Mismo tono</span>
                 </div>
-                <p className="mt-2 text-[12px] leading-relaxed text-subtle">
-                  Todo el equipo responde con el mismo estándar de cortesía, tono profesional y ortografía impecable.
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-zinc-200/80 bg-white p-3.5 shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
-                  >
-                    <ShieldCheck className="size-3.5" strokeWidth={2.25} />
-                  </span>
-                  <span className="font-heading text-[12.5px] font-bold text-ink">Rápida incorporación</span>
-                </div>
-                <p className="mt-2 text-[12px] leading-relaxed text-subtle">
-                  Los nuevos colaboradores pueden responder consultas complejas con seguridad desde su primer día.
-                </p>
-              </div>
-            </div>
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-subtle">Todo el equipo suena alineado con Plastifar.</p>
+              </li>
+            </ul>
           </section>
 
-          {/* Bloque: Paso a Paso en Bandeja */}
-          <section className="space-y-3">
+          <section className="space-y-2.5">
             <h3 className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">
-              ¿Cómo utilizarlas en la bandeja de entrada?
+              Cómo usarlas en la bandeja
             </h3>
-
-            <div className="space-y-3.5 rounded-lg border border-zinc-200/80 bg-white p-4 shadow-2xs">
-              <div className="flex items-start gap-3">
-                <span
-                  aria-hidden
-                  className="flex size-5 shrink-0 items-center justify-center rounded-md bg-zinc-900 font-heading text-[10.5px] font-bold text-white shadow-2xs"
-                >
-                  1
+            <ol className="space-y-2.5 rounded-lg border border-zinc-200/80 bg-white p-4 text-[12px] leading-relaxed text-subtle shadow-2xs">
+              <li className="flex gap-2.5">
+                <span className="font-heading font-bold text-ink">1.</span>
+                <span>Abre un hilo o redacta un correo nuevo.</span>
+              </li>
+              <li className="flex flex-wrap items-center gap-1.5">
+                <span className="font-heading font-bold text-ink">2.</span>
+                <span>Pulsa</span>
+                <span className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-700">
+                  <MessageSquareText className="size-3 text-brand-red" />
+                  Respuestas rápidas
                 </span>
-                <div>
-                  <h4 className="font-heading text-[12.5px] font-semibold text-ink">
-                    Abre una conversación o inicia un correo nuevo
-                  </h4>
-                  <p className="mt-0.5 text-[12px] leading-relaxed text-subtle">
-                    Accede a cualquier hilo en tu bandeja o pulsa "Redactar" para abrir el compositor de correo.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <span
-                  aria-hidden
-                  className="flex size-5 shrink-0 items-center justify-center rounded-md bg-zinc-900 font-heading text-[10.5px] font-bold text-white shadow-2xs"
-                >
-                  2
-                </span>
-                <div>
-                  <h4 className="flex flex-wrap items-center gap-1.5 font-heading text-[12.5px] font-semibold text-ink">
-                    <span>Haz clic en el botón</span>
-                    <span className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-700">
-                      <MessageSquareText className="size-3 text-brand-red" />
-                      <span>Respuestas rápidas</span>
-                    </span>
-                  </h4>
-                  <p className="mt-0.5 text-[12px] leading-relaxed text-subtle">
-                    Ubicado en la barra de herramientas inferior del editor, junto a las opciones de adjuntos.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <span
-                  aria-hidden
-                  className="flex size-5 shrink-0 items-center justify-center rounded-md bg-zinc-900 font-heading text-[10.5px] font-bold text-white shadow-2xs"
-                >
-                  3
-                </span>
-                <div>
-                  <h4 className="font-heading text-[12.5px] font-semibold text-ink">
-                    Elige la plantilla que necesitas
-                  </h4>
-                  <p className="mt-0.5 text-[12px] leading-relaxed text-subtle">
-                    Usa el buscador integrado en el menú para encontrar la respuesta por título o palabras clave.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <span
-                  aria-hidden
-                  className="flex size-5 shrink-0 items-center justify-center rounded-md bg-zinc-900 font-heading text-[10.5px] font-bold text-white shadow-2xs"
-                >
-                  4
-                </span>
-                <div>
-                  <h4 className="font-heading text-[12.5px] font-semibold text-ink">
-                    El texto se añade directamente al mensaje
-                  </h4>
-                  <p className="mt-0.5 text-[12px] leading-relaxed text-subtle">
-                    La plantilla se inserta respetando los párrafos sin borrar lo que ya tenías redactado.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <span
-                  aria-hidden
-                  className="flex size-5 shrink-0 items-center justify-center rounded-md bg-zinc-900 font-heading text-[10.5px] font-bold text-white shadow-2xs"
-                >
-                  5
-                </span>
-                <div>
-                  <h4 className="font-heading text-[12.5px] font-semibold text-ink">
-                    Ajusta los datos puntuales y envía
-                  </h4>
-                  <p className="mt-0.5 text-[12px] leading-relaxed text-subtle">
-                    Personaliza los campos entre corchetes con los datos concretos del cliente y envía el correo con confianza.
-                  </p>
-                </div>
-              </div>
-            </div>
+                <span>en la barra del editor.</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="font-heading font-bold text-ink">3.</span>
+                <span>Elige una, ajusta lo que haga falta y envía. No borra lo que ya habías escrito.</span>
+              </li>
+            </ol>
           </section>
 
-          {/* Bloque: Consejos de redacción */}
-          <section className="space-y-3">
+          <section className="rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-4">
             <h3 className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">
-              Recomendaciones para crear excelentes plantillas
+              Al crear una respuesta
             </h3>
-
-            <div className="space-y-2.5 rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-4 text-[12px] leading-relaxed text-subtle">
-              <div className="flex items-start gap-2.5">
+            <ul className="mt-2 space-y-2 text-[12px] leading-relaxed text-subtle">
+              <li className="flex gap-2">
                 <Lightbulb className="mt-0.5 size-4 shrink-0 text-amber-600" />
-                <p>
-                  <strong className="text-ink">Usa títulos claros y descriptivos:</strong> En lugar de <em>"Plantilla 1"</em>, usa <em>"Instrucciones de pago por transferencia"</em> o <em>"Recepción de cotización de empaques"</em>.
-                </p>
-              </div>
-
-              <div className="my-2 h-px bg-zinc-200/60" />
-
-              <div className="flex items-start gap-2.5">
+                <span>
+                  <strong className="text-ink">Ponle un nombre que se entienda:</strong> por ejemplo &quot;Datos para
+                  transferencia&quot;, no &quot;Plantilla 3&quot;.
+                </span>
+              </li>
+              <li className="flex gap-2">
                 <Lightbulb className="mt-0.5 size-4 shrink-0 text-amber-600" />
-                <p>
-                  <strong className="text-ink">Separa los párrafos con una línea en blanco:</strong> Al redactar en el estudio, dar un salto de línea doble ayuda a que el editor de correo monte bloques de texto limpios y agradables a la vista.
-                </p>
-              </div>
-
-              <div className="my-2 h-px bg-zinc-200/60" />
-
-              <div className="flex items-start gap-2.5">
-                <Lightbulb className="mt-0.5 size-4 shrink-0 text-amber-600" />
-                <p>
-                  <strong className="text-ink">Mantén modularidad:</strong> Es preferible tener respuestas concisas y específicas que se puedan combinar en un mismo correo si el cliente hace varias preguntas.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Bloque: Permisos y Gobernanza */}
-          <section className="rounded-lg border border-zinc-200/80 bg-white p-4 shadow-2xs">
-            <h3 className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">
-              Permisos y Gobernanza
-            </h3>
-            <p className="mt-1 text-[12px] leading-relaxed text-subtle">
-              Cualquier agente puede utilizar las respuestas predefinidas para responder correos. Para preservar la integridad del catálogo institucional, <strong>solo la persona que creó la plantilla o un administrador del sistema</strong> pueden editarla o eliminarla.
+                <span>
+                  <strong className="text-ink">Mejor varias cortas que una enorme:</strong> así combinas según lo que
+                  pregunte el cliente.
+                </span>
+              </li>
+            </ul>
+            <p className="mt-3 border-t border-zinc-200/60 pt-3 text-[11.5px] text-subtle">
+              Todos pueden usar las respuestas del equipo. Solo quien la creó o un administrador puede editarla o
+              borrarla.
             </p>
           </section>
         </div>
 
-        {/* Pie del Sheet */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-white px-6 py-3.5">
           <span className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-400">
             <kbd className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600">

@@ -6,6 +6,12 @@ import {
   PenLine,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  resolveSidebarNavTargetKey,
+  useSidebarNavIndicator,
+  type SidebarIndicatorMotion,
+  type SidebarNavIndicatorRect,
+} from "../../hooks/useSidebarNavIndicator";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
@@ -20,15 +26,50 @@ import { ChangePasswordModal } from "./ChangePasswordModal";
 import { NotificationsModal } from "./NotificationsModal";
 import { SignatureModal } from "./SignatureModal";
 
-/** Marca roja al borde de la barra junto a lo activo: crece con el resorte y se apaga al cambiar de ruta. */
-function ActiveMark({ active, className = "" }: { active: boolean; className?: string }) {
+/** Indicador único siempre visible: fondo + marca (sin duplicar en cada fila). */
+function sidebarIndicatorMotionClass(motion: SidebarIndicatorMotion, motionReady: boolean) {
+  if (motion === "travel" && motionReady) {
+    return "transition-[top,height,left,width] duration-[380ms] ease-plf-spring motion-reduce:transition-none";
+  }
+  return "transition-none";
+}
+
+function SidebarNavIndicator({
+  rect,
+  motionReady,
+  indicatorMotion,
+}: {
+  rect: SidebarNavIndicatorRect;
+  motionReady: boolean;
+  indicatorMotion: SidebarIndicatorMotion;
+}) {
+  const motion = sidebarIndicatorMotionClass(indicatorMotion, motionReady);
+  const markTop = rect.top + (rect.height - rect.markHeight) / 2;
+  const layer = "pointer-events-none absolute z-0";
+
   return (
-    <span
-      aria-hidden
-      className={`pointer-events-none absolute top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-red transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
-        active ? "scale-y-100" : "scale-y-0"
-      } ${className}`}
-    />
+    <>
+      <span
+        aria-hidden
+        className={`${layer} rounded-lg bg-zinc-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_1px_2px_rgba(24,24,27,0.04)] ring-1 ring-zinc-900/[0.06] ${motion}`}
+        style={{
+          top: rect.top,
+          left: rect.pillLeft,
+          width: rect.pillWidth,
+          height: rect.height,
+        }}
+      />
+      <span
+        aria-hidden
+        className={`${layer} rounded-r-full bg-brand-red shadow-[0_0_10px_rgba(228,0,43,0.38)] ${motion}`}
+        style={{
+          top: markTop,
+          left: rect.markLeft,
+          width: rect.markAtEdge ? 3 : 2.5,
+          height: rect.markHeight,
+        }}
+      />
+    </>
   );
 }
 
@@ -285,6 +326,38 @@ export function Sidebar() {
     setManualOpen((current) => ({ ...current, [group.label]: !isGroupOpen(group) }));
   }
 
+  const activeNavKey = useMemo(
+    () =>
+      resolveSidebarNavTargetKey(
+        pathname,
+        collapsed,
+        visibleGroups,
+        isGroupOpen,
+        visibleChildren,
+        isGroupActive,
+      ),
+    [pathname, collapsed, visibleGroups, manualOpen, user?.isAdmin, can],
+  );
+
+  const navLayoutKey = useMemo(
+    () => `${collapsed}|${JSON.stringify(manualOpen)}`,
+    [collapsed, manualOpen],
+  );
+
+  const {
+    navRef,
+    navListRef,
+    registerTarget,
+    rect: indicatorRect,
+    motionReady: indicatorMotionReady,
+    indicatorMotion,
+  } = useSidebarNavIndicator(activeNavKey, navLayoutKey, pathname);
+
+  /** Icono rojo al settled; durante el viaje lo lleva el indicador medido. */
+  function showsAccentActive(isActive: boolean) {
+    return isActive && indicatorMotion !== "travel";
+  }
+
   function renderExpandedGroup(group: NavGroup) {
     if (group.children) {
       const open = isGroupOpen(group);
@@ -296,24 +369,24 @@ export function Sidebar() {
         <div key={group.label} className="flex flex-col">
           <button
             type="button"
+            ref={registerTarget(`expanded:group:${group.label}`)}
             onClick={() => toggleGroup(group)}
             aria-expanded={open}
             aria-controls={panelId}
-            className={`group relative flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-all duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+            className={`group relative z-[2] flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-[color] duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
               active && !open
-                ? "bg-zinc-100/90 text-zinc-950 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(24,24,27,0.04)] ring-1 ring-zinc-900/[0.05]"
+                ? "text-zinc-950 font-semibold"
                 : active && open
-                ? "text-zinc-950 font-semibold hover:bg-zinc-100/60"
+                ? "text-zinc-950 font-semibold"
                 : open
                 ? "text-zinc-800 font-medium hover:bg-zinc-100/60"
                 : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
             }`}
           >
-            <ActiveMark active={active && !open} className="-left-2" />
             <group.icon
               strokeWidth={active || open ? 2.2 : 1.9}
               className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
-                active && !open
+                active && !open && showsAccentActive(active)
                   ? "text-brand-red"
                   : active || open
                   ? "text-zinc-900"
@@ -350,7 +423,9 @@ export function Sidebar() {
                 {/* Tronco vertical continuo de la familia: nace bajo el icono padre y entrega en el codo del último hijo */}
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute -top-0.5 bottom-[22px] left-[17.5px] w-px bg-zinc-200/90"
+                  className={`pointer-events-none absolute -top-0.5 bottom-[22px] left-[17.5px] w-px transition-colors duration-[380ms] ease-plf-spring motion-reduce:transition-none ${
+                    active ? "bg-brand-red/35" : "bg-zinc-200/90"
+                  }`}
                 />
 
                 {children.map((child, index) => {
@@ -369,12 +444,13 @@ export function Sidebar() {
                       )}
                       <NavLink
                       key={child.to}
+                      ref={registerTarget(`expanded:child:${child.to}`)}
                       to={child.to}
                       end={child.end}
                       className={({ isActive }) =>
-                        `group relative flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-all duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                        `group relative z-[2] flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-[color] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                           isActive
-                            ? "bg-zinc-100/95 text-zinc-950 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_1px_2px_rgba(24,24,27,0.04)] ring-1 ring-zinc-900/[0.06]"
+                            ? "text-zinc-950 font-semibold"
                             : hasUnread
                             ? "text-zinc-900 font-semibold hover:bg-zinc-100/65"
                             : "text-zinc-600 font-medium hover:bg-zinc-100/65 hover:text-zinc-900"
@@ -386,18 +462,10 @@ export function Sidebar() {
                           {/* Codo curvo que une cada opción con el tronco de su familia */}
                           <span
                             aria-hidden
-                            className={`pointer-events-none absolute -left-[8.5px] top-0 z-10 h-1/2 w-[8.5px] rounded-bl-[7px] border-b border-l transition-colors duration-150 ${
-                              isActive
-                                ? "border-brand-red/55"
+                            className={`pointer-events-none absolute -left-[8.5px] top-0 z-10 h-1/2 w-[8.5px] rounded-bl-[7px] border-b border-l transition-[border-color] duration-[380ms] ease-plf-spring motion-reduce:transition-none ${
+                              showsAccentActive(isActive)
+                                ? "border-brand-red/60"
                                 : "border-zinc-200/90 group-hover:border-zinc-300"
-                            }`}
-                          />
-
-                          {/* Cápsula activa sobre la unión de la opción */}
-                          <span
-                            aria-hidden
-                            className={`pointer-events-none absolute -left-[1.5px] top-1/2 z-20 h-3.5 w-[2.5px] -translate-y-1/2 rounded-full bg-brand-red shadow-[0_0_6px_rgba(228,0,43,0.35)] transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
-                              isActive ? "scale-y-100" : "scale-y-0"
                             }`}
                           />
 
@@ -406,7 +474,7 @@ export function Sidebar() {
                               aria-hidden
                               strokeWidth={isActive ? 2.2 : 1.9}
                               className={`h-3.5 w-3.5 shrink-0 transition-colors duration-150 ${
-                                isActive
+                                showsAccentActive(isActive)
                                   ? "text-brand-red"
                                   : hasUnread
                                   ? "text-zinc-800"
@@ -416,7 +484,7 @@ export function Sidebar() {
                           )}
                           <span className="min-w-0 flex-1 truncate">{child.label}</span>
                           {child.folder && counts && (
-                            <FolderBadge count={counts[child.folder]} isActive={isActive} />
+                            <FolderBadge count={counts[child.folder]} isActive={showsAccentActive(isActive)} />
                           )}
                         </>
                       )}
@@ -434,22 +502,22 @@ export function Sidebar() {
     return (
       <NavLink
         key={group.to}
+        ref={registerTarget(`expanded:top:${group.to!}`)}
         to={group.to!}
         className={({ isActive }) =>
-          `group relative flex h-[34px] items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-all duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+          `group relative z-[2] flex h-[34px] items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-[color] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
             isActive
-              ? "bg-zinc-100/95 text-zinc-950 font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_1px_2px_rgba(24,24,27,0.04)] ring-1 ring-zinc-900/[0.06]"
+              ? "text-zinc-950 font-semibold"
               : "text-zinc-600 font-medium hover:bg-zinc-100/70 hover:text-zinc-900"
           }`
         }
       >
         {({ isActive }) => (
           <>
-            <ActiveMark active={isActive} className="-left-2" />
             <group.icon
               strokeWidth={isActive ? 2.2 : 1.9}
               className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
-                isActive ? "text-brand-red" : "text-zinc-400 group-hover:text-zinc-700"
+                showsAccentActive(isActive) ? "text-brand-red" : "text-zinc-400 group-hover:text-zinc-700"
               }`}
             />
             <span className="min-w-0 flex-1 truncate">{group.label}</span>
@@ -526,7 +594,15 @@ export function Sidebar() {
       </div>
 
       {/* 2. Árbol de Navegación Principal con transición suave y ágil */}
-      <nav className="no-scrollbar relative flex-1 overflow-y-auto overflow-x-hidden">
+      <nav ref={navRef} className="no-scrollbar relative flex-1 overflow-y-auto overflow-x-hidden">
+        {indicatorRect && (
+          <SidebarNavIndicator
+            rect={indicatorRect}
+            motionReady={indicatorMotionReady}
+            indicatorMotion={indicatorMotion}
+          />
+        )}
+        <div ref={navListRef} className="relative z-[2] min-h-0">
         {/* Modo Riel (Contraído) */}
         <div
           className={`flex flex-col items-center gap-2 p-2 transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
@@ -538,22 +614,22 @@ export function Sidebar() {
           {visibleGroups.map((group) => (
             <div key={group.label} className="relative">
               <Link
+                ref={registerTarget(`collapsed:rail:${group.label}`)}
                 to={group.to ?? group.children![0].to}
                 aria-label={group.label}
                 onMouseEnter={(event) => openFlyout(group, event.currentTarget)}
                 onMouseLeave={scheduleClose}
                 onFocus={(event) => openFlyout(group, event.currentTarget)}
                 onBlur={scheduleClose}
-                className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                className={`group relative z-[2] flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                   isGroupActive(group)
-                    ? "bg-zinc-100/95 text-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_1px_2px_rgba(24,24,27,0.04)] ring-1 ring-zinc-900/[0.06]"
+                    ? "text-zinc-950"
                     : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 active:scale-95 motion-reduce:active:scale-100"
                 }`}
               >
-                <ActiveMark active={isGroupActive(group)} className="-left-4" />
                 <group.icon
                   className={`h-4.5 w-4.5 transition-colors ${
-                    isGroupActive(group) ? "text-brand-red" : ""
+                    showsAccentActive(isGroupActive(group)) ? "text-brand-red" : ""
                   }`}
                   strokeWidth={isGroupActive(group) ? 2.2 : 1.95}
                 />
@@ -577,16 +653,24 @@ export function Sidebar() {
               : "opacity-100 pointer-events-auto translate-x-0"
           }`}
         >
-          {sections.map(({ section, groups }) => (
+          {sections.map(({ section, groups }) => {
+            const sectionActive = groups.some((group) => isGroupActive(group));
+            return (
             <div key={section} className="flex flex-col">
-              <p className="px-2.5 pb-1 font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
+              <p
+                className={`px-2.5 pb-1 font-heading text-[10px] font-bold uppercase tracking-[0.1em] transition-colors duration-[380ms] ease-plf-spring motion-reduce:transition-none ${
+                  sectionActive ? "text-brand-red/70" : "text-zinc-400"
+                }`}
+              >
                 {section}
               </p>
               <div className="flex flex-col gap-0.5">
                 {groups.map(renderExpandedGroup)}
               </div>
             </div>
-          ))}
+          );
+          })}
+        </div>
         </div>
       </nav>
 
