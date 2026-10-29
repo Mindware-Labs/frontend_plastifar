@@ -26,8 +26,8 @@ import { Spinner } from "../../components/ui/Spinner";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../components/shadcn/resizable";
 import { ScrollArea } from "../../components/shadcn/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/shadcn/tooltip";
-import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
+import { usePermissions } from "../../hooks/usePermissions";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useHasOpenedNotifications, useNotifyPrefs } from "../../hooks/useNotifyPrefs";
@@ -342,13 +342,19 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const [params, setParams] = useSearchParams();
   const { counts, refresh: refreshCounts, onInboxChanged } = useEmailCounts();
   const receipts = useReceipts();
-  // Eliminar definitivamente y vaciar la papelera son de administradores.
-  const isAdmin = Boolean(useAuth().user?.isAdmin);
+  const { can } = usePermissions();
+  const canMailSend = can("mail.send");
+  const canMailManage = can("mail.manage");
+  const canMailDelete = can("mail.delete");
   const prefs = useNotifyPrefs();
   const hasOpenedAlerts = useHasOpenedNotifications();
   const debouncedSearch = useDebouncedValue(search).trim();
   const meta = folderMeta[folder];
   const selectable = folder !== "sent";
+
+  useEffect(() => {
+    if (!canMailSend && composing) setComposing(false);
+  }, [canMailSend, composing]);
 
   const { data, isStale, error, page, setPage, refresh } = usePagedList<EmailQuery, EmailListResponse>(
     {
@@ -708,7 +714,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
           }
           action={
             <div className="flex items-center gap-2">
-              {folder === "trash" && isAdmin && (
+              {folder === "trash" && canMailDelete && (
                 <button
                   type="button"
                   onClick={confirmEmptyTrash}
@@ -807,14 +813,16 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                 )}
               </div>
 
-              <Button
-                size="sm"
-                onClick={() => setComposing(true)}
-                className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
-              >
-                <Plus className="h-4 w-4" strokeWidth={2.5} />
-                <span>Redactar</span>
-              </Button>
+              {canMailSend && (
+                <Button
+                  size="sm"
+                  onClick={() => setComposing(true)}
+                  className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
+                >
+                  <Plus className="h-4 w-4" strokeWidth={2.5} />
+                  <span>Redactar</span>
+                </Button>
+              )}
             </div>
           }
         />
@@ -913,7 +921,8 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                       >
                         <SelectionBar
                           folder={folder as Exclude<FolderKey, "sent">}
-                          canDelete={isAdmin}
+                          canManage={canMailManage}
+                          canDelete={canMailDelete}
                           count={isSelecting ? checked.size : preservedSelection.count}
                           pageState={isSelecting ? pageState : preservedSelection.pageState}
                           busy={busy}
@@ -947,7 +956,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                           selectable={selectable}
                           onOpen={() => handleOpen(email)}
                           onToggle={(shiftKey) => toggleChecked(email, shiftKey)}
-                          onToggleStar={() => handleToggleStar(email.id)}
+                          onToggleStar={canMailManage ? () => handleToggleStar(email.id) : undefined}
                         />
                       ))}
                     </div>
@@ -1012,6 +1021,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                     folder={folder}
                     counts={data.counts}
                     folderCounts={data.folderCounts}
+                    canCompose={canMailSend}
                     onCompose={() => setComposing(true)}
                     onSelectTicketFilter={(f) => setTicketFilter(f)}
                     activeTicketFilter={ticketFilter}

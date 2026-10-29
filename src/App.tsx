@@ -1,4 +1,5 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { HomeRedirect } from "./components/HomeRedirect";
 import { GuestRoute, PermissionRoute, ProtectedRoute } from "./components/RouteGuards";
 import { AppLayout } from "./layouts/AppLayout";
 import { BandejaPage } from "./pages/bandeja/BandejaPage";
@@ -70,10 +71,6 @@ export default function App() {
         <Route path="/dashboard" element={<CXDashboard />} />
         <Route path="/dashboard-calidad" element={<DashboardPage />} />
 
-        {/* Bandeja de tickets y correo (modulo de Richard De Leon). Lleva el
-            mismo guard de lectura que el resto: la seccion 6.2 define
-            tickets.read y RF-P6 pide que la interfaz no ofrezca lo que el
-            servidor va a rechazar. */}
         <Route element={<PermissionRoute permission="tickets.read"><Outlet /></PermissionRoute>}>
           <Route path="/tickets" element={<TicketsPage />} />
           {/* Motivos y veredictos llegaron con la rama de Tickets. Hubo un
@@ -82,9 +79,12 @@ export default function App() {
             los campos. Quedo esta: un motivo es un concepto de tickets, no de
             configuracion, y dos pantallas para una tabla es como se desincronizan
             las reglas. */}
-        <Route path="/tickets/motivos" element={<MotivosPage />} />
-        <Route path="/tickets/veredictos" element={<VeredictosPage />} />
-        <Route path="/tickets/:id" element={<TicketDetailPage />} />
+          <Route path="/tickets/motivos" element={<MotivosPage />} />
+          <Route path="/tickets/veredictos" element={<VeredictosPage />} />
+          <Route path="/tickets/:id" element={<TicketDetailPage />} />
+        </Route>
+
+        <Route element={<PermissionRoute permission="mail.read"><Outlet /></PermissionRoute>}>
           <Route path="/bandeja" element={<BandejaPage folder="inbox" />} />
           <Route path="/bandeja/destacados" element={<BandejaPage folder="starred" />} />
           <Route path="/bandeja/archivados" element={<BandejaPage folder="archived" />} />
@@ -210,9 +210,7 @@ export default function App() {
           <Route path="/reportes/:familia" element={<Navigate to="/reportes" replace />} />
         </Route>
 
-        {/* La raiz entra a la Bandeja, no al Dashboard: es donde la operacion
-            pasa el dia (seccion 9.1). Criterio de la rama de Richard. */}
-        <Route path="/" element={<Navigate to="/bandeja" replace />} />
+        <Route path="/" element={<HomeRedirect />} />
       </Route>
 
       {/* Vistas de impresión de los formularios (docs/plan/03 RF-R9, 05 RF-H10,

@@ -17,6 +17,7 @@ interface InboxTriageEmptyStateProps {
   folder: FolderKey;
   counts?: { all: number; unlinked: number; linked: number; unanswered: number };
   folderCounts?: EmailFolderCounts;
+  canCompose: boolean;
   onCompose: () => void;
   onSelectTicketFilter: (filter: "todos" | "sin-ticket" | "sin-responder") => void;
   activeTicketFilter: string;
@@ -39,6 +40,7 @@ export function InboxTriageEmptyState({
   folder,
   counts,
   folderCounts,
+  canCompose,
   onCompose,
   onSelectTicketFilter,
   activeTicketFilter,
@@ -190,10 +192,12 @@ export function InboxTriageEmptyState({
 
         {/* Botones de acción principal */}
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
-          <PfButton size="sm" className="h-8 px-4 gap-1.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]" onClick={onCompose}>
-            <PenLine className="h-4 w-4" />
-            Escribir un correo
-          </PfButton>
+          {canCompose && (
+            <PfButton size="sm" className="h-8 px-4 gap-1.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]" onClick={onCompose}>
+              <PenLine className="h-4 w-4" />
+              Escribir un correo
+            </PfButton>
+          )}
 
           {isInbox && unansweredCount > 0 && activeTicketFilter !== "sin-responder" && (
             <button

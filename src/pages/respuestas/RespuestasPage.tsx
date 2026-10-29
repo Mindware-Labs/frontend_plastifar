@@ -12,6 +12,7 @@ import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/useAuth";
+import { usePermissions } from "../../hooks/usePermissions";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse } from "../../types/api";
 import { CannedResponseStudio } from "./CannedResponseStudio";
@@ -20,6 +21,8 @@ import { RespuestasHelpSheet } from "./RespuestasHelpSheet";
 /** Respuestas predefinidas: se insertan en el editor desde "Respuestas rápidas". */
 export function RespuestasPage() {
   const { user } = useAuth();
+  const { can } = usePermissions();
+  const canMailSend = can("mail.send");
   const [items, setItems] = useState<CannedResponseResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -45,6 +48,7 @@ export function RespuestasPage() {
   );
 
   function canManage(item: CannedResponseResponse) {
+    if (!canMailSend) return false;
     return Boolean(user?.isAdmin) || item.createdByStaffId === user?.staffId;
   }
 
@@ -83,10 +87,12 @@ export function RespuestasPage() {
             : "Cargando las respuestas…"
         }
         action={
-          <Button size="sm" onClick={() => setModal("nueva")}>
-            <Plus className="h-[15px] w-[15px]" />
-            Nueva respuesta
-          </Button>
+          canMailSend ? (
+            <Button size="sm" onClick={() => setModal("nueva")}>
+              <Plus className="h-[15px] w-[15px]" />
+              Nueva respuesta
+            </Button>
+          ) : undefined
         }
       />
 

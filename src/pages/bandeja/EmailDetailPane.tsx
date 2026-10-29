@@ -257,6 +257,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const permissions = usePermissions();
   const canCreateTask = permissions.can("tasks.create");
+  const canMailSend = permissions.can("mail.send");
+  const canMailManage = permissions.can("mail.manage");
+  const canMailDelete = permissions.can("mail.delete");
   const canSeeLinkedTasks =
     permissions.can("tasks.read") ||
     permissions.can("tasks.create") ||
@@ -270,6 +273,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
+
+  useEffect(() => {
+    if (!canMailSend && replyOpen) setReplyOpen(false);
+  }, [canMailSend, replyOpen]);
+
   const [composerMode, setComposerMode] = useState<ComposerMode>("reply");
   const [replyBlocks, setReplyBlocks] = useState<unknown>(null);
   const [draftBlocks, setDraftBlocks] = useState<unknown>(null);
@@ -300,7 +308,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [exporting, setExporting] = useState(false);
   const [dangerousToDownload, setDangerousToDownload] = useState<EmailAttachmentResponse | null>(null);
   const { user } = useAuth();
-  const isAdmin = Boolean(user?.isAdmin);
 
   // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
   const replyText = blocksToText(replyBlocks);
@@ -733,23 +740,25 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
     <div className="flex h-full flex-col">
       <div className="flex h-10 shrink-0 items-center px-2">
         <div className="flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`${toolButtonClass} ${email.starred ? "text-amber-500 hover:text-amber-600" : ""}`}
-                disabled={starring}
-                onClick={handleToggleStar}
-                aria-label={email.starred ? "Quitar de destacados" : "Destacar"}
-              >
-                <Star className={`h-4 w-4 ${email.starred ? "fill-amber-400 text-amber-500" : ""}`} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{email.starred ? "Quitar de destacados" : "Destacar"}</TooltipContent>
-          </Tooltip>
+          {canMailManage && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`${toolButtonClass} ${email.starred ? "text-amber-500 hover:text-amber-600" : ""}`}
+                  disabled={starring}
+                  onClick={handleToggleStar}
+                  aria-label={email.starred ? "Quitar de destacados" : "Destacar"}
+                >
+                  <Star className={`h-4 w-4 ${email.starred ? "fill-amber-400 text-amber-500" : ""}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{email.starred ? "Quitar de destacados" : "Destacar"}</TooltipContent>
+            </Tooltip>
+          )}
 
-          {isInInbox ? (
+          {canMailManage && isInInbox ? (
             <>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -780,7 +789,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 <TooltipContent>Mover a la papelera</TooltipContent>
               </Tooltip>
             </>
-          ) : (
+          ) : canMailManage ? (
             <>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -796,7 +805,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 </TooltipTrigger>
                 <TooltipContent>Restaurar a la bandeja</TooltipContent>
               </Tooltip>
-              {email.folder === "Trash" && isAdmin && (
+              {email.folder === "Trash" && canMailDelete && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -813,7 +822,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 </Tooltip>
               )}
             </>
-          )}
+          ) : null}
 
           {ticketsNote(email) && !email.ticketId && (
             <TicketsOriginPopover
@@ -824,13 +833,15 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
-          <AssignmentControl
-            emailId={email.id}
-            assignedStaffId={email.assignedStaffId ?? null}
-            assignedStaffName={email.assignedStaffName ?? null}
-            onChanged={(staffId, name) => setEmail({ ...email, assignedStaffId: staffId, assignedStaffName: name })}
-            onNoteAdded={() => setNotesRefreshKey((k) => k + 1)}
-          />
+          {canMailManage && (
+            <AssignmentControl
+              emailId={email.id}
+              assignedStaffId={email.assignedStaffId ?? null}
+              assignedStaffName={email.assignedStaffName ?? null}
+              onChanged={(staffId, name) => setEmail({ ...email, assignedStaffId: staffId, assignedStaffName: name })}
+              onNoteAdded={() => setNotesRefreshKey((k) => k + 1)}
+            />
+          )}
 
           <TicketChip
             ticketId={email.ticketId}
@@ -1236,7 +1247,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                         ? `Se reintentará solo. ${openReply.deliveryDetail ?? ""}`
                         : (openReply.deliveryDetail ?? "El proveedor no dio más detalle.")}
                     </span>
-                    {openReply.deliveryStatus === "Failed" && (
+                    {openReply.deliveryStatus === "Failed" && canMailSend && (
                       <PfButton
                         size="sm"
                         variant="ghost"
@@ -1371,7 +1382,9 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         </>
       )}
 
-      <AddNotePanel emailId={email.id} onNoteAdded={() => setNotesRefreshKey((k) => k + 1)} />
+      {canMailManage && (
+        <AddNotePanel emailId={email.id} onNoteAdded={() => setNotesRefreshKey((k) => k + 1)} />
+      )}
 
       <Separator className="bg-line" />
 
@@ -1450,28 +1463,30 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         )}
 
         {/* Dos botones iguales a todo el ancho; lo enviado no se responde, asi que queda solo reenviar. */}
-        <div className={`grid gap-2 ${isOutbound ? "grid-cols-1" : "grid-cols-2"}`}>
-          {!isOutbound && (
+        {canMailSend && (
+          <div className={`grid gap-2 ${isOutbound ? "grid-cols-1" : "grid-cols-2"}`}>
+            {!isOutbound && (
+              <button
+                type="button"
+                onClick={() => openComposer("reply")}
+                title={`Responder a ${email.fromName ?? email.fromEmail}`}
+                className={composerOpenerClass}
+              >
+                <CornerUpLeft className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
+                Responder
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => openComposer("reply")}
-              title={`Responder a ${email.fromName ?? email.fromEmail}`}
+              onClick={() => openComposer("forward")}
+              title="Reenviar este correo a otra dirección"
               className={composerOpenerClass}
             >
-              <CornerUpLeft className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
-              Responder
+              <Forward className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
+              Reenviar
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => openComposer("forward")}
-            title="Reenviar este correo a otra dirección"
-            className={composerOpenerClass}
-          >
-            <Forward className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
-            Reenviar
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       {confirmingDelete && (

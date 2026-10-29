@@ -124,7 +124,7 @@ export const SIDEBAR_NAV: NavGroup[] = [
     label: "Correo",
     icon: Inbox,
     section: "Principal",
-    permission: "tickets.read",
+    permission: "mail.read",
     children: [
       { label: "Bandeja", to: "/bandeja", end: true, folder: "inbox", icon: Inbox },
       { label: "Destacados", to: "/bandeja/destacados", folder: "starred", icon: Star },
