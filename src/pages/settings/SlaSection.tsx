@@ -1,4 +1,4 @@
-import { Ban, CheckCircle2, Flag, Layers, ListTodo, Pencil, Plus, Power, Star, Ticket } from "lucide-react";
+import { Ban, CheckCircle2, Layers, ListTodo, Pencil, Plus, Power, Star, Ticket } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
@@ -24,7 +24,8 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { humanizeMinutes, workdayMinutes } from "../../lib/sla";
 import { invalidateActiveSlaPoliciesCache } from "../../lib/useActiveSlaPolicies";
-import { PRIORITIES, type Holiday, type Priority, type SlaPolicy, type SlaPolicyType } from "../../types/settings";
+import { priorityFilterDefaultIcon, priorityFilterOptions } from "../../lib/priorityFilterOptions";
+import type { Holiday, Priority, SlaPolicy, SlaPolicyType } from "../../types/settings";
 import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { SlaModal } from "./SlaModal";
 
@@ -344,11 +345,8 @@ export function SlaSection() {
                 setPriority(value as Priority | "todas");
                 setPage(1);
               }}
-              defaultIcon={<Flag className="h-3.5 w-3.5 text-zinc-500" />}
-              options={[
-                { value: "todas", label: "Todas las prioridades" },
-                ...PRIORITIES.map((value) => ({ value, label: value })),
-              ]}
+              defaultIcon={priorityFilterDefaultIcon}
+              options={priorityFilterOptions()}
             />
 
             {(search || priority !== "todas" || typeFilter !== "todas") && (

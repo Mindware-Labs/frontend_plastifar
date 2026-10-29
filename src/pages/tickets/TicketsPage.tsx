@@ -1,16 +1,4 @@
-import {
-  AlertOctagon,
-  AlertTriangle,
-  Building2,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  Flag,
-  Plus,
-  SlidersHorizontal,
-  Ticket as TicketIcon,
-  X,
-} from "lucide-react";
+import { Building2, ChevronDown, Plus, SlidersHorizontal, Ticket as TicketIcon, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
@@ -19,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
+import { priorityFilterDefaultIcon, priorityFilterOptions } from "../../lib/priorityFilterOptions";
 import { formatTicketProductsSummary } from "../../lib/ticketProducts";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
@@ -459,33 +448,7 @@ export function TicketsPage() {
   // rotula con el camino, como el filtro, y cae al nombre si el id no está.
   const departmentPathById = departmentPaths(departments);
 
-  const priorityFilterOptions: TicketFilterOption[] = [
-    {
-      value: "todas",
-      label: "Todas las prioridades",
-      icon: <Flag className="h-4 w-4 text-zinc-500" />,
-    },
-    {
-      value: "Emergencia",
-      label: "Emergencia",
-      icon: <AlertOctagon className="h-4 w-4 text-brand-red" />,
-    },
-    {
-      value: "Alta",
-      label: "Alta",
-      icon: <AlertTriangle className="h-4 w-4 text-amber-500" />,
-    },
-    {
-      value: "Normal",
-      label: "Normal",
-      icon: <CheckCircle2 className="h-4 w-4 text-zinc-500" />,
-    },
-    {
-      value: "Baja",
-      label: "Baja",
-      icon: <Clock className="h-4 w-4 text-zinc-400" />,
-    },
-  ];
+  const priorityFilterOpts = priorityFilterOptions() as TicketFilterOption[];
 
   return (
     <div className="flex h-full flex-col">
@@ -627,8 +590,8 @@ export function TicketsPage() {
                   title="Seleccionar prioridad"
                   value={priority}
                   onChange={setPriority}
-                  options={priorityFilterOptions}
-                  defaultIcon={<Flag className="h-4 w-4 text-zinc-500" />}
+                  options={priorityFilterOpts}
+                  defaultIcon={priorityFilterDefaultIcon}
                   aria-label="Filtrar por prioridad"
                 />
 

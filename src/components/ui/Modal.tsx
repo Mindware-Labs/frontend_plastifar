@@ -3,6 +3,7 @@ import { useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
+import { dialogHeaderShellMutedClass, dialogHeaderStackClass } from "./dialogHeaderStyles";
 
 export interface ModalProps {
   title: string;
@@ -70,8 +71,8 @@ export function Modal({
         } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-[0_12px_36px_rgba(27,27,29,0.14)] transition-[max-width] duration-350 ease-[cubic-bezier(0.22,1,0.36,1)]`}
       >
         {/* Cabecera compacta con borde nítido y buena jerarquía */}
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line bg-zinc-50/50 px-6 py-4">
-          <div className="min-w-0 flex-1">
+        <div className={dialogHeaderShellMutedClass}>
+          <div className={dialogHeaderStackClass}>
             {eyebrow && (
               <p
                 key={eyebrow}
@@ -83,7 +84,7 @@ export function Modal({
             <h2
               key={title}
               id={titleId}
-              className="animate-plf-header-fade font-heading text-[16px] font-bold tracking-tight text-ink leading-snug"
+              className="animate-plf-header-fade font-heading text-[16px] font-bold leading-snug tracking-tight text-ink"
             >
               {title}
             </h2>
@@ -91,7 +92,7 @@ export function Modal({
               <div
                 key={typeof description === "string" ? description : undefined}
                 id={descriptionId}
-                className="animate-plf-header-fade mt-1 text-[12px] leading-relaxed text-subtle"
+                className="animate-plf-header-fade text-[12px] leading-relaxed text-subtle"
               >
                 {description}
               </div>

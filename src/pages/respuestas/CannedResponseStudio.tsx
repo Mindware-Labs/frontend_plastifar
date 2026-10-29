@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { cannedApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
 import { Alert } from "../../components/ui/Alert";
+import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
 import { Button } from "../../components/ui/Button";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { formatDateTime } from "../../lib/format";
@@ -125,15 +126,15 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
         } ${isExiting ? "pointer-events-none" : ""}`}
       >
         {/* Cabecera del Drawer con nueva jerarquía */}
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
-          <div className="min-w-0">
+        <div className={dialogHeaderShellClass}>
+          <div className={dialogHeaderStackClass}>
             <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
               Correo · Respuestas rápidas
             </p>
-            <h2 id={titleId} className="mt-1 font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+            <h2 id={titleId} className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
               {isEdit ? "Editar respuesta predefinida" : "Nueva respuesta predefinida"}
             </h2>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-subtle">
+            <p className="text-[12px] leading-relaxed text-subtle">
               Estructura de correo corporativo para agilizar la atención por soporte.
             </p>
           </div>

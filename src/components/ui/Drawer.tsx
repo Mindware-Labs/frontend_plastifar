@@ -70,8 +70,8 @@ export function Drawer({
             isExiting ? "pointer-events-none" : ""
           }`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-6 pb-4 pt-5">
-          <div>
+        <div className={`flex items-start justify-between gap-4 border-b border-line px-6 py-5`}>
+          <div className="min-w-0 flex-1 flex flex-col gap-1.5">
             {eyebrow && (
               <p className="font-heading text-[10px] font-medium uppercase tracking-[0.07em] text-faint">
                 {eyebrow}
@@ -79,12 +79,12 @@ export function Drawer({
             )}
             <h2
               id={titleId}
-              className="mt-1.5 font-heading text-[18px] font-semibold tracking-[-0.015em] text-ink"
+              className="font-heading text-[18px] font-semibold tracking-[-0.015em] text-ink"
             >
               {title}
             </h2>
             {description && (
-              <p id={descriptionId} className="mt-1.5 text-[12.5px] leading-relaxed text-subtle">
+              <p id={descriptionId} className="text-[12.5px] leading-relaxed text-subtle">
                 {description}
               </p>
             )}

@@ -38,6 +38,7 @@ import { Alert } from "../../components/ui/Alert";
 import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
 import { CheckboxField, SelectField, TextField } from "../../components/ui/Field";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
@@ -1831,15 +1832,15 @@ export function TicketDetailPage() {
       {/* Vista de redacción a pantalla completa con preservación de borrador. */}
       {replyOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white">
-          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-3.5">
-            <div className="min-w-0">
+          <div className={dialogHeaderShellClass}>
+            <div className={dialogHeaderStackClass}>
               <p className="font-heading text-[11px] font-semibold tracking-[0.02em] tabular-nums text-subtle">
                 {ticket.number}
               </p>
-              <h2 className="mt-0.5 truncate font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+              <h2 className="truncate font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
                 Re: {ticket.subject}
               </h2>
-              <p className="mt-0.5 truncate text-[12px] text-subtle">
+              <p className="truncate text-[12px] text-subtle">
                 Para <span className="font-medium text-ink">{recipientEmail}</span>
               </p>
             </div>
