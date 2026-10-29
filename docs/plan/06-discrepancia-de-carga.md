@@ -10,15 +10,15 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > (sección 9 del plan original, Richard De León), y se relaciona con las solicitudes de crédito del módulo de
 > Calidad (sección 10, Yordy Acosta).
 
-> **Estado (12 de octubre de 2026).** Construido en las ramas `modulo/discrepancia-carga` de ambos repositorios,
+> **Estado (29 de octubre de 2026).** Construido en `main` de ambos repositorios,
 > bajo los supuestos provisionales de la sección 16: modelo, migración con numeración propia (`DC-000001`), los
 > nueve endpoints de la sección 10, las líneas con sus reglas, los nueve puntos con el punto 9 condicionado, dar
 > por completa con la lista de lo que falta, aprobar o devolver con nota, reabrir, el aviso automático de
 > hallazgo con constancia, la solicitud de crédito desde una línea apta, el listado con la pastilla «Con hallazgo
 > de seguridad», la ficha, la impresión horizontal y las claves `discrepancies.*`. **No construido, a propósito:**
-> `TaskId` y todo lo que toca la tarea (RF-D1 «desde la tarea», RF-D4, RF-D8 «desde su tarea», pestaña del
-> ticket): es la Bandeja y depende del documento 02. Mientras tanto la investigación se crea desde el listado
-> eligiendo el ticket. Los destinatarios del aviso (pregunta 2) se leen de la configuración
+> `TaskId` y todo lo que toca la tarea (RF-D1 «desde la tarea», RF-D4, RF-D8 «desde su tarea»): es la Bandeja y
+> depende del documento 02. Mientras tanto la investigación se crea desde el listado eligiendo el ticket, o desde
+> la pestaña «Formularios» del ticket (`TicketFormsTab`, de la Bandeja, 22 de octubre de 2026), que las lista con `GET /api/tickets/{ticketId}/discrepancies`. Los destinatarios del aviso (pregunta 2) se leen de la configuración
 > `Discrepancies:SecurityNotifyEmails`; sin ella, el hallazgo queda en la bitácora sin aviso. La migración está
 > aplicada en Postgres 17 local el 23 de octubre de 2026, desde el estado anterior a los módulos y sobre datos de prueba;
 > falta aplicarla en Railway.

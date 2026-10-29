@@ -10,7 +10,7 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > plan original, Yordy Acosta). La conexión con las tareas del ticket toca la Bandeja (sección 9, Richard De
 > León) y se especifica en el documento 02.
 
-> **Estado (12 de octubre de 2026).** Construido en las ramas `modulo/hca-ampliada` de ambos repositorios todo
+> **Estado (29 de octubre de 2026).** Construido en `main` de ambos repositorios todo
 > lo que es de Calidad: autor, planta, producto y comentarios en la hoja; lista de causas con las tres reglas
 > movidas de la causa raíz a las causas (regla 4) y la migración de datos (RF-H11); evidencias por acción, texto
 > y archivos, con `AttachmentPolicy` e `IAttachmentStorage`; participantes con confirmación; filtros por planta y

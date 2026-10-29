@@ -10,7 +10,7 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > puntos pertenecen a la Bandeja de tickets (sección 9 del plan original, Richard De León). La integración debe
 > acordarse con su responsable.
 
-> **Estado (23 de octubre de 2026).** Construido en `main` de ambos repositorios (backend `d3dfec7` y
+> **Estado (29 de octubre de 2026).** Construido en `main` de ambos repositorios (backend `d3dfec7` y
 > correcciones, frontend `d02f67a`), bajo los supuestos provisionales de la sección 16: modelo y migración
 > `AddMerchandiseWithdrawals`; los endpoints `GET /api/withdrawals`, `GET /api/withdrawals/{id}`,
 > `GET|POST /api/tickets/{ticketId}/withdrawals`, `PUT /api/withdrawals/{id}` y `POST …/decision`, `…/complete` y
@@ -20,9 +20,9 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > `/retiros` (listado con pastillas de estado y filtros), ficha y la impresión horizontal en
 > `/retiros/{id}/imprimir`. Solo puede registrar un retiro el departamento con una regla de enrutamiento activa
 > para este formulario al crear el ticket, y la heredan sus subdepartamentos. **No construido, a propósito:**
-> llenarlo desde el alta del ticket (`CreateTicketModal.tsx`), abrirlo desde la tarea de Almacén y la pestaña del
-> ticket: es la Bandeja y depende del documento 02. Mientras tanto la solicitud se crea desde el listado eligiendo
-> el ticket. La migración está aplicada en Postgres 17 local el 23 de octubre de 2026, desde el estado anterior a los módulos y sobre datos de prueba;
+> llenarlo desde el alta del ticket (`CreateTicketModal.tsx`) y abrirlo desde la tarea de Almacén: es la Bandeja y
+> depende del documento 02. Mientras tanto la solicitud se crea desde el listado eligiendo el ticket, o desde
+> la pestaña «Formularios» del ticket (`TicketFormsTab`, de la Bandeja, 22 de octubre de 2026), que lista los retiros del ticket. La migración está aplicada en Postgres 17 local el 23 de octubre de 2026, desde el estado anterior a los módulos y sobre datos de prueba;
 > falta aplicarla en Railway.
 
 ## 1. Situación y objetivo

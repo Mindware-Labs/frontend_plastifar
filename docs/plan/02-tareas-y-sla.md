@@ -11,8 +11,8 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > (`TicketTasksController`) y el proceso de vencimientos (`SlaBreachWorker`). Según la sección 3.3 del plan
 > original, esos cambios los hace el responsable de la Bandeja o se acuerdan con él antes de escribirlos.
 
-> **Estado (12 de octubre de 2026).** Construida la parte de catálogo, que no toca la Bandeja, en las ramas
-> `modulo/tareas-catalogo` de ambos repositorios: tablas `TaskType`, `TaskTypeDepartment`, `TaskTypeAssignee` y
+> **Estado (29 de octubre de 2026).** Construida la parte de catálogo, que no toca la Bandeja, en `main` de
+> ambos repositorios (entró con `feature/formularios`): tablas `TaskType`, `TaskTypeDepartment`, `TaskTypeAssignee` y
 > `FormRoutingRule`; los endpoints `api/settings/task-types` y `api/settings/form-routing-rules` de la sección
 > 10, más `GET …/form-routing-rules/applicable?departmentId=&moment=` que resuelve las reglas subiendo por la
 > jerarquía y por los equipos de quien pregunta; la carga inicial de los 13 tipos y las reglas de 7.5 en

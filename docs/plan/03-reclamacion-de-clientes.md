@@ -10,14 +10,15 @@ Marcas usadas: **[Fuente]**, **[Propuesta]**, **[Abierta]**. Ver [README](README
 > en el alta de tickets de la Bandeja (sección 9 del plan original, Richard De León; pantalla
 > `src/pages/tickets/CreateTicketModal.tsx`). El punto de integración debe acordarse con su responsable.
 
-> **Estado (12 de octubre de 2026).** Construido en las ramas `modulo/reclamaciones` de ambos repositorios, bajo
+> **Estado (29 de octubre de 2026).** Construido en `main` de ambos repositorios, bajo
 > los supuestos provisionales de la sección 16: modelo, migración, los siete endpoints más `GET /api/claims/{id}`,
 > cálculo en el servidor, cierre condicionado, reapertura, listado, ficha, impresión y la pestaña «Reclamación»
 > del detalle del ticket. Lo que NO se construyó: el alta conjunta de ticket y reclamación desde
 > `CreateTicketModal.tsx` (RF-R1 tal como está escrito), porque es el punto de integración que debe acordarse
 > con el responsable de la Bandeja; mientras tanto la reclamación se registra desde la pestaña del ticket, en una
-> segunda llamada. El toque a la Bandeja se limitó a esa pestaña (`TicketDetailPage.tsx`) y a una palabra en el
-> tipo `TicketDetailTab`. Las rutas quedaron en `/reclamaciones`, no bajo `/calidad`, por la clave de lectura
+> segunda llamada. La pestaña «Reclamación» propia (`TicketClaimTab.tsx`) quedó sustituida por la pestaña «Formularios» del ticket (`TicketFormsTab`, de la Bandeja, 22 de octubre de 2026),
+> que reúne los cuatro formularios del ticket y permite iniciar cualquiera desde ahí; `TicketClaimTab.tsx` ya no
+> se importa en ninguna pantalla. Las rutas quedaron en `/reclamaciones`, no bajo `/calidad`, por la clave de lectura
 > propia (sección 12).
 
 ## 1. Situación y objetivo

@@ -300,7 +300,7 @@ Reglas espejo entre el esquema de Zod y el servidor; cada lado indica en un come
 - [x] Intentar eliminar un producto usado en un formulario devuelve 409 con el mensaje correcto. Comprobado
       con las líneas de la reclamación de clientes (03)
       (`ClaimsControllerTests.A_product_named_in_a_claim_cannot_be_deleted_from_the_catalogue`) y del retiro de
-      mercancía (04) (`WithdrawalsControllerTests.A_product_named_in_a_withdrawal_is_in_use_and_cannot_be_deleted`).
+      mercancía (04) (`WithdrawalsControllerTests.A_product_named_in_a_withdrawal_is_in_use_and_cannot_be_deleted`)
       y de la discrepancia de carga (06)
       (`DiscrepanciesControllerTests.A_product_named_in_a_discrepancy_is_in_use_and_cannot_be_deleted`).
 - [x] Cargar dos veces el mismo archivo no duplica productos: la segunda carga informa cero creados
