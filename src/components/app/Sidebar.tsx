@@ -29,7 +29,7 @@ import { SignatureModal } from "./SignatureModal";
 /** Indicador único siempre visible: fondo + marca (sin duplicar en cada fila). */
 function sidebarIndicatorMotionClass(motion: SidebarIndicatorMotion, motionReady: boolean) {
   if (motion === "travel" && motionReady) {
-    return "transition-[top,height,left,width] duration-[380ms] ease-plf-spring motion-reduce:transition-none";
+    return "transition-[top,height,left,width] duration-[320ms] ease-plf-spring motion-reduce:transition-none";
   }
   return "transition-none";
 }
@@ -525,14 +525,14 @@ export function Sidebar() {
   return (
     <aside
       className={`relative flex h-screen shrink-0 flex-col border-r border-zinc-200/80 bg-white select-none will-change-[width]
-        transition-[width] duration-[230ms] ease-plf-glide motion-reduce:transition-none ${collapsed ? "w-[68px]" : "w-60"}`}
+        transition-[width] duration-[320ms] ease-plf-spring motion-reduce:transition-none ${collapsed ? "w-[68px]" : "w-60"}`}
     >
       {/* 1. Cabecera superior: altura fija elegante (h-14) con cross-fade ágil */}
       <div className="relative flex h-14 shrink-0 items-center border-b border-zinc-200/80 px-3 overflow-hidden">
         {/* Versión expandida */}
         <div
-          className={`flex w-full items-center justify-between transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
-            collapsed ? "opacity-0 pointer-events-none -translate-x-3" : "opacity-100 translate-x-0"
+          className={`flex w-full items-center justify-between transition-all duration-[260ms] ease-plf-spring motion-reduce:transition-none ${
+            collapsed ? "opacity-0 pointer-events-none -translate-x-2" : "opacity-100 pointer-events-auto translate-x-0"
           }`}
         >
           <Link
@@ -559,8 +559,8 @@ export function Sidebar() {
 
         {/* Versión contraída */}
         <div
-          className={`absolute inset-0 flex items-center justify-center gap-1.5 px-2 transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
-            collapsed ? "opacity-100 pointer-events-auto scale-100" : "opacity-0 pointer-events-none scale-95"
+          className={`absolute inset-0 flex items-center justify-center gap-1.5 px-2 transition-all duration-[260ms] ease-plf-spring motion-reduce:transition-none ${
+            collapsed ? "opacity-100 pointer-events-auto translate-x-0" : "opacity-0 pointer-events-none translate-x-2"
           }`}
         >
           <Link
@@ -594,10 +594,10 @@ export function Sidebar() {
         <div ref={navListRef} className="relative z-[2] min-h-0">
         {/* Modo Riel (Contraído) */}
         <div
-          className={`flex flex-col items-center gap-2 p-2 transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
+          className={`flex flex-col items-center gap-2 p-2 transition-all duration-[260ms] ease-plf-spring motion-reduce:transition-none ${
             collapsed
-              ? "opacity-100 pointer-events-auto scale-100"
-              : "opacity-0 pointer-events-none scale-95 absolute inset-x-0 top-0"
+              ? "opacity-100 pointer-events-auto translate-x-0"
+              : "opacity-0 pointer-events-none -translate-x-2 absolute inset-x-0 top-0"
           }`}
         >
           {visibleGroups.map((group) => (
@@ -636,9 +636,9 @@ export function Sidebar() {
 
         {/* Modo Extendido (Expandido) */}
         <div
-          className={`w-full space-y-4 p-2 transition-all duration-[180ms] ease-plf-glide motion-reduce:transition-none ${
+          className={`w-full space-y-4 p-2 transition-all duration-[280ms] ease-plf-spring motion-reduce:transition-none ${
             collapsed
-              ? "opacity-0 pointer-events-none -translate-x-3 absolute inset-x-0 top-0"
+              ? "opacity-0 pointer-events-none -translate-x-2 absolute inset-x-0 top-0"
               : "opacity-100 pointer-events-auto translate-x-0"
           }`}
         >
@@ -869,10 +869,10 @@ export function Sidebar() {
               />
             </div>
 
-            {/* Contenedor del nombre y chevron con transición continua y rápida */}
+            {/* Contenedor del nombre y chevron con transición continua y orgánica */}
             <div
-              className={`flex min-w-0 flex-1 items-center justify-between transition-all duration-[200ms] ease-plf-glide motion-reduce:transition-none overflow-hidden ${
-                collapsed ? "max-w-0 opacity-0 pointer-events-none" : "max-w-[160px] opacity-100 pl-2.5"
+              className={`flex min-w-0 flex-1 items-center justify-between transition-all duration-[280ms] ease-plf-spring motion-reduce:transition-none overflow-hidden ${
+                collapsed ? "max-w-0 opacity-0 pointer-events-none -translate-x-2" : "max-w-[160px] opacity-100 pl-2.5 translate-x-0"
               }`}
             >
               <div className="min-w-0 flex-1 text-left">
@@ -893,30 +893,34 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* 5. Crédito institucional: visible solo con la barra expandida */}
-      {!collapsed && (
-        <div className="shrink-0 border-t border-zinc-100 px-3 py-2">
-          <a
-            href="https://www.cquest.do/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 text-[10.5px] text-zinc-400 transition-colors hover:text-zinc-600"
-          >
-            <span>Desarrollado por</span>
-            <img
-              src="/brand/centerquest-icon.png"
-              alt="Center Quest"
-              width={13}
-              height={13}
-              draggable={false}
-              className="select-none"
-            />
-            <span className="font-semibold text-zinc-600 hover:text-brand-red hover:underline underline-offset-2">
-              Center Quest
-            </span>
-          </a>
-        </div>
-      )}
+      {/* 5. Crédito institucional: transición suave sin saltos de layout */}
+      <div
+        className={`shrink-0 overflow-hidden transition-all duration-[260ms] ease-plf-spring motion-reduce:transition-none ${
+          collapsed
+            ? "max-h-0 opacity-0 pointer-events-none border-t-0 py-0"
+            : "max-h-12 opacity-100 border-t border-zinc-100 px-3 py-2"
+        }`}
+      >
+        <a
+          href="https://www.cquest.do/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1.5 text-[10.5px] text-zinc-400 transition-colors hover:text-zinc-600"
+        >
+          <span>Desarrollado por</span>
+          <img
+            src="/brand/centerquest-icon.png"
+            alt="Center Quest"
+            width={13}
+            height={13}
+            draggable={false}
+            className="select-none"
+          />
+          <span className="font-semibold text-zinc-600 hover:text-brand-red hover:underline underline-offset-2">
+            Center Quest
+          </span>
+        </a>
+      </div>
 
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
       {editingSignature && <SignatureModal onClose={() => setEditingSignature(false)} />}
