@@ -127,6 +127,8 @@ const lineSchema = z
       .string()
       .trim()
       .max(160, "Máximo 160 caracteres"),
+    supervisorMode: z.enum(["sistema", "manual"]),
+    supervisorStaffId: z.string().optional(),
     supervisorName: z.string().trim().max(160, "Máximo 160 caracteres"),
   })
   .superRefine((line, ctx) => {
@@ -177,6 +179,8 @@ const emptyLine = (defaultClientId = "", defaultClaimRef = ""): LineValues => ({
   dispatcherMode: "sistema",
   dispatcherStaffId: "",
   dispatcherName: "",
+  supervisorMode: "sistema",
+  supervisorStaffId: "",
   supervisorName: "",
 });
 
@@ -494,6 +498,12 @@ export function DiscrepancyFormModal({
                   : ("sistema" as const),
                 dispatcherStaffId: line.dispatcherStaffId ? String(line.dispatcherStaffId) : "",
                 dispatcherName: line.dispatcherName,
+                supervisorMode: line.supervisorStaffId
+                  ? ("sistema" as const)
+                  : line.supervisorName
+                  ? ("manual" as const)
+                  : ("sistema" as const),
+                supervisorStaffId: line.supervisorStaffId ? String(line.supervisorStaffId) : "",
                 supervisorName: line.supervisorName ?? "",
               };
             })
@@ -798,7 +808,10 @@ export function DiscrepancyFormModal({
             ? Number(line.dispatcherStaffId)
             : null,
         supervisorName: blank(line.supervisorName),
-        supervisorStaffId: null,
+        supervisorStaffId:
+          line.supervisorMode === "sistema" && line.supervisorStaffId
+            ? Number(line.supervisorStaffId)
+            : null,
       })),
       checks: checksPayload,
     };
@@ -1823,12 +1836,22 @@ function DiscrepancyLineCard({
   const qtyNum = Number(quantityValue) || 0;
   const dispatcherMode = useWatch({ control, name: `lines.${index}.dispatcherMode` }) ?? "sistema";
   const dispatcherName = useWatch({ control, name: `lines.${index}.dispatcherName` }) ?? "";
+  const supervisorMode = useWatch({ control, name: `lines.${index}.supervisorMode` }) ?? "sistema";
+  const supervisorName = useWatch({ control, name: `lines.${index}.supervisorName` }) ?? "";
 
   const handleDispatcherModeChange = (newMode: "sistema" | "manual") => {
     if (newMode === dispatcherMode) return;
     setValue(`lines.${index}.dispatcherMode`, newMode, { shouldDirty: true });
     if (newMode === "manual") {
       setValue(`lines.${index}.dispatcherStaffId`, "", { shouldDirty: true });
+    }
+  };
+
+  const handleSupervisorModeChange = (newMode: "sistema" | "manual") => {
+    if (newMode === supervisorMode) return;
+    setValue(`lines.${index}.supervisorMode`, newMode, { shouldDirty: true });
+    if (newMode === "manual") {
+      setValue(`lines.${index}.supervisorStaffId`, "", { shouldDirty: true });
     }
   };
 
@@ -2154,14 +2177,100 @@ function DiscrepancyLineCard({
           </div>
 
           {/** 10. Supervisor */}
-          <div className="lg:col-span-2">
-            <TextField
-              size="sm"
-              label="Supervisor"
-              placeholder="Supervisor (opcional)"
-              error={lineErrors?.supervisorName?.message}
-              {...register(`lines.${index}.supervisorName`)}
-            />
+          <div className="lg:col-span-2 flex flex-col gap-1.5">
+            <label
+              htmlFor={
+                supervisorMode === "sistema"
+                  ? `lines.${index}.supervisorSelect`
+                  : `lines.${index}.supervisorName`
+              }
+              className="font-heading text-[11.5px] font-semibold text-faint flex items-center justify-between"
+            >
+              <span>Supervisor</span>
+              <span className="text-[10px] text-zinc-400 font-normal">Opcional</span>
+            </label>
+
+            {supervisorMode === "sistema" ? (
+              <Controller
+                name={`lines.${index}.supervisorStaffId`}
+                control={control}
+                render={({ field: staffField }) => (
+                  <LookupSelect
+                    size="sm"
+                    id={`lines.${index}.supervisorSelect`}
+                    value={staffField.value || ""}
+                    selectedLabel={supervisorName || undefined}
+                    onChange={(value, option) => {
+                      staffField.onChange(value);
+                      setValue(
+                        `lines.${index}.supervisorName`,
+                        option ? option.label : "",
+                        {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        },
+                      );
+                    }}
+                    onBlur={staffField.onBlur}
+                    placeholder="Buscar supervisor…"
+                    searchPlaceholder="Buscar por nombre o correo…"
+                    search={searchActiveStaff}
+                    resolveSelectedLabel={resolveStaffLabel}
+                    clearLabel="Quitar supervisor"
+                    state={lineErrors?.supervisorName ? "error" : "idle"}
+                    rightAction={
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSupervisorModeChange("manual");
+                        }}
+                        tabIndex={-1}
+                        title="Escribir nombre manualmente"
+                        aria-label="Escribir nombre manualmente"
+                        className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                      >
+                        <PenLine className="h-3.5 w-3.5" />
+                      </button>
+                    }
+                  />
+                )}
+              />
+            ) : (
+              <div className="relative">
+                <ControlInput
+                  size="sm"
+                  id={`lines.${index}.supervisorName`}
+                  placeholder="Nombre supervisor"
+                  state={lineErrors?.supervisorName ? "error" : "idle"}
+                  className="w-full pr-8"
+                  {...register(`lines.${index}.supervisorName`)}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSupervisorModeChange("sistema")}
+                  tabIndex={-1}
+                  title="Buscar usuario en el sistema"
+                  aria-label="Buscar usuario en el sistema"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                >
+                  <Users className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
+            {lineErrors?.supervisorName?.message && (
+              <p
+                id={`lines.${index}.supervisorName-error`}
+                title={lineErrors.supervisorName.message}
+                className="animate-plf-shake flex items-center gap-1.5 text-[11px] font-medium text-brand-red-dark leading-none truncate"
+              >
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {lineErrors.supervisorName.message}
+                </span>
+              </p>
+            )}
           </div>
         </div>
       </div>

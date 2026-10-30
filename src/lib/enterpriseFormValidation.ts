@@ -232,6 +232,9 @@ export type DiscrepancyLineValues = {
   dispatcherMode?: string;
   dispatcherStaffId?: string;
   dispatcherName?: string;
+  supervisorMode?: string;
+  supervisorStaffId?: string;
+  supervisorName?: string;
   qualifies?: string;
   creditNoteNumber?: string;
 };
