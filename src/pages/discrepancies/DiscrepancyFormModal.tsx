@@ -32,6 +32,7 @@ import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { Button } from "../../components/ui/Button";
@@ -48,6 +49,13 @@ import { LookupSelect, type LookupOption } from "../../components/ui/LookupSelec
 import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 import { Modal } from "../../components/ui/Modal";
 import { useReceipts } from "../../context/useReceipts";
+import {
+  focusFormFieldByName,
+  getDiscrepancyStepMissing,
+} from "../../lib/enterpriseFormValidation";
+import { AppleSlidePanel, appleLineTabMotionClass } from "../../components/ui/AppleSlidePanel";
+import { prefersReducedMotion } from "../../hooks/motion";
+import { useAppleListMotion } from "../../hooks/useAppleListMotion";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import {
@@ -504,22 +512,35 @@ export function DiscrepancyFormModal({
     Math.max(0, fields.length - 1),
   );
 
+  const formValues = useWatch({ control });
+
+  const lineMotion = useAppleListMotion(
+    fields.map((field) => field.id),
+    { minItems: 1, enterMs: 440, exitMs: 400 },
+  );
+  const lineCardAnchorRef = useRef<HTMLDivElement>(null);
+
   const handleAddLine = () => {
+    const nextIndex = fields.length;
     append(emptyLine(defaultClientIdForLines, derivedTicketNumber));
-    setActiveLineIndex(fields.length);
+    setActiveLineIndex(nextIndex);
   };
 
   const handleRemoveLine = (idxToRemove: number) => {
     if (fields.length <= 1) return;
-    remove(idxToRemove);
-    setActiveLineIndex((current) => {
-      if (current === idxToRemove) {
-        return Math.max(0, idxToRemove - 1);
-      }
-      if (current > idxToRemove) {
-        return current - 1;
-      }
-      return current;
+    const field = fields[idxToRemove];
+    if (!field) return;
+    lineMotion.requestRemove(field.id, () => {
+      remove(idxToRemove);
+      setActiveLineIndex((current) => {
+        if (current === idxToRemove) {
+          return Math.max(0, idxToRemove - 1);
+        }
+        if (current > idxToRemove) {
+          return current - 1;
+        }
+        return current;
+      });
     });
   };
   const noteValue = useWatch({ control, name: "note" }) ?? "";
@@ -546,6 +567,41 @@ export function DiscrepancyFormModal({
   const anyPositive = Object.entries(checks).some(
     ([n, val]) => Number(n) !== 9 && val === "Positivo",
   );
+
+  const discrepancyStepMissing = useMemo(
+    () =>
+      getDiscrepancyStepMissing({
+        step: step as 1 | 2 | 3,
+        ticketId: ticketIdValue,
+        discrepancyDate,
+        lines: formValues?.lines ?? [],
+        checks,
+        anyPositive,
+      }),
+    [step, ticketIdValue, discrepancyDate, formValues?.lines, checks, anyPositive],
+  );
+
+  async function invalidateDiscrepancyStep() {
+    if (step === 1) await trigger("ticketId");
+    else if (step === 2) await trigger("lines");
+  }
+
+  function focusDiscrepancyField(fieldId: string) {
+    if (fieldId === "discrepancy-date") {
+      focusFormField("discrepancy-date");
+      return;
+    }
+    if (fieldId.startsWith("security-check-")) {
+      setStep(3);
+      return;
+    }
+    const lineMatch = /^lines\.(\d+)\./.exec(fieldId);
+    if (lineMatch) {
+      setActiveLineIndex(Number(lineMatch[1]));
+      if (step !== 2) setStep(2);
+    }
+    focusFormFieldByName(fieldId);
+  }
 
   function toggleCheck(itemNumber: number, choice: "Positivo" | "Negativo") {
     // Si es el punto 9 y no hay ningún positivo en 1..8, no aplica
@@ -633,12 +689,7 @@ export function DiscrepancyFormModal({
   async function handleNextStep() {
     if (step === 1) {
       const validTicket = await trigger("ticketId");
-      if (!validTicket || !ticketIdValue) {
-        receipts.failed({
-          action: "ticket-requerido",
-          title: "Ticket no seleccionado",
-          detail: "Por favor selecciona un ticket para continuar con la investigación.",
-        });
+      if (!validTicket || !ticketIdValue || !discrepancyDate) {
         return;
       }
       // Autocompleta # Reclamo si quedó en blanco
@@ -659,11 +710,6 @@ export function DiscrepancyFormModal({
             setActiveLineIndex(firstErrIdx);
           }
         }
-        receipts.failed({
-          action: "lineas-incompletas",
-          title: "Campos obligatorios requeridos",
-          detail: "Revisa las líneas en discrepancia. Completa los campos obligatorios marcados.",
-        });
         return;
       }
       setStep(3);
@@ -1002,6 +1048,7 @@ export function DiscrepancyFormModal({
           {/** Cuerpo del panel */}
           <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4">
             <DateField
+              id="discrepancy-date"
               label="Fecha del despacho"
               required
               value={discrepancyDate}
@@ -1037,33 +1084,6 @@ export function DiscrepancyFormModal({
           <div className="bg-zinc-50/50 px-4 py-2.5 border-t border-zinc-100 text-[11px] text-zinc-400 flex items-center gap-1.5">
             <Truck className="size-3.5 shrink-0 text-zinc-400" />
             <span>Fecha oficial para trazabilidad de precinto y contenedor.</span>
-          </div>
-        </div>
-      </div>
-
-      {/** Banner de Flujo de Investigación (3 Fases) */}
-      <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="font-heading font-bold text-zinc-900 text-xs">
-              Estructura Oficial del Formato:
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-zinc-500">
-            <span className="inline-flex items-center gap-1 font-semibold text-zinc-800">
-              <span className="flex size-4 items-center justify-center rounded-full bg-emerald-600 text-white text-[9px] font-bold">1</span>
-              Origen y Ticket
-            </span>
-            <span className="text-zinc-300">→</span>
-            <span className="inline-flex items-center gap-1 font-medium text-zinc-600">
-              <span className="flex size-4 items-center justify-center rounded-full bg-zinc-200 text-zinc-700 text-[9px] font-bold">2</span>
-              Líneas en Discrepancia
-            </span>
-            <span className="text-zinc-300">→</span>
-            <span className="inline-flex items-center gap-1 font-medium text-zinc-600">
-              <span className="flex size-4 items-center justify-center rounded-full bg-zinc-200 text-zinc-700 text-[9px] font-bold">3</span>
-              9 Puntos de Seguridad
-            </span>
           </div>
         </div>
       </div>
@@ -1110,6 +1130,8 @@ export function DiscrepancyFormModal({
                 const lineQty = Number(watchLines?.[idx]?.quantity) || 0;
                 const hasError = Boolean(errors.lines?.[idx]);
                 const isActive = idx === safeActiveLineIndex;
+                const tabExiting = lineMotion.isExiting(field.id);
+                const tabEntering = lineMotion.isEntering(field.id);
 
                 return (
                   <button
@@ -1117,11 +1139,13 @@ export function DiscrepancyFormModal({
                     type="button"
                     {...formLineTabIndexAttr(idx)}
                     onClick={() => setActiveLineIndex(idx)}
+                    aria-hidden={tabExiting || undefined}
+                    disabled={tabExiting}
                     className={`group relative inline-flex shrink-0 cursor-pointer select-none items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition-all duration-150 ${
                       isActive
                         ? "border-zinc-200/90 bg-white font-semibold text-zinc-900 shadow-2xs ring-1 ring-zinc-950/5"
                         : "border-transparent bg-zinc-100/80 font-medium text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800"
-                    }`}
+                    } ${appleLineTabMotionClass(tabEntering, tabExiting)}`}
                   >
                     <span
                       className={`flex size-4.5 items-center justify-center rounded-md font-heading text-[10px] font-bold ${
@@ -1173,25 +1197,35 @@ export function DiscrepancyFormModal({
           </div>
         </div>
 
-        {/** Ficha de la Línea Activa en la misma posición con animación fluida oficial del módulo */}
+        {/** Ficha de la línea activa — entrada/salida alineada con PF-FOR-068 */}
         {activeField && (
-          <div key={activeField.id} className="animate-plf-apple-tab">
-            <DiscrepancyLineCard
-              index={activeIndex}
-              control={control}
-              register={register}
-              setValue={setValue}
-              lineErrors={activeLineErrors}
-              existingLine={activeExistingLine}
-              ticketClientName={effectiveTicketClientName}
-              ticketClientId={effectiveTicketClientId}
-              ticketInheritedLabel={ticketInheritedLabel}
-              recommendedProductOptions={recommendedProductOptions}
-              ticketProductLabels={ticketProductLabels}
-              canRemove={fields.length > 1}
-              onRemove={() => handleRemoveLine(activeIndex)}
-            />
-          </div>
+          <AppleSlidePanel
+            key={activeField.id}
+            motionKey={activeField.id}
+            enter={lineMotion.isEntering(activeField.id)}
+            exit={lineMotion.isExiting(activeField.id)}
+            className={
+              lineMotion.isExiting(activeField.id) ? "pointer-events-none" : undefined
+            }
+          >
+            <div ref={lineCardAnchorRef}>
+              <DiscrepancyLineCard
+                index={activeIndex}
+                control={control}
+                register={register}
+                setValue={setValue}
+                lineErrors={activeLineErrors}
+                existingLine={activeExistingLine}
+                ticketClientName={effectiveTicketClientName}
+                ticketClientId={effectiveTicketClientId}
+                ticketInheritedLabel={ticketInheritedLabel}
+                recommendedProductOptions={recommendedProductOptions}
+                ticketProductLabels={ticketProductLabels}
+                canRemove={fields.length > 1 && !lineMotion.isExiting(activeField.id)}
+                onRemove={() => handleRemoveLine(activeIndex)}
+              />
+            </div>
+          </AppleSlidePanel>
         )}
 
         {/** SECCIÓN DE LA NOTA (según PF-FOR-291) */}
@@ -1403,25 +1437,36 @@ export function DiscrepancyFormModal({
       />
 
       {step < 3 ? (
-        <Button
+        <SubmitValidationButton
           key={`btn-next-step-${step}`}
-          type="button"
-          size="sm"
-          onClick={handleNextStep}
+          ready={discrepancyStepMissing.length === 0}
+          busy={isSubmitting}
+          missingItems={discrepancyStepMissing}
+          onSubmit={() => void handleNextStep()}
+          onInvalidClick={() => void invalidateDiscrepancyStep()}
+          onFocusField={focusDiscrepancyField}
+          blockTitle="No se puede continuar"
+          hintText="Para avanzar, completa lo siguiente:"
+          shortcutLabel={null}
         >
           <span>Siguiente paso</span>
           <ChevronRight className="h-3.5 w-3.5" />
-        </Button>
+        </SubmitValidationButton>
       ) : (
-        <Button
+        <SubmitValidationButton
           key="btn-submit-discrepancy"
-          type="submit"
-          form="discrepancy-form"
-          size="sm"
-          isLoading={isSubmitting}
+          formId="discrepancy-form"
+          ready={discrepancyStepMissing.length === 0}
+          busy={isSubmitting}
+          missingItems={discrepancyStepMissing}
+          onInvalidClick={() => void invalidateDiscrepancyStep()}
+          onFocusField={focusDiscrepancyField}
+          blockTitle="No se puede crear"
+          hintText="Para registrar la investigación, completa lo siguiente:"
+          shortcutLabel={null}
         >
           {isEdit ? "Guardar cambios" : "Crear investigación"}
-        </Button>
+        </SubmitValidationButton>
       )}
     </div>
   );

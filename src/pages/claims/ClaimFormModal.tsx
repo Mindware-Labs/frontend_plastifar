@@ -33,6 +33,7 @@ import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
@@ -52,6 +53,10 @@ import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { CLAIM_FORM_CONTROL } from "../../lib/claims";
+import {
+  focusFormFieldByName,
+  getClaimStepMissing,
+} from "../../lib/enterpriseFormValidation";
 import {
   clearEnterpriseFormDraft,
   enterpriseFormDraftKey,
@@ -495,11 +500,35 @@ export function ClaimFormModal({
     return active;
   }, [topics, claim?.topicId, claim?.reason]);
 
+  const claimValues = useWatch({ control });
+
   const selectedTopicName =
     topicOptions.find((o) => o.value === topicId)?.label ??
     topics.find((t) => String(t.id) === topicId)?.name ??
     "";
   const showReasonOther = topicRequiresOther(selectedTopicName);
+
+  const claimStepMissing = useMemo(
+    () => getClaimStepMissing(step, claimValues as FormValues, selectedTopicName),
+    [step, claimValues, selectedTopicName],
+  );
+
+  async function invalidateClaimStep() {
+    if (step === 1) await trigger(["claimDate", "country", "contactName", "contactPhone"]);
+    else if (step === 2) await trigger([...STEP2_FIELDS]);
+    else if (step === 3) await trigger([...STEP3_FIELDS]);
+    else await trigger();
+  }
+
+  function focusClaimField(fieldId: string) {
+    const lineMatch = /^lines\.(\d+)\./.exec(fieldId);
+    if (lineMatch) {
+      setActiveLineIndex(Number(lineMatch[1]));
+      focusFormFieldByName(fieldId);
+      return;
+    }
+    focusFormFieldByName(fieldId);
+  }
 
   const plantTileOptions = useMemo(
     () =>
@@ -1435,14 +1464,35 @@ export function ClaimFormModal({
         onClick={() => setSaveDraftConfirmOpen(true)}
       />
       {step < 4 ? (
-        <Button key={`claim-next-${step}`} type="button" size="sm" onClick={() => void handleNextStep()}>
+        <SubmitValidationButton
+          key={`claim-next-${step}`}
+          ready={claimStepMissing.length === 0}
+          busy={isSubmitting}
+          missingItems={claimStepMissing}
+          onSubmit={() => void handleNextStep()}
+          onInvalidClick={() => void invalidateClaimStep()}
+          onFocusField={focusClaimField}
+          blockTitle="No se puede continuar"
+          hintText="Para avanzar al siguiente paso, completa lo siguiente:"
+          shortcutLabel={null}
+        >
           <span>Siguiente paso</span>
           <ChevronRight className="h-3.5 w-3.5" />
-        </Button>
+        </SubmitValidationButton>
       ) : (
-        <Button type="submit" form="claim-form" size="sm" isLoading={isSubmitting}>
+        <SubmitValidationButton
+          formId="claim-form"
+          ready={claimStepMissing.length === 0}
+          busy={isSubmitting}
+          missingItems={claimStepMissing}
+          onInvalidClick={() => void invalidateClaimStep()}
+          onFocusField={focusClaimField}
+          blockTitle="No se puede registrar"
+          hintText="Para registrar la reclamación, completa lo siguiente:"
+          shortcutLabel="Ctrl + ↵"
+        >
           {isEdit ? "Guardar cambios" : "Registrar reclamación"}
-        </Button>
+        </SubmitValidationButton>
       )}
     </div>
   );

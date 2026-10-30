@@ -12,6 +12,8 @@ export interface SubmitValidationButtonProps {
   /** Si se indica, `requestSubmit()` al estar listo. */
   formId?: string;
   onSubmit?: () => void;
+  /** Dispara validación en pantalla (p. ej. react-hook-form trigger) cuando aún no está listo. */
+  onInvalidClick?: () => void;
   onFocusField?: (fieldId: string) => void;
   size?: "sm" | "md";
   variant?: "primary" | "secondary" | "danger" | "ghost";
@@ -35,6 +37,7 @@ export function SubmitValidationButton({
   children,
   formId,
   onSubmit,
+  onInvalidClick,
   onFocusField,
   size = "sm",
   variant = "primary",
@@ -74,7 +77,12 @@ export function SubmitValidationButton({
   }, []);
 
   function commit() {
-    if (busy || !ready) return;
+    if (busy) return;
+    if (!ready) {
+      if (missingItems.length > 0) setHovered(true);
+      onInvalidClick?.();
+      return;
+    }
     if (formId) {
       const form = document.getElementById(formId);
       if (form instanceof HTMLFormElement) form.requestSubmit();
@@ -130,7 +138,7 @@ export function SubmitValidationButton({
           event.preventDefault();
           commit();
         }}
-        className={`${!ready && !busy ? "opacity-50" : ""} ${className}`}
+        className={`${!ready && !busy ? "cursor-not-allowed opacity-50" : ""} ${className}`}
       >
         {children}
       </Button>

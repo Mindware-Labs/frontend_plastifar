@@ -13,6 +13,7 @@ import { fetchAllPages } from "../../api/paging";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { withdrawalsApi } from "../../api/withdrawals";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { Alert } from "../../components/ui/Alert";
@@ -29,6 +30,8 @@ import {
   readEnterpriseFormDraft,
   writeEnterpriseFormDraft,
 } from "../../lib/enterpriseFormDrafts";
+import { getWithdrawalStepMissing } from "../../lib/enterpriseFormValidation";
+import { focusFormField } from "../../lib/validationItems";
 import { today } from "../../lib/quality";
 import { computeLineValue, computeTotal, WITHDRAWAL_FORM_CONTROL } from "../../lib/withdrawals";
 import { WithdrawalLinesSpreadsheet } from "./WithdrawalLinesSpreadsheet";
@@ -614,6 +617,33 @@ export function WithdrawalFormModal({
 
   const isWideStep = step === 2;
 
+  const withdrawalStepMissing = useMemo(
+    () =>
+      getWithdrawalStepMissing({
+        step: step as 1 | 2,
+        lockedTicketId,
+        selectedTicketId,
+        requestDate,
+        reason,
+        currency,
+        lines,
+      }),
+    [step, lockedTicketId, selectedTicketId, requestDate, reason, currency, lines],
+  );
+
+  function focusWithdrawalField(fieldId: string) {
+    const lineMatch = /^withdrawal-line-(\d+)-/.exec(fieldId);
+    if (lineMatch) {
+      const key = Number(lineMatch[1]);
+      setHighlightLineKey(key);
+      if (step !== 2) {
+        setStepDirection("forward");
+        setStep(2);
+      }
+    }
+    focusFormField(fieldId);
+  }
+
   const renderStepper = () => (
     <ol
       className="mx-auto flex w-full max-w-2xl items-center select-none gap-1"
@@ -690,14 +720,40 @@ export function WithdrawalFormModal({
           onClick={() => setSaveDraftConfirmOpen(true)}
         />
         {step < STEPS.length ? (
-          <Button type="button" size="sm" onClick={handleNextStep}>
+          <SubmitValidationButton
+            ready={withdrawalStepMissing.length === 0}
+            busy={saving}
+            missingItems={withdrawalStepMissing}
+            onSubmit={handleNextStep}
+            onInvalidClick={() => {
+              validateStep(step);
+            }}
+            onFocusField={focusWithdrawalField}
+            blockTitle="No se puede continuar"
+            hintText="Para avanzar, completa lo siguiente:"
+            shortcutLabel={null}
+          >
             <span>Siguiente paso</span>
             <ChevronRight className="size-3.5" />
-          </Button>
+          </SubmitValidationButton>
         ) : (
-          <Button type="button" size="sm" onClick={handleSubmit} disabled={saving} isLoading={saving}>
+          <SubmitValidationButton
+            ready={withdrawalStepMissing.length === 0}
+            busy={saving}
+            missingItems={withdrawalStepMissing}
+            onSubmit={handleSubmit}
+            onInvalidClick={() => {
+              const { errors: validation, firstErrorStep } = validateAll();
+              setErrors(validation);
+              if (firstErrorStep !== null) setStep(firstErrorStep);
+            }}
+            onFocusField={focusWithdrawalField}
+            blockTitle="No se puede emitir"
+            hintText="Para emitir la solicitud, completa lo siguiente:"
+            shortcutLabel={null}
+          >
             {isEditing ? "Guardar cambios" : "Emitir solicitud"}
-          </Button>
+          </SubmitValidationButton>
         )}
       </div>
     </div>

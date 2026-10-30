@@ -34,6 +34,7 @@ import { EnterpriseFormDraftBadge } from "../../components/app/EnterpriseFormDra
 import { prefersReducedMotion } from "../../hooks/motion";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { usePermissions } from "../../hooks/usePermissions";
+import { MODULE_HEADER_CONTENT_BAND_CLASS } from "../../components/app/ModuleHeader";
 import { EnterpriseFormDraftLandingView } from "../../components/app/EnterpriseFormDraftLandingView";
 import { EnterpriseFormDraftResumeModal } from "../../components/app/EnterpriseFormDraftResumeModal";
 import { formatDay, formatInstant } from "../../lib/dates";
@@ -726,7 +727,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   // RENDER MODO PÁGINA: reclamación PF-FOR-034
   if (claimModalOpen) {
     return (
-      <div className="mt-3.5 w-full">
+      <div className={`mt-3.5 w-full min-w-0 ${MODULE_HEADER_CONTENT_BAND_CLASS}`}>
         <ClaimFormModal
           inline
           ticketId={ticket.id}
@@ -765,7 +766,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   // RENDER MODO PÁGINA: Si el usuario inició o está editando el retiro de mercancía
   if (withdrawalModalOpen) {
     return (
-      <div className="mt-3.5 w-full">
+      <div className={`mt-3.5 w-full min-w-0 ${MODULE_HEADER_CONTENT_BAND_CLASS}`}>
         <WithdrawalFormModal
           inline
           withdrawal={editingWithdrawal}
@@ -798,7 +799,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   // RENDER MODO PÁGINA: Si el usuario inició o está editando la discrepancia de cargas
   if (discrepancyModalOpen) {
     return (
-      <div className="mt-3.5 w-full">
+      <div className={`mt-3.5 w-full min-w-0 ${MODULE_HEADER_CONTENT_BAND_CLASS}`}>
         <DiscrepancyFormModal
           inline
           discrepancy={editingDiscrepancy}
@@ -831,7 +832,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
 
   if (hcaModalOpen) {
     return (
-      <div className="mt-3.5 w-full">
+      <div className={`mt-3.5 w-full min-w-0 ${MODULE_HEADER_CONTENT_BAND_CLASS}`}>
         <HcaModal
           inline
           sheet={editingHca}
@@ -862,10 +863,10 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   }
 
   return (
-    <div className="mt-3.5 space-y-4 animate-plf-fade">
+    <div className={`mt-3.5 min-w-0 space-y-4 animate-plf-fade ${MODULE_HEADER_CONTENT_BAND_CLASS}`}>
       {/* ZERO STATE: No forms registered yet */}
       {registeredForms.length === 0 ? (
-        <>
+        <div className="w-full min-w-0">
           {draftLandingVisible ? (
             <div
               key="enterprise-draft-landing"
@@ -971,7 +972,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
               </div>
             </div>
           ) : null}
-        </>
+        </div>
       ) : (
         /* REGISTERED FORMS VIEW */
         <div className="space-y-3">

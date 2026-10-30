@@ -921,6 +921,91 @@ input:-webkit-autofill:focus {
   animation: plf-apple-row-wash 480ms var(--ease-plf-spring) both;
 }
 
+/* PF-FOR-291: ficha y pestaña de línea — deslizamiento lateral, sin colapso de alto. */
+@keyframes plf-apple-line-slide-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(16px, 0, 0);
+    filter: blur(1.25px);
+  }
+  45% {
+    opacity: 0.92;
+    filter: blur(0.35px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+
+@keyframes plf-apple-line-slide-out {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-20px, 0, 0);
+    filter: blur(1.25px);
+  }
+}
+
+@keyframes plf-apple-line-tab-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(12px, 0, 0) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plf-apple-line-tab-out {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-14px, 0, 0) scale(0.985);
+  }
+}
+
+.plf-slide-enter-prep {
+  opacity: 0;
+  transform: translate3d(16px, 0, 0);
+  filter: blur(1.25px);
+}
+
+.plf-slide-enter-done {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+.animate-plf-apple-line-slide-in {
+  animation: plf-apple-line-slide-in 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity, filter;
+}
+
+.animate-plf-apple-line-slide-out {
+  animation: plf-apple-line-slide-out 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity, filter;
+}
+
+.animate-plf-apple-line-tab-in {
+  animation: plf-apple-line-tab-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+.animate-plf-apple-line-tab-out {
+  animation: plf-apple-line-tab-out 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -963,7 +1048,9 @@ input:-webkit-autofill:focus {
   .animate-plf-header-fade,
   .animate-plf-apple-pop,
   .animate-plf-apple-row-in,
-  .animate-plf-apple-row-wash {
+  .animate-plf-apple-row-wash,
+  .animate-plf-apple-line-slide-in,
+  .animate-plf-apple-line-tab-in {
     animation: none !important;
   }
 
@@ -987,7 +1074,9 @@ input:-webkit-autofill:focus {
   .animate-plf-modal-out,
   .animate-plf-drawer-out,
   .animate-plf-check-out,
-  .animate-plf-apple-row-out {
+  .animate-plf-apple-row-out,
+  .animate-plf-apple-line-slide-out,
+  .animate-plf-apple-line-tab-out {
     animation-duration: 1ms !important;
   }
 }

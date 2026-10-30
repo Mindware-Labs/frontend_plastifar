@@ -2,6 +2,12 @@ import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 
+/** Alinea bloques bajo el header con el título cuando hay botón volver (32px + gap-x-3). */
+export const MODULE_HEADER_TITLE_GUTTER_CLASS = "pl-11";
+
+/** Misma franja horizontal: eje del PLT-… a la izquierda y borde del layout a la derecha. */
+export const MODULE_HEADER_CONTENT_BAND_CLASS = "pl-11 pr-3 lg:pr-4";
+
 export interface ModuleHeaderSection {
   label: ReactNode;
   to?: string;

@@ -30,7 +30,11 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
-import { ModuleHeader, type ModuleHeaderSection } from "../../components/app/ModuleHeader";
+import {
+  MODULE_HEADER_TITLE_GUTTER_CLASS,
+  ModuleHeader,
+  type ModuleHeaderSection,
+} from "../../components/app/ModuleHeader";
 import { TicketPendingFileList } from "../../components/app/TicketPendingFileList";
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
@@ -1167,32 +1171,42 @@ export function TicketDetailPage() {
 
       {/* Zona de contenido con scroll vertical asegurado */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-8">
+        <div className="pt-2 pr-3 lg:pr-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Asunto — mismo eje vertical que el código PLT-… del ModuleHeader */}
+            <div
+              className={`min-w-0 max-w-full lg:max-w-2xl ${MODULE_HEADER_TITLE_GUTTER_CLASS}`}
+            >
+              <h1
+                className="font-heading text-[18px] sm:text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink truncate"
+                title={ticket.subject}
+              >
+                {ticket.subject}
+              </h1>
+            </div>
+
+            <p className="flex shrink-0 flex-wrap items-center gap-x-1.5 text-[12px] text-zinc-500">
+              <span>Creado el {formatDateTime(ticket.createdAt)} por</span>
+              <span className="font-medium text-zinc-800">
+                {ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}
+              </span>
+              <span aria-hidden className="text-zinc-300">
+                ·
+              </span>
+              <span className="font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+                {ticket.channel}
+              </span>
+            </p>
+          </div>
+        </div>
+
         <div
-          className={`w-full transition-all duration-200 ${
+          className={`mt-3.5 transition-all duration-200 ${
             activeTab === "formularios" || activeTab === "reclamacion"
-              ? "px-4 sm:px-6 2xl:px-8"
+              ? "w-full"
               : "mx-auto max-w-6xl"
           }`}
         >
-          <div className="pt-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              {/* Asunto (izquierda) */}
-              <div className="min-w-0 max-w-full lg:max-w-2xl">
-                <h1 className="font-heading text-[18px] sm:text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink truncate" title={ticket.subject}>
-                  {ticket.subject}
-                </h1>
-              </div>
-
-              {/* Creado por y demás (derecha) */}
-              <p className="flex flex-wrap items-center gap-x-1.5 text-[12px] text-zinc-500 shrink-0">
-                <span>Creado el {formatDateTime(ticket.createdAt)} por</span>
-                <span className="font-medium text-zinc-800">{ticket.createdByStaffName ?? ticket.requesterName ?? "Sistema"}</span>
-                <span aria-hidden className="text-zinc-300">·</span>
-                <span className="font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">{ticket.channel}</span>
-              </p>
-            </div>
-
-            <div className="mt-3.5">
               {/* Animación de entrada fluida estilo Apple idéntica a la vista de clientes */}
               <div key={activeTab} className="animate-plf-apple-tab">
                 {/* TAB: DATOS / RESUMEN */}
@@ -1897,10 +1911,8 @@ export function TicketDetailPage() {
                   </div>
                 )}
               </div>
-            </div>
+        </div>
       </div>
-    </div>
-  </div>
 
       {/* Vista de redacción a pantalla completa con preservación de borrador. */}
       {replyOpen && (
