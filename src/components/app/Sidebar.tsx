@@ -105,11 +105,10 @@ function FolderBadge({
 
 /**
  * Icono interactivo tipo hamburguesa para abrir y cerrar la barra lateral.
- * En reposo muestra las 3 barras horizontales redondeadas características.
- * Al hacer hover, se orienta dinámicamente como flecha indicativa hacia la
- * dirección del pliegue (izquierda al contraer, derecha al expandir).
+ * Diseño limpio de 3 barras horizontales redondeadas que se mantienen siempre
+ * paralelas y estables, con micro-interacción suave al hover y pulsación táctil al clic.
  */
-function SidebarToggleIcon({ collapsed = false }: { collapsed?: boolean }) {
+function SidebarToggleIcon() {
   return (
     <svg
       width="18"
@@ -117,7 +116,7 @@ function SidebarToggleIcon({ collapsed = false }: { collapsed?: boolean }) {
       viewBox="0 0 18 18"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0"
+      className="shrink-0 transition-transform duration-100 ease-out group-active:scale-95"
       aria-hidden="true"
     >
       {/* Barra superior de la hamburguesa */}
@@ -127,33 +126,21 @@ function SidebarToggleIcon({ collapsed = false }: { collapsed?: boolean }) {
         x2="15"
         y2="5.25"
         stroke="currentColor"
-        strokeWidth="1.6"
+        strokeWidth="1.65"
         strokeLinecap="round"
-        style={{
-          transformOrigin: collapsed ? "3px 5.25px" : "15px 5.25px",
-          transformBox: "view-box",
-        }}
-        className={`transition-transform duration-200 ease-out motion-reduce:transition-none ${
-          collapsed
-            ? "group-hover:rotate-[20deg]"
-            : "group-hover:-rotate-[20deg]"
-        }`}
+        className="transition-all duration-150 ease-out group-hover:stroke-zinc-900"
       />
 
-      {/* Barra central de la hamburguesa */}
+      {/* Barra central de la hamburguesa (desplazamiento sutil y elegante de 0.8px en hover) */}
       <line
         x1="3"
         y1="9"
         x2="15"
         y2="9"
         stroke="currentColor"
-        strokeWidth="1.6"
+        strokeWidth="1.65"
         strokeLinecap="round"
-        className={`transition-transform duration-200 ease-out motion-reduce:transition-none ${
-          collapsed
-            ? "group-hover:translate-x-[0.75px]"
-            : "group-hover:-translate-x-[0.75px]"
-        }`}
+        className="transition-all duration-150 ease-out group-hover:translate-x-[0.8px] group-hover:stroke-zinc-900 motion-reduce:transform-none"
       />
 
       {/* Barra inferior de la hamburguesa */}
@@ -163,17 +150,9 @@ function SidebarToggleIcon({ collapsed = false }: { collapsed?: boolean }) {
         x2="15"
         y2="12.75"
         stroke="currentColor"
-        strokeWidth="1.6"
+        strokeWidth="1.65"
         strokeLinecap="round"
-        style={{
-          transformOrigin: collapsed ? "3px 12.75px" : "15px 12.75px",
-          transformBox: "view-box",
-        }}
-        className={`transition-transform duration-200 ease-out motion-reduce:transition-none ${
-          collapsed
-            ? "group-hover:-rotate-[20deg]"
-            : "group-hover:rotate-[20deg]"
-        }`}
+        className="transition-all duration-150 ease-out group-hover:stroke-zinc-900"
       />
     </svg>
   );
@@ -572,9 +551,9 @@ export function Sidebar() {
             onClick={toggleCollapsed}
             aria-label="Contraer la barra lateral"
             title="Contraer barra lateral"
-            className="group flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors duration-150 hover:bg-zinc-100 hover:text-zinc-900 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer motion-reduce:active:scale-100"
+            className="group flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-all duration-150 hover:bg-zinc-100 hover:text-zinc-900 active:scale-90 active:bg-zinc-200/80 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer select-none motion-reduce:active:scale-100"
           >
-            <SidebarToggleIcon collapsed={false} />
+            <SidebarToggleIcon />
           </button>
         </div>
 
@@ -596,9 +575,9 @@ export function Sidebar() {
             onClick={toggleCollapsed}
             aria-label="Expandir la barra lateral"
             title="Expandir barra lateral"
-            className="group flex size-7 items-center justify-center rounded-lg text-zinc-500 transition-colors duration-150 hover:bg-zinc-100 hover:text-zinc-900 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer motion-reduce:active:scale-100"
+            className="group flex size-7 items-center justify-center rounded-lg text-zinc-500 transition-all duration-150 hover:bg-zinc-100 hover:text-zinc-900 active:scale-90 active:bg-zinc-200/80 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer select-none motion-reduce:active:scale-100"
           >
-            <SidebarToggleIcon collapsed={true} />
+            <SidebarToggleIcon />
           </button>
         </div>
       </div>
