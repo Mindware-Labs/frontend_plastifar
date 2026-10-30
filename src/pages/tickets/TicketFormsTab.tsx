@@ -30,9 +30,20 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
+import { EnterpriseFormDraftBadge } from "../../components/app/EnterpriseFormDraftBadge";
+import { prefersReducedMotion } from "../../hooks/motion";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { usePermissions } from "../../hooks/usePermissions";
-import { formatDay } from "../../lib/dates";
+import { EnterpriseFormDraftLandingView } from "../../components/app/EnterpriseFormDraftLandingView";
+import { EnterpriseFormDraftResumeModal } from "../../components/app/EnterpriseFormDraftResumeModal";
+import { formatDay, formatInstant } from "../../lib/dates";
+import {
+  ENTERPRISE_FORM_PICKER_META,
+  type EnterpriseFormPickerKey,
+  clearEnterpriseFormDraft,
+  enterpriseFormDraftKeyForPicker,
+  readEnterpriseFormDraft,
+} from "../../lib/enterpriseFormDrafts";
 import { buildHcaHechoText, hcaProductLabel } from "../../lib/hcaForm109";
 import { formatAmount } from "../../lib/numbers";
 import { isPlanItemOverdue, isPlanItemSettled } from "../../lib/quality";
@@ -94,6 +105,17 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   // Selected sub-tab when forms exist
   const [selectedSubTabKey, setSelectedSubTabKey] = useState<string | null>(null);
   const [newFormModalOpen, setNewFormModalOpen] = useState(false);
+  const [draftResumePrompt, setDraftResumePrompt] = useState<{
+    pickerKey: EnterpriseFormPickerKey;
+    savedAt?: number;
+    step?: number;
+    start: () => void;
+  } | null>(null);
+  const [draftLandingDismissed, setDraftLandingDismissed] = useState(false);
+  const [draftLandingExiting, setDraftLandingExiting] = useState(false);
+  const [officialGridStaggerIn, setOfficialGridStaggerIn] = useState(false);
+  const [draftRefreshToken, setDraftRefreshToken] = useState(0);
+  const DRAFT_LANDING_EXIT_MS = 360;
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const actionsMenuContainerRef = useRef<HTMLDivElement>(null);
   const { mounted: menuMounted, exiting: menuExiting, ref: menuPanelRef } = useDisclosureMotion<HTMLDivElement>(actionsMenuOpen);
@@ -191,6 +213,67 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     });
     setHcaModalOpen(true);
   };
+
+  function openFormByPickerKey(pickerKey: EnterpriseFormPickerKey) {
+    switch (pickerKey) {
+      case "Reclamacion":
+        handleOpenNewClaim();
+        break;
+      case "RetiroMercancia":
+        handleOpenNewWithdrawal();
+        break;
+      case "DiscrepanciaCarga":
+        handleOpenNewDiscrepancy();
+        break;
+      case "Hca":
+        handleOpenNewHca();
+        break;
+    }
+  }
+
+  function beginFormStart(pickerKey: EnterpriseFormPickerKey, start: () => void) {
+    const draftKey = enterpriseFormDraftKeyForPicker(pickerKey, ticket.id);
+    const draft = readEnterpriseFormDraft<{ savedAt?: number; step?: number }>(draftKey);
+    if (!draft) {
+      start();
+      return;
+    }
+    setDraftResumePrompt({
+      pickerKey,
+      savedAt: typeof draft.savedAt === "number" ? draft.savedAt : undefined,
+      step: typeof draft.step === "number" ? draft.step : undefined,
+      start,
+    });
+  }
+
+  function bumpDraftRefresh() {
+    setDraftRefreshToken((value) => value + 1);
+  }
+
+  function handleReturnFromInlineForm() {
+    setDraftLandingDismissed(false);
+    setDraftLandingExiting(false);
+    setOfficialGridStaggerIn(false);
+    bumpDraftRefresh();
+  }
+
+  function beginBrowseOfficialForms() {
+    if (prefersReducedMotion()) {
+      setDraftLandingDismissed(true);
+      return;
+    }
+    setDraftLandingExiting(true);
+  }
+
+  useEffect(() => {
+    if (!draftLandingExiting) return;
+    const timer = window.setTimeout(() => {
+      setDraftLandingDismissed(true);
+      setDraftLandingExiting(false);
+      setOfficialGridStaggerIn(true);
+    }, DRAFT_LANDING_EXIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [draftLandingExiting]);
 
   useEffect(() => {
     const formToOpen = searchParams.get("openForm");
@@ -404,7 +487,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         icon: Plus,
         btnLabel: "Iniciar reclamación",
         disabled: !canWriteClaims,
-        action: () => handleOpenNewClaim(),
+        action: () => beginFormStart("Reclamacion", () => handleOpenNewClaim()),
       },
       {
         key: "RetiroMercancia",
@@ -417,7 +500,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         icon: Truck,
         btnLabel: "Iniciar retiro",
         disabled: !canWriteWithdrawals,
-        action: () => handleOpenNewWithdrawal(),
+        action: () => beginFormStart("RetiroMercancia", () => handleOpenNewWithdrawal()),
       },
       {
         key: "DiscrepanciaCarga",
@@ -430,7 +513,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         icon: AlertTriangle,
         btnLabel: "Iniciar discrepancia",
         disabled: !canWriteDiscrepancies,
-        action: () => handleOpenNewDiscrepancy(),
+        action: () => beginFormStart("DiscrepanciaCarga", () => handleOpenNewDiscrepancy()),
       },
       {
         key: "Hca",
@@ -443,7 +526,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         icon: Wrench,
         btnLabel: "Iniciar hoja HCA",
         disabled: !canWriteQuality,
-        action: () => handleOpenNewHca(),
+        action: () => beginFormStart("Hca", () => handleOpenNewHca()),
       },
     ];
 
@@ -456,6 +539,52 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       return 0;
     });
   }, [suggestedFormRaw, canWriteClaims, canWriteWithdrawals, canWriteDiscrepancies, canWriteQuality]);
+
+  const pendingDrafts = useMemo(() => {
+    void draftRefreshToken;
+    const pickerKeys: EnterpriseFormPickerKey[] = [
+      "Reclamacion",
+      "RetiroMercancia",
+      "DiscrepanciaCarga",
+      "Hca",
+    ];
+    return pickerKeys.flatMap((pickerKey) => {
+      const draftKey = enterpriseFormDraftKeyForPicker(pickerKey, ticket.id);
+      const draft = readEnterpriseFormDraft<{ savedAt?: number; step?: number }>(draftKey);
+      if (!draft) return [];
+      const meta = ENTERPRISE_FORM_PICKER_META[pickerKey];
+      const catalog = availableForms.find((form) => form.key === pickerKey);
+      return [
+        {
+          pickerKey,
+          draftKey,
+          formCode: meta.formCode,
+          title: catalog?.title ?? meta.title,
+          dept: catalog?.dept,
+          savedAtLabel:
+            typeof draft.savedAt === "number"
+              ? formatInstant(new Date(draft.savedAt).toISOString())
+              : null,
+          stepLabel: typeof draft.step === "number" ? `Paso ${draft.step}` : null,
+        },
+      ];
+    });
+  }, [availableForms, draftRefreshToken, ticket.id]);
+
+  const draftPickerKeySet = useMemo(
+    () => new Set(pendingDrafts.map((draft) => draft.pickerKey)),
+    [pendingDrafts],
+  );
+
+  const draftLandingVisible =
+    registeredForms.length === 0 &&
+    pendingDrafts.length > 0 &&
+    (!draftLandingDismissed || draftLandingExiting);
+
+  const zeroStateOfficialGridVisible =
+    registeredForms.length === 0 &&
+    (pendingDrafts.length === 0 || draftLandingDismissed) &&
+    !draftLandingExiting;
 
   // Helper to trigger form migration
   const handleTriggerMigration = (currentForm: NonNullable<typeof activeForm>) => {
@@ -618,11 +747,13 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
             setClaimModalOpen(false);
             setEditingClaim(undefined);
             setClaimInitialData(undefined);
+            handleReturnFromInlineForm();
           }}
           onSaved={() => {
             setClaimModalOpen(false);
             setEditingClaim(undefined);
             setClaimInitialData(undefined);
+            handleReturnFromInlineForm();
             fetchAllForms();
             onTicketStatusChanged?.();
           }}
@@ -649,11 +780,13 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
             setWithdrawalModalOpen(false);
             setEditingWithdrawal(undefined);
             setWithdrawalInitialLines(undefined);
+            handleReturnFromInlineForm();
           }}
           onSaved={() => {
             setWithdrawalModalOpen(false);
             setEditingWithdrawal(undefined);
             setWithdrawalInitialLines(undefined);
+            handleReturnFromInlineForm();
             fetchAllForms();
             onTicketStatusChanged?.();
           }}
@@ -681,11 +814,13 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
             setDiscrepancyModalOpen(false);
             setEditingDiscrepancy(undefined);
             setDiscrepancyInitialData(undefined);
+            handleReturnFromInlineForm();
           }}
           onSaved={() => {
             setDiscrepancyModalOpen(false);
             setEditingDiscrepancy(undefined);
             setDiscrepancyInitialData(undefined);
+            handleReturnFromInlineForm();
             fetchAllForms();
             onTicketStatusChanged?.();
           }}
@@ -712,11 +847,13 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
             setHcaModalOpen(false);
             setEditingHca(undefined);
             setHcaInitialDefaults(undefined);
+            handleReturnFromInlineForm();
           }}
           onSaved={() => {
             setHcaModalOpen(false);
             setEditingHca(undefined);
             setHcaInitialDefaults(undefined);
+            handleReturnFromInlineForm();
             fetchAllForms();
           }}
         />
@@ -728,72 +865,113 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     <div className="mt-3.5 space-y-4 animate-plf-fade">
       {/* ZERO STATE: No forms registered yet */}
       {registeredForms.length === 0 ? (
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-2xs">
-          <div className="flex flex-col items-center text-center">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-brand-red/10 text-brand-red">
-              <FileSpreadsheet className="size-5" />
+        <>
+          {draftLandingVisible ? (
+            <div
+              key="enterprise-draft-landing"
+              className={draftLandingExiting ? "animate-plf-check-out" : "animate-plf-check-in"}
+              style={draftLandingExiting ? { pointerEvents: "none" } : undefined}
+              aria-hidden={draftLandingExiting}
+            >
+              <EnterpriseFormDraftLandingView
+                ticketNumber={ticket.number}
+                drafts={pendingDrafts}
+                onResume={(pickerKey) => openFormByPickerKey(pickerKey)}
+                onDiscard={(pickerKey) => {
+                  const draft = pendingDrafts.find((item) => item.pickerKey === pickerKey);
+                  if (draft) clearEnterpriseFormDraft(draft.draftKey);
+                  bumpDraftRefresh();
+                }}
+                onBrowseForms={beginBrowseOfficialForms}
+                browseDisabled={draftLandingExiting}
+              />
             </div>
-            <h3 className="mt-3 text-base font-semibold text-zinc-900">
-              Formularios del Ciclo de Vida del Ticket
-            </h3>
-            <p className="mt-1 max-w-xl text-xs text-zinc-500 leading-relaxed">
-              Integra los procesos y formatos oficiales de Plastifar directamente en este ticket. Puedes iniciar el formulario correspondiente ahora o dejarlo como borrador y completarlo más adelante.
-            </p>
-          </div>
+          ) : null}
 
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {availableForms.map((form) => {
-              const isRecommended = form.key === suggestedFormRaw;
-              const Icon = form.icon;
-
-              return (
-                <div
-                  key={form.key}
-                  className={`flex flex-col justify-between rounded-xl border p-4.5 transition-all ${
-                    isRecommended
-                      ? "border-brand-red/40 bg-brand-red/5 ring-1 ring-brand-red/30 shadow-xs"
-                      : "border-zinc-200 bg-white hover:border-zinc-300"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className={`font-heading text-[10.5px] font-bold uppercase tracking-wider ${form.codeColor}`}>
-                        {form.code}
-                      </span>
-                      {isRecommended && (
-                        <span className="inline-flex items-center rounded-md border border-brand-red/20 bg-brand-red/10 px-2.5 py-0.5 text-xs font-semibold text-brand-red">
-                          Recomendado según el motivo
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="mt-1.5 text-sm font-semibold text-zinc-900">{form.title}</h4>
-                    <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
-                      {form.description}
-                    </p>
-                    {isRecommended && ticket.topicName && (
-                      <p className="mt-2 text-[11.5px] font-medium text-brand-red/90 leading-snug">
-                        Formato oficial sugerido para casos clasificados como {ticket.topicName}.
-                      </p>
-                    )}
+          {zeroStateOfficialGridVisible ? (
+            <div key="enterprise-official-grid" className="animate-plf-apple-tab">
+              <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-2xs">
+                <div className="flex flex-col items-center text-center">
+                  <div className="flex size-11 items-center justify-center rounded-xl bg-brand-red/10 text-brand-red">
+                    <FileSpreadsheet className="size-5" />
                   </div>
-                  <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between">
-                    <span className="text-[11px] text-zinc-400">{form.dept}</span>
-                    <Button
-                      size="sm"
-                      variant={isRecommended ? "primary" : "secondary"}
-                      disabled={form.disabled}
-                      onClick={form.action}
-                      className={isRecommended ? "font-heading font-semibold" : undefined}
-                    >
-                      <Icon className="size-3.5" />
-                      {form.btnLabel}
-                    </Button>
-                  </div>
+                  <h3 className="mt-3 text-base font-semibold text-zinc-900">
+                    Formularios del Ciclo de Vida del Ticket
+                  </h3>
+                  <p className="mt-1 max-w-xl text-xs text-zinc-500 leading-relaxed">
+                    Integra los procesos y formatos oficiales de Plastifar directamente en este ticket.
+                    Puedes iniciar el formulario correspondiente ahora o dejarlo como borrador y completarlo
+                    más adelante.
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-        </div>
+
+                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {availableForms.map((form, formIndex) => {
+                    const isRecommended = form.key === suggestedFormRaw;
+                    const hasDraft = draftPickerKeySet.has(form.key as EnterpriseFormPickerKey);
+                    const Icon = form.icon;
+
+                    return (
+                      <div
+                        key={form.key}
+                        className={`flex flex-col justify-between rounded-xl border p-4.5 transition-all ${
+                          isRecommended
+                            ? "border-brand-red/40 bg-brand-red/5 ring-1 ring-brand-red/30 shadow-xs"
+                            : hasDraft
+                              ? "border-brand-red/25 bg-brand-red/[0.03] ring-1 ring-brand-red/10 hover:border-brand-red/35"
+                              : "border-zinc-200 bg-white hover:border-zinc-300"
+                        } ${officialGridStaggerIn ? "animate-plf-list-row-in" : ""}`}
+                        style={
+                          officialGridStaggerIn
+                            ? { animationDelay: `${formIndex * 45}ms` }
+                            : undefined
+                        }
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <span
+                              className={`font-heading text-[10.5px] font-bold uppercase tracking-wider ${form.codeColor}`}
+                            >
+                              {form.code}
+                            </span>
+                            <div className="flex shrink-0 flex-col items-end gap-1">
+                              {isRecommended ? (
+                                <span className="inline-flex items-center rounded-md border border-brand-red/20 bg-brand-red/10 px-2.5 py-0.5 text-xs font-semibold text-brand-red">
+                                  Recomendado según el motivo
+                                </span>
+                              ) : null}
+                              {hasDraft ? <EnterpriseFormDraftBadge /> : null}
+                            </div>
+                          </div>
+                          <h4 className="mt-1.5 text-sm font-semibold text-zinc-900">{form.title}</h4>
+                          <p className="mt-1 text-xs text-zinc-500 leading-relaxed">{form.description}</p>
+                          {isRecommended && ticket.topicName ? (
+                            <p className="mt-2 text-[11.5px] font-medium text-brand-red/90 leading-snug">
+                              Formato oficial sugerido para casos clasificados como {ticket.topicName}.
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3">
+                          <span className="text-[11px] text-zinc-400">{form.dept}</span>
+                          <Button
+                            size="sm"
+                            variant={isRecommended ? "primary" : "secondary"}
+                            disabled={form.disabled}
+                            onClick={form.action}
+                            className={isRecommended ? "font-heading font-semibold" : undefined}
+                          >
+                            <Icon className="size-3.5" />
+                            {form.btnLabel}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </>
       ) : (
         /* REGISTERED FORMS VIEW */
         <div className="space-y-3">
@@ -1821,59 +1999,97 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       {/* 5. Modal para elegir nuevo formulario */}
       {newFormModalOpen && (
         <Modal
-          title="Seleccionar Formulario Oficial"
-          eyebrow="Ciclo de Vida del Ticket"
+          title="Formulario oficial"
+          eyebrow={`Ticket ${ticket.number}`}
+          description="Selecciona el formato empresarial que deseas iniciar o retomar."
           onClose={() => setNewFormModalOpen(false)}
-          maxWidth="max-w-xl"
+          maxWidth="max-w-2xl"
+          footer={
+            <div className="flex w-full items-center justify-end">
+              <Button type="button" variant="secondary" size="sm" onClick={() => setNewFormModalOpen(false)}>
+                Cancelar
+              </Button>
+            </div>
+          }
         >
-          <div className="space-y-3 py-1">
-            <p className="text-xs text-zinc-500">
-              Selecciona el formato empresarial de Plastifar que deseas iniciar para el ticket #{ticket.number}:
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {availableForms.map((form) => {
-                const isRecommended = form.key === suggestedFormRaw;
-                const Icon = form.icon;
-                return (
-                  <button
-                    key={form.key}
-                    type="button"
-                    disabled={form.disabled}
-                    onClick={() => {
-                      setNewFormModalOpen(false);
-                      form.action();
-                    }}
-                    className={`flex flex-col text-left p-3.5 rounded-xl border transition-all ${
-                      isRecommended
-                        ? "border-brand-red/40 bg-brand-red/5 ring-1 ring-brand-red/20 hover:bg-brand-red/10 cursor-pointer"
-                        : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50 cursor-pointer"
-                    } ${form.disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`font-heading text-[10px] font-bold uppercase tracking-wider ${form.codeColor}`}>
-                        {form.code}
-                      </span>
-                      {isRecommended && (
-                        <span className="text-[10px] font-bold text-brand-red bg-brand-red/10 px-1.5 py-0.5 rounded">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {availableForms.map((form) => {
+              const isRecommended = form.key === suggestedFormRaw;
+              const Icon = form.icon;
+              const pickerKey = form.key as EnterpriseFormPickerKey;
+              const hasDraft = readEnterpriseFormDraft(
+                enterpriseFormDraftKeyForPicker(pickerKey, ticket.id),
+              );
+              return (
+                <button
+                  key={form.key}
+                  type="button"
+                  disabled={form.disabled}
+                  onClick={() => {
+                    setNewFormModalOpen(false);
+                    form.action();
+                  }}
+                  className={`flex min-h-[9.5rem] flex-col rounded-xl border p-4 text-left transition-all ${
+                    isRecommended
+                      ? "border-brand-red/40 bg-brand-red/[0.04] ring-1 ring-brand-red/20 hover:bg-brand-red/[0.07]"
+                      : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/80"
+                  } ${form.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span
+                      className={`font-heading text-[10px] font-bold uppercase tracking-[0.08em] ${form.codeColor}`}
+                    >
+                      {form.code}
+                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {isRecommended ? (
+                        <span className="rounded-md border border-brand-red/20 bg-brand-red/10 px-1.5 py-0.5 text-[10px] font-bold text-brand-red">
                           Recomendado
                         </span>
-                      )}
+                      ) : null}
+                      {hasDraft ? <EnterpriseFormDraftBadge className="px-1.5 py-0.5 text-[10px]" /> : null}
                     </div>
-                    <span className="mt-1 text-xs font-semibold text-zinc-900">{form.title}</span>
-                    <span className="mt-0.5 text-[11px] text-zinc-500 line-clamp-2 leading-relaxed">{form.description}</span>
-                    <div className="mt-2.5 pt-2 border-t border-zinc-100 flex items-center justify-between text-[10.5px] text-zinc-400">
-                      <span>{form.dept}</span>
-                      <span className="inline-flex items-center text-xs font-semibold text-zinc-700">
-                        Iniciar <Icon className="size-3 ml-1" />
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                  </div>
+                  <span className="mt-2 text-[13px] font-semibold leading-snug text-zinc-900">{form.title}</span>
+                  <span className="mt-1 line-clamp-2 flex-1 text-[11.5px] leading-relaxed text-zinc-500">
+                    {form.description}
+                  </span>
+                  <div className="mt-3 flex items-center justify-between border-t border-zinc-100 pt-2.5 text-[10.5px] text-zinc-400">
+                    <span>{form.dept}</span>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-700">
+                      Iniciar
+                      <Icon className="size-3" />
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </Modal>
       )}
+
+      {draftResumePrompt ? (
+        <EnterpriseFormDraftResumeModal
+          open
+          formCode={ENTERPRISE_FORM_PICKER_META[draftResumePrompt.pickerKey].formCode}
+          formTitle={ENTERPRISE_FORM_PICKER_META[draftResumePrompt.pickerKey].title}
+          ticketNumber={ticket.number}
+          savedAtLabel={
+            draftResumePrompt.savedAt
+              ? formatInstant(new Date(draftResumePrompt.savedAt).toISOString())
+              : null
+          }
+          stepLabel={
+            draftResumePrompt.step ? `Paso ${draftResumePrompt.step}` : null
+          }
+          onResume={() => {
+            const start = draftResumePrompt.start;
+            setDraftResumePrompt(null);
+            start();
+          }}
+          onCancel={() => setDraftResumePrompt(null)}
+        />
+      ) : null}
     </div>
   );
 }

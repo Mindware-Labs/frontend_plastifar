@@ -33,6 +33,8 @@ import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
+import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Logo } from "../../components/Logo";
 import { Alert } from "../../components/ui/Alert";
@@ -50,6 +52,12 @@ import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { CLAIM_FORM_CONTROL } from "../../lib/claims";
+import {
+  clearEnterpriseFormDraft,
+  enterpriseFormDraftKey,
+  readEnterpriseFormDraft,
+  writeEnterpriseFormDraft,
+} from "../../lib/enterpriseFormDrafts";
 import { formatPhoneNumber } from "../../lib/format";
 import { toNumberOrNull } from "../../lib/numbers";
 import { today } from "../../lib/quality";
@@ -265,6 +273,9 @@ export function ClaimFormModal({
   onSaved,
 }: ClaimFormModalProps) {
   const isEdit = claim !== undefined;
+  const draftStorageKey =
+    !isEdit && ticketId > 0 ? enterpriseFormDraftKey("pf034", ticketId) : null;
+  const draftLoadedRef = useRef(false);
   const receipts = useReceipts();
   const savedResultRef = useRef<ClaimDetail | null>(null);
   const [showClosePrompt, setShowClosePrompt] = useState(false);
@@ -275,6 +286,7 @@ export function ClaimFormModal({
   const [closeReason, setCloseReason] = useState("");
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [saveDraftConfirmOpen, setSaveDraftConfirmOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [plants, setPlants] = useState<Plant[] | null>(null);
   const [topics, setTopics] = useState<TicketTopicResponse[]>([]);
@@ -372,6 +384,7 @@ export function ClaimFormModal({
     handleSubmit,
     trigger,
     getValues,
+    reset,
     setError,
     formState: { errors, touchedFields, isSubmitting },
   } = useForm<FormValues>({
@@ -420,6 +433,24 @@ export function ClaimFormModal({
 
   const { fields, append, remove } = useFieldArray({ control, name: "lines" });
   const [activeLineIndex, setActiveLineIndex] = useState(0);
+
+  useEffect(() => {
+    if (!draftStorageKey || draftLoadedRef.current) return;
+    const draft = readEnterpriseFormDraft<{
+      step?: number;
+      values?: FormValues;
+      activeLineIndex?: number;
+    }>(draftStorageKey);
+    if (!draft?.values) return;
+    draftLoadedRef.current = true;
+    reset(draft.values);
+    if (typeof draft.step === "number" && draft.step >= 1 && draft.step <= 4) {
+      setStep(draft.step as 1 | 2 | 3 | 4);
+    }
+    if (typeof draft.activeLineIndex === "number") {
+      setActiveLineIndex(Math.max(0, draft.activeLineIndex));
+    }
+  }, [draftStorageKey, reset]);
 
   const safeActiveLineIndex = Math.min(
     activeLineIndex,
@@ -675,6 +706,29 @@ export function ClaimFormModal({
     </div>
   );
 
+  function handleSaveDraft() {
+    if (!draftStorageKey || isSubmitting) return;
+    if (
+      !writeEnterpriseFormDraft(draftStorageKey, {
+        step,
+        values: getValues(),
+        activeLineIndex: safeActiveLineIndex,
+      })
+    ) {
+      receipts.failed({
+        action: "guardar-borrador-reclamacion",
+        title: "No se pudo guardar el borrador",
+        detail: "Revisa el espacio del navegador e inténtalo de nuevo.",
+      });
+      return;
+    }
+    receipts.done({
+      action: "guardar-borrador-reclamacion",
+      title: "Borrador guardado",
+      detail: `${CLAIM_FORM_CONTROL.code} · ${ticketNumber}`,
+    });
+  }
+
   async function onSubmit(values: FormValues) {
     setFormError(null);
     if (!validateReasonOther(values)) return;
@@ -715,6 +769,7 @@ export function ClaimFormModal({
       const saved = isEdit
         ? await claimsApi.update(claim.id, request)
         : await claimsApi.create(ticketId, request);
+      clearEnterpriseFormDraft(draftStorageKey);
       receipts.done({
         action: "guardar-reclamacion",
         title: isEdit ? "Reclamación actualizada" : "Reclamación registrada",
@@ -1222,6 +1277,20 @@ export function ClaimFormModal({
     </div>
   );
 
+  const renderSaveDraftConfirmModal = () =>
+    saveDraftConfirmOpen ? (
+      <EnterpriseFormSaveDraftConfirmModal
+        open
+        formCode={CLAIM_FORM_CONTROL.code}
+        ticketLabel={ticketNumber}
+        onClose={() => setSaveDraftConfirmOpen(false)}
+        onConfirm={() => {
+          handleSaveDraft();
+          setSaveDraftConfirmOpen(false);
+        }}
+      />
+    ) : null;
+
   const renderClosePromptModal = () => {
     if (!showClosePrompt || !completedClaim) return null;
     const savedClaim = completedClaim.claim;
@@ -1360,6 +1429,11 @@ export function ClaimFormModal({
           Cancelar
         </Button>
       )}
+      <EnterpriseFormSaveDraftButton
+        visible={Boolean(draftStorageKey)}
+        disabled={isSubmitting}
+        onClick={() => setSaveDraftConfirmOpen(true)}
+      />
       {step < 4 ? (
         <Button key={`claim-next-${step}`} type="button" size="sm" onClick={() => void handleNextStep()}>
           <span>Siguiente paso</span>
@@ -1442,6 +1516,7 @@ export function ClaimFormModal({
           {renderFooterButtons()}
         </div>
         {renderClosePromptModal()}
+        {renderSaveDraftConfirmModal()}
       </div>
     );
   }
@@ -1466,6 +1541,7 @@ export function ClaimFormModal({
         {formBody}
       </Modal>
       {renderClosePromptModal()}
+      {renderSaveDraftConfirmModal()}
     </>
   );
 }

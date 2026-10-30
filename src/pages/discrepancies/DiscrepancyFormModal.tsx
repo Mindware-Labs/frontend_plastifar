@@ -32,6 +32,8 @@ import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
+import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
+import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { Button } from "../../components/ui/Button";
 import { ControlInput } from "../../components/ui/ControlInput";
 import {
@@ -50,10 +52,17 @@ import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import {
   cacheTicketInfo,
+  DISCREPANCY_FORM_CONTROL,
   getCachedTicketInfo,
   resolveTicketLabel,
   searchTickets,
 } from "../../lib/discrepancies";
+import {
+  clearEnterpriseFormDraft,
+  enterpriseFormDraftKey,
+  readEnterpriseFormDraft,
+  writeEnterpriseFormDraft,
+} from "../../lib/enterpriseFormDrafts";
 import {
   resolveClientLabel,
   resolveProductLabel,
@@ -282,6 +291,7 @@ export function DiscrepancyFormModal({
   inline = false,
 }: DiscrepancyFormModalProps) {
   const isEdit = discrepancy !== undefined;
+  const draftLoadedRef = useRef(false);
   const recommendedProductOptions = useMemo(
     () => ticketProductsToLookupOptions(ticketProducts),
     [ticketProducts],
@@ -291,6 +301,7 @@ export function DiscrepancyFormModal({
     [ticketProducts],
   );
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [saveDraftConfirmOpen, setSaveDraftConfirmOpen] = useState(false);
   const receipts = useReceipts();
 
   // Almacena el resultado para entregarlo a onSaved cuando termine la animación de salida
@@ -353,6 +364,8 @@ export function DiscrepancyFormModal({
 
   // Ticket label y cliente resueltos de inmediato (sin delay de red ni mostrar ID en bruto)
   const initialTicketId = discrepancy ? discrepancy.ticketId : ticketId;
+  const draftStorageKey =
+    !isEdit && initialTicketId ? enterpriseFormDraftKey("pf291", initialTicketId) : null;
   const initialTicketLabel =
     fixedTicketLabel ??
     (discrepancy ? `${discrepancy.ticketNumber} · ${discrepancy.ticketSubject}` : undefined) ??
@@ -410,6 +423,7 @@ export function DiscrepancyFormModal({
     handleSubmit,
     setValue,
     getValues,
+    reset,
     trigger,
     formState: { errors, touchedFields, isSubmitting },
   } = useForm<FormValues>({
@@ -567,6 +581,54 @@ export function DiscrepancyFormModal({
     return touchedFields[field] ? "valid" : "idle";
   }
 
+  useEffect(() => {
+    if (!draftStorageKey || draftLoadedRef.current) return;
+    const draft = readEnterpriseFormDraft<{
+      step?: number;
+      values?: FormValues;
+      activeLineIndex?: number;
+      discrepancyDate?: string;
+      checks?: Record<number, CheckChoice>;
+    }>(draftStorageKey);
+    if (!draft?.values) return;
+    draftLoadedRef.current = true;
+    reset(draft.values);
+    if (typeof draft.step === "number" && draft.step >= 1 && draft.step <= 3) {
+      setStep(draft.step as 1 | 2 | 3);
+    }
+    if (typeof draft.activeLineIndex === "number") {
+      setActiveLineIndex(Math.max(0, draft.activeLineIndex));
+    }
+    if (typeof draft.discrepancyDate === "string") setDiscrepancyDate(draft.discrepancyDate);
+    if (draft.checks && typeof draft.checks === "object") setChecks(draft.checks);
+  }, [draftStorageKey, reset]);
+
+  function handleSaveDraft() {
+    if (!draftStorageKey || isSubmitting) return;
+    const ticketLabelShort = ticketLabel?.split(" ")[0] ?? fixedTicketLabel?.split(" ")[0] ?? "";
+    if (
+      !writeEnterpriseFormDraft(draftStorageKey, {
+        step,
+        values: getValues(),
+        activeLineIndex: safeActiveLineIndex,
+        discrepancyDate,
+        checks,
+      })
+    ) {
+      receipts.failed({
+        action: "guardar-borrador-discrepancia",
+        title: "No se pudo guardar el borrador",
+        detail: "Revisa el espacio del navegador e inténtalo de nuevo.",
+      });
+      return;
+    }
+    receipts.done({
+      action: "guardar-borrador-discrepancia",
+      title: "Borrador guardado",
+      detail: `${DISCREPANCY_FORM_CONTROL.code}${ticketLabelShort ? ` · ${ticketLabelShort}` : ""}`,
+    });
+  }
+
   // Navegación entre pasos con validación
   async function handleNextStep() {
     if (step === 1) {
@@ -672,6 +734,7 @@ export function DiscrepancyFormModal({
       const saved = isEdit
         ? await discrepanciesApi.update(discrepancy.id, request)
         : await discrepanciesApi.create(Number(values.ticketId), request);
+      clearEnterpriseFormDraft(draftStorageKey);
       receipts.done({
         action: "guardar-discrepancia",
         title: isEdit ? "Investigación actualizada" : "Investigación creada",
@@ -1333,6 +1396,12 @@ export function DiscrepancyFormModal({
         </Button>
       )}
 
+      <EnterpriseFormSaveDraftButton
+        visible={Boolean(draftStorageKey)}
+        disabled={isSubmitting}
+        onClick={() => setSaveDraftConfirmOpen(true)}
+      />
+
       {step < 3 ? (
         <Button
           key={`btn-next-step-${step}`}
@@ -1356,6 +1425,20 @@ export function DiscrepancyFormModal({
       )}
     </div>
   );
+
+  const renderSaveDraftConfirmModal = () =>
+    saveDraftConfirmOpen ? (
+      <EnterpriseFormSaveDraftConfirmModal
+        open
+        formCode={DISCREPANCY_FORM_CONTROL.code}
+        ticketLabel={ticketLabel?.split(" ")[0] ?? fixedTicketLabel?.split(" ")[0]}
+        onClose={() => setSaveDraftConfirmOpen(false)}
+        onConfirm={() => {
+          handleSaveDraft();
+          setSaveDraftConfirmOpen(false);
+        }}
+      />
+    ) : null;
 
   const renderClosePromptModal = () => {
     if (!showClosePrompt || !completedDiscrepancy) return null;
@@ -1570,6 +1653,7 @@ export function DiscrepancyFormModal({
           {renderFooterButtons()}
         </div>
         {renderClosePromptModal()}
+        {renderSaveDraftConfirmModal()}
       </div>
     );
   }
@@ -1619,6 +1703,7 @@ export function DiscrepancyFormModal({
         </form>
       </Modal>
       {renderClosePromptModal()}
+      {renderSaveDraftConfirmModal()}
     </>
   );
 }

@@ -13,6 +13,8 @@ import { fetchAllPages } from "../../api/paging";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { withdrawalsApi } from "../../api/withdrawals";
+import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
+import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DateField, LookupField, SelectField, TextField } from "../../components/ui/Field";
@@ -21,6 +23,12 @@ import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { resolveTicketLabel, searchTickets } from "../../lib/discrepancies";
+import {
+  clearEnterpriseFormDraft,
+  enterpriseFormDraftKey,
+  readEnterpriseFormDraft,
+  writeEnterpriseFormDraft,
+} from "../../lib/enterpriseFormDrafts";
 import { today } from "../../lib/quality";
 import { computeLineValue, computeTotal, WITHDRAWAL_FORM_CONTROL } from "../../lib/withdrawals";
 import { WithdrawalLinesSpreadsheet } from "./WithdrawalLinesSpreadsheet";
@@ -171,7 +179,8 @@ export function WithdrawalFormModal({
   const isEditing = Boolean(withdrawal);
   const lockedTicketId = fixedTicketId ?? withdrawal?.ticketId;
   const activeTicketId = lockedTicketId ?? 0;
-  const draftStorageKey = !isEditing && activeTicketId ? `pf068-draft:ticket:${activeTicketId}` : null;
+  const draftStorageKey =
+    !isEditing && activeTicketId > 0 ? enterpriseFormDraftKey("pf068", activeTicketId) : null;
 
   const [step, setStep] = useState<number>(1);
   const [stepDirection, setStepDirection] = useState<"forward" | "backward">("forward");
@@ -211,6 +220,7 @@ export function WithdrawalFormModal({
 
   // Confirmación al cerrar con cambios y prompt de cierre del ticket al terminar
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [saveDraftConfirmOpen, setSaveDraftConfirmOpen] = useState(false);
   const [completedWithdrawal, setCompletedWithdrawal] = useState<WithdrawalDetail | null>(null);
   const [showClosePrompt, setShowClosePrompt] = useState(false);
   const [verdicts, setVerdicts] = useState<Array<{ id: number; name: string }>>([]);
@@ -267,10 +277,15 @@ export function WithdrawalFormModal({
   useEffect(() => {
     if (!draftStorageKey) return;
     try {
-      const raw = localStorage.getItem(draftStorageKey);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
+      const parsed = readEnterpriseFormDraft<{
+        step?: number;
+        requestDate?: string;
+        reason?: WithdrawalReason;
+        errorOrigin?: string;
+        currency?: string;
+        lines?: Partial<LineDraft>[];
+      }>(draftStorageKey);
+      if (parsed) {
         if (typeof parsed.step === "number" && parsed.step >= 1 && parsed.step <= 2) setStep(parsed.step);
         if (typeof parsed.requestDate === "string") setRequestDate(parsed.requestDate);
         if (parsed.reason === "Por devolución" || parsed.reason === "Por cambio") setReason(parsed.reason);
@@ -323,31 +338,29 @@ export function WithdrawalFormModal({
   const isDirty = initialSnapshotRef.current !== "" && initialSnapshotRef.current !== currentSnapshot;
 
   function saveDraftToStorage() {
-    if (!draftStorageKey) return;
-    try {
-      localStorage.setItem(
-        draftStorageKey,
-        JSON.stringify({
-          step,
-          requestDate,
-          reason,
-          errorOrigin,
-          currency,
-          lines,
-        }),
-      );
-    } catch {
-      /** sin espacio */
-    }
+    writeEnterpriseFormDraft(draftStorageKey, {
+      step,
+      requestDate,
+      reason,
+      errorOrigin,
+      currency,
+      lines,
+    });
   }
 
   function clearDraftFromStorage() {
-    if (!draftStorageKey) return;
-    try {
-      localStorage.removeItem(draftStorageKey);
-    } catch {
-      /** ignorar */
-    }
+    clearEnterpriseFormDraft(draftStorageKey);
+  }
+
+  function handleSaveDraft() {
+    if (!draftStorageKey || saving) return;
+    saveDraftToStorage();
+    initialSnapshotRef.current = currentSnapshot;
+    receipts.done({
+      action: "guardar-borrador-retiro",
+      title: "Borrador guardado",
+      detail: `${WITHDRAWAL_FORM_CONTROL.code}${displayTicketNumber ? ` · ${displayTicketNumber}` : ""}`,
+    });
   }
 
   function handleRequestClose() {
@@ -671,6 +684,11 @@ export function WithdrawalFormModal({
             Cancelar
           </Button>
         )}
+        <EnterpriseFormSaveDraftButton
+          visible={Boolean(draftStorageKey)}
+          disabled={saving}
+          onClick={() => setSaveDraftConfirmOpen(true)}
+        />
         {step < STEPS.length ? (
           <Button type="button" size="sm" onClick={handleNextStep}>
             <span>Siguiente paso</span>
@@ -891,6 +909,19 @@ export function WithdrawalFormModal({
           <div className="mb-4 -mt-2 border-b border-zinc-100 pb-3">{renderStepper()}</div>
           {wizardBody}
         </Modal>
+      )}
+
+      {saveDraftConfirmOpen && (
+        <EnterpriseFormSaveDraftConfirmModal
+          open
+          formCode={WITHDRAWAL_FORM_CONTROL.code}
+          ticketLabel={displayTicketNumber ?? undefined}
+          onClose={() => setSaveDraftConfirmOpen(false)}
+          onConfirm={() => {
+            handleSaveDraft();
+            setSaveDraftConfirmOpen(false);
+          }}
+        />
       )}
 
       {/** Confirmación al salir con cambios sin guardar */}

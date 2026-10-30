@@ -28,6 +28,8 @@ import { qualityApi } from "../../api/quality";
 import { settingsApi } from "../../api/settings";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
+import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
+import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Logo } from "../../components/Logo";
 import { Button } from "../../components/ui/Button";
@@ -49,6 +51,13 @@ import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
+import {
+  clearEnterpriseFormDraft,
+  enterpriseFormDraftKey,
+  readEnterpriseFormDraft,
+  writeEnterpriseFormDraft,
+} from "../../lib/enterpriseFormDrafts";
+import { HCA_FORM_CONTROL } from "../../lib/hcaForm109";
 import { today } from "../../lib/quality";
 import type { TicketProductResponse } from "../../types/api";
 import type { CorrectiveActionSheet, HcaParticipant } from "../../types/quality";
@@ -477,9 +486,14 @@ export function HcaFormModal({
   onSaved,
 }: HcaFormModalProps) {
   const isEdit = sheet !== undefined;
+  const draftTicketId = defaults?.ticketId ?? null;
+  const draftStorageKey =
+    !isEdit && draftTicketId ? enterpriseFormDraftKey("pf109", draftTicketId) : null;
+  const draftLoadedRef = useRef(false);
   const { user } = useAuth();
   const receipts = useReceipts();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [saveDraftConfirmOpen, setSaveDraftConfirmOpen] = useState(false);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loadingExtras, setLoadingExtras] = useState(isEdit);
   const originalParticipants = useRef<HcaParticipant[]>(sheet?.participants ?? []);
@@ -523,6 +537,7 @@ export function HcaFormModal({
     register,
     handleSubmit,
     getValues,
+    reset,
     setValue,
     trigger,
     formState: { errors, touchedFields, isSubmitting },
@@ -898,6 +913,35 @@ export function HcaFormModal({
     return "";
   }
 
+  useEffect(() => {
+    if (!draftStorageKey || draftLoadedRef.current) return;
+    const draft = readEnterpriseFormDraft<{ step?: number; values?: FormValues }>(draftStorageKey);
+    if (!draft?.values) return;
+    draftLoadedRef.current = true;
+    reset(draft.values);
+    if (typeof draft.step === "number" && draft.step >= 1 && draft.step <= 4) {
+      setStep(draft.step as 1 | 2 | 3 | 4);
+    }
+  }, [draftStorageKey, reset]);
+
+  function handleSaveDraft() {
+    if (!draftStorageKey || isSubmitting) return;
+    const ticketLabelShort = fixedTicketLabel?.split(" ")[0] ?? "";
+    if (!writeEnterpriseFormDraft(draftStorageKey, { step, values: getValues() })) {
+      receipts.failed({
+        action: "guardar-borrador-hca",
+        title: "No se pudo guardar el borrador",
+        detail: "Revisa el espacio del navegador e inténtalo de nuevo.",
+      });
+      return;
+    }
+    receipts.done({
+      action: "guardar-borrador-hca",
+      title: "Borrador guardado",
+      detail: `${HCA_FORM_CONTROL.code}${ticketLabelShort ? ` · ${ticketLabelShort}` : ""}`,
+    });
+  }
+
   async function handleNextStep() {
     if (step === 1) {
       const ok = await trigger([
@@ -1126,6 +1170,7 @@ export function HcaFormModal({
       await syncParticipants(saved.id, values.participants);
 
       const detail = await qualityApi.sheets.get(saved.id);
+      clearEnterpriseFormDraft(draftStorageKey);
       receipts.done({
         action: "guardar-hca",
         title: isEdit ? "HCA actualizada" : "HCA creada",
@@ -1827,6 +1872,20 @@ export function HcaFormModal({
     );
   };
 
+  const renderSaveDraftConfirmModal = () =>
+    saveDraftConfirmOpen ? (
+      <EnterpriseFormSaveDraftConfirmModal
+        open
+        formCode={HCA_FORM_CONTROL.code}
+        ticketLabel={fixedTicketLabel?.split(" ")[0]}
+        onClose={() => setSaveDraftConfirmOpen(false)}
+        onConfirm={() => {
+          handleSaveDraft();
+          setSaveDraftConfirmOpen(false);
+        }}
+      />
+    ) : null;
+
   const renderClosePromptModal = () => {
     if (!showClosePrompt || !completedSheet) return null;
     const effectiveTicketId = Number(completedSheet.ticketId ?? defaults?.ticketId ?? 0);
@@ -1964,6 +2023,11 @@ export function HcaFormModal({
           Cancelar
         </Button>
       )}
+      <EnterpriseFormSaveDraftButton
+        visible={Boolean(draftStorageKey)}
+        disabled={isSubmitting}
+        onClick={() => setSaveDraftConfirmOpen(true)}
+      />
       {step < 4 ? (
         <Button
           type="button"
@@ -2054,13 +2118,14 @@ export function HcaFormModal({
           {renderFooterButtons()}
         </div>
         {renderClosePromptModal()}
+        {renderSaveDraftConfirmModal()}
       </div>
     );
   }
 
   return (
     <>
-    <Modal
+      <Modal
       closeOnBackdropClick={false}
       maxWidth={modalMaxWidth}
       eyebrow={
@@ -2082,6 +2147,7 @@ export function HcaFormModal({
       {formBody}
     </Modal>
     {renderClosePromptModal()}
+    {renderSaveDraftConfirmModal()}
     </>
   );
 }
