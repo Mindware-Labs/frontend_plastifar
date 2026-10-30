@@ -660,26 +660,17 @@ export function ClaimFormModal({
   );
 
   const renderStep1 = () => (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 animate-plf-fade text-left">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 animate-plf-fade text-left">
       <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs">
-        <div className="flex flex-col items-center gap-2 border-b border-zinc-100 bg-zinc-50/70 px-4 py-4 sm:flex-row sm:justify-between sm:px-5">
-          <div className="flex items-center gap-3">
-            <Logo height={24} />
-            <div className="min-w-0 text-left">
-              <p className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-500">
-                {CLAIM_FORM_CONTROL.code}
-              </p>
-              <p className="font-heading text-xs font-bold uppercase leading-snug tracking-wide text-zinc-900 sm:text-sm">
-                {CLAIM_FORM_CONTROL.title}
-              </p>
-            </div>
-          </div>
+        <div className="flex items-center border-b border-zinc-100 bg-zinc-50/70 px-4 py-3 sm:px-5">
+          <Logo height={22} />
         </div>
 
         <div className="flex flex-col gap-3 px-4 py-4 sm:px-5 sm:py-5">
           <ClaimFormDivider title="Identificación del caso" />
 
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <StaticField label="Código" value={ticketNumber} mono />
             <Controller
               name="claimDate"
               control={control}
@@ -696,7 +687,6 @@ export function ClaimFormModal({
                 />
               )}
             />
-            <StaticField label="Código" value={ticketNumber} mono />
           </div>
 
           <ClaimFormDivider title="I. Información general" />
@@ -1572,7 +1562,7 @@ export function ClaimFormModal({
           </div>
         </div>
         <div className="border-b border-zinc-100 px-4 py-3 sm:px-6">{renderStepper()}</div>
-        <div className="p-4 sm:p-6">{formBody}</div>
+        <div className="p-4 sm:px-6 sm:pt-6 sm:pb-4">{formBody}</div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200/80 bg-zinc-50/70 px-5 py-3.5 sm:px-6">
           {renderFooterLeft()}
           {renderFooterButtons()}

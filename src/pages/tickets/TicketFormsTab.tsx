@@ -62,6 +62,7 @@ import { HcaModal } from "../quality/HcaModal";
 import { HcaStatusBadge, PlanItemStatusBadge } from "../quality/StatusBadges";
 import { WithdrawalFormModal } from "../withdrawals/WithdrawalFormModal";
 import { WithdrawalStatusBadge } from "../withdrawals/WithdrawalStatusBadge";
+import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 
 export type EnterpriseFormType = "reclamacion" | "retiro" | "discrepancia" | "hca";
 
@@ -431,6 +432,13 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     if (!selectedSubTabKey) return registeredForms[0] ?? null;
     return registeredForms.find((f) => f.key === selectedSubTabKey) ?? registeredForms[0] ?? null;
   }, [selectedSubTabKey, registeredForms]);
+
+  const activeFormIndex = useMemo(() => {
+    return Math.max(
+      0,
+      registeredForms.findIndex((f) => f.key === activeForm?.key)
+    );
+  }, [registeredForms, activeForm?.key]);
 
   useEffect(() => {
     if (activeForm?.type !== "hca") return;
@@ -978,30 +986,36 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         <div className="space-y-3">
           {/* Sub-tabs switcher only if there are 2 or more forms */}
           {registeredForms.length > 1 && (
-            <div className="flex flex-wrap items-center gap-1.5 pb-1">
-              {registeredForms.map((item) => {
-                const isSelected = item.key === activeForm?.key;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setSelectedSubTabKey(item.key)}
-                    className={`inline-flex items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
-                      isSelected
-                        ? "bg-brand-red/10 border border-brand-red/30 text-brand-red shadow-2xs font-semibold"
-                        : "bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border border-zinc-200"
-                    }`}
-                  >
-                    <span className={`font-mono text-[10px] font-bold uppercase ${isSelected ? "text-brand-red" : "text-zinc-400"}`}>
-                      {item.code}
-                    </span>
-                    <span>{item.title}</span>
-                    <span className={`rounded px-1.5 py-0.2 text-[10px] ${isSelected ? "bg-brand-red/15 text-brand-red font-semibold" : "bg-zinc-100 text-zinc-600"}`}>
-                      {item.badgeText}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="min-w-0 max-w-full pb-1">
+              <FormLineTabStrip
+                activeIndex={activeFormIndex}
+                tabCount={registeredForms.length}
+              >
+                {registeredForms.map((item, idx) => {
+                  const isSelected = item.key === activeForm?.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      {...formLineTabIndexAttr(idx)}
+                      onClick={() => setSelectedSubTabKey(item.key)}
+                      className={`inline-flex shrink-0 whitespace-nowrap items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-brand-red/10 border border-brand-red/30 text-brand-red shadow-2xs font-semibold"
+                          : "bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border border-zinc-200"
+                      }`}
+                    >
+                      <span className={`font-mono text-[10px] font-bold uppercase ${isSelected ? "text-brand-red" : "text-zinc-400"}`}>
+                        {item.code}
+                      </span>
+                      <span>{item.title}</span>
+                      <span className={`rounded px-1.5 py-0.2 text-[10px] ${isSelected ? "bg-brand-red/15 text-brand-red font-semibold" : "bg-zinc-100 text-zinc-600"}`}>
+                        {item.badgeText}
+                      </span>
+                    </button>
+                  );
+                })}
+              </FormLineTabStrip>
             </div>
           )}
 

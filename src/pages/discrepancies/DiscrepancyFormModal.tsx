@@ -1723,7 +1723,7 @@ export function DiscrepancyFormModal({
 
             {/** Paso 2: Todo el ancho de la página para la tabla editorial */}
             {step === 2 && (
-              <div className="w-full">
+              <div className="w-full -mt-2 sm:-mt-4">
                 {renderStep2()}
               </div>
             )}
@@ -1788,7 +1788,7 @@ export function DiscrepancyFormModal({
           className="flex flex-col gap-3 text-left"
         >
           {step === 1 && renderStep1()}
-          {step === 2 && renderStep2()}
+          {step === 2 && <div className="-mt-2">{renderStep2()}</div>}
           {step === 3 && renderStep3()}
         </form>
       </Modal>
