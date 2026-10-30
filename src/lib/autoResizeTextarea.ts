@@ -6,10 +6,17 @@ export function autoResizeTextarea(textarea: HTMLTextAreaElement | null, minHeig
   const scrollParent = textarea.closest(".overflow-y-auto") as HTMLElement | null;
   const prevScrollTop = scrollParent ? scrollParent.scrollTop : null;
 
+  const prevHeight = textarea.style.height;
   textarea.style.height = "auto";
   const borderOffset = textarea.offsetHeight - textarea.clientHeight;
   const targetHeight = Math.max(textarea.scrollHeight + borderOffset, minHeightPx);
-  textarea.style.height = `${targetHeight}px`;
+  const nextHeight = `${targetHeight}px`;
+
+  if (prevHeight !== nextHeight) {
+    textarea.style.height = nextHeight;
+  } else {
+    textarea.style.height = prevHeight;
+  }
 
   // Si el cambio de alto temporal descolocó el scroll del modal, restaurarlo inmediatamente
   if (scrollParent && prevScrollTop !== null && scrollParent.scrollTop !== prevScrollTop) {

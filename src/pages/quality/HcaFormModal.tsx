@@ -2,7 +2,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
   Check,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   PenLine,
@@ -26,8 +25,7 @@ import { ApiError } from "../../api/client";
 import { fetchAllPages } from "../../api/paging";
 import { qualityApi } from "../../api/quality";
 import { settingsApi } from "../../api/settings";
-import { ticketsApi } from "../../api/tickets";
-import { ticketVerdictsApi } from "../../api/ticketVerdicts";
+import { EnterpriseFormCloseTicketModal } from "../../components/app/EnterpriseFormCloseTicketModal";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
@@ -40,11 +38,11 @@ import {
   type HcaStepValues,
 } from "../../lib/enterpriseFormValidation";
 import { ControlInput } from "../../components/ui/ControlInput";
+import { AppleMotionBlock } from "../../components/ui/AppleMotionBlock";
 import {
   DateField,
   SelectField,
   TextAreaField,
-  TextField,
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
@@ -52,6 +50,7 @@ import { LookupSelect } from "../../components/ui/LookupSelect";
 import { RowAction } from "../../components/ui/RowAction";
 import { useAuth } from "../../context/useAuth";
 import { useReceipts } from "../../context/useReceipts";
+import { useAppleListMotion, type AppleListPhase } from "../../hooks/useAppleListMotion";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { prefersReducedMotion } from "../../hooks/motion";
@@ -507,26 +506,6 @@ export function HcaFormModal({
 
   const [showClosePrompt, setShowClosePrompt] = useState(false);
   const [completedSheet, setCompletedSheet] = useState<CorrectiveActionSheet | null>(null);
-  const [closingTicket, setClosingTicket] = useState(false);
-  const [verdicts, setVerdicts] = useState<Array<{ id: number; name: string }>>([]);
-  const [selectedVerdictId, setSelectedVerdictId] = useState<string>("");
-  const [closeReason, setCloseReason] = useState<string>("");
-
-  useEffect(() => {
-    if (showClosePrompt && completedSheet) {
-      setCloseReason(`Cerrado tras completar HCA ${completedSheet.number}`);
-      ticketVerdictsApi
-        .list({ page: 1, pageSize: 100, status: "activos" })
-        .then((res) => {
-          const activeVerdicts = res.items.map((v) => ({ id: v.id, name: v.name }));
-          setVerdicts(activeVerdicts);
-          if (activeVerdicts.length > 0) {
-            setSelectedVerdictId(String(activeVerdicts[0].id));
-          }
-        })
-        .catch(() => setVerdicts([]));
-    }
-  }, [showClosePrompt, completedSheet]);
 
   const elaboradoLabel =
     sheet?.createdByName ??
@@ -597,16 +576,18 @@ export function HcaFormModal({
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const immediateActionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const causeTextareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
-  const [removingCauseIds, setRemovingCauseIds] = useState<Set<string>>(() => new Set());
-  const [causeEnterIds, setCauseEnterIds] = useState<Set<string>>(() => new Set());
-  const prevCauseFieldIdsRef = useRef<string[] | null>(null);
-  const causeRemoveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const causeKeys = useMemo(
+    () => causeFields.fields.map((field) => field.id),
+    [causeFields.fields],
+  );
+  const causeMotion = useAppleListMotion(causeKeys, { minItems: 1 });
   const planTextareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+  const planKeys = useMemo(
+    () => planFields.fields.map((field) => field.id),
+    [planFields.fields],
+  );
+  const planMotion = useAppleListMotion(planKeys, { minItems: 1 });
   const planItemsWatch = useWatch({ control, name: "planItems" });
-  const [removingPlanIds, setRemovingPlanIds] = useState<Set<string>>(() => new Set());
-  const [planEnterIds, setPlanEnterIds] = useState<Set<string>>(() => new Set());
-  const prevPlanFieldIdsRef = useRef<string[] | null>(null);
-  const planRemoveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   /** Etiqueta del responsable en filas cargadas del servidor (modo sistema). */
   const planStaffLabelsRef = useRef<Record<number, string>>({});
   const [planStaffPickLabels, setPlanStaffPickLabels] = useState<Record<string, string>>({});
@@ -684,48 +665,10 @@ export function HcaFormModal({
 
   useEffect(() => {
     return () => {
-      for (const timer of causeRemoveTimers.current.values()) clearTimeout(timer);
-      causeRemoveTimers.current.clear();
-      for (const timer of planRemoveTimers.current.values()) clearTimeout(timer);
-      planRemoveTimers.current.clear();
       for (const timer of participantRemoveTimers.current.values()) clearTimeout(timer);
       participantRemoveTimers.current.clear();
     };
   }, []);
-
-  useEffect(() => {
-    const ids = causeFields.fields.map((field) => field.id);
-    if (prevCauseFieldIdsRef.current === null) {
-      prevCauseFieldIdsRef.current = ids;
-      return;
-    }
-    const added = ids.filter((id) => !prevCauseFieldIdsRef.current!.includes(id));
-    if (added.length > 0 && !prefersReducedMotion()) {
-      setCauseEnterIds((prev) => {
-        const next = new Set(prev);
-        for (const id of added) next.add(id);
-        return next;
-      });
-    }
-    prevCauseFieldIdsRef.current = ids;
-  }, [causeFields.fields]);
-
-  useEffect(() => {
-    const ids = planFields.fields.map((field) => field.id);
-    if (prevPlanFieldIdsRef.current === null) {
-      prevPlanFieldIdsRef.current = ids;
-      return;
-    }
-    const added = ids.filter((id) => !prevPlanFieldIdsRef.current!.includes(id));
-    if (added.length > 0 && !prefersReducedMotion()) {
-      setPlanEnterIds((prev) => {
-        const next = new Set(prev);
-        for (const id of added) next.add(id);
-        return next;
-      });
-    }
-    prevPlanFieldIdsRef.current = ids;
-  }, [planFields.fields]);
 
   useEffect(() => {
     const ids = participantFields.fields.map((field) => field.id);
@@ -768,71 +711,35 @@ export function HcaFormModal({
   const commentsField = register("comments");
 
   function handleAddCause() {
+    if (causeFields.fields.length >= 20) return;
     causeFields.append({ text: "" });
   }
 
-  function handleRemoveCause(index: number) {
+  function handleRemoveCause(fieldId: string) {
     if (causeFields.fields.length <= 1) return;
-    const fieldId = causeFields.fields[index]?.id;
-    if (!fieldId) {
-      causeFields.remove(index);
-      return;
-    }
-    if (removingCauseIds.has(fieldId)) return;
-
-    if (prefersReducedMotion()) {
-      causeFields.remove(index);
-      causeTextareaRefs.current.delete(fieldId);
-      return;
-    }
-
-    setRemovingCauseIds((prev) => new Set(prev).add(fieldId));
-    const timer = setTimeout(() => {
-      const currentIndex = causeFields.fields.findIndex((field) => field.id === fieldId);
-      if (currentIndex >= 0) causeFields.remove(currentIndex);
-      setRemovingCauseIds((prev) => {
-        const next = new Set(prev);
-        next.delete(fieldId);
-        return next;
-      });
-      causeTextareaRefs.current.delete(fieldId);
-      causeRemoveTimers.current.delete(fieldId);
-    }, LIST_ROW_REMOVE_MS);
-    causeRemoveTimers.current.set(fieldId, timer);
+    causeMotion.requestRemove(fieldId, () => {
+      const currentIndex = causeFields.fields.findIndex((f) => f.id === fieldId);
+      if (currentIndex >= 0) {
+        causeFields.remove(currentIndex);
+        causeTextareaRefs.current.delete(fieldId);
+      }
+    });
   }
 
   function handleAddPlanRow() {
+    if (planFields.fields.length >= 20) return;
     planFields.append(emptyPlanRow());
   }
 
-  function handleRemovePlanRow(index: number) {
+  function handleRemovePlanRow(fieldId: string) {
     if (planFields.fields.length <= 1) return;
-    const fieldId = planFields.fields[index]?.id;
-    if (!fieldId) {
-      planFields.remove(index);
-      return;
-    }
-    if (removingPlanIds.has(fieldId)) return;
-
-    if (prefersReducedMotion()) {
-      planFields.remove(index);
-      planTextareaRefs.current.delete(fieldId);
-      return;
-    }
-
-    setRemovingPlanIds((prev) => new Set(prev).add(fieldId));
-    const timer = setTimeout(() => {
-      const currentIndex = planFields.fields.findIndex((field) => field.id === fieldId);
-      if (currentIndex >= 0) planFields.remove(currentIndex);
-      setRemovingPlanIds((prev) => {
-        const next = new Set(prev);
-        next.delete(fieldId);
-        return next;
-      });
-      planTextareaRefs.current.delete(fieldId);
-      planRemoveTimers.current.delete(fieldId);
-    }, LIST_ROW_REMOVE_MS);
-    planRemoveTimers.current.set(fieldId, timer);
+    planMotion.requestRemove(fieldId, () => {
+      const currentIndex = planFields.fields.findIndex((f) => f.id === fieldId);
+      if (currentIndex >= 0) {
+        planFields.remove(currentIndex);
+        planTextareaRefs.current.delete(fieldId);
+      }
+    });
   }
 
   function handleResponsibleModeChange(newMode: "sistema" | "manual") {
@@ -1529,81 +1436,124 @@ export function HcaFormModal({
       </HcaFormBlock>
 
       <HcaFormBlock label="Causas">
-        <div className="space-y-2">
+        <div className="space-y-4">
           {causeFields.fields.map((field, index) => {
             const causeField = register(`causes.${index}.text`);
             const causeFieldId = `hca-cause-${field.id}`;
             const causeLabel = index === 0 ? "Causa identificada" : `Causa ${index + 1}`;
             const causeError = errors.causes?.[index]?.text?.message;
-            const exiting = removingCauseIds.has(field.id);
-            const entering = causeEnterIds.has(field.id);
+            const phase = causeMotion.phaseFor(field.id);
+            const isExiting = causeMotion.isExiting(field.id);
+
             return (
-              <div
-                key={field.id}
-                className={`grid grid-cols-[1fr_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1.5 ${
-                  exiting
-                    ? "animate-plf-list-row-out"
-                    : entering
-                    ? "animate-plf-list-row-in"
-                    : ""
-                }`}
-              >
-                <label
-                  htmlFor={causeFieldId}
-                  className="col-start-1 row-start-1 flex min-w-0 items-baseline gap-1 font-heading text-[11.5px] font-semibold leading-[1.2] text-faint"
-                >
-                  <span className="w-4 shrink-0 text-right font-normal tabular-nums text-zinc-400">
-                    {index + 1}.
-                  </span>
-                  <span className="min-w-0">{causeLabel}</span>
-                </label>
-                {causeFields.fields.length > 1 ? (
-                  <div className="col-start-2 row-start-1 self-center">
-                    <RowAction
-                      label={`Quitar causa ${index + 1}`}
-                      icon={Trash2}
-                      danger
-                      disabled={exiting}
-                      onClick={() => handleRemoveCause(index)}
-                    />
+              <AppleMotionBlock key={field.id} phase={phase}>
+                <div className="space-y-1.5 pb-0.5">
+                  <div className="flex h-6 items-center justify-between">
+                    <label
+                      htmlFor={causeFieldId}
+                      className="flex items-center gap-1.5 font-heading text-xs font-semibold tracking-wide text-zinc-700"
+                    >
+                      <span className="font-mono text-[11px] font-bold text-zinc-400">
+                        {index + 1}.
+                      </span>
+                      <span>{causeLabel}</span>
+                    </label>
+                    {causeFields.fields.length > 1 ? (
+                      <button
+                        type="button"
+                        title={`Quitar ${causeLabel.toLowerCase()}`}
+                        aria-label={`Quitar ${causeLabel.toLowerCase()}`}
+                        disabled={isExiting}
+                        onClick={() => handleRemoveCause(field.id)}
+                        className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-brand-red active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    ) : (
+                      <div className="size-6" aria-hidden="true" />
+                    )}
                   </div>
-                ) : null}
-                <textarea
-                  id={causeFieldId}
-                  rows={1}
-                  aria-invalid={causeError !== undefined}
-                  placeholder="Describe una causa raíz o factor contribuyente…"
-                  className={`col-span-2 row-start-2 w-full rounded-edge border bg-white px-3 py-2.5 text-[13px] leading-relaxed text-ink outline-none transition-colors placeholder:text-faint ${
-                    causeError
-                      ? "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/10"
-                      : "border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
-                  } ${HCA_TEXTAREA_AUTO}`}
-                  {...bindAutoResizeTextarea(causeField, HCA_CAUSE_LINE_MIN_PX, (element) => {
-                    if (element) causeTextareaRefs.current.set(field.id, element);
-                    else causeTextareaRefs.current.delete(field.id);
-                  })}
-                />
-                {causeError ? (
-                  <p className="col-span-2 row-start-3 animate-plf-shake text-[11px] font-medium text-brand-red-dark leading-none">
-                    {causeError}
-                  </p>
-                ) : null}
-              </div>
+                  <textarea
+                    id={causeFieldId}
+                    rows={1}
+                    aria-invalid={causeError !== undefined}
+                    placeholder="Describe una causa raíz o factor contribuyente…"
+                    className={`w-full rounded-edge border bg-white px-3 py-2.5 text-[13px] leading-relaxed text-ink outline-none transition-colors placeholder:text-faint ${
+                      causeError
+                        ? "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/10"
+                        : "border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
+                    } ${HCA_TEXTAREA_AUTO}`}
+                    {...bindAutoResizeTextarea(causeField, HCA_CAUSE_LINE_MIN_PX, (element) => {
+                      if (element) causeTextareaRefs.current.set(field.id, element);
+                      else causeTextareaRefs.current.delete(field.id);
+                    })}
+                  />
+                  {causeError ? (
+                    <p className="animate-plf-shake text-[11px] font-medium text-brand-red-dark leading-none">
+                      {causeError}
+                    </p>
+                  ) : null}
+                </div>
+              </AppleMotionBlock>
             );
           })}
           {typeof errors.causes?.message === "string" && (
             <p className="text-[11.5px] font-medium text-brand-red">{errors.causes.message}</p>
           )}
           {causeFields.fields.length < 20 && (
-            <Button type="button" size="sm" variant="secondary" onClick={handleAddCause}>
-              <Plus className="h-3.5 w-3.5" />
-              Agregar causa
-            </Button>
+            <div className="pt-0.5">
+              <Button type="button" size="sm" variant="secondary" onClick={handleAddCause}>
+                <Plus className="h-3.5 w-3.5" />
+                Agregar causa
+              </Button>
+            </div>
           )}
         </div>
       </HcaFormBlock>
     </div>
   );
+
+function PlanMotionCell({
+  phase,
+  className = "",
+  innerClassName = "",
+  children,
+}: {
+  phase: AppleListPhase;
+  className?: string;
+  innerClassName?: string;
+  children: React.ReactNode;
+}) {
+  const collapsed = phase === "from" || phase === "hold" || phase === "out";
+  const ready = phase === "hold" || phase === "in" || phase === "arm" || phase === "out";
+  const motion = phase === "out" || phase === "arm" ? "out" : phase === "idle" ? "idle" : "in";
+  return (
+    <td className={`!py-0 ${className}`}>
+      <div
+        className="plf-apple-row-shell"
+        data-collapsed={collapsed ? "true" : "false"}
+        data-ready={ready ? "true" : "false"}
+        data-motion={motion}
+      >
+        <div className="plf-apple-row-clip">
+          <div
+            className={`${innerClassName} ${
+              phase === "in"
+                ? "animate-plf-apple-row-in"
+                : phase === "out"
+                  ? "animate-plf-apple-row-out"
+                  : phase === "from" || phase === "hold"
+                    ? "opacity-0"
+                    : ""
+            }`}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
+    </td>
+  );
+}
 
   const renderStep3 = () => (
     <div className="flex w-full flex-col gap-4 animate-plf-fade">
@@ -1641,23 +1591,27 @@ export function HcaFormModal({
               {planFields.fields.map((planField, index) => {
                 const planErrors = errors.planItems?.[index];
                 const descriptionField = register(`planItems.${index}.description`);
-                const exiting = removingPlanIds.has(planField.id);
-                const entering = planEnterIds.has(planField.id);
+                const phase = planMotion.phaseFor(planField.id);
+                const isExiting = planMotion.isExiting(planField.id);
                 return (
                   <tr
                     key={planField.id}
-                    className={`border-b border-zinc-100/90 transition-colors hover:bg-zinc-50/40 ${
-                      exiting
-                        ? "animate-plf-list-row-out"
-                        : entering
-                        ? "animate-plf-list-row-in"
-                        : ""
-                    }`}
+                    className="border-b border-zinc-100/90 transition-colors hover:bg-zinc-50/40"
                   >
-                    <td className="align-top py-2.5 pl-2 text-center font-heading text-[11.5px] font-normal tabular-nums leading-none text-zinc-400">
-                      {index + 1}
-                    </td>
-                    <td className="align-top border-l border-zinc-100 px-2 py-1.5">
+                    <PlanMotionCell
+                      phase={phase}
+                      innerClassName="py-2.5 pl-2 flex items-center justify-center min-h-[38px]"
+                      className="align-middle text-center"
+                    >
+                      <span className="font-heading text-[11.5px] font-normal tabular-nums leading-none text-zinc-400">
+                        {index + 1}
+                      </span>
+                    </PlanMotionCell>
+                    <PlanMotionCell
+                      phase={phase}
+                      innerClassName="px-2 py-1.5"
+                      className="align-top border-l border-zinc-100"
+                    >
                       <div className={HCA_TABLE_FIELD}>
                         <textarea
                           rows={1}
@@ -1679,8 +1633,12 @@ export function HcaFormModal({
                           </p>
                         ) : null}
                       </div>
-                    </td>
-                    <td className="align-top border-l border-zinc-100 px-1 py-1.5">
+                    </PlanMotionCell>
+                    <PlanMotionCell
+                      phase={phase}
+                      innerClassName="px-1 py-1.5"
+                      className="align-top border-l border-zinc-100"
+                    >
                       <span id={`hca-plan-who-label-${index}`} className="sr-only">
                         Quién · acción {index + 1}
                       </span>
@@ -1699,8 +1657,12 @@ export function HcaFormModal({
                         onPickLabel={handlePlanStaffPickLabel}
                         onModeChange={handlePlanResponsibleModeChange}
                       />
-                    </td>
-                    <td className="align-top border-l border-zinc-100 px-1 py-1.5">
+                    </PlanMotionCell>
+                    <PlanMotionCell
+                      phase={phase}
+                      innerClassName="px-1 py-1.5"
+                      className="align-top border-l border-zinc-100"
+                    >
                       <div className={`${HCA_TABLE_FIELD} w-full min-w-0`}>
                         <Controller
                           name={`planItems.${index}.dueDate`}
@@ -1718,18 +1680,27 @@ export function HcaFormModal({
                           )}
                         />
                       </div>
-                    </td>
-                    <td className="align-top border-l border-zinc-100 px-1 py-2">
+                    </PlanMotionCell>
+                    <PlanMotionCell
+                      phase={phase}
+                      innerClassName="px-1 py-1.5 flex items-center justify-center min-h-[38px]"
+                      className="align-middle border-l border-zinc-100 text-center"
+                    >
                       {planFields.fields.length > 1 ? (
-                        <RowAction
-                          label="Quitar acción"
-                          icon={Trash2}
-                          danger
-                          disabled={exiting}
-                          onClick={() => handleRemovePlanRow(index)}
-                        />
-                      ) : null}
-                    </td>
+                        <button
+                          type="button"
+                          title="Quitar acción"
+                          aria-label="Quitar acción"
+                          disabled={isExiting}
+                          onClick={() => handleRemovePlanRow(planField.id)}
+                          className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-brand-red active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      ) : (
+                        <div className="size-7" aria-hidden="true" />
+                      )}
+                    </PlanMotionCell>
                   </tr>
                 );
               })}
@@ -1752,21 +1723,26 @@ export function HcaFormModal({
           una vez guardada.
         </p>
         <div className="space-y-3">
-          {planFields.fields.map((field, index) => (
-            <div key={field.id} className="rounded-lg border border-zinc-100 bg-zinc-50/40 p-3">
-              <span className="text-[10px] font-heading font-bold uppercase text-zinc-400">
-                Evidencia · Acción {index + 1}
-              </span>
-              <TextAreaField
-                label="Notas de evidencia"
-                rows={2}
-                className="mt-1.5"
-                placeholder="Evidencia de la implementación (opcional)…"
-                error={errors.planItems?.[index]?.evidenceNotes?.message}
-                {...register(`planItems.${index}.evidenceNotes`)}
-              />
-            </div>
-          ))}
+          {planFields.fields.map((field, index) => {
+            const phase = planMotion.phaseFor(field.id);
+            return (
+              <AppleMotionBlock key={field.id} phase={phase}>
+                <div className="rounded-lg border border-zinc-100 bg-zinc-50/40 p-3">
+                  <span className="text-[10px] font-heading font-bold uppercase text-zinc-400">
+                    Evidencia · Acción {index + 1}
+                  </span>
+                  <TextAreaField
+                    label="Notas de evidencia"
+                    rows={2}
+                    className="mt-1.5"
+                    placeholder="Evidencia de la implementación (opcional)…"
+                    error={errors.planItems?.[index]?.evidenceNotes?.message}
+                    {...register(`planItems.${index}.evidenceNotes`)}
+                  />
+                </div>
+              </AppleMotionBlock>
+            );
+          })}
         </div>
       </HcaFormBlock>
     </div>
@@ -1944,105 +1920,23 @@ export function HcaFormModal({
   const renderClosePromptModal = () => {
     if (!showClosePrompt || !completedSheet) return null;
     const effectiveTicketId = Number(completedSheet.ticketId ?? defaults?.ticketId ?? 0);
+    const rawNumber = completedSheet.number || "";
+    const cleanNumber = rawNumber.replace(/^HCA\s*[-–—]?\s*/i, "");
+    const sheetCode = cleanNumber ? `HCA-${cleanNumber}` : rawNumber;
 
     return (
-      <Modal
-        title="¿Deseas cerrar este ticket ahora?"
-        eyebrow="PF-FOR-109 · Resolución de Caso"
+      <EnterpriseFormCloseTicketModal
+        open={showClosePrompt}
+        ticketId={effectiveTicketId}
+        formCode="PF-FOR-109"
+        recordNumber={sheetCode}
+        descriptionText="La HCA ha sido registrada exitosamente. Puedes dar por concluido y cerrar este ticket indicando el veredicto oficial y el comentario de resolución."
+        defaultReason={`Cerrado tras completar ${sheetCode}`}
+        receiptDetail={`El ticket ha sido marcado como solucionado en base a ${sheetCode}.`}
         onClose={() => finishModal(completedSheet)}
-        maxWidth="max-w-md"
-        closeOnBackdropClick={false}
-        footer={
-          <div className="flex items-center justify-end gap-2 w-full">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => finishModal(completedSheet)}
-            >
-              Mantener ticket abierto
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              disabled={closingTicket || effectiveTicketId <= 0}
-              onClick={async () => {
-                setClosingTicket(true);
-                try {
-                  const finalVerdictId = selectedVerdictId
-                    ? Number(selectedVerdictId)
-                    : verdicts.length > 0
-                    ? verdicts[0].id
-                    : undefined;
-
-                  await ticketsApi.updateStatus(effectiveTicketId, {
-                    status: "Solucionado",
-                    verdictId: finalVerdictId,
-                    reason:
-                      closeReason.trim() ||
-                      `Cerrado tras completar HCA ${completedSheet.number}`,
-                  });
-                  receipts.done({
-                    action: "cerrar-ticket",
-                    title: "Ticket cerrado y solucionado",
-                    detail: `El ticket ha sido marcado como solucionado en base a ${completedSheet.number}.`,
-                  });
-                  onTicketStatusChanged?.();
-                } catch (err) {
-                  receipts.failed({
-                    action: "error-cerrar-ticket",
-                    title: "No se pudo cerrar el ticket",
-                    detail: err instanceof ApiError ? err.message : "Error al actualizar estado del ticket",
-                  });
-                } finally {
-                  setClosingTicket(false);
-                  finishModal(completedSheet);
-                }
-              }}
-            >
-              <CheckCircle2 className="size-3.5 mr-1" />
-              {closingTicket ? "Cerrando..." : "Sí, cerrar ticket"}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3.5 py-1 text-left">
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3.5">
-            <p className="text-xs text-zinc-700 leading-relaxed">
-              La HCA{" "}
-              <strong className="font-semibold text-zinc-900 font-mono">{completedSheet.number}</strong> ha sido
-              registrada exitosamente.
-            </p>
-            <p className="mt-1.5 text-xs text-zinc-500 leading-relaxed">
-              Puedes dar por resuelto y cerrar este ticket indicando el veredicto oficial.
-            </p>
-          </div>
-
-          {verdicts.length > 0 && (
-            <SelectField
-              size="sm"
-              label="Veredicto de resolución"
-              required
-              value={selectedVerdictId}
-              onChange={setSelectedVerdictId}
-              options={verdicts.map((v) => ({
-                value: String(v.id),
-                label: v.name,
-              }))}
-            />
-          )}
-
-          <TextField
-            size="sm"
-            label="Comentario de cierre"
-            required
-            value={closeReason}
-            onChange={(e) => setCloseReason(e.target.value)}
-            placeholder="Motivo o comentario de resolución..."
-          />
-        </div>
-      </Modal>
+        onSuccess={() => onTicketStatusChanged?.()}
+        onTicketStatusChanged={onTicketStatusChanged}
+      />
     );
   };
 

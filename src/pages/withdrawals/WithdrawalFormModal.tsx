@@ -1,24 +1,22 @@
 import {
   ArrowLeft,
   Check,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
-import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
-import { fetchAllPages } from "../../api/paging";
 import { ticketsApi } from "../../api/tickets";
-import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { withdrawalsApi } from "../../api/withdrawals";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
+import { EnterpriseFormCloseTicketModal } from "../../components/app/EnterpriseFormCloseTicketModal";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { DateField, LookupField, SelectField, TextField } from "../../components/ui/Field";
+import { DateField, LookupField, SelectField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
@@ -177,7 +175,6 @@ export function WithdrawalFormModal({
   onSaved,
   onConflict,
 }: Props) {
-  const baseId = useId();
   const receipts = useReceipts();
   const isEditing = Boolean(withdrawal);
   const lockedTicketId = fixedTicketId ?? withdrawal?.ticketId;
@@ -226,10 +223,6 @@ export function WithdrawalFormModal({
   const [saveDraftConfirmOpen, setSaveDraftConfirmOpen] = useState(false);
   const [completedWithdrawal, setCompletedWithdrawal] = useState<WithdrawalDetail | null>(null);
   const [showClosePrompt, setShowClosePrompt] = useState(false);
-  const [verdicts, setVerdicts] = useState<Array<{ id: number; name: string }>>([]);
-  const [selectedVerdictId, setSelectedVerdictId] = useState<string>("");
-  const [closeReason, setCloseReason] = useState<string>("");
-  const [closingTicket, setClosingTicket] = useState(false);
   const initialSnapshotRef = useRef<string>("");
   const savedResultRef = useRef<WithdrawalDetail | null>(null);
 
@@ -244,16 +237,6 @@ export function WithdrawalFormModal({
   const modalAnimation = useModalAnimation();
   const inlineMotion = useDialogMotion(handleFinishedExit);
   const requestClose = inline ? inlineMotion.requestClose : modalAnimation.requestClose;
-
-  // Cargar veredictos activos para el prompt opcional de cierre de ticket
-  useEffect(() => {
-    fetchAllPages((page, pageSize) => ticketVerdictsApi.list({ page, pageSize, status: "activos" }))
-      .then((list) => {
-        setVerdicts(list);
-        if (list.length > 0) setSelectedVerdictId(String(list[0].id));
-      })
-      .catch(() => setVerdicts([]));
-  }, []);
 
   // Resolver cliente y número de ticket cuando cambia el ticket elegido
   useEffect(() => {
@@ -1030,120 +1013,27 @@ export function WithdrawalFormModal({
         </Modal>
       )}
 
-      {/** Prompt al completar para cerrar el ticket si corresponde */}
+      {/** Modal unificado al completar para cerrar el ticket si corresponde */}
       {showClosePrompt && completedWithdrawal && (
-        <Modal
-          title="Solicitud de retiro registrada"
+        <EnterpriseFormCloseTicketModal
+          open={showClosePrompt}
+          ticketId={lockedTicketId ?? Number(selectedTicketId)}
+          formCode={WITHDRAWAL_FORM_CONTROL.code}
+          recordNumber={completedWithdrawal.withdrawal.number}
+          descriptionText="La solicitud de retiro ha sido registrada exitosamente. Puedes dar por concluido y cerrar este ticket indicando el veredicto oficial y el comentario de resolución."
+          defaultReason={`Cerrado tras registrar solicitud de retiro ${WITHDRAWAL_FORM_CONTROL.code} · ${completedWithdrawal.withdrawal.number}`}
+          receiptDetail={`El ticket quedó solucionado tras el retiro ${completedWithdrawal.withdrawal.number}.`}
           onClose={() => {
             const done = completedWithdrawal;
             setShowClosePrompt(false);
             setCompletedWithdrawal(null);
             finishModal(done);
           }}
-          maxWidth="max-w-md"
-          closeOnBackdropClick={false}
-          footer={
-            <div className="flex w-full items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  const done = completedWithdrawal;
-                  setShowClosePrompt(false);
-                  setCompletedWithdrawal(null);
-                  finishModal(done);
-                }}
-              >
-                Mantener ticket abierto
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                disabled={closingTicket}
-                onClick={async () => {
-                  const done = completedWithdrawal;
-                  const targetTicketId = lockedTicketId ?? Number(selectedTicketId);
-                  setClosingTicket(true);
-                  try {
-                    const finalVerdictId = selectedVerdictId
-                      ? Number(selectedVerdictId)
-                      : verdicts.length > 0
-                        ? verdicts[0].id
-                        : undefined;
-                    await ticketsApi.updateStatus(targetTicketId, {
-                      status: "Solucionado",
-                      verdictId: finalVerdictId,
-                      reason:
-                        closeReason.trim() ||
-                        `Cerrado tras registrar solicitud de retiro ${WITHDRAWAL_FORM_CONTROL.code} · ${done.withdrawal.number}`,
-                    });
-                    receipts.done({
-                      action: "cerrar-ticket",
-                      title: "Ticket cerrado y solucionado",
-                      detail: `El ticket quedó solucionado tras el retiro ${done.withdrawal.number}.`,
-                    });
-                    onTicketStatusChanged?.();
-                  } catch (err) {
-                    receipts.failed({
-                      action: "error-cerrar-ticket",
-                      title: "No se pudo cerrar el ticket",
-                      detail: err instanceof ApiError ? err.message : "Error al actualizar estado del ticket",
-                    });
-                  } finally {
-                    setClosingTicket(false);
-                    setShowClosePrompt(false);
-                    setCompletedWithdrawal(null);
-                    finishModal(done);
-                  }
-                }}
-              >
-                <CheckCircle2 className="mr-1 size-3.5" />
-                {closingTicket ? "Cerrando..." : "Sí, cerrar ticket"}
-              </Button>
-            </div>
-          }
-        >
-          <div className="space-y-3.5 py-1 text-left">
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3.5">
-              <p className="text-xs leading-relaxed text-zinc-700">
-                La solicitud{" "}
-                <strong className="font-mono font-semibold text-zinc-900">
-                  {completedWithdrawal.withdrawal.number}
-                </strong>{" "}
-                ({WITHDRAWAL_FORM_CONTROL.code}) quedó registrada correctamente.
-              </p>
-              <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                Puedes mantener el ticket abierto o darlo por resuelto indicando el veredicto oficial.
-              </p>
-            </div>
-
-            {verdicts.length > 0 && (
-              <SelectField
-                size="sm"
-                label="Veredicto de resolución"
-                required
-                value={selectedVerdictId}
-                onChange={setSelectedVerdictId}
-                options={verdicts.map((v) => ({
-                  value: String(v.id),
-                  label: v.name,
-                }))}
-              />
-            )}
-
-            <TextField
-              size="sm"
-              label="Comentario de cierre"
-              required
-              id={`${baseId}-close-reason`}
-              value={closeReason}
-              onChange={(e) => setCloseReason(e.target.value)}
-              placeholder="Motivo o comentario de resolución..."
-            />
-          </div>
-        </Modal>
+          onSuccess={() => {
+            onTicketStatusChanged?.();
+          }}
+          onTicketStatusChanged={onTicketStatusChanged}
+        />
       )}
     </>
   );

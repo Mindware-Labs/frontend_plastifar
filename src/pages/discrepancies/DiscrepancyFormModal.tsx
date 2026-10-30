@@ -31,8 +31,8 @@ import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
 import { ticketsApi } from "../../api/tickets";
-import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
+import { EnterpriseFormCloseTicketModal } from "../../components/app/EnterpriseFormCloseTicketModal";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { Button } from "../../components/ui/Button";
@@ -322,28 +322,6 @@ export function DiscrepancyFormModal({
   // Modal para preguntar si desea cerrar el ticket al completar la investigación
   const [showClosePrompt, setShowClosePrompt] = useState(false);
   const [completedDiscrepancy, setCompletedDiscrepancy] = useState<DiscrepancyDetail | null>(null);
-  const [closingTicket, setClosingTicket] = useState(false);
-  const [verdicts, setVerdicts] = useState<Array<{ id: number; name: string }>>([]);
-  const [selectedVerdictId, setSelectedVerdictId] = useState<string>("");
-  const [closeReason, setCloseReason] = useState<string>("");
-
-  useEffect(() => {
-    if (showClosePrompt && completedDiscrepancy) {
-      setCloseReason(
-        `Cerrado tras completar investigación de discrepancia ${completedDiscrepancy.discrepancy.number}`
-      );
-      ticketVerdictsApi
-        .list({ page: 1, pageSize: 100, status: "activos" })
-        .then((res) => {
-          const activeVerdicts = res.items.map((v) => ({ id: v.id, name: v.name }));
-          setVerdicts(activeVerdicts);
-          if (activeVerdicts.length > 0) {
-            setSelectedVerdictId(String(activeVerdicts[0].id));
-          }
-        })
-        .catch(() => setVerdicts([]));
-    }
-  }, [showClosePrompt, completedDiscrepancy]);
 
   const finishModal = (saved: DiscrepancyDetail) => {
     setShowClosePrompt(false);
@@ -1532,108 +1510,31 @@ export function DiscrepancyFormModal({
 
   const renderClosePromptModal = () => {
     if (!showClosePrompt || !completedDiscrepancy) return null;
+    const currentTicketId = Number(getValues("ticketId") || ticketId);
+
     return (
-      <Modal
-        title="¿Deseas cerrar este ticket ahora?"
-        eyebrow="PF-FOR-291 · Resolución de Caso"
-        onClose={() => finishModal(completedDiscrepancy)}
-        maxWidth="max-w-md"
-        closeOnBackdropClick={false}
-        footer={
-          <div className="flex items-center justify-end gap-2 w-full">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => finishModal(completedDiscrepancy)}
-            >
-              Mantener ticket abierto
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              disabled={closingTicket}
-              onClick={async () => {
-                setClosingTicket(true);
-                try {
-                  const currentTicketId = Number(getValues("ticketId") || ticketId);
-                  const finalVerdictId = selectedVerdictId
-                    ? Number(selectedVerdictId)
-                    : (verdicts.length > 0 ? verdicts[0].id : undefined);
-
-                  await ticketsApi.updateStatus(currentTicketId, {
-                    status: "Solucionado",
-                    verdictId: finalVerdictId,
-                    reason: closeReason.trim() || `Cerrado tras completar investigación de discrepancia ${completedDiscrepancy.discrepancy.number}`,
-                  });
-                  receipts.done({
-                    action: "cerrar-ticket",
-                    title: "Ticket cerrado y solucionado",
-                    detail: `El ticket ha sido marcado como solucionado en base a ${completedDiscrepancy.discrepancy.number}.`,
-                  });
-                  onTicketStatusChanged?.();
-                } catch (err) {
-                  receipts.failed({
-                    action: "error-cerrar-ticket",
-                    title: "No se pudo cerrar el ticket",
-                    detail: err instanceof ApiError ? err.message : "Error al actualizar estado del ticket",
-                  });
-                } finally {
-                  setClosingTicket(false);
-                  finishModal(completedDiscrepancy);
-                }
-              }}
-            >
-              <CheckCircle2 className="size-3.5 mr-1" />
-              {closingTicket ? "Cerrando..." : "Sí, cerrar ticket"}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3.5 py-1 text-left">
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3.5">
-            <p className="text-xs text-zinc-700 leading-relaxed">
-              La investigación de discrepancia <strong className="font-semibold text-zinc-900 font-mono">{completedDiscrepancy.discrepancy.number}</strong> ha sido registrada exitosamente.
-            </p>
-            <p className="mt-1.5 text-xs text-zinc-500 leading-relaxed">
-              Puedes dar por resuelto y cerrar este ticket indicando el veredicto oficial.
-            </p>
-          </div>
-
-          {verdicts.length > 0 && (
-            <SelectField
-              size="sm"
-              label="Veredicto de resolución"
-              required
-              value={selectedVerdictId}
-              onChange={setSelectedVerdictId}
-              options={verdicts.map((v) => ({
-                value: String(v.id),
-                label: v.name,
-              }))}
-            />
-          )}
-
-          <TextField
-            size="sm"
-            label="Comentario de cierre"
-            required
-            value={closeReason}
-            onChange={(e) => setCloseReason(e.target.value)}
-            placeholder="Motivo o comentario de resolución..."
-          />
-
-          {completedDiscrepancy.discrepancy.hasSecurityFinding && (
+      <EnterpriseFormCloseTicketModal
+        open={showClosePrompt}
+        ticketId={currentTicketId}
+        formCode="PF-FOR-291"
+        recordNumber={completedDiscrepancy.discrepancy.number}
+        descriptionText="La investigación de discrepancia ha sido registrada exitosamente. Puedes dar por concluido y cerrar este ticket indicando el veredicto oficial y el comentario de resolución."
+        defaultReason={`Cerrado tras completar investigación de discrepancia ${completedDiscrepancy.discrepancy.number}`}
+        receiptDetail={`El ticket ha sido marcado como solucionado en base a ${completedDiscrepancy.discrepancy.number}.`}
+        extraAlert={
+          completedDiscrepancy.discrepancy.hasSecurityFinding ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 flex items-start gap-2">
               <AlertTriangle className="size-4 text-amber-600 shrink-0 mt-0.5" />
               <span>
                 <strong>Atención:</strong> Esta discrepancia contiene un hallazgo de seguridad positivo reportado al área de Seguridad y Logística.
               </span>
             </div>
-          )}
-        </div>
-      </Modal>
+          ) : undefined
+        }
+        onClose={() => finishModal(completedDiscrepancy)}
+        onSuccess={() => onTicketStatusChanged?.()}
+        onTicketStatusChanged={onTicketStatusChanged}
+      />
     );
   };
 

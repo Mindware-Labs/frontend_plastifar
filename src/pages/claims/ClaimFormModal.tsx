@@ -2,7 +2,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
   Check,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Factory,
@@ -29,11 +28,11 @@ import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
 import { ticketsApi } from "../../api/tickets";
 import { ticketTopicsApi } from "../../api/ticketTopics";
-import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
+import { EnterpriseFormCloseTicketModal } from "../../components/app/EnterpriseFormCloseTicketModal";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
@@ -285,10 +284,6 @@ export function ClaimFormModal({
   const savedResultRef = useRef<ClaimDetail | null>(null);
   const [showClosePrompt, setShowClosePrompt] = useState(false);
   const [completedClaim, setCompletedClaim] = useState<ClaimDetail | null>(null);
-  const [closingTicket, setClosingTicket] = useState(false);
-  const [verdicts, setVerdicts] = useState<Array<{ id: number; name: string }>>([]);
-  const [selectedVerdictId, setSelectedVerdictId] = useState("");
-  const [closeReason, setCloseReason] = useState("");
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [saveDraftConfirmOpen, setSaveDraftConfirmOpen] = useState(false);
@@ -300,24 +295,6 @@ export function ClaimFormModal({
   );
 
   const ticketProducts = ticketProductsProp ?? ticketProductsFetched;
-
-  useEffect(() => {
-    if (showClosePrompt && completedClaim) {
-      setCloseReason(
-        `Cerrado tras registrar reclamación PF-FOR-034 · ${completedClaim.claim.ticketNumber}`,
-      );
-      ticketVerdictsApi
-        .list({ page: 1, pageSize: 100, status: "activos" })
-        .then((res) => {
-          const activeVerdicts = res.items.map((v) => ({ id: v.id, name: v.name }));
-          setVerdicts(activeVerdicts);
-          if (activeVerdicts.length > 0) {
-            setSelectedVerdictId(String(activeVerdicts[0].id));
-          }
-        })
-        .catch(() => setVerdicts([]));
-    }
-  }, [showClosePrompt, completedClaim]);
 
   const finishModal = (saved: ClaimDetail) => {
     setShowClosePrompt(false);
@@ -1327,103 +1304,18 @@ export function ClaimFormModal({
     const savedClaim = completedClaim.claim;
 
     return (
-      <Modal
-        title="¿Deseas cerrar este ticket ahora?"
-        eyebrow={`${CLAIM_FORM_CONTROL.code} · Resolución de caso`}
+      <EnterpriseFormCloseTicketModal
+        open={showClosePrompt}
+        ticketId={ticketId}
+        formCode={CLAIM_FORM_CONTROL.code}
+        recordNumber={savedClaim.ticketNumber}
+        descriptionText="La reclamación quedó registrada correctamente. Puedes dar por concluido y cerrar este ticket indicando el veredicto oficial y el comentario de resolución."
+        defaultReason={`Cerrado tras registrar reclamación ${CLAIM_FORM_CONTROL.code} · ${savedClaim.ticketNumber}`}
+        receiptDetail={`El ticket quedó solucionado tras la reclamación ${savedClaim.ticketNumber}.`}
         onClose={() => finishModal(completedClaim)}
-        maxWidth="max-w-md"
-        closeOnBackdropClick={false}
-        footer={
-          <div className="flex w-full items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => finishModal(completedClaim)}
-            >
-              Mantener ticket abierto
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              disabled={closingTicket}
-              onClick={async () => {
-                setClosingTicket(true);
-                try {
-                  const finalVerdictId = selectedVerdictId
-                    ? Number(selectedVerdictId)
-                    : verdicts.length > 0
-                    ? verdicts[0].id
-                    : undefined;
-
-                  await ticketsApi.updateStatus(ticketId, {
-                    status: "Solucionado",
-                    verdictId: finalVerdictId,
-                    reason:
-                      closeReason.trim() ||
-                      `Cerrado tras registrar reclamación ${CLAIM_FORM_CONTROL.code} · ${savedClaim.ticketNumber}`,
-                  });
-                  receipts.done({
-                    action: "cerrar-ticket",
-                    title: "Ticket cerrado y solucionado",
-                    detail: `El ticket quedó solucionado tras la reclamación ${savedClaim.ticketNumber}.`,
-                  });
-                  onTicketStatusChanged?.();
-                } catch (err) {
-                  receipts.failed({
-                    action: "error-cerrar-ticket",
-                    title: "No se pudo cerrar el ticket",
-                    detail: err instanceof ApiError ? err.message : "Error al actualizar estado del ticket",
-                  });
-                } finally {
-                  setClosingTicket(false);
-                  finishModal(completedClaim);
-                }
-              }}
-            >
-              <CheckCircle2 className="mr-1 size-3.5" />
-              {closingTicket ? "Cerrando..." : "Sí, cerrar ticket"}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3.5 py-1 text-left">
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3.5">
-            <p className="text-xs leading-relaxed text-zinc-700">
-              La reclamación{" "}
-              <strong className="font-mono font-semibold text-zinc-900">{savedClaim.ticketNumber}</strong>{" "}
-              ({CLAIM_FORM_CONTROL.code}) quedó registrada correctamente.
-            </p>
-            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-              Puedes dar por resuelto y cerrar este ticket indicando el veredicto oficial.
-            </p>
-          </div>
-
-          {verdicts.length > 0 && (
-            <SelectField
-              size="sm"
-              label="Veredicto de resolución"
-              required
-              value={selectedVerdictId}
-              onChange={setSelectedVerdictId}
-              options={verdicts.map((v) => ({
-                value: String(v.id),
-                label: v.name,
-              }))}
-            />
-          )}
-
-          <TextField
-            size="sm"
-            label="Comentario de cierre"
-            required
-            value={closeReason}
-            onChange={(e) => setCloseReason(e.target.value)}
-            placeholder="Motivo o comentario de resolución..."
-          />
-        </div>
-      </Modal>
+        onSuccess={() => onTicketStatusChanged?.()}
+        onTicketStatusChanged={onTicketStatusChanged}
+      />
     );
   };
 
