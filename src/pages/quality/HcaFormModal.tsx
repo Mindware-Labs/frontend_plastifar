@@ -10,7 +10,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
   useFieldArray,
@@ -33,6 +33,12 @@ import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/Enterp
 import { ProductLookupField } from "../../components/app/ProductLookupField";
 import { Logo } from "../../components/Logo";
 import { Button } from "../../components/ui/Button";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
+import {
+  focusFormFieldByName,
+  getHcaStepMissing,
+  type HcaStepValues,
+} from "../../lib/enterpriseFormValidation";
 import { ControlInput } from "../../components/ui/ControlInput";
 import {
   DateField,
@@ -611,6 +617,55 @@ export function HcaFormModal({
   const participantRemoveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const commentsTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const commentsValue = useWatch({ control, name: "comments" }) ?? "";
+
+  const hcaValues = useWatch({ control });
+
+  const hcaStepMissing = useMemo(
+    () =>
+      getHcaStepMissing(
+        step as 1 | 2 | 3 | 4,
+        hcaValues as unknown as HcaStepValues,
+      ),
+    [step, hcaValues],
+  );
+
+  async function invalidateHcaStep() {
+    if (step === 1) {
+      await trigger([
+        "detectedAt",
+        "responsibleMode",
+        "responsibleStaffId",
+        "responsibleManualName",
+      ]);
+    } else if (step === 2) {
+      await trigger(["description", "causes"]);
+    } else if (step === 3) {
+      await trigger("planItems");
+    } else {
+      await trigger();
+    }
+  }
+
+  function focusHcaField(fieldId: string) {
+    if (
+      fieldId === "detectedAt" ||
+      fieldId === "responsibleStaffId" ||
+      fieldId === "responsibleManualName"
+    ) {
+      if (step !== 1) setStep(1);
+    } else if (
+      fieldId === "description" ||
+      fieldId === "causes" ||
+      fieldId.startsWith("causes.")
+    ) {
+      if (step !== 2) setStep(2);
+    } else if (fieldId === "planItems" || fieldId.startsWith("planItems.")) {
+      if (step !== 3) setStep(3);
+    } else {
+      if (step !== 4) setStep(4);
+    }
+    setTimeout(() => focusFormFieldByName(fieldId), 60);
+  }
 
   const responsibleMode = useWatch({ control, name: "responsibleMode" }) ?? "sistema";
 
@@ -2029,32 +2084,36 @@ export function HcaFormModal({
         onClick={() => setSaveDraftConfirmOpen(true)}
       />
       {step < 4 ? (
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          className="rounded-full px-4 font-semibold shadow-sm"
-          onClick={() => void handleNextStep()}
+        <SubmitValidationButton
+          key={`hca-next-${step}`}
+          ready={hcaStepMissing.length === 0}
+          busy={isSubmitting}
+          missingItems={hcaStepMissing}
+          onSubmit={() => void handleNextStep()}
+          onInvalidClick={() => void invalidateHcaStep()}
+          onFocusField={focusHcaField}
+          blockTitle="No se puede continuar"
+          hintText="Para avanzar al siguiente paso, completa lo siguiente:"
+          shortcutLabel={null}
         >
-          <span>Siguiente</span>
-          <ChevronRight className="size-3.5 shrink-0" strokeWidth={2.25} />
-        </Button>
+          <span>Siguiente paso</span>
+          <ChevronRight className="h-3.5 w-3.5" />
+        </SubmitValidationButton>
       ) : (
-        <>
-          <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            form="hca-form"
-            variant="primary"
-            size="sm"
-            className="rounded-full px-4 font-semibold shadow-sm"
-            isLoading={isSubmitting}
-          >
-            {isEdit ? "Guardar cambios" : "Crear HCA"}
-          </Button>
-        </>
+        <SubmitValidationButton
+          key="hca-submit"
+          formId="hca-form"
+          ready={hcaStepMissing.length === 0}
+          busy={isSubmitting}
+          missingItems={hcaStepMissing}
+          onInvalidClick={() => void invalidateHcaStep()}
+          onFocusField={focusHcaField}
+          blockTitle="No se puede registrar"
+          hintText="Para registrar la HCA, completa lo siguiente:"
+          shortcutLabel="Ctrl + ↵"
+        >
+          {isEdit ? "Guardar cambios" : "Crear HCA"}
+        </SubmitValidationButton>
       )}
     </div>
   );

@@ -521,13 +521,25 @@ export function ClaimFormModal({
   }
 
   function focusClaimField(fieldId: string) {
-    const lineMatch = /^lines\.(\d+)\./.exec(fieldId);
-    if (lineMatch) {
-      setActiveLineIndex(Number(lineMatch[1]));
-      focusFormFieldByName(fieldId);
-      return;
+    if (fieldId === "claimDate") {
+      if (step !== 1) setStep(1);
+    } else if (
+      fieldId === "topicId" ||
+      fieldId === "reasonOther" ||
+      fieldId === "affectedAreas" ||
+      fieldId === "plantIds"
+    ) {
+      if (step !== 2) setStep(2);
+    } else if (fieldId === "lines" || fieldId.startsWith("lines.") || fieldId === "currency") {
+      if (step !== 3) setStep(3);
+      const lineMatch = /^lines\.(\d+)\./.exec(fieldId);
+      if (lineMatch) {
+        setActiveLineIndex(Number(lineMatch[1]));
+      }
+    } else {
+      if (step !== 4) setStep(4);
     }
-    focusFormFieldByName(fieldId);
+    setTimeout(() => focusFormFieldByName(fieldId), 60);
   }
 
   const plantTileOptions = useMemo(

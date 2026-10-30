@@ -53,8 +53,8 @@ import {
   focusFormFieldByName,
   getDiscrepancyStepMissing,
 } from "../../lib/enterpriseFormValidation";
+import { focusFormField } from "../../lib/validationItems";
 import { AppleSlidePanel, appleLineTabMotionClass } from "../../components/ui/AppleSlidePanel";
-import { prefersReducedMotion } from "../../hooks/motion";
 import { useAppleListMotion } from "../../hooks/useAppleListMotion";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
@@ -587,18 +587,25 @@ export function DiscrepancyFormModal({
   }
 
   function focusDiscrepancyField(fieldId: string) {
-    if (fieldId === "discrepancy-date") {
-      focusFormField("discrepancy-date");
-      return;
-    }
-    if (fieldId.startsWith("security-check-")) {
-      setStep(3);
+    if (fieldId === "ticketId" || fieldId === "discrepancy-date") {
+      if (step !== 1) setStep(1);
+      setTimeout(() => {
+        if (fieldId === "ticketId") focusFormFieldByName("ticketId");
+        else focusFormField("discrepancy-date");
+      }, 60);
       return;
     }
     const lineMatch = /^lines\.(\d+)\./.exec(fieldId);
     if (lineMatch) {
       setActiveLineIndex(Number(lineMatch[1]));
       if (step !== 2) setStep(2);
+      setTimeout(() => focusFormFieldByName(fieldId), 60);
+      return;
+    }
+    if (fieldId.startsWith("security-check-")) {
+      if (step !== 3) setStep(3);
+      setTimeout(() => focusFormField(fieldId), 60);
+      return;
     }
     focusFormFieldByName(fieldId);
   }

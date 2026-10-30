@@ -1550,14 +1550,12 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           senderName={email.fromName ?? undefined}
           initialAssignedStaffId={email.assignedStaffId}
           onClose={() => setIsCreateTicketModalOpen(false)}
-          onCreated={(created, targetUrl) => {
+          onCreated={(created) => {
             setEmail({ ...email, ticketId: created.id });
             setJustCreatedTicketId(created.id);
             onTicketCreated();
             setIsCreateTicketModalOpen(false);
-            if (targetUrl) {
-              navigate(targetUrl);
-            }
+            navigate(`/tickets/${created.id}`);
             receipts.done({
               action: "crear-ticket",
               title: "Ticket creado",

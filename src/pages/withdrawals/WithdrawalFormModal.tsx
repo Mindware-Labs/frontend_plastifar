@@ -640,8 +640,14 @@ export function WithdrawalFormModal({
         setStepDirection("forward");
         setStep(2);
       }
+      setTimeout(() => focusFormField(fieldId), 60);
+      return;
     }
-    focusFormField(fieldId);
+    if (step !== 1) {
+      setStepDirection("backward");
+      setStep(1);
+    }
+    setTimeout(() => focusFormField(fieldId), 60);
   }
 
   const renderStepper = () => (

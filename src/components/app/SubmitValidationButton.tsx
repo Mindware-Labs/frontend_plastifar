@@ -52,6 +52,8 @@ export function SubmitValidationButton({
   sendLabel,
 }: SubmitValidationButtonProps) {
   const [hovered, setHovered] = useState(false);
+  const [clickedOpen, setClickedOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
 
   const handleOpen = useCallback(() => {
@@ -63,12 +65,13 @@ export function SubmitValidationButton({
   }, [ready, busy, missingItems.length]);
 
   const handleClose = useCallback(() => {
+    if (clickedOpen) return;
     if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
     closeTimerRef.current = window.setTimeout(() => {
       setHovered(false);
       closeTimerRef.current = null;
     }, 120);
-  }, []);
+  }, [clickedOpen]);
 
   useEffect(() => {
     return () => {
@@ -76,10 +79,42 @@ export function SubmitValidationButton({
     };
   }, []);
 
+  useEffect(() => {
+    if (ready || busy) {
+      setClickedOpen(false);
+      setHovered(false);
+    }
+  }, [ready, busy]);
+
+  useEffect(() => {
+    if (!clickedOpen) return;
+    function handlePointerDown(e: MouseEvent | TouchEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setClickedOpen(false);
+        setHovered(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setClickedOpen(false);
+        setHovered(false);
+      }
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [clickedOpen]);
+
   function commit() {
     if (busy) return;
     if (!ready) {
-      if (missingItems.length > 0) setHovered(true);
+      if (missingItems.length > 0) {
+        setClickedOpen(true);
+        setHovered(true);
+      }
       onInvalidClick?.();
       return;
     }
@@ -91,7 +126,7 @@ export function SubmitValidationButton({
     onSubmit?.();
   }
 
-  const showPopover = hovered && !ready && !busy && missingItems.length > 0;
+  const showPopover = (hovered || clickedOpen) && !ready && !busy && missingItems.length > 0;
   const { mounted, exiting, ref: popoverRef } = useDisclosureMotion<HTMLDivElement>(showPopover, {
     direction: "up",
   });
@@ -146,6 +181,7 @@ export function SubmitValidationButton({
 
   return (
     <div
+      ref={containerRef}
       className="relative inline-flex items-center"
       onMouseEnter={handleOpen}
       onMouseLeave={handleClose}
@@ -193,6 +229,7 @@ export function SubmitValidationButton({
                 onClick={(event) => {
                   event.stopPropagation();
                   onFocusField?.(item.id);
+                  setClickedOpen(false);
                   setHovered(false);
                 }}
                 title={onFocusField ? "Ir al campo" : undefined}
