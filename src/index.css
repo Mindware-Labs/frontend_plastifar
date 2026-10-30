@@ -847,6 +847,80 @@ input:-webkit-autofill:focus {
   will-change: transform, opacity, filter;
 }
 
+/* Alta y baja de un renglón de planilla. El alto vive en el grid (0fr ↔ 1fr)
+   para que las filas de abajo se deslicen; el contenido llega con el mismo
+   blur corto de los pasos de ticket. 480ms / 320ms tienen que coincidir con
+   ROW_ENTER_MS y ROW_EXIT_MS en WithdrawalLinesSpreadsheet. */
+@keyframes plf-apple-row-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
+    filter: blur(2px);
+  }
+  42% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes plf-apple-row-out {
+  0% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0);
+    filter: blur(2px);
+  }
+}
+
+@keyframes plf-apple-row-wash {
+  0% { background-color: rgb(244 244 245 / 0.96); }
+  40% { background-color: rgb(244 244 245 / 0.55); }
+  100% { background-color: transparent; }
+}
+
+.plf-apple-row-shell {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.plf-apple-row-shell[data-collapsed="true"] {
+  grid-template-rows: 0fr;
+}
+.plf-apple-row-shell[data-ready="true"] {
+  transition: grid-template-rows 480ms var(--ease-plf-spring);
+  will-change: grid-template-rows;
+}
+.plf-apple-row-shell[data-motion="out"][data-ready="true"] {
+  transition-duration: 320ms;
+}
+.plf-apple-row-shell > .plf-apple-row-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.plf-apple-row-shell[data-motion="idle"][data-collapsed="false"] > .plf-apple-row-clip {
+  overflow: visible;
+}
+
+.animate-plf-apple-row-in {
+  animation: plf-apple-row-in 480ms var(--ease-plf-spring) both;
+  will-change: transform, opacity, filter;
+}
+.animate-plf-apple-row-out {
+  animation: plf-apple-row-out 320ms var(--ease-plf-spring) both;
+  will-change: transform, opacity, filter;
+}
+.animate-plf-apple-row-wash {
+  animation: plf-apple-row-wash 480ms var(--ease-plf-spring) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -887,7 +961,9 @@ input:-webkit-autofill:focus {
   .animate-plf-step-forward,
   .animate-plf-step-backward,
   .animate-plf-header-fade,
-  .animate-plf-apple-pop {
+  .animate-plf-apple-pop,
+  .animate-plf-apple-row-in,
+  .animate-plf-apple-row-wash {
     animation: none !important;
   }
 
@@ -910,7 +986,8 @@ input:-webkit-autofill:focus {
   .animate-plf-scrim-out,
   .animate-plf-modal-out,
   .animate-plf-drawer-out,
-  .animate-plf-check-out {
+  .animate-plf-check-out,
+  .animate-plf-apple-row-out {
     animation-duration: 1ms !important;
   }
 }

@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
-import { useId, useMemo } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { prefersReducedMotion } from "../../hooks/motion";
 import {
   ticketProductLabelMap,
   ticketProductsToLookupOptions,
@@ -91,6 +92,56 @@ function clampUnitPrice(raw: string): string {
   return normalized;
 }
 
+/** Deben coincidir con plf-apple-row-in / plf-apple-row-out en index.css. */
+const ROW_ENTER_MS = 480;
+const ROW_EXIT_MS = 320;
+
+type RowPhase = "idle" | "from" | "hold" | "in" | "arm" | "out";
+
+function MotionCell({
+  phase,
+  className = "",
+  innerClassName = "",
+  style,
+  children,
+}: {
+  phase: RowPhase;
+  className?: string;
+  innerClassName?: string;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  const collapsed = phase === "from" || phase === "hold" || phase === "out";
+  const ready = phase === "hold" || phase === "in" || phase === "arm" || phase === "out";
+  const motion = phase === "out" || phase === "arm" ? "out" : phase === "idle" ? "idle" : "in";
+  return (
+    <Td style={style} className={`!py-0 ${className}`}>
+      <div
+        className="plf-apple-row-shell"
+        data-collapsed={collapsed ? "true" : "false"}
+        data-ready={ready ? "true" : "false"}
+        data-motion={motion}
+      >
+        <div className="plf-apple-row-clip">
+          <div
+            className={`${innerClassName} ${
+              phase === "in"
+                ? "animate-plf-apple-row-in"
+                : phase === "out"
+                  ? "animate-plf-apple-row-out"
+                  : phase === "from" || phase === "hold"
+                    ? "opacity-0"
+                    : ""
+            }`}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
+    </Td>
+  );
+}
+
 export function WithdrawalLinesSpreadsheet({
   lines,
   currency,
@@ -105,6 +156,198 @@ export function WithdrawalLinesSpreadsheet({
   onRemoveLine,
 }: WithdrawalLinesSpreadsheetProps) {
   const baseId = useId();
+  const [prevLineKeys, setPrevLineKeys] = useState<number[]>(() => lines.map((line) => line.key));
+  const [enterKeys, setEnterKeys] = useState<Set<number>>(() => new Set());
+  const [enterArmed, setEnterArmed] = useState<Set<number>>(() => new Set());
+  const [openKeys, setOpenKeys] = useState<Set<number>>(() => new Set());
+  const [exitKeys, setExitKeys] = useState<Set<number>>(() => new Set());
+  const [exitArmed, setExitArmed] = useState<Set<number>>(() => new Set());
+  const [indexByKey, setIndexByKey] = useState<Map<number, number>>(
+    () => new Map(lines.map((line, index) => [line.key, index])),
+  );
+  const [bumpedKeys, setBumpedKeys] = useState<Set<number>>(() => new Set());
+  const rowEls = useRef(new Map<number, HTMLTableRowElement>());
+  const exitTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  const enterTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+
+  const lineKeys = lines.map((line) => line.key);
+  const lineKeySignature = lineKeys.join(",");
+  const prevKeySignature = prevLineKeys.join(",");
+  if (lineKeySignature !== prevKeySignature) {
+    const prev = new Set(prevLineKeys);
+    const added = lineKeys.filter((key) => !prev.has(key));
+    const moved = new Set<number>();
+    lines.forEach((line, index) => {
+      const previousIndex = indexByKey.get(line.key);
+      if (previousIndex !== undefined && previousIndex !== index) moved.add(line.key);
+    });
+    setPrevLineKeys(lineKeys);
+    setIndexByKey(new Map(lines.map((line, index) => [line.key, index])));
+    if (moved.size > 0) setBumpedKeys(moved);
+    setEnterKeys((current) => {
+      const next = new Set(current);
+      let changed = false;
+      if (added.length === 1 && !next.has(added[0]) && !prefersReducedMotion()) {
+        next.add(added[0]);
+        changed = true;
+      }
+      for (const key of current) {
+        if (!lineKeys.includes(key)) {
+          next.delete(key);
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }
+
+  useLayoutEffect(() => {
+    const pending = [...enterKeys].filter((key) => !enterArmed.has(key) && !exitKeys.has(key));
+    if (pending.length === 0) return;
+    const frame = requestAnimationFrame(() => {
+      setEnterArmed((current) => {
+        const next = new Set(current);
+        for (const key of pending) next.add(key);
+        return next;
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [enterKeys, enterArmed, exitKeys]);
+
+  useLayoutEffect(() => {
+    const pending = [...enterKeys].filter(
+      (key) => enterArmed.has(key) && !openKeys.has(key) && !exitKeys.has(key),
+    );
+    if (pending.length === 0) return;
+    const frame = requestAnimationFrame(() => {
+      setOpenKeys((current) => {
+        const next = new Set(current);
+        for (const key of pending) next.add(key);
+        return next;
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [enterKeys, enterArmed, openKeys, exitKeys]);
+
+  useEffect(() => {
+    for (const key of openKeys) {
+      if (!enterKeys.has(key) || enterTimers.current.has(key)) continue;
+      const timer = setTimeout(() => {
+        enterTimers.current.delete(key);
+        setEnterKeys((current) => {
+          if (!current.has(key)) return current;
+          const next = new Set(current);
+          next.delete(key);
+          return next;
+        });
+        setOpenKeys((current) => {
+          if (!current.has(key)) return current;
+          const next = new Set(current);
+          next.delete(key);
+          return next;
+        });
+        setEnterArmed((current) => {
+          if (!current.has(key)) return current;
+          const next = new Set(current);
+          next.delete(key);
+          return next;
+        });
+        rowEls.current.get(key)?.scrollIntoView({ block: "nearest", behavior: "auto" });
+      }, ROW_ENTER_MS);
+      enterTimers.current.set(key, timer);
+    }
+  }, [openKeys, enterKeys]);
+
+  useEffect(() => {
+    if (bumpedKeys.size === 0) return;
+    const timer = setTimeout(() => setBumpedKeys(new Set()), 320);
+    return () => clearTimeout(timer);
+  }, [bumpedKeys]);
+
+  const scrolledEnter = useRef(new Set<number>());
+  useEffect(() => {
+    for (const key of openKeys) {
+      if (!enterKeys.has(key) || scrolledEnter.current.has(key)) continue;
+      scrolledEnter.current.add(key);
+      rowEls.current.get(key)?.scrollIntoView({
+        block: "nearest",
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+      });
+    }
+  }, [openKeys, enterKeys]);
+
+  const onRemoveRef = useRef(onRemoveLine);
+  onRemoveRef.current = onRemoveLine;
+  const exitKeysRef = useRef(exitKeys);
+  exitKeysRef.current = exitKeys;
+
+  useEffect(() => {
+    const enterTimerMap = enterTimers.current;
+    const exitTimerMap = exitTimers.current;
+    return () => {
+      for (const timer of enterTimerMap.values()) clearTimeout(timer);
+      enterTimerMap.clear();
+      for (const timer of exitTimerMap.values()) clearTimeout(timer);
+      exitTimerMap.clear();
+      for (const key of exitKeysRef.current) onRemoveRef.current(key);
+    };
+  }, []);
+
+  function requestRemove(key: number) {
+    if (exitKeys.has(key) || exitArmed.has(key)) return;
+    const survivors = lines.filter((line) => line.key !== key && !exitKeys.has(line.key)).length;
+    if (survivors < 1) return;
+    if (prefersReducedMotion()) {
+      onRemoveLine(key);
+      return;
+    }
+    setExitKeys((current) => new Set(current).add(key));
+  }
+
+  useLayoutEffect(() => {
+    const pending = [...exitKeys].filter((key) => !exitArmed.has(key));
+    if (pending.length === 0) return;
+    const frame = requestAnimationFrame(() => {
+      setExitArmed((current) => {
+        const next = new Set(current);
+        for (const key of pending) next.add(key);
+        return next;
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [exitKeys, exitArmed]);
+
+  useEffect(() => {
+    for (const key of exitArmed) {
+      if (exitTimers.current.has(key)) continue;
+      const timer = setTimeout(() => {
+        exitTimers.current.delete(key);
+        onRemoveRef.current(key);
+        setExitKeys((current) => {
+          if (!current.has(key)) return current;
+          const next = new Set(current);
+          next.delete(key);
+          return next;
+        });
+        setExitArmed((current) => {
+          if (!current.has(key)) return current;
+          const next = new Set(current);
+          next.delete(key);
+          return next;
+        });
+      }, ROW_EXIT_MS);
+      exitTimers.current.set(key, timer);
+    }
+  }, [exitArmed]);
+
+  function phaseFor(key: number): RowPhase {
+    if (exitKeys.has(key)) return exitArmed.has(key) ? "out" : "arm";
+    if (!enterKeys.has(key)) return "idle";
+    if (!enterArmed.has(key)) return "from";
+    return openKeys.has(key) ? "in" : "hold";
+  }
+
+  const liveCount = lines.filter((line) => !exitKeys.has(line.key)).length;
 
   const recommendedOptions = useMemo(
     () => ticketProductsToLookupOptions(ticketProducts),
@@ -150,19 +393,32 @@ export function WithdrawalLinesSpreadsheet({
               const highlighted = highlightLineKey === line.key;
               const selectedLabel =
                 line.productLabel ?? (line.productId ? ticketLabels.get(line.productId) : undefined);
+              const phase = phaseFor(line.key);
+              const exiting = phase === "out" || phase === "arm";
 
               return (
                 <tr
                   key={line.key}
-                  ref={(el) => rowRef?.(line.key, el)}
-                  className={`group border-b border-line-soft transition-colors duration-150 last:border-0 hover:bg-fill/80 ${
-                    highlighted ? "bg-brand-red/[0.03]" : ""
-                  }`}
+                  ref={(el) => {
+                    if (el) rowEls.current.set(line.key, el);
+                    else rowEls.current.delete(line.key);
+                    rowRef?.(line.key, el);
+                  }}
+                  aria-hidden={exiting || undefined}
+                  className={`group border-b border-line-soft transition-colors duration-150 last:border-0 hover:bg-fill/80 motion-reduce:transition-none ${
+                    phase === "in" && !highlighted ? "animate-plf-apple-row-wash" : ""
+                  } ${highlighted ? "bg-brand-red/[0.03]" : ""} ${exiting ? "pointer-events-none" : ""}`}
                 >
-                  <Td className="border-r border-line-soft bg-zinc-50/40 text-center font-heading text-[11px] font-bold tabular-nums text-zinc-500">
-                    {index + 1}
-                  </Td>
-                  <Td className="max-w-0 border-r border-line-soft py-1.5">
+                  <MotionCell
+                    phase={phase}
+                    innerClassName="py-2"
+                    className="border-r border-line-soft bg-zinc-50/40 text-center font-heading text-[11px] font-bold tabular-nums text-zinc-500"
+                  >
+                    <span className={bumpedKeys.has(line.key) ? "inline-block animate-plf-header-fade" : "inline-block"}>
+                      {index + 1}
+                    </span>
+                  </MotionCell>
+                  <MotionCell phase={phase} innerClassName="py-1.5" className="max-w-0 border-r border-line-soft">
                     <LookupSelect
                       id={`${baseId}-product-${line.key}`}
                       size="sm"
@@ -187,10 +443,12 @@ export function WithdrawalLinesSpreadsheet({
                         {lineErrors.productId}
                       </p>
                     ) : null}
-                  </Td>
-                  <Td
+                  </MotionCell>
+                  <MotionCell
+                    phase={phase}
                     style={qtyColTightStyle}
-                    className="border-r border-line-soft !px-0 py-1.5 text-center"
+                    innerClassName="py-1.5"
+                    className="border-r border-line-soft !px-0 text-center"
                   >
                     <div
                       className="mx-auto flex items-center justify-center gap-1"
@@ -225,8 +483,12 @@ export function WithdrawalLinesSpreadsheet({
                         className={`${cellInputClass(Boolean(lineErrors.quantityUnit), true, true)} shrink-0 uppercase`}
                       />
                     </div>
-                  </Td>
-                  <Td className="border-r border-line-soft px-1.5 py-1.5 text-center">
+                  </MotionCell>
+                  <MotionCell
+                    phase={phase}
+                    innerClassName="py-1.5"
+                    className="border-r border-line-soft px-1.5 text-center"
+                  >
                     <input
                       type="text"
                       maxLength={60}
@@ -238,8 +500,12 @@ export function WithdrawalLinesSpreadsheet({
                       }
                       className={`${cellInputClass(Boolean(lineErrors.packDetail), true, true)} w-full uppercase font-mono`}
                     />
-                  </Td>
-                  <Td className="border-r border-line-soft px-1 py-1.5 text-center">
+                  </MotionCell>
+                  <MotionCell
+                    phase={phase}
+                    innerClassName="py-1.5"
+                    className="border-r border-line-soft px-1 text-center"
+                  >
                     <input
                       type="text"
                       inputMode="decimal"
@@ -252,26 +518,30 @@ export function WithdrawalLinesSpreadsheet({
                       }
                       className={`${cellInputClass(Boolean(lineErrors.unitPrice), true, true)} mx-auto w-[2.65rem]`}
                     />
-                  </Td>
-                  <Td className="border-r border-line-soft py-1.5 text-center">
+                  </MotionCell>
+                  <MotionCell
+                    phase={phase}
+                    innerClassName="py-1.5"
+                    className="border-r border-line-soft text-center"
+                  >
                     <span className="block px-1 font-medium tabular-nums text-[12px] text-zinc-800">
                       {lineValue === null
                         ? "—"
                         : formatAmountOrPlain(lineValue, currency || null)}
                     </span>
-                  </Td>
-                  <Td className="py-1.5 text-center">
+                  </MotionCell>
+                  <MotionCell phase={phase} innerClassName="py-1.5" className="text-center">
                     <button
                       type="button"
                       title={`Quitar fila ${index + 1}`}
                       aria-label={`Quitar fila ${index + 1}`}
-                      disabled={lines.length <= 1}
-                      onClick={() => onRemoveLine(line.key)}
-                      className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-brand-red disabled:cursor-not-allowed disabled:opacity-30"
+                      disabled={liveCount <= 1 || exiting}
+                      onClick={() => requestRemove(line.key)}
+                      className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-zinc-400 transition-[color,background-color,transform] duration-150 ease-plf-spring hover:bg-zinc-100 hover:text-brand-red active:scale-[0.92] disabled:cursor-not-allowed disabled:opacity-30 motion-reduce:transition-none motion-reduce:active:scale-100"
                     >
                       <Trash2 className="size-3.5" />
                     </button>
-                  </Td>
+                  </MotionCell>
                 </tr>
               );
             })}
