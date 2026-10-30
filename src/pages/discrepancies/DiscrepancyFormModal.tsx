@@ -401,6 +401,26 @@ export function DiscrepancyFormModal({
     discrepancy?.ticketNumber ||
     (ticketLabel ? ticketLabel.split(" ")[0].trim() : "");
 
+  const parsedTicketInfo = useMemo(() => {
+    if (!ticketLabel) {
+      return {
+        code: derivedTicketNumber || null,
+        subject: null,
+      };
+    }
+    const match = /^([A-Z0-9_-]+)\s*(?:[·–—\-:]|\s-\s)\s*(.+)$/i.exec(ticketLabel.trim());
+    if (match) {
+      return {
+        code: match[1].trim(),
+        subject: match[2].trim(),
+      };
+    }
+    return {
+      code: derivedTicketNumber || null,
+      subject: ticketLabel,
+    };
+  }, [ticketLabel, derivedTicketNumber]);
+
   // Caché inmediata
   if (initialTicketId && initialTicketLabel) {
     cacheTicketInfo(initialTicketId, initialTicketLabel, initialClientName, initialClientId);
@@ -823,7 +843,7 @@ export function DiscrepancyFormModal({
 
   // Dinamismo de ancho para modal: amplio para la tabla editorial sin apretar columnas ni s...
   const modalMaxWidth =
-    step === 1 ? "max-w-2xl" : "max-w-[96vw] 2xl:max-w-[1720px] w-full";
+    step === 1 ? "max-w-3xl" : "max-w-[96vw] 2xl:max-w-[1720px] w-full";
 
   const ticketInheritedLabel = effectiveTicketClientName
     ? effectiveTicketClientName
@@ -937,161 +957,166 @@ export function DiscrepancyFormModal({
     </div>
   );
 
-  // Paso 1: Origen e Identificación (Diseño Editorial Simétrico de 2 Columnas)
+  // Paso 1: Origen e Identificación (Diseño Editorial Simétrico y Dividido)
   const renderStep1 = () => (
-    <div className="flex flex-col gap-5 animate-plf-fade">
-      {/** Grilla simétrica de 2 paneles principales */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
-        {/** Panel 1 (Izquierda): Identificación del Caso & Ticket */}
-        <div className="flex flex-col justify-between rounded-xl border border-zinc-200/90 bg-white shadow-2xs overflow-hidden">
-          {/** Cabecera del panel */}
-          <div className="border-b border-zinc-100 bg-zinc-50/70 px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-md bg-zinc-200/60 text-zinc-700 font-heading text-xs font-bold">
-                1
-              </span>
-              <h3 className="font-heading text-xs font-bold uppercase tracking-wider text-zinc-800">
-                Identificación del Caso
-              </h3>
+    <div className="flex flex-col gap-4 animate-plf-fade">
+      <div className="rounded-xl border border-zinc-200/90 bg-white shadow-2xs overflow-hidden">
+        {/** Cabecera sobria y editorial (sin mayúsculas sostenidas ni badges repetitivos) */}
+        <div className="border-b border-zinc-100 bg-zinc-50/70 px-5 sm:px-6 py-3.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-zinc-200/60 text-zinc-700">
+              <Truck className="size-4 text-zinc-700" />
             </div>
-            <span className="font-heading text-[10.5px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 border border-purple-200/80 px-2 py-0.5 rounded-md">
-              PF-FOR-291
-            </span>
+            <div>
+              <h3 className="font-heading text-xs font-semibold text-zinc-900">
+                Origen del caso y fecha de investigación
+              </h3>
+              <p className="text-[11px] text-zinc-500">
+                Información vinculada al caso y fecha oficial para la investigación.
+              </p>
+            </div>
           </div>
+          {ticketLabel && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
+              <CheckCircle2 className="size-3 text-emerald-600" />
+              <span>Ticket vinculado</span>
+            </span>
+          )}
+        </div>
 
-          {/** Cuerpo del panel */}
-          <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4">
-            <Controller
-              name="ticketId"
-              control={control}
-              render={({ field }) => (
-                <LookupField
-                  size="sm"
-                  label="Ticket vinculado"
-                  required
-                  name={field.name}
-                  value={field.value}
-                  selectedLabel={ticketLabel}
-                  onChange={(value, option) => {
-                    field.onChange(value);
-                    if (option) {
-                      setTicketLabel(option.label);
-                      if (option.hint) {
-                        setEffectiveTicketClientName(option.hint);
-                      }
-                    }
-                  }}
-                  onBlur={field.onBlur}
-                  placeholder="Elige un ticket…"
-                  searchPlaceholder="Número, asunto o cliente…"
-                  search={searchTickets}
-                  resolveSelectedLabel={resolveTicketLabel}
-                  disabled={isEdit || ticketId !== undefined}
-                  state={stateOf("ticketId")}
-                  error={errors.ticketId?.message}
-                />
-              )}
-            />
-
-            {/** Ficha sintética del ticket seleccionado */}
-            {ticketLabel ? (
-              <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-3.5 space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-zinc-400">
-                      Asunto del caso
-                    </span>
-                    <span className="text-xs font-semibold text-zinc-900 mt-0.5 line-clamp-2" title={ticketLabel}>
-                      {ticketLabel}
-                    </span>
-                  </div>
+        {/** Fila 1: Ticket vinculado y Cliente asociado */}
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-zinc-100 border-b border-zinc-100">
+          {/** Columna 1: Ticket vinculado */}
+          <div className="p-5 flex flex-col justify-center gap-1.5">
+            <label className="font-heading text-[11.5px] font-semibold text-faint">
+              Ticket vinculado
+            </label>
+            {ticketIdValue ? (
+              <div className="flex items-center justify-between gap-2 h-9">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="shrink-0 font-mono text-xs font-bold text-zinc-900 bg-zinc-100 border border-zinc-200/80 px-2.5 py-1 rounded-md">
+                    {parsedTicketInfo.code || ticketIdValue}
+                  </span>
+                  <span className="text-[11.5px] text-zinc-400 truncate">
+                    Caso registrado
+                  </span>
                 </div>
-
-                {effectiveTicketClientName && (
-                  <div className="pt-2 border-t border-zinc-200/60 flex items-center justify-between text-xs">
-                    <span className="text-zinc-500 font-medium flex items-center gap-1.5">
-                      <Building2 className="size-3.5 text-zinc-400" />
-                      <span>Cliente</span>
-                    </span>
-                    <span className="font-semibold text-zinc-800 truncate max-w-[220px]">
-                      {effectiveTicketClientName}
-                    </span>
-                  </div>
+                {!isEdit && ticketId === undefined && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValue("ticketId", "");
+                      setTicketLabel(undefined);
+                      setEffectiveTicketClientName(undefined);
+                    }}
+                    className="shrink-0 text-xs text-brand-red hover:underline font-medium cursor-pointer"
+                  >
+                    Cambiar
+                  </button>
                 )}
+                <input type="hidden" {...register("ticketId")} value={ticketIdValue} />
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/30 p-4 text-center">
-                <p className="text-xs text-zinc-400">
-                  Selecciona un ticket para vincular automáticamente los datos del cliente y reclamo.
-                </p>
-              </div>
+              <Controller
+                name="ticketId"
+                control={control}
+                render={({ field }) => (
+                  <LookupField
+                    size="sm"
+                    label=""
+                    required
+                    name={field.name}
+                    value={field.value}
+                    selectedLabel={ticketLabel}
+                    onChange={(value, option) => {
+                      field.onChange(value);
+                      if (option) {
+                        setTicketLabel(option.label);
+                        if (option.hint) {
+                          setEffectiveTicketClientName(option.hint);
+                        }
+                      }
+                    }}
+                    onBlur={field.onBlur}
+                    placeholder="Elige un ticket…"
+                    searchPlaceholder="Número, asunto o cliente…"
+                    search={searchTickets}
+                    resolveSelectedLabel={resolveTicketLabel}
+                    disabled={isEdit || ticketId !== undefined}
+                    state={stateOf("ticketId")}
+                    error={errors.ticketId?.message}
+                  />
+                )}
+              />
             )}
           </div>
 
-          {/** Pie informativo del panel */}
-          <div className="bg-zinc-50/50 px-4 py-2.5 border-t border-zinc-100 text-[11px] text-zinc-400 flex items-center gap-1.5">
-            <Info className="size-3.5 shrink-0 text-zinc-400" />
-            <span>Documenta diferencias entre la carga facturada y la despachada.</span>
+          {/** Columna 2: Cliente asociado */}
+          <div className="p-5 flex flex-col justify-center gap-1.5">
+            <label className="font-heading text-[11.5px] font-semibold text-faint">
+              Cliente asociado
+            </label>
+            <div className="flex items-center gap-2 h-9 min-w-0">
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-zinc-100 border border-zinc-200/60 text-zinc-500">
+                <Building2 className="size-3.5" />
+              </div>
+              <span
+                className="text-xs font-semibold text-zinc-800 truncate"
+                title={effectiveTicketClientName || "No especificado"}
+              >
+                {effectiveTicketClientName || "No especificado"}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/** Panel 2 (Derecha): Fecha de Despacho & Parámetros Operativos */}
-        <div className="flex flex-col justify-between rounded-xl border border-zinc-200/90 bg-white shadow-2xs overflow-hidden">
-          {/** Cabecera del panel */}
-          <div className="border-b border-zinc-100 bg-zinc-50/70 px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-md bg-zinc-200/60 text-zinc-700 font-heading text-xs font-bold">
-                2
-              </span>
-              <h3 className="font-heading text-xs font-bold uppercase tracking-wider text-zinc-800">
-                Fecha del Despacho y Registro
-              </h3>
+        {/** Fila 2: Asunto del caso y Fecha de investigación */}
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-zinc-100">
+          {/** Columna 1: Asunto del caso */}
+          <div className="p-5 flex flex-col justify-center gap-1.5">
+            <label className="font-heading text-[11.5px] font-semibold text-faint">
+              Asunto del caso
+            </label>
+            <div className="flex items-center h-9 min-w-0">
+              <p
+                className="text-xs font-semibold text-zinc-800 truncate leading-normal"
+                title={parsedTicketInfo.subject || ticketLabel || "Sin asunto"}
+              >
+                {parsedTicketInfo.subject || ticketLabel || "Sin asunto registrado"}
+              </p>
             </div>
-            <span className="font-heading text-[10.5px] font-medium uppercase tracking-wider text-zinc-400">
-              Control Operativo
-            </span>
           </div>
 
-          {/** Cuerpo del panel */}
-          <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4">
+          {/** Columna 2: Fecha de investigación */}
+          <div className="p-5 flex flex-col justify-center">
             <DateField
               id="discrepancy-date"
-              label="Fecha del despacho"
+              label="Fecha de investigación"
               required
               value={discrepancyDate}
               onChange={setDiscrepancyDate}
               placeholder="Seleccionar fecha…"
-              headerLabel="Fecha del despacho"
+              headerLabel="Fecha de investigación"
               align="end"
             />
+          </div>
+        </div>
 
-            {/** Pauta operativa */}
-            <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-3.5 space-y-2">
-              <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-zinc-400 block">
-                Criterios de verificación inicial
-              </span>
-              <ul className="text-xs text-zinc-600 space-y-1.5 leading-relaxed">
-                <li className="flex items-start gap-2">
-                  <span className="size-1.5 rounded-full bg-brand-red mt-1.5 shrink-0" />
-                  <span>Verificar concordancia con la factura y conduce de salida.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="size-1.5 rounded-full bg-brand-red mt-1.5 shrink-0" />
-                  <span>
-                    {recommendedProductOptions.length > 0
-                      ? `En el paso 2 se propondrán los ${recommendedProductOptions.length} producto(s) ligados al ticket; solo indicas cantidades y factura.`
-                      : "En el siguiente paso se registrarán los productos sobrantes o faltantes."}
-                  </span>
-                </li>
-              </ul>
+        {/** Pie unificado informativo y sobrio */}
+        <div className="bg-zinc-50/50 px-5 sm:px-6 py-2.5 border-t border-zinc-100 text-[11px] text-zinc-400 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Info className="size-3.5 shrink-0 text-zinc-400" />
+            <span>Documenta diferencias entre la carga facturada y la despachada físicamente.</span>
+          </div>
+          {recommendedProductOptions.length > 0 ? (
+            <div className="flex items-center gap-1.5 text-zinc-500 font-medium">
+              <span>{recommendedProductOptions.length} producto{recommendedProductOptions.length === 1 ? "" : "s"} para revisar en el Paso 2</span>
             </div>
-          </div>
-
-          {/** Pie informativo del panel */}
-          <div className="bg-zinc-50/50 px-4 py-2.5 border-t border-zinc-100 text-[11px] text-zinc-400 flex items-center gap-1.5">
-            <Truck className="size-3.5 shrink-0 text-zinc-400" />
-            <span>Fecha oficial para trazabilidad de precinto y contenedor.</span>
-          </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-1.5 text-zinc-400">
+              <span>Trazabilidad de precinto y contenedor</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1628,7 +1653,7 @@ export function DiscrepancyFormModal({
                   </span>
                   <span className="text-xs font-heading font-medium text-zinc-500">
                     {step === 1
-                      ? "Identificación y fecha de despacho"
+                      ? "Identificación y fecha de investigación"
                       : step === 2
                       ? "Líneas en discrepancia y nota operativa"
                       : "Evaluación de 9 puntos de seguridad"}
@@ -1678,7 +1703,7 @@ export function DiscrepancyFormModal({
           >
             {/** Paso 1: Reformulado con máxima simetría y balance editorial */}
             {step === 1 && (
-              <div className="max-w-5xl mx-auto w-full py-2">
+              <div className="max-w-3xl mx-auto w-full py-3">
                 {renderStep1()}
               </div>
             )}
@@ -1724,7 +1749,7 @@ export function DiscrepancyFormModal({
         title={isEdit ? `Editar ${discrepancy.number}` : "Nueva investigación de discrepancia"}
         description={
           step === 1
-            ? "Paso 1 de 3: Identificación del caso y fecha de despacho."
+            ? "Paso 1 de 3: Identificación del caso y fecha de investigación."
             : step === 2
             ? "Paso 2 de 3: Tabla de productos en discrepancia y notas operativas."
             : "Paso 3 de 3: Evaluación de los 9 puntos de seguridad de la carga."

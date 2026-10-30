@@ -251,8 +251,8 @@ export function getDiscrepancyStepMissing(input: {
       check("ticketId", "Elige el ticket vinculado", "el ticket", (input.ticketId ?? "").trim().length > 0),
       check(
         "discrepancy-date",
-        "Indica la fecha del despacho",
-        "la fecha del despacho",
+        "Indica la fecha de investigación",
+        "la fecha de investigación",
         (input.discrepancyDate ?? "").trim().length > 0,
       ),
     );
