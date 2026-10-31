@@ -9,7 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { fetchAllPages } from "../../api/paging";
 import { productLinesApi } from "../../api/productLines";
 import { qualityApi } from "../../api/quality";
@@ -48,6 +48,7 @@ import type { Plant, ProductLine } from "../../types/settings";
 import type { CorrectiveActionSheet, HcaQuery, HcaStatus, SheetListResponse } from "../../types/quality";
 import { HcaFormModal } from "./HcaFormModal";
 import { HcaStatusBadge } from "./StatusBadges";
+import { HcaSummaryDrawer } from "./HcaSummaryDrawer";
 
 type ChipKey = "todas" | HcaStatus;
 type SortKey = "fecha" | "numero" | "cliente" | "vencimiento";
@@ -69,7 +70,8 @@ const CHIPS: {
 
 /**
  * Listado paginado de Hojas de Acción Correctiva (HCA, PF-FOR-109)
- * con filtros completos, selección múltiple, exportación a Excel/PDF y navegación fluida.
+ * con filtros completos, selección múltiple, exportación a Excel/PDF,
+ * búsqueda integrada en plantas y líneas, y drawer ejecutivo unificado.
  */
 export function HcasPage() {
   const navigate = useNavigate();
@@ -88,6 +90,9 @@ export function HcasPage() {
   const [chip, setChip] = useState<ChipKey>("todas");
   const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
+
+  // Drawer de resumen ejecutivo (mismo formato que Reclamaciones, Discrepancias y Retiros)
+  const [summarySheetId, setSummarySheetId] = useState<number | null>(null);
 
   const [creating, setCreating] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -315,6 +320,8 @@ export function HcasPage() {
                 value={plantId}
                 onChange={setPlantId}
                 defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
+                searchable
+                searchPlaceholder="Buscar planta…"
               />
 
               <FilterDropdown
@@ -324,6 +331,8 @@ export function HcasPage() {
                 value={productLineId}
                 onChange={setProductLineId}
                 defaultIcon={<Layers className="h-3.5 w-3.5 text-zinc-500" />}
+                searchable
+                searchPlaceholder="Buscar línea de producto…"
               />
 
               <DateRangeFilterDropdown
@@ -404,7 +413,7 @@ export function HcasPage() {
                     <Row
                       key={item.id}
                       className={`cursor-pointer ${isChecked ? "bg-brand-red/[0.03]" : ""}`}
-                      onClick={() => navigate(`/calidad/hca/${item.id}`)}
+                      onClick={() => setSummarySheetId(item.id)}
                     >
                       <Td className="w-9 px-2 text-center" onClick={(e) => e.stopPropagation()}>
                         <SelectBox
@@ -414,13 +423,16 @@ export function HcasPage() {
                         />
                       </Td>
                       <Td>
-                        <Link
-                          to={`/calidad/hca/${item.id}`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="whitespace-nowrap font-mono text-[12.5px] font-semibold text-ink hover:text-brand-red"
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSummarySheetId(item.id);
+                          }}
+                          className="whitespace-nowrap font-mono text-[12.5px] font-semibold text-ink hover:text-brand-red text-left transition-colors"
                         >
                           {item.number}
-                        </Link>
+                        </button>
                       </Td>
                       <Td className="text-[12.5px] text-brand-gray">
                         <span title={item.clientName} className="block max-w-[200px] truncate font-medium text-ink">
@@ -463,9 +475,9 @@ export function HcasPage() {
                           onClick={(event) => event.stopPropagation()}
                         >
                           <RowAction
-                            label={`Ver detalle de ${item.number}`}
+                            label={`Ver resumen de ${item.number}`}
                             icon={Eye}
-                            onClick={() => navigate(`/calidad/hca/${item.id}`)}
+                            onClick={() => setSummarySheetId(item.id)}
                           />
                           <RowAction
                             label={`Documento oficial ${item.number}`}
@@ -482,6 +494,14 @@ export function HcasPage() {
           </div>
         )}
       </ListPanel>
+
+      {/* Drawer de Resumen Ejecutivo (unificado con Reclamaciones, Discrepancias y Retiros) */}
+      {summarySheetId !== null && (
+        <HcaSummaryDrawer
+          sheetId={summarySheetId}
+          onClose={() => setSummarySheetId(null)}
+        />
+      )}
 
       {creating && (
         <HcaFormModal
