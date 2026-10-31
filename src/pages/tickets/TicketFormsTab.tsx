@@ -29,7 +29,7 @@ import { withdrawalsApi } from "../../api/withdrawals";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
-import { Spinner } from "../../components/ui/Spinner";
+import { TicketFormsSkeleton, ActionPlanTableSkeleton } from "../../components/ui/Skeleton";
 import { EnterpriseFormDraftBadge } from "../../components/app/EnterpriseFormDraftBadge";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
@@ -732,12 +732,7 @@ export function TicketFormsTab({
   };
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Spinner size="md" />
-        <p className="mt-3 text-xs text-zinc-500">Cargando formularios asociados al ticket...</p>
-      </div>
-    );
+    return <TicketFormsSkeleton />;
   }
 
   if (error) {
@@ -1836,9 +1831,7 @@ export function TicketFormsTab({
                           </span>
                         </div>
                         {planItems === undefined ? (
-                          <div className="flex justify-center py-8">
-                            <Spinner />
-                          </div>
+                          <ActionPlanTableSkeleton />
                         ) : planItems.length > 0 ? (
                           <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">

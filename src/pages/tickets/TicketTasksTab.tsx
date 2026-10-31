@@ -20,7 +20,7 @@ import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
-import { Spinner } from "../../components/ui/Spinner";
+import { TicketTasksSkeleton } from "../../components/ui/Skeleton";
 import { Toast } from "../../components/ui/Toast";
 import { useReceipts } from "../../context/useReceipts";
 import { formatBytes, formatDateTime } from "../../lib/format";
@@ -306,10 +306,7 @@ export function TicketTasksTab({
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12 text-zinc-400">
-          <Spinner className="size-5 text-brand-red" />
-          <span className="ml-2.5 text-[13px]">Cargando tareas...</span>
-        </div>
+        <TicketTasksSkeleton />
       ) : error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-[13px] text-red-700">
           {error}

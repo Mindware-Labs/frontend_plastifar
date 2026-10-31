@@ -170,3 +170,36 @@ export interface QualityStaff {
   id: number;
   name: string;
 }
+
+export interface SheetCounts {
+  all: number;
+  open: number;
+  inAnalysis: number;
+  inExecution: number;
+  inVerification: number;
+  closed: number;
+}
+
+export interface SheetListResponse {
+  items: CorrectiveActionSheet[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: SheetCounts;
+}
+
+export interface HcaQuery {
+  page: number;
+  pageSize?: number;
+  search?: string;
+  clientId?: number;
+  plantId?: number;
+  productLineId?: number;
+  from?: string;
+  to?: string;
+  status?: string;
+  sort?: string;
+  dir?: "asc" | "desc";
+  [key: string]: string | number | boolean | undefined;
+}

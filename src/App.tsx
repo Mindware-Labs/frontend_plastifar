@@ -21,6 +21,8 @@ import { DiscrepancyPrintPage } from "./pages/discrepancies/DiscrepancyPrintPage
 import { WithdrawalDetailPage } from "./pages/withdrawals/WithdrawalDetailPage";
 import { WithdrawalPrintPage } from "./pages/withdrawals/WithdrawalPrintPage";
 import { WithdrawalsPage } from "./pages/withdrawals/WithdrawalsPage";
+import { HcasPage } from "./pages/quality/HcasPage";
+import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
 import { HcaPrintPage } from "./pages/quality/HcaPrintPage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { DepartmentsPage } from "./pages/departments/DepartmentsPage";
@@ -128,9 +130,11 @@ export default function App() {
           <Route path="/clientes/:id/historial" element={<ClientDetailPage section="historial" />} />
         </Route>
 
-        <Route path="/calidad" element={<Navigate to="/configuracion/lineas" replace />} />
-        <Route path="/calidad/hca" element={<Navigate to="/configuracion/lineas" replace />} />
-        <Route path="/calidad/hca/*" element={<Navigate to="/configuracion/lineas" replace />} />
+        <Route path="/calidad" element={<Navigate to="/calidad/hca" replace />} />
+        <Route element={<PermissionRoute permission="quality.read"><Outlet /></PermissionRoute>}>
+          <Route path="/calidad/hca" element={<HcasPage />} />
+          <Route path="/calidad/hca/:id" element={<HcaDetailPage />} />
+        </Route>
         <Route path="/calidad/creditos" element={<Navigate to="/configuracion/lineas" replace />} />
         <Route path="/calidad/lineas" element={<Navigate to="/configuracion/lineas" replace />} />
 

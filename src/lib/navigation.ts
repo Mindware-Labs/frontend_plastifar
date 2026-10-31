@@ -116,6 +116,7 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Reclamaciones", to: "/reclamaciones", icon: FileWarning, permission: "claims.read", subgroup: "Incidencias y Casos" },
       { label: "Discrepancias", to: "/discrepancias", icon: PackageSearch, permission: "discrepancies.read", subgroup: "Incidencias y Casos" },
       { label: "Retiros", to: "/retiros", icon: PackageMinus, permission: "withdrawals.read", subgroup: "Incidencias y Casos" },
+      { label: "Acciones Correctivas (HCA)", to: "/calidad/hca", icon: ShieldCheck, permission: "quality.read", subgroup: "Incidencias y Casos" },
       { label: "Motivos", to: "/tickets/motivos", icon: Tag, permission: "tickets.read", subgroup: "Parámetros" },
       { label: "Veredictos", to: "/tickets/veredictos", icon: Gavel, permission: "tickets.read", subgroup: "Parámetros" },
     ],

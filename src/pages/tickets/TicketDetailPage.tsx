@@ -48,6 +48,7 @@ import { CheckboxField, SelectField, TextField } from "../../components/ui/Field
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
+import { TicketDetailSkeleton } from "../../components/ui/Skeleton";
 import { openOverlay } from "../../hooks/overlayStack";
 import { useSettle } from "../../hooks/useSettle";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
@@ -1013,11 +1014,7 @@ export function TicketDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center py-16">
-        <Spinner />
-      </div>
-    );
+    return <TicketDetailSkeleton />;
   }
 
   if (error || !ticket) {

@@ -1,10 +1,12 @@
-﻿import { apiRequest, toQuery } from "./client";
+import { apiRequest, toQuery } from "./client";
 import type { AttachmentLinkResponse } from "../types/api";
 import type {
   ActionPlanItem,
   CorrectiveActionSheet,
   HcaCause,
   HcaParticipant,
+  HcaQuery,
+  SheetListResponse,
 } from "../types/quality";
 
 export interface ClosureCondition {
@@ -92,6 +94,9 @@ export interface SaveCreditRequestRequest {
 
 export const qualityApi = {
   sheets: {
+    list: (query?: HcaQuery) =>
+      apiRequest<SheetListResponse>(`/api/quality/sheets${toQuery(query ?? {})}`),
+
     listByTicket: (ticketId: number) =>
       apiRequest<CorrectiveActionSheet[]>(`/api/tickets/${ticketId}/sheets`),
 
