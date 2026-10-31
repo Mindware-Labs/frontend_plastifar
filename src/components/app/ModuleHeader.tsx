@@ -18,6 +18,8 @@ export interface ModuleHeaderSection {
 interface ModuleHeaderProps {
   /** Enlace opcional para volver atrás (p. ej. a la tabla o listado principal). */
   backTo?: string;
+  /** Acción de retorno opcional (en vez de un enlace de navegación). */
+  onBack?: () => void;
   /** Texto del tooltip y aria-label del botón volver. */
   backLabel?: string;
   /** Titulo de la pagina. */
@@ -43,6 +45,7 @@ interface ModuleHeaderProps {
 
 export function ModuleHeader({
   backTo,
+  onBack,
   backLabel,
   title,
   badge,
@@ -52,7 +55,7 @@ export function ModuleHeader({
   action,
   className = "",
 }: ModuleHeaderProps) {
-  const hasHeading = title !== undefined || summary !== undefined || backTo !== undefined;
+  const hasHeading = title !== undefined || summary !== undefined || backTo !== undefined || onBack !== undefined;
 
   return (
     <div
@@ -63,7 +66,18 @@ export function ModuleHeader({
       <div className="flex h-full items-center justify-between gap-x-4">
         {hasHeading ? (
           <div className="flex shrink-0 items-center gap-x-3">
-            {backTo && (
+            {onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                title={backLabel ?? "Volver"}
+                aria-label={backLabel ?? "Volver"}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-2.5 text-xs font-semibold text-zinc-700 hover:text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50 transition-all shadow-2xs shrink-0 cursor-pointer"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {backLabel && <span>{backLabel}</span>}
+              </button>
+            ) : backTo ? (
               <Link
                 to={backTo}
                 title={backLabel ?? "Volver"}
@@ -72,7 +86,7 @@ export function ModuleHeader({
               >
                 <ArrowLeft className="h-4 w-4" />
               </Link>
-            )}
+            ) : null}
             {title && (
               <div className="flex items-center gap-2">
                 <h1 className="font-heading text-[20px] font-bold leading-none tracking-[-0.02em] text-zinc-900">

@@ -1,51 +1,72 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
-import { FileSpreadsheet, FileText, Printer } from "lucide-react";
+import { FileDown, FileSpreadsheet, Printer } from "lucide-react";
+import { ModuleHeader } from "../app/ModuleHeader";
+import { Button } from "../ui/Button";
 
 type Orientation = "portrait" | "landscape";
 
 const layouts: Record<Orientation, { page: string; sheet: string; hint: string }> = {
   portrait: {
     page: "size: letter; margin: 14mm;",
-    sheet: "max-w-[800px] text-[11px]",
-    hint: "Elige exportar a Excel, guardar PDF o imprimir. Si la descarga no inició sola, usa «Guardar doc PDF».",
+    sheet: "max-w-[820px] text-[11px]",
+    hint: "Elige exportar a Excel, guardar PDF o imprimir.",
   },
   landscape: {
     page: "size: letter landscape; margin: 12mm;",
     sheet: "max-w-[1040px] text-[10.5px]",
-    hint: "Elige exportar a Excel, guardar PDF o imprimir. Si la descarga no inició sola, usa «Guardar doc PDF».",
+    hint: "Elige exportar a Excel, guardar PDF o imprimir.",
   },
 };
 
-const actionBtnBase =
-  "inline-flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
-
 /**
- * La hoja de un formulario controlado (PF-FOR-…): el tamaño de papel, la barra
- * con los botones de guardar PDF, exportar Excel e imprimir —que no salen en el papel— y las
- * clases `no-print` y `avoid-break` que usan las secciones. Fuera del armazón de
- * la aplicación, para que la barra lateral no se imprima.
+ * La hoja de un formulario controlado (PF-FOR-…): tamaño de papel, barra de
+ * herramientas ejecutiva con botón claro de retorno, exportación a Excel,
+ * descarga de PDF e impresión, con lienzo centrado y simetría.
  */
 export function PrintSheet({
   orientation,
   filename,
   onExportExcel,
   extraActions,
+  title,
+  backLabel = "Volver",
+  onBack,
   children,
 }: {
   orientation: Orientation;
   filename?: string;
   onExportExcel?: () => void | Promise<void>;
   extraActions?: ReactNode;
+  title?: string;
+  backLabel?: string;
+  onBack?: () => void;
   children: ReactNode;
 }) {
+  const navigate = useNavigate();
   const layout = layouts[orientation];
   const downloadingRef = useRef(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const sheetContentRef = useRef<HTMLDivElement>(null);
   const autoTriggeredRef = useRef(false);
+
+  const handleGoBack = useCallback(() => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      window.close();
+      navigate("/");
+    }
+  }, [navigate, onBack]);
 
   const handleDownloadPdf = useCallback(async () => {
     if (!sheetContentRef.current || downloadingRef.current) return;
@@ -118,88 +139,93 @@ export function PrintSheet({
     }
   }, [handleDownloadPdf]);
 
+  const displayTitle = title || document.title.split("·")[0]?.trim() || "Documento Oficial";
+
   return (
-    <div className={`mx-auto bg-white p-8 leading-snug text-black print:p-0 ${layout.sheet}`}>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden font-sans text-zinc-900 print:min-h-0 print:bg-white print:p-0">
       <style>{`
         @page { ${layout.page} }
         @media print {
-          body { background: white; }
+          body { background: white !important; }
           .no-print { display: none !important; }
           .avoid-break { break-inside: avoid; }
         }
       `}</style>
 
-      {/* Salida del documento: Excel, PDF e impresión (no sale en papel) */}
-      <div className="no-print mb-4 rounded-xl border border-zinc-200/90 bg-zinc-50/60 px-3 py-2.5">
-        <div className="mx-auto flex max-w-3xl flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-zinc-200/80 bg-white text-zinc-600">
-              <FileText className="size-3.5" />
-            </div>
-            <div className="min-w-0 text-left">
-              <h1 className="font-heading text-[11px] font-bold leading-tight tracking-tight text-zinc-900">
-                Salida del documento oficial
-              </h1>
-              <p className="text-[10px] leading-snug text-zinc-500">
-                {downloading
-                  ? "Generando PDF…"
-                  : "Excel · PDF · Impresión"}
-              </p>
-              {downloadError && (
-                <p className="mt-0.5 text-[10px] font-semibold leading-snug text-rose-600">{downloadError}</p>
-              )}
-              {!downloading && !downloadError && (
-                <p className="sr-only">{layout.hint}</p>
-              )}
-            </div>
+      {/* Header oficial de la aplicación integrado a la perfección */}
+      <ModuleHeader
+        className="no-print !mb-0"
+        onBack={handleGoBack}
+        backLabel={backLabel}
+        title={
+          <div className="flex items-center gap-2">
+            <span>{displayTitle}</span>
+            <span className="hidden sm:inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600">
+              {orientation === "portrait" ? "Carta · Vertical" : "Carta · Horizontal"}
+            </span>
           </div>
-
-          <div
-            className={`grid shrink-0 gap-1.5 sm:w-[min(100%,22rem)] ${
-              onExportExcel ? "grid-cols-3" : "grid-cols-2"
-            }`}
-          >
+        }
+        action={
+          <div className="flex shrink-0 items-center gap-2">
             {onExportExcel && (
-              <button
+              <Button
                 type="button"
+                size="sm"
+                variant="secondary"
                 onClick={() => void onExportExcel()}
-                className={`${actionBtnBase} border border-emerald-200/90 bg-emerald-50 text-emerald-800 hover:bg-emerald-100`}
+                className="gap-1.5 text-emerald-800 border-emerald-200/90 bg-emerald-50/90 hover:bg-emerald-100 hover:border-emerald-300 active:scale-95 cursor-pointer"
                 title="Descargar en formato Excel (.xlsx)"
               >
-                <FileSpreadsheet className="size-3 shrink-0 text-emerald-600" />
-                <span className="truncate">Excel</span>
-              </button>
+                <FileSpreadsheet className="size-3.5 text-emerald-600 shrink-0" />
+                <span className="hidden sm:inline">Exportar</span>
+                <span>Excel</span>
+              </Button>
             )}
 
             {extraActions}
 
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="secondary"
               onClick={handleDownloadPdf}
               disabled={downloading}
-              className={`${actionBtnBase} border border-rose-200/90 bg-rose-50 text-rose-800 hover:bg-rose-100`}
+              className="gap-1.5 text-rose-800 border-rose-200/90 bg-rose-50/90 hover:bg-rose-100 hover:border-rose-300 active:scale-95 disabled:opacity-50 cursor-pointer"
               title="Guardar como archivo PDF"
             >
-              <FileText className="size-3 shrink-0 text-rose-600" />
-              <span className="truncate">{downloading ? "PDF…" : "PDF"}</span>
-            </button>
+              <FileDown className="size-3.5 text-rose-600 shrink-0" />
+              <span>{downloading ? "Generando…" : "Descargar PDF"}</span>
+            </Button>
 
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="primary"
               onClick={() => window.print()}
-              className={`${actionBtnBase} border border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700`}
+              className="gap-1.5 active:scale-95 cursor-pointer"
               title="Abrir diálogo de impresión nativo"
             >
-              <Printer className="size-3 shrink-0 text-zinc-200" />
-              <span className="truncate">Imprimir</span>
-            </button>
+              <Printer className="size-3.5 text-zinc-300 shrink-0" />
+              <span>Imprimir</span>
+            </Button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
-      <div ref={sheetContentRef}>
-        {children}
-      </div>
+      {/* Espacio del lienzo de papel con sombra realista y centrado perfecto */}
+      <main className="flex-1 min-h-0 overflow-y-auto -mx-3 -mb-3 lg:-mx-4 lg:-mb-3.5 py-6 sm:py-8 px-4 sm:px-6 bg-canvas print:p-0 print:m-0 print:bg-white print:overflow-visible">
+        {downloadError && (
+          <div className="mx-auto mb-4 max-w-2xl rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-center text-[12px] font-medium text-rose-700">
+            {downloadError}
+          </div>
+        )}
+        <div
+          ref={sheetContentRef}
+          className={`mx-auto bg-white rounded-md p-8 sm:p-10 shadow-[0_4px_24px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-zinc-900/[0.05] leading-snug text-black print:p-0 print:m-0 print:shadow-none print:ring-0 print:rounded-none ${layout.sheet}`}
+        >
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

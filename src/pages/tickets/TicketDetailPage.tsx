@@ -80,7 +80,11 @@ import { FormattedTicketBody } from "./FormattedTicketBody";
 import { AttachmentChip, TicketMessageCard } from "./TicketMessageCard";
 import { TicketTasksTab } from "./TicketTasksTab";
 import { TicketTimelineSheet, type TicketDetailTab, type TimelineItem } from "./TicketTimelineSheet";
-import { TicketFormsTab } from "./TicketFormsTab";
+import { TicketFormsTab, type RegisteredFormItem } from "./TicketFormsTab";
+import { ClaimDocumentSheet } from "../../components/claims/ClaimDocumentSheet";
+import { WithdrawalDocumentSheet } from "../../components/withdrawals/WithdrawalDocumentSheet";
+import type { CustomerClaim } from "../../types/claims";
+import type { MerchandiseWithdrawal } from "../../types/withdrawals";
 import { usePermissions } from "../../hooks/usePermissions";
 
 /** El atajo se nombra con la tecla que la persona tiene delante, no con las dos. */
@@ -379,6 +383,19 @@ export function TicketDetailPage() {
     }
   }, [searchParams]);
   const [tasksCount, setTasksCount] = useState(0);
+  const [viewingDocumentForm, setViewingDocumentForm] = useState<RegisteredFormItem | null>(null);
+
+  useEffect(() => {
+    if (!viewingDocumentForm) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setViewingDocumentForm(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [viewingDocumentForm]);
+
   useDynamicBreadcrumb(ticket?.number ?? null);
   const [showTimeline, setShowTimeline] = useState(false);
   const [activeCommentsTask, setActiveCommentsTask] = useState<TicketTaskResponse | null>(null);
@@ -1111,7 +1128,26 @@ export function TicketDetailPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <ModuleHeader
+      {viewingDocumentForm ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in">
+          {viewingDocumentForm.type === "reclamacion" && (
+            <ClaimDocumentSheet
+              claim={viewingDocumentForm.data as CustomerClaim}
+              onBack={() => setViewingDocumentForm(null)}
+              backLabel="Volver al ticket"
+            />
+          )}
+          {viewingDocumentForm.type === "retiro" && (
+            <WithdrawalDocumentSheet
+              withdrawal={viewingDocumentForm.data as MerchandiseWithdrawal}
+              onBack={() => setViewingDocumentForm(null)}
+              backLabel="Volver al ticket"
+            />
+          )}
+        </div>
+      ) : (
+        <>
+          <ModuleHeader
         backTo="/tickets"
         backLabel="Volver al listado de tickets"
         title={ticket.number}
@@ -1766,6 +1802,7 @@ export function TicketDetailPage() {
                       ticket={ticket}
                       onHasFormsChanged={(has) => setHasForms(has)}
                       onTicketStatusChanged={refreshTicket}
+                      onViewDocument={(form) => setViewingDocumentForm(form)}
                     />
                   </div>
                 )}
@@ -1913,6 +1950,8 @@ export function TicketDetailPage() {
               </div>
         </div>
       </div>
+      </>
+    )}
 
       {/* Vista de redacción a pantalla completa con preservación de borrador. */}
       {replyOpen && (

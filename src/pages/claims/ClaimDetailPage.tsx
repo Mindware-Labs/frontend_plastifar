@@ -19,6 +19,7 @@ import { describeStatus } from "../../lib/claims";
 import type { ProductLine } from "../../types/settings";
 import { HcaModal } from "../quality/HcaModal";
 import { ClaimExecutiveSummary } from "./ClaimExecutiveSummary";
+import { ClaimDocumentSheet } from "../../components/claims/ClaimDocumentSheet";
 import { ClaimFormModal } from "./ClaimFormModal";
 import { ClaimTreatmentModal } from "./ClaimTreatmentModal";
 import { ReopenClaimModal } from "./ReopenClaimModal";
@@ -41,6 +42,7 @@ export function ClaimDetailPage() {
   const [closing, setClosing] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [openingHca, setOpeningHca] = useState<ProductLine[] | "cargando" | null>(null);
+  const [viewingDocument, setViewingDocument] = useState(false);
 
   useDynamicBreadcrumb(detail?.claim.ticketNumber ?? null);
 
@@ -103,10 +105,11 @@ export function ClaimDetailPage() {
       <Button
         size="sm"
         variant="secondary"
-        onClick={() => window.open(`/reclamaciones/${claim.id}/imprimir`, "_blank")}
+        onClick={() => setViewingDocument(true)}
+        title="Ver y exportar documento oficial (PF-FOR-034)"
       >
         <FileText className="h-[15px] w-[15px] mr-1" />
-        Imprimir
+        Documento
       </Button>
       {canWrite && !isClosed && (
         <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
@@ -152,8 +155,20 @@ export function ClaimDetailPage() {
     </div>
   );
 
+  if (viewingDocument) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in">
+        <ClaimDocumentSheet
+          claim={claim}
+          onBack={() => setViewingDocument(false)}
+          backLabel="Volver al resumen"
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-[920px] pb-10">
+    <div className="max-w-[920px] pb-10 animate-plf-apple-tab">
       <ModuleHeader
         title={`Reclamación · ${claim.ticketNumber}`}
         summary={`${claim.clientName} · ${describeStatus(claim.status)}`}

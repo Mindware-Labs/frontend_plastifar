@@ -40,6 +40,8 @@ export function HcaPrintPage() {
   return (
     <PrintSheet
       orientation="portrait"
+      title={`${FORM_CONTROL.code} · ${sheet.number}`}
+      backLabel="Volver a la HCA"
       filename={`${FORM_CONTROL.code}_${sheet.number}.pdf`}
       onExportExcel={() => exportHcaToExcel(sheet, planItems)}
     >

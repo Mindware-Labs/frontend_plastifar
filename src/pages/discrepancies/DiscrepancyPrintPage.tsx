@@ -46,6 +46,8 @@ export function DiscrepancyPrintPage() {
   return (
     <PrintSheet
       orientation="landscape"
+      title={`${DISCREPANCY_FORM_CONTROL.code} · ${discrepancy.number}`}
+      backLabel="Volver a la discrepancia"
       filename={`${DISCREPANCY_FORM_CONTROL.code}_${discrepancy.number}.pdf`}
       onExportExcel={() => exportDiscrepancyToExcel(discrepancy)}
     >

@@ -18,7 +18,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
@@ -66,10 +66,20 @@ import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/Form
 
 export type EnterpriseFormType = "reclamacion" | "retiro" | "discrepancia" | "hca";
 
+export interface RegisteredFormItem {
+  key: string;
+  type: EnterpriseFormType;
+  code: string;
+  title: string;
+  badgeText: string;
+  data: any;
+}
+
 interface TicketFormsTabProps {
   ticket: TicketDetailResponse;
   onHasFormsChanged?: (hasForms: boolean) => void;
   onTicketStatusChanged?: () => void;
+  onViewDocument?: (form: RegisteredFormItem) => void;
 }
 
 interface CommonExtractedData {
@@ -83,7 +93,13 @@ interface CommonExtractedData {
   }>;
 }
 
-export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChanged }: TicketFormsTabProps) {
+export function TicketFormsTab({
+  ticket,
+  onHasFormsChanged,
+  onTicketStatusChanged,
+  onViewDocument,
+}: TicketFormsTabProps) {
+  const navigate = useNavigate();
   const { can } = usePermissions();
 
   const canReadClaims = can("claims.read", ticket.departmentId ?? undefined);
@@ -1075,10 +1091,14 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
                     size="sm"
                     variant="secondary"
                     onClick={() => {
+                      if (onViewDocument) {
+                        onViewDocument(activeForm);
+                        return;
+                      }
                       const path = getPrintPath(activeForm);
-                      if (path) window.open(`${path}?mode=pdf`, "_blank");
+                      if (path) navigate(path);
                     }}
-                    title="Abrir la salida del documento oficial (Excel, PDF e impresión)"
+                    title="Ver y exportar documento oficial (Excel, PDF e impresión)"
                   >
                     <FileText className="size-3.5 mr-1 text-zinc-600" />
                     Documento
