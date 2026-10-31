@@ -14,6 +14,7 @@ export interface SidebarNavIndicatorRect {
   markLeft: number;
   markHeight: number;
   markAtEdge: boolean;
+  showMark: boolean;
 }
 
 interface MatchChild {
@@ -90,6 +91,7 @@ const emptyRect: SidebarNavIndicatorRect = {
   markLeft: 0,
   markHeight: 16,
   markAtEdge: true,
+  showMark: false,
 };
 
 /** Un único highlight medido: nunca se intercambia con estilos de fila (evita parpadeos). */
@@ -135,10 +137,11 @@ export function useSidebarNavIndicator(
 
     const isChild = activeKey.startsWith("expanded:child:");
     const isRail = activeKey.startsWith("collapsed:rail:");
+    const showMark = !isChild;
     const markAtEdge = !isChild;
-    const markHeight = isChild ? 14 : 16;
+    const markHeight = showMark ? 16 : 0;
     const markLeft = isChild
-      ? pillLeft - 1.5
+      ? pillLeft
       : isRail
         ? pillLeft - 16
         : Math.max(0, pillLeft - 8);
@@ -151,6 +154,7 @@ export function useSidebarNavIndicator(
       markLeft,
       markHeight,
       markAtEdge,
+      showMark,
     });
 
     if (!primedRef.current) {

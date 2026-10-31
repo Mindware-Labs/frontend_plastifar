@@ -59,16 +59,18 @@ function SidebarNavIndicator({
           height: rect.height,
         }}
       />
-      <span
-        aria-hidden
-        className={`${layer} rounded-r-full bg-brand-red shadow-[0_0_10px_rgba(228,0,43,0.38)] ${motion}`}
-        style={{
-          top: markTop,
-          left: rect.markLeft,
-          width: rect.markAtEdge ? 3 : 2.5,
-          height: rect.markHeight,
-        }}
-      />
+      {rect.showMark && rect.markHeight > 0 && (
+        <span
+          aria-hidden
+          className={`${layer} rounded-r-full bg-brand-red shadow-[0_0_10px_rgba(228,0,43,0.38)] ${motion}`}
+          style={{
+            top: markTop,
+            left: rect.markLeft,
+            width: rect.markAtEdge ? 3 : 2.5,
+            height: rect.markHeight,
+          }}
+        />
+      )}
     </>
   );
 }
@@ -412,9 +414,7 @@ export function Sidebar() {
                 {/* Tronco vertical continuo de la familia: nace bajo el icono padre y entrega en el codo del último hijo */}
                 <span
                   aria-hidden
-                  className={`pointer-events-none absolute -top-0.5 bottom-[22px] left-[17.5px] w-px transition-colors duration-[380ms] ease-plf-spring motion-reduce:transition-none ${
-                    active ? "bg-brand-red/35" : "bg-zinc-200/90"
-                  }`}
+                  className="pointer-events-none absolute -top-0.5 bottom-[22px] left-[17.5px] w-px bg-zinc-200/90"
                 />
 
                 {children.map((child, index) => {
@@ -451,11 +451,7 @@ export function Sidebar() {
                           {/* Codo curvo que une cada opción con el tronco de su familia */}
                           <span
                             aria-hidden
-                            className={`pointer-events-none absolute -left-[8.5px] top-0 z-10 h-1/2 w-[8.5px] rounded-bl-[7px] border-b border-l transition-[border-color] duration-[380ms] ease-plf-spring motion-reduce:transition-none ${
-                              showsAccentActive(isActive)
-                                ? "border-brand-red/60"
-                                : "border-zinc-200/90 group-hover:border-zinc-300"
-                            }`}
+                            className="pointer-events-none absolute -left-[8.5px] top-0 z-10 h-1/2 w-[8.5px] rounded-bl-[7px] border-b border-l border-zinc-200/90 group-hover:border-zinc-300 transition-colors duration-150"
                           />
 
                           {child.icon && (
