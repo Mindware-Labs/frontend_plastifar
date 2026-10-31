@@ -50,7 +50,7 @@ export function HcaSummaryDrawer({ sheetId, onClose }: HcaSummaryDrawerProps) {
       eyebrow="PF-FOR-109 · Hecho, Causa y Acción"
       description={
         detail
-          ? `${detail.sheet.clientName} · ${detail.sheet.status}`
+          ? `${detail.sheet.clientName} · ${detail.sheet.status === "Abierta" ? "Registrada" : detail.sheet.status}`
           : "Cargando datos de la acción correctiva..."
       }
       maxWidth="max-w-[760px]"
@@ -109,7 +109,6 @@ export function HcaSummaryDrawer({ sheetId, onClose }: HcaSummaryDrawerProps) {
           <HcaExecutiveSummary
             sheet={detail.sheet}
             planItems={detail.planItems}
-            closureConditions={detail.closureConditions}
           />
         </div>
       ) : null}

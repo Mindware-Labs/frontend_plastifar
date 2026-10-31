@@ -24,7 +24,7 @@ import {
   FilterDropdown,
   LookupFilterDropdown,
 } from "../../components/ui/FilterDropdown";
-import { HeaderTag, type HeaderTagTone } from "../../components/ui/HeaderTag";
+import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -33,7 +33,6 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { TableSelectionBar, type TableSelectionAction } from "../../components/ui/TableSelectionBar";
-import { Tooltip } from "../../components/ui/Tooltip";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
@@ -43,35 +42,19 @@ import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { formatDay } from "../../lib/dates";
 import { exportHcasListToExcel, exportHcasListToPdf } from "../../lib/hcaListExport";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
-import { describeDueShort, isSheetOverdue } from "../../lib/quality";
 import type { Plant, ProductLine } from "../../types/settings";
-import type { CorrectiveActionSheet, HcaQuery, HcaStatus, SheetListResponse } from "../../types/quality";
+import type { CorrectiveActionSheet, HcaQuery, SheetListResponse } from "../../types/quality";
 import { HcaFormModal } from "./HcaFormModal";
 import { HcaStatusBadge } from "./StatusBadges";
 import { HcaSummaryDrawer } from "./HcaSummaryDrawer";
 
-type ChipKey = "todas" | HcaStatus;
-type SortKey = "fecha" | "numero" | "cliente" | "vencimiento";
-
-const CHIPS: {
-  key: ChipKey;
-  label: string;
-  status?: string;
-  countKey: "all" | "open" | "inAnalysis" | "inExecution" | "inVerification" | "closed";
-  tone: HeaderTagTone;
-}[] = [
-  { key: "todas", label: "Todas", countKey: "all", tone: "neutral" },
-  { key: "Abierta", label: "Abiertas", status: "Abierta", countKey: "open", tone: "amber" },
-  { key: "En análisis" as HcaStatus, label: "En análisis", status: "En análisis", countKey: "inAnalysis", tone: "blue" },
-  { key: "En ejecución" as HcaStatus, label: "En ejecución", status: "En ejecución", countKey: "inExecution", tone: "amber" },
-  { key: "En verificación" as HcaStatus, label: "En verificación", status: "En verificación", countKey: "inVerification", tone: "blue" },
-  { key: "Cerrada", label: "Cerradas", status: "Cerrada", countKey: "closed", tone: "emerald" },
-];
+type SortKey = "fecha" | "numero" | "cliente";
 
 /**
- * Listado paginado de Hojas de Acción Correctiva (HCA, PF-FOR-109)
- * con filtros completos, selección múltiple, exportación a Excel/PDF,
- * búsqueda integrada en plantas y líneas, y drawer ejecutivo unificado.
+ * Listado paginado de Hojas de Acción Correctiva (HCA, PF-FOR-109).
+ * Funciona de manera idéntica al módulo de Discrepancias: se registra el formulario,
+ * queda asentado permanentemente en el sistema con su estado completado y se consulta
+ * de inmediato desde el drawer o la vista completa.
  */
 export function HcasPage() {
   const navigate = useNavigate();
@@ -87,11 +70,10 @@ export function HcasPage() {
   const [productLineId, setProductLineId] = useState("todas");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [chip, setChip] = useState<ChipKey>("todas");
   const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
 
-  // Drawer de resumen ejecutivo (mismo formato que Reclamaciones, Discrepancias y Retiros)
+  // Drawer de resumen ejecutivo (igual a Discrepancias)
   const [summarySheetId, setSummarySheetId] = useState<number | null>(null);
 
   const [creating, setCreating] = useState(false);
@@ -119,7 +101,6 @@ export function HcasPage() {
     productLineId: productLineId === "todas" ? undefined : Number(productLineId),
     from: from || undefined,
     to: to || undefined,
-    status: CHIPS.find((c) => c.key === chip)?.status,
     sort: sort.key,
     dir: sort.dir,
   };
@@ -180,7 +161,7 @@ export function HcasPage() {
     setTo("");
   }
 
-  const unfiltered = narrowFiltersCount === 0 && !debouncedSearch && chip === "todas";
+  const unfiltered = narrowFiltersCount === 0 && !debouncedSearch;
 
   async function handleBulkExportExcel() {
     if (selectedItems.length === 0) return;
@@ -248,28 +229,19 @@ export function HcasPage() {
         summary={
           counts ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              {CHIPS.map((c, i) => (
-                <span key={c.key} className="inline-flex items-center gap-1.5">
-                  {i > 0 && <span aria-hidden className="text-zinc-300">·</span>}
-                  <HeaderTag
-                    label={c.label}
-                    count={counts[c.countKey]}
-                    active={chip === c.key}
-                    onClick={() => {
-                      setChip(c.key);
-                      setPage(1);
-                    }}
-                    tone={c.tone}
-                    dot={c.key !== "todas"}
-                    title={`Filtrar por ${c.label.toLowerCase()}`}
-                  />
-                </span>
-              ))}
+              <HeaderTag
+                label={counts.all === 1 ? "acción correctiva" : "acciones correctivas"}
+                count={counts.all}
+                active
+                onClick={() => setPage(1)}
+                tone="neutral"
+                title="Total de acciones correctivas registradas"
+              />
             </div>
           ) : (
             <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando las acciones correctivas…
+              Cargando acciones correctivas…
             </span>
           )
         }
@@ -370,7 +342,7 @@ export function HcasPage() {
         }
       >
         {data === null ? (
-          error === null && <TableSkeleton rows={pageSize} columns={8} />
+          error === null && <TableSkeleton rows={pageSize} columns={7} />
         ) : rows.length === 0 ? (
           <ListEmptyState
             icon={ShieldCheck}
@@ -399,8 +371,7 @@ export function HcasPage() {
                   <Th sort={sortOf("cliente")}>Cliente</Th>
                   <Th>Línea / Planta</Th>
                   <Th>Responsable</Th>
-                  <Th sort={sortOf("fecha")}>Detección</Th>
-                  <Th sort={sortOf("vencimiento")}>Vencimiento</Th>
+                  <Th sort={sortOf("fecha")}>Fecha</Th>
                   <Th>Estado</Th>
                   <Th className="w-24 text-right">Acciones</Th>
                 </HeadRow>
@@ -408,7 +379,6 @@ export function HcasPage() {
               <tbody>
                 {rows.map((item) => {
                   const isChecked = selectedIds.has(item.id);
-                  const overdue = isSheetOverdue(item);
                   return (
                     <Row
                       key={item.id}
@@ -453,21 +423,8 @@ export function HcasPage() {
                       <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
                         {formatDay(item.detectedAt.slice(0, 10))}
                       </Td>
-                      <Td className="whitespace-nowrap text-[12.5px] tabular-nums">
-                        {overdue ? (
-                          <Tooltip content={`Venció el ${formatDay(item.dueDate)}`}>
-                            <span className="font-medium text-red-600">
-                              {describeDueShort(item.dueDate)}
-                            </span>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-brand-gray">
-                            {describeDueShort(item.dueDate)}
-                          </span>
-                        )}
-                      </Td>
                       <Td>
-                        <HcaStatusBadge status={item.status} overdue={overdue} />
+                        <HcaStatusBadge status={item.status} />
                       </Td>
                       <Td>
                         <div
@@ -495,7 +452,7 @@ export function HcasPage() {
         )}
       </ListPanel>
 
-      {/* Drawer de Resumen Ejecutivo (unificado con Reclamaciones, Discrepancias y Retiros) */}
+      {/* Drawer de Resumen Ejecutivo (unificado con Discrepancias) */}
       {summarySheetId !== null && (
         <HcaSummaryDrawer
           sheetId={summarySheetId}

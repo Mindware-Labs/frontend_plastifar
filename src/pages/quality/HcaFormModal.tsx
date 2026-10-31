@@ -840,9 +840,7 @@ export function HcaFormModal({
   function resolveDueDate(detectedAt: string, explicit: string): string {
     if (explicit !== "") return explicit;
     if (sheet?.dueDate) return sheet.dueDate;
-    const base = new Date(`${detectedAt}T12:00:00`);
-    base.setDate(base.getDate() + 15);
-    return base.toISOString().slice(0, 10);
+    return detectedAt;
   }
 
   function resolveProductLineId(values: FormValues): string {

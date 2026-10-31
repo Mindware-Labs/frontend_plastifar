@@ -15,13 +15,13 @@ const HCA_LIST_HEADERS = [
   "Planta",
   "Responsable",
   "Fecha Detección",
-  "Vencimiento",
   "Estado",
 ] as const;
 
-const HCA_LIST_COL_WEIGHTS = [24, 38, 28, 22, 32, 22, 22, 24];
+const HCA_LIST_COL_WEIGHTS = [26, 42, 30, 24, 34, 26, 26];
 
 function hcaListRowValues(sheet: CorrectiveActionSheet): string[] {
+  const displayStatus = sheet.status === "Abierta" ? "Registrada" : sheet.status;
   return [
     sheet.number,
     sheet.clientName,
@@ -29,8 +29,7 @@ function hcaListRowValues(sheet: CorrectiveActionSheet): string[] {
     sheet.plantName || "—",
     sheet.responsibleName,
     sheet.detectedAt ? formatDay(sheet.detectedAt.slice(0, 10)) : "",
-    sheet.dueDate ? formatDay(sheet.dueDate) : "",
-    sheet.status,
+    displayStatus,
   ];
 }
 
