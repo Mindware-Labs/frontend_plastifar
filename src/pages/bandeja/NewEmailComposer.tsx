@@ -58,7 +58,10 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   }, []);
 
   // El texto elegido se suma a lo escrito; el editor se vuelve a montar porque solo lee el contenido inicial.
-  function insertCanned(text: string) {
+  function insertCanned(text: string, suggestedSubject?: string) {
+    if (suggestedSubject && !subject.trim()) {
+      setSubject(suggestedSubject);
+    }
     const next = [...(Array.isArray(blocks) ? (blocks as unknown[]) : []), ...textToBlocks(text)];
     setInitialBlocks(next);
     setBlocks(next);

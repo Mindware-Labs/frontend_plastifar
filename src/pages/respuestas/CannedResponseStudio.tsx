@@ -1,44 +1,113 @@
 import {
+  Bookmark,
   Eye,
   Mail,
   Maximize2,
   Minimize2,
   PenLine,
+  Plus,
   Send,
+  Tag,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { cannedApi } from "../../api/canned";
+import { cannedApi, cannedCategoriesApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
 import { Alert } from "../../components/ui/Alert";
 import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
 import { Button } from "../../components/ui/Button";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
+import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { formatDateTime } from "../../lib/format";
-import type { CannedResponseResponse } from "../../types/api";
+import type { CannedResponseResponse, CategoriaResponseItem } from "../../types/api";
+import {
+  CANNED_CATEGORIES,
+  formatCannedBody,
+  formatCannedTitle,
+  getCategoryBadgeClasses,
+  parseCanned,
+} from "./cannedHelpers";
+import { CategoriaModal } from "./CategoriaModal";
+
+const INITIAL_BODY_MIN_PX = 42;
 
 interface CannedResponseStudioProps {
   /** Presente = edición; ausente = nueva respuesta rápida. */
   item?: CannedResponseResponse;
+  /** Datos iniciales (por ejemplo, para duplicar una plantilla existente). */
+  initialData?: {
+    title: string;
+    body: string;
+    categoryId?: number | null;
+  };
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseStudioProps) {
+export function CannedResponseStudio({ item, initialData, onClose, onSaved }: CannedResponseStudioProps) {
   const isEdit = item !== undefined;
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
-  const [title, setTitle] = useState(item?.title ?? "");
-  const [body, setBody] = useState(item?.body ?? "");
+  const rawInit = useMemo(() => {
+    const rawTitle = item?.title ?? initialData?.title ?? "";
+    const rawBody = item?.body ?? initialData?.body ?? "";
+    return parseCanned(rawTitle, rawBody, item?.categoryName);
+  }, [item, initialData]);
+
+  const [dbCategories, setDbCategories] = useState<CategoriaResponseItem[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    item?.categoryId ?? initialData?.categoryId ?? null,
+  );
+  const [categoryName, setCategoryName] = useState(rawInit.category || "General");
+  const [title, setTitle] = useState(rawInit.cleanTitle);
+  const [suggestedSubject, setSuggestedSubject] = useState(rawInit.suggestedSubject ?? "");
+  const [body, setBody] = useState(rawInit.cleanBody);
   const [activeTab, setActiveTab] = useState<"compose" | "preview">("compose");
   const [isMaximized, setIsMaximized] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [createCategoryModalOpen, setCreateCategoryModalOpen] = useState(false);
 
   const titleId = useId();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+
+  // Cargar categorías del catálogo de base de datos
+  function loadCategories() {
+    cannedCategoriesApi
+      .list()
+      .then((data) => {
+        setDbCategories(data);
+        if (selectedCategoryId) {
+          const match = data.find((c) => c.id === selectedCategoryId);
+          if (match) setCategoryName(match.name);
+        } else if (rawInit.category && rawInit.category !== "General") {
+          const match = data.find((c) => c.name.toLowerCase() === rawInit.category.toLowerCase());
+          if (match) {
+            setSelectedCategoryId(match.id);
+            setCategoryName(match.name);
+          }
+        }
+      })
+      .catch(() => {});
+  }
+
+  useEffect(loadCategories, []);
+
+  // Redimensionar automáticamente el textarea sin scroll interno
+  useEffect(() => {
+    if (activeTab === "compose") {
+      autoResizeTextarea(bodyRef.current, INITIAL_BODY_MIN_PX);
+    }
+  }, [body, activeTab]);
+
+  // Estilo del distintivo
+  const currentCategoryColor = useMemo(() => {
+    return dbCategories.find((c) => c.id === selectedCategoryId)?.color;
+  }, [dbCategories, selectedCategoryId]);
+
+  const badgeStyle = getCategoryBadgeClasses(categoryName, currentCategoryColor);
 
   // Métricas del cuerpo
   const stats = useMemo(() => {
@@ -51,14 +120,15 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
   const handleSave = useCallback(async () => {
     const cleanTitle = title.trim();
     const cleanBody = body.trim();
+    const cleanSubject = suggestedSubject.trim();
 
     if (!cleanTitle) {
       setFormError("Ingresa un nombre o título para identificar la respuesta.");
       titleRef.current?.focus();
       return;
     }
-    if (cleanTitle.length > 120) {
-      setFormError("El título no puede exceder 120 caracteres.");
+    if (cleanTitle.length > 100) {
+      setFormError("El título no puede exceder 100 caracteres.");
       return;
     }
     if (!cleanBody) {
@@ -71,13 +141,21 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
       return;
     }
 
+    const finalTitle = formatCannedTitle(cleanTitle, categoryName);
+    const finalBody = formatCannedBody(cleanBody, cleanSubject);
+
+    if (finalTitle.length > 120) {
+      setFormError("El nombre combinado con la categoría supera los 120 caracteres.");
+      return;
+    }
+
     setFormError(null);
     setIsSubmitting(true);
     try {
       if (isEdit) {
-        await cannedApi.update(item.id, cleanTitle, cleanBody);
+        await cannedApi.update(item.id, finalTitle, finalBody, selectedCategoryId);
       } else {
-        await cannedApi.create(cleanTitle, cleanBody);
+        await cannedApi.create(finalTitle, finalBody, selectedCategoryId);
       }
       onSaved();
       requestClose();
@@ -86,22 +164,22 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
     } finally {
       setIsSubmitting(false);
     }
-  }, [title, body, isEdit, item, onSaved, requestClose]);
+  }, [title, body, suggestedSubject, categoryName, selectedCategoryId, isEdit, item, onSaved, requestClose]);
 
   // Cerrar con Escape y atajo para guardar
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && !isExiting) {
+      if (e.key === "Escape" && !isExiting && !createCategoryModalOpen) {
         requestClose();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !createCategoryModalOpen) {
         e.preventDefault();
         handleSave();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isExiting, requestClose, handleSave]);
+  }, [isExiting, requestClose, handleSave, createCategoryModalOpen]);
 
   return createPortal(
     <div
@@ -111,7 +189,7 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
         isExiting ? "pointer-events-none" : ""
       }`}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !isExiting) requestClose();
+        if (e.target === e.currentTarget && !isExiting && !createCategoryModalOpen) requestClose();
       }}
     >
       <div
@@ -120,10 +198,10 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
         aria-modal="true"
         aria-labelledby={titleId}
         className={`relative flex h-full flex-col bg-white shadow-[0_4px_32px_rgba(27,27,29,0.22)] transition-all duration-200 ease-out ${
-          isMaximized ? "w-full" : "w-full sm:w-[680px] md:w-[740px] lg:w-[800px]"
+          isMaximized ? "w-full" : "w-full sm:w-[680px] md:w-[740px] lg:w-[820px]"
         } ${isExiting ? "pointer-events-none" : ""}`}
       >
-        {/* Cabecera del Drawer con nueva jerarquía */}
+        {/* Cabecera del Drawer */}
         <div className={dialogHeaderShellClass}>
           <div className={dialogHeaderStackClass}>
             <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
@@ -132,9 +210,6 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
             <h2 id={titleId} className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
               {isEdit ? "Editar respuesta predefinida" : "Nueva respuesta predefinida"}
             </h2>
-            <p className="text-[12px] leading-relaxed text-subtle">
-              Estructura de correo corporativo para agilizar la atención por soporte.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -203,15 +278,15 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
         {/* Cuerpo del Sheet */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {formError && (
-            <div className="px-6 pt-4">
+            <div className="px-6 pt-3.5">
               <Alert variant="error">{formError}</Alert>
             </div>
           )}
 
           {activeTab === "compose" ? (
             <div className="flex flex-1 flex-col">
-              {/* Título de la plantilla */}
-              <div className="border-b border-line px-6 py-4">
+              {/* 1. Nombre de la plantilla (primero) */}
+              <div className="border-b border-line px-6 py-3.5">
                 <div className="flex items-center justify-between">
                   <label
                     htmlFor="canned-title"
@@ -228,27 +303,141 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
                     </span>
                   </label>
                   <span className="font-heading text-[10.5px] font-bold tabular-nums text-zinc-400">
-                    {title.length}/120
+                    {title.length}/100
                   </span>
                 </div>
                 <input
                   id="canned-title"
                   ref={titleRef}
                   value={title}
-                  maxLength={120}
+                  maxLength={100}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ej. Solicitud de comprobante de pago, Confirmación de entrega..."
-                  className="mt-2 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-2xs outline-none transition-colors placeholder:font-normal placeholder:text-zinc-400 focus:border-zinc-300 focus:ring-2 focus:ring-brand-red/25"
-                  autoFocus
+                  placeholder="Ej. Confirmación de entrega, Datos de cuenta bancaria..."
+                  className="mt-2 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-2xs outline-none transition-colors placeholder:font-normal placeholder:text-zinc-400 hover:border-zinc-300 focus:border-zinc-300 focus:ring-2 focus:ring-brand-red/25"
+                  autoFocus={!rawInit.cleanTitle}
                 />
-                <p className="mt-1.5 text-[11.5px] text-subtle">
-                  Este es el nombre visible en el menú "Respuestas rápidas" para encontrarla al redactar correos.
-                </p>
               </div>
 
+              {/* 2. Categoría temática (con línea divisoria) */}
+              <div className="border-b border-line px-6 py-3.5">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink">
+                    <span
+                      aria-hidden
+                      className="flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
+                    >
+                      <Tag className="size-3" strokeWidth={2.25} />
+                    </span>
+                    <span>Categoría temática</span>
+                  </label>
 
-              {/* Lienzo de Redacción del Correo */}
-              <div className="flex flex-1 flex-col px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => setCreateCategoryModalOpen(true)}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-red hover:underline cursor-pointer"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Nueva categoría</span>
+                  </button>
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {/* Opción General */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategoryId(null);
+                      setCategoryName("General");
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[12px] font-medium transition-all cursor-pointer ${
+                      selectedCategoryId === null && categoryName === "General"
+                        ? "border-zinc-300 bg-zinc-100 text-zinc-800 ring-1.5 ring-brand-red/30 shadow-2xs font-semibold"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50"
+                    }`}
+                  >
+                    <span className="size-1.5 rounded-full bg-zinc-400" />
+                    General
+                  </button>
+
+                  {/* Categorías de la Base de Datos */}
+                  {dbCategories.map((cat) => {
+                    const isSelected = selectedCategoryId === cat.id || categoryName.toLowerCase() === cat.name.toLowerCase();
+                    const style = getCategoryBadgeClasses(cat.name, cat.color);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCategoryId(cat.id);
+                          setCategoryName(cat.name);
+                        }}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[12px] font-medium transition-all cursor-pointer ${
+                          isSelected
+                            ? `${style.badge} ring-1.5 ring-brand-red/30 shadow-2xs font-semibold`
+                            : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50"
+                        }`}
+                      >
+                        <span className={`size-1.5 rounded-full ${style.dot}`} />
+                        {cat.name}
+                      </button>
+                    );
+                  })}
+
+                  {/* Si la lista de la BD aún no tiene categorías, mostrar las estándar como fallback */}
+                  {dbCategories.length === 0 &&
+                    CANNED_CATEGORIES.filter((c) => c !== "General").map((cat) => {
+                      const isSelected = categoryName.toLowerCase() === cat.toLowerCase();
+                      const style = getCategoryBadgeClasses(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCategoryId(null);
+                            setCategoryName(cat);
+                          }}
+                          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[12px] font-medium transition-all cursor-pointer ${
+                            isSelected
+                              ? `${style.badge} ring-1.5 ring-brand-red/30 shadow-2xs font-semibold`
+                              : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50"
+                          }`}
+                        >
+                          <span className={`size-1.5 rounded-full ${style.dot}`} />
+                          {cat}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* 3. Asunto sugerido (opcional) (con línea divisoria) */}
+              <div className="border-b border-line px-6 py-3.5">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="canned-subject"
+                    className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink"
+                  >
+                    <span
+                      aria-hidden
+                      className="flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-red/10 text-brand-red"
+                    >
+                      <Bookmark className="size-3" strokeWidth={2.25} />
+                    </span>
+                    <span>Asunto sugerido (opcional)</span>
+                  </label>
+                </div>
+                <input
+                  id="canned-subject"
+                  value={suggestedSubject}
+                  maxLength={120}
+                  onChange={(e) => setSuggestedSubject(e.target.value)}
+                  placeholder="Ej. Solicitud de Información · Plastifar"
+                  className="mt-2 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[13px] font-medium text-ink shadow-2xs outline-none transition-colors placeholder:font-normal placeholder:text-zinc-400 hover:border-zinc-300 focus:border-zinc-300 focus:ring-2 focus:ring-brand-red/25"
+                />
+              </div>
+
+              {/* 4. Cuerpo del correo (con auto-resize dinámico según contenido) */}
+              <div className="flex flex-1 flex-col px-6 py-3.5">
                 <div className="flex items-center justify-between pb-2">
                   <span className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink">
                     <span
@@ -268,40 +457,45 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
                   </div>
                 </div>
 
-                <div className="relative flex min-h-[300px] flex-1 flex-col rounded-lg border border-zinc-200 bg-white shadow-2xs focus-within:border-zinc-300 focus-within:ring-2 focus-within:ring-brand-red/25">
+                <div className="relative rounded-lg border border-zinc-200 bg-white shadow-2xs transition-all hover:border-zinc-300 focus-within:border-zinc-300 focus-within:ring-2 focus-within:ring-brand-red/25">
                   <textarea
                     ref={bodyRef}
+                    rows={1}
                     value={body}
                     maxLength={20000}
-                    onChange={(e) => setBody(e.target.value)}
+                    onChange={(e) => {
+                      setBody(e.target.value);
+                      autoResizeTextarea(e.target, INITIAL_BODY_MIN_PX);
+                    }}
                     placeholder={
                       "Estimado/a [Nombre del Cliente],\n\n" +
                       "Gracias por comunicarse con Plastifar. Hemos recibido su consulta sobre [Detalle / Pedido] y nuestro equipo ya está atendiendo los detalles.\n\n" +
                       "Quedamos a su entera disposición ante cualquier duda adicional.\n\n" +
-                      "Atentamente,"
+                      "Atentamente,\nEquipo de Soporte"
                     }
-                    className="w-full flex-1 resize-none bg-transparent p-4 font-sans text-[13px] leading-[1.7] text-ink outline-none placeholder:text-zinc-400"
+                    className="w-full resize-none overflow-hidden bg-transparent px-3.5 py-2.5 font-sans text-[13px] leading-[1.65] text-ink outline-none [field-sizing:content] placeholder:text-zinc-400 min-h-[42px]"
                   />
-                </div>
-
-                {/* Controles de pie de redacción */}
-                <div className="mt-2.5 flex items-center justify-between text-[11.5px] text-subtle">
-                  <span>
-                    Plantilla reutilizable. Al insertarla desde "Respuestas rápidas", podrás ajustar y completar el texto manualmente.
-                  </span>
                 </div>
               </div>
             </div>
           ) : (
             /* MODO: VISTA PREVIA INTERACTIVA DE CORREO */
-            <div className="flex flex-1 flex-col bg-zinc-50/60 p-6">
-              <div className="mb-3 flex items-center justify-between">
+            <div className="flex flex-1 flex-col bg-zinc-50/60 px-6 pt-4 pb-6">
+              <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <h3 className="font-heading text-[13.5px] font-bold text-ink">
-                    Vista previa de la plantilla
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-heading text-[13.5px] font-bold text-ink">
+                      Vista previa de la plantilla
+                    </h3>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10.5px] font-semibold ${badgeStyle.badge}`}
+                    >
+                      <span className={`size-1.5 rounded-full ${badgeStyle.dot}`} />
+                      {categoryName}
+                    </span>
+                  </div>
                   <p className="text-[11.5px] text-subtle">
-                    Así se estructurará el mensaje como plantilla de correo.
+                    Así se estructurará el mensaje como plantilla de correo corporativo.
                   </p>
                 </div>
                 <button
@@ -344,11 +538,18 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
                   </div>
 
                   <div className="mt-4 border-t border-zinc-100 pt-3">
-                    <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
-                      Asunto
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+                        Asunto {suggestedSubject.trim() ? "(Sugerido)" : ""}
+                      </span>
+                      {suggestedSubject.trim() && (
+                        <span className="text-[10px] text-brand-red font-medium">
+                          Auto-completado en correos nuevos
+                        </span>
+                      )}
+                    </div>
                     <h4 className="mt-0.5 font-heading text-[15px] font-semibold text-ink">
-                      {title.trim() ? title.trim() : "Sin asunto especificado"}
+                      {suggestedSubject.trim() || title.trim() || "Sin asunto especificado"}
                     </h4>
                   </div>
                 </div>
@@ -415,6 +616,16 @@ export function CannedResponseStudio({ item, onClose, onSaved }: CannedResponseS
           </div>
         </div>
       </div>
+
+      {createCategoryModalOpen && (
+        <CategoriaModal
+          onClose={() => setCreateCategoryModalOpen(false)}
+          onSaved={() => {
+            setCreateCategoryModalOpen(false);
+            loadCategories();
+          }}
+        />
+      )}
     </div>,
     document.body,
   );

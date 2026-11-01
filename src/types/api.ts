@@ -398,10 +398,22 @@ export interface ContactResponse {
   name: string | null;
 }
 
+export interface CategoriaResponseItem {
+  id: number;
+  name: string;
+  description: string | null;
+  color: string | null;
+  responseCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CannedResponseResponse {
   id: number;
   title: string;
   body: string;
+  categoryId?: number | null;
+  categoryName?: string | null;
   createdByStaffId: number;
   createdByName: string;
   updatedAt: string;
