@@ -60,6 +60,8 @@ import { AssignmentControl } from "./ConversationTools";
 import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
 import { RecipientInput } from "./RecipientInput";
 import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
+import { ComposerSendSuccessLayer } from "./ComposerSendSuccessLayer";
+import { useComposerSendCelebration } from "./useComposerSendCelebration";
 import {
   COMPOSER_BCC_KEY,
   COMPOSER_CC_KEY,
@@ -67,6 +69,11 @@ import {
 } from "./useComposerFieldMotion";
 import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
 import { SendValidationButton } from "./SendValidationButton";
+import {
+  hasInvalidRecipients,
+  optionalRecipientFieldValidationItems,
+  recipientFieldValidationItems,
+} from "../../lib/recipientValidation";
 import { type ValidationItem } from "./sendValidation";
 
 /** Que adjunto se esta mirando: puede ser del correo o de una respuesta nuestra. */
@@ -309,6 +316,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
   const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
+  const { celebration, celebrate, isCelebrating } = useComposerSendCelebration();
   const replyContainerRef = useRef<HTMLDivElement>(null);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
   const [composers, setComposers] = useState<ComposingPresence[]>([]);
@@ -338,13 +346,17 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
   // Al reenviar el comentario es opcional: lo que no puede faltar es a quien va.
   const replyMissingItems: ValidationItem[] = [];
-  if (isForward && forwardTo.trim() === "") {
-    replyMissingItems.push({
-      id: "to",
-      label: "Falta el destinatario (Para)",
-      short: "el destinatario (Para)",
-    });
+  if (isForward) {
+    replyMissingItems.push(
+      ...recipientFieldValidationItems(forwardTo, {
+        id: "to",
+        emptyLabel: "Falta el destinatario (Para)",
+        emptyShort: "el destinatario (Para)",
+      }),
+    );
   }
+  replyMissingItems.push(...optionalRecipientFieldValidationItems(replyCc, { id: "cc", fieldLabel: "CC" }));
+  replyMissingItems.push(...optionalRecipientFieldValidationItems(replyBcc, { id: "bcc", fieldLabel: "CCO" }));
   if (!isForward && replyText.trim() === "") {
     replyMissingItems.push({
       id: "body",
@@ -357,6 +369,10 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   function handleFocusReplyField(fieldId: string) {
     if (fieldId === "to") {
       toRef.current?.focus();
+    } else if (fieldId === "cc") {
+      ccRef.current?.focus();
+    } else if (fieldId === "bcc") {
+      bccRef.current?.focus();
     } else if (fieldId === "body") {
       const editorEl = replyContainerRef.current?.querySelector('[contenteditable="true"]');
       if (editorEl instanceof HTMLElement) editorEl.focus();
@@ -468,7 +484,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   }, [openReplyId]);
 
   async function handleReply() {
-    if (!email || sending || !replyReady) return;
+    if (!email || sending || isCelebrating || !replyReady) return;
     setSending(true);
     setReplyError(null);
 
@@ -488,28 +504,34 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       // En cola: el proveedor no respondio y saldra solo; conviene decirlo en vez de "enviado".
       const queued = sent.deliveryStatus === "Queued";
-      receipts.done({
-        action: isForward ? "reenviar" : "responder",
-        title: queued
-          ? "Guardado en la cola de salida"
-          : isForward
-            ? "Correo reenviado"
-            : "Respuesta enviada",
-        detail: queued
-          ? "El proveedor no respondió; se reintentará solo"
-          : isForward
-            ? forwardTo
-            : (email.fromName ?? email.fromEmail),
-      });
+      const receiptTitle = queued
+        ? "Guardado en la cola de salida"
+        : isForward
+          ? "Correo reenviado"
+          : "Respuesta enviada";
+      const receiptDetail = queued
+        ? "El proveedor no respondió; se reintentará solo"
+        : isForward
+          ? forwardTo
+          : (email.fromName ?? email.fromEmail);
 
-      clearDraft(String(email.id));
-      // El reenvio abre conversacion propia: no forma parte de este hilo.
-      if (!isForward) {
-        setEmail({ ...email, thread: [...(email.thread ?? []), sent] });
-        setOpenReplyId(sent.id);
-      }
-      resetComposer();
-      setReplyOpen(false);
+      setSending(false);
+      celebrate(
+        {
+          title: receiptTitle,
+          detail: receiptDetail,
+        },
+        () => {
+          clearDraft(String(email.id));
+          // El reenvio abre conversacion propia: no forma parte de este hilo.
+          if (!isForward) {
+            setEmail({ ...email, thread: [...(email.thread ?? []), sent] });
+            setOpenReplyId(sent.id);
+          }
+          resetComposer();
+          setReplyOpen(false);
+        },
+      );
     } catch (err) {
       setReplyError(
         err instanceof ApiError
@@ -518,7 +540,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             ? "No se pudo reenviar el correo"
             : "No se pudo enviar la respuesta",
       );
-    } finally {
       setSending(false);
     }
   }
@@ -956,7 +977,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         {replyOpen && (
           <div
             ref={replyContainerRef}
-            className="absolute inset-0 z-20 flex flex-col bg-white"
+            className="absolute inset-0 z-20 flex flex-col bg-white animate-plf-side-panel-in relative"
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
@@ -993,6 +1014,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   inputRef={toRef}
                   value={forwardTo}
                   onChange={setForwardTo}
+                  invalid={hasInvalidRecipients(forwardTo)}
                   placeholder="correo@dominio.com, otro@dominio.com"
                   autoFocus
                 />
@@ -1037,6 +1059,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 inputRef={ccRef}
                 value={replyCc}
                 onChange={setReplyCc}
+                invalid={hasInvalidRecipients(replyCc)}
                 placeholder="correo@dominio.com, otro@dominio.com"
               />
               <button
@@ -1061,6 +1084,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 inputRef={bccRef}
                 value={replyBcc}
                 onChange={setReplyBcc}
+                invalid={hasInvalidRecipients(replyBcc)}
                 placeholder="Nadie más ve a quién va esta copia"
               />
               <button
@@ -1190,7 +1214,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   Cancelar
                 </PfButton>
                 <SendValidationButton
-                  ready={replyReady}
+                  ready={replyReady && !isCelebrating}
                   sending={sending}
                   missingItems={replyMissingItems}
                   onSend={handleReply}
@@ -1198,11 +1222,17 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 />
               </div>
             </div>
+
+            <ComposerSendSuccessLayer
+              open={celebration !== null}
+              title={celebration?.title ?? ""}
+              detail={celebration?.detail ?? ""}
+            />
           </div>
         )}
 
         {openReply && (
-          <div className="absolute inset-0 z-10 flex flex-col bg-white">
+          <div key={openReply.id} className="absolute inset-0 z-10 flex flex-col bg-white animate-plf-apple-tab">
             <div className="flex shrink-0 items-start gap-2.5 border-b border-line px-4 py-2.5">
               {(() => {
                 const openBadge = getThreadMessageBadge(openReply);

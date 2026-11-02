@@ -90,7 +90,7 @@ export function InboxTriageEmptyState({
 
         {/* Tarjetas operativas de estado (solo en bandeja de entrada) */}
         {isInbox && counts && (
-          <div className="mt-6 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-3">
+          <div className="plf-stagger mt-6 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-3">
             {/* 1. Sin responder */}
             <button
               type="button"

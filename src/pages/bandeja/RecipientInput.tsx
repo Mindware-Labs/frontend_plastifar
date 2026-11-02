@@ -10,6 +10,8 @@ interface RecipientInputProps {
   className?: string;
   autoFocus?: boolean;
   inputRef?: RefObject<HTMLInputElement | null>;
+  /** Texto con direcciones mal formadas (tiempo real). */
+  invalid?: boolean;
 }
 
 /** El trozo que se esta escribiendo: lo que va despues de la ultima coma o punto y coma. */
@@ -19,7 +21,15 @@ function splitCurrent(value: string) {
 }
 
 /** Selector de destinatarios con autocompletado de contactos sugeridos. */
-export function RecipientInput({ value, onChange, placeholder, className = "", autoFocus, inputRef }: RecipientInputProps) {
+export function RecipientInput({
+  value,
+  onChange,
+  placeholder,
+  className = "",
+  autoFocus,
+  inputRef,
+  invalid = false,
+}: RecipientInputProps) {
   const [suggestions, setSuggestions] = useState<ContactResponse[]>([]);
   const [active, setActive] = useState(0);
   const [open, setOpen] = useState(false);
@@ -90,7 +100,12 @@ export function RecipientInput({ value, onChange, placeholder, className = "", a
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
-        className={`w-full bg-transparent text-[12.5px] text-zinc-900 outline-none placeholder:text-zinc-400 font-medium ${className}`}
+        aria-invalid={invalid || undefined}
+        className={`w-full bg-transparent text-[12.5px] outline-none font-medium ${className} ${
+          invalid
+            ? "text-brand-red placeholder:text-red-300/80 caret-brand-red"
+            : "text-zinc-900 placeholder:text-zinc-400"
+        }`}
       />
 
       {open && shown.length > 0 && (

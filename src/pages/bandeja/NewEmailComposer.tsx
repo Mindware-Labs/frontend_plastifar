@@ -17,8 +17,15 @@ import { SendValidationButton } from "./SendValidationButton";
 import { CannedPicker } from "./CannedPicker";
 import { textToBlocks } from "./textToBlocks";
 import { RecipientInput } from "./RecipientInput";
+import {
+  hasInvalidRecipients,
+  optionalRecipientFieldValidationItems,
+  recipientFieldValidationItems,
+} from "../../lib/recipientValidation";
 import { type ValidationItem } from "./sendValidation";
 import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
+import { ComposerSendSuccessLayer } from "./ComposerSendSuccessLayer";
+import { useComposerSendCelebration } from "./useComposerSendCelebration";
 import {
   COMPOSER_BCC_KEY,
   COMPOSER_CC_KEY,
@@ -59,6 +66,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
   const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
+  const { celebration, celebrate, isCelebrating } = useComposerSendCelebration();
   const fileRef = useRef<HTMLInputElement>(null);
   // La marca del envio nace con el editor: un reintento la repite y no duplica el correo.
   const tokenRef = useRef(crypto.randomUUID());
@@ -119,7 +127,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   }
 
   async function handleSend() {
-    if (sending || !ready) return;
+    if (sending || isCelebrating || !ready) return;
     setSending(true);
     setError(null);
 
@@ -134,16 +142,16 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         files,
         clientToken: tokenRef.current,
       });
-      receipts.done({
-        action: "componer",
-        title: "Correo enviado",
-        detail: "Lo encuentras en Enviados",
-      });
-
-      onSent();
+      setSending(false);
+      celebrate(
+        {
+          title: "Correo enviado",
+          detail: "Lo encuentras en Enviados",
+        },
+        onSent,
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo enviar el correo");
-    } finally {
       setSending(false);
     }
   }
@@ -151,13 +159,15 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const body = blocksToText(blocks);
 
   const missingItems: ValidationItem[] = [];
-  if (!to.trim()) {
-    missingItems.push({
+  missingItems.push(
+    ...recipientFieldValidationItems(to, {
       id: "to",
-      label: "Falta el destinatario (Para)",
-      short: "el destinatario (Para)",
-    });
-  }
+      emptyLabel: "Falta el destinatario (Para)",
+      emptyShort: "el destinatario (Para)",
+    }),
+  );
+  missingItems.push(...optionalRecipientFieldValidationItems(cc, { id: "cc", fieldLabel: "CC" }));
+  missingItems.push(...optionalRecipientFieldValidationItems(bcc, { id: "bcc", fieldLabel: "CCO" }));
   if (!subject.trim()) {
     missingItems.push({
       id: "subject",
@@ -178,6 +188,10 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   function handleFocusField(fieldId: string) {
     if (fieldId === "to") {
       toRef.current?.focus();
+    } else if (fieldId === "cc") {
+      ccRef.current?.focus();
+    } else if (fieldId === "bcc") {
+      bccRef.current?.focus();
     } else if (fieldId === "subject") {
       subjectRef.current?.focus();
     } else if (fieldId === "body") {
@@ -189,7 +203,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   return (
     <div
       ref={containerRef}
-      className="flex h-full flex-col bg-white"
+      className="relative flex h-full flex-col bg-white"
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
@@ -216,6 +230,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
           inputRef={toRef}
           value={to}
           onChange={setTo}
+          invalid={hasInvalidRecipients(to)}
           placeholder="correo@dominio.com, otro@dominio.com"
         />
         {!ccOpen && (
@@ -246,6 +261,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
           inputRef={ccRef}
           value={cc}
           onChange={setCc}
+          invalid={hasInvalidRecipients(cc)}
           placeholder="correo@dominio.com, otro@dominio.com"
         />
         <button
@@ -270,6 +286,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
           inputRef={bccRef}
           value={bcc}
           onChange={setBcc}
+          invalid={hasInvalidRecipients(bcc)}
           placeholder="Nadie más ve a quién va esta copia"
         />
         <button
@@ -391,7 +408,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
             Descartar
           </PfButton>
           <SendValidationButton
-            ready={ready}
+            ready={ready && !isCelebrating}
             sending={sending}
             missingItems={missingItems}
             onSend={handleSend}
@@ -400,6 +417,12 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
           />
         </div>
       </div>
+
+      <ComposerSendSuccessLayer
+        open={celebration !== null}
+        title={celebration?.title ?? ""}
+        detail={celebration?.detail ?? ""}
+      />
     </div>
   );
 }

@@ -976,6 +976,73 @@ input:-webkit-autofill:focus {
   will-change: transform, opacity;
 }
 
+/* Confirmación de envío en compositor de bandeja (ComposerSendSuccessLayer). */
+@keyframes plf-composer-send-backdrop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes plf-composer-send-badge {
+  0% {
+    opacity: 0;
+    transform: scale(0.68);
+  }
+  48% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  72% {
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes plf-composer-send-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes plf-composer-send-copy {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-plf-composer-send-backdrop {
+  animation: plf-composer-send-backdrop 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-plf-composer-send-badge {
+  animation: plf-composer-send-badge 0.62s var(--ease-plf-spring) both;
+  will-change: transform, opacity;
+}
+.animate-plf-composer-send-ring {
+  animation: plf-composer-send-ring 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+}
+.animate-plf-composer-send-copy {
+  animation: plf-composer-send-copy 0.44s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.plf-composer-send-check .animate-plf-check-stroke {
+  animation-delay: 0.34s;
+}
+
 /* PF-FOR-291: ficha y pestaña de línea — deslizamiento lateral, sin colapso de alto. */
 @keyframes plf-apple-line-slide-in {
   0% {
@@ -1104,6 +1171,10 @@ input:-webkit-autofill:focus {
   .animate-plf-apple-pop,
   .animate-plf-apple-row-in,
   .animate-plf-apple-row-wash,
+  .animate-plf-composer-send-backdrop,
+  .animate-plf-composer-send-badge,
+  .animate-plf-composer-send-ring,
+  .animate-plf-composer-send-copy,
   .animate-plf-composer-row-in,
   .animate-plf-apple-line-slide-in,
   .animate-plf-apple-line-tab-in {

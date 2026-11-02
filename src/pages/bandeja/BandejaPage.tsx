@@ -43,6 +43,7 @@ import { FilterButton, FilterChips } from "./SearchFilters";
 import { EMPTY_FILTERS, countActive, toQueryParams, type AdvancedFilters } from "./filterCriteria";
 import { SelectionBar } from "./SelectionBar";
 import { InboxTriageEmptyState } from "./InboxTriageEmptyState";
+import { MailReadingPaneShell } from "./MailReadingPaneShell";
 
 export type FolderKey = "inbox" | "archived" | "starred" | "trash" | "sent";
 type TicketFilter = "todos" | "sin-ticket" | "sin-responder" | "mios";
@@ -1012,40 +1013,45 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
               <ResizableHandle withHandle className="bg-zinc-200/80 hover:bg-zinc-300" />
 
-              <ResizablePanel minSize="35%" className="flex flex-col">
-                {composing ? (
-                  <NewEmailComposer
-                    onSent={() => {
-                      setComposing(false);
-                      refreshAll();
-                    }}
-                    onCancel={() => setComposing(false)}
-                  />
-                ) : selectedId ? (
-                  <EmailDetailPane
-                    key={selectedId}
-                    emailId={selectedId}
-                    onTicketCreated={refresh}
-                    onMoved={handleMoved}
-                    onStarred={(starred) => {
-                      refresh();
-                      if (folder === "starred" && !starred) {
-                        setSelectedId(null);
-                      }
-                    }}
-                    onClose={() => setSelectedId(null)}
-                  />
-                ) : (
-                  <InboxTriageEmptyState
-                    folder={folder}
-                    counts={data.counts}
-                    folderCounts={data.folderCounts}
-                    canCompose={canMailSend}
-                    onCompose={() => setComposing(true)}
-                    onSelectTicketFilter={(f) => setTicketFilter(f)}
-                    activeTicketFilter={ticketFilter}
-                  />
-                )}
+              <ResizablePanel minSize="35%" className="flex min-h-0 flex-col overflow-hidden">
+                <MailReadingPaneShell
+                  key={
+                    composing ? "compose" : selectedId != null ? `detail-${selectedId}` : "empty"
+                  }
+                >
+                  {composing ? (
+                    <NewEmailComposer
+                      onSent={() => {
+                        setComposing(false);
+                        refreshAll();
+                      }}
+                      onCancel={() => setComposing(false)}
+                    />
+                  ) : selectedId ? (
+                    <EmailDetailPane
+                      emailId={selectedId}
+                      onTicketCreated={refresh}
+                      onMoved={handleMoved}
+                      onStarred={(starred) => {
+                        refresh();
+                        if (folder === "starred" && !starred) {
+                          setSelectedId(null);
+                        }
+                      }}
+                      onClose={() => setSelectedId(null)}
+                    />
+                  ) : (
+                    <InboxTriageEmptyState
+                      folder={folder}
+                      counts={data.counts}
+                      folderCounts={data.folderCounts}
+                      canCompose={canMailSend}
+                      onCompose={() => setComposing(true)}
+                      onSelectTicketFilter={(f) => setTicketFilter(f)}
+                      activeTicketFilter={ticketFilter}
+                    />
+                  )}
+                </MailReadingPaneShell>
               </ResizablePanel>
             </ResizablePanelGroup>
           </div>

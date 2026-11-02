@@ -45,7 +45,7 @@ export function ConversationRow({
       data-unread={email.unread}
       data-checked={checked}
       data-selecting={selecting}
-      className="group relative rounded-lg border transition-all duration-150 ease-out
+      className="group relative animate-plf-list-row-in rounded-lg border transition-all duration-150 ease-out
         data-[unread=false]:border-zinc-200/80 data-[unread=false]:bg-white/70
         data-[unread=false]:hover:border-zinc-300 data-[unread=false]:hover:bg-zinc-50/80 data-[unread=false]:hover:shadow-2xs
         data-[unread=true]:data-[selected=false]:border-zinc-200/90 data-[unread=true]:data-[selected=false]:bg-white
