@@ -921,6 +921,61 @@ input:-webkit-autofill:focus {
   animation: plf-apple-row-wash 480ms var(--ease-plf-spring) both;
 }
 
+/* CC/CCO al redactar: misma gramática, menos blur y 400/260 ms (useComposerFieldMotion). */
+@keyframes plf-composer-row-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0);
+    filter: blur(1px);
+  }
+  32% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes plf-composer-row-out {
+  0% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0);
+    filter: blur(0.75px);
+  }
+}
+
+.plf-composer-row-shell {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.plf-composer-row-shell[data-collapsed="true"] {
+  grid-template-rows: 0fr;
+}
+.plf-composer-row-shell[data-ready="true"] {
+  transition: grid-template-rows 400ms var(--ease-plf-spring);
+  will-change: grid-template-rows;
+}
+.plf-composer-row-shell[data-motion="out"][data-ready="true"] {
+  transition-duration: 260ms;
+}
+
+.animate-plf-composer-row-in {
+  animation: plf-composer-row-in 400ms var(--ease-plf-spring) both;
+  will-change: transform, opacity;
+}
+.animate-plf-composer-row-out {
+  animation: plf-composer-row-out 260ms var(--ease-plf-spring) both;
+  will-change: transform, opacity;
+}
+
 /* PF-FOR-291: ficha y pestaña de línea — deslizamiento lateral, sin colapso de alto. */
 @keyframes plf-apple-line-slide-in {
   0% {
@@ -1049,6 +1104,7 @@ input:-webkit-autofill:focus {
   .animate-plf-apple-pop,
   .animate-plf-apple-row-in,
   .animate-plf-apple-row-wash,
+  .animate-plf-composer-row-in,
   .animate-plf-apple-line-slide-in,
   .animate-plf-apple-line-tab-in {
     animation: none !important;
@@ -1075,6 +1131,7 @@ input:-webkit-autofill:focus {
   .animate-plf-drawer-out,
   .animate-plf-check-out,
   .animate-plf-apple-row-out,
+  .animate-plf-composer-row-out,
   .animate-plf-apple-line-slide-out,
   .animate-plf-apple-line-tab-out {
     animation-duration: 1ms !important;

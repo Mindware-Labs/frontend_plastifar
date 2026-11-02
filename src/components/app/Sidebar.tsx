@@ -3,6 +3,7 @@ import {
   ChevronDown,
   KeyRound,
   LogOut,
+  PanelLeft,
   PenLine,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -105,58 +106,13 @@ function FolderBadge({
   );
 }
 
-/**
- * Icono interactivo tipo hamburguesa para abrir y cerrar la barra lateral.
- * Diseño limpio de 3 barras horizontales redondeadas que se mantienen siempre
- * paralelas y estables, con micro-interacción suave al hover y pulsación táctil al clic.
- */
 function SidebarToggleIcon() {
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0 transition-transform duration-100 ease-out group-active:scale-95"
-      aria-hidden="true"
-    >
-      {/* Barra superior de la hamburguesa */}
-      <line
-        x1="3"
-        y1="5.25"
-        x2="15"
-        y2="5.25"
-        stroke="currentColor"
-        strokeWidth="1.65"
-        strokeLinecap="round"
-        className="transition-all duration-150 ease-out group-hover:stroke-zinc-900"
-      />
-
-      {/* Barra central de la hamburguesa (desplazamiento sutil y elegante de 0.8px en hover) */}
-      <line
-        x1="3"
-        y1="9"
-        x2="15"
-        y2="9"
-        stroke="currentColor"
-        strokeWidth="1.65"
-        strokeLinecap="round"
-        className="transition-all duration-150 ease-out group-hover:translate-x-[0.8px] group-hover:stroke-zinc-900 motion-reduce:transform-none"
-      />
-
-      {/* Barra inferior de la hamburguesa */}
-      <line
-        x1="3"
-        y1="12.75"
-        x2="15"
-        y2="12.75"
-        stroke="currentColor"
-        strokeWidth="1.65"
-        strokeLinecap="round"
-        className="transition-all duration-150 ease-out group-hover:stroke-zinc-900"
-      />
-    </svg>
+    <PanelLeft
+      aria-hidden
+      strokeWidth={1.65}
+      className="h-[18px] w-[18px] shrink-0 transition-transform duration-100 ease-out group-active:scale-95 group-hover:text-zinc-900"
+    />
   );
 }
 
@@ -524,7 +480,11 @@ export function Sidebar() {
         transition-[width] duration-[320ms] ease-plf-spring motion-reduce:transition-none ${collapsed ? "w-[68px]" : "w-60"}`}
     >
       {/* 1. Cabecera superior: altura fija elegante (h-14) con cross-fade ágil */}
-      <div className="relative flex h-14 shrink-0 items-center border-b border-zinc-200/80 px-3 overflow-hidden">
+      <div
+        className={`relative flex shrink-0 items-center border-b border-zinc-200/80 px-3 overflow-hidden transition-[height] duration-[260ms] ease-plf-spring motion-reduce:transition-none ${
+          collapsed ? "h-[4.25rem]" : "h-14"
+        }`}
+      >
         {/* Versión expandida */}
         <div
           className={`flex w-full items-center justify-between transition-all duration-[260ms] ease-plf-spring motion-reduce:transition-none ${
@@ -555,7 +515,7 @@ export function Sidebar() {
 
         {/* Versión contraída */}
         <div
-          className={`absolute inset-0 flex items-center justify-center gap-1.5 px-2 transition-all duration-[260ms] ease-plf-spring motion-reduce:transition-none ${
+          className={`absolute inset-0 flex flex-col items-center justify-center gap-0.5 px-2 transition-all duration-[260ms] ease-plf-spring motion-reduce:transition-none ${
             collapsed ? "opacity-100 pointer-events-auto translate-x-0" : "opacity-0 pointer-events-none translate-x-2"
           }`}
         >

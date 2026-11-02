@@ -21,16 +21,20 @@ export function DataTable({
   fixed = false,
   bare = false,
   className = "",
+  tableClassName = "",
   children,
 }: {
   fixed?: boolean;
   bare?: boolean;
   className?: string;
+  tableClassName?: string;
   children: ReactNode;
 }) {
   const inPanel = useInListPanel();
   const table = (
-    <table className={`w-full border-collapse text-left ${fixed ? "table-fixed" : ""}`}>
+    <table
+      className={`w-full border-collapse text-left ${fixed ? "table-fixed" : ""} ${tableClassName}`.trim()}
+    >
       {children}
     </table>
   );

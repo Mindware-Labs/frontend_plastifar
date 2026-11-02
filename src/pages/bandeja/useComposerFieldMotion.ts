@@ -1,9 +1,9 @@
 import { useMemo } from "react";
-import {
-  APPLE_LIST_ENTER_MS,
-  APPLE_LIST_EXIT_MS,
-  useAppleListMotion,
-} from "../../hooks/useAppleListMotion";
+import { useAppleListMotion } from "../../hooks/useAppleListMotion";
+
+/** Deben coincidir con plf-composer-row-in / plf-composer-row-out en index.css. */
+export const COMPOSER_FIELD_ENTER_MS = 400;
+export const COMPOSER_FIELD_EXIT_MS = 260;
 
 export const COMPOSER_CC_KEY = "cc";
 export const COMPOSER_BCC_KEY = "bcc";
@@ -19,7 +19,7 @@ export function useComposerFieldMotion(ccOpen: boolean, bccOpen: boolean) {
 
   return useAppleListMotion(keys, {
     minItems: 0,
-    enterMs: APPLE_LIST_ENTER_MS,
-    exitMs: APPLE_LIST_EXIT_MS,
+    enterMs: COMPOSER_FIELD_ENTER_MS,
+    exitMs: COMPOSER_FIELD_EXIT_MS,
   });
 }

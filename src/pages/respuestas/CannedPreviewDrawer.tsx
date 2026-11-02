@@ -18,7 +18,9 @@ import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse } from "../../types/api";
+import { templateToReadablePlain } from "../../lib/cannedVariables";
 import { getCategoryBadgeClasses, parseCanned } from "./cannedHelpers";
+import { CannedTemplateInline } from "./CannedTemplateInline";
 
 interface CannedPreviewDrawerProps {
   item: CannedResponseResponse;
@@ -59,13 +61,13 @@ export function CannedPreviewDrawer({
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(cleanBody);
+      await navigator.clipboard.writeText(templateToReadablePlain(cleanBody));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Fallback
       const ta = document.createElement("textarea");
-      ta.value = cleanBody;
+      ta.value = templateToReadablePlain(cleanBody);
       ta.style.position = "fixed";
       ta.style.opacity = "0";
       document.body.appendChild(ta);
@@ -225,8 +227,8 @@ export function CannedPreviewDrawer({
               {cleanBody.trim() ? (
                 <div className="max-w-2xl space-y-4 font-sans text-[13.5px] leading-[1.75] text-ink">
                   {cleanBody.split(/\n{2,}/).map((para, i) => (
-                    <p key={i} className="whitespace-pre-line">
-                      {para}
+                    <p key={i}>
+                      <CannedTemplateInline value={para} size="md" />
                     </p>
                   ))}
                 </div>

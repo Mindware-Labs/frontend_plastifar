@@ -18,7 +18,7 @@ import { Alert } from "../../components/ui/Alert";
 import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
 import { Button } from "../../components/ui/Button";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
-import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
+import { CANNED_BODY_PLACEHOLDER } from "../../lib/cannedVariables";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse, CategoriaResponseItem } from "../../types/api";
 import {
@@ -28,9 +28,10 @@ import {
   parseCanned,
 } from "./cannedHelpers";
 import { CategoriaModal } from "./CategoriaModal";
-import { CannedVariableChips } from "./CannedVariableChips";
-
-const INITIAL_BODY_MIN_PX = 42;
+import {
+  CannedTemplateBodyEditor,
+  type CannedTemplateBodyEditorHandle,
+} from "./CannedTemplateBodyEditor";
 
 interface CannedResponseStudioProps {
   /** Presente = edición; ausente = nueva respuesta rápida. */
@@ -70,7 +71,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
   const [createCategoryModalOpen, setCreateCategoryModalOpen] = useState(false);
 
   const titleId = useId();
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const bodyEditorRef = useRef<CannedTemplateBodyEditorHandle>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   // Cargar categorías del catálogo de base de datos
@@ -95,13 +96,6 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
 
   useEffect(loadCategories, []);
 
-  // Redimensionar automáticamente el textarea sin scroll interno
-  useEffect(() => {
-    if (activeTab === "compose") {
-      autoResizeTextarea(bodyRef.current, INITIAL_BODY_MIN_PX);
-    }
-  }, [body, activeTab]);
-
   // Estilo del distintivo
   const currentCategoryColor = useMemo(() => {
     return dbCategories.find((c) => c.id === selectedCategoryId)?.color;
@@ -116,24 +110,6 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
     const chars = body.length;
     return { words, chars };
   }, [body]);
-
-  function insertVariable(token: string) {
-    const el = bodyRef.current;
-    if (!el) {
-      setBody((prev) => (prev ? `${prev} ${token}` : token));
-      return;
-    }
-    const start = el.selectionStart ?? body.length;
-    const end = el.selectionEnd ?? body.length;
-    const next = body.slice(0, start) + token + body.slice(end);
-    setBody(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      const pos = start + token.length;
-      el.setSelectionRange(pos, pos);
-      autoResizeTextarea(el, INITIAL_BODY_MIN_PX);
-    });
-  }
 
   const handleSave = useCallback(async () => {
     const cleanTitle = title.trim();
@@ -150,8 +126,8 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
       return;
     }
     if (!cleanBody) {
-      setFormError("Escribe el cuerpo del correo de la respuesta.");
-      bodyRef.current?.focus();
+      setFormError("Escribe el cuerpo del correo de la plantilla.");
+      bodyEditorRef.current?.focus();
       return;
     }
     if (cleanBody.length > 20000) {
@@ -458,29 +434,14 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                 </div>
 
                 <div className="relative rounded-lg border border-zinc-200 bg-white shadow-2xs transition-all hover:border-zinc-300 focus-within:border-zinc-300 focus-within:ring-2 focus-within:ring-brand-red/25">
-                  <textarea
-                    ref={bodyRef}
-                    rows={1}
+                  <CannedTemplateBodyEditor
+                    ref={bodyEditorRef}
                     value={body}
                     maxLength={20000}
-                    onChange={(e) => {
-                      setBody(e.target.value);
-                      autoResizeTextarea(e.target, INITIAL_BODY_MIN_PX);
-                    }}
-                    placeholder={
-                      "Estimado/a {cliente.nombre},\n\n" +
-                      "Gracias por comunicarse con Plastifar. Hemos recibido su consulta sobre {ticket.numero} y nuestro equipo ya está atendiendo los detalles.\n\n" +
-                      "Quedamos a su entera disposición ante cualquier duda adicional.\n\n" +
-                      "Atentamente,\n{agente.nombre}"
-                    }
-                    className="w-full resize-none overflow-hidden bg-transparent px-3.5 py-2.5 font-sans text-[13px] leading-[1.65] text-ink outline-none [field-sizing:content] placeholder:text-zinc-400 min-h-[42px]"
+                    onChange={setBody}
+                    placeholder={CANNED_BODY_PLACEHOLDER}
                   />
                 </div>
-                <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-                  Variables inteligentes: al insertar la plantilla en la bandeja se rellenan con datos del hilo cuando
-                  existen; si falta algún dato, el marcador se mantiene para completarlo a mano.
-                </p>
-                <CannedVariableChips onInsert={insertVariable} />
               </div>
             </div>
           ) : (
@@ -564,7 +525,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                   {body.trim() ? (
                     <div className="max-w-2xl space-y-4 font-sans text-[13.5px] leading-[1.75] text-ink">
                       {body.split(/\n{2,}/).map((para, i) => (
-                        <p key={i} className="whitespace-pre-line">
+                        <p key={i} className="whitespace-pre-wrap">
                           {para}
                         </p>
                       ))}

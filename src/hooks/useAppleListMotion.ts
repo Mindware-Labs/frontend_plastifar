@@ -82,16 +82,6 @@ export function useAppleListMotion(itemKeys: string[], options: UseAppleListMoti
         for (const key of pending) next.add(key);
         return next;
       });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [enterKeys, enterArmed, exitKeys]);
-
-  useLayoutEffect(() => {
-    const pending = [...enterKeys].filter(
-      (key) => enterArmed.has(key) && !openKeys.has(key) && !exitKeys.has(key),
-    );
-    if (pending.length === 0) return;
-    const frame = requestAnimationFrame(() => {
       setOpenKeys((current) => {
         const next = new Set(current);
         for (const key of pending) next.add(key);
@@ -99,7 +89,7 @@ export function useAppleListMotion(itemKeys: string[], options: UseAppleListMoti
       });
     });
     return () => cancelAnimationFrame(frame);
-  }, [enterKeys, enterArmed, openKeys, exitKeys]);
+  }, [enterKeys, enterArmed, exitKeys]);
 
   useEffect(() => {
     for (const key of openKeys) {

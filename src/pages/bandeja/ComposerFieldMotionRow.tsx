@@ -12,7 +12,7 @@ export function ComposerFieldMotionRow({ open, phase, children }: ComposerFieldM
   if (!open) return null;
 
   return (
-    <AppleMotionBlock phase={phase} className="shrink-0">
+    <AppleMotionBlock phase={phase} rowPreset="composer" className="shrink-0">
       <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
         {children}
       </div>

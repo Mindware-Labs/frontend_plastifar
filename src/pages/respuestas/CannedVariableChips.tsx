@@ -1,4 +1,5 @@
 import { CANNED_VARIABLES } from "../../lib/cannedVariables";
+import { CANNED_VAR_CHIP_PICKER } from "./cannedVariableChipStyles";
 
 export function CannedVariableChips({ onInsert }: { onInsert: (token: string) => void }) {
   return (
@@ -9,9 +10,9 @@ export function CannedVariableChips({ onInsert }: { onInsert: (token: string) =>
           type="button"
           title={variable.hint}
           onClick={() => onInsert(variable.token)}
-          className="inline-flex items-center rounded-md border border-zinc-200 bg-zinc-50 px-2 py-0.5 font-mono text-[10.5px] font-medium text-zinc-700 transition-colors hover:border-brand-red/30 hover:bg-brand-red/5 hover:text-brand-red cursor-pointer"
+          className={CANNED_VAR_CHIP_PICKER}
         >
-          {variable.token}
+          {variable.label}
         </button>
       ))}
     </div>

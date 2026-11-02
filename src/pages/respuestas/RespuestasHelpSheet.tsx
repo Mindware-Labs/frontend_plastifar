@@ -118,33 +118,25 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
               </div>
 
               <div className="p-4 font-sans text-[12.5px] leading-relaxed text-ink">
-                <p className="font-medium">
+                <p className="font-medium leading-relaxed">
                   Estimado/a{" "}
-                  <span className="rounded-md border border-brand-red/20 bg-brand-red/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-red">
-                    [Nombre del cliente]
+                  <span className="inline-flex items-center rounded border border-zinc-300/90 bg-zinc-100/90 px-1.5 py-0 font-sans text-[11px] font-medium text-zinc-800">
+                    Cliente
                   </span>
                   ,
                 </p>
-                <p className="mt-2.5">
+                <p className="mt-2.5 leading-relaxed">
                   Confirmamos su pedido{" "}
-                  <span className="rounded-md border border-brand-red/20 bg-brand-red/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-red">
-                    [N° pedido]
+                  <span className="inline-flex items-center rounded border border-zinc-300/90 bg-zinc-100/90 px-1.5 py-0 font-sans text-[11px] font-medium text-zinc-800">
+                    Ticket
                   </span>
-                  . El envío estimado es de{" "}
-                  <span className="rounded-md border border-brand-red/20 bg-brand-red/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-red">
-                    [Días hábiles]
-                  </span>
-                  .
+                  . Nuestro equipo ya está atendiendo los detalles.
                 </p>
               </div>
 
               <div className="border-t border-zinc-100 bg-zinc-50/50 px-4 py-2.5 text-[11.5px] text-zinc-500">
-                Usa variables como{" "}
-                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono font-medium text-brand-red">
-                  {"{cliente.nombre}"}
-                </code>
-                : se rellenan solas al insertar la plantilla cuando el dato está en el hilo; si no, las completas tú
-                antes de enviar.
+                En el editor se ven como chips (p. ej. «Cliente», «Ticket»). Al insertar la plantilla en la bandeja se
+                rellenan solas cuando el dato está en el hilo; si no, las completas tú antes de enviar.
               </div>
             </div>
           </section>

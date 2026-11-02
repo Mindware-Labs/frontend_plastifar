@@ -424,6 +424,7 @@ export interface CannedResponseResponse {
   categoryName?: string | null;
   createdByStaffId: number;
   createdByName: string;
+  createdAt: string;
   updatedAt: string;
   usageCount: number;
   lastUsedAt: string | null;

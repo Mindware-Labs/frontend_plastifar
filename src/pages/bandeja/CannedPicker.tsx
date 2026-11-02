@@ -4,7 +4,11 @@ import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { cannedApi } from "../../api/canned";
 import type { CannedResponseResponse } from "../../types/api";
-import { applyCannedVariables, type CannedVariableContext } from "../../lib/cannedVariables";
+import {
+  applyCannedVariables,
+  templateToReadablePlain,
+  type CannedVariableContext,
+} from "../../lib/cannedVariables";
 import { getCategoryBadgeClasses, parseCanned } from "../respuestas/cannedHelpers";
 
 interface CannedPickerProps {
@@ -219,7 +223,9 @@ export function CannedPicker({ onPick, variableContext }: CannedPickerProps) {
                         <span className={`size-1 rounded-full ${badge.dot}`} />
                         {entry.category}
                       </span>
-                      <span className="min-w-0 truncate text-[11px] text-zinc-500">{entry.cleanBody}</span>
+                      <span className="min-w-0 truncate text-[11px] text-zinc-500">
+                        {templateToReadablePlain(entry.cleanBody)}
+                      </span>
                     </div>
                   </button>
                 );

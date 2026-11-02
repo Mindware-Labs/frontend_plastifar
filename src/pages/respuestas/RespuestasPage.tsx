@@ -1,8 +1,4 @@
 import {
-  Check,
-  Copy,
-  CopyPlus,
-  Eye,
   HelpCircle,
   MessageSquareText,
   Pencil,
@@ -30,6 +26,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDateTime } from "../../lib/format";
+import { templateToReadablePlain } from "../../lib/cannedVariables";
 import type { CannedResponseResponse, CategoriaResponseItem } from "../../types/api";
 import { getCategoryBadgeClasses, parseCanned } from "./cannedHelpers";
 import { CannedPreviewDrawer } from "./CannedPreviewDrawer";
@@ -50,7 +47,6 @@ export function RespuestasPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [pageSize, setPageSize] = useState(10);
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [copiedId, setCopiedId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
@@ -140,26 +136,6 @@ export function RespuestasPage() {
   function canManage(item: CannedResponseResponse) {
     if (!canMailSend) return false;
     return Boolean(user?.isAdmin) || item.createdByStaffId === user?.staffId;
-  }
-
-  async function handleCopyText(item: CannedResponseResponse, cleanBody: string) {
-    try {
-      await navigator.clipboard.writeText(cleanBody);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = cleanBody;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    }
-    setCopiedId(item.id);
-    setTimeout(() => {
-      setCopiedId((curr) => (curr === item.id ? null : curr));
-    }, 2000);
   }
 
   function handleDuplicate(item: CannedResponseResponse) {
@@ -404,7 +380,7 @@ export function RespuestasPage() {
               />
             ) : (
               <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-                <DataTable>
+                <DataTable fixed>
                   <thead>
                     <HeadRow>
                       {canMailSend && (
@@ -422,15 +398,15 @@ export function RespuestasPage() {
                           </div>
                         </Th>
                       )}
-                      <Th className="w-36">Categoría</Th>
-                      <Th>Título</Th>
-                      <Th className="w-44">Asunto sugerido</Th>
+                      <Th className="w-[11%]">Categoría</Th>
+                      <Th className="w-[14%]">Título</Th>
+                      <Th className="w-[13%]">Asunto sugerido</Th>
                       <Th>Vista previa</Th>
-                      <Th className="w-24 text-center">Usos</Th>
-                      <Th className="w-36">Último uso</Th>
-                      <Th className="w-32">Creada por</Th>
-                      <Th className="w-32">Actualizada</Th>
-                      <Th className="w-32 text-right">Acciones</Th>
+                      <Th className="w-16 text-center">Usos</Th>
+                      <Th className="w-[10%]">Último uso</Th>
+                      <Th className="w-[10%]">Creada por</Th>
+                      <Th className="w-[11%]">Creado</Th>
+                      {canMailSend && <Th className="w-[4.5rem] text-right">Acciones</Th>}
                     </HeadRow>
                   </thead>
                   <tbody>
@@ -438,8 +414,8 @@ export function RespuestasPage() {
                       const { category, cleanTitle, cleanBody, suggestedSubject } = item.parsed;
                       const matchedCat = categories?.find((c) => c.name.toLowerCase() === category.toLowerCase());
                       const badge = getCategoryBadgeClasses(category, matchedCat?.color);
-                      const isCopied = copiedId === item.id;
                       const checked = selectedIds.includes(item.id);
+                      const manageable = canManage(item);
 
                       return (
                         <Row
@@ -461,38 +437,36 @@ export function RespuestasPage() {
                             </Td>
                           )}
 
-                          {/* Categoría */}
-                          <Td className="whitespace-nowrap">
+                          <Td className="overflow-hidden">
                             <span
-                              className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${badge.badge}`}
+                              className={`inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${badge.badge}`}
                             >
-                              <span className={`size-1.5 rounded-full ${badge.dot}`} />
-                              <span className="truncate max-w-[110px]">{category}</span>
+                              <span className={`size-1.5 shrink-0 rounded-full ${badge.dot}`} />
+                              <span className="truncate">{category}</span>
                             </span>
                           </Td>
 
-                          {/* Título */}
-                          <Td className="text-[13px] font-semibold text-ink">
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate max-w-[280px]" title={cleanTitle}>
-                                {cleanTitle}
-                              </span>
-                            </div>
+                          <Td className="overflow-hidden text-[13px] font-semibold text-ink">
+                            <span className="block truncate" title={cleanTitle}>
+                              {cleanTitle}
+                            </span>
                           </Td>
 
-                          {/* Asunto sugerido */}
-                          <Td className="whitespace-nowrap text-[12px] text-subtle">
+                          <Td className="overflow-hidden text-[12px] text-subtle">
                             {suggestedSubject ? (
-                              <span className="truncate max-w-[190px] block font-medium text-zinc-700" title={suggestedSubject}>
+                              <span className="block truncate font-medium text-zinc-700" title={suggestedSubject}>
                                 {suggestedSubject}
                               </span>
                             ) : (
-                              <span className="text-zinc-400 font-mono text-[11px]">—</span>
+                              <span className="text-zinc-400">—</span>
                             )}
                           </Td>
 
-                          <Td className="max-w-[280px] truncate text-[12.5px] text-subtle" title={cleanBody}>
-                            {cleanBody}
+                          <Td
+                            className="overflow-hidden truncate text-[12.5px] text-subtle"
+                            title={templateToReadablePlain(cleanBody)}
+                          >
+                            {templateToReadablePlain(cleanBody)}
                           </Td>
 
                           <Td className="text-center whitespace-nowrap">
@@ -501,63 +475,49 @@ export function RespuestasPage() {
                             </span>
                           </Td>
 
-                          <Td className="whitespace-nowrap text-[12px] text-subtle">
-                            {item.lastUsedAt ? formatDateTime(item.lastUsedAt) : "—"}
+                          <Td className="overflow-hidden whitespace-nowrap text-[12px] text-subtle">
+                            {item.lastUsedAt ? (
+                              <span className="block truncate" title={formatDateTime(item.lastUsedAt)}>
+                                {formatDateTime(item.lastUsedAt)}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
                           </Td>
 
-                          <Td className="whitespace-nowrap text-[12px] text-subtle">{item.createdByName}</Td>
-
-                          <Td className="whitespace-nowrap text-[12px] text-subtle">{formatDateTime(item.updatedAt)}</Td>
-
-                          {/* Acciones */}
-                          <Td onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-end gap-1">
-                              {/* Ver detalle / previsualización */}
-                              <RowAction
-                                label={`Vista previa de ${cleanTitle}`}
-                                icon={Eye}
-                                onClick={() => setPreviewItem(item)}
-                              />
-
-                              {/* Copiar texto */}
-                              <RowAction
-                                label={isCopied ? "¡Copiado al portapapeles!" : `Copiar texto de ${cleanTitle}`}
-                                icon={isCopied ? Check : Copy}
-                                onClick={() => handleCopyText(item, cleanBody)}
-                                className={isCopied ? "!text-emerald-600 bg-emerald-50" : ""}
-                              />
-
-                              {/* Duplicar plantilla */}
-                              {canMailSend && (
-                                <RowAction
-                                  label={`Duplicar ${cleanTitle}`}
-                                  icon={CopyPlus}
-                                  onClick={() => handleDuplicate(item)}
-                                />
-                              )}
-
-                              {/* Editar */}
-                              {canManage(item) && (
-                                <RowAction
-                                  label={`Editar ${cleanTitle}`}
-                                  icon={Pencil}
-                                  onClick={() => setStudioState({ mode: "editar", item })}
-                                  disabled={busyId === item.id}
-                                />
-                              )}
-
-                              {/* Eliminar */}
-                              {canManage(item) && (
-                                <RowAction
-                                  label={`Eliminar ${cleanTitle}`}
-                                  icon={Trash2}
-                                  onClick={() => askDelete(item)}
-                                  disabled={busyId === item.id}
-                                  danger
-                                />
-                              )}
-                            </div>
+                          <Td className="overflow-hidden text-[12px] text-subtle">
+                            <span className="block truncate" title={item.createdByName}>
+                              {item.createdByName}
+                            </span>
                           </Td>
+
+                          <Td className="overflow-hidden whitespace-nowrap text-[12px] text-subtle">
+                            <span className="block truncate" title={formatDateTime(item.createdAt)}>
+                              {formatDateTime(item.createdAt)}
+                            </span>
+                          </Td>
+
+                          {canMailSend && (
+                            <Td onClick={(e) => e.stopPropagation()}>
+                              {manageable ? (
+                                <div className="flex items-center justify-end gap-1">
+                                  <RowAction
+                                    label={`Editar ${cleanTitle}`}
+                                    icon={Pencil}
+                                    onClick={() => setStudioState({ mode: "editar", item })}
+                                    disabled={busyId === item.id}
+                                  />
+                                  <RowAction
+                                    label={`Eliminar ${cleanTitle}`}
+                                    icon={Trash2}
+                                    onClick={() => askDelete(item)}
+                                    disabled={busyId === item.id}
+                                    danger
+                                  />
+                                </div>
+                              ) : null}
+                            </Td>
+                          )}
                         </Row>
                       );
                     })}

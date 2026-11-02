@@ -53,6 +53,37 @@ export const CANNED_VARIABLES: CannedVariableDefinition[] = [
   },
 ];
 
+/** Clave sin llaves, p. ej. `cliente.nombre`. */
+export function normalizeVariableKey(raw: string): string {
+  const trimmed = raw.trim().toLowerCase();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+export function lookupCannedVariable(keyOrToken: string): CannedVariableDefinition | undefined {
+  const key = normalizeVariableKey(keyOrToken);
+  return CANNED_VARIABLES.find((def) => normalizeVariableKey(def.token) === key);
+}
+
+export function cannedVariableLabel(keyOrToken: string): string {
+  return lookupCannedVariable(keyOrToken)?.label ?? normalizeVariableKey(keyOrToken);
+}
+
+/** Texto de ejemplo para el cuerpo vacío (misma estructura que antes, sin sintaxis técnica). */
+export const CANNED_BODY_PLACEHOLDER =
+  "Estimado/a nombre del cliente,\n\n" +
+  "Gracias por comunicarse con Plastifar. Hemos recibido su consulta sobre el ticket o pedido y nuestro equipo ya está atendiendo los detalles.\n\n" +
+  "Quedamos a su entera disposición ante cualquier duda adicional.\n\n" +
+  "Atentamente,\n" +
+  "nombre de quien responde";
+
+/** Vista previa en listas: sustituye marcadores internos por etiquetas legibles. */
+export function templateToReadablePlain(text: string): string {
+  return text.replace(/\{([a-z0-9_.]+)\}/gi, (_, raw: string) => cannedVariableLabel(raw));
+}
+
 function formatToday(): string {
   return new Intl.DateTimeFormat("es-DO", {
     day: "numeric",
@@ -93,9 +124,9 @@ function legacyPattern(label: string): RegExp {
 
 /** Sustituye variables `{clave}` y etiquetas legacy `[…]` cuando hay dato; si no, deja el marcador. */
 export function applyCannedVariables(text: string, ctx: CannedVariableContext): string {
-  let out = text.replace(/\{([a-z0-9_.]+)\}/gi, (match, key: string) => {
+  let out = text.replace(/\{([a-z0-9_.]+)\}/gi, (_match, key: string) => {
     const value = resolveToken(key, ctx);
-    return value ?? match;
+    return value ?? cannedVariableLabel(key);
   });
 
   for (const def of CANNED_VARIABLES) {
