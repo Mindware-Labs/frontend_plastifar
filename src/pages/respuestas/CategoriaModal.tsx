@@ -92,6 +92,7 @@ export function CategoriaModal({ category, onClose, onSaved }: CategoriaModalPro
       title={isEdit ? "Editar categoría" : "Nueva categoría"}
       eyebrow="Correo · Catálogo de respuestas"
       description="Organiza las respuestas rápidas y plantillas en categorías operativas."
+      maxWidth="max-w-xl"
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={requestClose}
@@ -140,7 +141,7 @@ export function CategoriaModal({ category, onClose, onSaved }: CategoriaModalPro
             <Palette className="h-3.5 w-3.5 text-zinc-400" />
             <span>Color del distintivo</span>
           </label>
-          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+          <div className="grid grid-cols-6 gap-1.5 pt-0.5">
             {PRESET_COLORS.map((c) => {
               const isSelected = color === c.value;
               return (
@@ -148,14 +149,15 @@ export function CategoriaModal({ category, onClose, onSaved }: CategoriaModalPro
                   key={c.value}
                   type="button"
                   onClick={() => setColor(c.value)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[12px] font-medium transition-all cursor-pointer ${
+                  title={c.label}
+                  className={`flex w-full min-w-0 items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
                     isSelected
                       ? `${c.bg} ${c.text} border-zinc-400/80 ring-2 ring-brand-red/20 shadow-2xs font-semibold`
                       : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50"
                   }`}
                 >
-                  <span className={`size-2 rounded-full ${c.dot}`} />
-                  <span>{c.label}</span>
+                  <span className={`size-2 shrink-0 rounded-full ${c.dot}`} />
+                  <span className="truncate">{c.label}</span>
                 </button>
               );
             })}
@@ -167,22 +169,21 @@ export function CategoriaModal({ category, onClose, onSaved }: CategoriaModalPro
             label="Descripción (opcional)"
             placeholder="Breve explicación de los tipos de plantillas incluidas en esta categoría..."
             maxLength={200}
-            rows={3}
+            autoGrow
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
 
-        {/* Vista previa miniatura del distintivo */}
-        <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/60 p-3">
-          <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 block mb-1.5">
-            Vista previa del distintivo
+        <div className="flex min-w-0 items-center gap-2.5 rounded-lg border border-zinc-200/80 bg-zinc-50/60 px-3 py-2">
+          <span className="shrink-0 font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+            Vista previa
           </span>
           <span
-            className={`inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-2 py-0.5 text-[11.5px] font-semibold ${selectedColorOption.bg} ${selectedColorOption.text}`}
+            className={`inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-zinc-200 px-2 py-0.5 text-[11.5px] font-semibold ${selectedColorOption.bg} ${selectedColorOption.text}`}
           >
-            <span className={`size-1.5 rounded-full ${selectedColorOption.dot}`} />
-            <span>{name.trim() || "Nombre de categoría"}</span>
+            <span className={`size-1.5 shrink-0 rounded-full ${selectedColorOption.dot}`} />
+            <span className="truncate">{name.trim() || "Nombre de categoría"}</span>
           </span>
         </div>
       </form>

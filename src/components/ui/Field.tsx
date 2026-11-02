@@ -1,12 +1,16 @@
 import { AlertCircle, Check, Eye, EyeOff } from "lucide-react";
 import {
   forwardRef,
+  useCallback,
   useId,
+  useLayoutEffect,
+  useRef,
   useState,
   type InputHTMLAttributes,
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
+import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import {
   controlBase,
   controlSizes,
@@ -321,10 +325,19 @@ export function DateField({
   );
 }
 
+/** Clase compartida: crece con el texto, sin scroll interno ni asa de redimensionar. */
+export const TEXTAREA_AUTO_GROW_CLASS = "min-h-0 resize-none overflow-hidden";
+
+/** Altura mínima de una línea con `py-2.5` y `text-[13px] leading-relaxed`. */
+export const TEXTAREA_ONE_LINE_MIN_PX = 44;
+
 interface TextAreaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
   error?: string;
   hint?: ReactNode;
+  /** Empieza en una línea y crece con el contenido (sin scroll interno). */
+  autoGrow?: boolean;
+  minHeightPx?: number;
 }
 
 /**
@@ -333,25 +346,68 @@ interface TextAreaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaElement>
  * una palomita verde junto a un parrafo de causa raiz no dice nada util.
  */
 export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
-  function TextAreaField({ label, error, hint, id, className = "", required, rows = 3, ...props }, ref) {
+  function TextAreaField(
+    {
+      label,
+      error,
+      hint,
+      id,
+      className = "",
+      required,
+      rows = 3,
+      autoGrow = false,
+      minHeightPx = TEXTAREA_ONE_LINE_MIN_PX,
+      onChange,
+      value,
+      ...props
+    },
+    ref,
+  ) {
     const generated = useId();
     const fieldId = id ?? props.name ?? generated;
+    const innerRef = useRef<HTMLTextAreaElement | null>(null);
+
+    const resize = useCallback(
+      (element: HTMLTextAreaElement | null) => {
+        if (autoGrow) autoResizeTextarea(element, minHeightPx);
+      },
+      [autoGrow, minHeightPx],
+    );
+
+    const mergeRef = useCallback(
+      (element: HTMLTextAreaElement | null) => {
+        innerRef.current = element;
+        if (typeof ref === "function") ref(element);
+        else if (ref) ref.current = element;
+        resize(element);
+      },
+      [ref, resize],
+    );
+
+    useLayoutEffect(() => {
+      resize(innerRef.current);
+    }, [resize, value]);
 
     return (
       <FieldShell id={fieldId} label={label} error={error} hint={hint} required={required}>
         <textarea
-          ref={ref}
+          ref={mergeRef}
           id={fieldId}
-          rows={rows}
+          rows={autoGrow ? 1 : rows}
+          value={value}
           aria-invalid={error !== undefined}
           aria-describedby={describedBy(fieldId, error, hint)}
+          onChange={(event) => {
+            onChange?.(event);
+            resize(event.target);
+          }}
           className={`w-full rounded-edge border bg-white px-3 py-2.5 text-[13px] leading-relaxed
             text-ink outline-none transition-colors placeholder:text-faint
             ${
               error
                 ? "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/10"
                 : "border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
-            } ${className}`}
+            } ${autoGrow ? TEXTAREA_AUTO_GROW_CLASS : ""} ${className}`}
           {...props}
         />
       </FieldShell>

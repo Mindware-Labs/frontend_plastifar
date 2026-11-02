@@ -22,7 +22,6 @@ import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse, CategoriaResponseItem } from "../../types/api";
 import {
-  CANNED_CATEGORIES,
   formatCannedBody,
   formatCannedTitle,
   getCategoryBadgeClasses,
@@ -382,32 +381,14 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                       </button>
                     );
                   })}
-
-                  {/* Si la lista de la BD aún no tiene categorías, mostrar las estándar como fallback */}
-                  {dbCategories.length === 0 &&
-                    CANNED_CATEGORIES.filter((c) => c !== "General").map((cat) => {
-                      const isSelected = categoryName.toLowerCase() === cat.toLowerCase();
-                      const style = getCategoryBadgeClasses(cat);
-                      return (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCategoryId(null);
-                            setCategoryName(cat);
-                          }}
-                          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[12px] font-medium transition-all cursor-pointer ${
-                            isSelected
-                              ? `${style.badge} ring-1.5 ring-brand-red/30 shadow-2xs font-semibold`
-                              : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50"
-                          }`}
-                        >
-                          <span className={`size-1.5 rounded-full ${style.dot}`} />
-                          {cat}
-                        </button>
-                      );
-                    })}
                 </div>
+
+                {dbCategories.length === 0 && (
+                  <p className="mt-2 text-[11.5px] leading-relaxed text-zinc-500">
+                    Todavía no hay categorías en el catálogo. Usa «Nueva categoría» o créalas en la pestaña
+                    Categorías.
+                  </p>
+                )}
               </div>
 
               {/* 3. Asunto sugerido (opcional) (con línea divisoria) */}

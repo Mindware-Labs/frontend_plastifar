@@ -1,14 +1,3 @@
-export const CANNED_CATEGORIES = [
-  "General",
-  "Atención al Cliente",
-  "Logística y Envíos",
-  "Facturación y Cobros",
-  "Calidad y Garantías",
-  "Cierre y Despedida",
-] as const;
-
-export type CannedCategory = (typeof CANNED_CATEGORIES)[number] | string;
-
 export interface ParsedCannedResponse {
   category: string;
   cleanTitle: string;

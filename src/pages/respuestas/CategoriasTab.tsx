@@ -1,14 +1,12 @@
 import {
   MessageSquareText,
   Pencil,
-  Plus,
   Tag,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { cannedCategoriesApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
-import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
@@ -16,7 +14,7 @@ import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDateTime } from "../../lib/format";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
@@ -26,9 +24,16 @@ import { CategoriaModal } from "./CategoriaModal";
 
 interface CategoriasTabProps {
   onCategoriesChanged?: () => void;
+  /** Abre el modal de nueva categoría (acción en ModuleHeader). */
+  pendingNew?: boolean;
+  onPendingNewConsumed?: () => void;
 }
 
-export function CategoriasTab({ onCategoriesChanged }: CategoriasTabProps) {
+export function CategoriasTab({
+  onCategoriesChanged,
+  pendingNew,
+  onPendingNewConsumed,
+}: CategoriasTabProps) {
   const { can } = usePermissions();
   const canMailSend = can("mail.send");
 
@@ -51,6 +56,12 @@ export function CategoriasTab({ onCategoriesChanged }: CategoriasTabProps) {
   }
 
   useEffect(load, []);
+
+  useEffect(() => {
+    if (!pendingNew) return;
+    setModal("nueva");
+    onPendingNewConsumed?.();
+  }, [pendingNew, onPendingNewConsumed]);
 
   useLoadErrorReceipt(error, "canned-categories-list", load);
 
@@ -171,30 +182,19 @@ export function CategoriasTab({ onCategoriesChanged }: CategoriasTabProps) {
             : undefined
         }
         toolbar={
-          <div className="flex w-full flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="Buscar categoría o descripción…"
-                className="w-[280px]"
-              />
-              {search && <ClearFiltersButton onClick={() => setSearch("")} title="Limpiar búsqueda" />}
-            </div>
-
-            {canMailSend && (
-              <Button size="sm" onClick={() => setModal("nueva")}>
-                <Plus className="h-[15px] w-[15px]" />
-                Nueva categoría
-              </Button>
-            )}
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar categoría o descripción…"
+              className="w-[280px]"
+            />
+            {search && <ClearFiltersButton onClick={() => setSearch("")} title="Limpiar búsqueda" />}
           </div>
         }
       >
         {categories === null ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
+          <TableSkeleton rows={8} columns={canMailSend ? 6 : 5} />
         ) : (
           <DataTable>
             <thead>

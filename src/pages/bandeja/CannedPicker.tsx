@@ -50,7 +50,7 @@ export function CannedPicker({ onPick }: CannedPickerProps) {
   // Parsear items para búsqueda y badges
   const parsedItems = useMemo(() => {
     return (items ?? []).map((item) => {
-      const parsed = parseCanned(item.title, item.body);
+      const parsed = parseCanned(item.title, item.body, item.categoryName);
       return {
         item,
         ...parsed,

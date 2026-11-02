@@ -23,16 +23,12 @@ import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useAuth } from "../../context/useAuth";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse, CategoriaResponseItem } from "../../types/api";
-import {
-  CANNED_CATEGORIES,
-  getCategoryBadgeClasses,
-  parseCanned,
-} from "./cannedHelpers";
+import { getCategoryBadgeClasses, parseCanned } from "./cannedHelpers";
 import { CannedPreviewDrawer } from "./CannedPreviewDrawer";
 import { CannedResponseStudio } from "./CannedResponseStudio";
 import { CategoriasTab } from "./CategoriasTab";
@@ -66,6 +62,7 @@ export function RespuestasPage() {
   >(null);
   const [previewItem, setPreviewItem] = useState<CannedResponseResponse | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [pendingNewCategory, setPendingNewCategory] = useState(false);
 
   function load() {
     cannedApi
@@ -96,29 +93,25 @@ export function RespuestasPage() {
 
   // Lista única de categorías encontradas para el filtro
   const categoryOptions: FilterOption[] = useMemo(() => {
-    const customCats = new Set<string>();
-    CANNED_CATEGORIES.forEach((c) => customCats.add(c));
-    (categories ?? []).forEach((c) => customCats.add(c.name));
-    (items ?? []).forEach((item) => {
-      const { category } = parseCanned(item.title, item.body, item.categoryName);
-      if (category) customCats.add(category);
-    });
-
     const options: FilterOption[] = [
       { value: "all", label: "Todas las categorías", hint: `${items?.length ?? 0}` },
     ];
 
-    Array.from(customCats).forEach((cat) => {
-      const count = parsedItems.filter((i) => i.parsed.category.toLowerCase() === cat.toLowerCase()).length;
+    for (const cat of categories ?? []) {
+      const count = parsedItems.filter(
+        (i) =>
+          i.categoryId === cat.id ||
+          i.parsed.category.toLowerCase() === cat.name.toLowerCase(),
+      ).length;
       options.push({
-        value: cat,
-        label: cat,
+        value: cat.name,
+        label: cat.name,
         hint: count > 0 ? `${count}` : undefined,
       });
-    });
+    }
 
     return options;
-  }, [categories, items, parsedItems]);
+  }, [categories, parsedItems, items?.length]);
 
   const term = search.trim().toLowerCase();
   const rows = useMemo(() => {
@@ -268,13 +261,15 @@ export function RespuestasPage() {
       <ModuleHeader
         title="Respuestas"
         summary={
-          activeTab === "respuestas"
-            ? items
-              ? `${items.length} ${items.length === 1 ? "respuesta predefinida" : "respuestas predefinidas"} · se insertan desde el editor con "Respuestas rápidas"`
-              : "Cargando respuestas…"
-            : categories
-              ? `${categories.length} ${categories.length === 1 ? "categoría registrada" : "categorías registradas"}`
-              : "Cargando categorías…"
+          <span key={activeTab} className="animate-plf-header-fade">
+            {activeTab === "respuestas"
+              ? items
+                ? `${items.length} ${items.length === 1 ? "respuesta predefinida" : "respuestas predefinidas"} · se insertan desde el editor con "Respuestas rápidas"`
+                : "Cargando respuestas…"
+              : categories
+                ? `${categories.length} ${categories.length === 1 ? "categoría registrada" : "categorías registradas"}`
+                : "Cargando categorías…"}
+          </span>
         }
         sections={[
           {
@@ -309,20 +304,34 @@ export function RespuestasPage() {
           },
         ]}
         action={
-          activeTab === "respuestas" && canMailSend ? (
-            <Button size="sm" onClick={() => setStudioState({ mode: "nueva" })}>
-              <Plus className="h-[15px] w-[15px]" />
-              Nueva respuesta
-            </Button>
+          canMailSend ? (
+            <div key={activeTab} className="animate-plf-header-fade">
+              {activeTab === "respuestas" ? (
+                <Button size="sm" onClick={() => setStudioState({ mode: "nueva" })}>
+                  <Plus className="h-[15px] w-[15px]" />
+                  Nueva respuesta
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => setPendingNewCategory(true)}>
+                  <Plus className="h-[15px] w-[15px]" />
+                  Nueva categoría
+                </Button>
+              )}
+            </div>
           ) : undefined
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-8 pt-3">
-        {activeTab === "categorias" ? (
-          <CategoriasTab onCategoriesChanged={load} />
-        ) : (
-          <ListPanel
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        <div key={activeTab} className="animate-plf-apple-tab">
+          {activeTab === "categorias" ? (
+            <CategoriasTab
+              onCategoriesChanged={load}
+              pendingNew={pendingNewCategory}
+              onPendingNewConsumed={() => setPendingNewCategory(false)}
+            />
+          ) : (
+            <ListPanel
             selection={
               canMailSend && selectedIds.length > 0
                 ? {
@@ -382,9 +391,7 @@ export function RespuestasPage() {
             }
           >
             {items === null ? (
-              <div className="flex justify-center py-16">
-                <Spinner />
-              </div>
+              <TableSkeleton rows={8} columns={canMailSend ? 8 : 7} />
             ) : (
               <>
                 <DataTable>
@@ -563,8 +570,9 @@ export function RespuestasPage() {
                 )}
               </>
             )}
-          </ListPanel>
-        )}
+            </ListPanel>
+          )}
+        </div>
       </div>
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
