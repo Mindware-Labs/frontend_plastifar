@@ -7,6 +7,8 @@ import { SelectBox } from "../../components/ui/SelectBox";
 
 interface ConversationRowProps {
   email: EmailSummaryResponse;
+  starred?: boolean;
+  starPending?: boolean;
   selected: boolean;
   checked: boolean;
   /** Hay alguna fila marcada: las casillas se quedan a la vista en todas. */
@@ -28,6 +30,8 @@ const deliveryBadges: Record<string, string> = {
 /** Fila de conversación con selector de selección y estado de lectura. */
 export function ConversationRow({
   email,
+  starred: starredProp,
+  starPending = false,
   selected,
   checked,
   selecting,
@@ -37,6 +41,7 @@ export function ConversationRow({
   onToggleStar,
 }: ConversationRowProps) {
   const name = email.fromName ?? email.fromEmail;
+  const starred = starredProp ?? email.starred;
   const delivery = email.deliveryStatus ? deliveryBadges[email.deliveryStatus] : undefined;
 
   return (
@@ -111,20 +116,21 @@ export function ConversationRow({
             {onToggleStar && (
               <button
                 type="button"
-                aria-label={email.starred ? "Quitar de destacados" : "Destacar"}
+                aria-label={starred ? "Quitar de destacados" : "Destacar"}
+                disabled={starPending}
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleStar();
                 }}
                 className={`items-center justify-center rounded outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer ${
-                  email.starred
+                  starred || starPending
                     ? "flex size-4 text-amber-500 hover:text-amber-600 hover:scale-110 active:scale-95"
                     : "hidden group-hover:flex group-focus-within:flex focus-visible:flex size-4 text-zinc-300 hover:text-amber-500 hover:scale-110 active:scale-95 animate-in fade-in zoom-in-75 duration-150"
                 }`}
               >
                 <Star
                   className={`size-3.5 transition-transform ${
-                    email.starred ? "fill-amber-400 text-amber-500" : ""
+                    starred ? "fill-amber-400 text-amber-500" : ""
                   }`}
                 />
               </button>

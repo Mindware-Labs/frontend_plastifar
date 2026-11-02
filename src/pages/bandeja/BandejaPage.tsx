@@ -338,6 +338,8 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const [composing, setComposing] = useState(false);
   const [checked, setChecked] = useState<Set<number>>(() => new Set());
   const [busy, setBusy] = useState(false);
+  const [starOverrides, setStarOverrides] = useState<Record<number, boolean>>({});
+  const [starPendingIds, setStarPendingIds] = useState<Set<number>>(() => new Set());
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [editingAlerts, setEditingAlerts] = useState(false);
   const lastToggled = useRef<number | null>(null);
@@ -397,6 +399,23 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const rows = data?.items ?? [];
   const unfiltered = !debouncedSearch && countActive(filters) === 0;
 
+  useEffect(() => {
+    setStarOverrides((current) => {
+      if (Object.keys(current).length === 0) return current;
+      const next = { ...current };
+      let changed = false;
+      for (const [idRaw, starred] of Object.entries(current)) {
+        const id = Number(idRaw);
+        const row = rows.find((email) => email.id === id);
+        if (row && row.starred === starred) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [rows]);
+
   // Lo marcado que ya no esta en pantalla (cambio de pagina, de carpeta o de filtro) deja de contar.
   const visibleKey = rows.map((email) => email.id).join(",");
   const [prunedFor, setPrunedFor] = useState(visibleKey);
@@ -449,15 +468,36 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
   async function handleToggleStar(id: number) {
     const target = rows.find((row) => row.id === id);
-    if (!target) return;
-    const nextStarred = !target.starred;
+    if (!target || starPendingIds.has(id)) return;
+
+    const currentStarred = starOverrides[id] ?? target.starred;
+    const nextStarred = !currentStarred;
+
+    setStarOverrides((current) => ({ ...current, [id]: nextStarred }));
+    setStarPendingIds((current) => new Set(current).add(id));
+
+    if (folder === "starred" && !nextStarred && selectedId === id) {
+      setSelectedId(null);
+    }
+
     try {
       await emailsApi.toggleStar(id, nextStarred);
       refresh();
     } catch {
+      setStarOverrides((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
       receipts.failed({
         action: "destacar",
         title: "No se pudo actualizar destacados",
+      });
+    } finally {
+      setStarPendingIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
       });
     }
   }
@@ -544,6 +584,11 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     const info = BULK[action];
     setBusy(true);
 
+    if ((info.closesOpen || (folder === "starred" && action === "unstar")) && selectedId !== null && ids.includes(selectedId)) {
+      setSelectedId(null);
+    }
+    setChecked(new Set());
+
     try {
       const { affected } = await emailsApi.bulk(ids, action);
       const kept = ids.length - affected;
@@ -563,10 +608,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
           : undefined,
       });
 
-      if ((info.closesOpen || (folder === "starred" && action === "unstar")) && selectedId !== null && ids.includes(selectedId)) {
-        setSelectedId(null);
-      }
-      setChecked(new Set());
       refreshAll();
     } catch (err) {
       receipts.failed({
@@ -971,6 +1012,8 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                         <ConversationRow
                           key={email.id}
                           email={email}
+                          starred={starOverrides[email.id] ?? email.starred}
+                          starPending={starPendingIds.has(email.id)}
                           selected={selectedId === email.id}
                           checked={checked.has(email.id)}
                           selecting={checked.size > 0}
@@ -1033,10 +1076,13 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                       onTicketCreated={refresh}
                       onMoved={handleMoved}
                       onStarred={(starred) => {
-                        refresh();
+                        if (selectedId != null) {
+                          setStarOverrides((current) => ({ ...current, [selectedId]: starred }));
+                        }
                         if (folder === "starred" && !starred) {
                           setSelectedId(null);
                         }
+                        refresh();
                       }}
                       onClose={() => setSelectedId(null)}
                     />

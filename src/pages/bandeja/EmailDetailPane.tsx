@@ -69,6 +69,7 @@ import {
   useComposerFieldMotion,
 } from "./useComposerFieldMotion";
 import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
+import { MailToolbarIconButton } from "./MailToolbarIconButton";
 import { SendValidationButton } from "./SendValidationButton";
 import {
   hasInvalidRecipients,
@@ -695,21 +696,23 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   async function handleMove(move: MoveKind) {
     if (!email || moving) return;
     setMoving(true);
+    const movedEmail = email;
+
+    onMoved();
 
     try {
-      await move.run(email.id);
-      onMoved();
+      await move.run(movedEmail.id);
 
       receipts.done({
         action: move.action,
         title: move.done,
-        detail: email.fromName ?? email.fromEmail,
+        detail: movedEmail.fromName ?? movedEmail.fromEmail,
         undo: move.action === "restaurar"
           ? undefined
           : {
               label: "Devolver a la bandeja",
               run: async () => {
-                await emailsApi.restore(email.id);
+                await emailsApi.restore(movedEmail.id);
                 onMoved();
               },
             },
@@ -728,18 +731,22 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
   async function handleToggleStar() {
     if (!email || starring) return;
+    const previousStarred = email.starred;
+    const nextStarred = !previousStarred;
     setStarring(true);
-    const nextStarred = !email.starred;
+    setEmail({ ...email, starred: nextStarred });
+    onStarred?.(nextStarred);
+
     try {
       await emailsApi.toggleStar(email.id, nextStarred);
-      setEmail({ ...email, starred: nextStarred });
       receipts.done({
         action: nextStarred ? "destacar" : "quitar-destacado",
         title: nextStarred ? "Añadido a destacados" : "Quitado de destacados",
         detail: email.subject || "(sin asunto)",
       });
-      onStarred?.(nextStarred);
     } catch (err) {
+      setEmail({ ...email, starred: previousStarred });
+      onStarred?.(previousStarred);
       receipts.failed({
         action: "destacar",
         title: "No se pudo actualizar destacados",
@@ -781,16 +788,19 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           {canMailManage && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
+                <MailToolbarIconButton
                   variant="ghost"
                   size="icon"
-                  className={`${toolButtonClass} ${email.starred ? "text-amber-500 hover:text-amber-600" : ""}`}
+                  pending={false}
                   disabled={starring}
+                  buttonClassName={`${toolButtonClass} ${email.starred ? "text-amber-500 hover:text-amber-600" : ""}`}
                   onClick={handleToggleStar}
                   aria-label={email.starred ? "Quitar de destacados" : "Destacar"}
                 >
-                  <Star className={`h-4 w-4 ${email.starred ? "fill-amber-400 text-amber-500" : ""}`} />
-                </Button>
+                  <Star
+                    className={`h-4 w-4 ${email.starred ? "fill-amber-400 text-amber-500" : ""}`}
+                  />
+                </MailToolbarIconButton>
               </TooltipTrigger>
               <TooltipContent>{email.starred ? "Quitar de destacados" : "Destacar"}</TooltipContent>
             </Tooltip>
@@ -800,29 +810,31 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             <>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
+                  <MailToolbarIconButton
                     variant="ghost"
                     size="icon"
-                    className={toolButtonClass}
-                    disabled={moving}
+                    pending={moving}
+                    buttonClassName={toolButtonClass}
                     onClick={() => handleMove(MOVES.archivar)}
+                    aria-label="Archivar"
                   >
                     <Archive />
-                  </Button>
+                  </MailToolbarIconButton>
                 </TooltipTrigger>
                 <TooltipContent>Archivar</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
+                  <MailToolbarIconButton
                     variant="ghost"
                     size="icon"
-                    className={toolButtonClass}
-                    disabled={moving}
+                    pending={moving}
+                    buttonClassName={toolButtonClass}
                     onClick={() => handleMove(MOVES.papelera)}
+                    aria-label="Mover a la papelera"
                   >
                     <Trash2 />
-                  </Button>
+                  </MailToolbarIconButton>
                 </TooltipTrigger>
                 <TooltipContent>Mover a la papelera</TooltipContent>
               </Tooltip>
@@ -831,15 +843,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             <>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
+                  <MailToolbarIconButton
                     variant="ghost"
                     size="icon"
-                    className={toolButtonClass}
-                    disabled={moving}
+                    pending={moving}
+                    buttonClassName={toolButtonClass}
                     onClick={() => handleMove(MOVES.restaurar)}
+                    aria-label="Restaurar a la bandeja"
                   >
                     <ArchiveRestore />
-                  </Button>
+                  </MailToolbarIconButton>
                 </TooltipTrigger>
                 <TooltipContent>Restaurar a la bandeja</TooltipContent>
               </Tooltip>
