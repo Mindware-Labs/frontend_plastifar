@@ -21,6 +21,7 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
@@ -691,12 +692,35 @@ export function TicketsPage() {
           )}
         </div>
 
-        {!data ? (
-          <TableSkeleton rows={8} columns={10} />
-        ) : (
-          // Atenuada mientras llega la pagina nueva: la anterior se queda para no dar un salto en blanco.
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable fixed>
+        <ListPanel
+          footer={
+            data !== null && data.total > 0 ? (
+              <Pagination
+                page={data.page}
+                pageSize={data.pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="tickets"
+              />
+            ) : undefined
+          }
+        >
+          {!data ? (
+            error === null && <TableSkeleton rows={8} columns={10} />
+          ) : rows.length === 0 ? (
+            <ListEmptyState
+              icon={TicketIcon}
+              isFiltered={hasCriteria}
+              filteredTitle="Ningún ticket coincide con estos criterios."
+              onClearFilters={clearCriteria}
+              emptyTitle="Todavía no hay tickets."
+              emptyDescription="Se crean desde un correo de la bandeja o a mano con «Nuevo ticket»."
+            />
+          ) : (
+            <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+              <DataTable fixed>
               <thead>
                 <HeadRow>
                   <Th className={SELECT_COLUMN}>
@@ -828,30 +852,10 @@ export function TicketsPage() {
                   );
                 })}
               </tbody>
-            </DataTable>
-
-            {rows.length === 0 && (
-              <ListEmptyState
-                icon={TicketIcon}
-                isFiltered={hasCriteria}
-                filteredTitle="Ningún ticket coincide con estos criterios."
-                onClearFilters={clearCriteria}
-                emptyTitle="Todavía no hay tickets."
-                emptyDescription="Se crean desde un correo de la bandeja o a mano con «Nuevo ticket»."
-              />
-            )}
-
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="tickets"
-            />
-          </div>
-        )}
+              </DataTable>
+            </div>
+          )}
+        </ListPanel>
       </div>
 
       {createModalOpen && (

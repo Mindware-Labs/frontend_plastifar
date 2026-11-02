@@ -26,6 +26,7 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { TableSelectionBar } from "../../components/ui/TableSelectionBar";
 import { useAuth } from "../../context/useAuth";
@@ -317,85 +318,115 @@ export function MotivosPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          {isAdmin && selectedIds.size > 0 ? (
-            <TableSelectionBar
-              count={selectedIds.size}
-              pageState={pageState}
-              busy={bulkBusy}
-              onTogglePage={togglePage}
-              onClear={clearSelection}
-              actions={[
-                {
-                  key: "activate",
-                  label: "Activar",
-                  icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
-                  onClick: askBulkActivate,
-                },
-                {
-                  key: "deactivate",
-                  label: "Desactivar",
-                  icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
-                  onClick: askBulkDeactivate,
-                },
-                {
-                  key: "delete",
-                  label: "Eliminar",
-                  icon: <Trash2 aria-hidden className="h-3.5 w-3.5 text-rose-600" />,
-                  onClick: askBulkDelete,
-                },
-              ]}
+        <ListPanel
+          selection={
+            isAdmin && selectedIds.size > 0
+              ? {
+                  count: selectedIds.size,
+                  pageState,
+                  busy: bulkBusy,
+                  onTogglePage: togglePage,
+                  onClear: clearSelection,
+                  actions: [
+                    {
+                      key: "activate",
+                      label: "Activar",
+                      icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
+                      onClick: askBulkActivate,
+                    },
+                    {
+                      key: "deactivate",
+                      label: "Desactivar",
+                      icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
+                      onClick: askBulkDeactivate,
+                    },
+                    {
+                      key: "delete",
+                      label: "Eliminar",
+                      icon: <Trash2 aria-hidden className="h-3.5 w-3.5 text-rose-600" />,
+                      onClick: askBulkDelete,
+                    },
+                  ],
+                }
+              : undefined
+          }
+          toolbar={
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por motivo o departamento…"
+                className="w-[280px]"
+              />
+              <TicketFilterDropdown
+                title="Seleccionar departamento"
+                value={String(departmentId)}
+                onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+                options={departmentOptions}
+                defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
+                aria-label="Filtrar por departamento"
+              />
+              <TicketFilterDropdown
+                title="Seleccionar prioridad"
+                value={priority}
+                onChange={setPriority}
+                options={priorityFilterOptions}
+                defaultIcon={<Flag className="h-4 w-4 text-zinc-500" />}
+                aria-label="Filtrar por prioridad"
+              />
+
+              {(search || departmentId !== "todos" || priority !== "todas") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setDepartmentId("todos");
+                    setPriority("todas");
+                  }}
+                  title="Limpiar filtros"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
+                >
+                  <X className="h-3.5 w-3.5 text-zinc-400" />
+                  <span>Limpiar</span>
+                </button>
+              )}
+            </div>
+          }
+          footer={
+            data !== null && data.total > 0 ? (
+              <Pagination
+                page={data.page}
+                pageSize={data.pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="motivos"
+              />
+            ) : undefined
+          }
+        >
+          {!data ? (
+            error === null && <TableSkeleton rows={pageSize} columns={isAdmin ? 8 : 7} />
+          ) : rows.length === 0 ? (
+            <ListEmptyState
+              icon={Tag}
+              isFiltered={Boolean(
+                debouncedSearch || status !== "todos" || departmentId !== "todos" || priority !== "todas",
+              )}
+              filteredTitle="Ningún motivo coincide con este filtro o búsqueda."
+              onClearFilters={() => {
+                setSearch("");
+                setStatus("todos");
+                setDepartmentId("todos");
+                setPriority("todas");
+              }}
+              emptyTitle="Todavía no hay motivos en el catálogo."
+              emptyDescription="Los motivos clasifican los tickets y sugieren el formulario a usar en cada caso."
             />
           ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar por motivo o departamento…"
-              className="w-[280px]"
-            />
-            <TicketFilterDropdown
-              title="Seleccionar departamento"
-              value={String(departmentId)}
-              onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
-              options={departmentOptions}
-              defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
-              aria-label="Filtrar por departamento"
-            />
-            <TicketFilterDropdown
-              title="Seleccionar prioridad"
-              value={priority}
-              onChange={setPriority}
-              options={priorityFilterOptions}
-              defaultIcon={<Flag className="h-4 w-4 text-zinc-500" />}
-              aria-label="Filtrar por prioridad"
-            />
-
-            {(search || departmentId !== "todos" || priority !== "todas") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  setDepartmentId("todos");
-                  setPriority("todas");
-                }}
-                title="Limpiar filtros"
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
-              >
-                <X className="h-3.5 w-3.5 text-zinc-400" />
-                <span>Limpiar</span>
-              </button>
-            )}
-          </div>
-          )}
-        </div>
-
-        {!data ? (
-          <TableSkeleton rows={pageSize} columns={isAdmin ? 8 : 7} />
-        ) : (
-          // Atenuada mientras llega la página nueva: la anterior se queda para no dar un salto en blanco.
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable>
+            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+              <DataTable>
               <thead>
                 <HeadRow>
                   {isAdmin && (
@@ -508,37 +539,10 @@ export function MotivosPage() {
                   );
                 })}
               </tbody>
-            </DataTable>
-
-            {rows.length === 0 && (
-              <ListEmptyState
-                icon={Tag}
-                isFiltered={Boolean(
-                  debouncedSearch || status !== "todos" || departmentId !== "todos" || priority !== "todas",
-                )}
-                filteredTitle="Ningún motivo coincide con el filtro."
-                onClearFilters={() => {
-                  setSearch("");
-                  setStatus("todos");
-                  setDepartmentId("todos");
-                  setPriority("todas");
-                }}
-                emptyTitle="Todavía no hay motivos en el catálogo."
-                emptyDescription="Los motivos clasifican los tickets y sugieren el formulario a usar en cada caso."
-              />
-            )}
-
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="motivos"
-            />
-          </div>
-        )}
+              </DataTable>
+            </div>
+          )}
+        </ListPanel>
       </div>
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}

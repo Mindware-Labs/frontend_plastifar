@@ -12,9 +12,9 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { ListPanel } from "../../components/ui/ListPanel";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
-import { TableSelectionBar } from "../../components/ui/TableSelectionBar";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
@@ -244,64 +244,90 @@ export function VeredictosPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          {isAdmin && selectedIds.size > 0 ? (
-            <TableSelectionBar
-              count={selectedIds.size}
-              pageState={pageState}
-              busy={bulkBusy}
-              onTogglePage={togglePage}
-              onClear={clearSelection}
-              actions={[
-                {
-                  key: "activate",
-                  label: "Activar",
-                  icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
-                  onClick: askBulkActivate,
-                },
-                {
-                  key: "deactivate",
-                  label: "Desactivar",
-                  icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
-                  onClick: askBulkDeactivate,
-                },
-                {
-                  key: "delete",
-                  label: "Eliminar",
-                  icon: <Trash2 aria-hidden className="h-3.5 w-3.5 text-rose-600" />,
-                  onClick: askBulkDelete,
-                },
-              ]}
+        <ListPanel
+          selection={
+            isAdmin && selectedIds.size > 0
+              ? {
+                  count: selectedIds.size,
+                  pageState,
+                  busy: bulkBusy,
+                  onTogglePage: togglePage,
+                  onClear: clearSelection,
+                  actions: [
+                    {
+                      key: "activate",
+                      label: "Activar",
+                      icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
+                      onClick: askBulkActivate,
+                    },
+                    {
+                      key: "deactivate",
+                      label: "Desactivar",
+                      icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
+                      onClick: askBulkDeactivate,
+                    },
+                    {
+                      key: "delete",
+                      label: "Eliminar",
+                      icon: <Trash2 aria-hidden className="h-3.5 w-3.5 text-rose-600" />,
+                      onClick: askBulkDelete,
+                    },
+                  ],
+                }
+              : undefined
+          }
+          toolbar={
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por veredicto…"
+                className="w-[260px] sm:w-[280px]"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  title="Limpiar búsqueda"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
+                >
+                  <X className="h-3.5 w-3.5 text-zinc-400" />
+                  <span>Limpiar</span>
+                </button>
+              )}
+            </div>
+          }
+          footer={
+            data !== null && data.total > 0 ? (
+              <Pagination
+                page={data.page}
+                pageSize={data.pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="veredictos"
+              />
+            ) : undefined
+          }
+        >
+          {!data ? (
+            error === null && <TableSkeleton rows={pageSize} columns={isAdmin ? 6 : 5} />
+          ) : rows.length === 0 ? (
+            <ListEmptyState
+              icon={Gavel}
+              isFiltered={Boolean(debouncedSearch || status !== "todos")}
+              filteredTitle="Ningún veredicto coincide con este filtro o búsqueda."
+              onClearFilters={() => {
+                setSearch("");
+                setStatus("todos");
+              }}
+              emptyTitle="Todavía no hay veredictos en el catálogo."
+              emptyDescription="Los veredictos cierran tickets con una resolución estandarizada para reportes y seguimiento."
             />
           ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar por veredicto…"
-              className="w-[260px] sm:w-[280px]"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                title="Limpiar búsqueda"
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
-              >
-                <X className="h-3.5 w-3.5 text-zinc-400" />
-                <span>Limpiar</span>
-              </button>
-            )}
-          </div>
-          )}
-        </div>
-
-        {!data ? (
-          <TableSkeleton rows={pageSize} columns={isAdmin ? 6 : 5} />
-        ) : (
-          // Atenuada mientras llega la página nueva: la anterior se queda para no dar un salto en blanco.
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable>
+            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+              <DataTable>
               <thead>
                 <HeadRow>
                   {isAdmin && (
@@ -380,33 +406,10 @@ export function VeredictosPage() {
                   );
                 })}
               </tbody>
-            </DataTable>
-
-            {rows.length === 0 && (
-              <ListEmptyState
-                icon={Gavel}
-                isFiltered={Boolean(debouncedSearch || status !== "todos")}
-                filteredTitle="Ningún veredicto coincide con el filtro."
-                onClearFilters={() => {
-                  setSearch("");
-                  setStatus("todos");
-                }}
-                emptyTitle="Todavía no hay veredictos en el catálogo."
-                emptyDescription="Los veredictos cierran tickets con una resolución estandarizada para reportes y seguimiento."
-              />
-            )}
-
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="veredictos"
-            />
-          </div>
-        )}
+              </DataTable>
+            </div>
+          )}
+        </ListPanel>
       </div>
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}

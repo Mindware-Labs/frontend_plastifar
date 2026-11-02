@@ -1,4 +1,4 @@
-import { CheckCircle2, Pencil, Plug, Plus, Power, XCircle } from "lucide-react";
+import { CheckCircle2, Inbox, Pencil, Plug, Plus, Power, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { settingsApi } from "../../api/settings";
@@ -9,6 +9,7 @@ import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/Conf
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
@@ -263,11 +264,22 @@ export function MailboxesSection() {
         {data === null ? (
           error === null && <TableSkeleton rows={pageSize} columns={6} />
         ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
-              ? "Ningún buzón coincide con este filtro o búsqueda."
-              : "Todavía no hay ningún buzón configurado."}
-          </p>
+          <ListEmptyState
+            icon={Inbox}
+            isFiltered={isFiltering}
+            filteredTitle="Ningún buzón coincide con este filtro o búsqueda."
+            onClearFilters={() => changeCriteria(() => {
+              setSearch("");
+              setChip("todos");
+              setPage(1);
+            })}
+            emptyTitle="Todavía no hay ningún buzón configurado."
+            emptyDescription={
+              canWrite
+                ? "Conecta un buzón con «Nuevo buzón» (IMAP, Gmail u Office 365) para que la bandeja reciba correo."
+                : "Cuando un administrador configure buzones, el correo entrante aparecerá en la bandeja."
+            }
+          />
         ) : (
           <div className={staleClass(isStale)}>
             <DataTable>
