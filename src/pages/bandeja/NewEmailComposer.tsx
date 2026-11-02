@@ -16,6 +16,12 @@ import { CannedPicker } from "./CannedPicker";
 import { textToBlocks } from "./textToBlocks";
 import { RecipientInput } from "./RecipientInput";
 import { type ValidationItem } from "./sendValidation";
+import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
+import {
+  COMPOSER_BCC_KEY,
+  COMPOSER_CC_KEY,
+  useComposerFieldMotion,
+} from "./useComposerFieldMotion";
 
 interface NewEmailComposerProps {
   onSent: () => void;
@@ -49,6 +55,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const subjectRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
+  const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
   const fileRef = useRef<HTMLInputElement>(null);
   // La marca del envio nace con el editor: un reintento la repite y no duplica el correo.
   const tokenRef = useRef(crypto.randomUUID());
@@ -221,53 +228,53 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         )}
       </div>
 
-      {ccOpen && (
-        <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-          <span className={fieldLabelClass}>CC</span>
-          <RecipientInput
-            inputRef={ccRef}
-            value={cc}
-            onChange={setCc}
-            placeholder="correo@dominio.com, otro@dominio.com"
-          />
-          <button
-            type="button"
-            onClick={() => {
+      <ComposerFieldMotionRow open={ccOpen} phase={fieldMotion.phaseFor(COMPOSER_CC_KEY)}>
+        <span className={fieldLabelClass}>CC</span>
+        <RecipientInput
+          inputRef={ccRef}
+          value={cc}
+          onChange={setCc}
+          placeholder="correo@dominio.com, otro@dominio.com"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            fieldMotion.requestRemove(COMPOSER_CC_KEY, () => {
               setCcOpen(false);
               setCc("");
-            }}
-            aria-label="Quitar la copia"
-            title="Quitar la copia"
-            className={fieldCloseClass}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      )}
+            });
+          }}
+          aria-label="Quitar la copia"
+          title="Quitar la copia"
+          className={fieldCloseClass}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </ComposerFieldMotionRow>
 
-      {bccOpen && (
-        <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-          <span className={fieldLabelClass}>CCO</span>
-          <RecipientInput
-            inputRef={bccRef}
-            value={bcc}
-            onChange={setBcc}
-            placeholder="Nadie más ve a quién va esta copia"
-          />
-          <button
-            type="button"
-            onClick={() => {
+      <ComposerFieldMotionRow open={bccOpen} phase={fieldMotion.phaseFor(COMPOSER_BCC_KEY)}>
+        <span className={fieldLabelClass}>CCO</span>
+        <RecipientInput
+          inputRef={bccRef}
+          value={bcc}
+          onChange={setBcc}
+          placeholder="Nadie más ve a quién va esta copia"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            fieldMotion.requestRemove(COMPOSER_BCC_KEY, () => {
               setBccOpen(false);
               setBcc("");
-            }}
-            aria-label="Quitar la copia oculta"
-            title="Quitar la copia oculta"
-            className={fieldCloseClass}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      )}
+            });
+          }}
+          aria-label="Quitar la copia oculta"
+          title="Quitar la copia oculta"
+          className={fieldCloseClass}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </ComposerFieldMotionRow>
 
       <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
         <span className={fieldLabelClass}>Asunto</span>

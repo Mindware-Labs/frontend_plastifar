@@ -58,6 +58,12 @@ import { textToBlocks } from "./textToBlocks";
 import { AssignmentControl } from "./ConversationTools";
 import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
 import { RecipientInput } from "./RecipientInput";
+import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
+import {
+  COMPOSER_BCC_KEY,
+  COMPOSER_CC_KEY,
+  useComposerFieldMotion,
+} from "./useComposerFieldMotion";
 import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
 import { SendValidationButton } from "./SendValidationButton";
 import { type ValidationItem } from "./sendValidation";
@@ -301,6 +307,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const toRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
+  const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
   const replyContainerRef = useRef<HTMLDivElement>(null);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
   const [composers, setComposers] = useState<ComposingPresence[]>([]);
@@ -1012,53 +1019,53 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               )}
             </div>
 
-            {ccOpen && (
-              <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-                <span className={fieldLabelClass}>CC</span>
-                <RecipientInput
-                  inputRef={ccRef}
-                  value={replyCc}
-                  onChange={setReplyCc}
-                  placeholder="correo@dominio.com, otro@dominio.com"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
+            <ComposerFieldMotionRow open={ccOpen} phase={fieldMotion.phaseFor(COMPOSER_CC_KEY)}>
+              <span className={fieldLabelClass}>CC</span>
+              <RecipientInput
+                inputRef={ccRef}
+                value={replyCc}
+                onChange={setReplyCc}
+                placeholder="correo@dominio.com, otro@dominio.com"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  fieldMotion.requestRemove(COMPOSER_CC_KEY, () => {
                     setCcOpen(false);
                     setReplyCc("");
-                  }}
-                  aria-label="Quitar la copia"
-                  title="Quitar la copia"
-                  className={fieldCloseClass}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            )}
+                  });
+                }}
+                aria-label="Quitar la copia"
+                title="Quitar la copia"
+                className={fieldCloseClass}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </ComposerFieldMotionRow>
 
-            {bccOpen && (
-              <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-                <span className={fieldLabelClass}>CCO</span>
-                <RecipientInput
-                  inputRef={bccRef}
-                  value={replyBcc}
-                  onChange={setReplyBcc}
-                  placeholder="Nadie más ve a quién va esta copia"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
+            <ComposerFieldMotionRow open={bccOpen} phase={fieldMotion.phaseFor(COMPOSER_BCC_KEY)}>
+              <span className={fieldLabelClass}>CCO</span>
+              <RecipientInput
+                inputRef={bccRef}
+                value={replyBcc}
+                onChange={setReplyBcc}
+                placeholder="Nadie más ve a quién va esta copia"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  fieldMotion.requestRemove(COMPOSER_BCC_KEY, () => {
                     setBccOpen(false);
                     setReplyBcc("");
-                  }}
-                  aria-label="Quitar la copia oculta"
-                  title="Quitar la copia oculta"
-                  className={fieldCloseClass}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            )}
+                  });
+                }}
+                aria-label="Quitar la copia oculta"
+                title="Quitar la copia oculta"
+                className={fieldCloseClass}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </ComposerFieldMotionRow>
 
             {isForward && email.attachments.length > 0 && (
               <label className="flex shrink-0 cursor-pointer items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-1.5 text-[12px] font-medium text-zinc-700">
