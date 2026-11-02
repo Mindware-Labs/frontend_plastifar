@@ -148,7 +148,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       celebrate(
         {
           title: "Correo enviado correctamente",
-          detail: "Tu mensaje ya salió. Lo encuentras en Enviados.",
+          detail: "Tu mensaje ya salió hacia el destinatario.",
         },
         onSent,
       );
