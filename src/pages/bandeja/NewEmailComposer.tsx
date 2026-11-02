@@ -25,6 +25,7 @@ import {
 import { type ValidationItem } from "./sendValidation";
 import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
 import { ComposerSendSuccessLayer } from "./ComposerSendSuccessLayer";
+import { invalidateMailContactDirectory } from "../../hooks/useMailContactDirectory";
 import { useComposerSendCelebration } from "./useComposerSendCelebration";
 import {
   COMPOSER_BCC_KEY,
@@ -143,10 +144,11 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         clientToken: tokenRef.current,
       });
       setSending(false);
+      invalidateMailContactDirectory();
       celebrate(
         {
-          title: "Correo enviado",
-          detail: "Lo encuentras en Enviados",
+          title: "Correo enviado correctamente",
+          detail: "Tu mensaje ya salió. Lo encuentras en Enviados.",
         },
         onSent,
       );

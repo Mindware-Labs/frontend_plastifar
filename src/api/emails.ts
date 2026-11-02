@@ -133,6 +133,8 @@ export const emailsApi = {
 
   contacts: (q: string) => apiRequest<ContactResponse[]>(`/api/emails/contacts${toQuery({ q })}`),
 
+  contactDirectory: () => apiRequest<ContactResponse[]>("/api/emails/contact-directory"),
+
   // El archivo llega con la sesion: se baja como blob y se entrega al navegador.
   exportConversation: (id: number) => apiBlob(`/api/emails/${id}/export`),
 

@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { emailsApi } from "../../api/emails";
-import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import {
+  filterMailContactDirectory,
+  useMailContactDirectory,
+} from "../../hooks/useMailContactDirectory";
 import type { ContactResponse } from "../../types/api";
 
 interface RecipientInputProps {
@@ -20,6 +23,18 @@ function splitCurrent(value: string) {
   return { head: at >= 0 ? value.slice(0, at + 1) : "", current: value.slice(at + 1).trim() };
 }
 
+function mergeContacts(primary: ContactResponse[], secondary: ContactResponse[]) {
+  const seen = new Set(primary.map((item) => item.email.toLowerCase()));
+  const merged = [...primary];
+  for (const item of secondary) {
+    const key = item.email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(item);
+  }
+  return merged;
+}
+
 /** Selector de destinatarios con autocompletado de contactos sugeridos. */
 export function RecipientInput({
   value,
@@ -30,56 +45,68 @@ export function RecipientInput({
   inputRef,
   invalid = false,
 }: RecipientInputProps) {
-  const [suggestions, setSuggestions] = useState<ContactResponse[]>([]);
+  const directory = useMailContactDirectory();
+  const [remoteSuggestions, setRemoteSuggestions] = useState<ContactResponse[]>([]);
   const [active, setActive] = useState(0);
   const [open, setOpen] = useState(false);
   const ownRef = useRef<HTMLInputElement>(null);
   const ref = inputRef ?? ownRef;
 
   const { head, current } = splitCurrent(value);
-  const query = useDebouncedValue(current, 200);
+  const localMatches = useMemo(
+    () => filterMailContactDirectory(directory, current, 10),
+    [directory, current],
+  );
 
   useEffect(() => {
-    if (query.length < 2) return;
+    if (current.length < 2) {
+      setRemoteSuggestions([]);
+      return;
+    }
 
     let cancelled = false;
     emailsApi
-      .contacts(query)
+      .contacts(current)
       .then((list) => {
         if (cancelled) return;
-        setSuggestions(list);
-        setActive(0);
-        setOpen(list.length > 0);
+        setRemoteSuggestions(list);
       })
       .catch(() => undefined);
 
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [current]);
 
-  // Con menos de dos letras no hay busqueda: lo que quedo de antes no se muestra.
-  const shown = query.length >= 2 ? suggestions : [];
+  const suggestions = useMemo(
+    () => mergeContacts(localMatches, remoteSuggestions).slice(0, 12),
+    [localMatches, remoteSuggestions],
+  );
+
+  useEffect(() => {
+    setActive(0);
+    setOpen(current.length >= 2 && suggestions.length > 0);
+  }, [current, suggestions.length]);
 
   function pick(contact: ContactResponse) {
     onChange(`${head}${head ? " " : ""}${contact.email}, `);
     setOpen(false);
-    setSuggestions([]);
+    setRemoteSuggestions([]);
     ref.current?.focus();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (!open || shown.length === 0) return;
+    if (!open || suggestions.length === 0) return;
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActive((index) => (index + 1) % shown.length);
+      setActive((index) => (index + 1) % suggestions.length);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActive((index) => (index - 1 + shown.length) % shown.length);
+      setActive((index) => (index - 1 + suggestions.length) % suggestions.length);
     } else if (event.key === "Enter" || event.key === "Tab") {
       event.preventDefault();
-      pick(shown[active]);
+      pick(suggestions[active]);
     } else if (event.key === "Escape") {
       setOpen(false);
     }
@@ -92,7 +119,7 @@ export function RecipientInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
-        onFocus={() => shown.length > 0 && setOpen(true)}
+        onFocus={() => current.length >= 2 && suggestions.length > 0 && setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         placeholder={placeholder}
         autoFocus={autoFocus}
@@ -108,13 +135,13 @@ export function RecipientInput({
         }`}
       />
 
-      {open && shown.length > 0 && (
+      {open && suggestions.length > 0 && (
         <ul
           role="listbox"
-          className="animate-plf-toast-in absolute left-0 top-full z-30 mt-1.5 max-h-56 w-full max-w-[420px] overflow-y-auto rounded-lg
+          className="animate-plf-toast-in absolute left-0 top-full z-30 mt-1.5 max-h-56 w-max min-w-[11rem] max-w-[min(100%,26rem)] overflow-y-auto overflow-x-hidden rounded-lg
             border border-zinc-200/90 bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
         >
-          {shown.map((contact, index) => (
+          {suggestions.map((contact, index) => (
             <li
               key={contact.email}
               role="option"
@@ -122,12 +149,20 @@ export function RecipientInput({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => pick(contact)}
               onMouseEnter={() => setActive(index)}
-              className={`flex cursor-pointer flex-col rounded-md px-3 py-1.5 text-[12px] transition-colors ${
+              className={`max-w-full cursor-pointer rounded-md px-2.5 py-1.5 text-[12px] transition-colors ${
                 index === active ? "bg-zinc-100 text-zinc-900" : "text-zinc-700 hover:bg-zinc-50"
               }`}
             >
-              {contact.name && <span className="font-semibold text-zinc-900">{contact.name}</span>}
-              <span className={contact.name ? "text-[11px] text-zinc-500" : "font-medium text-zinc-800"}>{contact.email}</span>
+              {contact.name && (
+                <span className="block max-w-full truncate font-semibold text-zinc-900">{contact.name}</span>
+              )}
+              <span
+                className={`block max-w-full truncate whitespace-nowrap ${
+                  contact.name ? "text-[11px] text-zinc-500" : "font-medium text-zinc-800"
+                }`}
+              >
+                {contact.email}
+              </span>
             </li>
           ))}
         </ul>

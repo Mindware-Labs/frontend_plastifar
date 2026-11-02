@@ -61,6 +61,7 @@ import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
 import { RecipientInput } from "./RecipientInput";
 import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
 import { ComposerSendSuccessLayer } from "./ComposerSendSuccessLayer";
+import { invalidateMailContactDirectory } from "../../hooks/useMailContactDirectory";
 import { useComposerSendCelebration } from "./useComposerSendCelebration";
 import {
   COMPOSER_BCC_KEY,
@@ -507,8 +508,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
       const receiptTitle = queued
         ? "Guardado en la cola de salida"
         : isForward
-          ? "Correo reenviado"
-          : "Respuesta enviada";
+          ? "Correo reenviado correctamente"
+          : "Respuesta enviada correctamente";
       const receiptDetail = queued
         ? "El proveedor no respondió; se reintentará solo"
         : isForward
@@ -516,6 +517,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           : (email.fromName ?? email.fromEmail);
 
       setSending(false);
+      invalidateMailContactDirectory();
       celebrate(
         {
           title: receiptTitle,
@@ -1317,7 +1319,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               </div>
             )}
 
-            {openReply.bodyHtml && openReply.direction === "Inbound" ? (
+            {openReply.bodyHtml ? (
               <EmailBodyFrame
                 key={openReply.id}
                 html={openReply.bodyHtml}
