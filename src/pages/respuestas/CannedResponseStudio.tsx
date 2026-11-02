@@ -28,6 +28,7 @@ import {
   parseCanned,
 } from "./cannedHelpers";
 import { CategoriaModal } from "./CategoriaModal";
+import { CannedVariableChips } from "./CannedVariableChips";
 
 const INITIAL_BODY_MIN_PX = 42;
 
@@ -75,7 +76,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
   // Cargar categorías del catálogo de base de datos
   function loadCategories() {
     cannedCategoriesApi
-      .list()
+      .listAll()
       .then((data) => {
         setDbCategories(data);
         if (selectedCategoryId) {
@@ -115,6 +116,24 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
     const chars = body.length;
     return { words, chars };
   }, [body]);
+
+  function insertVariable(token: string) {
+    const el = bodyRef.current;
+    if (!el) {
+      setBody((prev) => (prev ? `${prev} ${token}` : token));
+      return;
+    }
+    const start = el.selectionStart ?? body.length;
+    const end = el.selectionEnd ?? body.length;
+    const next = body.slice(0, start) + token + body.slice(end);
+    setBody(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+      autoResizeTextarea(el, INITIAL_BODY_MIN_PX);
+    });
+  }
 
   const handleSave = useCallback(async () => {
     const cleanTitle = title.trim();
@@ -204,10 +223,10 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
         <div className={dialogHeaderShellClass}>
           <div className={dialogHeaderStackClass}>
             <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
-              Correo · Respuestas rápidas
+              Correo · Plantillas
             </p>
             <h2 id={titleId} className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
-              {isEdit ? "Editar respuesta predefinida" : "Nueva respuesta predefinida"}
+              {isEdit ? "Editar plantilla" : "Nueva plantilla"}
             </h2>
           </div>
 
@@ -449,14 +468,19 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                       autoResizeTextarea(e.target, INITIAL_BODY_MIN_PX);
                     }}
                     placeholder={
-                      "Estimado/a [Nombre del Cliente],\n\n" +
-                      "Gracias por comunicarse con Plastifar. Hemos recibido su consulta sobre [Detalle / Pedido] y nuestro equipo ya está atendiendo los detalles.\n\n" +
+                      "Estimado/a {cliente.nombre},\n\n" +
+                      "Gracias por comunicarse con Plastifar. Hemos recibido su consulta sobre {ticket.numero} y nuestro equipo ya está atendiendo los detalles.\n\n" +
                       "Quedamos a su entera disposición ante cualquier duda adicional.\n\n" +
-                      "Atentamente,\nEquipo de Soporte"
+                      "Atentamente,\n{agente.nombre}"
                     }
                     className="w-full resize-none overflow-hidden bg-transparent px-3.5 py-2.5 font-sans text-[13px] leading-[1.65] text-ink outline-none [field-sizing:content] placeholder:text-zinc-400 min-h-[42px]"
                   />
                 </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+                  Variables inteligentes: al insertar la plantilla en la bandeja se rellenan con datos del hilo cuando
+                  existen; si falta algún dato, el marcador se mantiene para completarlo a mano.
+                </p>
+                <CannedVariableChips onInsert={insertVariable} />
               </div>
             </div>
           ) : (

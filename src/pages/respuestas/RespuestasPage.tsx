@@ -12,19 +12,22 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { cannedApi, cannedCategoriesApi } from "../../api/canned";
-import { ApiError } from "../../api/client";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton, FilterDropdown, type FilterOption } from "../../components/ui/FilterDropdown";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { ListPanel } from "../../components/ui/ListPanel";
+import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useAuth } from "../../context/useAuth";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse, CategoriaResponseItem } from "../../types/api";
@@ -34,20 +37,18 @@ import { CannedResponseStudio } from "./CannedResponseStudio";
 import { CategoriasTab } from "./CategoriasTab";
 import { RespuestasHelpSheet } from "./RespuestasHelpSheet";
 
-/** Respuestas predefinidas y categorías de plantilla con selección múltiple y gestión en lote. */
+/** Plantillas de correo y categorías con selección múltiple y gestión en lote. */
 export function RespuestasPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const canMailSend = can("mail.send");
 
-  const [activeTab, setActiveTab] = useState<"respuestas" | "categorias">("respuestas");
+  const [activeTab, setActiveTab] = useState<"plantillas" | "categorias">("plantillas");
 
-  // Estado de respuestas
-  const [items, setItems] = useState<CannedResponseResponse[] | null>(null);
   const [categories, setCategories] = useState<CategoriaResponseItem[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [pageSize, setPageSize] = useState(10);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -64,75 +65,59 @@ export function RespuestasPage() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [pendingNewCategory, setPendingNewCategory] = useState(false);
 
-  function load() {
-    cannedApi
-      .list()
-      .then(setItems)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "No se pudieron cargar las respuestas"));
+  const debouncedSearch = useDebouncedValue(search).trim();
 
+  const { data, isStale, error, setPage, refresh } = usePagedList({
+    fetch: cannedApi.list,
+    criteria: {
+      pageSize,
+      search: debouncedSearch || undefined,
+      categoryId: selectedCategory === "all" ? undefined : Number(selectedCategory),
+      sort: "updated",
+    },
+    fallbackError: "No se pudieron cargar las plantillas de correo.",
+  });
+
+  function loadCategories() {
     cannedCategoriesApi
-      .list()
+      .listAll()
       .then(setCategories)
       .catch(() => setCategories([]));
   }
 
-  useEffect(load, []);
+  useEffect(loadCategories, []);
 
-  useLoadErrorReceipt(error, "respuestas-list", load);
+  useLoadErrorReceipt(error, "plantillas-list", refresh);
 
-  // Parsear items con su categoría, cleanTitle, cleanBody y suggestedSubject
+  function reloadAll() {
+    refresh();
+    loadCategories();
+  }
+
+  const items = data?.items ?? null;
+
   const parsedItems = useMemo(() => {
     return (items ?? []).map((item) => {
       const parsed = parseCanned(item.title, item.body, item.categoryName);
-      return {
-        ...item,
-        parsed,
-      };
+      return { ...item, parsed };
     });
   }, [items]);
 
-  // Lista única de categorías encontradas para el filtro
+  const rows = parsedItems;
+
   const categoryOptions: FilterOption[] = useMemo(() => {
     const options: FilterOption[] = [
-      { value: "all", label: "Todas las categorías", hint: `${items?.length ?? 0}` },
+      { value: "all", label: "Todas las categorías", hint: data ? `${data.total}` : undefined },
     ];
-
     for (const cat of categories ?? []) {
-      const count = parsedItems.filter(
-        (i) =>
-          i.categoryId === cat.id ||
-          i.parsed.category.toLowerCase() === cat.name.toLowerCase(),
-      ).length;
       options.push({
-        value: cat.name,
+        value: String(cat.id),
         label: cat.name,
-        hint: count > 0 ? `${count}` : undefined,
+        hint: cat.responseCount > 0 ? `${cat.responseCount}` : undefined,
       });
     }
-
     return options;
-  }, [categories, parsedItems, items?.length]);
-
-  const term = search.trim().toLowerCase();
-  const rows = useMemo(() => {
-    return parsedItems.filter((item) => {
-      // Filtro de categoría
-      if (selectedCategory !== "all") {
-        if (item.parsed.category.toLowerCase() !== selectedCategory.toLowerCase()) {
-          return false;
-        }
-      }
-      // Filtro de búsqueda
-      if (!term) return true;
-      return (
-        item.parsed.cleanTitle.toLowerCase().includes(term) ||
-        item.parsed.cleanBody.toLowerCase().includes(term) ||
-        item.parsed.category.toLowerCase().includes(term) ||
-        item.createdByName.toLowerCase().includes(term) ||
-        (item.parsed.suggestedSubject && item.parsed.suggestedSubject.toLowerCase().includes(term))
-      );
-    });
-  }, [parsedItems, selectedCategory, term]);
+  }, [categories, data?.total]);
 
   // Selección múltiple para respuestas
   const allPageSelected = rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
@@ -194,8 +179,8 @@ export function RespuestasPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Correo · Respuestas",
-      title: "Eliminar respuesta",
+      eyebrow: "Correo · Plantillas",
+      title: "Eliminar plantilla",
       description: (
         <>
           Se eliminará <strong className="font-semibold text-ink">{cleanTitle}</strong>. Los correos ya
@@ -211,7 +196,7 @@ export function RespuestasPage() {
             setPreviewItem(null);
           }
           setSelectedIds((prev) => prev.filter((id) => id !== item.id));
-          load();
+          reloadAll();
         } finally {
           setBusyId(null);
         }
@@ -226,11 +211,11 @@ export function RespuestasPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Correo · Respuestas en lote",
-      title: `Eliminar ${count} ${count === 1 ? "respuesta" : "respuestas"}`,
+      eyebrow: "Correo · Plantillas en lote",
+      title: `Eliminar ${count} ${count === 1 ? "plantilla" : "plantillas"}`,
       description: (
         <>
-          Se eliminarán <strong className="font-semibold text-ink">{count} respuestas</strong> seleccionadas.
+          Se eliminarán <strong className="font-semibold text-ink">{count} plantillas</strong> seleccionadas.
           Esta acción no se puede deshacer.
         </>
       ),
@@ -239,7 +224,7 @@ export function RespuestasPage() {
         try {
           await cannedApi.bulkDelete(selectedIds);
           setSelectedIds([]);
-          load();
+          reloadAll();
         } catch {
           // Fallback individual si falla en lote
           for (const id of selectedIds) {
@@ -248,7 +233,7 @@ export function RespuestasPage() {
             } catch {}
           }
           setSelectedIds([]);
-          load();
+          reloadAll();
         }
       },
     });
@@ -259,13 +244,13 @@ export function RespuestasPage() {
   return (
     <div className="flex h-full flex-col">
       <ModuleHeader
-        title="Respuestas"
+        title="Plantillas de correo"
         summary={
           <span key={activeTab} className="animate-plf-header-fade">
-            {activeTab === "respuestas"
-              ? items
-                ? `${items.length} ${items.length === 1 ? "respuesta predefinida" : "respuestas predefinidas"} · se insertan desde el editor con "Respuestas rápidas"`
-                : "Cargando respuestas…"
+            {activeTab === "plantillas"
+              ? data
+                ? `${data.total} ${data.total === 1 ? "plantilla" : "plantillas"} · se insertan desde la bandeja con «Insertar plantilla»`
+                : "Cargando plantillas…"
               : categories
                 ? `${categories.length} ${categories.length === 1 ? "categoría registrada" : "categorías registradas"}`
                 : "Cargando categorías…"}
@@ -276,16 +261,16 @@ export function RespuestasPage() {
             label: (
               <span className="flex items-center gap-1.5">
                 <MessageSquareText className="h-3.5 w-3.5" />
-                <span>Respuestas</span>
-                {items !== null && (
+                <span>Plantillas</span>
+                {data !== null && (
                   <span className="ml-1 rounded-full bg-zinc-100 px-1.5 py-0.2 text-[10.5px] font-semibold text-zinc-600">
-                    {items.length}
+                    {data.total}
                   </span>
                 )}
               </span>
             ),
-            active: activeTab === "respuestas",
-            onClick: () => setActiveTab("respuestas"),
+            active: activeTab === "plantillas",
+            onClick: () => setActiveTab("plantillas"),
           },
           {
             label: (
@@ -306,10 +291,10 @@ export function RespuestasPage() {
         action={
           canMailSend ? (
             <div key={activeTab} className="animate-plf-header-fade">
-              {activeTab === "respuestas" ? (
+              {activeTab === "plantillas" ? (
                 <Button size="sm" onClick={() => setStudioState({ mode: "nueva" })}>
                   <Plus className="h-[15px] w-[15px]" />
-                  Nueva respuesta
+                  Nueva plantilla
                 </Button>
               ) : (
                 <Button size="sm" onClick={() => setPendingNewCategory(true)}>
@@ -326,7 +311,7 @@ export function RespuestasPage() {
         <div key={activeTab} className="animate-plf-apple-tab">
           {activeTab === "categorias" ? (
             <CategoriasTab
-              onCategoriesChanged={load}
+              onCategoriesChanged={reloadAll}
               pendingNew={pendingNewCategory}
               onPendingNewConsumed={() => setPendingNewCategory(false)}
             />
@@ -389,11 +374,36 @@ export function RespuestasPage() {
                 </button>
               </div>
             }
+            footer={
+              data !== null && data.total > 0 ? (
+                <Pagination
+                  page={data.page}
+                  pageSize={data.pageSize}
+                  total={data.total}
+                  totalPages={data.totalPages}
+                  onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
+                  noun="plantillas"
+                />
+              ) : undefined
+            }
           >
             {items === null ? (
-              <TableSkeleton rows={8} columns={canMailSend ? 8 : 7} />
+              error === null && <TableSkeleton rows={pageSize} columns={canMailSend ? 10 : 9} />
+            ) : rows.length === 0 ? (
+              <ListEmptyState
+                icon={MessageSquareText}
+                isFiltered={hasActiveFilters}
+                filteredTitle="Ninguna plantilla coincide con los filtros aplicados."
+                onClearFilters={() => {
+                  setSearch("");
+                  setSelectedCategory("all");
+                }}
+                emptyTitle="Todavía no hay plantillas de correo."
+                emptyDescription="Crea la primera con «Nueva plantilla» y úsala al redactar desde la bandeja con «Insertar plantilla»."
+              />
             ) : (
-              <>
+              <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
                 <DataTable>
                   <thead>
                     <HeadRow>
@@ -405,7 +415,7 @@ export function RespuestasPage() {
                               label={
                                 pageState === true
                                   ? "Quitar la selección de esta página"
-                                  : "Seleccionar todas las respuestas de esta página"
+                                  : "Seleccionar todas las plantillas de esta página"
                               }
                               onToggle={toggleAllOnPage}
                             />
@@ -413,11 +423,13 @@ export function RespuestasPage() {
                         </Th>
                       )}
                       <Th className="w-36">Categoría</Th>
-                      <Th>Título de la plantilla</Th>
-                      <Th className="w-52">Asunto sugerido</Th>
-                      <Th>Texto</Th>
-                      <Th className="w-36">Creada por</Th>
-                      <Th className="w-36">Actualizada</Th>
+                      <Th>Título</Th>
+                      <Th className="w-44">Asunto sugerido</Th>
+                      <Th>Vista previa</Th>
+                      <Th className="w-24 text-center">Usos</Th>
+                      <Th className="w-36">Último uso</Th>
+                      <Th className="w-32">Creada por</Th>
+                      <Th className="w-32">Actualizada</Th>
                       <Th className="w-32 text-right">Acciones</Th>
                     </HeadRow>
                   </thead>
@@ -479,15 +491,22 @@ export function RespuestasPage() {
                             )}
                           </Td>
 
-                          {/* Texto de la respuesta */}
-                          <Td className="max-w-[320px] truncate text-[12.5px] text-subtle" title={cleanBody}>
+                          <Td className="max-w-[280px] truncate text-[12.5px] text-subtle" title={cleanBody}>
                             {cleanBody}
                           </Td>
 
-                          {/* Creada por */}
+                          <Td className="text-center whitespace-nowrap">
+                            <span className="font-heading text-[11.5px] font-bold tabular-nums text-zinc-700">
+                              {item.usageCount}
+                            </span>
+                          </Td>
+
+                          <Td className="whitespace-nowrap text-[12px] text-subtle">
+                            {item.lastUsedAt ? formatDateTime(item.lastUsedAt) : "—"}
+                          </Td>
+
                           <Td className="whitespace-nowrap text-[12px] text-subtle">{item.createdByName}</Td>
 
-                          {/* Actualizada */}
                           <Td className="whitespace-nowrap text-[12px] text-subtle">{formatDateTime(item.updatedAt)}</Td>
 
                           {/* Acciones */}
@@ -544,31 +563,7 @@ export function RespuestasPage() {
                     })}
                   </tbody>
                 </DataTable>
-
-                {rows.length === 0 && (
-                  <div className="flex flex-col items-center gap-2 py-14 text-center">
-                    <MessageSquareText className="h-6 w-6 text-faint" />
-                    <p className="text-[13.5px] text-faint">
-                      {hasActiveFilters
-                        ? "Ninguna respuesta coincide con los filtros aplicados."
-                        : "Todavía no hay respuestas guardadas."}
-                    </p>
-                    {hasActiveFilters && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setSearch("");
-                          setSelectedCategory("all");
-                        }}
-                        className="mt-2 text-[12px]"
-                      >
-                        Restablecer filtros
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </>
+              </div>
             )}
             </ListPanel>
           )}
@@ -608,7 +603,7 @@ export function RespuestasPage() {
           initialData={studioState.mode === "duplicar" ? studioState.initialData : undefined}
           onClose={() => setStudioState(null)}
           onSaved={() => {
-            load();
+            reloadAll();
             setStudioState(null);
           }}
         />

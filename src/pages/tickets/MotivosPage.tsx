@@ -28,7 +28,6 @@ import { SelectBox } from "../../components/ui/SelectBox";
 import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { TableSkeleton } from "../../components/ui/Skeleton";
-import { TableSelectionBar } from "../../components/ui/TableSelectionBar";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";

@@ -15,7 +15,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
@@ -53,6 +53,7 @@ import { CreateTicketModal } from "../tickets/CreateTicketModal";
 import type { EmailLinkedTask } from "../../types/tasks";
 import { TaskFormModal } from "../tasks/TaskFormModal";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
+import { buildCannedVariableContext } from "../../lib/cannedVariables";
 import { CannedPicker } from "./CannedPicker";
 import { textToBlocks } from "./textToBlocks";
 import { AssignmentControl } from "./ConversationTools";
@@ -315,6 +316,17 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [exporting, setExporting] = useState(false);
   const [dangerousToDownload, setDangerousToDownload] = useState<EmailAttachmentResponse | null>(null);
   const { user } = useAuth();
+
+  const cannedVariableContext = useMemo(() => {
+    if (!email) return undefined;
+    const inbound = email.direction === "Inbound";
+    return buildCannedVariableContext({
+      user,
+      contactName: inbound ? email.fromName ?? email.fromEmail : null,
+      contactEmail: inbound ? email.fromEmail : email.toEmails[0] ?? null,
+      ticketId: email.ticketId,
+    });
+  }, [email, user]);
 
   // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
   const replyText = blocksToText(replyBlocks);
@@ -1168,7 +1180,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   event.target.value = "";
                 }}
               />
-              <CannedPicker onPick={insertCanned} />
+              <CannedPicker onPick={insertCanned} variableContext={cannedVariableContext} />
               <span className="truncate text-[11px] font-medium text-zinc-400">
                 Hasta {MAX_FILES} archivos, 10 MB · también puedes soltarlos aquí
               </span>

@@ -408,6 +408,14 @@ export interface CategoriaResponseItem {
   updatedAt: string;
 }
 
+export interface CategoriaResponseListResponse {
+  items: CategoriaResponseItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 export interface CannedResponseResponse {
   id: number;
   title: string;
@@ -417,6 +425,16 @@ export interface CannedResponseResponse {
   createdByStaffId: number;
   createdByName: string;
   updatedAt: string;
+  usageCount: number;
+  lastUsedAt: string | null;
+}
+
+export interface CannedResponseListResponse {
+  items: CannedResponseResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 }
 
 /** Quien esta escribiendo en que conversacion; active false = dejo de hacerlo. */

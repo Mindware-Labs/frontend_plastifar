@@ -1,5 +1,7 @@
 import { PenLine, Paperclip, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "../../context/useAuth";
+import { buildCannedVariableContext } from "../../lib/cannedVariables";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
@@ -32,6 +34,7 @@ const MAX_FILES = 5;
 const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
 
 export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
+  const { user } = useAuth();
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
   const [ccOpen, setCcOpen] = useState(false);
@@ -59,6 +62,15 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   // La marca del envio nace con el editor: un reintento la repite y no duplica el correo.
   const tokenRef = useRef(crypto.randomUUID());
+
+  const cannedVariableContext = useMemo(() => {
+    const firstTo = to.split(/[,;]/)[0]?.trim() ?? "";
+    const emailMatch = firstTo.match(/<([^>]+)>/) ?? (firstTo.includes("@") ? [null, firstTo] : null);
+    const contactEmail = emailMatch?.[1]?.trim();
+    const contactName =
+      firstTo && !firstTo.includes("@") ? firstTo.replace(/<[^>]+>/, "").trim() || undefined : undefined;
+    return buildCannedVariableContext({ user, contactName, contactEmail });
+  }, [to, user]);
 
   useEffect(() => {
     toRef.current?.focus();
@@ -369,7 +381,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
             event.target.value = "";
           }}
         />
-        <CannedPicker onPick={insertCanned} />
+        <CannedPicker onPick={insertCanned} variableContext={cannedVariableContext} />
         <span className="truncate text-[11px] font-medium text-zinc-400">
           Sale de la casilla de soporte, con tu nombre y tu firma.
         </span>

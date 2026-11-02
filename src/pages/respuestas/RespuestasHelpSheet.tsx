@@ -61,10 +61,10 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
               Correo
             </p>
             <h2 id={titleId} className="font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
-              Respuestas rápidas
+              Plantillas de correo
             </h2>
             <p className="text-[12px] leading-relaxed text-subtle">
-              Guarda un texto una vez y úsalo cuando lo necesites al escribir un correo.
+              Guarda un mensaje una vez y reutilízalo al redactar desde la bandeja con «Insertar plantilla».
             </p>
           </div>
 
@@ -139,9 +139,12 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
               </div>
 
               <div className="border-t border-zinc-100 bg-zinc-50/50 px-4 py-2.5 text-[11.5px] text-zinc-500">
-                Lo que va entre{" "}
-                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono font-medium text-brand-red">[ ]</code> lo
-                completas tú con los datos de ese cliente antes de enviar.
+                Usa variables como{" "}
+                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono font-medium text-brand-red">
+                  {"{cliente.nombre}"}
+                </code>
+                : se rellenan solas al insertar la plantilla cuando el dato está en el hilo; si no, las completas tú
+                antes de enviar.
               </div>
             </div>
           </section>
@@ -191,7 +194,7 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
                 <span>Pulsa</span>
                 <span className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-700">
                   <MessageSquareText className="size-3 text-brand-red" />
-                  Respuestas rápidas
+                  Insertar plantilla
                 </span>
                 <span>en la barra del editor.</span>
               </li>
@@ -253,7 +256,7 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
                 className="gap-1.5"
               >
                 <Sparkles className="size-3.5" />
-                <span>Crear respuesta</span>
+                <span>Crear plantilla</span>
               </Button>
             )}
           </div>

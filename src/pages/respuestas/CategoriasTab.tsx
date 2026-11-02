@@ -4,17 +4,20 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { cannedCategoriesApi } from "../../api/canned";
-import { ApiError } from "../../api/client";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { ListPanel } from "../../components/ui/ListPanel";
+import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDateTime } from "../../lib/format";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
@@ -37,25 +40,25 @@ export function CategoriasTab({
   const { can } = usePermissions();
   const canMailSend = can("mail.send");
 
-  const [categories, setCategories] = useState<CategoriaResponseItem[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState(10);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [modal, setModal] = useState<"nueva" | CategoriaResponseItem | null>(null);
 
-  function load() {
-    cannedCategoriesApi
-      .list()
-      .then((data) => {
-        setCategories(data);
-        onCategoriesChanged?.();
-      })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "No se pudieron cargar las categorías"));
-  }
+  const debouncedSearch = useDebouncedValue(search).trim();
 
-  useEffect(load, []);
+  const { data, isStale, error, setPage, refresh } = usePagedList({
+    fetch: cannedCategoriesApi.list,
+    criteria: { pageSize, search: debouncedSearch || undefined },
+    fallbackError: "No se pudieron cargar las categorías.",
+  });
+
+  function reload() {
+    refresh();
+    onCategoriesChanged?.();
+  }
 
   useEffect(() => {
     if (!pendingNew) return;
@@ -63,18 +66,10 @@ export function CategoriasTab({
     onPendingNewConsumed?.();
   }, [pendingNew, onPendingNewConsumed]);
 
-  useLoadErrorReceipt(error, "canned-categories-list", load);
+  useLoadErrorReceipt(error, "canned-categories-list", refresh);
 
-  const term = search.trim().toLowerCase();
-  const rows = useMemo(() => {
-    return (categories ?? []).filter((item) => {
-      if (!term) return true;
-      return (
-        item.name.toLowerCase().includes(term) ||
-        (item.description && item.description.toLowerCase().includes(term))
-      );
-    });
-  }, [categories, term]);
+  const rows = data?.items ?? [];
+  const hasSearch = Boolean(debouncedSearch);
 
   // Selección múltiple
   const allPageSelected = rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
@@ -116,7 +111,7 @@ export function CategoriasTab({
         try {
           await cannedCategoriesApi.remove(item.id);
           setSelectedIds((prev) => prev.filter((i) => i !== item.id));
-          load();
+          reload();
         } finally {
           setBusyId(null);
         }
@@ -144,16 +139,15 @@ export function CategoriasTab({
         try {
           await cannedCategoriesApi.bulkDelete(selectedIds);
           setSelectedIds([]);
-          load();
+          reload();
         } catch {
-          // Fallback individual
           for (const id of selectedIds) {
             try {
               await cannedCategoriesApi.remove(id);
             } catch {}
           }
           setSelectedIds([]);
-          load();
+          reload();
         }
       },
     });
@@ -192,11 +186,34 @@ export function CategoriasTab({
             {search && <ClearFiltersButton onClick={() => setSearch("")} title="Limpiar búsqueda" />}
           </div>
         }
+        footer={
+          data !== null && data.total > 0 ? (
+            <Pagination
+              page={data.page}
+              pageSize={data.pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="categorías"
+            />
+          ) : undefined
+        }
       >
-        {categories === null ? (
-          <TableSkeleton rows={8} columns={canMailSend ? 6 : 5} />
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={canMailSend ? 6 : 5} />
+        ) : rows.length === 0 ? (
+          <ListEmptyState
+            icon={Tag}
+            isFiltered={hasSearch}
+            filteredTitle="Ninguna categoría coincide con la búsqueda."
+            onClearFilters={() => setSearch("")}
+            emptyTitle="Todavía no hay categorías registradas."
+            emptyDescription="Agrupa las plantillas por área (Logística, Cobros, Calidad…) con «Nueva categoría»."
+          />
         ) : (
-          <DataTable>
+          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <DataTable>
             <thead>
               <HeadRow>
                 {canMailSend && (
@@ -291,15 +308,7 @@ export function CategoriasTab({
                 );
               })}
             </tbody>
-          </DataTable>
-        )}
-
-        {categories !== null && rows.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-14 text-center">
-            <Tag className="h-6 w-6 text-faint" />
-            <p className="text-[13.5px] text-faint">
-              {term ? "Ninguna categoría coincide con la búsqueda." : "Todavía no hay categorías registradas."}
-            </p>
+            </DataTable>
           </div>
         )}
       </ListPanel>
@@ -310,7 +319,7 @@ export function CategoriasTab({
         <CategoriaModal
           category={modal === "nueva" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={load}
+          onSaved={reload}
         />
       )}
     </div>

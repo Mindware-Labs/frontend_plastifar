@@ -132,7 +132,7 @@ export const SIDEBAR_NAV: NavGroup[] = [
       { label: "Enviados", to: "/bandeja/enviados", folder: "sent", icon: Send },
       { label: "Archivados", to: "/bandeja/archivados", folder: "archived", icon: Archive },
       { label: "Papelera", to: "/bandeja/papelera", folder: "trash", icon: Trash2 },
-      { label: "Respuestas", to: "/bandeja/respuestas", icon: MessageSquareText },
+      { label: "Plantillas", to: "/bandeja/respuestas", icon: MessageSquareText },
     ],
   },
   {

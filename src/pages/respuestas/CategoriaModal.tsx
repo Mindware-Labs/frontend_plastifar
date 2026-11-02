@@ -90,8 +90,8 @@ export function CategoriaModal({ category, onClose, onSaved }: CategoriaModalPro
   return (
     <Modal
       title={isEdit ? "Editar categoría" : "Nueva categoría"}
-      eyebrow="Correo · Catálogo de respuestas"
-      description="Organiza las respuestas rápidas y plantillas en categorías operativas."
+      eyebrow="Correo · Plantillas"
+      description="Organiza las plantillas de correo en categorías operativas."
       maxWidth="max-w-xl"
       onClose={onClose}
       isExiting={isExiting}
