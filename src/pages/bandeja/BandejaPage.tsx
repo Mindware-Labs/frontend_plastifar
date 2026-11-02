@@ -2,8 +2,6 @@ import {
   Bell,
   BellOff,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Inbox,
   Plus,
   Trash2,
@@ -23,6 +21,7 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { Pagination } from "../../components/ui/Pagination";
 import { InboxListSkeleton, MailReadingPaneSkeleton, Skeleton } from "../../components/ui/Skeleton";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../components/shadcn/resizable";
 import { ScrollArea } from "../../components/shadcn/scroll-area";
@@ -252,9 +251,6 @@ function EmailFilterMenu({
   );
 }
 
-/** Cada pagina se pide al servidor: entra lo que se ve, no la bandeja entera. */
-const PAGE_SIZE = 15;
-
 function conversations(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? `conversación ${singular}` : `conversaciones ${plural}`}`;
 }
@@ -353,6 +349,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const prefs = useNotifyPrefs();
   const hasOpenedAlerts = useHasOpenedNotifications();
   const debouncedSearch = useDebouncedValue(search).trim();
+  const [pageSize, setPageSize] = useState(10);
   const meta = folderMeta[folder];
   const selectable = folder !== "sent";
 
@@ -360,19 +357,20 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     if (!canMailSend && composing) setComposing(false);
   }, [canMailSend, composing]);
 
-  const { data, error, page, setPage, refresh } = usePagedList<EmailQuery, EmailListResponse>(
-    {
-      fetch: emailsApi.list,
-      criteria: {
-        pageSize: PAGE_SIZE,
-        folder,
-        filter: ticketFilter,
-        search: debouncedSearch || undefined,
-        ...toQueryParams(filters),
-      },
-      fallbackError: "No se pudo cargar la bandeja",
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<
+    EmailQuery,
+    EmailListResponse
+  >({
+    fetch: emailsApi.list,
+    criteria: {
+      pageSize,
+      folder,
+      filter: ticketFilter,
+      search: debouncedSearch || undefined,
+      ...toQueryParams(filters),
     },
-  );
+    fallbackError: "No se pudo cargar la bandeja",
+  });
 
   useLoadErrorReceipt(error, "bandeja-list", refresh);
 
@@ -396,7 +394,8 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     if (requestedId !== null) setParams({}, { replace: true });
   }, [requestedId, setParams]);
 
-  const rows = data?.items ?? [];
+  const rows = isStale ? [] : (data?.items ?? []);
+  const listLoading = data === null || isStale;
   const unfiltered = !debouncedSearch && countActive(filters) === 0;
 
   useEffect(() => {
@@ -995,7 +994,11 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                 </div>
 
                 <ScrollArea className="min-h-0 flex-1">
-                  {rows.length === 0 ? (
+                  {listLoading ? (
+                    <div className="p-3 pt-0">
+                      <InboxListSkeleton rows={pageSize} />
+                    </div>
+                  ) : rows.length === 0 ? (
                     <ListEmptyState
                       icon={Inbox}
                       isFiltered={!unfiltered}
@@ -1027,29 +1030,19 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                   )}
                 </ScrollArea>
 
-                {data.totalPages > 1 && (
-                  <div className="flex shrink-0 items-center justify-between gap-2 border-t border-zinc-200/80 px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => setPage(page - 1)}
-                      disabled={page <= 1}
-                      aria-label="Página anterior"
-                      className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-white"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="text-[11.5px] font-medium text-zinc-500 tabular-nums">
-                      {page} de {data.totalPages} · {data.total} conversaciones
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setPage(page + 1)}
-                      disabled={page >= data.totalPages}
-                      aria-label="Página siguiente"
-                      className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-white"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
+                {data !== null && data.total > 0 && (
+                  <div className="shrink-0 border-t border-zinc-200/80 bg-zinc-50 px-3">
+                    <Pagination
+                      layout="panel"
+                      page={page}
+                      pageSize={pageSize}
+                      total={data.total}
+                      totalPages={data.totalPages}
+                      onPageChange={setPage}
+                      onPageSizeChange={setPageSize}
+                      noun="conversaciones"
+                      nounSingular="conversación"
+                    />
                   </div>
                 )}
               </ResizablePanel>
