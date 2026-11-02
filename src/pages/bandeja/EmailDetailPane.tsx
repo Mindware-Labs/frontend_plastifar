@@ -986,6 +986,10 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               addFiles(Array.from(event.dataTransfer.files));
             }}
           >
+            {celebration ? (
+              <ComposerSendSuccessLayer title={celebration.title} detail={celebration.detail} />
+            ) : (
+              <>
             <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
               {isForward ? (
                 <Forward className="h-3.5 w-3.5 shrink-0 text-brand-red" />
@@ -1008,7 +1012,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
-
             <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
               <span className={fieldLabelClass}>Para</span>
               {isForward ? (
@@ -1224,12 +1227,8 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 />
               </div>
             </div>
-
-            <ComposerSendSuccessLayer
-              open={celebration !== null}
-              title={celebration?.title ?? ""}
-              detail={celebration?.detail ?? ""}
-            />
+              </>
+            )}
           </div>
         )}
 

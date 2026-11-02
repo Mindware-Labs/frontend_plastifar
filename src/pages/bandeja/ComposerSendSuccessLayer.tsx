@@ -1,27 +1,24 @@
 import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 
 interface ComposerSendSuccessLayerProps {
-  open: boolean;
   title: string;
   detail: string;
 }
 
-/** Confirmación de envío dentro del compositor, antes de cerrar la vista. */
-export function ComposerSendSuccessLayer({ open, title, detail }: ComposerSendSuccessLayerProps) {
-  if (!open) return null;
-
+/** Vista de confirmación de envío: ocupa el cuerpo del compositor. */
+export function ComposerSendSuccessLayer({ title, detail }: ComposerSendSuccessLayerProps) {
   return (
     <div
-      className="absolute inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-white animate-plf-composer-send-backdrop"
+      className="relative flex min-h-0 flex-1 flex-col items-center justify-center bg-white px-6 py-10 animate-plf-composer-send-backdrop"
       role="status"
       aria-live="polite"
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald-50/70 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-emerald-50/80 to-transparent"
       />
 
-      <div className="relative z-10 flex max-w-[19rem] flex-col items-center px-6 text-center">
+      <div className="relative z-10 flex max-w-md flex-col items-center text-center">
         <div className="relative flex h-[4.5rem] w-[4.5rem] items-center justify-center">
           <span
             aria-hidden
@@ -40,13 +37,13 @@ export function ComposerSendSuccessLayer({ open, title, detail }: ComposerSendSu
         </div>
 
         <p
-          className="mt-6 font-heading text-[17px] font-bold tracking-[-0.02em] text-zinc-900 animate-plf-composer-send-copy"
+          className="mt-6 font-heading text-[18px] font-bold tracking-[-0.02em] text-zinc-900 animate-plf-composer-send-copy"
           style={{ animationDelay: "0.52s" }}
         >
           {title}
         </p>
         <p
-          className="mt-1.5 text-[12.5px] font-medium leading-relaxed text-zinc-500 animate-plf-composer-send-copy"
+          className="mt-1.5 max-w-[18rem] text-[13px] font-medium leading-relaxed text-zinc-500 animate-plf-composer-send-copy"
           style={{ animationDelay: "0.64s" }}
         >
           {detail}

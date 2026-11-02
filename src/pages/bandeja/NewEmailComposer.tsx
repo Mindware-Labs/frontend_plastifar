@@ -212,6 +212,10 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
         addFiles(Array.from(event.dataTransfer.files));
       }}
     >
+      {celebration ? (
+        <ComposerSendSuccessLayer title={celebration.title} detail={celebration.detail} />
+      ) : (
+        <>
       <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
         <PenLine className="h-3.5 w-3.5 shrink-0 text-brand-red" />
         <span className="text-[12.5px] font-semibold text-zinc-900">Correo nuevo</span>
@@ -225,7 +229,6 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-
       <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
         <span className={fieldLabelClass}>Para</span>
         <RecipientInput
@@ -419,12 +422,8 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
           />
         </div>
       </div>
-
-      <ComposerSendSuccessLayer
-        open={celebration !== null}
-        title={celebration?.title ?? ""}
-        detail={celebration?.detail ?? ""}
-      />
+        </>
+      )}
     </div>
   );
 }
