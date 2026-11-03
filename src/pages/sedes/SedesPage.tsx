@@ -7,7 +7,8 @@ import {
   Power,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { ApiError } from "../../api/client";
 import { sedesApi } from "../../api/sedes";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
@@ -20,13 +21,15 @@ import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import type { Sede, SedeQuery } from "../../types/sedes";
-import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { SedeModal } from "./SedeModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -37,6 +40,8 @@ export function SedesPage() {
   const canWrite = can("settings.write");
 
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
   const [pageSize, setPageSize] = useState(15);
@@ -61,10 +66,84 @@ export function SedesPage() {
   });
 
   useLoadErrorReceipt(error, "sedes-list", refresh);
+  useActionErrorReceipt(actionError, "sedes-action");
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
+
+  const pageIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } =
+    useTablePageSelection(pageIds);
+
+  async function runBulk(action: "activate" | "deactivate" | "delete") {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    setActionError(null);
+    try {
+      const result = await sedesApi.bulk({
+        ids: Array.from(selectedIds),
+        action,
+      });
+      if (result.updatedCount < result.totalRequested) {
+        const skipped = result.totalRequested - result.updatedCount;
+        setActionError(
+          action === "delete"
+            ? `Se eliminaron ${result.updatedCount} de ${result.totalRequested}. ${skipped} tienen departamentos asignados.`
+            : `Se actualizaron ${result.updatedCount} de ${result.totalRequested} sedes.`,
+        );
+      }
+      clearSelection();
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo completar la acción en lote");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function askBulkActivate() {
+    setConfirmation({
+      tone: "warn",
+      icon: CheckCircle2,
+      title: `Reactivar ${selectedIds.size} sedes`,
+      description: "Volverán a ofrecerse al asignar sede a un departamento.",
+      confirmLabel: "Reactivar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("activate");
+      },
+    });
+  }
+
+  function askBulkDeactivate() {
+    setConfirmation({
+      tone: "warn",
+      icon: Ban,
+      title: `Desactivar ${selectedIds.size} sedes`,
+      description: "Dejarán de ofrecerse en selectores; los departamentos que ya las usan las conservan.",
+      confirmLabel: "Desactivar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("deactivate");
+      },
+    });
+  }
+
+  function askBulkDelete() {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      title: `Eliminar ${selectedIds.size} sedes`,
+      description:
+        "Solo se borran las que no tienen departamentos. Las demás se omitirán; desactívalas si no las necesitas.",
+      confirmLabel: "Eliminar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("delete");
+      },
+    });
+  }
 
   function askToggle(sede: Sede) {
     const willDeactivate = sede.isActive;
@@ -221,6 +300,37 @@ export function SedesPage() {
               </div>
             </div>
           }
+          selection={
+            canWrite && selectedIds.size > 0
+              ? {
+                  count: selectedIds.size,
+                  pageState,
+                  busy: bulkBusy,
+                  onTogglePage: togglePage,
+                  onClear: clearSelection,
+                  actions: [
+                    {
+                      key: "activate",
+                      label: "Reactivar",
+                      icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
+                      onClick: askBulkActivate,
+                    },
+                    {
+                      key: "deactivate",
+                      label: "Desactivar",
+                      icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
+                      onClick: askBulkDeactivate,
+                    },
+                    {
+                      key: "delete",
+                      label: "Eliminar",
+                      icon: <Trash2 aria-hidden className="h-3.5 w-3.5 text-brand-red" />,
+                      onClick: askBulkDelete,
+                    },
+                  ],
+                }
+              : undefined
+          }
           footer={
             data && data.total > 0 && (
               <Pagination
@@ -247,6 +357,21 @@ export function SedesPage() {
             <DataTable>
               <thead>
                 <HeadRow>
+                  {canWrite && (
+                    <Th className="w-10 text-center">
+                      <div className="flex items-center justify-center">
+                        <SelectBox
+                          checked={pageState}
+                          onToggle={togglePage}
+                          label={
+                            pageState === true
+                              ? "Quitar la selección de esta página"
+                              : "Seleccionar toda la página"
+                          }
+                        />
+                      </div>
+                    </Th>
+                  )}
                   <Th>Nombre de la sede</Th>
                   <Th>Dirección / Ubicación</Th>
                   <Th className="w-36 text-center">Departamentos</Th>
@@ -255,8 +380,21 @@ export function SedesPage() {
                 </HeadRow>
               </thead>
               <tbody className={isStale ? "opacity-60 transition-opacity" : ""}>
-                {rows.map((sede) => (
-                  <Row key={sede.id} busy={busyId === sede.id}>
+                {rows.map((sede) => {
+                  const checked = selectedIds.has(sede.id);
+                  return (
+                  <Row key={sede.id} busy={busyId === sede.id || bulkBusy} data-checked={checked}>
+                    {canWrite && (
+                      <Td className="w-10 text-center">
+                        <div className="flex items-center justify-center">
+                          <SelectBox
+                            checked={checked}
+                            onToggle={() => toggleSelect(sede.id)}
+                            label={`Seleccionar ${sede.name}`}
+                          />
+                        </div>
+                      </Td>
+                    )}
                     {/* 1. NOMBRE */}
                     <Td>
                       <div className="flex items-center gap-2.5">
@@ -318,7 +456,8 @@ export function SedesPage() {
                       </Td>
                     )}
                   </Row>
-                ))}
+                );
+                })}
               </tbody>
             </DataTable>
           )}

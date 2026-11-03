@@ -14,4 +14,10 @@ export const sedesApi = {
     apiRequest<Sede>(`/api/sedes/${id}`, { method: "PUT", body: JSON.stringify(data) }),
 
   remove: (id: number) => apiRequest<void>(`/api/sedes/${id}`, { method: "DELETE" }),
+
+  bulk: (input: { ids: number[]; action: "activate" | "deactivate" | "delete" }) =>
+    apiRequest<import("../types/api").BulkActionResult>("/api/sedes/bulk", {
+      method: "POST",
+      body: JSON.stringify({ ids: input.ids, action: input.action }),
+    }),
 };

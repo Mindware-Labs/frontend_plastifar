@@ -48,6 +48,8 @@ export interface StaffResponse {
   /** Usuario en el sistema anterior (RF-O9). Nulo cuando no lo tiene. */
   legacyUsername: string | null;
   primaryRoleId?: number | null;
+  /** Nombre del rol del acceso principal (ALL ACCESS, LIMITED ACCESS, …). */
+  primaryRoleName?: string | null;
 }
 
 /** Respuesta paginada del listado de personal (GET /api/staff). */

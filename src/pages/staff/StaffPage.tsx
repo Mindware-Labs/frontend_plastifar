@@ -599,7 +599,14 @@ export function StaffPage() {
                     </Td>
                     <Td className="text-[12.5px] text-brand-gray">{member.email}</Td>
                     <Td>
-                      {member.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
+                      <div className="flex flex-wrap items-center gap-1">
+                        {member.primaryRoleName ? (
+                          <Badge>{member.primaryRoleName}</Badge>
+                        ) : (
+                          <Badge tone="slate">Sin rol</Badge>
+                        )}
+                        {member.isAdmin ? <Badge tone="red">Administrador</Badge> : null}
+                      </div>
                     </Td>
                     <Td>
                       <StatusDot active={member.isActive} />
