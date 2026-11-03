@@ -1160,7 +1160,7 @@ input:-webkit-autofill:focus {
   will-change: transform, opacity, filter;
 }
 .animate-plf-composer-send-progress {
-  animation: plf-composer-send-progress 1.45s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
+  animation: plf-composer-send-progress 3.85s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
 }
 .plf-composer-send-check .animate-plf-check-stroke {
   animation-delay: 0.16s;

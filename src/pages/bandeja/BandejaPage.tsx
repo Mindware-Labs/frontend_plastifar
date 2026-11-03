@@ -337,7 +337,10 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     mounted: composeMounted,
     exiting: composeExiting,
     ref: composePanelRef,
+    snap: snapCompose,
   } = useSidePanelMotion(composing);
+  const [emptyPaneReveal, setEmptyPaneReveal] = useState(false);
+  const composeMountedRef = useRef(composeMounted);
   const [checked, setChecked] = useState<Set<number>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [starOverrides, setStarOverrides] = useState<Record<number, boolean>>({});
@@ -362,6 +365,20 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   useEffect(() => {
     if (!canMailSend && composing) setComposing(false);
   }, [canMailSend, composing]);
+
+  useEffect(() => {
+    const wasMounted = composeMountedRef.current;
+    composeMountedRef.current = composeMounted;
+    if (wasMounted && !composeMounted && selectedId === null) {
+      setEmptyPaneReveal(true);
+    }
+  }, [composeMounted, selectedId]);
+
+  useEffect(() => {
+    if (!emptyPaneReveal) return;
+    const timer = window.setTimeout(() => setEmptyPaneReveal(false), 480);
+    return () => window.clearTimeout(timer);
+  }, [emptyPaneReveal]);
 
   const { data, isStale, error, page, setPage, refresh } = usePagedList<
     EmailQuery,
@@ -454,6 +471,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
   // Abrir una conversacion la marca leida, y si se la acaban de asignar, tambien "vista".
   function handleOpen(email: EmailSummaryResponse) {
+    if (composing) setComposing(false);
     setSelectedId(email.id);
 
     if (email.unread) {
@@ -871,7 +889,10 @@ export function BandejaPage({ folder }: BandejaPageProps) {
               {canMailSend && (
                 <Button
                   size="sm"
-                  onClick={() => setComposing(true)}
+                  onClick={() => {
+                    setSelectedId(null);
+                    setComposing(true);
+                  }}
                   className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
                 >
                   <Plus className="h-4 w-4" strokeWidth={2.5} />
@@ -1060,7 +1081,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
               <ResizableHandle withHandle className="bg-zinc-200/80 hover:bg-zinc-300" />
 
-              <ResizablePanel minSize="35%" className="flex min-h-0 flex-col overflow-hidden">
+              <ResizablePanel minSize="35%" className="flex h-full min-h-0 flex-col overflow-hidden">
                 <MailReadingPaneShell
                   key={selectedId != null ? `detail-${selectedId}` : "reading-pane"}
                 >
@@ -1068,13 +1089,17 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                     <div
                       ref={composePanelRef as React.RefObject<HTMLDivElement | null>}
                       aria-hidden={composeExiting}
-                      className={`h-full min-h-0 flex flex-col overflow-hidden bg-white ${
+                      className={`flex h-full w-full flex-1 min-h-0 flex-col overflow-hidden bg-white ${
                         composeExiting ? "pointer-events-none" : ""
                       }`}
                     >
                       <NewEmailComposer
+                        panelExiting={composeExiting}
                         onSent={() => {
+                          snapCompose();
+                          setSelectedId(null);
                           setComposing(false);
+                          setEmptyPaneReveal(true);
                           refreshAll();
                         }}
                         onCancel={() => setComposing(false)}
@@ -1086,6 +1111,11 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                       starred={starOverrides[selectedId]}
                       onTicketCreated={refresh}
                       onMoved={handleMoved}
+                      onSent={() => {
+                        setSelectedId(null);
+                        setEmptyPaneReveal(true);
+                        refreshAll();
+                      }}
                       onStarred={(starred) => {
                         if (selectedId != null) {
                           setStarOverrides((current) => ({ ...current, [selectedId]: starred }));
@@ -1098,15 +1128,20 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                       onClose={() => setSelectedId(null)}
                     />
                   ) : (
-                    <InboxTriageEmptyState
-                      folder={folder}
-                      counts={data.counts}
-                      folderCounts={data.folderCounts}
-                      canCompose={canMailSend}
-                      onCompose={() => setComposing(true)}
-                      onSelectTicketFilter={(f) => setTicketFilter(f)}
-                      activeTicketFilter={ticketFilter}
-                    />
+                    <div className={`flex h-full w-full flex-1 min-h-0 flex-col ${emptyPaneReveal ? "animate-plf-receipt-in" : ""}`}>
+                      <InboxTriageEmptyState
+                        folder={folder}
+                        counts={data.counts}
+                        folderCounts={data.folderCounts}
+                        canCompose={canMailSend}
+                        onCompose={() => {
+                          setSelectedId(null);
+                          setComposing(true);
+                        }}
+                        onSelectTicketFilter={(f) => setTicketFilter(f)}
+                        activeTicketFilter={ticketFilter}
+                      />
+                    </div>
                   )}
                 </MailReadingPaneShell>
               </ResizablePanel>

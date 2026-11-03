@@ -35,7 +35,10 @@ import {
   invalidateMailContactDirectory,
   useMailContactDirectory,
 } from "../../hooks/useMailContactDirectory";
-import { useComposerSendCelebration } from "./useComposerSendCelebration";
+import {
+  useComposerSendCelebration,
+  type ComposerSendCelebrationPayload,
+} from "./useComposerSendCelebration";
 import {
   COMPOSER_BCC_KEY,
   COMPOSER_CC_KEY,
@@ -45,13 +48,15 @@ import {
 interface NewEmailComposerProps {
   onSent: () => void;
   onCancel: () => void;
+  /** Salida del panel en BandejaPage (animación de cierre tras enviar). */
+  panelExiting?: boolean;
 }
 
 const MAX_FILES = 5;
 const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
 const VALID_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
+export function NewEmailComposer({ onSent, onCancel, panelExiting = false }: NewEmailComposerProps) {
   const { user } = useAuth();
   const directory = useMailContactDirectory();
   const [to, setTo] = useState("");
@@ -78,6 +83,9 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const bccRef = useRef<HTMLInputElement>(null);
   const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
   const { celebration, celebrate, isCelebrating, isExiting } = useComposerSendCelebration();
+  const [sendHold, setSendHold] = useState<ComposerSendCelebrationPayload | null>(null);
+  const successPayload = celebration ?? sendHold;
+  const successVisible = successPayload !== null;
   const fileRef = useRef<HTMLInputElement>(null);
   // La marca del envio nace con el editor: un reintento la repite y no duplica el correo.
   const tokenRef = useRef(crypto.randomUUID());
@@ -195,16 +203,17 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       });
       setSending(false);
       invalidateMailContactDirectory();
-      celebrate(
-        {
-          kind: "compose",
-          title: "Correo enviado correctamente",
-          detail: to.trim() || "Tu mensaje ya salió hacia el destinatario.",
-          subject: resolvedSubject.trim() || undefined,
-          attachmentsCount: files.length > 0 ? files.length : undefined,
-        },
-        onSent,
-      );
+      const celebrationPayload: ComposerSendCelebrationPayload = {
+        kind: "compose",
+        title: "Correo enviado correctamente",
+        detail: to.trim() || "Tu mensaje ya salió hacia el destinatario.",
+        subject: resolvedSubject.trim() || undefined,
+        attachmentsCount: files.length > 0 ? files.length : undefined,
+      };
+      celebrate(celebrationPayload, () => {
+        setSendHold(celebrationPayload);
+        onSent();
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo enviar el correo");
       setSending(false);
@@ -258,21 +267,22 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   return (
     <div
       ref={containerRef}
-      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-white"
+      className="relative flex h-full w-full flex-1 min-h-0 flex-col overflow-hidden bg-white"
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
         addFiles(Array.from(event.dataTransfer.files));
       }}
     >
-      {celebration ? (
+      {successVisible && successPayload ? (
         <ComposerSendSuccessLayer
-          kind={celebration.kind}
-          title={celebration.title}
-          detail={celebration.detail}
-          subject={celebration.subject}
-          attachmentsCount={celebration.attachmentsCount}
-          exiting={isExiting}
+          kind={successPayload.kind}
+          title={successPayload.title}
+          detail={successPayload.detail}
+          subject={successPayload.subject}
+          attachmentsCount={successPayload.attachmentsCount}
+          exiting={isExiting || (sendHold !== null && panelExiting)}
+          fillPanel
         />
       ) : (
         <>

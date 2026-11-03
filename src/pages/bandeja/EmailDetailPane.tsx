@@ -2,6 +2,7 @@ import {
   Archive,
   ArchiveRestore,
   ArrowUpRight,
+  ChevronDown,
   CornerUpLeft,
   Download,
   Forward,
@@ -73,7 +74,10 @@ import { RecipientInput } from "./RecipientInput";
 import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
 import { ComposerSendSuccessLayer } from "./ComposerSendSuccessLayer";
 import { invalidateMailContactDirectory } from "../../hooks/useMailContactDirectory";
-import { useComposerSendCelebration } from "./useComposerSendCelebration";
+import {
+  useComposerSendCelebration,
+  type ComposerSendCelebrationPayload,
+} from "./useComposerSendCelebration";
 import {
   COMPOSER_BCC_KEY,
   COMPOSER_CC_KEY,
@@ -107,6 +111,8 @@ interface EmailDetailPaneProps {
   onTicketCreated: () => void;
   /** El correo cambió de carpeta: ya no pertenece a la vista actual. */
   onMoved: () => void;
+  /** Tras enviar respuesta o reenvío y completar la confirmación visual. */
+  onSent?: () => void;
   /** El correo cambió su estado de destacado. */
   onStarred?: (starred: boolean) => void;
   /** Cierra el panel y deja la lista sin seleccion. */
@@ -246,6 +252,11 @@ function TicketsOriginPopover({ note, ticketId }: TicketsOriginPopoverProps) {
 }
 
 
+/** A partir de cuántos mensajes del hilo se puede plegar la lista inferior. */
+const THREAD_HISTORY_COLLAPSE_AT = 4;
+/** Cuántas filas se ven con la lista plegada (las más recientes). */
+const THREAD_HISTORY_COLLAPSED_VISIBLE = 2;
+
 function getThreadMessageBadge(message: { direction: string; subject?: string }) {
   if (message.direction !== "Outbound") {
     return {
@@ -283,6 +294,7 @@ export function EmailDetailPane({
   starred: starredProp,
   onTicketCreated,
   onMoved,
+  onSent,
   onStarred,
   onClose,
 }: EmailDetailPaneProps) {
@@ -340,8 +352,18 @@ export function EmailDetailPane({
   const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
   const { celebration, celebrate, isCelebrating, isExiting } = useComposerSendCelebration();
   const replyContainerRef = useRef<HTMLDivElement>(null);
-  const { mounted: composerMounted, exiting: composerExiting, ref: composerPanelRef } = useSidePanelMotion(replyOpen);
+  const {
+    mounted: composerMounted,
+    exiting: composerExiting,
+    ref: composerPanelRef,
+    snap: snapComposer,
+  } = useSidePanelMotion(replyOpen);
+  const [replySendHold, setReplySendHold] = useState<ComposerSendCelebrationPayload | null>(null);
+  const [detailReveal, setDetailReveal] = useState(false);
+  const replySuccessPayload = celebration ?? replySendHold;
+  const replySuccessVisible = replySuccessPayload !== null;
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
+  const [threadHistoryExpanded, setThreadHistoryExpanded] = useState(false);
   const [composers, setComposers] = useState<ComposingPresence[]>([]);
   const [editorKey, setEditorKey] = useState(0);
   const [exporting, setExporting] = useState(false);
@@ -521,6 +543,23 @@ export function EmailDetailPane({
   }, [replyOpen, emailId, replyBlocks, replyText, replyCc, replyBcc, forwardTo, isForward]);
 
   useEffect(() => {
+    setThreadHistoryExpanded(false);
+    setOpenReplyId(null);
+  }, [emailId]);
+
+  useEffect(() => {
+    if (composerMounted || !replySendHold) return;
+    setReplySendHold(null);
+    setDetailReveal(true);
+  }, [composerMounted, replySendHold]);
+
+  useEffect(() => {
+    if (!detailReveal) return;
+    const timer = window.setTimeout(() => setDetailReveal(false), 480);
+    return () => window.clearTimeout(timer);
+  }, [detailReveal]);
+
+  useEffect(() => {
     if (ccOpen) ccRef.current?.focus();
   }, [ccOpen]);
 
@@ -580,25 +619,25 @@ export function EmailDetailPane({
 
       setSending(false);
       invalidateMailContactDirectory();
-      celebrate(
-        {
-          kind: queued ? "queued" : isForward ? "forward" : "reply",
-          title: receiptTitle,
-          detail: receiptDetail,
-          subject: email.subject ? `${isForward ? "Fwd" : "Re"}: ${email.subject}` : undefined,
-          attachmentsCount: totalAttachments > 0 ? totalAttachments : undefined,
-        },
-        () => {
-          clearDraft(String(email.id));
-          // El reenvio abre conversacion propia: no forma parte de este hilo.
-          if (!isForward) {
-            setEmail({ ...email, thread: [...(email.thread ?? []), sent] });
-            setOpenReplyId(sent.id);
-          }
-          resetComposer();
-          setReplyOpen(false);
-        },
-      );
+      const celebrationPayload: ComposerSendCelebrationPayload = {
+        kind: queued ? "queued" : isForward ? "forward" : "reply",
+        title: receiptTitle,
+        detail: receiptDetail,
+        subject: email.subject ? `${isForward ? "Fwd" : "Re"}: ${email.subject}` : undefined,
+        attachmentsCount: totalAttachments > 0 ? totalAttachments : undefined,
+      };
+      celebrate(celebrationPayload, () => {
+        setReplySendHold(celebrationPayload);
+        clearDraft(String(email.id));
+        // El reenvio abre conversacion propia: no forma parte de este hilo.
+        if (!isForward) {
+          setEmail({ ...email, thread: [...(email.thread ?? []), sent] });
+        }
+        resetComposer();
+        snapComposer();
+        setReplyOpen(false);
+        onSent?.();
+      });
     } catch (err) {
       setReplyError(
         err instanceof ApiError
@@ -690,6 +729,7 @@ export function EmailDetailPane({
   }
 
   function closeComposer() {
+    if (!isCelebrating) setReplySendHold(null);
     setReplyOpen(false);
     setReplyError(null);
   }
@@ -846,9 +886,26 @@ export function EmailDetailPane({
   // El correo abierto ya se ve completo arriba: en la tira va el resto de la conversacion.
   const others = thread.filter((message) => message.id !== email.id);
   const openReply = thread.find((message) => message.id === openReplyId) ?? null;
+  const threadHistoryCollapsible = others.length >= THREAD_HISTORY_COLLAPSE_AT;
+  const threadHistoryHiddenCount = Math.max(0, others.length - THREAD_HISTORY_COLLAPSED_VISIBLE);
+  const visibleThreadOthers =
+    threadHistoryCollapsible && !threadHistoryExpanded
+      ? others.slice(-THREAD_HISTORY_COLLAPSED_VISIBLE)
+      : others;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full w-full flex-1 min-h-0 flex-col overflow-hidden bg-white">
+      {replySuccessVisible && replySuccessPayload && (
+        <ComposerSendSuccessLayer
+          kind={replySuccessPayload.kind}
+          title={replySuccessPayload.title}
+          detail={replySuccessPayload.detail}
+          subject={replySuccessPayload.subject}
+          attachmentsCount={replySuccessPayload.attachmentsCount}
+          exiting={isExiting || (replySendHold !== null && composerExiting)}
+          fillPanel
+        />
+      )}
       <div className="flex h-10 shrink-0 items-center px-2">
         <div className="flex items-center gap-1">
           {canMailManage && (
@@ -1054,8 +1111,10 @@ export function EmailDetailPane({
       <Separator className="bg-zinc-100" />
 
       {/* Columna: los avisos ocupan lo suyo y el cuerpo se queda con el resto, sin desbordar sobre el pie. */}
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        {composerMounted && (
+      <div
+        className={`relative flex min-h-0 flex-1 flex-col ${detailReveal ? "animate-plf-receipt-in" : ""}`}
+      >
+        {composerMounted && !replySuccessVisible && (
           <div
             ref={(node) => {
               composerPanelRef.current = node;
@@ -1069,17 +1128,6 @@ export function EmailDetailPane({
               addFiles(Array.from(event.dataTransfer.files));
             }}
           >
-            {celebration ? (
-              <ComposerSendSuccessLayer
-                kind={celebration.kind}
-                title={celebration.title}
-                detail={celebration.detail}
-                subject={celebration.subject}
-                attachmentsCount={celebration.attachmentsCount}
-                exiting={isExiting}
-              />
-            ) : (
-              <>
             <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
               {isForward ? (
                 <Forward className="h-3.5 w-3.5 shrink-0 text-brand-red" />
@@ -1317,8 +1365,6 @@ export function EmailDetailPane({
                 />
               </div>
             </div>
-              </>
-            )}
           </div>
         )}
 
@@ -1468,7 +1514,6 @@ export function EmailDetailPane({
         ) : (
           <p className="min-h-0 flex-1 p-4 text-[13px] text-subtle">Este correo no tiene contenido.</p>
         )}
-      </div>
 
       {email.attachments.length > 0 && (
         <>
@@ -1526,8 +1571,34 @@ export function EmailDetailPane({
 
       <div className="shrink-0 px-4 py-2.5">
         {others.length > 0 && (
-          <div className="mb-2 max-h-40 overflow-y-auto pr-0.5">
-            {others.map((reply) => {
+          <div className="mb-2">
+            {threadHistoryCollapsible && (
+              <div className="mb-1 flex items-center justify-between gap-2 px-1.5">
+                <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
+                  {others.length} {others.length === 1 ? "acción" : "acciones"} en el hilo
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setThreadHistoryExpanded((open) => !open)}
+                  aria-expanded={threadHistoryExpanded}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-heading text-[11px] font-semibold text-brand-red outline-none transition-colors hover:bg-brand-red/8 focus-visible:ring-2 focus-visible:ring-brand-red/20"
+                >
+                  {threadHistoryExpanded ? "Ocultar" : "Mostrar"}
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                      threadHistoryExpanded ? "rotate-180" : ""
+                    }`}
+                    aria-hidden
+                  />
+                </button>
+              </div>
+            )}
+            <div
+              className={`pr-0.5 ${
+                threadHistoryExpanded ? "max-h-72 overflow-y-auto" : threadHistoryCollapsible ? "" : "max-h-40 overflow-y-auto"
+              }`}
+            >
+            {visibleThreadOthers.map((reply) => {
               const badge = getThreadMessageBadge(reply);
               const contactName =
                 reply.direction === "Outbound"
@@ -1595,6 +1666,16 @@ export function EmailDetailPane({
                 </button>
               );
             })}
+            </div>
+            {threadHistoryCollapsible && !threadHistoryExpanded && threadHistoryHiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setThreadHistoryExpanded(true)}
+                className="mt-0.5 w-full rounded-edge px-1.5 py-1 text-left text-[11px] font-medium text-subtle outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/15"
+              >
+                y {threadHistoryHiddenCount} {threadHistoryHiddenCount === 1 ? "acción más" : "acciones más"}…
+              </button>
+            )}
           </div>
         )}
 
@@ -1623,6 +1704,7 @@ export function EmailDetailPane({
             </button>
           </div>
         )}
+      </div>
       </div>
 
       {confirmingDelete && (
@@ -1686,8 +1768,11 @@ export function EmailDetailPane({
           emailId={email.id}
           initialSubject={email.subject}
           initialMessage={email.bodyText || ""}
-          senderEmail={email.fromEmail}
-          senderName={email.fromName ?? undefined}
+          senderEmail={
+            isOutbound ? (email.toEmails[0] ?? email.fromEmail) : email.fromEmail
+          }
+          senderName={isOutbound ? undefined : (email.fromName ?? undefined)}
+          emailDirection={isOutbound ? "outbound" : "inbound"}
           initialAssignedStaffId={email.assignedStaffId}
           onClose={() => setIsCreateTicketModalOpen(false)}
           onCreated={(created) => {

@@ -55,7 +55,7 @@ export function InboxTriageEmptyState({
   const linkedCount = counts?.linked ?? 0;
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden p-6">
+    <div className="relative flex h-full w-full flex-1 min-h-0 flex-col items-center justify-center overflow-hidden p-6">
       {/* Fondo con aros geométricos decorativos (eco sutil del isotipo Plastifar) */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden select-none">
         <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-brand-red/[0.04]" />

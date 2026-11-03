@@ -142,7 +142,7 @@ export function PrintSheet({
   const displayTitle = title || document.title.split("·")[0]?.trim() || "Documento Oficial";
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden font-sans text-zinc-900 print:min-h-0 print:bg-white print:p-0">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden font-sans text-zinc-900 print:min-h-0 print:bg-white print:p-0">
       <style>{`
         @page { ${layout.page} }
         @media print {

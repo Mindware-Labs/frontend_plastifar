@@ -52,7 +52,7 @@ import { Alert } from "../../components/ui/Alert";
 import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
+import { dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
 import { CheckboxField, SelectField, TEXTAREA_AUTO_GROW_CLASS, TextField } from "../../components/ui/Field";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
@@ -60,6 +60,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { TicketDetailSkeleton } from "../../components/ui/Skeleton";
 import { openOverlay } from "../../hooks/overlayStack";
 import { useSettle } from "../../hooks/useSettle";
+import { useSidePanelMotion } from "../../hooks/useSidePanelMotion";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { useAuth } from "../../context/useAuth";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
@@ -70,6 +71,11 @@ import { resolveSlaPolicyIdForPriority, sortSlaPolicies } from "../../lib/slaPol
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
+import {
+  buildCannedVariableContext,
+  replaceRecipientVariablesInBlocks,
+  type CannedVariableContext,
+} from "../../lib/cannedVariables";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes, formatDateTime, formatPhoneNumber, formatSlaRemaining } from "../../lib/format";
 import { formatTicketProductsSummary } from "../../lib/ticketProducts";
@@ -85,6 +91,14 @@ import type {
   TicketVerdictOption,
 } from "../../types/api";
 import { AttachmentPreviewModal } from "../bandeja/AttachmentPreviewModal";
+import { CannedPicker } from "../bandeja/CannedPicker";
+import { ComposerSendSuccessLayer } from "../bandeja/ComposerSendSuccessLayer";
+import { textToBlocks } from "../bandeja/textToBlocks";
+import {
+  TICKET_REPLY_SEND_CELEBRATION_MS,
+  useComposerSendCelebration,
+  type ComposerSendCelebrationPayload,
+} from "../bandeja/useComposerSendCelebration";
 import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
 import { TaskCommentsAside, type TaskCommentsAsideHandle } from "./TaskCommentsAside";
 import { FormattedTicketBody } from "./FormattedTicketBody";
@@ -92,10 +106,7 @@ import { AttachmentChip, TicketMessageCard } from "./TicketMessageCard";
 import { TicketTasksTab } from "./TicketTasksTab";
 import { TicketTimelineSheet, type TicketDetailTab, type TimelineItem } from "./TicketTimelineSheet";
 import { TicketFormsTab, type RegisteredFormItem } from "./TicketFormsTab";
-import { ClaimDocumentSheet } from "../../components/claims/ClaimDocumentSheet";
-import { WithdrawalDocumentSheet } from "../../components/withdrawals/WithdrawalDocumentSheet";
-import type { CustomerClaim } from "../../types/claims";
-import type { MerchandiseWithdrawal } from "../../types/withdrawals";
+import { TicketFormDocumentView } from "./TicketFormDocumentView";
 import { usePermissions } from "../../hooks/usePermissions";
 
 /** El atajo se nombra con la tecla que la persona tiene delante, no con las dos. */
@@ -434,9 +445,68 @@ export function TicketDetailPage() {
 
   // Respuesta al cliente: el mismo editor que la bandeja, porque lo que sale de aqui tambien es un correo.
   const [replyOpen, setReplyOpen] = useState(false);
+  const {
+    mounted: replyComposerMounted,
+    exiting: replyComposerExiting,
+    ref: replyComposerPanelRef,
+    snap: snapReplyComposer,
+  } = useSidePanelMotion<HTMLDivElement>(replyOpen);
+  const { celebration: replyCelebration, celebrate: celebrateReplySend, isCelebrating: replyCelebrating, isExiting: replyCelebrationExiting } =
+    useComposerSendCelebration(TICKET_REPLY_SEND_CELEBRATION_MS);
+  const [replySendHold, setReplySendHold] = useState<ComposerSendCelebrationPayload | null>(null);
+  const [conversationReveal, setConversationReveal] = useState(false);
+  const replyWasMountedRef = useRef(false);
+  const replySuccessPayload = replyCelebration ?? replySendHold;
+  const replySuccessVisible = replySuccessPayload !== null;
   const [replyBlocks, setReplyBlocks] = useState<unknown>(null);
   // Remontar el editor es la forma de vaciarlo: su contenido inicial no es controlado.
   const [replyEditorKey, setReplyEditorKey] = useState(0);
+  const prevReplyVarCtxRef = useRef<CannedVariableContext | undefined>(undefined);
+
+  const replyRecipientEmail = useMemo(
+    () => ticket?.contactEmail?.trim() || ticket?.requesterEmail?.trim() || null,
+    [ticket?.contactEmail, ticket?.requesterEmail],
+  );
+
+  const cannedVariableContext = useMemo(() => {
+    if (!ticket || !replyRecipientEmail) return undefined;
+    const contactName =
+      ticket.contactName?.trim() || ticket.requesterName?.trim() || replyRecipientEmail;
+    return buildCannedVariableContext({
+      user,
+      contactName,
+      contactEmail: replyRecipientEmail,
+      ticketId: ticket.id,
+    });
+  }, [ticket, replyRecipientEmail, user]);
+
+  useEffect(() => {
+    if (!cannedVariableContext) return;
+    const nextEmail = cannedVariableContext.contactEmail?.trim();
+    if (!nextEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) return;
+
+    const { blocks: updatedBlocks, changed } = replaceRecipientVariablesInBlocks(
+      replyBlocks,
+      prevReplyVarCtxRef.current,
+      cannedVariableContext,
+    );
+    if (changed) {
+      setReplyBlocks(updatedBlocks);
+      setReplyEditorKey((key) => key + 1);
+    }
+    prevReplyVarCtxRef.current = cannedVariableContext;
+  }, [cannedVariableContext, replyBlocks]);
+
+  const insertReplyCanned = useCallback(
+    (body: string) => {
+      const current = Array.isArray(replyBlocks) ? (replyBlocks as unknown[]) : [];
+      const next = [...current, ...textToBlocks(body)];
+      setReplyBlocks(next);
+      setReplyEditorKey((key) => key + 1);
+      prevReplyVarCtxRef.current = cannedVariableContext;
+    },
+    [replyBlocks, cannedVariableContext],
+  );
   const [replyAttachments, setReplyAttachments] = useState<File[]>([]);
   const {
     isShowing: showReplyAttachedFeedback,
@@ -547,7 +617,28 @@ export function TicketDetailPage() {
     return () => unsubs.forEach((unsub) => unsub());
   }, [ticketId, onTicketsChanged, onTicketStatusChanged, onTicketNewMessage, refreshTicket]);
 
-  // El editor tapa la pagina entera: Escape tiene que devolverte a donde estabas, salvo que haya un modal encima.
+  useEffect(() => {
+    if (replyOpen && activeTab !== "conversacion") setReplyOpen(false);
+  }, [activeTab, replyOpen]);
+
+  useEffect(() => {
+    if (replyComposerMounted) {
+      replyWasMountedRef.current = true;
+      return;
+    }
+    if (!replyWasMountedRef.current) return;
+    replyWasMountedRef.current = false;
+    setReplySendHold(null);
+    setConversationReveal(true);
+  }, [replyComposerMounted]);
+
+  useEffect(() => {
+    if (!conversationReveal) return;
+    const timer = window.setTimeout(() => setConversationReveal(false), 480);
+    return () => window.clearTimeout(timer);
+  }, [conversationReveal]);
+
+  // El editor tapa solo la zona del ticket (asunto + hilo): Escape cierra salvo que haya un modal encima.
   useEffect(() => {
     if (!replyOpen) return;
     const overlay = openOverlay();
@@ -587,7 +678,7 @@ export function TicketDetailPage() {
   };
 
   const sendReply = async () => {
-    if (!replyReady || replySending) return;
+    if (!replyReady || replySending || replyCelebrating) return;
     try {
       setReplySending(true);
       setReplySendError(null);
@@ -600,16 +691,30 @@ export function TicketDetailPage() {
       replyAttachments.forEach((file) => formData.append("Attachments", file));
 
       await ticketsApi.createMessage(ticketId, formData);
+      void refreshTicket();
 
-      setReplyBlocks(null);
-      setReplyEditorKey((key) => key + 1);
-      setReplyAttachments([]);
-      setReplyOpen(false);
-      await refreshTicket();
-      receipts.done({ action: "responder-ticket", title: "Respuesta enviada", detail: ticket?.number });
+      const attachmentCount = replyAttachments.length;
+      const celebrationPayload: ComposerSendCelebrationPayload = {
+        kind: "reply",
+        title: "Respuesta enviada correctamente",
+        detail: recipientEmail ?? ticket?.number ?? "",
+        subject: ticket?.subject ? `Re: ${ticket.subject}` : undefined,
+        attachmentsCount: attachmentCount > 0 ? attachmentCount : undefined,
+      };
+      setReplySending(false);
+      celebrateReplySend(celebrationPayload, () => {
+        setReplySendHold(null);
+        setReplyBlocks(null);
+        setReplyEditorKey((key) => key + 1);
+        setReplyAttachments([]);
+        snapReplyComposer();
+        setReplyOpen(false);
+        setConversationReveal(true);
+        void refreshTicket();
+        receipts.done({ action: "responder-ticket", title: "Respuesta enviada", detail: ticket?.number });
+      });
     } catch (err) {
       setReplySendError(err instanceof Error ? err.message : "Ocurrió un error al enviar la respuesta.");
-    } finally {
       setReplySending(false);
     }
   };
@@ -1078,7 +1183,7 @@ export function TicketDetailPage() {
   const originMessage = sortedMessages.find((m) => m.isOrigin) ?? sortedMessages[0];
   const clientThread = sortedMessages.filter((m) => m.direction.toLowerCase() !== "interna");
   const internalNotes = sortedMessages.filter((m) => m.direction.toLowerCase() === "interna");
-  const recipientEmail = ticket.contactEmail ?? ticket.requesterEmail ?? null;
+  const recipientEmail = replyRecipientEmail;
   const currentDepartmentPath = departmentPath(editDepartmentTree ?? [], ticket.departmentId);
   const departmentLabel = currentDepartmentPath ?? ticket.departmentName;
   const canAssign = ticket.status !== "Cancelado";
@@ -1153,21 +1258,8 @@ export function TicketDetailPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {viewingDocumentForm ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in">
-          {viewingDocumentForm.type === "reclamacion" && (
-            <ClaimDocumentSheet
-              claim={viewingDocumentForm.data as CustomerClaim}
-              onBack={() => setViewingDocumentForm(null)}
-              backLabel="Volver al ticket"
-            />
-          )}
-          {viewingDocumentForm.type === "retiro" && (
-            <WithdrawalDocumentSheet
-              withdrawal={viewingDocumentForm.data as MerchandiseWithdrawal}
-              onBack={() => setViewingDocumentForm(null)}
-              backLabel="Volver al ticket"
-            />
-          )}
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in">
+          <TicketFormDocumentView form={viewingDocumentForm} onBack={() => setViewingDocumentForm(null)} />
         </div>
       ) : (
         <>
@@ -1229,9 +1321,21 @@ export function TicketDetailPage() {
         }
       />
 
-      {/* Zona de contenido con scroll vertical asegurado */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-8">
-        <div className="pt-2 pr-3 lg:pr-4">
+      {/* Zona de contenido: al responder, el compositor ocupa todo el contenedor de la vista de conversación sin dejar ver el encabezado ni mensajes debajo. */}
+      <div
+        className={`flex-1 min-h-0 pr-0.5 ${
+          replyComposerMounted
+            ? "relative flex flex-col overflow-hidden pb-3 pt-2"
+            : "overflow-y-auto pb-8"
+        }`}
+      >
+        <div
+          className={
+            replyComposerMounted
+              ? "hidden"
+              : `pt-2 pr-3 lg:pr-4 ${conversationReveal ? "animate-plf-receipt-in" : ""}`
+          }
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* Asunto — mismo eje vertical que el código PLT-… del ModuleHeader */}
             <div
@@ -1265,7 +1369,7 @@ export function TicketDetailPage() {
             activeTab === "formularios" || activeTab === "reclamacion"
               ? "w-full"
               : "mx-auto max-w-6xl"
-          }`}
+          } ${replyComposerMounted ? "hidden" : ""}`}
         >
               {/* Animación de entrada fluida estilo Apple idéntica a la vista de clientes */}
               <div key={activeTab} className="animate-plf-apple-tab">
@@ -1609,6 +1713,25 @@ export function TicketDetailPage() {
                                   </div>
                                 </div>
                               </div>
+                            ) : recipientEmail ? (
+                              <div className="space-y-1 py-1">
+                                <p className="text-[11px] font-heading font-semibold uppercase tracking-wider text-zinc-400">
+                                  Destinatario del correo
+                                </p>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <a
+                                    href={`mailto:${recipientEmail}`}
+                                    title={recipientEmail}
+                                    className="truncate text-[13px] font-semibold text-zinc-900 hover:text-brand-red"
+                                  >
+                                    {recipientEmail}
+                                  </a>
+                                  <CopyButton text={recipientEmail} label="Copiar correo" />
+                                </div>
+                                {ticket.requesterName && (
+                                  <p className="text-[12px] text-zinc-600">{ticket.requesterName}</p>
+                                )}
+                              </div>
                             ) : (
                               <div className="py-2 text-[12.5px] text-zinc-400 italic">Sin cliente asociado</div>
                             )}
@@ -1833,7 +1956,9 @@ export function TicketDetailPage() {
 
                 {/* TAB: CONVERSACIÓN */}
                 {activeTab === "conversacion" && (
-                  <div className="space-y-2.5">
+                  <div
+                    className={`space-y-2.5 ${conversationReveal ? "animate-plf-receipt-in" : ""}`}
+                  >
                     {/* La accion encabeza el hilo; el editor se pide, no esta siempre puesto. */}
                     <div className="flex items-center gap-3">
                       <span className="shrink-0 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
@@ -1844,7 +1969,10 @@ export function TicketDetailPage() {
                         <Button
                           type="button"
                           size="sm"
-                          onClick={() => setReplyOpen(true)}
+                          onClick={() => {
+                            setActiveTab("conversacion");
+                            setReplyOpen(true);
+                          }}
                           disabled={!recipientEmail}
                           title={recipientEmail ? undefined : "Sin correo de contacto no se puede enviar la respuesta."}
                         >
@@ -1973,38 +2101,14 @@ export function TicketDetailPage() {
                 )}
               </div>
         </div>
-      </div>
-      </>
-    )}
 
-      {/* Vista de redacción a pantalla completa con preservación de borrador. */}
-      {replyOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white">
-          <div className={dialogHeaderShellClass}>
-            <div className={dialogHeaderStackClass}>
-              <p className="font-heading text-[11px] font-semibold tracking-[0.02em] tabular-nums text-subtle">
-                {ticket.number}
-              </p>
-              <h2 className="truncate font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
-                Re: {ticket.subject}
-              </h2>
-              <p className="truncate text-[12px] text-subtle">
-                Para <span className="font-medium text-ink">{recipientEmail}</span>
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => !replySending && setReplyOpen(false)}
-              aria-label="Cerrar el editor (Esc)"
-              className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none
-                transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
+        {replyComposerMounted && (
           <div
-            className="min-h-0 flex-1 overflow-y-auto"
+            ref={replyComposerPanelRef}
+            aria-hidden={replyComposerExiting}
+            className={`relative mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-2xs ${
+              replyComposerExiting ? "pointer-events-none" : ""
+            }`}
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
                 event.preventDefault();
@@ -2012,98 +2116,136 @@ export function TicketDetailPage() {
               }
             }}
           >
-            <div className="mx-auto h-full max-w-4xl px-4 py-3">
-              <LazyBlockEditor
-                key={replyEditorKey}
-                initialContent={replyBlocks ?? undefined}
-                onChange={(blocks) => {
-                  setReplyBlocks(blocks);
-                  if (replySendError) setReplySendError(null);
-                }}
-                placeholder="Escribe tu respuesta para el cliente…"
+            {replySuccessVisible && replySuccessPayload ? (
+              <ComposerSendSuccessLayer
+                kind={replySuccessPayload.kind}
+                title={replySuccessPayload.title}
+                detail={replySuccessPayload.detail}
+                subject={replySuccessPayload.subject}
+                attachmentsCount={replySuccessPayload.attachmentsCount}
+                exiting={replyCelebrationExiting || (replySendHold !== null && replyComposerExiting)}
+                progressDurationMs={TICKET_REPLY_SEND_CELEBRATION_MS - 650}
+                fillPanel
               />
-            </div>
-          </div>
+            ) : (
+              <>
+                <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-3.5">
+                  <div className={dialogHeaderStackClass}>
+                    <p className="font-heading text-[11px] font-semibold tracking-[0.02em] tabular-nums text-subtle">
+                      {ticket.number}
+                    </p>
+                    <h2 className="truncate font-heading text-[17px] font-bold tracking-[-0.01em] text-ink">
+                      Re: {ticket.subject}
+                    </h2>
+                    <p className="truncate text-[12px] text-subtle">
+                      Para <span className="font-medium text-ink">{recipientEmail}</span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => !replySending && !replyCelebrating && setReplyOpen(false)}
+                    aria-label="Cerrar el editor (Esc)"
+                    disabled={replyCelebrating}
+                    className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none
+                      transition-colors hover:bg-fill hover:text-ink focus-visible:ring-3 focus-visible:ring-brand-red/20"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto px-1 py-2">
+                  <LazyBlockEditor
+                    key={replyEditorKey}
+                    initialContent={replyBlocks ?? undefined}
+                    onChange={(blocks) => {
+                      setReplyBlocks(blocks);
+                      if (replySendError) setReplySendError(null);
+                    }}
+                    placeholder="Escribe tu respuesta para el cliente…"
+                  />
+                </div>
 
-          <div className="shrink-0 space-y-2.5 border-t border-line bg-canvas/40 px-6 py-3">
-            <TicketPendingFileList
-              files={replyAttachments}
-              onChange={setReplyAttachments}
-              variant="inline"
-              layout="wrap"
-              className="mx-auto max-w-4xl"
-            />
+                <div className="shrink-0 space-y-2.5 border-t border-line bg-canvas/40 px-5 py-3">
+                  <TicketPendingFileList
+                    files={replyAttachments}
+                    onChange={setReplyAttachments}
+                    variant="inline"
+                    layout="wrap"
+                  />
 
-            <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <input
-                  ref={replyFileInputRef}
-                  id="reply-attachment-input"
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => {
-                    pickFiles(
-                      event.target,
-                      replyAttachments,
-                      setReplyAttachments,
-                      setReplySendError,
-                      () => triggerReplyAttachedFeedback(),
-                    );
-                    if (replySendError) setReplySendError(null);
-                  }}
-                />
-                <label
-                  htmlFor="reply-attachment-input"
-                  className={
-                    showReplyAttachedFeedback
-                      ? replyAttachedExiting
-                        ? attachExitingLabelClass
-                        : attachSuccessLabelClass
-                      : attachLabelClass
-                  }
-                >
-                  {showReplyAttachedFeedback ? (
-                    <span
-                      className={`inline-flex items-center gap-1.5 ${
-                        replyAttachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
-                      }`}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      ref={replyFileInputRef}
+                      id="reply-attachment-input"
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => {
+                        pickFiles(
+                          event.target,
+                          replyAttachments,
+                          setReplyAttachments,
+                          setReplySendError,
+                          () => triggerReplyAttachedFeedback(),
+                        );
+                        if (replySendError) setReplySendError(null);
+                      }}
+                    />
+                    <label
+                      htmlFor="reply-attachment-input"
+                      className={
+                        showReplyAttachedFeedback
+                          ? replyAttachedExiting
+                            ? attachExitingLabelClass
+                            : attachSuccessLabelClass
+                          : attachLabelClass
+                      }
                     >
-                      <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
-                        <AnimatedCheckIcon size={11} strokeWidth={3} />
-                      </span>
-                      <span>¡Adjuntado!</span>
-                    </span>
-                  ) : (
-                    <>
-                      <Paperclip className="h-3.5 w-3.5" />
-                      Adjuntar
-                    </>
-                  )}
-                </label>
-                <span className="hidden text-[11px] text-faint sm:inline">{SAVE_SHORTCUT} para enviar</span>
-              </div>
+                      {showReplyAttachedFeedback ? (
+                        <span
+                          className={`inline-flex items-center gap-1.5 ${
+                            replyAttachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+                          }`}
+                        >
+                          <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
+                            <AnimatedCheckIcon size={11} strokeWidth={3} />
+                          </span>
+                          <span>¡Adjuntado!</span>
+                        </span>
+                      ) : (
+                        <>
+                          <Paperclip className="h-3.5 w-3.5" />
+                          Adjuntar
+                        </>
+                      )}
+                    </label>
+                    <CannedPicker onPick={insertReplyCanned} variableContext={cannedVariableContext} />
+                    <span className="hidden text-[11px] text-faint sm:inline">{SAVE_SHORTCUT} para enviar</span>
 
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="secondary" disabled={replySending} onClick={() => setReplyOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  isLoading={replySending}
-                  disabled={!replyReady && !replySendError}
-                  tone={replySendError ? "ink" : "primary"}
-                  toneLabel={replySendError}
-                  onClick={() => void sendReply()}
-                >
-                  <Send className="h-[15px] w-[15px]" />
-                  Enviar respuesta
-                </Button>
-              </div>
-            </div>
+                    <div className="ml-auto flex shrink-0 items-center gap-2">
+                      <Button type="button" variant="secondary" disabled={replySending} onClick={() => setReplyOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="button"
+                        isLoading={replySending}
+                        disabled={(!replyReady && !replySendError) || replyCelebrating}
+                        tone={replySendError ? "ink" : "primary"}
+                        toneLabel={replySendError}
+                        onClick={() => void sendReply()}
+                      >
+                        <Send className="h-[15px] w-[15px]" />
+                        Enviar respuesta
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+      </>
+    )}
 
       {/* Escribir una nota es un acto aparte: se pide, se escribe y se cierra. El borrador sobrevive si se cierra sin guardar. */}
       {showNoteModal && canEditTicket && (

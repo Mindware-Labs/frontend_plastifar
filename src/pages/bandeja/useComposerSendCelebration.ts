@@ -10,10 +10,14 @@ export interface ComposerSendCelebrationPayload {
   attachmentsCount?: number;
 }
 
-const DEFAULT_CELEBRATION_MS = 1800;
+/** Tiempo visible de la confirmación de envío (bandeja). */
+export const COMPOSER_SEND_CELEBRATION_MS = 4500;
+
+/** Respuesta desde ticket: un segundo menos que bandeja. */
+export const TICKET_REPLY_SEND_CELEBRATION_MS = 3500;
 const EXIT_LEAD_MS = 240;
 
-export function useComposerSendCelebration(celebrationMs = DEFAULT_CELEBRATION_MS) {
+export function useComposerSendCelebration(celebrationMs = COMPOSER_SEND_CELEBRATION_MS) {
   const [celebration, setCelebration] = useState<ComposerSendCelebrationPayload | null>(null);
   const [isExiting, setIsExiting] = useState(false);
   const timerRef = useRef<number | null>(null);
@@ -40,9 +44,9 @@ export function useComposerSendCelebration(celebrationMs = DEFAULT_CELEBRATION_M
 
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
+      onComplete();
       setCelebration(null);
       setIsExiting(false);
-      onComplete();
     }, celebrationMs);
   }
 

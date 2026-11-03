@@ -3,7 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type R
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { z } from "zod";
-import { Building2, Check, Info, Mail, MessageSquareText, Package, RotateCcw, Tag, X } from "lucide-react";
+import { Building2, Info, Mail, MessageSquareText, Package, RotateCcw, Tag, X } from "lucide-react";
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
 import { pickDefaultSlaPolicyId } from "../../lib/slaPolicyUi";
 import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
@@ -56,8 +56,10 @@ interface CreateTicketModalProps {
   initialSubject?: string;
   initialMessage?: string;
   initialClientId?: number;
+  /** Correo del cliente en el hilo: remitente si entró; destinatario si salió Plastifar primero. */
   senderEmail?: string;
   senderName?: string;
+  emailDirection?: "inbound" | "outbound";
   initialAssignedStaffId?: number | null;
 }
 
@@ -126,6 +128,7 @@ export function CreateTicketModal({
   initialClientId,
   senderEmail,
   senderName,
+  emailDirection = "inbound",
   initialAssignedStaffId,
 }: CreateTicketModalProps) {
   const [catalogs, setCatalogs] = useState<TicketCreateOptionsResponse | null>(null);
@@ -135,7 +138,6 @@ export function CreateTicketModal({
   const [formError, setFormError] = useState<string | null>(null);
   const [ticketProducts, setTicketProducts] = useState<TicketProductDraft[]>([]);
   const [createAttachments, setCreateAttachments] = useState<File[]>([]);
-  const [detectedMatch, setDetectedMatch] = useState<{ clientName: string; contactName: string } | null>(null);
   const [fetchedContacts, setFetchedContacts] = useState<TicketContactOption[]>([]);
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
@@ -211,31 +213,12 @@ export function CreateTicketModal({
       .createOptions()
       .then((data) => {
         setCatalogs(data);
-
-        // Coincidencia automática de cliente a partir del remitente del correo.
-        if (senderEmail && !initialClientId && data.clients.length > 0) {
-          const searchEmail = senderEmail.toLowerCase().trim();
-          for (const client of data.clients) {
-            const matchedContact = client.contacts.find(
-              (c) => c.email?.toLowerCase().trim() === searchEmail
-            );
-            if (matchedContact) {
-              setValue("clientId", String(client.id));
-              setValue("contactId", String(matchedContact.id));
-              setDetectedMatch({
-                clientName: `${client.name} (${client.code})`,
-                contactName: matchedContact.fullName,
-              });
-              break;
-            }
-          }
-        }
       })
       .catch((err) => {
         setCatalogsError(err instanceof Error ? err.message : "Error al cargar catálogos");
       })
       .finally(() => setLoadingCatalogs(false));
-  }, [senderEmail, initialClientId, setValue]);
+  }, []);
 
   // Carga el árbol completo de departamentos (incluidos inactivos) para resolver rutas jerárquicas de nombres repetidos.
   useEffect(() => {
@@ -337,7 +320,6 @@ export function CreateTicketModal({
   function handleClearClient() {
     setValue("clientId", "");
     setValue("contactId", "");
-    setDetectedMatch(null);
   }
 
   function handleResetMessage() {
@@ -469,12 +451,20 @@ export function CreateTicketModal({
                     </span>
                     <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
                       <span className="font-heading text-[8.5px] font-bold uppercase leading-none tracking-[0.08em] text-zinc-400">
-                        Correo entrante · las respuestas quedarán en el ticket
+                        {emailDirection === "outbound"
+                          ? "Correo enviado · referencia del cliente (Para)"
+                          : "Correo recibido · referencia del cliente (De)"}
                       </span>
                       <span className="truncate text-[12px] leading-none text-ink">
-                        <span className="font-semibold">{senderName || senderEmail || "Correo entrante"}</span>
-                        {senderName && senderEmail && (
-                          <span className="ml-1.5 font-mono text-[11px] text-subtle">{senderEmail}</span>
+                        {emailDirection === "inbound" && senderName ? (
+                          <>
+                            <span className="font-semibold">{senderName}</span>
+                            {senderEmail && (
+                              <span className="ml-1.5 font-mono text-[11px] text-subtle">{senderEmail}</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="font-mono font-semibold">{senderEmail ?? "—"}</span>
                         )}
                       </span>
                     </div>
@@ -624,28 +614,6 @@ export function CreateTicketModal({
                   }
                 />
 
-                {detectedMatch && (
-                  <div className="flex items-center gap-2.5 rounded-lg border border-brand-green/30 bg-brand-green/[0.05] py-1.5 pl-1.5 pr-2.5">
-                    <span
-                      aria-hidden
-                      className="animate-plf-seal-pop flex size-5 shrink-0 items-center justify-center rounded-md bg-brand-green text-white"
-                    >
-                      <Check className="size-3" strokeWidth={3} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[12px] text-ink">
-                      Identificado por remitente: <strong className="font-semibold">{detectedMatch.clientName}</strong>
-                      <span className="text-subtle"> · {detectedMatch.contactName}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleClearClient}
-                      className="shrink-0 cursor-pointer rounded text-[11px] font-medium text-zinc-500 underline-offset-4 transition-colors hover:text-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red"
-                    >
-                      Desvincular
-                    </button>
-                  </div>
-                )}
-
                 <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                   <Controller
                     control={control}
@@ -703,8 +671,8 @@ export function CreateTicketModal({
                   <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-400">
                     <Info className="mt-px size-3 shrink-0" />
                     <span>
-                      Sin cliente registrado, el ticket se tramita con los datos del solicitante
-                      {senderEmail ? ` (${senderEmail})` : ""}.
+                      Sin cliente en catálogo, las respuestas y el contacto del ticket usan este correo
+                      {senderEmail ? `: ${senderEmail}` : "."}
                     </span>
                   </p>
                 )}

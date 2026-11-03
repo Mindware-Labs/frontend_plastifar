@@ -48,7 +48,9 @@ export function ClaimDocumentSheet({ claim, onBack, backLabel = "Volver" }: Clai
       .catch(() => setTopicNames([claim.reason]));
   }, [claim.reason]);
 
-  const lines = padRows(claim.lines, 3);
+  const lines = padRows(claim.lines ?? [], 3);
+  const affectedAreas = claim.affectedAreas ?? [];
+  const plants = claim.plants ?? [];
   const money = (value: number) => (claim.currency ? formatAmount(value, claim.currency) : formatQuantity(value));
   const sectionTitle = "bg-brand-red px-1.5 py-0.5 text-[11px] font-bold text-white";
 
@@ -100,7 +102,7 @@ export function ClaimDocumentSheet({ claim, onBack, backLabel = "Volver" }: Clai
           <div className="border-r border-black p-1.5">
             <p className="font-semibold">Planta Involucrada:</p>
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-              {claim.plants.map((plant) => (
+              {plants.map((plant) => (
                 <Box key={plant.id} checked label={plant.name} />
               ))}
             </div>
@@ -122,7 +124,7 @@ export function ClaimDocumentSheet({ claim, onBack, backLabel = "Volver" }: Clai
             <span className="font-semibold">Área Afectada: </span>
             <span className="ml-2 inline-flex gap-4">
               {CLAIM_AREAS.map((area) => (
-                <Box key={area} checked={claim.affectedAreas.includes(area)} label={area} />
+                <Box key={area} checked={affectedAreas.includes(area)} label={area} />
               ))}
             </span>
           </div>

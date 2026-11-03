@@ -10,6 +10,10 @@ export interface ComposerSendSuccessLayerProps {
   attachmentsCount?: number;
   exiting?: boolean;
   showProgress?: boolean;
+  /** Ocupa todo el panel del compositor (sin cabecera de asunto/código). */
+  fillPanel?: boolean;
+  /** Duración de la barra de progreso; por defecto ~3.85s (bandeja). */
+  progressDurationMs?: number;
 }
 
 function resolveCelebrationKind(
@@ -47,6 +51,8 @@ export function ComposerSendSuccessLayer({
   attachmentsCount,
   exiting = false,
   showProgress = true,
+  fillPanel = false,
+  progressDurationMs = 3850,
 }: ComposerSendSuccessLayerProps) {
   const kind = resolveCelebrationKind(explicitKind, title);
   const isQueued = kind === "queued";
@@ -83,7 +89,9 @@ export function ComposerSendSuccessLayer({
 
   return (
     <div
-      className={`relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-white px-6 py-8 select-none ${
+      className={`${
+        fillPanel ? "absolute inset-0 z-30" : "relative"
+      } flex h-full w-full flex-1 min-h-0 flex-col items-center justify-center overflow-hidden bg-white px-6 py-8 select-none ${
         exiting ? "animate-plf-composer-send-out" : "animate-plf-composer-send-backdrop"
       }`}
       role="status"
@@ -100,7 +108,7 @@ export function ComposerSendSuccessLayer({
         }}
       />
 
-      <div className="relative z-10 flex w-full max-w-lg flex-col items-center text-center">
+      <div className="relative z-10 my-auto flex w-full max-w-lg flex-col items-center justify-center text-center">
         {/* Sello concéntrico estilo Apple con trazo perimetral y satélite de acción */}
         <div className="relative flex size-[72px] items-center justify-center">
           <span
@@ -254,6 +262,7 @@ export function ComposerSendSuccessLayer({
               className={`h-full w-full origin-left rounded-full animate-plf-composer-send-progress ${
                 isQueued ? "bg-amber-500/75" : "bg-emerald-500/80"
               }`}
+              style={{ animationDuration: `${progressDurationMs}ms` }}
             />
           </div>
         )}
