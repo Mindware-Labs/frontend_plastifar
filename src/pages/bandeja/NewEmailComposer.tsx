@@ -205,7 +205,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   return (
     <div
       ref={containerRef}
-      className="relative flex h-full flex-col bg-white"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-white"
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
@@ -322,7 +322,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       </div>
 
       <div
-        className="min-h-0 flex-1 overflow-y-auto"
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden no-scrollbar"
         onKeyDown={(event) => {
           if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
             if (ready) handleSend();

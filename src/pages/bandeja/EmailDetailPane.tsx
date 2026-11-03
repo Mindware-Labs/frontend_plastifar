@@ -1148,7 +1148,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             )}
 
             <div
-              className="min-h-0 flex-1 overflow-y-auto"
+              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden no-scrollbar"
               onKeyDown={(event) => {
                 if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
                   if (replyReady) handleReply();

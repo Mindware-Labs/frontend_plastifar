@@ -10,6 +10,7 @@ import {
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
+import { useSidePanelMotion } from "../../hooks/useSidePanelMotion";
 import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
 import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
@@ -332,6 +333,11 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const [ticketFilter, setTicketFilter] = useState<TicketFilter>("todos");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
+  const {
+    mounted: composeMounted,
+    exiting: composeExiting,
+    ref: composePanelRef,
+  } = useSidePanelMotion(composing);
   const [checked, setChecked] = useState<Set<number>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [starOverrides, setStarOverrides] = useState<Record<number, boolean>>({});
@@ -1051,18 +1057,24 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
               <ResizablePanel minSize="35%" className="flex min-h-0 flex-col overflow-hidden">
                 <MailReadingPaneShell
-                  key={
-                    composing ? "compose" : selectedId != null ? `detail-${selectedId}` : "empty"
-                  }
+                  key={selectedId != null ? `detail-${selectedId}` : "reading-pane"}
                 >
-                  {composing ? (
-                    <NewEmailComposer
-                      onSent={() => {
-                        setComposing(false);
-                        refreshAll();
-                      }}
-                      onCancel={() => setComposing(false)}
-                    />
+                  {composeMounted ? (
+                    <div
+                      ref={composePanelRef}
+                      aria-hidden={composeExiting}
+                      className={`h-full min-h-0 flex flex-col overflow-hidden bg-white ${
+                        composeExiting ? "pointer-events-none" : ""
+                      }`}
+                    >
+                      <NewEmailComposer
+                        onSent={() => {
+                          setComposing(false);
+                          refreshAll();
+                        }}
+                        onCancel={() => setComposing(false)}
+                      />
+                    </div>
                   ) : selectedId ? (
                     <EmailDetailPane
                       emailId={selectedId}
