@@ -25,7 +25,16 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
@@ -44,7 +53,7 @@ import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
-import { CheckboxField, SelectField, TextField } from "../../components/ui/Field";
+import { CheckboxField, SelectField, TEXTAREA_AUTO_GROW_CLASS, TextField } from "../../components/ui/Field";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
@@ -58,6 +67,7 @@ import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { departmentPath, departmentPathOptions } from "../../lib/departments";
 import { resolveSlaPolicyIdForPriority, sortSlaPolicies } from "../../lib/slaPolicyUi";
+import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
@@ -227,6 +237,9 @@ const textareaClass =
   "w-full resize-none rounded-lg border border-zinc-200/80 bg-white px-3 py-2 text-[12.5px] leading-relaxed " +
   "text-zinc-900 outline-none transition-all placeholder:text-zinc-400 hover:border-zinc-300 " +
   "focus:border-brand-red focus:ring-2 focus:ring-brand-red/15";
+
+/** Una línea con `py-2` y `text-[12.5px]`; crece con el texto sin scroll interno. */
+const TICKET_NOTE_TEXTAREA_MIN_PX = 40;
 
 const attachLabelClass =
   "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 " +
@@ -446,6 +459,20 @@ export function TicketDetailPage() {
   const [noteSending, setNoteSending] = useState(false);
   const [noteSendError, setNoteSendError] = useState<string | null>(null);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
+  const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!showNoteModal) return;
+    const id = window.setTimeout(() => {
+      noteTextareaRef.current?.focus();
+      autoResizeTextarea(noteTextareaRef.current, TICKET_NOTE_TEXTAREA_MIN_PX);
+    }, 120);
+    return () => window.clearTimeout(id);
+  }, [showNoteModal]);
+
+  useLayoutEffect(() => {
+    if (showNoteModal) autoResizeTextarea(noteTextareaRef.current, TICKET_NOTE_TEXTAREA_MIN_PX);
+  }, [showNoteModal, noteBody]);
 
   // Que adjunto se esta mirando y con que vecinos, para poder saltar entre ellos.
   const [preview, setPreview] = useState<{ attachments: TicketAttachmentResponse[]; index: number } | null>(null);
@@ -2125,13 +2152,15 @@ export function TicketDetailPage() {
         >
           <div className="space-y-3">
             <textarea
+              ref={noteTextareaRef}
               id="ticket-note-body"
               autoFocus
-              rows={7}
+              rows={1}
               value={noteBody}
               onChange={(event) => {
                 setNoteBody(event.target.value);
                 if (noteSendError) setNoteSendError(null);
+                autoResizeTextarea(event.target, TICKET_NOTE_TEXTAREA_MIN_PX);
               }}
               onKeyDown={(event) => {
                 // Escribir y guardar sin soltar el teclado: es el gesto de cualquier campo de notas.
@@ -2141,7 +2170,7 @@ export function TicketDetailPage() {
                 }
               }}
               placeholder="Lo que el equipo debe saber sobre este caso…"
-              className={`${textareaClass} ${
+              className={`${textareaClass} ${TEXTAREA_AUTO_GROW_CLASS} ${
                 noteSendError ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red" : ""
               }`}
             />

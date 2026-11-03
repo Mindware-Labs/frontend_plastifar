@@ -13,7 +13,6 @@
 import {
   Archive,
   BarChart3,
-  BellRing,
   Building,
   Building2,
   Factory,
@@ -103,7 +102,6 @@ export interface NavGroup {
  */
 export const SIDEBAR_NAV: NavGroup[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", section: "Principal" },
-  { label: "Lab. Notificaciones", icon: BellRing, to: "/notificaciones-lab", section: "Principal" },
   /*
    * Tickets agrupa el flujo completo de atención al cliente e incidencias
    * derivadas (reclamaciones, discrepancias y retiros), además de los catálogos

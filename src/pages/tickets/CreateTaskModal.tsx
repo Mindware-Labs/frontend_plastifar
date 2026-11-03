@@ -4,7 +4,7 @@ import { SubmitValidationButton } from "../../components/app/SubmitValidationBut
 import { Button } from "../../components/ui/Button";
 import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { DatePicker } from "../../components/ui/DatePicker";
-import { TextField } from "../../components/ui/Field";
+import { TextAreaField, TextField } from "../../components/ui/Field";
 import { Select } from "../../components/ui/Select";
 import { Modal } from "../../components/ui/Modal";
 import { prefersReducedMotion } from "../../hooks/motion";
@@ -289,25 +289,18 @@ export function CreateTaskModal({
                   autoFocus
                 />
 
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="task-description"
-                    className="font-heading text-[11px] font-semibold text-zinc-500"
-                  >
-                    Descripción o instrucciones
-                  </label>
-                  <textarea
-                    id="task-description"
-                    rows={5}
-                    placeholder="Detalla qué se necesita averiguar, qué pruebas realizar o qué información recopilar..."
-                    value={description}
-                    onChange={(e) => {
-                      setDescription(e.target.value);
-                      if (error) setError(null);
-                    }}
-                    className="min-h-[120px] w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-[12.5px] leading-relaxed text-zinc-800 shadow-2xs outline-none transition-colors focus:border-brand-red focus:ring-1 focus:ring-brand-red/20 placeholder:text-zinc-400"
-                  />
-                </div>
+                <TextAreaField
+                  id="task-description"
+                  label="Descripción o instrucciones"
+                  placeholder="Detalla qué se necesita averiguar, qué pruebas realizar o qué información recopilar..."
+                  value={description}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    if (error) setError(null);
+                  }}
+                  autoGrow
+                  className="text-[12.5px] shadow-2xs"
+                />
 
                 <TaskEvidenceUpload
                   files={evidenceFiles}
