@@ -5,9 +5,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/** Atenuacion del 60 % mientras hay una relectura en vuelo (DESIGN.md, «Stale data»). */
-export function staleClass(isStale: boolean): string {
-  return `transition-opacity ${isStale ? "opacity-60" : ""}`;
+/** Contenedor de resultados sin velo blanco: la transición de página la ejecuta DataTable sobre las filas. */
+export function staleClass(_isStale: boolean): string {
+  void _isStale;
+  return "plf-results-in";
 }
 
 /**

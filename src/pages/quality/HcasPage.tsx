@@ -105,7 +105,7 @@ export function HcasPage() {
     dir: sort.dir,
   };
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<HcaQuery, SheetListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<HcaQuery, SheetListResponse>({
     fetch: qualityApi.sheets.list,
     criteria,
     fallbackError: "No se pudieron cargar las HCA. Vuelve a intentarlo.",
@@ -356,7 +356,7 @@ export function HcasPage() {
             emptyDescription="Se pueden crear desde aquí con el botón 'Nueva HCA' o derivadas directamente desde un ticket o reclamación."
           />
         ) : (
-          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

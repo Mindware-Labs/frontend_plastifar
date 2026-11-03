@@ -1,6 +1,20 @@
-import { Building2, ChevronDown, Plus, SlidersHorizontal, Ticket as TicketIcon, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  ArrowUpDown,
+  Building2,
+  Check,
+  ChevronDown,
+  Clock,
+  Copy,
+  Lock,
+  Package,
+  Plus,
+  SlidersHorizontal,
+  Ticket as TicketIcon,
+  X,
+} from "lucide-react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { animateCardGridPageTurn, consumePageDirection } from "../../hooks/motion";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
 import { useNavigate } from "react-router-dom";
@@ -14,15 +28,14 @@ import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Button } from "../../components/ui/Button";
-import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import type { SortDir } from "../../components/ui/DataTable";
 import { Modal } from "../../components/ui/Modal";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { ListEmptyState } from "../../components/ui/ListEmptyState";
-import { ListPanel } from "../../components/ui/ListPanel";
-import { TableSkeleton } from "../../components/ui/Skeleton";
+import { TicketCardsSkeleton } from "../../components/ui/Skeleton";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -66,20 +79,18 @@ const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos"];
 const primaryFilters = filters.filter((f) => PRIMARY_FILTER_KEYS.includes(f.key));
 const secondaryFilters = filters.filter((f) => !PRIMARY_FILTER_KEYS.includes(f.key));
 
-// Tabla de anchos fijos: el asunto absorbe lo que sobra y las columnas secundarias entran por escalones.
-const columns: { key: SortKey; label: string; className: string }[] = [
-  { key: "numero", label: "Número", className: "w-[100px]" },
-  { key: "asunto", label: "Asunto", className: "" },
-  { key: "cliente", label: "Cliente", className: "hidden w-[160px] lg:table-cell" },
-  { key: "departamento", label: "Departamento", className: "hidden w-[125px] 2xl:table-cell" },
-  { key: "prioridad", label: "Prioridad", className: "hidden w-[96px] md:table-cell" },
-  { key: "estado", label: "Estado", className: "w-[115px]" },
-  { key: "sla", label: "SLA", className: "w-[110px]" },
-  { key: "actividad", label: "Actividad", className: "hidden w-[120px] xl:table-cell" },
-];
+// Múltiplos de 3 para mantener la simetría exacta de la cuadrícula 3×3 en escritorio.
+const CARD_PAGE_SIZES = [9, 18, 27, 45];
 
-const SELECT_COLUMN = "w-10 px-2 text-center";
-const ASSIGNED_COLUMN = "hidden w-[145px] lg:table-cell";
+const sortFilterOptions: TicketFilterOption[] = [
+  { value: "actividad:desc", label: "Actividad reciente" },
+  { value: "actividad:asc", label: "Actividad más antigua" },
+  { value: "sla:asc", label: "SLA próximo a vencer" },
+  { value: "prioridad:desc", label: "Mayor prioridad" },
+  { value: "numero:desc", label: "Código (recientes)" },
+  { value: "cliente:asc", label: "Cliente (A–Z)" },
+  { value: "departamento:asc", label: "Departamento (A–Z)" },
+];
 
 const clientColors = [
   "bg-sky-400",
@@ -279,12 +290,226 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
   );
 }
 
+interface TicketCardProps {
+  ticket: TicketListItemResponse;
+  checked: boolean;
+  department: string | null;
+  onToggleSelect: (id: number) => void;
+  onOpen: (id: number) => void;
+}
+
+/**
+ * Ficha arquitectónica simétrica de ticket.
+ *
+ * Diseñada en cuatro zonas de altura determinista para que las 9 tarjetas de la
+ * cuadrícula 3×3 mantengan una alineación horizontal y vertical idéntica:
+ * 1. Barra superior (`h-6`): Selección + Código íntegro a la izquierda; Prioridad + Estado a la derecha.
+ * 2. Núcleo de asunto (`h-[40px]`): Hasta 2 líneas en Onest (`line-clamp-2`) con altura bloqueada.
+ * 3. Panel hundido (`rounded-inset`): 2 franjas de ancho completo (Cliente con código y Departamento con ruta)
+ *    + 1 franja inferior bisecada al 50/50 (Motivo | Compromiso SLA).
+ * 4. Pie operativo (`h-7`): Responsable con avatar a la izquierda; Productos + Actividad a la derecha.
+ */
+function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: TicketCardProps) {
+  const [copied, setCopied] = useState(false);
+  const sla = formatSlaRemaining(t.resolutionDueAt, Boolean(t.pausedAt), t.status, t.closedAt);
+  const activity = formatActivityDate(t.lastActivityAt);
+  const client = t.clientName && t.clientName !== "Sin cliente" ? t.clientName : null;
+  const clientCode = t.clientCode && t.clientCode !== "-" ? t.clientCode : null;
+  const productsSummary = formatTicketProductsSummary(t.products);
+  const productCount = t.products?.length ?? 0;
+
+  return (
+    <article
+      tabIndex={0}
+      role="button"
+      aria-label={`Abrir ticket ${t.number}: ${t.subject}`}
+      data-checked={checked || undefined}
+      onClick={() => onOpen(t.id)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(t.id);
+        }
+      }}
+      className={`group relative flex flex-col justify-between rounded-card border bg-white p-4 outline-none transition-all duration-180 ${
+        checked
+          ? "border-brand-red/45 ring-2 ring-brand-red/12 shadow-card"
+          : "border-line shadow-card hover:border-hairline-hover/70 focus-visible:ring-2 focus-visible:ring-brand-red/25"
+      }`}
+    >
+      {/* Zona 1: Cabecera de Identidad y Estado (Simetría bilateral) */}
+      <div className="flex h-6 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <SelectBox
+            checked={checked}
+            label={`Seleccionar ${t.number}`}
+            onToggle={() => onToggleSelect(t.id)}
+          />
+          <span className="font-heading text-[12.5px] font-bold tabular-nums tracking-[0.01em] text-ink">
+            {t.number}
+          </span>
+          <button
+            type="button"
+            title={`Copiar código ${t.number}`}
+            aria-label={`Copiar código ${t.number}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              void navigator.clipboard.writeText(t.number);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1400);
+            }}
+            className="inline-flex size-5 shrink-0 items-center justify-center rounded text-faint opacity-0 transition-opacity hover:bg-canvas hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+          >
+            {copied ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+          </button>
+          {t.accessLevel === "readOnly" && (
+            <span
+              title="Solo lectura"
+              className="inline-flex items-center text-faint"
+              aria-label="Ticket de solo lectura"
+            >
+              <Lock className="size-3" />
+            </span>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <PriorityCell priority={t.priority} />
+          <span aria-hidden className="h-3 w-px bg-line" />
+          <StatusCell status={t.status} />
+        </div>
+      </div>
+
+      {/* Zona 2: Núcleo del Asunto (Altura bloqueada de 40px = 2 líneas exactas para alineación de fila) */}
+      <div className="mt-2.5 flex h-[40px] items-start">
+        <h3
+          className="line-clamp-2 font-heading text-[13.5px] font-bold leading-[20px] tracking-[-0.012em] text-ink transition-colors group-hover:text-brand-red"
+          title={t.subject}
+        >
+          {t.subject}
+        </h3>
+      </div>
+
+      {/* Zona 3: Panel Hundido Simétrico (Cliente + Departamento a ancho completo + Bisección 50/50 Motivo/SLA) */}
+      <div className="mt-3 overflow-hidden rounded-inset border border-line bg-canvas/85 divide-y divide-line">
+        {/* Fila 1: Cliente (ancho completo, eje de rótulo fijo en 78px y código a la derecha) */}
+        <div
+          className="grid h-8.5 grid-cols-[78px_1fr] items-center gap-2.5 px-3"
+          title={client ? `${client}${clientCode ? ` (#${clientCode})` : ""}` : "Sin cliente asignado"}
+        >
+          <div className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className={`h-2 w-2 shrink-0 rounded-full ${
+                client ? getClientDotColor(client) : "bg-zinc-300"
+              }`}
+            />
+            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
+              Cliente
+            </span>
+          </div>
+
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <span
+              className={`truncate text-[12px] ${
+                client ? "font-semibold text-ink" : "font-normal text-faint"
+              }`}
+            >
+              {client ?? "Sin cliente"}
+            </span>
+            {clientCode && (
+              <span className="shrink-0 rounded border border-line bg-white px-1.5 py-0.5 font-heading text-[10px] font-bold leading-none tabular-nums text-subtle">
+                #{clientCode}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Fila 2: Departamento (ancho completo, mismo eje de rótulo de 78px) */}
+        <div
+          className="grid h-8.5 grid-cols-[78px_1fr] items-center gap-2.5 px-3"
+          title={department ?? "Sin departamento"}
+        >
+          <div className="flex items-center gap-1.5">
+            <Building2 aria-hidden className="size-3 shrink-0 text-faint" />
+            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
+              Depto.
+            </span>
+          </div>
+
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <span
+              className={`truncate text-[12px] ${
+                department ? "font-medium text-ink" : "font-normal text-faint"
+              }`}
+            >
+              {department ?? "Sin departamento"}
+            </span>
+          </div>
+        </div>
+
+        {/* Fila 3: Bisección Simétrica 50/50 (Motivo | Compromiso SLA) */}
+        <div className="grid h-[48px] grid-cols-2 divide-x divide-line bg-white/55">
+          <div
+            className="flex min-w-0 flex-col justify-center gap-0.5 px-3"
+            title={t.topicName ?? "Sin motivo"}
+          >
+            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
+              Motivo
+            </span>
+            <span className="truncate text-[11.5px] font-medium text-ink">
+              {t.topicName ?? "Sin motivo"}
+            </span>
+          </div>
+
+          <div className="flex min-w-0 flex-col justify-center gap-0.5 px-3">
+            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
+              Compromiso SLA
+            </span>
+            <div className="flex min-w-0 items-center">
+              <SlaCell sla={sla} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Zona 4: Pie Operativo Simétrico (Responsable a la izquierda; Productos y Actividad a la derecha) */}
+      <div className="mt-3 flex h-7 items-center justify-between gap-2 border-t border-line-soft pt-2.5">
+        <div className="min-w-0 flex-1">
+          <AssigneeCell id={t.assignedStaffId} name={t.assignedStaffName} />
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2 text-[11.5px] text-subtle">
+          {productsSummary && (
+            <span
+              className="inline-flex max-w-[130px] items-center gap-1 truncate rounded-md border border-line bg-canvas px-1.5 py-0.5 text-[10.5px] font-medium text-subtle"
+              title={productsSummary}
+            >
+              <Package aria-hidden className="size-3 shrink-0 text-faint" />
+              <span className="truncate">
+                {productCount === 1 ? productsSummary : `${productCount} prod.`}
+              </span>
+            </span>
+          )}
+          <span
+            className="inline-flex items-center gap-1 whitespace-nowrap text-[11.5px] font-medium tabular-nums text-subtle"
+            title={`Última actividad: ${activity.full}`}
+          >
+            <Clock aria-hidden className="size-3 shrink-0 text-faint" />
+            {activity.compact}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
 
 interface TicketsPageProps {
   origin?: TicketOriginFilter;
 }
 
-/** Bandeja de tickets: cada fila abre el detalle; marcar filas cambia la barra de criterios por la de acciones. */
+/** Bandeja de tickets en cuadrícula simétrica 3×3 (9 por vista por defecto). */
 export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
   const navigate = useNavigate();
   const receipts = useReceipts();
@@ -298,7 +523,7 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
   const [priority, setPriority] = useState<string>("todas");
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "actividad", dir: "desc" });
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(9);
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -315,7 +540,7 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
 
   const canCreateTicket = can("tickets.create");
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
     fetch: ticketsApi.list,
     criteria: {
       pageSize,
@@ -338,6 +563,23 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
   const counts = data?.counts;
   const hasCriteria =
     Boolean(debouncedSearch) || filter !== "todos" || departmentId !== "todos" || priority !== "todas";
+
+  const cardsGridRef = useRef<HTMLDivElement>(null);
+  const prevCardIdsRef = useRef<string | null>(null);
+  const currentCardIds = rows.map((row) => row.id).join(",");
+
+  useLayoutEffect(() => {
+    const grid = cardsGridRef.current;
+    if (!grid || rows.length === 0) return;
+
+    const prev = prevCardIdsRef.current;
+    prevCardIdsRef.current = currentCardIds;
+
+    // En el primer montaje actúa plf-results-in; si los IDs son los mismos (ej. marcar selección), no reanimamos.
+    if (prev === null || prev === currentCardIds) return;
+
+    animateCardGridPageTurn(grid, consumePageDirection(), 3);
+  }, [currentCardIds, rows.length]);
 
   const visibleIds = rows.map((row) => row.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
@@ -406,10 +648,12 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
     setPriority("todas");
   }
 
-  function toggleSort(key: SortKey) {
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
-    );
+  const sortValue = `${sort.key}:${sort.dir}`;
+  function handleSortChange(next: string) {
+    const [nextKey, nextDir] = next.split(":") as [SortKey, SortDir];
+    if (nextKey && (nextDir === "asc" || nextDir === "desc")) {
+      setSort({ key: nextKey, dir: nextDir });
+    }
   }
 
   function openBulkAssign() {
@@ -616,8 +860,8 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {/* Barra de herramientas en una sola línea: búsqueda y filtros a la izquierda, vistas de estado a la derecha */}
-        <div className="mb-3 grid min-h-8">
+        {/* Barra de herramientas en una sola línea: selección, búsqueda, filtros y orden a la izquierda; vistas de estado a la derecha */}
+        <div className="mb-3.5 grid min-h-8">
           {showCriteria && (
             <div
               inert={criteriaExiting ? true : undefined}
@@ -626,11 +870,32 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
               }`}
             >
               <div className="flex flex-wrap items-center gap-2">
+                {visibleIds.length > 0 && (
+                  <div
+                    className="inline-flex h-8 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-2.5 shadow-2xs"
+                    title={
+                      pageState === true
+                        ? "Quitar la selección de esta página"
+                        : "Seleccionar las tarjetas de esta página"
+                    }
+                  >
+                    <SelectBox
+                      checked={pageState}
+                      label={
+                        pageState === true
+                          ? "Quitar la selección de esta página"
+                          : "Seleccionar toda la página"
+                      }
+                      onToggle={togglePage}
+                    />
+                  </div>
+                )}
+
                 <SearchInput
                   value={search}
                   onChange={setSearch}
                   placeholder="Buscar por número, asunto o cliente…"
-                  className="w-[280px] sm:w-[300px]"
+                  className="w-[260px] sm:w-[290px]"
                 />
                 <TicketFilterDropdown
                   title="Seleccionar departamento"
@@ -649,6 +914,14 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
                   options={priorityFilterOpts}
                   defaultIcon={priorityFilterDefaultIcon}
                   aria-label="Filtrar por prioridad"
+                />
+                <TicketFilterDropdown
+                  title="Ordenar tarjetas por"
+                  value={sortValue}
+                  onChange={handleSortChange}
+                  options={sortFilterOptions}
+                  defaultIcon={<ArrowUpDown className="h-3.5 w-3.5 text-zinc-500" />}
+                  aria-label="Ordenar tickets"
                 />
 
                 {(search || departmentId !== "todos" || priority !== "todas") && (
@@ -726,24 +999,11 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
           )}
         </div>
 
-        <ListPanel
-          footer={
-            data !== null && data.total > 0 ? (
-              <Pagination
-                page={data.page}
-                pageSize={data.pageSize}
-                total={data.total}
-                totalPages={data.totalPages}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                noun="tickets"
-              />
-            ) : undefined
-          }
-        >
-          {!data ? (
-            error === null && <TableSkeleton rows={8} columns={10} />
-          ) : rows.length === 0 ? (
+        {/* Superficie de resultados: las 9 tarjetas flotan directamente sobre el lienzo tintado (sin anidar tarjetas) */}
+        {!data ? (
+          error === null && <TicketCardsSkeleton count={pageSize} />
+        ) : rows.length === 0 ? (
+          <section className="overflow-hidden rounded-card border border-line bg-white shadow-card">
             <ListEmptyState
               icon={TicketIcon}
               isFiltered={hasCriteria}
@@ -758,144 +1018,52 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
                   : "Se crean desde un correo de la bandeja o a mano con «Nuevo ticket»."
               }
             />
-          ) : (
-            <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-              <DataTable fixed>
-              <thead>
-                <HeadRow>
-                  <Th className={SELECT_COLUMN}>
-                    <div className="flex items-center justify-center">
-                      <SelectBox
-                        checked={pageState}
-                        label={pageState === true ? "Quitar la selección de esta página" : "Seleccionar toda la página"}
-                        onToggle={togglePage}
-                      />
-                    </div>
-                  </Th>
-                  {columns.map(({ key, label, className }) => (
-                    <Th
-                      key={key}
-                      className={className}
-                      sort={{ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) }}
-                    >
-                      {label}
-                    </Th>
-                  ))}
-                  <Th className={ASSIGNED_COLUMN}>Asignado</Th>
-                </HeadRow>
-              </thead>
-              <tbody>
-                {rows.map((t) => {
-                  const checked = selectedIds.has(t.id);
-                  const sla = formatSlaRemaining(t.resolutionDueAt, Boolean(t.pausedAt), t.status, t.closedAt);
-                  const activity = formatActivityDate(t.lastActivityAt);
-                  const client = t.clientName && t.clientName !== "Sin cliente" ? t.clientName : null;
-                  const clientCode = t.clientCode && t.clientCode !== "-" ? t.clientCode : null;
-                  const department =
-                    t.departmentName && t.departmentName !== "Sin departamento"
-                      ? ((t.departmentId != null ? departmentPathById.get(t.departmentId) : undefined) ??
-                        t.departmentName)
-                      : null;
-                  const open = () => navigate(`/tickets/${t.id}`);
+          </section>
+        ) : (
+          <div className="plf-results-in">
+            <div
+              ref={cardsGridRef}
+              className="grid auto-rows-fr grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3"
+            >
+              {rows.map((t) => {
+                const checked = selectedIds.has(t.id);
+                const department =
+                  t.departmentName && t.departmentName !== "Sin departamento"
+                    ? ((t.departmentId != null ? departmentPathById.get(t.departmentId) : undefined) ??
+                      t.departmentName)
+                    : null;
 
-                  return (
-                    <Row
-                      key={t.id}
-                      tabIndex={0}
-                      data-checked={checked}
-                      onClick={open}
-                      onKeyDown={(event) => {
-                        if (event.target !== event.currentTarget) return;
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          open();
-                        }
-                      }}
-                      className="group cursor-pointer outline-none focus-visible:bg-zinc-50"
-                    >
-                      <Td className={SELECT_COLUMN}>
-                        <div className="flex items-center justify-center">
-                          <SelectBox
-                            checked={checked}
-                            label={`Seleccionar ${t.number}`}
-                            onToggle={() => toggleSelect(t.id)}
-                          />
-                        </div>
-                      </Td>
-
-                      <Td className={columns[0].className}>
-                        <span className="font-heading text-[11.5px] font-bold tabular-nums tracking-[0.01em] text-zinc-800">
-                          {t.number}
-                        </span>
-                      </Td>
-
-                      <Td className={columns[1].className}>
-                        <div className="min-w-0">
-                          <p className="truncate text-[12.5px] font-medium text-zinc-900 leading-snug" title={t.subject}>
-                            {t.subject}
-                          </p>
-                          <p className="truncate text-[11px] text-zinc-500 font-normal leading-tight mt-0.5">
-                            {t.topicName ?? "Sin motivo"}
-                            {department && <span className="text-zinc-400 2xl:hidden"> · {department}</span>}
-                            {formatTicketProductsSummary(t.products) && (
-                              <span className="text-zinc-400"> · {formatTicketProductsSummary(t.products)}</span>
-                            )}
-                          </p>
-                        </div>
-                      </Td>
-
-                      <Td className={columns[2].className}>
-                        {client ? (
-                          <div className="flex items-center gap-1.5 min-w-0" title={`${client}${clientCode ? ` (${clientCode})` : ""}`}>
-                            <span
-                              aria-hidden
-                              className={`h-2 w-2 shrink-0 rounded-full ${getClientDotColor(client)}`}
-                            />
-                            <span className="truncate text-[12.5px] font-medium text-zinc-800">
-                              {client}
-                            </span>
-                            {clientCode && (
-                              <span className="shrink-0 text-[11px] font-normal text-zinc-400 tabular-nums">
-                                #{clientCode}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-[12px] text-zinc-400">—</span>
-                        )}
-                      </Td>
-
-                      <Td className={`${columns[3].className} truncate text-[12px] text-zinc-600`}>
-                        {department ?? <span className="text-zinc-300">—</span>}
-                      </Td>
-
-                      <Td className={columns[4].className}>
-                        <PriorityCell priority={t.priority} />
-                      </Td>
-
-                      <Td className={columns[5].className}>
-                        <StatusCell status={t.status} />
-                      </Td>
-
-                      <Td className={columns[6].className}>
-                        <SlaCell sla={sla} />
-                      </Td>
-
-                      <Td className={`${columns[7].className} truncate whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500`}>
-                        <span className="truncate" title={activity.full}>{activity.compact}</span>
-                      </Td>
-
-                      <Td className={ASSIGNED_COLUMN}>
-                        <AssigneeCell id={t.assignedStaffId} name={t.assignedStaffName} />
-                      </Td>
-                    </Row>
-                  );
-                })}
-              </tbody>
-              </DataTable>
+                return (
+                  <TicketCard
+                    key={t.id}
+                    ticket={t}
+                    checked={checked}
+                    department={department}
+                    onToggleSelect={toggleSelect}
+                    onOpen={(id) => navigate(`/tickets/${id}`)}
+                  />
+                );
+              })}
             </div>
-          )}
-        </ListPanel>
+
+            {data.total > 0 && (
+              <div className="mt-2">
+                <Pagination
+                  page={data.page}
+                  pageSize={data.pageSize}
+                  total={data.total}
+                  totalPages={data.totalPages}
+                  onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
+                  pageSizes={CARD_PAGE_SIZES}
+                  rowsLabel="Tarjetas"
+                  noun="tickets"
+                  nounSingular="ticket"
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {createModalOpen && (

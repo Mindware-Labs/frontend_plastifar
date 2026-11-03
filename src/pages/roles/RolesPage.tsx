@@ -81,7 +81,7 @@ export function RolesPage() {
   const [pageSize, setPageSize] = useState(10);
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<RoleQuery, RoleListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<RoleQuery, RoleListResponse>({
     fetch: rolesApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined, status: filter },
     fallbackError: "No se pudieron cargar los roles",
@@ -416,7 +416,7 @@ export function RolesPage() {
             <Spinner />
           </div>
         ) : (
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

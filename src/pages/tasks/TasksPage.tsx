@@ -116,7 +116,7 @@ export function TasksPage() {
     [departments],
   );
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<TaskQuery, TaskListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<TaskQuery, TaskListResponse>({
     fetch: tasksApi.list,
     criteria: {
       pageSize,
@@ -369,7 +369,7 @@ export function TasksPage() {
             onClear={unfiltered ? undefined : clearFilters}
           />
         ) : (
-          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

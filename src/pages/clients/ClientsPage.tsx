@@ -140,7 +140,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
     fetch: clientsApi.list,
     criteria: {
       pageSize,
@@ -526,7 +526,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
             onClear={unfiltered ? undefined : clearFilters}
           />
         ) : (
-          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

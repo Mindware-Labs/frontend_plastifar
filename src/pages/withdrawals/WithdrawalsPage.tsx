@@ -81,7 +81,7 @@ export function WithdrawalsPage() {
     dir: sort.dir,
   };
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<WithdrawalQuery, WithdrawalListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<WithdrawalQuery, WithdrawalListResponse>({
     fetch: withdrawalsApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las solicitudes de retiro. Vuelve a intentarlo.",
@@ -374,7 +374,7 @@ export function WithdrawalsPage() {
             emptyDescription="Se registran desde el ticket: abre el ticket y entra a la pestaña «Retiro de mercancía»."
           />
         ) : (
-          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

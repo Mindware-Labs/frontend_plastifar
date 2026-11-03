@@ -140,7 +140,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   // Pestaña de Contactos
   const {
     data: contactPage,
-    isStale: contactsStale,
+    // transición de página manejada en DataTable
     error: contactsError,
     setPage: setContactPage,
     refresh: refreshContacts,
@@ -157,7 +157,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   // Pestaña de Historial de Tickets
   const {
     data: ticketPage,
-    isStale: ticketsStale,
+    // transición de página manejada en DataTable
     error: ticketsError,
     setPage: setTicketPage,
     refresh: refreshTickets,
@@ -910,7 +910,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     </p>
                   )
                 ) : (
-                  <div className={`transition-opacity ${contactsStale ? "opacity-60" : ""}`}>
+                  <div className="plf-results-in">
                     <DataTable>
                       <thead>
                         <HeadRow>
@@ -1088,7 +1088,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     </p>
                   </div>
                 ) : (
-                  <div className={`transition-opacity ${ticketsStale ? "opacity-60" : ""}`}>
+                  <div className="plf-results-in">
                     <DataTable>
                       <thead>
                         <HeadRow>

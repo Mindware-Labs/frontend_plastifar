@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { recordPageDirection } from "../../hooks/motion";
 import { Select } from "./Select";
 
 interface PaginationProps {
@@ -11,12 +12,14 @@ interface PaginationProps {
   noun: string;
   nounSingular?: string;
   layout?: "toolbar" | "panel";
+  pageSizes?: number[];
+  rowsLabel?: string;
 }
 
-const pageSizes = [10, 25, 50];
+const defaultPageSizes = [10, 25, 50];
 
-function opcionesDeTamano(actual: number): number[] {
-  return pageSizes.includes(actual) ? pageSizes : [...pageSizes, actual].sort((a, b) => a - b);
+function opcionesDeTamano(actual: number, baseSizes: number[] = defaultPageSizes): number[] {
+  return baseSizes.includes(actual) ? baseSizes : [...baseSizes, actual].sort((a, b) => a - b);
 }
 
 type Slot = number | "gap-start" | "gap-end";
@@ -58,7 +61,7 @@ function RangeBar({
       className={`relative h-1 shrink-0 overflow-hidden rounded-pill bg-fill ${className}`}
     >
       <span
-        className="absolute inset-y-0 rounded-pill bg-brand-red"
+        className="absolute inset-y-0 rounded-pill bg-brand-red transition-[left,width] duration-300 ease-plf-glide"
         style={{
           left: `${((from - 1) / total) * 100}%`,
           width: `${Math.max(((to - from + 1) / total) * 100, 8)}%`,
@@ -98,6 +101,12 @@ function PageNav({
       ? "text-brand-gray hover:bg-canvas hover:text-ink"
       : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900";
 
+  function handleSelectPage(target: number) {
+    if (target === page) return;
+    recordPageDirection(target > page ? "next" : "prev");
+    onPageChange(target);
+  }
+
   return (
     <nav
       aria-label="Paginación"
@@ -105,7 +114,7 @@ function PageNav({
     >
       <button
         type="button"
-        onClick={() => onPageChange(page - 1)}
+        onClick={() => handleSelectPage(page - 1)}
         disabled={page <= 1}
         aria-label="Página anterior"
         title="Página anterior"
@@ -119,7 +128,7 @@ function PageNav({
           <button
             key={slot}
             type="button"
-            onClick={() => onPageChange(slot)}
+            onClick={() => handleSelectPage(slot)}
             aria-label={`Página ${slot}`}
             aria-current={slot === page ? "page" : undefined}
             className={`${cell} ${slot === page ? activeClass : idleClass}`}
@@ -139,7 +148,7 @@ function PageNav({
 
       <button
         type="button"
-        onClick={() => onPageChange(page + 1)}
+        onClick={() => handleSelectPage(page + 1)}
         disabled={page >= safeTotalPages}
         aria-label="Página siguiente"
         title="Página siguiente"
@@ -154,23 +163,30 @@ function PageNav({
 function ToolbarRowsSelect({
   pageSize,
   onPageSizeChange,
+  pageSizes,
+  rowsLabel = "Filas",
 }: {
   pageSize: number;
   onPageSizeChange: (pageSize: number) => void;
+  pageSizes?: number[];
+  rowsLabel?: string;
 }) {
   return (
     <label className="flex h-7 shrink-0 items-center gap-1.5 text-[12px] leading-none text-subtle">
-      <span>Filas</span>
+      <span>{rowsLabel}</span>
       <Select
         size="xs"
         centered
         className="w-[52px]"
         buttonClassName="!h-7 !gap-1 !rounded-edge !border-line-strong !bg-white !px-2 !py-0 !text-[12px] !font-medium !leading-none !tabular-nums !text-ink !shadow-none hover:!border-hairline-hover hover:!bg-canvas"
         matchTriggerWidth
-        aria-label="Filas por página"
+        aria-label={`${rowsLabel} por página`}
         value={String(pageSize)}
-        onChange={(next) => onPageSizeChange(Number(next))}
-        options={opcionesDeTamano(pageSize).map((size) => ({
+        onChange={(next) => {
+          recordPageDirection("settle");
+          onPageSizeChange(Number(next));
+        }}
+        options={opcionesDeTamano(pageSize, pageSizes).map((size) => ({
           value: String(size),
           label: String(size),
         }))}
@@ -191,6 +207,8 @@ function PanelPagination({
   nounSingular,
   onPageChange,
   onPageSizeChange,
+  pageSizes,
+  rowsLabel,
 }: {
   page: number;
   pageSize: number;
@@ -202,6 +220,8 @@ function PanelPagination({
   nounSingular?: string;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
+  pageSizes?: number[];
+  rowsLabel?: string;
 }) {
   const label = nounLabel(total, noun, nounSingular);
   const safeTotalPages = Math.max(totalPages, 1);
@@ -229,7 +249,12 @@ function PanelPagination({
       </div>
 
       <div className="flex h-7 min-w-0 items-center justify-between gap-2">
-        <ToolbarRowsSelect pageSize={pageSize} onPageSizeChange={onPageSizeChange} />
+        <ToolbarRowsSelect
+          pageSize={pageSize}
+          onPageSizeChange={onPageSizeChange}
+          pageSizes={pageSizes}
+          rowsLabel={rowsLabel}
+        />
         <PageNav
           page={page}
           totalPages={totalPages}
@@ -252,6 +277,8 @@ export function Pagination({
   noun,
   nounSingular,
   layout = "toolbar",
+  pageSizes,
+  rowsLabel,
 }: PaginationProps) {
   if (total === 0) return null;
 
@@ -271,6 +298,8 @@ export function Pagination({
         nounSingular={nounSingular}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
+        pageSizes={pageSizes}
+        rowsLabel={rowsLabel}
       />
     );
   }
@@ -293,7 +322,12 @@ export function Pagination({
       </p>
 
       <div className="flex shrink-0 flex-nowrap items-center gap-3">
-        <ToolbarRowsSelect pageSize={pageSize} onPageSizeChange={onPageSizeChange} />
+        <ToolbarRowsSelect
+          pageSize={pageSize}
+          onPageSizeChange={onPageSizeChange}
+          pageSizes={pageSizes}
+          rowsLabel={rowsLabel}
+        />
         <PageNav page={page} totalPages={totalPages} onPageChange={onPageChange} tone="brand" />
       </div>
     </div>

@@ -88,6 +88,84 @@ export function TableSkeleton({
   );
 }
 
+/**
+ * Esqueleto simétrico de la cuadrícula de tickets (3×3 por defecto).
+ * Reproduce las 4 zonas arquitectónicas de cada tarjeta para evitar cualquier salto de layout.
+ */
+export function TicketCardsSkeleton({ count = 9 }: { count?: number }) {
+  return (
+    <div
+      role="status"
+      aria-label="Cargando tickets"
+      className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3 auto-rows-fr"
+    >
+      {Array.from({ length: count }).map((_, i) => {
+        const row = Math.floor(i / 3);
+        const col = i % 3;
+        const baseDelay = Math.min(row * 75 + col * 40, 420);
+        return (
+          <div
+            key={i}
+            className="flex flex-col justify-between rounded-card border border-line bg-white p-4 shadow-card"
+          >
+            {/* Zona 1: Cabecera simétrica (Código + Estado/Prioridad) */}
+            <div className="flex h-6 items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="size-4.5 rounded-[5px]" delay={baseDelay} />
+                <Skeleton className="h-4 w-28 rounded-md" delay={baseDelay + 20} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Skeleton className="h-5 w-14 rounded-md" delay={baseDelay + 40} />
+                <Skeleton className="h-5 w-20 rounded-md" delay={baseDelay + 60} />
+              </div>
+            </div>
+
+            {/* Zona 2: Bloque de asunto de altura fija (40px) */}
+            <div className="mt-2.5 flex h-[40px] flex-col justify-center gap-1.5">
+              <Skeleton className="h-3.5 w-[92%] rounded" delay={baseDelay + 50} />
+              <Skeleton className="h-3.5 w-[68%] rounded" delay={baseDelay + 70} />
+            </div>
+
+            {/* Zona 3: Panel Hundido Simétrico (Cliente + Departamento + 50/50 Motivo y SLA) */}
+            <div className="mt-3 overflow-hidden rounded-inset border border-line bg-canvas/85 divide-y divide-line">
+              <div className="grid h-8.5 grid-cols-[76px_1fr] items-center gap-2.5 px-3">
+                <Skeleton className="h-2.5 w-14 rounded" delay={baseDelay + 80} />
+                <div className="flex items-center justify-between gap-2">
+                  <Skeleton className="h-3 w-36 rounded" delay={baseDelay + 95} />
+                  <Skeleton className="h-4 w-12 rounded" delay={baseDelay + 110} />
+                </div>
+              </div>
+              <div className="grid h-8.5 grid-cols-[76px_1fr] items-center gap-2.5 px-3">
+                <Skeleton className="h-2.5 w-12 rounded" delay={baseDelay + 100} />
+                <Skeleton className="h-3 w-44 rounded" delay={baseDelay + 115} />
+              </div>
+              <div className="grid h-[46px] grid-cols-2 divide-x divide-line bg-white/50">
+                <div className="flex flex-col justify-center gap-1.5 px-3">
+                  <Skeleton className="h-2 w-12 rounded" delay={baseDelay + 120} />
+                  <Skeleton className="h-3 w-24 rounded" delay={baseDelay + 135} />
+                </div>
+                <div className="flex flex-col justify-center gap-1.5 px-3">
+                  <Skeleton className="h-2 w-16 rounded" delay={baseDelay + 130} />
+                  <Skeleton className="h-3.5 w-20 rounded" delay={baseDelay + 145} />
+                </div>
+              </div>
+            </div>
+
+            {/* Zona 4: Pie operativo simétrico */}
+            <div className="mt-3 flex h-7 items-center justify-between gap-2 border-t border-line-soft pt-2.5">
+              <div className="flex items-center gap-2">
+                <Skeleton className="size-5 rounded-full" delay={baseDelay + 140} />
+                <Skeleton className="h-3 w-24 rounded" delay={baseDelay + 155} />
+              </div>
+              <Skeleton className="h-3 w-16 rounded" delay={baseDelay + 165} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Lista de conversaciones en la bandeja (columna izquierda). */
 export function InboxListSkeleton({ rows = 8 }: { rows?: number }) {
   return (

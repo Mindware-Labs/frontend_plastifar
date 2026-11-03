@@ -84,7 +84,7 @@ export function StaffPage() {
       .catch(() => setDepartments([]));
   }, []);
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
     fetch: staffApi.list,
     criteria: {
       pageSize,
@@ -510,7 +510,7 @@ export function StaffPage() {
               onClear={unfiltered ? undefined : clearFilters}
             />
           ) : (
-            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <div className="plf-results-in">
               <DataTable>
               <thead>
                 <HeadRow>

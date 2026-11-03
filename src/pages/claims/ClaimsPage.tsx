@@ -109,7 +109,7 @@ export function ClaimsPage() {
     dir: sort.dir,
   };
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<ClaimQuery, ClaimListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<ClaimQuery, ClaimListResponse>({
     fetch: claimsApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las reclamaciones. Vuelve a intentarlo.",
@@ -395,7 +395,7 @@ export function ClaimsPage() {
             emptyDescription="Se registran desde el ticket: abre el ticket de la reclamación y entra a su pestaña «Reclamación»."
           />
         ) : (
-          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

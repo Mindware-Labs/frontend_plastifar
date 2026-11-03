@@ -49,7 +49,7 @@ export function CategoriasTab({
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, isStale, error, setPage, refresh } = usePagedList({
+  const { data, error, setPage, refresh } = usePagedList({
     fetch: cannedCategoriesApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined },
     fallbackError: "No se pudieron cargar las categorías.",
@@ -212,7 +212,7 @@ export function CategoriasTab({
             emptyDescription="Agrupa las plantillas por área (Logística, Cobros, Calidad…) con «Nueva categoría»."
           />
         ) : (
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className="plf-results-in">
             <DataTable>
             <thead>
               <HeadRow>

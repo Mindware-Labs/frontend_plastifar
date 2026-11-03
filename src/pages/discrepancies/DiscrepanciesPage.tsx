@@ -76,7 +76,7 @@ export function DiscrepanciesPage() {
     dir: sort.dir,
   };
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<DiscrepancyQuery, DiscrepancyListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<DiscrepancyQuery, DiscrepancyListResponse>({
     fetch: discrepanciesApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las investigaciones. Vuelve a intentarlo.",
@@ -359,7 +359,7 @@ export function DiscrepanciesPage() {
             emptyDescription="Se registran desde el ticket: abre el ticket y entra a la pestaña «Discrepancia de carga»."
           />
         ) : (
-          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

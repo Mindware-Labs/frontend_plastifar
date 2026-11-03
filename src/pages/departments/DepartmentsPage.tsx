@@ -71,7 +71,7 @@ export function DepartmentsPage() {
   // Paginación real de servidor mediante usePagedList
   const {
     data,
-    isStale,
+    // transición de página manejada en DataTable
     error,
     page,
     setPage,
@@ -485,7 +485,7 @@ export function DepartmentsPage() {
                 : "Todavía no hay ningún departamento registrado."}
             </p>
           ) : (
-            <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <div className="plf-results-in">
               <DataTable>
                 <thead>
                   <HeadRow>

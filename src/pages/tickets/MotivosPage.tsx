@@ -73,7 +73,7 @@ export function MotivosPage() {
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<
+  const { data, error, setPage, refresh } = usePagedList<
     TicketTopicQuery,
     TicketTopicListResponse
   >({
@@ -424,7 +424,7 @@ export function MotivosPage() {
               emptyDescription="Los motivos clasifican los tickets y sugieren el formulario a usar en cada caso."
             />
           ) : (
-            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <div className="plf-results-in">
               <DataTable>
               <thead>
                 <HeadRow>

@@ -51,7 +51,7 @@ export function SedesPage() {
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, isStale, error, page, setPage, refresh } = usePagedList<
+  const { data, error, page, setPage, refresh } = usePagedList<
     PagedSedeQuery,
     Awaited<ReturnType<typeof sedesApi.list>>
   >({
@@ -379,7 +379,7 @@ export function SedesPage() {
                   {canWrite && <Th className="w-24 text-right">Acciones</Th>}
                 </HeadRow>
               </thead>
-              <tbody className={isStale ? "opacity-60 transition-opacity" : ""}>
+              <tbody>
                 {rows.map((sede) => {
                   const checked = selectedIds.has(sede.id);
                   return (

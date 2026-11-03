@@ -63,7 +63,7 @@ export function RespuestasPage() {
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, isStale, error, setPage, refresh } = usePagedList({
+  const { data, error, setPage, refresh } = usePagedList({
     fetch: cannedApi.list,
     criteria: {
       pageSize,
@@ -379,7 +379,7 @@ export function RespuestasPage() {
                 emptyDescription="Crea la primera con «Nueva plantilla» y úsala al redactar desde la bandeja con «Insertar plantilla»."
               />
             ) : (
-              <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
+              <div className="plf-results-in">
                 <DataTable fixed>
                   <thead>
                     <HeadRow>

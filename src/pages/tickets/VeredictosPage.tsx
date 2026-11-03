@@ -42,7 +42,7 @@ export function VeredictosPage() {
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<
+  const { data, error, setPage, refresh } = usePagedList<
     TicketVerdictQuery,
     TicketVerdictListResponse
   >({
@@ -326,7 +326,7 @@ export function VeredictosPage() {
               emptyDescription="Los veredictos cierran tickets con una resolución estandarizada para reportes y seguimiento."
             />
           ) : (
-            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <div className="plf-results-in">
               <DataTable>
               <thead>
                 <HeadRow>
