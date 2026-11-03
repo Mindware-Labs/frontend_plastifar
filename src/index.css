@@ -1598,3 +1598,11 @@ input:-webkit-autofill:focus {
     to { opacity: 1; }
   }
 }
+
+
+@media print {
+  aside,
+  .no-print {
+    display: none !important;
+  }
+}

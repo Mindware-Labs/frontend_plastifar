@@ -86,7 +86,7 @@ export function HcaDetailPage() {
 
   if (viewingDocument) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in print:block print:h-auto print:min-h-0 print:overflow-visible print:animate-none">
         <HcaDocumentSheet
           sheet={sheet}
           planItems={planItems}

@@ -476,7 +476,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`relative flex h-screen shrink-0 flex-col border-r border-zinc-200/80 bg-white select-none will-change-[width]
+      className={`no-print print:hidden relative flex h-screen shrink-0 flex-col border-r border-zinc-200/80 bg-white select-none will-change-[width]
         transition-[width] duration-[320ms] ease-plf-spring motion-reduce:transition-none ${collapsed ? "w-[68px]" : "w-60"}`}
     >
       {/* 1. Cabecera superior: altura fija elegante (h-14) con cross-fade ágil */}

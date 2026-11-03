@@ -1256,9 +1256,9 @@ export function TicketDetailPage() {
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden print:block print:h-auto print:min-h-0 print:overflow-visible">
       {viewingDocumentForm ? (
-        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in">
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in print:block print:h-auto print:min-h-0 print:overflow-visible print:animate-none">
           <TicketFormDocumentView form={viewingDocumentForm} onBack={() => setViewingDocumentForm(null)} />
         </div>
       ) : (

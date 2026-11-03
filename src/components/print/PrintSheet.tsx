@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
 import { FileDown, FileSpreadsheet, Printer } from "lucide-react";
+import { captureElementAsCanvas } from "./printCapture";
 import { ModuleHeader } from "../app/ModuleHeader";
 import { Button } from "../ui/Button";
 
@@ -10,13 +10,13 @@ type Orientation = "portrait" | "landscape";
 
 const layouts: Record<Orientation, { page: string; sheet: string; hint: string }> = {
   portrait: {
-    page: "size: letter; margin: 14mm;",
-    sheet: "max-w-[820px] text-[11px]",
+    page: "size: letter; margin: 12mm;",
+    sheet: "box-border w-full max-w-[820px] text-[11px]",
     hint: "Elige exportar a Excel, guardar PDF o imprimir.",
   },
   landscape: {
-    page: "size: letter landscape; margin: 12mm;",
-    sheet: "max-w-[1040px] text-[10.5px]",
+    page: "size: letter landscape; margin: 10mm;",
+    sheet: "box-border w-full max-w-[1056px] text-[10px]",
     hint: "Elige exportar a Excel, guardar PDF o imprimir.",
   },
 };
@@ -76,43 +76,82 @@ export function PrintSheet({
 
     try {
       const element = sheetContentRef.current;
-      const dataUrl = await toPng(element, {
-        pixelRatio: 2,
-        backgroundColor: "#ffffff",
-      });
+      const canvas = await captureElementAsCanvas(element, orientation);
 
       const pdf = new jsPDF({
         orientation,
         unit: "mm",
         format: "letter",
+        compress: true,
       });
 
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = orientation === "landscape" ? 10 : 12;
-      const printWidth = pageWidth - margin * 2;
+      const margin = orientation === "landscape" ? 8 : 10;
+      const availWidth = pageWidth - margin * 2;
+      const availHeight = pageHeight - margin * 2;
 
-      const img = new Image();
-      img.src = dataUrl;
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+      const naturalPrintHeight = (imgH * availWidth) / imgW;
 
-      const printHeight = (img.height * printWidth) / img.width;
-      const maxPageContentHeight = pageHeight - margin * 2;
+      // Si cabe en una página o la excede moderadamente (formularios oficiales de 1 hoja),
+      // se ajusta proporcionalmente dentro del área útil para que nunca salga cortado.
+      if (naturalPrintHeight <= availHeight * 1.5) {
+        const scale = Math.min(availWidth / imgW, availHeight / imgH);
+        const renderWidth = imgW * scale;
+        const renderHeight = imgH * scale;
+        const offsetX = margin + (availWidth - renderWidth) / 2;
+        const offsetY = margin;
 
-      let remainingHeight = printHeight;
-      let position = margin;
+        const dataUrl = canvas.toDataURL("image/png");
+        pdf.addImage(dataUrl, "PNG", offsetX, offsetY, renderWidth, renderHeight);
+      } else {
+        // Documento multipágina: rebanar el canvas por página respetando márgenes limpios.
+        const sliceHeightPx = Math.max(1, Math.floor((availHeight / availWidth) * imgW));
+        let offsetYpx = 0;
+        let pageIndex = 0;
 
-      pdf.addImage(dataUrl, "PNG", margin, position, printWidth, printHeight);
-      remainingHeight -= maxPageContentHeight;
+        while (offsetYpx < imgH) {
+          const currentSlicePx = Math.min(sliceHeightPx, imgH - offsetYpx);
+          const sliceCanvas = document.createElement("canvas");
+          sliceCanvas.width = imgW;
+          sliceCanvas.height = currentSlicePx;
 
-      while (remainingHeight > 0) {
-        position -= maxPageContentHeight;
-        pdf.addPage("letter", orientation);
-        pdf.addImage(dataUrl, "PNG", margin, position, printWidth, printHeight);
-        remainingHeight -= maxPageContentHeight;
+          const sliceCtx = sliceCanvas.getContext("2d");
+          if (sliceCtx) {
+            sliceCtx.fillStyle = "#ffffff";
+            sliceCtx.fillRect(0, 0, imgW, currentSlicePx);
+            sliceCtx.drawImage(
+              canvas,
+              0,
+              offsetYpx,
+              imgW,
+              currentSlicePx,
+              0,
+              0,
+              imgW,
+              currentSlicePx,
+            );
+          }
+
+          if (pageIndex > 0) {
+            pdf.addPage("letter", orientation);
+          }
+
+          const slicePrintHeight = (currentSlicePx * availWidth) / imgW;
+          pdf.addImage(
+            sliceCanvas.toDataURL("image/png"),
+            "PNG",
+            margin,
+            margin,
+            availWidth,
+            slicePrintHeight,
+          );
+
+          offsetYpx += currentSlicePx;
+          pageIndex += 1;
+        }
       }
 
       const rawName = filename || `${document.title.replace(/[·\/\\:*?"<>|]/g, "_").trim() || "documento"}.pdf`;
@@ -142,19 +181,87 @@ export function PrintSheet({
   const displayTitle = title || document.title.split("·")[0]?.trim() || "Documento Oficial";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden font-sans text-zinc-900 print:min-h-0 print:bg-white print:p-0">
+    <div
+      data-print-sheet-root="true"
+      className="flex min-h-screen flex-col overflow-hidden font-sans text-zinc-900 print:block print:h-auto print:min-h-0 print:overflow-visible print:bg-white print:p-0"
+    >
       <style>{`
         @page { ${layout.page} }
         @media print {
-          body { background: white !important; }
-          .no-print { display: none !important; }
-          .avoid-break { break-inside: avoid; }
+          html, body, #root {
+            background: #ffffff !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          aside,
+          nav,
+          .no-print {
+            display: none !important;
+          }
+          div:has([data-print-sheet-root="true"]),
+          main:has([data-print-sheet-root="true"]) {
+            display: block !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: #ffffff !important;
+          }
+          [data-print-sheet-root="true"],
+          [data-print-sheet-root="true"] > main,
+          [data-print-sheet-canvas="true"] {
+            display: block !important;
+            width: 100% !important;
+            max-width: none !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+          }
+          [data-print-sheet-canvas="true"] table {
+            width: 100% !important;
+            max-width: 100% !important;
+            table-layout: fixed !important;
+          }
+          [data-print-sheet-canvas="true"] th,
+          [data-print-sheet-canvas="true"] td {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+          }
+          .avoid-break {
+            break-inside: avoid;
+          }
+        }
+        [data-pdf-capture="true"] {
+          overflow: visible !important;
+          box-sizing: border-box !important;
+        }
+        [data-pdf-capture="true"] table {
+          width: 100% !important;
+          max-width: 100% !important;
+          table-layout: fixed !important;
+        }
+        [data-pdf-capture="true"] th,
+        [data-pdf-capture="true"] td {
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
       `}</style>
 
       {/* Header oficial de la aplicación integrado a la perfección */}
       <ModuleHeader
-        className="no-print !mb-0"
+        className="no-print print:hidden !mb-0"
         onBack={handleGoBack}
         backLabel={backLabel}
         title={
@@ -213,15 +320,16 @@ export function PrintSheet({
       />
 
       {/* Espacio del lienzo de papel con sombra realista y centrado perfecto */}
-      <main className="flex-1 min-h-0 overflow-y-auto -mx-3 -mb-3 lg:-mx-4 lg:-mb-3.5 py-6 sm:py-8 px-4 sm:px-6 bg-canvas print:p-0 print:m-0 print:bg-white print:overflow-visible">
+      <main className="flex-1 min-h-0 overflow-auto -mx-3 -mb-3 lg:-mx-4 lg:-mb-3.5 py-6 sm:py-8 px-4 sm:px-6 bg-canvas print:block print:p-0 print:m-0 print:bg-white print:overflow-visible">
         {downloadError && (
-          <div className="mx-auto mb-4 max-w-2xl rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-center text-[12px] font-medium text-rose-700">
+          <div className="no-print print:hidden mx-auto mb-4 max-w-2xl rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-center text-[12px] font-medium text-rose-700">
             {downloadError}
           </div>
         )}
         <div
           ref={sheetContentRef}
-          className={`mx-auto bg-white rounded-md p-8 sm:p-10 shadow-[0_4px_24px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-zinc-900/[0.05] leading-snug text-black print:p-0 print:m-0 print:shadow-none print:ring-0 print:rounded-none ${layout.sheet}`}
+          data-print-sheet-canvas="true"
+          className={`mx-auto bg-white rounded-md p-6 sm:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-zinc-900/[0.05] leading-snug text-black print:p-0 print:m-0 print:shadow-none print:ring-0 print:rounded-none print:min-w-0 print:w-full print:max-w-none ${layout.sheet}`}
         >
           {children}
         </div>
