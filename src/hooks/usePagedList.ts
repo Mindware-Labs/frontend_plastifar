@@ -35,7 +35,6 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
   }
 
   const queryJson = JSON.stringify({ ...criteria, page });
-  const queryKey = `${queryJson}|${reloadKey}`;
 
   // La funcion de consulta se lee por ref: el efecto no debe reejecutarse por ella.
   const fetchRef = useRef(fetch);
@@ -52,7 +51,7 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
       .current(JSON.parse(queryJson) as TQuery)
       .then((data) => {
         if (cancelled) return;
-        setSnapshot({ key: `${queryJson}|${reloadKey}`, data });
+        setSnapshot({ key: queryJson, data });
         setError(null);
       })
       .catch((err) => {
@@ -66,12 +65,12 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
   }, [queryJson, reloadKey, fallbackError, enabled]);
 
   const data = snapshot?.data ?? null;
-  const isStale = snapshot !== null && snapshot.key !== queryKey;
+  const isStale = snapshot !== null && snapshot.key !== queryJson;
 
   // Borrar la ultima fila de la ultima pagina deja la pagina fuera de rango.
   if (data && data.totalPages > 0 && page > data.totalPages) setPage(data.totalPages);
 
-  /** Tras cada cambio se relee la pagina: totales y contadores vienen del servidor. */
+  /** Tras cada cambio se relee la pagina en segundo plano sin marcar la vista como obsoleta. */
   const refresh = useCallback(() => {
     setReloadKey((value) => value + 1);
   }, []);

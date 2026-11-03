@@ -77,7 +77,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
   const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
-  const { celebration, celebrate, isCelebrating } = useComposerSendCelebration();
+  const { celebration, celebrate, isCelebrating, isExiting } = useComposerSendCelebration();
   const fileRef = useRef<HTMLInputElement>(null);
   // La marca del envio nace con el editor: un reintento la repite y no duplica el correo.
   const tokenRef = useRef(crypto.randomUUID());
@@ -197,8 +197,11 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       invalidateMailContactDirectory();
       celebrate(
         {
+          kind: "compose",
           title: "Correo enviado correctamente",
-          detail: "Tu mensaje ya salió hacia el destinatario.",
+          detail: to.trim() || "Tu mensaje ya salió hacia el destinatario.",
+          subject: resolvedSubject.trim() || undefined,
+          attachmentsCount: files.length > 0 ? files.length : undefined,
         },
         onSent,
       );
@@ -263,7 +266,14 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
       }}
     >
       {celebration ? (
-        <ComposerSendSuccessLayer title={celebration.title} detail={celebration.detail} />
+        <ComposerSendSuccessLayer
+          kind={celebration.kind}
+          title={celebration.title}
+          detail={celebration.detail}
+          subject={celebration.subject}
+          attachmentsCount={celebration.attachmentsCount}
+          exiting={isExiting}
+        />
       ) : (
         <>
           <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
@@ -392,7 +402,7 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
               {files.map((file, position) => (
                 <span
                   key={`${file.name}-${position}`}
-                  className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-zinc-800 shadow-2xs"
+                  className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-emerald-950 shadow-2xs"
                 >
                   <span
                     className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe"

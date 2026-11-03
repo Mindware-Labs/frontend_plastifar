@@ -487,6 +487,11 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
     try {
       await emailsApi.toggleStar(id, nextStarred);
+      receipts.done({
+        action: nextStarred ? "destacar" : "quitar-destacado",
+        title: nextStarred ? "Añadido a destacados" : "Quitado de destacados",
+        detail: target.subject || (target.fromName ?? target.fromEmail),
+      });
       refresh();
     } catch {
       setStarOverrides((current) => {
@@ -1061,7 +1066,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                 >
                   {composeMounted ? (
                     <div
-                      ref={composePanelRef}
+                      ref={composePanelRef as React.RefObject<HTMLDivElement | null>}
                       aria-hidden={composeExiting}
                       className={`h-full min-h-0 flex flex-col overflow-hidden bg-white ${
                         composeExiting ? "pointer-events-none" : ""
@@ -1078,6 +1083,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                   ) : selectedId ? (
                     <EmailDetailPane
                       emailId={selectedId}
+                      starred={starOverrides[selectedId]}
                       onTicketCreated={refresh}
                       onMoved={handleMoved}
                       onStarred={(starred) => {

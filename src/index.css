@@ -499,7 +499,16 @@ input:-webkit-autofill:focus {
 
 /* El recibo se va mas rapido de lo que llega: el aviso pesa al aparecer, no al irse. */
 @keyframes plf-receipt-out {
-  to { opacity: 0; transform: translateY(6px); }
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(16px, 4px, 0) scale(0.96);
+    filter: blur(2px);
+  }
 }
 
 @keyframes plf-toast-progress {
@@ -570,7 +579,11 @@ input:-webkit-autofill:focus {
 .animate-plf-drawer-out { animation: plf-drawer-out 0.22s cubic-bezier(0.3, 0, 0.8, 0.15) forwards; }
 .animate-plf-shake { animation: plf-shake 0.4s ease-in-out both; }
 .animate-plf-toast-progress { animation-name: plf-toast-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
-.animate-plf-receipt-out { animation: plf-receipt-out 0.16s ease-in both; }
+.animate-plf-receipt-out {
+  animation: plf-receipt-out 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transform-origin: bottom right;
+  will-change: transform, opacity, filter;
+}
 .animate-plf-spinner-rotate { animation: plf-spinner-rotate 1.4s linear infinite; }
 .animate-plf-spinner-dash { animation: plf-spinner-dash 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 .animate-plf-spinner-pulse { animation: plf-spinner-pulse 2s ease-in-out infinite; }
@@ -754,8 +767,20 @@ input:-webkit-autofill:focus {
 }
 
 @keyframes plf-receipt-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.985); }
-  to { opacity: 1; transform: none; }
+  0% {
+    opacity: 0;
+    transform: translate3d(14px, 10px, 0) scale(0.96);
+    filter: blur(2px);
+  }
+  40% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: none;
+  }
 }
 
 @keyframes plf-seal-pop {
@@ -844,7 +869,11 @@ input:-webkit-autofill:focus {
   animation: plf-header-fade 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .animate-plf-otp-confirm { animation: plf-otp-confirm 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-plf-receipt-in { animation: plf-receipt-in 0.28s var(--ease-plf-spring) both; }
+.animate-plf-receipt-in {
+  animation: plf-receipt-in 0.42s var(--ease-plf-spring) both;
+  transform-origin: bottom right;
+  will-change: transform, opacity, filter;
+}
 .animate-plf-seal-pop { animation: plf-seal-pop 0.42s var(--ease-plf-spring) both; }
 .animate-plf-list-row-in { animation: plf-list-row-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-list-row-out { animation: plf-list-row-out 0.28s cubic-bezier(0.4, 0, 0.2, 1) both; }
@@ -1000,28 +1029,51 @@ input:-webkit-autofill:focus {
   }
 }
 
+@keyframes plf-composer-send-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.985) translate3d(0, -4px, 0);
+    filter: blur(1.5px);
+  }
+}
+
 @keyframes plf-composer-send-badge {
   0% {
     opacity: 0;
-    transform: scale(0.68);
+    transform: scale(0.72) translate3d(0, 6px, 0);
+    filter: blur(1.5px);
   }
-  48% {
+  42% {
     opacity: 1;
-    transform: scale(1.08);
-  }
-  72% {
-    transform: scale(0.96);
+    filter: blur(0);
   }
   100% {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) translate3d(0, 0, 0);
+    filter: none;
+  }
+}
+
+@keyframes plf-composer-send-wave {
+  0% {
+    opacity: 0.62;
+    transform: scale(0.78);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.54);
   }
 }
 
 @keyframes plf-composer-send-ring {
   0% {
     opacity: 0;
-    transform: scale(0.85);
+    transform: scale(0.84);
   }
   100% {
     opacity: 1;
@@ -1029,32 +1081,89 @@ input:-webkit-autofill:focus {
   }
 }
 
+@keyframes plf-composer-send-arc {
+  0% {
+    stroke-dashoffset: 208;
+    opacity: 0.25;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes plf-composer-send-satellite {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) translate3d(-2px, 2px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
 @keyframes plf-composer-send-copy {
   0% {
     opacity: 0;
-    transform: translate3d(0, 8px, 0);
+    transform: translate3d(0, 7px, 0);
+    filter: blur(1.25px);
+  }
+  45% {
+    opacity: 1;
+    filter: blur(0);
   }
   100% {
     opacity: 1;
     transform: none;
+    filter: none;
+  }
+}
+
+@keyframes plf-composer-send-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
   }
 }
 
 .animate-plf-composer-send-backdrop {
-  animation: plf-composer-send-backdrop 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: plf-composer-send-backdrop 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-plf-composer-send-out {
+  animation: plf-composer-send-out 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity, filter;
 }
 .animate-plf-composer-send-badge {
-  animation: plf-composer-send-badge 0.62s var(--ease-plf-spring) both;
-  will-change: transform, opacity;
+  animation: plf-composer-send-badge 0.56s var(--ease-plf-spring) both;
+  will-change: transform, opacity, filter;
+}
+.animate-plf-composer-send-wave {
+  animation: plf-composer-send-wave 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.04s both;
 }
 .animate-plf-composer-send-ring {
-  animation: plf-composer-send-ring 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+  animation: plf-composer-send-ring 0.52s var(--ease-plf-spring) 0.05s both;
+}
+.animate-plf-composer-send-arc {
+  stroke-dasharray: 208;
+  stroke-dashoffset: 208;
+  animation: plf-composer-send-arc 0.54s cubic-bezier(0.16, 1, 0.3, 1) 0.06s forwards;
+}
+.animate-plf-composer-send-satellite {
+  animation: plf-composer-send-satellite 0.48s var(--ease-plf-spring) 0.22s both;
+  will-change: transform, opacity;
 }
 .animate-plf-composer-send-copy {
-  animation: plf-composer-send-copy 0.44s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: plf-composer-send-copy 0.40s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity, filter;
+}
+.animate-plf-composer-send-progress {
+  animation: plf-composer-send-progress 1.45s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
 }
 .plf-composer-send-check .animate-plf-check-stroke {
-  animation-delay: 0.34s;
+  animation-delay: 0.16s;
 }
 
 /* PF-FOR-291: ficha y pestaña de línea — deslizamiento lateral, sin colapso de alto. */
@@ -1188,8 +1297,12 @@ input:-webkit-autofill:focus {
   .animate-plf-apple-row-wash,
   .animate-plf-composer-send-backdrop,
   .animate-plf-composer-send-badge,
+  .animate-plf-composer-send-wave,
   .animate-plf-composer-send-ring,
+  .animate-plf-composer-send-arc,
+  .animate-plf-composer-send-satellite,
   .animate-plf-composer-send-copy,
+  .animate-plf-composer-send-progress,
   .animate-plf-composer-row-in,
   .animate-plf-apple-line-slide-in,
   .animate-plf-apple-line-tab-in {
@@ -1220,6 +1333,7 @@ input:-webkit-autofill:focus {
   .animate-plf-composer-row-out,
   .animate-plf-apple-line-slide-out,
   .animate-plf-apple-line-tab-out,
+  .animate-plf-composer-send-out,
   .animate-plf-side-panel-out {
     animation-duration: 1ms !important;
   }

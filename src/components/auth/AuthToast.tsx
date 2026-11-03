@@ -12,6 +12,67 @@ interface AuthToastProps {
 
 const DEFAULT_DURATION = 5000;
 
+export function AuthToastCard({
+  message,
+  onDismiss,
+  variant = "error",
+  duration = DEFAULT_DURATION,
+  staticPreview = false,
+}: {
+  message: string;
+  onDismiss: () => void;
+  variant?: "error" | "success";
+  duration?: number;
+  staticPreview?: boolean;
+}) {
+  const isError = variant === "error";
+
+  return (
+    <div
+      role={isError ? "alert" : "status"}
+      className={`${
+        staticPreview ? "" : "animate-plf-toast-in"
+      } pointer-events-auto relative flex w-full max-w-[408px] items-start gap-3 overflow-hidden rounded-xl border bg-white py-3 pl-3 pr-[15px] text-[13px] font-medium leading-relaxed shadow-[0_2px_6px_-2px_rgba(15,23,42,0.08),0_16px_36px_-12px_rgba(15,23,42,0.28)] ${
+        isError ? "border-brand-red/20 text-brand-red-dark" : "border-brand-green/20 text-brand-green"
+      }`}
+    >
+      <span
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+          isError ? "bg-brand-red/10" : "bg-brand-green/10"
+        }`}
+      >
+        {isError ? (
+          <CircleAlert className="h-4 w-4" aria-hidden />
+        ) : (
+          <ShieldCheck className="h-4 w-4" aria-hidden />
+        )}
+      </span>
+
+      <span className="flex-1 pt-1">{message}</span>
+
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Cerrar aviso"
+        className="-m-2 shrink-0 rounded-full p-2 text-current opacity-50 transition-opacity hover:opacity-100"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+
+      <span
+        key={message}
+        aria-hidden
+        style={staticPreview ? { width: "68%" } : { animationDuration: `${duration}ms` }}
+        className={`${
+          staticPreview ? "" : "animate-plf-toast-progress"
+        } absolute inset-x-0 bottom-0 hidden h-[3px] origin-left motion-safe:block ${
+          isError ? "bg-brand-red/35" : "bg-brand-green/35"
+        }`}
+      />
+    </div>
+  );
+}
+
 /** Notificación flotante montada en portal para avisos de autenticación. */
 export function AuthToast({
   message,
@@ -33,48 +94,9 @@ export function AuthToast({
 
   if (!message) return null;
 
-  const isError = variant === "error";
-
   return createPortal(
     <div className="pointer-events-none fixed inset-x-0 top-5 z-50 flex justify-center px-5 sm:px-6">
-      <div
-        role={isError ? "alert" : "status"}
-        className={`animate-plf-toast-in pointer-events-auto relative flex w-full max-w-[408px] items-start gap-3 overflow-hidden rounded-xl border bg-white py-3 pl-3 pr-[15px] text-[13px] font-medium leading-relaxed shadow-[0_2px_6px_-2px_rgba(15,23,42,0.08),0_16px_36px_-12px_rgba(15,23,42,0.28)] ${
-          isError ? "border-brand-red/20 text-brand-red-dark" : "border-brand-green/20 text-brand-green"
-        }`}
-      >
-        <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-            isError ? "bg-brand-red/10" : "bg-brand-green/10"
-          }`}
-        >
-          {isError ? (
-            <CircleAlert className="h-4 w-4" aria-hidden />
-          ) : (
-            <ShieldCheck className="h-4 w-4" aria-hidden />
-          )}
-        </span>
-
-        <span className="flex-1 pt-1">{message}</span>
-
-        <button
-          type="button"
-          onClick={onDismiss}
-          aria-label="Cerrar aviso"
-          className="-m-2 shrink-0 rounded-full p-2 text-current opacity-50 transition-opacity hover:opacity-100"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-
-        <span
-          key={message}
-          aria-hidden
-          style={{ animationDuration: `${duration}ms` }}
-          className={`animate-plf-toast-progress absolute inset-x-0 bottom-0 hidden h-[3px] origin-left motion-safe:block ${
-            isError ? "bg-brand-red/35" : "bg-brand-green/35"
-          }`}
-        />
-      </div>
+      <AuthToastCard message={message} onDismiss={onDismiss} variant={variant} duration={duration} />
     </div>,
     document.body,
   );

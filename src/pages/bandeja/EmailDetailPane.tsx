@@ -101,6 +101,8 @@ const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
 
 interface EmailDetailPaneProps {
   emailId: number;
+  /** Estado de destacado sincronizado desde la lista para evitar recargas. */
+  starred?: boolean;
   /** Avisa al panel de la lista para que refresque (el correo puede salir del filtro actual). */
   onTicketCreated: () => void;
   /** El correo cambió de carpeta: ya no pertenece a la vista actual. */
@@ -276,7 +278,14 @@ function firstLine(text: string) {
 }
 
 /** El cuerpo del correo viene de un remitente externo: se muestra siempre via EmailBodyFrame, nunca inyectado. */
-export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, onClose }: EmailDetailPaneProps) {
+export function EmailDetailPane({
+  emailId,
+  starred: starredProp,
+  onTicketCreated,
+  onMoved,
+  onStarred,
+  onClose,
+}: EmailDetailPaneProps) {
   const navigate = useNavigate();
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -329,7 +338,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
   const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
-  const { celebration, celebrate, isCelebrating } = useComposerSendCelebration();
+  const { celebration, celebrate, isCelebrating, isExiting } = useComposerSendCelebration();
   const replyContainerRef = useRef<HTMLDivElement>(null);
   const { mounted: composerMounted, exiting: composerExiting, ref: composerPanelRef } = useSidePanelMotion(replyOpen);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
@@ -566,12 +575,18 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           ? forwardTo
           : (email.fromName ?? email.fromEmail);
 
+      const totalAttachments =
+        files.length + (isForward && includeAttachments ? email.attachments.length : 0);
+
       setSending(false);
       invalidateMailContactDirectory();
       celebrate(
         {
+          kind: queued ? "queued" : isForward ? "forward" : "reply",
           title: receiptTitle,
           detail: receiptDetail,
+          subject: email.subject ? `${isForward ? "Fwd" : "Re"}: ${email.subject}` : undefined,
+          attachmentsCount: totalAttachments > 0 ? totalAttachments : undefined,
         },
         () => {
           clearDraft(String(email.id));
@@ -781,7 +796,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
   async function handleToggleStar() {
     if (!email || starring) return;
-    const previousStarred = email.starred;
+    const previousStarred = starredProp ?? email.starred;
     const nextStarred = !previousStarred;
     setStarring(true);
     setEmail({ ...email, starred: nextStarred });
@@ -792,7 +807,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
       receipts.done({
         action: nextStarred ? "destacar" : "quitar-destacado",
         title: nextStarred ? "Añadido a destacados" : "Quitado de destacados",
-        detail: email.subject || "(sin asunto)",
+        detail: email.subject || (email.fromName ?? email.fromEmail),
       });
     } catch (err) {
       setEmail({ ...email, starred: previousStarred });
@@ -820,6 +835,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   }
 
   const displayName = email.fromName ?? email.fromEmail;
+  const isStarred = starredProp ?? email.starred;
   const isOutbound = email.direction === "Outbound";
   // Quienes ya estaban en el hilo: el servidor ya descarto nuestra casilla y al remitente.
   const replyAll = email.otherRecipients ?? [];
@@ -843,16 +859,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   size="icon"
                   pending={false}
                   disabled={starring}
-                  buttonClassName={`${toolButtonClass} ${email.starred ? "text-amber-500 hover:text-amber-600" : ""}`}
+                  buttonClassName={`${toolButtonClass} ${isStarred ? "text-amber-500 hover:text-amber-600" : ""}`}
                   onClick={handleToggleStar}
-                  aria-label={email.starred ? "Quitar de destacados" : "Destacar"}
+                  aria-label={isStarred ? "Quitar de destacados" : "Destacar"}
                 >
                   <Star
-                    className={`h-4 w-4 ${email.starred ? "fill-amber-400 text-amber-500" : ""}`}
+                    className={`h-4 w-4 ${isStarred ? "fill-amber-400 text-amber-500" : ""}`}
                   />
                 </MailToolbarIconButton>
               </TooltipTrigger>
-              <TooltipContent>{email.starred ? "Quitar de destacados" : "Destacar"}</TooltipContent>
+              <TooltipContent>{isStarred ? "Quitar de destacados" : "Destacar"}</TooltipContent>
             </Tooltip>
           )}
 
@@ -1054,7 +1070,14 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             }}
           >
             {celebration ? (
-              <ComposerSendSuccessLayer title={celebration.title} detail={celebration.detail} />
+              <ComposerSendSuccessLayer
+                kind={celebration.kind}
+                title={celebration.title}
+                detail={celebration.detail}
+                subject={celebration.subject}
+                attachmentsCount={celebration.attachmentsCount}
+                exiting={isExiting}
+              />
             ) : (
               <>
             <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
@@ -1209,7 +1232,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                   <span
                     key={`${file.name}-${position}`}
                     className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80
-                      bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-zinc-800 shadow-2xs"
+                      bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-emerald-950 shadow-2xs"
                   >
                     <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
                       <AnimatedCheckIcon size={10} strokeWidth={3} />

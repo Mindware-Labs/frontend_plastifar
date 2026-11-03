@@ -41,6 +41,7 @@ import { TerritoriesSection } from "./pages/settings/TerritoriesSection";
 import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
 import { StaffPage } from "./pages/staff/StaffPage";
 import { RespuestasPage } from "./pages/respuestas/RespuestasPage";
+import { NotificationsLabPage } from "./pages/dev/NotificationsLabPage";
 import { TicketDetailPage } from "./pages/tickets/TicketDetailPage";
 import { TicketsPage } from "./pages/tickets/TicketsPage";
 
@@ -72,6 +73,7 @@ export default function App() {
             /dashboard-calidad. */}
         <Route path="/dashboard" element={<CXDashboard />} />
         <Route path="/dashboard-calidad" element={<DashboardPage />} />
+        <Route path="/notificaciones-lab" element={<NotificationsLabPage />} />
 
         <Route element={<PermissionRoute permission="tickets.read"><Outlet /></PermissionRoute>}>
           <Route path="/tickets" element={<TicketsPage />} />
