@@ -18,6 +18,7 @@ import {
   Factory,
   FileWarning,
   Gavel,
+  History,
   Inbox,
   Layers,
   LayoutDashboard,
@@ -113,6 +114,7 @@ export const SIDEBAR_NAV: NavGroup[] = [
     section: "Principal",
     children: [
       { label: "Bandeja", to: "/tickets", end: true, icon: TicketIcon, permission: "tickets.read" },
+      { label: "Histórico", to: "/tickets/historico", icon: History, permission: "tickets.read" },
       { label: "Reclamaciones", to: "/reclamaciones", icon: FileWarning, permission: "claims.read", subgroup: "Incidencias y Casos" },
       { label: "Discrepancias", to: "/discrepancias", icon: PackageSearch, permission: "discrepancies.read", subgroup: "Incidencias y Casos" },
       { label: "Retiros", to: "/retiros", icon: PackageMinus, permission: "withdrawals.read", subgroup: "Incidencias y Casos" },

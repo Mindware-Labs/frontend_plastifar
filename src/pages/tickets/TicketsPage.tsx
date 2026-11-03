@@ -41,6 +41,7 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { CreateTicketModal } from "./CreateTicketModal";
 import { AssigneeCell, PriorityCell, SlaCell, StatusCell } from "./ticketCells";
 import { TicketSelectionBar } from "./TicketSelectionBar";
+import { TICKETS_LIST_ROUTES, type TicketOriginFilter } from "./ticketLegacy";
 
 type TicketFilterKey = "todos" | "abiertos" | "por-vencer" | "vencidos" | "espera" | "cerrados";
 type SortKey = "numero" | "asunto" | "cliente" | "departamento" | "prioridad" | "estado" | "sla" | "actividad";
@@ -279,8 +280,12 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
 }
 
 
+interface TicketsPageProps {
+  origin?: TicketOriginFilter;
+}
+
 /** Bandeja de tickets: cada fila abre el detalle; marcar filas cambia la barra de criterios por la de acciones. */
-export function TicketsPage() {
+export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
   const navigate = useNavigate();
   const receipts = useReceipts();
   const { onTicketsChanged } = useEmailCounts();
@@ -318,6 +323,7 @@ export function TicketsPage() {
       departmentId: departmentId === "todos" ? undefined : departmentId,
       priority: priority === "todas" ? undefined : priority,
       status: filter,
+      origin,
       sort: sort.key,
       dir: sort.dir,
     },
@@ -474,6 +480,34 @@ export function TicketsPage() {
     <div className="flex h-full flex-col">
       <ModuleHeader
         title="Tickets"
+        sections={[
+          {
+            label: (
+              <span className="flex items-center gap-1.5">
+                <span>Actuales</span>
+                {counts != null && (
+                  <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-zinc-600">
+                    {counts.plastifar}
+                  </span>
+                )}
+              </span>
+            ),
+            to: TICKETS_LIST_ROUTES.actuales,
+          },
+          {
+            label: (
+              <span className="flex items-center gap-1.5">
+                <span>Histórico</span>
+                {counts != null && (
+                  <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-zinc-600">
+                    {counts.legacy}
+                  </span>
+                )}
+              </span>
+            ),
+            to: TICKETS_LIST_ROUTES.historico,
+          },
+        ]}
         summary={
           counts ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
@@ -568,7 +602,7 @@ export function TicketsPage() {
           )
         }
         action={
-          canCreateTicket ? (
+          canCreateTicket && origin === "plastifar" ? (
             <Button
               size="sm"
               onClick={() => setCreateModalOpen(true)}
@@ -715,8 +749,14 @@ export function TicketsPage() {
               isFiltered={hasCriteria}
               filteredTitle="Ningún ticket coincide con estos criterios."
               onClearFilters={clearCriteria}
-              emptyTitle="Todavía no hay tickets."
-              emptyDescription="Se crean desde un correo de la bandeja o a mano con «Nuevo ticket»."
+              emptyTitle={
+                origin === "legacy" ? "El histórico está vacío." : "Todavía no hay tickets."
+              }
+              emptyDescription={
+                origin === "legacy"
+                  ? "Aquí verás los tickets migrados del sistema anterior."
+                  : "Se crean desde un correo de la bandeja o a mano con «Nuevo ticket»."
+              }
             />
           ) : (
             <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>

@@ -100,6 +100,7 @@ import {
   type ComposerSendCelebrationPayload,
 } from "../bandeja/useComposerSendCelebration";
 import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
+import { parseTicketDetailId } from "./ticketLegacy";
 import { TaskCommentsAside, type TaskCommentsAsideHandle } from "./TaskCommentsAside";
 import { FormattedTicketBody } from "./FormattedTicketBody";
 import { AttachmentChip, TicketMessageCard } from "./TicketMessageCard";
@@ -368,11 +369,11 @@ function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const ticketId = id ? parseInt(id, 10) : 0;
+  const ticketId = parseTicketDetailId(id);
 
   const [ticket, setTicket] = useState<TicketDetailResponse | null>(null);
-  const [loading, setLoading] = useState(Boolean(ticketId));
-  const [error, setError] = useState<string | null>(ticketId ? null : "Identificador de ticket no válido.");
+  const [loading, setLoading] = useState(ticketId != null);
+  const [error, setError] = useState<string | null>(ticketId != null ? null : "Identificador de ticket no válido.");
 
   const { user } = useAuth();
   // Formularios empresariales del ciclo de vida del ticket (PF-FOR-034, 068, 291, 109)

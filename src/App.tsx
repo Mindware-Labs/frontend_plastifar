@@ -1,4 +1,4 @@
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 import { HomeRedirect } from "./components/HomeRedirect";
 import { GuestRoute, PermissionRoute, ProtectedRoute } from "./components/RouteGuards";
 import { AppLayout } from "./layouts/AppLayout";
@@ -44,6 +44,14 @@ import { RespuestasPage } from "./pages/respuestas/RespuestasPage";
 import { NotificationsLabPage } from "./pages/dev/NotificationsLabPage";
 import { TicketDetailPage } from "./pages/tickets/TicketDetailPage";
 import { TicketsPage } from "./pages/tickets/TicketsPage";
+import { ticketDetailReservedRedirect } from "./pages/tickets/ticketLegacy";
+
+function TicketDetailRoute() {
+  const { id } = useParams<{ id: string }>();
+  const reserved = ticketDetailReservedRedirect(id);
+  if (reserved) return <Navigate to={reserved} replace />;
+  return <TicketDetailPage />;
+}
 
 export default function App() {
   return (
@@ -76,16 +84,20 @@ export default function App() {
         <Route path="/notificaciones-lab" element={<NotificationsLabPage />} />
 
         <Route element={<PermissionRoute permission="tickets.read"><Outlet /></PermissionRoute>}>
-          <Route path="/tickets" element={<TicketsPage />} />
-          {/* Motivos y veredictos llegaron con la rama de Tickets. Hubo un
-            tiempo en que los motivos tambien se administraban desde
-            /configuracion/motivos, contra la misma entidad y con otra mitad de
-            los campos. Quedo esta: un motivo es un concepto de tickets, no de
-            configuracion, y dos pantallas para una tabla es como se desincronizan
-            las reglas. */}
-          <Route path="/tickets/motivos" element={<MotivosPage />} />
-          <Route path="/tickets/veredictos" element={<VeredictosPage />} />
-          <Route path="/tickets/:id" element={<TicketDetailPage />} />
+          {/* Rutas anidadas: historico/motivos/veredictos deben resolverse antes que :id numérico. */}
+          <Route path="/tickets" element={<Outlet />}>
+            <Route index element={<TicketsPage origin="plastifar" />} />
+            <Route path="historico" element={<TicketsPage origin="legacy" />} />
+            {/* Motivos y veredictos llegaron con la rama de Tickets. Hubo un
+              tiempo en que los motivos tambien se administraban desde
+              /configuracion/motivos, contra la misma entidad y con otra mitad de
+              los campos. Quedo esta: un motivo es un concepto de tickets, no de
+              configuracion, y dos pantallas para una tabla es como se desincronizan
+              las reglas. */}
+            <Route path="motivos" element={<MotivosPage />} />
+            <Route path="veredictos" element={<VeredictosPage />} />
+            <Route path=":id" element={<TicketDetailRoute />} />
+          </Route>
         </Route>
 
         <Route element={<PermissionRoute permission="mail.read"><Outlet /></PermissionRoute>}>

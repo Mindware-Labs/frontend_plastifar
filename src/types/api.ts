@@ -483,6 +483,8 @@ export interface TicketListItemResponse {
   createdAt: string;
   updatedAt: string;
   products?: TicketProductResponse[];
+  /** Id en osTicket si el ticket fue migrado. */
+  legacyTicketId?: number | null;
   /** full | readOnly — alcance sobre este ticket según departamento y reglas transversales. */
   accessLevel?: "full" | "readOnly" | null;
 }
@@ -494,6 +496,10 @@ export interface TicketCounts {
   overdue: number;
   waitingOnClient: number;
   closed: number;
+  /** Tickets sin LegacyTicketId (bandeja Plastifar). */
+  plastifar: number;
+  /** Tickets migrados de osTicket. */
+  legacy: number;
 }
 
 export interface TicketListResponse {
@@ -523,6 +529,8 @@ export interface TicketQuery {
   /** numero | asunto | cliente | departamento | prioridad | estado | sla | actividad */
   sort?: string;
   dir?: "asc" | "desc";
+  /** plastifar | legacy */
+  origin?: string;
 }
 
 export interface TicketAttachmentResponse {
