@@ -1,4 +1,3 @@
-﻿import { useLayoutEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Select } from "./Select";
 
@@ -20,12 +19,16 @@ function opcionesDeTamano(actual: number): number[] {
   return pageSizes.includes(actual) ? pageSizes : [...pageSizes, actual].sort((a, b) => a - b);
 }
 
-const SLOTS = 7;
-
 type Slot = number | "gap-start" | "gap-end";
 
-function pageSlots(page: number, totalPages: number): Slot[] {
-  if (totalPages <= SLOTS) return Array.from({ length: totalPages }, (_, i) => i + 1);
+function pageSlots(page: number, totalPages: number, maxSlots = 7): Slot[] {
+  if (totalPages <= maxSlots) return Array.from({ length: totalPages }, (_, i) => i + 1);
+
+  if (maxSlots <= 5) {
+    if (page <= 3) return [1, 2, 3, "gap-end", totalPages];
+    if (page >= totalPages - 2) return [1, "gap-start", totalPages - 2, totalPages - 1, totalPages];
+    return [1, "gap-start", page, "gap-end", totalPages];
+  }
 
   if (page <= 4) return [1, 2, 3, 4, 5, "gap-end", totalPages];
   if (page >= totalPages - 3) {
@@ -38,11 +41,21 @@ function nounLabel(total: number, noun: string, nounSingular?: string) {
   return total === 1 ? (nounSingular ?? noun) : noun;
 }
 
-function RangeBar({ from, to, total }: { from: number; to: number; total: number }) {
+function RangeBar({
+  from,
+  to,
+  total,
+  className = "w-14",
+}: {
+  from: number;
+  to: number;
+  total: number;
+  className?: string;
+}) {
   return (
     <span
       aria-hidden="true"
-      className="relative h-1 w-14 shrink-0 overflow-hidden rounded-pill bg-fill"
+      className={`relative h-1 shrink-0 overflow-hidden rounded-pill bg-fill ${className}`}
     >
       <span
         className="absolute inset-y-0 rounded-pill bg-brand-red"
@@ -62,96 +75,19 @@ function PageNav({
   totalPages,
   onPageChange,
   tone = "brand",
-  integrated = false,
+  maxSlots = 7,
 }: {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
   tone?: NavTone;
-  integrated?: boolean;
+  maxSlots?: 5 | 7;
 }) {
   const safeTotalPages = Math.max(totalPages, 1);
-  const slots = pageSlots(page, safeTotalPages);
-  const navRef = useRef<HTMLElement>(null);
-
-  useLayoutEffect(() => {
-    if (!integrated) return;
-    const nav = navRef.current;
-    const current = nav?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!nav || !current || nav.scrollWidth <= nav.clientWidth + 1) return;
-    const navBox = nav.getBoundingClientRect();
-    const box = current.getBoundingClientRect();
-    const pad = 4;
-    if (box.left < navBox.left + pad) {
-      nav.scrollLeft -= navBox.left + pad - box.left;
-    } else if (box.right > navBox.right - pad) {
-      nav.scrollLeft += box.right - (navBox.right - pad);
-    }
-  }, [integrated, page, safeTotalPages]);
-
-  if (integrated) {
-    const tile =
-      "inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-[6px] text-[13px] font-medium tabular-nums leading-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-400/70";
-    const arrow = `${tile} text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:text-zinc-300 disabled:hover:bg-transparent`;
-    const active = `${tile} bg-zinc-950 text-white hover:bg-zinc-900`;
-    const idle = `${tile} text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900`;
-
-    return (
-      <nav
-        ref={navRef}
-        aria-label="Paginación"
-        className="no-scrollbar flex h-8 min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain"
-      >
-        <button
-          type="button"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-          aria-label="Página anterior"
-          title="Página anterior"
-          className={arrow}
-        >
-          <ChevronLeft className="h-4 w-4" strokeWidth={1.75} />
-        </button>
-
-        {slots.map((slot) =>
-          typeof slot === "number" ? (
-            <button
-              key={slot}
-              type="button"
-              onClick={() => onPageChange(slot)}
-              aria-label={`Página ${slot}`}
-              aria-current={slot === page ? "page" : undefined}
-              className={slot === page ? active : idle}
-            >
-              {slot}
-            </button>
-          ) : (
-            <span
-              key={slot}
-              aria-hidden="true"
-              className="inline-flex h-8 w-8 shrink-0 select-none items-center justify-center text-[13px] leading-none text-zinc-400"
-            >
-              …
-            </span>
-          ),
-        )}
-
-        <button
-          type="button"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= safeTotalPages}
-          aria-label="Página siguiente"
-          title="Página siguiente"
-          className={arrow}
-        >
-          <ChevronRight className="h-4 w-4" strokeWidth={1.75} />
-        </button>
-      </nav>
-    );
-  }
+  const slots = pageSlots(page, safeTotalPages, maxSlots);
 
   const cell =
-    "flex h-7 min-w-7 shrink-0 cursor-pointer items-center justify-center px-1 text-[12px] font-medium tabular-nums outline-none transition-colors focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-brand-red/30";
+    "flex h-7 min-w-7 shrink-0 cursor-pointer items-center justify-center px-1 text-[12px] font-medium leading-none tabular-nums outline-none transition-colors focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-brand-red/30";
 
   const arrow = `${cell} text-subtle hover:bg-canvas hover:text-ink disabled:cursor-not-allowed disabled:text-line-strong disabled:hover:bg-transparent`;
 
@@ -175,7 +111,7 @@ function PageNav({
         title="Página anterior"
         className={arrow}
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-3.5 w-3.5" />
       </button>
 
       {slots.map((slot) =>
@@ -194,7 +130,7 @@ function PageNav({
           <span
             key={slot}
             aria-hidden="true"
-            className="flex h-7 w-6 select-none items-center justify-center text-faint"
+            className="flex h-7 w-7 shrink-0 select-none items-center justify-center text-[12px] leading-none text-faint"
           >
             …
           </span>
@@ -209,7 +145,7 @@ function PageNav({
         title="Página siguiente"
         className={arrow}
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-3.5 w-3.5" />
       </button>
     </nav>
   );
@@ -223,12 +159,13 @@ function ToolbarRowsSelect({
   onPageSizeChange: (pageSize: number) => void;
 }) {
   return (
-    <label className="flex shrink-0 items-center gap-1.5 text-[12px] text-subtle">
-      Filas
+    <label className="flex h-7 shrink-0 items-center gap-1.5 text-[12px] leading-none text-subtle">
+      <span>Filas</span>
       <Select
         size="xs"
-        className="w-[50px]"
-        buttonClassName="!gap-1 !px-1.5"
+        centered
+        className="w-[52px]"
+        buttonClassName="!h-7 !gap-1 !rounded-edge !border-line-strong !bg-white !px-2 !py-0 !text-[12px] !font-medium !leading-none !tabular-nums !text-ink !shadow-none hover:!border-hairline-hover hover:!bg-canvas"
         matchTriggerWidth
         aria-label="Filas por página"
         value={String(pageSize)}
@@ -242,7 +179,7 @@ function ToolbarRowsSelect({
   );
 }
 
-/** Pie de la bandeja: conteo, bloque de controles y estado, en un solo eje centrado. */
+/** Pie compacto de la bandeja: dos filas simétricas alineadas a los bordes del panel. */
 function PanelPagination({
   page,
   pageSize,
@@ -270,57 +207,37 @@ function PanelPagination({
   const safeTotalPages = Math.max(totalPages, 1);
 
   return (
-    <div className="flex w-full min-w-0 flex-col items-center gap-2.5 py-3">
-      <p
-        className="max-w-full px-1 text-center text-[13px] font-normal leading-none text-zinc-600 tabular-nums"
-        title={`Mostrando ${from} a ${to} de ${total}`}
-      >
-        {from} – {to} de {total} {label}
-      </p>
-
-      <div className="w-fit max-w-full min-w-0 rounded-[12px] border border-zinc-200 bg-white">
-        <div className="grid min-w-0 grid-cols-[auto_1px_minmax(0,max-content)] grid-rows-[auto_auto] items-center gap-x-3 gap-y-1.5 px-3 py-2.5">
-          <span className="col-start-1 row-start-1 justify-self-center text-[10px] font-medium uppercase leading-none tracking-[0.16em] text-zinc-500">
-            Filas
+    <div className="flex w-full min-w-0 flex-col gap-1.5 py-2 text-[12px] text-subtle">
+      <div className="flex h-4 min-w-0 items-center justify-between gap-2 leading-none tabular-nums">
+        <p
+          className="min-w-0 truncate"
+          title={`Mostrando ${from} a ${to} de ${total}`}
+        >
+          <span className="font-semibold text-ink">{total}</span> {label}
+          <span className="sr-only">
+            {" "}
+            (mostrando {from} a {to})
           </span>
+        </p>
 
-          <Select
-            size="xs"
-            className="col-start-1 row-start-2 w-[3.75rem] justify-self-center"
-            buttonClassName="!h-8 !gap-1 !rounded-lg !border-zinc-200 !px-2 !py-0 !text-[13px] !font-medium !leading-none !tabular-nums !shadow-none"
-            matchTriggerWidth
-            aria-label="Filas por página"
-            value={String(pageSize)}
-            onChange={(next) => onPageSizeChange(Number(next))}
-            options={opcionesDeTamano(pageSize).map((size) => ({
-              value: String(size),
-              label: String(size),
-            }))}
-          />
-
-          <div
-            aria-hidden="true"
-            className="col-start-2 row-span-2 row-start-1 w-px self-stretch bg-zinc-200"
-          />
-
-          <div className="col-start-3 row-start-2 min-w-0">
-            <PageNav
-              page={page}
-              totalPages={totalPages}
-              onPageChange={onPageChange}
-              tone="neutral"
-              integrated
-            />
-          </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <RangeBar from={from} to={to} total={total} className="w-10" />
+          <span aria-hidden="true">
+            Pág. <span className="font-semibold text-ink">{page}</span>/{safeTotalPages}
+          </span>
         </div>
       </div>
 
-      <p
-        className="text-center text-[11px] font-normal leading-none tracking-[0.01em] text-zinc-500 tabular-nums"
-        aria-hidden="true"
-      >
-        Página {page} de {safeTotalPages}
-      </p>
+      <div className="flex h-7 min-w-0 items-center justify-between gap-2">
+        <ToolbarRowsSelect pageSize={pageSize} onPageSizeChange={onPageSizeChange} />
+        <PageNav
+          page={page}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          tone="brand"
+          maxSlots={5}
+        />
+      </div>
     </div>
   );
 }

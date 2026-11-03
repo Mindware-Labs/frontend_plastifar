@@ -15,7 +15,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
@@ -41,10 +41,16 @@ import {
   formatEmailListDate,
   formatTicketCode,
 } from "../../lib/format";
-import type { ComposingPresence, EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
+import type {
+  ComposingPresence,
+  EmailAttachmentResponse,
+  EmailDetailResponse,
+  EmailNoteResponse,
+} from "../../types/api";
 import { EmailBodyFrame } from "../../components/ui/EmailBodyFrame";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { openOverlay } from "../../hooks/overlayStack";
+import { useSidePanelMotion } from "../../hooks/useSidePanelMotion";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
@@ -57,7 +63,7 @@ import { buildCannedVariableContext } from "../../lib/cannedVariables";
 import { CannedPicker } from "./CannedPicker";
 import { textToBlocks } from "./textToBlocks";
 import { AssignmentControl } from "./ConversationTools";
-import { AddNotePanel, ConversationNotes } from "./ConversationNotes";
+import { AddNotePanel, ConversationNotes, type ConversationNotesHandle } from "./ConversationNotes";
 import { RecipientInput } from "./RecipientInput";
 import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
 import { ComposerSendSuccessLayer } from "./ComposerSendSuccessLayer";
@@ -320,6 +326,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
   const { celebration, celebrate, isCelebrating } = useComposerSendCelebration();
   const replyContainerRef = useRef<HTMLDivElement>(null);
+  const { mounted: composerMounted, exiting: composerExiting, ref: composerPanelRef } = useSidePanelMotion(replyOpen);
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
   const [composers, setComposers] = useState<ComposingPresence[]>([]);
   const [editorKey, setEditorKey] = useState(0);
@@ -341,7 +348,10 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
   const replyText = blocksToText(replyBlocks);
   const [reloadKey, setReloadKey] = useState(0);
-  const [notesRefreshKey, setNotesRefreshKey] = useState(0);
+  const conversationNotesRef = useRef<ConversationNotesHandle>(null);
+  const handleNoteAdded = useCallback((note: EmailNoteResponse) => {
+    conversationNotesRef.current?.appendNote(note);
+  }, []);
   const { onInboxChanged, onComposing, setComposing, whoIsComposing } = useEmailCounts();
   const receipts = useReceipts();
   const isForward = composerMode === "forward";
@@ -890,7 +900,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               assignedStaffId={email.assignedStaffId ?? null}
               assignedStaffName={email.assignedStaffName ?? null}
               onChanged={(staffId, name) => setEmail({ ...email, assignedStaffId: staffId, assignedStaffName: name })}
-              onNoteAdded={() => setNotesRefreshKey((k) => k + 1)}
+              onNoteAdded={handleNoteAdded}
             />
           )}
 
@@ -967,7 +977,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           </div>
 
           <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
-            <ConversationNotes key={notesRefreshKey} emailId={email.id} />
+            <ConversationNotes ref={conversationNotesRef} emailId={email.id} />
             <span className="whitespace-nowrap text-[11px] font-medium text-zinc-400">
               {formatDateTime(email.createdAt)}
             </span>
@@ -989,10 +999,14 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       {/* Columna: los avisos ocupan lo suyo y el cuerpo se queda con el resto, sin desbordar sobre el pie. */}
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {replyOpen && (
+        {composerMounted && (
           <div
-            ref={replyContainerRef}
-            className="absolute inset-0 z-20 flex flex-col bg-white animate-plf-side-panel-in relative"
+            ref={(node) => {
+              composerPanelRef.current = node;
+              replyContainerRef.current = node;
+            }}
+            aria-hidden={composerExiting}
+            className={`absolute inset-0 z-20 flex flex-col bg-white ${composerExiting ? "pointer-events-none" : ""}`}
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
@@ -1442,7 +1456,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
       )}
 
       {canMailManage && (
-        <AddNotePanel emailId={email.id} onNoteAdded={() => setNotesRefreshKey((k) => k + 1)} />
+        <AddNotePanel emailId={email.id} onNoteAdded={handleNoteAdded} />
       )}
 
       <Separator className="bg-line" />

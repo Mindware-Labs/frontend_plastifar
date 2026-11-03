@@ -816,6 +816,19 @@ input:-webkit-autofill:focus {
   }
 }
 
+@keyframes plf-side-panel-out {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(18px) scale(0.99);
+    filter: blur(1.25px);
+  }
+}
+
 .animate-plf-apple-pop { animation: plf-apple-pop 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 .animate-plf-check-breathe { animation: plf-check-breathe 2.2s ease-in-out infinite; }
@@ -838,6 +851,7 @@ input:-webkit-autofill:focus {
 .animate-plf-settle { animation: plf-settle 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-side-panel-back { animation: plf-side-panel-back 0.40s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-side-panel-in { animation: plf-side-panel-in 0.44s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-plf-side-panel-out { animation: plf-side-panel-out 0.36s cubic-bezier(0.16, 1, 0.3, 1) both; will-change: transform, opacity, filter; }
 .animate-plf-step-backward {
   animation: plf-apple-slide-backward 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
   will-change: transform, opacity, filter;
@@ -1157,6 +1171,7 @@ input:-webkit-autofill:focus {
   .plf-results-in,
   .plf-stagger > *,
   .animate-plf-side-panel-in,
+  .animate-plf-side-panel-out,
   .animate-plf-side-panel-back,
   .animate-plf-settle,
   .animate-plf-otp-confirm,
@@ -1204,7 +1219,8 @@ input:-webkit-autofill:focus {
   .animate-plf-apple-row-out,
   .animate-plf-composer-row-out,
   .animate-plf-apple-line-slide-out,
-  .animate-plf-apple-line-tab-out {
+  .animate-plf-apple-line-tab-out,
+  .animate-plf-side-panel-out {
     animation-duration: 1ms !important;
   }
 }

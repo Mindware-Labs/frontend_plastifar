@@ -25,6 +25,8 @@ interface DisclosureMotionOptions {
   symmetricEasing?: boolean;
   /** Escalonado de `[data-motion-item]`; desactivar si el contenido cambia de alto al abrir. */
   itemStagger?: boolean;
+  /** Movimiento más sutil: paneles inline cuyo alto crece con el contenido (p. ej. textareas autoGrow). */
+  fluid?: boolean;
 }
 
 interface DisclosureMotion<T extends HTMLElement> {
@@ -42,6 +44,16 @@ function closedFrame(direction: DisclosureDirection, distance: number, scale: nu
   return { opacity: 0, transform: `translateY(${direction === "down" ? -distance : distance}px) scale(${scale})` };
 }
 
+function openFromFrame(direction: DisclosureDirection, fluid: boolean, reduced: boolean): Keyframe {
+  if (fluid) return closedFrame(direction, 2, 0.99, reduced);
+  return closedFrame(direction, 5, 0.972, reduced);
+}
+
+function closeToFrame(direction: DisclosureDirection, fluid: boolean, reduced: boolean): Keyframe {
+  if (fluid) return closedFrame(direction, 2, 0.992, reduced);
+  return closedFrame(direction, 3, 0.985, reduced);
+}
+
 export function useDisclosureMotion<T extends HTMLElement>(
   open: boolean,
   {
@@ -50,6 +62,7 @@ export function useDisclosureMotion<T extends HTMLElement>(
     closeMs = CLOSE_MS,
     symmetricEasing = false,
     itemStagger = true,
+    fluid = false,
   }: DisclosureMotionOptions = {},
 ): DisclosureMotion<T> {
   const [exiting, setExiting] = useState(false);
@@ -87,7 +100,7 @@ export function useDisclosureMotion<T extends HTMLElement>(
     const dir = directionRef.current;
     const reduced = prefersReducedMotion();
     const running = panelAnim.current;
-    const from = running ? capture(el) : open ? closedFrame(dir, 5, 0.972, reduced) : OPEN_FRAME;
+    const from = running ? capture(el) : open ? openFromFrame(dir, fluid, reduced) : OPEN_FRAME;
     // La opacidad pintada mide cuánto camino queda: la duración se escala con él.
     const progress = Number(from.opacity);
     running?.cancel();
@@ -121,7 +134,7 @@ export function useDisclosureMotion<T extends HTMLElement>(
     for (const anim of itemAnims.current) anim.finish();
     itemAnims.current = [];
 
-    const anim = el.animate([from, closedFrame(dir, 3, 0.985, reduced)], {
+    const anim = el.animate([from, closeToFrame(dir, fluid, reduced)], {
       duration: reduced ? REDUCED_CLOSE_MS : Math.max(80, Math.round(closeMs * progress)),
       easing: closeEasing,
       fill: "both",
@@ -132,7 +145,7 @@ export function useDisclosureMotion<T extends HTMLElement>(
       panelAnim.current = null;
       setExiting(false);
     };
-  }, [open, closeMs, itemStagger, openMs, symmetricEasing]);
+  }, [open, closeMs, fluid, itemStagger, openMs, symmetricEasing]);
 
   return { mounted: open || exiting, exiting, ref, snap };
 }

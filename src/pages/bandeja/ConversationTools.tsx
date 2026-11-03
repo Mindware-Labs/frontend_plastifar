@@ -9,7 +9,7 @@ import { Select, type SelectOption } from "../../components/ui/Select";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
-import type { StaffOptionResponse } from "../../types/api";
+import type { EmailNoteResponse, StaffOptionResponse } from "../../types/api";
 
 interface AssignWithNoteModalProps {
   targetStaffName: string;
@@ -115,7 +115,7 @@ interface AssignmentProps {
   assignedStaffId: number | null;
   assignedStaffName: string | null;
   onChanged: (staffId: number | null, name: string | null) => void;
-  onNoteAdded?: () => void;
+  onNoteAdded?: (note: EmailNoteResponse) => void;
 }
 
 /** Quien atiende la conversacion: un selector con el equipo activo y un atajo para tomarla. */
@@ -161,8 +161,8 @@ export function AssignmentControl({
       const result = await emailsApi.assign(emailId, pendingAssignment.staffId);
       const trimmed = noteText.trim();
       if (trimmed) {
-        await emailsApi.addNote(emailId, trimmed);
-        onNoteAdded?.();
+        const newNote = await emailsApi.addNote(emailId, trimmed);
+        onNoteAdded?.(newNote);
       }
       onChanged(result.assignedStaffId, result.assignedStaffName);
       setPendingAssignment(null);
