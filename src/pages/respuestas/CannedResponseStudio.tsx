@@ -7,6 +7,7 @@ import {
   PenLine,
   Plus,
   Send,
+  Sparkles,
   Tag,
   X,
 } from "lucide-react";
@@ -17,8 +18,14 @@ import { ApiError } from "../../api/client";
 import { Alert } from "../../components/ui/Alert";
 import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
 import { Button } from "../../components/ui/Button";
+import { useAuth } from "../../context/useAuth";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
-import { CANNED_BODY_PLACEHOLDER } from "../../lib/cannedVariables";
+import {
+  applyCannedVariables,
+  buildCannedVariableContext,
+  CANNED_BODY_PLACEHOLDER,
+  templateToReadablePlain,
+} from "../../lib/cannedVariables";
 import { formatDateTime } from "../../lib/format";
 import type { CannedResponseResponse, CategoriaResponseItem } from "../../types/api";
 import {
@@ -32,6 +39,8 @@ import {
   CannedTemplateBodyEditor,
   type CannedTemplateBodyEditorHandle,
 } from "./CannedTemplateBodyEditor";
+import { CannedTemplateInline } from "./CannedTemplateInline";
+import { CannedVariableChips } from "./CannedVariableChips";
 
 interface CannedResponseStudioProps {
   /** Presente = edición; ausente = nueva respuesta rápida. */
@@ -48,6 +57,7 @@ interface CannedResponseStudioProps {
 
 export function CannedResponseStudio({ item, initialData, onClose, onSaved }: CannedResponseStudioProps) {
   const isEdit = item !== undefined;
+  const { user } = useAuth();
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
   const rawInit = useMemo(() => {
@@ -65,6 +75,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
   const [suggestedSubject, setSuggestedSubject] = useState(rawInit.suggestedSubject ?? "");
   const [body, setBody] = useState(rawInit.cleanBody);
   const [activeTab, setActiveTab] = useState<"compose" | "preview">("compose");
+  const [previewMode, setPreviewMode] = useState<"simulated" | "tokens">("simulated");
   const [isMaximized, setIsMaximized] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -73,6 +84,16 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
   const titleId = useId();
   const bodyEditorRef = useRef<CannedTemplateBodyEditorHandle>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+
+  const sampleContext = useMemo(
+    () =>
+      buildCannedVariableContext({
+        user,
+        contactEmail: "cliente@empresa.com",
+        ticketId: 1042,
+      }),
+    [user],
+  );
 
   // Cargar categorías del catálogo de base de datos
   function loadCategories() {
@@ -103,11 +124,12 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
 
   const badgeStyle = getCategoryBadgeClasses(categoryName, currentCategoryColor);
 
-  // Métricas del cuerpo
+  // Métricas del cuerpo sobre texto legible (sin contar llaves internas)
   const stats = useMemo(() => {
-    const trimmed = body.trim();
+    const readable = templateToReadablePlain(body);
+    const trimmed = readable.trim();
     const words = trimmed ? trimmed.split(/\s+/).length : 0;
-    const chars = body.length;
+    const chars = readable.length;
     return { words, chars };
   }, [body]);
 
@@ -279,7 +301,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
 
           {activeTab === "compose" ? (
             <div className="flex flex-1 flex-col">
-              {/* 1. Nombre de la plantilla (primero) */}
+              {/* 1. Nombre de la plantilla */}
               <div className="border-b border-line px-6 py-3.5">
                 <div className="flex items-center justify-between">
                   <label
@@ -312,7 +334,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                 />
               </div>
 
-              {/* 2. Categoría temática (con línea divisoria) */}
+              {/* 2. Categoría temática */}
               <div className="border-b border-line px-6 py-3.5">
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink">
@@ -336,7 +358,6 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  {/* Opción General */}
                   <button
                     type="button"
                     onClick={() => {
@@ -353,9 +374,9 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                     General
                   </button>
 
-                  {/* Categorías de la Base de Datos */}
                   {dbCategories.map((cat) => {
-                    const isSelected = selectedCategoryId === cat.id || categoryName.toLowerCase() === cat.name.toLowerCase();
+                    const isSelected =
+                      selectedCategoryId === cat.id || categoryName.toLowerCase() === cat.name.toLowerCase();
                     const style = getCategoryBadgeClasses(cat.name, cat.color);
                     return (
                       <button
@@ -386,7 +407,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                 )}
               </div>
 
-              {/* 3. Asunto sugerido (opcional) (con línea divisoria) */}
+              {/* 3. Asunto sugerido (opcional) */}
               <div className="border-b border-line px-6 py-3.5">
                 <div className="flex items-center justify-between">
                   <label
@@ -412,7 +433,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                 />
               </div>
 
-              {/* 4. Cuerpo del correo (con auto-resize dinámico según contenido) */}
+              {/* 4. Cuerpo del correo con Variables Inteligentes */}
               <div className="flex flex-1 flex-col px-6 py-3.5">
                 <div className="flex items-center justify-between pb-2">
                   <span className="flex items-center gap-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink">
@@ -427,13 +448,20 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                     </span>
                   </span>
                   <div className="flex items-center gap-2 font-heading text-[10.5px] font-bold tabular-nums text-zinc-400">
-                    <span>{stats.words} {stats.words === 1 ? "palabra" : "palabras"}</span>
+                    <span>
+                      {stats.words} {stats.words === 1 ? "palabra" : "palabras"}
+                    </span>
                     <span>·</span>
                     <span>{stats.chars}/20,000 caracteres</span>
                   </div>
                 </div>
 
-                <div className="relative rounded-lg border border-zinc-200 bg-white shadow-2xs transition-all hover:border-zinc-300 focus-within:border-zinc-300 focus-within:ring-2 focus-within:ring-brand-red/25">
+                <div className="relative overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xs transition-all hover:border-zinc-300 focus-within:border-zinc-300 focus-within:ring-2 focus-within:ring-brand-red/25">
+                  <CannedVariableChips
+                    onInsert={(token) => {
+                      bodyEditorRef.current?.insertVariable(token);
+                    }}
+                  />
                   <CannedTemplateBodyEditor
                     ref={bodyEditorRef}
                     value={body}
@@ -447,7 +475,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
           ) : (
             /* MODO: VISTA PREVIA INTERACTIVA DE CORREO */
             <div className="flex flex-1 flex-col bg-zinc-50/60 px-6 pt-4 pb-6">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-heading text-[13.5px] font-bold text-ink">
@@ -461,17 +489,48 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                     </span>
                   </div>
                   <p className="text-[11.5px] text-subtle">
-                    Así se estructurará el mensaje como plantilla de correo corporativo.
+                    {previewMode === "simulated"
+                      ? "Simulación con datos reales del destinatario (cliente@empresa.com)."
+                      : "Visualización de las etiquetas de variables inteligentes en la plantilla."}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("compose")}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[12px] font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50 hover:text-ink transition-colors cursor-pointer"
-                >
-                  <PenLine className="h-3.5 w-3.5 text-zinc-500" />
-                  <span>Volver a redacción</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex h-7 items-center gap-0.5 rounded-lg border border-zinc-200 bg-white p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode("simulated")}
+                      className={`inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition-colors cursor-pointer ${
+                        previewMode === "simulated"
+                          ? "bg-brand-red/10 font-semibold text-brand-red"
+                          : "text-zinc-500 hover:text-ink"
+                      }`}
+                    >
+                      <Sparkles className="size-3" />
+                      <span>Simular envío</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode("tokens")}
+                      className={`inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition-colors cursor-pointer ${
+                        previewMode === "tokens"
+                          ? "bg-zinc-100 font-semibold text-ink"
+                          : "text-zinc-500 hover:text-ink"
+                      }`}
+                    >
+                      <span>Ver variables</span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("compose")}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[12px] font-medium text-zinc-700 shadow-2xs hover:bg-zinc-50 hover:text-ink transition-colors cursor-pointer"
+                  >
+                    <PenLine className="h-3.5 w-3.5 text-zinc-500" />
+                    <span>Volver a redacción</span>
+                  </button>
+                </div>
               </div>
 
               {/* Tarjeta de correo recibido */}
@@ -486,14 +545,15 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-heading text-[14px] font-bold text-ink">
-                            Soporte Plastifar
+                            {sampleContext.agentName ?? "Soporte Plastifar"}
                           </span>
-                          <span className="text-[12px] text-zinc-400">&lt;soporte@plastifar.com&gt;</span>
+                          <span className="text-[12px] text-zinc-400">
+                            &lt;{sampleContext.agentEmail ?? "soporte@plastifar.com"}&gt;
+                          </span>
                         </div>
                         <p className="mt-0.5 text-[12px] text-zinc-500">
                           Para:{" "}
-                          <span className="font-medium text-ink">[Destinatario del correo]</span>{" "}
-                          <span className="text-zinc-400">&lt;cliente@empresa.com&gt;</span>
+                          <span className="font-medium text-ink">{sampleContext.contactEmail}</span>
                         </p>
                       </div>
                     </div>
@@ -515,7 +575,17 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                       )}
                     </div>
                     <h4 className="mt-0.5 font-heading text-[15px] font-semibold text-ink">
-                      {suggestedSubject.trim() || title.trim() || "Sin asunto especificado"}
+                      {previewMode === "simulated" ? (
+                        applyCannedVariables(
+                          suggestedSubject.trim() || title.trim() || "Sin asunto especificado",
+                          sampleContext,
+                        )
+                      ) : (
+                        <CannedTemplateInline
+                          value={suggestedSubject.trim() || title.trim() || "Sin asunto especificado"}
+                          size="md"
+                        />
+                      )}
                     </h4>
                   </div>
                 </div>
@@ -526,7 +596,11 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                     <div className="max-w-2xl space-y-4 font-sans text-[13.5px] leading-[1.75] text-ink">
                       {body.split(/\n{2,}/).map((para, i) => (
                         <p key={i} className="whitespace-pre-wrap">
-                          {para}
+                          {previewMode === "simulated" ? (
+                            applyCannedVariables(para, sampleContext)
+                          ) : (
+                            <CannedTemplateInline value={para} size="md" />
+                          )}
                         </p>
                       ))}
                     </div>
@@ -542,9 +616,9 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
 
                 {/* Banner inferior de la vista previa */}
                 <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50/80 px-4 py-2.5 text-[11.5px] text-subtle">
-                  <span className="font-medium text-ink">Modo plantilla de correo</span>
+                  <span className="font-medium text-ink">Variables inteligentes activas</span>
                   <span>
-                    El texto se inserta tal cual en el editor para su ajuste manual antes de enviar
+                    Al usar la plantilla en un correo, las variables se sustituyen por los datos reales del destinatario
                   </span>
                 </div>
               </div>
@@ -558,26 +632,25 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
             <kbd className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600">
               Ctrl
             </kbd>
-            <span aria-hidden>+</span>
+            <span>+</span>
             <kbd className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600">
               Enter
             </kbd>
-            <span>para guardar</span>
+            <span className="ml-1">para guardar rápidamente</span>
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose} disabled={isSubmitting}>
+            <Button type="button" variant="secondary" onClick={requestClose} disabled={isSubmitting}>
               Cancelar
             </Button>
             <Button
               type="button"
-              size="sm"
               onClick={handleSave}
               isLoading={isSubmitting}
-              className="gap-1.5"
+              disabled={!title.trim() || !body.trim()}
             >
               <Send className="h-3.5 w-3.5" />
-              <span>{isEdit ? "Guardar cambios" : "Crear respuesta"}</span>
+              {isEdit ? "Guardar cambios" : "Crear plantilla"}
             </Button>
           </div>
         </div>
@@ -586,10 +659,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
       {createCategoryModalOpen && (
         <CategoriaModal
           onClose={() => setCreateCategoryModalOpen(false)}
-          onSaved={() => {
-            setCreateCategoryModalOpen(false);
-            loadCategories();
-          }}
+          onSaved={loadCategories}
         />
       )}
     </div>,

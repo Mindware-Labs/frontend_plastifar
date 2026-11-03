@@ -6,7 +6,6 @@ import { cannedApi } from "../../api/canned";
 import type { CannedResponseResponse } from "../../types/api";
 import {
   applyCannedVariables,
-  templateToReadablePlain,
   type CannedVariableContext,
 } from "../../lib/cannedVariables";
 import { getCategoryBadgeClasses, parseCanned } from "../respuestas/cannedHelpers";
@@ -224,7 +223,7 @@ export function CannedPicker({ onPick, variableContext }: CannedPickerProps) {
                         {entry.category}
                       </span>
                       <span className="min-w-0 truncate text-[11px] text-zinc-500">
-                        {templateToReadablePlain(entry.cleanBody)}
+                        {applyCannedVariables(entry.cleanBody, ctx)}
                       </span>
                     </div>
                   </button>

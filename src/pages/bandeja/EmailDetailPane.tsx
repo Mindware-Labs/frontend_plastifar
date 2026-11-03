@@ -59,7 +59,12 @@ import { CreateTicketModal } from "../tickets/CreateTicketModal";
 import type { EmailLinkedTask } from "../../types/tasks";
 import { TaskFormModal } from "../tasks/TaskFormModal";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
-import { buildCannedVariableContext } from "../../lib/cannedVariables";
+import {
+  buildCannedVariableContext,
+  parseRecipientAddress,
+  replaceRecipientVariablesInBlocks,
+  type CannedVariableContext,
+} from "../../lib/cannedVariables";
 import { CannedPicker } from "./CannedPicker";
 import { textToBlocks } from "./textToBlocks";
 import { AssignmentControl } from "./ConversationTools";
@@ -333,17 +338,51 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [exporting, setExporting] = useState(false);
   const [dangerousToDownload, setDangerousToDownload] = useState<EmailAttachmentResponse | null>(null);
   const { user } = useAuth();
+  const prevVarCtxRef = useRef<CannedVariableContext | undefined>(undefined);
 
   const cannedVariableContext = useMemo(() => {
     if (!email) return undefined;
     const inbound = email.direction === "Inbound";
+    const threadEmail = inbound ? email.fromEmail : (email.toEmails[0] ?? email.fromEmail);
+    const threadName = inbound ? (email.fromName ?? email.fromEmail) : threadEmail;
+
+    if (composerMode === "forward" && forwardTo.trim()) {
+      const parsedForward = parseRecipientAddress(forwardTo);
+      if (parsedForward.email) {
+        return buildCannedVariableContext({
+          user,
+          contactName: parsedForward.name ?? parsedForward.email,
+          contactEmail: parsedForward.email,
+          ticketId: email.ticketId,
+        });
+      }
+    }
+
     return buildCannedVariableContext({
       user,
-      contactName: inbound ? email.fromName ?? email.fromEmail : null,
-      contactEmail: inbound ? email.fromEmail : email.toEmails[0] ?? null,
+      contactName: threadName,
+      contactEmail: threadEmail,
       ticketId: email.ticketId,
     });
-  }, [email, user]);
+  }, [composerMode, email, forwardTo, user]);
+
+  useEffect(() => {
+    if (!cannedVariableContext) return;
+    const nextEmail = cannedVariableContext.contactEmail?.trim();
+    if (!nextEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) return;
+
+    const { blocks: updatedBlocks, changed } = replaceRecipientVariablesInBlocks(
+      replyBlocks,
+      prevVarCtxRef.current,
+      cannedVariableContext,
+    );
+    if (changed) {
+      setDraftBlocks(updatedBlocks);
+      setReplyBlocks(updatedBlocks);
+      setEditorKey((key) => key + 1);
+    }
+    prevVarCtxRef.current = cannedVariableContext;
+  }, [cannedVariableContext, replyBlocks]);
 
   // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
   const replyText = blocksToText(replyBlocks);
@@ -647,6 +686,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
     setDraftBlocks(next);
     setReplyBlocks(next);
     setEditorKey((key) => key + 1);
+    prevVarCtxRef.current = cannedVariableContext;
   }
 
   async function handleExport() {
