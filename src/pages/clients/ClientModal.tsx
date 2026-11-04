@@ -28,7 +28,7 @@ import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatPhoneNumber } from "../../lib/format";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import type { Client, ClientType, SaveClientRequest } from "../../types/clients";
-import { fieldForServerError, type FieldRule } from "./serverFieldErrors";
+import { fieldForServerError, type FieldRule } from "../../lib/serverFieldErrors";
 
 /**
  * 4 tipos de cliente con micro-ícono y etiqueta compacta.

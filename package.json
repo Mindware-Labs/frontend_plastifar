@@ -46,6 +46,8 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@locator/babel-jsx": "^0.4.4",
     "@types/html2pdf.js": "^0.10.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
