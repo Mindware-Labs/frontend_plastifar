@@ -18,6 +18,8 @@ export interface ClientQuery {
   type?: string;
   /** todos | activos | inactivos | sinvendedor */
   status?: string;
+  /** todos | sintickets | contickets | abiertos */
+  focus?: string;
   sort?: string;
   dir?: "asc" | "desc";
 }
