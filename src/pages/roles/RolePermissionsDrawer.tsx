@@ -560,10 +560,6 @@ export function RolePermissionsDrawer({
                                   {p.label}
                                 </span>
 
-                                <code className="rounded border border-zinc-200 bg-zinc-100 px-1.5 py-0.2 font-mono text-[10.5px] text-zinc-500">
-                                  {p.key}
-                                </code>
-
                                 {p.reserved && (
                                   <span className="rounded-full bg-amber-100 px-1.5 py-0.2 text-[9.5px] font-bold text-amber-800">
                                     Función reservada

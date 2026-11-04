@@ -27,6 +27,10 @@ export type PermissionKey =
   | "staff.write"
   | "roles.read"
   | "roles.write"
+  | "departments.read"
+  | "departments.write"
+  | "sedes.read"
+  | "sedes.write"
   | "clients.read"
   | "clients.write"
   | "mail.read"
@@ -159,6 +163,10 @@ export interface StaffDetail {
   isLastAdmin: boolean;
   /** Lo que esta persona puede hacer hoy, resuelto por el servidor (RF-P4). */
   effectivePermissions: EffectivePermission[];
+  /** Permisos concedidos manualmente a nivel individual para este usuario. */
+  grantedPermissions?: string[];
+  /** Permisos revocados manualmente a nivel individual para este usuario. */
+  revokedPermissions?: string[];
 }
 
 /** Un permiso y los departamentos donde esa persona lo ejerce. */

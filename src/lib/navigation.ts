@@ -150,8 +150,8 @@ export const SIDEBAR_NAV: NavGroup[] = [
     children: [
       { label: "Colaboradores", to: "/staff", icon: Users, permission: "staff.read", subgroup: "Equipo y Accesos" },
       { label: "Roles", to: "/roles", icon: ShieldCheck, permission: "roles.read", subgroup: "Equipo y Accesos" },
-      { label: "Sedes", to: "/sedes", icon: Building, permission: "settings.write", subgroup: "Estructura Organizacional" },
-      { label: "Departamentos", to: "/departamentos", icon: Building2, permission: "settings.write", subgroup: "Estructura Organizacional" },
+      { label: "Sedes", to: "/sedes", icon: Building, permission: "sedes.read", subgroup: "Estructura Organizacional" },
+      { label: "Departamentos", to: "/departamentos", icon: Building2, permission: "departments.read", subgroup: "Estructura Organizacional" },
     ],
   },
   {

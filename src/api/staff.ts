@@ -91,4 +91,14 @@ export const staffApi = {
 
   revokeDepartmentAccess: (id: number, departmentId: number) =>
     apiRequest<void>(`/api/staff/${id}/department-access/${departmentId}`, { method: "DELETE" }),
+
+  /** Personaliza individualmente un permiso para este colaborador (conceder, revocar o restablecer). */
+  overridePermission: (id: number, permission: string, action: "grant" | "revoke" | "reset") =>
+    apiRequest<{ message: string; grantedPermissions: string[]; revokedPermissions: string[] }>(
+      `/api/staff/${id}/permissions/override`,
+      {
+        method: "POST",
+        body: JSON.stringify({ permission, action }),
+      },
+    ),
 };

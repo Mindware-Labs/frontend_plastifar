@@ -312,9 +312,6 @@ export function PermissionMatrix({
                               </Tooltip>
                             )}
                           </span>
-                          <span className="font-mono text-[10.5px] leading-tight text-faint">
-                            {permission.key}
-                          </span>
                         </span>
                       </th>
 

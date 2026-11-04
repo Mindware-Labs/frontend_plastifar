@@ -30,6 +30,7 @@ const schema = z.object({
     .max(120, "Máximo 120 caracteres"),
   primaryDepartmentId: z.string().min(1, "Elige el departamento al que pertenece"),
   primaryRoleId: z.string().min(1, "Elige el rol para el colaborador"),
+  isAdmin: z.boolean(),
   isActive: z.boolean(),
 });
 
@@ -78,6 +79,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
       email: staff?.email ?? "",
       primaryDepartmentId: staff ? String(staff.primaryDepartmentId) : "",
       primaryRoleId: staff?.primaryRoleId ? String(staff.primaryRoleId) : "",
+      isAdmin: staff?.isAdmin ?? false,
       isActive: staff?.isActive ?? true,
     },
   });
@@ -149,7 +151,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           email: values.email,
           primaryDepartmentId,
           primaryRoleId,
-          isAdmin: staff.isAdmin,
+          isAdmin: values.isAdmin,
           isActive: values.isActive,
           legacyUsername: staff.legacyUsername,
         });
@@ -180,7 +182,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           email: values.email,
           primaryDepartmentId,
           primaryRoleId,
-          isAdmin: false,
+          isAdmin: values.isAdmin,
         });
         onSaved(saved);
       }
@@ -328,6 +330,15 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
                 error={errors.primaryRoleId?.message}
               />
             )}
+          />
+        </div>
+
+        <div className="pt-0.5">
+          <CheckboxField
+            label="Perfil de administrador"
+            description="Concede acceso total e irrestricto a todos los departamentos, módulos y configuraciones del panel."
+            disabled={isSelf}
+            {...register("isAdmin")}
           />
         </div>
 

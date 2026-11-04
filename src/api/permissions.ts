@@ -1,10 +1,14 @@
 import { apiRequest } from "./client";
 import type {
+  PermissionGroup,
   PermissionMatrixResponse,
   SavePermissionMatrixRequest,
 } from "../types/permissions";
 
 export const permissionsApi = {
+  /** Catálogo agrupado por módulo para pintar la matriz y las fichas. */
+  catalog: () => apiRequest<PermissionGroup[]>("/api/permissions"),
+
   /** Catalogo, roles y lo que concede cada uno, en una sola peticion (seccion 6.5). */
   matrix: () => apiRequest<PermissionMatrixResponse>("/api/permissions/matrix"),
 

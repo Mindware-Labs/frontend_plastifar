@@ -1,8 +1,9 @@
-import { Building2, KeyRound, ShieldCheck, Star, Trash2 } from "lucide-react";
+import { Building2, KeyRound, Star, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
+import { permissionsApi } from "../../api/permissions";
 import { staffApi } from "../../api/staff";
 import { DetailLoadError } from "../../components/app/DetailLoadError";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -16,11 +17,13 @@ import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { StaffDetailSkeleton } from "../../components/ui/Skeleton";
 import { RowAction } from "../../components/ui/RowAction";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
+import { useConfigNoticeReceipt } from "../../hooks/useNoticeReceipts";
 import { usePermissions } from "../../hooks/usePermissions";
 import { departmentPaths } from "../../lib/departments";
 import type { DepartmentResponse } from "../../types/api";
-import type { DepartmentAccess, StaffDetail } from "../../types/permissions";
+import type { DepartmentAccess, PermissionGroup, StaffDetail } from "../../types/permissions";
 import { StaffActivityTab } from "./StaffActivityTab";
+import { StaffEffectivePermissionsCard } from "./StaffEffectivePermissionsCard";
 import { StaffOverview } from "./StaffOverview";
 
 interface StaffDetailPageProps {
@@ -45,6 +48,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
 
   const [staff, setStaff] = useState<StaffDetail | null>(null);
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
+  const [catalogGroups, setCatalogGroups] = useState<PermissionGroup[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const [busyDepartmentId, setBusyDepartmentId] = useState<number | null>(null);
@@ -80,20 +84,38 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
       });
   }
 
+  function loadCatalog() {
+    permissionsApi
+      .catalog()
+      .then(setCatalogGroups)
+      .catch(() => {
+        // En caso de fallo de red, StaffEffectivePermissionsCard utilizará el catálogo canónico por defecto.
+      });
+  }
+
   useEffect(() => {
     if (!id) return;
     void load();
     void loadDepartments();
+    void loadCatalog();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fullName = staff ? `${staff.firstName} ${staff.lastName}` : "";
   useDynamicBreadcrumb(staff ? fullName : null);
+
+  // Notificación tipo toast al entrar a accesos si el colaborador es administrador
+  useConfigNoticeReceipt(
+    Boolean(staff?.isAdmin && section === "accesos"),
+    "Perfil de administrador",
+    "Es administrador del sistema",
+    "Tiene todos los permisos en todos los departamentos. Los accesos asignados indican dónde trabaja.",
+  );
+
   const primary = staff?.accesses.find((access) => access.isPrimary) ?? null;
   const departmentPathById = departmentPaths(departments);
   const departmentLabel = (access: { departmentId: number; departmentName: string }) =>
     departmentPathById.get(access.departmentId) ?? access.departmentName;
-  const effective = staff?.effectivePermissions ?? [];
 
   async function makePrimary(access: DepartmentAccess) {
     setBusyDepartmentId(access.departmentId);
@@ -202,13 +224,6 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
               />
             ) : section === "accesos" ? (
               <div className="space-y-3.5">
-                {staff.isAdmin && (
-                  <Alert variant="info">
-                    Es administrador: tiene todos los permisos en todos los departamentos. Los accesos de
-                    abajo no limitan lo que puede hacer, solo indican dónde trabaja.
-                  </Alert>
-                )}
-
                 {/* Tarjeta 1: Departamentos con acceso */}
                 <DetailCard
                   icon={Building2}
@@ -313,72 +328,12 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                   )}
                 </DetailCard>
 
-                {/* Tarjeta 2: Permisos efectivos */}
-                <DetailCard
-                  icon={ShieldCheck}
-                  title={`Permisos efectivos (${effective.length})`}
-                  aside={
-                    <span className="text-[11.5px] text-zinc-400">
-                      {staff.isAdmin
-                        ? "Acceso total de administrador"
-                        : "Suma de los permisos de los roles asignados"}
-                    </span>
-                  }
-                >
-                  <div className="border-b border-zinc-100 bg-zinc-50/50 px-4 py-2 text-[12px] text-zinc-500">
-                    Lo que esta persona puede hacer hoy en el panel de Plastifar. No se edita directamente aquí: se gestiona mediante los roles otorgados a cada departamento.
-                  </div>
-
-                  {effective.length === 0 ? (
-                    <div className="py-10 text-center">
-                      <ShieldCheck className="mx-auto h-8 w-8 text-zinc-300" />
-                      <p className="mt-2 text-[13px] font-medium text-zinc-700">
-                        Sin permisos efectivos
-                      </p>
-                      <p className="mt-0.5 text-[12px] text-zinc-400">
-                        {staff.accesses.length === 0
-                          ? "Sin accesos departamentales no hay permisos: hoy esta persona no puede realizar acciones dentro del panel."
-                          : "Tiene accesos, pero ninguno de sus roles concede todavía un permiso en la matriz."}
-                      </p>
-                    </div>
-                  ) : (
-                    <DataTable bare>
-                      <thead>
-                        <HeadRow>
-                          <Th className="sm:w-[360px]">Permiso / Acción</Th>
-                          <Th className="sm:w-[180px]">Módulo</Th>
-                          <Th>Ámbito / Dónde aplica</Th>
-                        </HeadRow>
-                      </thead>
-                      <tbody>
-                        {effective.map(({ permission, module, departments, scope }) => (
-                          <Row key={permission.key}>
-                            <Td>
-                              <span className="flex flex-col gap-0.5">
-                                <span className="text-[13px] font-medium leading-tight text-ink">
-                                  {permission.label}
-                                </span>
-                                <span className="font-mono text-[10.5px] leading-tight text-faint">
-                                  {permission.key}
-                                </span>
-                              </span>
-                            </Td>
-                            <Td>
-                              <Badge tone="slate">{module}</Badge>
-                            </Td>
-                            <Td className="text-[12.5px] text-brand-gray">
-                              {scope === "todos" ? (
-                                <Badge tone="green">Todos los departamentos</Badge>
-                              ) : (
-                                departments.join(", ")
-                              )}
-                            </Td>
-                          </Row>
-                        ))}
-                      </tbody>
-                    </DataTable>
-                  )}
-                </DetailCard>
+                {/* Tarjeta 2: Permisos efectivos y restricciones */}
+                <StaffEffectivePermissionsCard
+                  staff={staff}
+                  catalogGroups={catalogGroups}
+                  onReload={reload}
+                />
               </div>
             ) : (
               <StaffActivityTab staffId={staffId} staffName={fullName} />
