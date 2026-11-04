@@ -12,6 +12,7 @@ import { useSettle } from "../../hooks/useSettle";
 import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { formatBytes } from "../../lib/format";
 import type { TicketStaffOptionResponse } from "../../types/api";
+import { isPastDueDate } from "../tasks/taskSchema";
 
 // Misma curva larga que el resto de paneles: arranca rápido y se asienta con suavidad.
 const STEP_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
@@ -45,6 +46,13 @@ export function CreateTaskModal({
   const [error, setError] = useState<string | null>(null);
   const [settle, triggerSettle] = useSettle();
   const [step, setStep] = useState<0 | 1>(0);
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+
+  const dueDateIsPast = dueDate !== "" && isPastDueDate(dueDate);
+
   const createTaskMissing = useMemo(
     () =>
       buildValidationItems([
@@ -54,8 +62,14 @@ export function CreateTaskModal({
           short: "el título",
           valid: title.trim().length > 0,
         },
+        {
+          id: "task-due-date",
+          label: "La fecha límite no puede ser una fecha que ya pasó",
+          short: "una fecha límite válida",
+          valid: !dueDateIsPast,
+        },
       ]),
-    [title],
+    [title, dueDateIsPast],
   );
 
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -416,6 +430,7 @@ export function CreateTaskModal({
                   <DatePicker
                     id="task-due-date"
                     value={dueDate}
+                    minDate={todayStr}
                     onChange={(val) => {
                       setDueDate(val);
                       if (error) setError(null);
@@ -423,6 +438,8 @@ export function CreateTaskModal({
                     placeholder="Seleccionar fecha límite..."
                     headerLabel="Fecha límite"
                     align="center"
+                    state={dueDateIsPast ? "error" : "idle"}
+                    error={dueDateIsPast ? "La fecha límite no puede ser una fecha que ya pasó." : undefined}
                   />
                 </div>
               </>

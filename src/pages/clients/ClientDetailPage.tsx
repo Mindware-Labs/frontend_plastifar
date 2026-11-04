@@ -223,7 +223,9 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   }, [id]);
 
   function territoryName(territoryId: number) {
-    return territories.find((territory) => territory.id === territoryId)?.name ?? "—";
+    const territory = territories.find((t) => t.id === territoryId);
+    if (!territory || territory.code === "UNASSIGNED") return "—";
+    return territory.name;
   }
 
   useEffect(() => {

@@ -168,6 +168,14 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   const departmentValue = useWatch({ control, name: "departmentId" }) ?? "";
   const slaPolicyValue = useWatch({ control, name: "slaPolicyId" }) ?? "";
   const instructions = useWatch({ control, name: "instructions" }) ?? "";
+  const dueDateValue = useWatch({ control, name: "dueDate" }) ?? "";
+  const dueTimeValue = useWatch({ control, name: "dueTime" }) ?? "";
+
+  const dueDateIsPast = useMemo(
+    () => !isEdit && dueDateValue.trim() !== "" && isPastDueDate(dueDateValue, dueTimeValue),
+    [isEdit, dueDateValue, dueTimeValue],
+  );
+
   const taskFormMissing = useMemo(
     () =>
       buildValidationItems([
@@ -195,12 +203,33 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
           short: "la política SLA",
           valid: slaPolicyValue.trim().length > 0,
         },
+        ...(!isEdit
+          ? [
+              {
+                id: "dueDate",
+                label: "La fecha límite no puede ser una fecha que ya pasó",
+                short: "una fecha límite válida",
+                valid: !dueDateIsPast,
+              },
+            ]
+          : []),
       ]),
-    [titleValue, instructions, departmentValue, slaPolicyValue],
+    [titleValue, instructions, departmentValue, slaPolicyValue, isEdit, dueDateIsPast],
   );
-  const dueTimeValue = useWatch({ control, name: "dueTime" }) ?? "";
 
   const instructionsField = register("instructions");
+
+  useEffect(() => {
+    if (isEdit) return;
+    if (dueDateIsPast) {
+      setError("dueDate", {
+        type: "manual",
+        message: "La fecha límite no puede ser una fecha que ya pasó.",
+      });
+    } else {
+      clearErrors("dueDate");
+    }
+  }, [dueDateIsPast, isEdit, setError, clearErrors]);
 
   useEffect(() => {
     autoResizeTextarea(instructionsTextareaRef.current, 38);
@@ -590,31 +619,12 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
                 minDate={!isEdit ? todayStr : undefined}
                 onChange={(date) => {
                   field.onChange(date);
-                  if (!date) {
-                    setValue("dueTime", "");
-                    clearErrors(["dueDate", "dueTime"]);
-                  } else if (!isEdit && isPastDueDate(date, dueTimeValue)) {
-                    setError("dueDate", {
-                      type: "manual",
-                      message: "La fecha límite no puede ser una fecha que ya pasó.",
-                    });
-                  } else if (errors.dueDate?.message === "La fecha límite no puede ser una fecha que ya pasó.") {
-                    clearErrors("dueDate");
-                  }
+                  if (!date) setValue("dueTime", "");
                 }}
                 showTime
                 timeValue={dueTimeValue}
                 onTimeChange={(time) => {
                   setValue("dueTime", time, { shouldValidate: true });
-                  const currentDate = getValues("dueDate");
-                  if (!isEdit && currentDate && isPastDueDate(currentDate, time)) {
-                    setError("dueDate", {
-                      type: "manual",
-                      message: "La fecha límite no puede ser una fecha que ya pasó.",
-                    });
-                  } else if (errors.dueDate?.message === "La fecha límite no puede ser una fecha que ya pasó.") {
-                    clearErrors("dueDate");
-                  }
                 }}
                 error={errors.dueDate?.message ?? errors.dueTime?.message}
                 state={errors.dueDate || errors.dueTime ? "error" : stateOf("dueDate")}

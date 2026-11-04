@@ -204,12 +204,16 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
    * abre el listado para ver primero lo que ya no opera.
    */
   function territoryName(id: number) {
-    return territories.find((territory) => territory.id === id)?.name ?? "—";
+    const territory = territories.find((t) => t.id === id);
+    if (!territory || territory.code === "UNASSIGNED") return "—";
+    return territory.name;
   }
 
   function territoryLookupLabel(id: number | null) {
     if (id === null) return null;
-    return territories.find((territory) => territory.id === id)?.name ?? null;
+    const territory = territories.find((t) => t.id === id);
+    if (!territory || territory.code === "UNASSIGNED") return null;
+    return territory.name;
   }
 
   function repName(id: number | null) {
