@@ -143,7 +143,7 @@ export function WithdrawalDocumentSheet({
           <div className="grid grid-cols-3 gap-12 text-center">
             <div>
               <div className="min-h-[22px] border-b border-black px-2 pb-0.5 font-medium uppercase">
-                {withdrawal.requestedByName ?? ""}
+                {/* Vendedor: se deja en blanco para firma manual. */}
               </div>
               <p className="pt-1 text-[11px]">Vendedor</p>
             </div>

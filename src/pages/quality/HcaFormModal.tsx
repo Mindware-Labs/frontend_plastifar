@@ -51,6 +51,7 @@ import { RowAction } from "../../components/ui/RowAction";
 import { useAuth } from "../../context/useAuth";
 import { useReceipts } from "../../context/useReceipts";
 import { useAppleListMotion, type AppleListPhase } from "../../hooks/useAppleListMotion";
+import { COMPOSER_FIELD_ENTER_MS, COMPOSER_FIELD_EXIT_MS } from "../bandeja/useComposerFieldMotion";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { prefersReducedMotion } from "../../hooks/motion";
@@ -580,13 +581,21 @@ export function HcaFormModal({
     () => causeFields.fields.map((field) => field.id),
     [causeFields.fields],
   );
-  const causeMotion = useAppleListMotion(causeKeys, { minItems: 1 });
+  const causeMotion = useAppleListMotion(causeKeys, {
+    minItems: 1,
+    enterMs: COMPOSER_FIELD_ENTER_MS,
+    exitMs: COMPOSER_FIELD_EXIT_MS,
+  });
   const planTextareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
   const planKeys = useMemo(
     () => planFields.fields.map((field) => field.id),
     [planFields.fields],
   );
-  const planMotion = useAppleListMotion(planKeys, { minItems: 1 });
+  const planMotion = useAppleListMotion(planKeys, {
+    minItems: 1,
+    enterMs: COMPOSER_FIELD_ENTER_MS,
+    exitMs: COMPOSER_FIELD_EXIT_MS,
+  });
   const planItemsWatch = useWatch({ control, name: "planItems" });
   /** Etiqueta del responsable en filas cargadas del servidor (modo sistema). */
   const planStaffLabelsRef = useRef<Record<number, string>>({});
@@ -1444,7 +1453,7 @@ export function HcaFormModal({
             const isExiting = causeMotion.isExiting(field.id);
 
             return (
-              <AppleMotionBlock key={field.id} phase={phase}>
+              <AppleMotionBlock key={field.id} phase={phase} rowPreset="composer">
                 <div className="space-y-1.5 pb-0.5">
                   <div className="flex h-6 items-center justify-between">
                     <label
@@ -1522,13 +1531,13 @@ function PlanMotionCell({
   innerClassName?: string;
   children: React.ReactNode;
 }) {
-  const collapsed = phase === "from" || phase === "hold" || phase === "out";
+  const collapsed = phase === "from" || phase === "hold" || phase === "out" || phase === "arm";
   const ready = phase === "hold" || phase === "in" || phase === "arm" || phase === "out";
   const motion = phase === "out" || phase === "arm" ? "out" : phase === "idle" ? "idle" : "in";
   return (
     <td className={`!py-0 ${className}`}>
       <div
-        className="plf-apple-row-shell"
+        className="plf-composer-row-shell"
         data-collapsed={collapsed ? "true" : "false"}
         data-ready={ready ? "true" : "false"}
         data-motion={motion}
@@ -1537,9 +1546,9 @@ function PlanMotionCell({
           <div
             className={`${innerClassName} ${
               phase === "in"
-                ? "animate-plf-apple-row-in"
+                ? "animate-plf-composer-row-in"
                 : phase === "out"
-                  ? "animate-plf-apple-row-out"
+                  ? "animate-plf-composer-row-out"
                   : phase === "from" || phase === "hold"
                     ? "opacity-0"
                     : ""
@@ -1724,7 +1733,7 @@ function PlanMotionCell({
           {planFields.fields.map((field, index) => {
             const phase = planMotion.phaseFor(field.id);
             return (
-              <AppleMotionBlock key={field.id} phase={phase}>
+              <AppleMotionBlock key={field.id} phase={phase} rowPreset="composer">
                 <div className="rounded-lg border border-zinc-100 bg-zinc-50/40 p-3">
                   <span className="text-[10px] font-heading font-bold uppercase text-zinc-400">
                     Evidencia · Acción {index + 1}

@@ -88,7 +88,14 @@ function cellInputClass(hasError: boolean, compact?: boolean, centered?: boolean
 }
 
 function clampUnitPrice(raw: string): string {
-  const normalized = raw.replace(",", ".").slice(0, UNIT_PRICE_CHARS_MAX);
+  // Solo dígitos y un único separador decimal (la coma se convierte en punto).
+  const cleaned = raw.replace(",", ".").replace(/[^0-9.]/g, "");
+  const firstDot = cleaned.indexOf(".");
+  const normalized = (
+    firstDot === -1
+      ? cleaned
+      : cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "")
+  ).slice(0, UNIT_PRICE_CHARS_MAX);
   return normalized;
 }
 
