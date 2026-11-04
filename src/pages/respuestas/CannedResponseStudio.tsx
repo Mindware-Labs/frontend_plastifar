@@ -7,7 +7,6 @@ import {
   PenLine,
   Plus,
   Send,
-  Sparkles,
   Tag,
   X,
 } from "lucide-react";
@@ -484,7 +483,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                   <p className="text-[11.5px] text-subtle">
                     {previewMode === "simulated"
                       ? "Simulación con datos reales del destinatario (cliente@empresa.com)."
-                      : "Visualización de las etiquetas de variables inteligentes en la plantilla."}
+                      : "Visualización de las etiquetas de variables en la plantilla."}
                   </p>
                 </div>
 
@@ -499,7 +498,6 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                           : "text-zinc-500 hover:text-ink"
                       }`}
                     >
-                      <Sparkles className="size-3" />
                       <span>Simular envío</span>
                     </button>
                     <button
@@ -609,7 +607,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
 
                 {/* Banner inferior de la vista previa */}
                 <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50/80 px-4 py-2.5 text-[11.5px] text-subtle">
-                  <span className="font-medium text-ink">Variables inteligentes activas</span>
+                  <span className="font-medium text-ink">Variables activas</span>
                   <span>
                     Al usar la plantilla en un correo, las variables se sustituyen por los datos reales del destinatario
                   </span>
