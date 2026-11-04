@@ -392,6 +392,7 @@ export interface EmailNoteResponse {
   authorName: string;
   body: string;
   createdAt: string;
+  parentId?: number | null;
 }
 
 /** Direccion conocida, para completar el "Para" mientras se escribe. */
@@ -564,6 +565,7 @@ export interface TicketMessageResponse {
   deliveryDetail?: string | null;
   /** La solicitud que abrio el caso, no un mensaje mas del hilo. */
   isOrigin?: boolean;
+  parentId?: number | null;
 }
 
 export interface TicketEventResponse {
@@ -700,6 +702,7 @@ export interface TicketTaskCommentResponse {
   authorStaffName: string;
   comment: string;
   createdAt: string;
+  parentId?: number | null;
 }
 
 export interface TicketTaskResponse {
@@ -733,6 +736,7 @@ export interface UpdateTicketTaskRequest {
 
 export interface CreateTicketTaskCommentRequest {
   comment: string;
+  parentId?: number | null;
 }
 
 export interface TicketStaffOptionResponse {

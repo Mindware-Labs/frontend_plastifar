@@ -29,7 +29,9 @@ import { Button } from "../../components/ui/Button";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { TaskDetailSkeleton } from "../../components/ui/Skeleton";
 import { Modal } from "../../components/ui/Modal";
+import { useAuth } from "../../context/useAuth";
 import { useReceipts } from "../../context/useReceipts";
+import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { formatDateTime } from "../../lib/format";
@@ -182,6 +184,7 @@ export function TaskDetailPage() {
   const params = useParams();
   const navigate = useNavigate();
   const receipts = useReceipts();
+  const { user } = useAuth();
   const id = Number(params.id);
 
   const [task, setTask] = useState<TaskDetail | null>(null);
@@ -263,6 +266,17 @@ export function TaskDetailPage() {
       active = false;
     };
   }, [id]);
+
+  async function replyToTaskNote(parentId: number, body: string) {
+    if (!task) return;
+    await tasksApi.comment(task.id, body, parentId);
+    await load({ silent: true });
+    receipts.done({
+      action: "nota-tarea-respuesta",
+      title: "Respuesta guardada",
+      detail: task.number,
+    });
+  }
 
   async function handleSaveNote() {
     if (!task) return;
@@ -959,45 +973,26 @@ export function TaskDetailPage() {
                           )}
                         </div>
 
-                        <div className="space-y-2.5">
-                          {task.comments.map((comment) => (
-                            <article
-                              key={comment.id}
-                              className="overflow-hidden rounded-lg border border-amber-200/90 bg-amber-50/30 shadow-2xs"
-                            >
-                              <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-amber-200/70 px-3.5 py-2">
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <Avatar name={comment.authorName} seed={comment.authorStaffId} size={24} />
-                                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                                    <span
-                                      className="truncate text-[12.5px] font-semibold text-zinc-900 leading-tight"
-                                      title={comment.authorName}
-                                    >
-                                      {comment.authorName}
-                                    </span>
-                                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-200/70 px-1.5 py-0.5 font-heading text-[9.5px] font-bold uppercase leading-none tracking-[0.06em] text-amber-900">
-                                      <Lock aria-hidden className="size-2.5" />
-                                      Nota interna
-                                    </span>
-                                    <span aria-hidden className="text-zinc-300">·</span>
-                                    <time dateTime={comment.createdAt} className="text-[11px] tabular-nums text-zinc-400">
-                                      {formatDateTime(comment.createdAt)}
-                                    </time>
-                                  </div>
-                                </div>
-                              </header>
-
-                              <div className="p-3.5 text-[13px] leading-relaxed text-zinc-800">
-                                <p className="whitespace-pre-wrap">{comment.comment}</p>
-                                <TaskAttachmentInlineList
-                                  attachments={noteAttachmentsMap.get(comment.id) ?? []}
-                                  onOpen={(id) => void openAttachment(id, false)}
-                                  compact
-                                />
-                              </div>
-                            </article>
-                          ))}
-                        </div>
+                        <InternalNoteThread
+                          notes={task.comments.map((comment) => ({
+                            id: comment.id,
+                            parentId: comment.parentId ?? null,
+                            authorStaffId: comment.authorStaffId,
+                            authorName: comment.authorName,
+                            body: comment.comment,
+                            createdAt: comment.createdAt,
+                          }))}
+                          currentStaffId={user?.staffId}
+                          canReply={!isClosed && task.canComment}
+                          onReply={replyToTaskNote}
+                          renderExtra={(note) => (
+                            <TaskAttachmentInlineList
+                              attachments={noteAttachmentsMap.get(note.id) ?? []}
+                              onOpen={(attachmentId) => void openAttachment(attachmentId, false)}
+                              compact
+                            />
+                          )}
+                        />
                       </>
                     )}
                   </div>

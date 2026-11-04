@@ -964,7 +964,7 @@ input:-webkit-autofill:focus {
   animation: plf-apple-row-wash 480ms var(--ease-plf-spring) both;
 }
 
-/* CC/CCO al redactar: misma gramática, menos blur y 400/260 ms (useComposerFieldMotion). */
+/* CC/CCO al redactar: entrada/salida simétricas 400 ms (useComposerFieldMotion). */
 @keyframes plf-composer-row-in {
   0% {
     opacity: 0;
@@ -988,10 +988,14 @@ input:-webkit-autofill:focus {
     transform: none;
     filter: none;
   }
+  68% {
+    opacity: 1;
+    filter: blur(0);
+  }
   100% {
     opacity: 0;
-    transform: translate3d(0, -4px, 0);
-    filter: blur(0.75px);
+    transform: translate3d(0, -6px, 0);
+    filter: blur(1px);
   }
 }
 
@@ -1007,7 +1011,7 @@ input:-webkit-autofill:focus {
   will-change: grid-template-rows;
 }
 .plf-composer-row-shell[data-motion="out"][data-ready="true"] {
-  transition-duration: 260ms;
+  transition-duration: 400ms;
 }
 
 .animate-plf-composer-row-in {
@@ -1015,7 +1019,7 @@ input:-webkit-autofill:focus {
   will-change: transform, opacity;
 }
 .animate-plf-composer-row-out {
-  animation: plf-composer-row-out 260ms var(--ease-plf-spring) both;
+  animation: plf-composer-row-out 400ms var(--ease-plf-spring) both;
   will-change: transform, opacity;
 }
 

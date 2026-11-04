@@ -24,6 +24,7 @@ import { useAuth } from "../../context/useAuth";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { formatDateTime } from "../../lib/format";
 import type { EmailNoteResponse } from "../../types/api";
+import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
 
 interface ConversationNotesProps {
   emailId: number;
@@ -356,38 +357,29 @@ export const ConversationNotes = forwardRef<ConversationNotesHandle, Conversatio
             </div>
           </div>
 
-          {/* Listado de todas las notas */}
-          <div className="flex max-h-56 flex-col gap-2 overflow-y-auto pr-0.5">
-            {[...(notes ?? [])].reverse().map((note) => (
-              <div
-                key={note.id}
-                data-motion-item
-                className="group/item relative rounded-lg border border-amber-200/90 bg-amber-50/70 p-2.5 shadow-2xs transition-colors
-                  hover:bg-amber-50"
-              >
-                <div className="flex items-center justify-between text-[10.5px]">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="font-semibold text-amber-950">{note.authorName}</span>
-                    <span className="text-amber-300">·</span>
-                    <span className="text-amber-800/80">{formatDateTime(note.createdAt)}</span>
-                  </div>
-                  {(user?.staffId === note.staffId || user?.isAdmin) && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleRemove(note, e)}
-                      aria-label="Borrar esta nota"
-                      title="Borrar nota"
-                      className="text-amber-400 opacity-60 transition-opacity hover:text-brand-red hover:opacity-100"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-                <p className="mt-1.5 whitespace-pre-wrap text-[12px] leading-relaxed text-amber-950 font-normal">
-                  {note.body}
-                </p>
-              </div>
-            ))}
+          <div className="max-h-64 overflow-y-auto pr-0.5">
+            <InternalNoteThread
+              density="compact"
+              notes={(notes ?? []).map((note) => ({
+                id: note.id,
+                parentId: note.parentId ?? null,
+                authorStaffId: note.staffId,
+                authorName: note.authorName,
+                body: note.body,
+                createdAt: note.createdAt,
+              }))}
+              currentStaffId={user?.staffId}
+              canReply={Boolean(user)}
+              onReply={async (parentId, body) => {
+                const created = await emailsApi.addNote(emailId, body, parentId);
+                setNotes((prev) => {
+                  const list = prev ?? [];
+                  const next = mergeNotes(list, [created]);
+                  onNotesCountChange?.(next.length);
+                  return next;
+                });
+              }}
+            />
           </div>
 
           {/* Formulario para agregar nota (misma entrada que CC/CCO) */}

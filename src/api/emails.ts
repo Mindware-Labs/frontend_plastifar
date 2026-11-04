@@ -126,8 +126,11 @@ export const emailsApi = {
 
   notes: (id: number) => apiRequest<EmailNoteResponse[]>(`/api/emails/${id}/notes`),
 
-  addNote: (id: number, body: string) =>
-    apiRequest<EmailNoteResponse>(`/api/emails/${id}/notes`, { method: "POST", body: JSON.stringify({ body }) }),
+  addNote: (id: number, body: string, parentId?: number | null) =>
+    apiRequest<EmailNoteResponse>(`/api/emails/${id}/notes`, {
+      method: "POST",
+      body: JSON.stringify({ body, parentId: parentId ?? null }),
+    }),
 
   removeNote: (noteId: number) => apiRequest<void>(`/api/emails/notes/${noteId}`, { method: "DELETE" }),
 

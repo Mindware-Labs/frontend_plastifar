@@ -102,6 +102,7 @@ import {
 import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
 import { parseTicketDetailId } from "./ticketLegacy";
 import { TaskCommentsAside, type TaskCommentsAsideHandle } from "./TaskCommentsAside";
+import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
 import { FormattedTicketBody } from "./FormattedTicketBody";
 import { AttachmentChip, TicketMessageCard } from "./TicketMessageCard";
 import { TicketTasksTab } from "./TicketTasksTab";
@@ -1146,6 +1147,23 @@ export function TicketDetailPage() {
     }
   };
 
+  const internalNoteThreadItems = useMemo(() => {
+    if (!ticket) return [];
+    const internalNotes = [...ticket.messages]
+      .sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      )
+      .filter((m) => m.direction.toLowerCase() === "interna");
+    return internalNotes.map((message) => ({
+      id: message.id,
+      parentId: message.parentId ?? null,
+      authorStaffId: message.authorStaffId ?? 0,
+      authorName: message.authorStaffName ?? "Equipo",
+      body: message.bodyText?.trim() || message.bodyHtml?.replace(/<[^>]+>/g, " ").trim() || "",
+      createdAt: message.createdAt,
+    }));
+  }, [ticket]);
+
   if (loading) {
     return <TicketDetailSkeleton />;
   }
@@ -1204,6 +1222,16 @@ export function TicketDetailPage() {
         onOpenAttachment={openAttachment}
       />
     ));
+
+  const replyToInternalNote = async (parentId: number, body: string) => {
+    const formData = new FormData();
+    formData.append("Direction", "Interna");
+    formData.append("BodyText", body);
+    formData.append("ParentMessageId", String(parentId));
+    await ticketsApi.createMessage(ticketId, formData);
+    await refreshTicket();
+    receipts.done({ action: "nota-ticket-respuesta", title: "Respuesta guardada", detail: ticket.number });
+  };
 
   const sections: ModuleHeaderSection[] = [
     {
@@ -2095,7 +2123,27 @@ export function TicketDetailPage() {
                             </Button>
                           )}
                         </div>
-                        {renderThread(internalNotes)}
+                        <InternalNoteThread
+                          notes={internalNoteThreadItems}
+                          currentStaffId={user?.staffId}
+                          canReply={canEditTicket}
+                          onReply={replyToInternalNote}
+                          renderExtra={(note) => {
+                            const message = internalNotes.find((m) => m.id === note.id);
+                            if (!message?.attachments.length) return null;
+                            return (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {message.attachments.map((att) => (
+                                  <AttachmentChip
+                                    key={att.id}
+                                    attachment={att}
+                                    onOpen={() => openAttachment(message.attachments, att.id)}
+                                  />
+                                ))}
+                              </div>
+                            );
+                          }}
+                        />
                       </>
                     )}
                   </div>

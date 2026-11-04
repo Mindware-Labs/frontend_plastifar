@@ -83,6 +83,7 @@ export interface TaskComment {
   authorName: string;
   comment: string;
   createdAt: string;
+  parentId?: number | null;
 }
 
 export interface TaskEvent {

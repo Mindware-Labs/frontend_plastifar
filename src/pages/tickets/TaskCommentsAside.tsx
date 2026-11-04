@@ -8,6 +8,7 @@ import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, u
 import { ticketsApi } from "../../api/tickets";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { openOverlay } from "../../hooks/overlayStack";
+import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
 import { Avatar } from "../../components/ui/Avatar";
 import { formatDateTime } from "../../lib/format";
 import type { TicketTaskCommentResponse, TicketTaskResponse } from "../../types/api";
@@ -200,36 +201,26 @@ export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskComment
               </p>
             </div>
           ) : (
-            task.comments.map((comment) => {
-              const isMyComment = comment.authorStaffId === currentStaffId;
-
-              return (
-                <div
-                  key={comment.id}
-                  className="rounded-lg border border-zinc-200/80 bg-white p-2.5 shadow-2xs space-y-1.5 transition-colors hover:border-zinc-300"
-                >
-                  <div className="flex items-center justify-between gap-2 text-[11px]">
-                    <div className="flex items-center gap-1.5 min-w-0 font-medium text-zinc-800">
-                      <Avatar name={comment.authorStaffName} seed={comment.authorStaffId} size={17} />
-                      <span className="font-semibold text-zinc-900 truncate max-w-[130px]" title={comment.authorStaffName}>
-                        {comment.authorStaffName}
-                      </span>
-                      {isMyComment && (
-                        <span className="rounded bg-brand-red/10 px-1 py-0.2 font-heading text-[8.5px] font-bold text-brand-red">
-                          Tú
-                        </span>
-                      )}
-                    </div>
-                    <span className="shrink-0 text-[10px] text-zinc-400 tabular-nums">
-                      {formatDateTime(comment.createdAt)}
-                    </span>
-                  </div>
-                  <p className="text-[12px] leading-relaxed text-zinc-700 whitespace-pre-wrap break-words">
-                    {comment.comment}
-                  </p>
-                </div>
-              );
-            })
+            <InternalNoteThread
+              density="compact"
+              notes={task.comments.map((comment) => ({
+                id: comment.id,
+                parentId: comment.parentId ?? null,
+                authorStaffId: comment.authorStaffId,
+                authorName: comment.authorStaffName,
+                body: comment.comment,
+                createdAt: comment.createdAt,
+              }))}
+              currentStaffId={currentStaffId}
+              canReply={canComment}
+              onReply={async (parentId, body) => {
+                const newComment = await ticketsApi.addTaskComment(ticketId, task.id, {
+                  comment: body,
+                  parentId,
+                });
+                onCommentAdded(task.id, newComment);
+              }}
+            />
           )}
           <div ref={commentsEndRef} />
         </div>

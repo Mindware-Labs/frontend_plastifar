@@ -41,10 +41,10 @@ export const tasksApi = {
   update: (id: number, data: UpdateTaskRequest) =>
     apiRequest<TaskDetail>(`/api/tasks/${id}`, { method: "PUT", body: JSON.stringify(data) }),
 
-  comment: (id: number, comment: string) =>
+  comment: (id: number, comment: string, parentId?: number | null) =>
     apiRequest<TaskComment>(`/api/tasks/${id}/comments`, {
       method: "POST",
-      body: JSON.stringify({ comment }),
+      body: JSON.stringify({ comment, parentId: parentId ?? null }),
     }),
 
   addAttachments: (id: number, form: FormData) =>
