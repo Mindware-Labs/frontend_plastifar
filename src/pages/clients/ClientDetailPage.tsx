@@ -28,7 +28,7 @@ import {
   type ContactQuery,
 } from "../../api/clients";
 import { ticketsApi } from "../../api/tickets";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { MODULE_HEADER_SYMMETRIC_BAND_CLASS, ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -358,8 +358,8 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       />
 
       {/* Zona de contenido con scroll vertical asegurado */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-8">
-        <div className="mx-auto w-full max-w-6xl">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-8">
+        <div className={`w-full min-w-0 ${MODULE_HEADER_SYMMETRIC_BAND_CLASS}`}>
           {error !== null && (
             <ErrorRetry className="mb-3" onRetry={() => void loadRecord()}>{error}</ErrorRetry>
           )}
@@ -1014,7 +1014,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                           <Th className="w-32">Estado</Th>
                           <Th>Departamento</Th>
                           <Th>Asignado a</Th>
-                          <Th className="w-36 text-right">Creado</Th>
+                          <Th className="whitespace-nowrap text-right">Creado</Th>
                         </HeadRow>
                       </thead>
 
@@ -1056,7 +1056,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                                 <span className="text-zinc-400">Sin asignar</span>
                               )}
                             </Td>
-                            <Td className="text-[12px] text-zinc-500 text-right tabular-nums">
+                            <Td className="whitespace-nowrap text-[12px] text-zinc-500 text-right tabular-nums">
                               {formatDateTime(ticket.createdAt)}
                             </Td>
                           </Row>

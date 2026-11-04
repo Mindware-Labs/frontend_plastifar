@@ -1,15 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useMemo, useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
-import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatPhoneNumber } from "../../lib/format";
 import { fieldForServerError, type FieldRule } from "../../lib/serverFieldErrors";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import type { Contact } from "../../types/clients";
 
 /**
@@ -62,6 +65,17 @@ const fieldRules: FieldRule<keyof FormValues>[] = [
   { field: "firstName", matches: ["nombre"] },
 ];
 
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 border-t border-zinc-100 pt-2 first:border-0 first:pt-0">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
+
 interface ContactModalProps {
   clientId: number;
   contact?: Contact;
@@ -73,6 +87,7 @@ interface ContactModalProps {
 export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: ContactModalProps) {
   const isEdit = contact !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
+  const { isExiting, requestClose } = useModalAnimation();
 
   const {
     control,
@@ -94,6 +109,27 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
       isActive: contact?.isActive ?? true,
     },
   });
+
+  const firstName = useWatch({ control, name: "firstName" }) ?? "";
+  const lastName = useWatch({ control, name: "lastName" }) ?? "";
+  const contactFormMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "firstName",
+          label: "Falta el nombre",
+          short: "el nombre",
+          valid: firstName.trim().length >= 2,
+        },
+        {
+          id: "lastName",
+          label: "Falta el apellido",
+          short: "el apellido",
+          valid: lastName.trim().length >= 2,
+        },
+      ]),
+    [firstName, lastName],
+  );
 
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
@@ -119,11 +155,8 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
         ? await clientsApi.contacts.update(contact.id, request)
         : await clientsApi.contacts.create(clientId, request);
       onSaved(saved);
-      onClose();
+      requestClose();
     } catch (err) {
-      // Seccion 4.2: en su campo y con el foco de vuelta. Antes solo el 409 del
-      // correo duplicado llegaba a su campo; los 400 de longitud o formato
-      // acababan en el aviso general de arriba.
       const field = fieldForServerError(err, fieldRules);
       if (field) {
         setError(field.field, { message: field.message });
@@ -136,39 +169,77 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
     }
   }
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLFormElement>) {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      void handleSubmit(onSubmit)();
+    }
+  }
+
   return (
     <Modal
-      title={isEdit ? "Editar contacto" : "Nuevo contacto"}
+      maxWidth="max-w-xl"
+      eyebrow={isEdit ? `Contacto #${contact.id}` : "Persona de contacto del cliente"}
+      title={isEdit ? `Editar ${contact.firstName} ${contact.lastName}` : "Nuevo contacto"}
       description="La persona dentro del cliente con la que se coordina cada ticket."
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       footer={
-        <FormModalFooter
-          formId="contact-form"
-          isEdit={isEdit}
-          createLabel="Agregar contacto"
-          isSubmitting={isSubmitting}
-          onCancel={onClose}
-        />
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden select-none items-center gap-1 text-[11px] text-zinc-400 sm:inline-flex">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[10px] text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[10px] text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <SubmitValidationButton
+              formId="contact-form"
+              ready={contactFormMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={contactFormMissing}
+              onFocusField={focusFormField}
+              hintText="Para guardar el contacto, completa lo siguiente:"
+            >
+              {isEdit ? "Guardar cambios" : "Agregar contacto"}
+            </SubmitValidationButton>
+          </div>
+        </div>
       }
     >
       <form
         id="contact-form"
         onSubmit={handleSubmit(onSubmit)}
+        onKeyDown={handleKeyDown}
         noValidate
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-3 text-left"
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <div className="grid grid-cols-2 gap-3">
+        <FormDivider title="Identificación" />
+
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           <TextField
+            size="sm"
             label="Nombre"
+            placeholder="Nombre de pila"
             required
             state={stateOf("firstName")}
             error={errors.firstName?.message}
             {...register("firstName")}
           />
           <TextField
+            size="sm"
             label="Apellido"
+            placeholder="Apellido"
             required
             state={stateOf("lastName")}
             error={errors.lastName?.message}
@@ -177,41 +248,47 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
         </div>
 
         <TextField
-          label="Correo"
+          size="sm"
+          label="Cargo"
+          placeholder="Opcional"
+          state={stateOf("position")}
+          error={errors.position?.message}
+          {...register("position")}
+        />
+
+        <FormDivider title="Canales" />
+
+        <TextField
+          size="sm"
+          label="Correo electrónico"
           type="email"
-          placeholder="Opcional, pero único dentro de este cliente"
+          placeholder="contacto@empresa.com"
           state={stateOf("email")}
           error={errors.email?.message}
-          hint="Con la ingesta de tickets por correo, reconoce al remitente."
+          hint="Opcional, pero único dentro de este cliente. Con la ingesta por correo, reconoce al remitente."
           {...register("email")}
         />
 
-        <div className="grid grid-cols-2 gap-3">
-          <Controller
-            name="phone"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                type="tel"
-                label="Teléfono"
-                placeholder="Ej. 809-555-0123"
-                name={field.name}
-                value={field.value}
-                onChange={(e) => field.onChange(formatPhoneNumber(e.target.value))}
-                onBlur={field.onBlur}
-                state={stateOf("phone")}
-                error={errors.phone?.message}
-              />
-            )}
-          />
-          <TextField
-            label="Cargo"
-            placeholder="Opcional"
-            state={stateOf("position")}
-            error={errors.position?.message}
-            {...register("position")}
-          />
-        </div>
+        <Controller
+          name="phone"
+          control={control}
+          render={({ field }) => (
+            <TextField
+              size="sm"
+              type="tel"
+              label="Teléfono"
+              placeholder="Ej. 809-555-0123"
+              name={field.name}
+              value={field.value}
+              onChange={(e) => field.onChange(formatPhoneNumber(e.target.value))}
+              onBlur={field.onBlur}
+              state={stateOf("phone")}
+              error={errors.phone?.message}
+            />
+          )}
+        />
+
+        <FormDivider title="Preferencias" />
 
         <div className="flex flex-col gap-2">
           <CheckboxField

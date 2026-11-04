@@ -9,6 +9,9 @@ export const MODULE_HEADER_TITLE_GUTTER_CLASS = "pl-11";
 /** Misma franja horizontal: eje del PLT-… a la izquierda y borde del layout a la derecha. */
 export const MODULE_HEADER_CONTENT_BAND_CLASS = "pl-11 pr-3 lg:pr-4";
 
+/** Igual offset a ambos lados del lienzo (fichas de cliente). */
+export const MODULE_HEADER_SYMMETRIC_BAND_CLASS = "pl-11 pr-11";
+
 export interface ModuleHeaderSection {
   label: ReactNode;
   to?: string;

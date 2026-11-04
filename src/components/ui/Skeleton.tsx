@@ -1,4 +1,8 @@
-import { MODULE_HEADER_TITLE_GUTTER_CLASS } from "../app/ModuleHeader";
+import {
+  MODULE_HEADER_CONTENT_BAND_CLASS,
+  MODULE_HEADER_SYMMETRIC_BAND_CLASS,
+  MODULE_HEADER_TITLE_GUTTER_CLASS,
+} from "../app/ModuleHeader";
 
 /**
  * Marcador de carga.
@@ -601,8 +605,8 @@ export function ClientDetailSkeleton({
         <Skeleton className="hidden h-8 w-28 rounded-lg sm:block" delay={200} />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-0.5 pb-8">
-        <div className="mx-auto w-full max-w-6xl">
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        <div className={`w-full min-w-0 ${MODULE_HEADER_SYMMETRIC_BAND_CLASS}`}>
           {section === "datos" ? (
             <div className="space-y-3.5">
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
