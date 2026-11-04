@@ -1,6 +1,7 @@
 import { apiRequest, toQuery } from "./client";
 import type {
   CreateStaffRequest,
+  StaffActivityResponse,
   StaffListResponse,
   StaffResponse,
   StaffSignatureResponse,
@@ -69,6 +70,12 @@ export const staffApi = {
   /** RF-P4: accesos vigentes y permiso efectivo, resuelto por el servidor. */
   getDepartmentAccess: (id: number) =>
     apiRequest<StaffDetail>(`/api/staff/${id}/department-access`),
+
+  /** Historial cronológico unificado de actividad del colaborador en el sistema. */
+  getActivity: (
+    id: number,
+    query?: { page?: number; pageSize?: number; category?: string; search?: string },
+  ) => apiRequest<StaffActivityResponse>(`/api/staff/${id}/activity${toQuery(query ?? {})}`),
 
   grantDepartmentAccess: (id: number, data: GrantDepartmentAccessRequest) =>
     apiRequest<void>(`/api/staff/${id}/department-access`, {

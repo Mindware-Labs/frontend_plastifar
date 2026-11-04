@@ -391,7 +391,7 @@ export function TicketDetailSkeleton() {
  * ficha de ticket: cabecera con botón volver y pestañas, y debajo el resumen
  * (métricas + rejilla 2/3 · 1/3) o, en «Accesos», las dos tablas.
  */
-export function StaffDetailSkeleton({ section = "datos" }: { section?: "datos" | "accesos" }) {
+export function StaffDetailSkeleton({ section = "datos" }: { section?: "datos" | "accesos" | "actividad" }) {
   const cardHead = (delay: number, width = "w-28") => (
     <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
       <div className="flex items-center gap-2">
@@ -430,6 +430,7 @@ export function StaffDetailSkeleton({ section = "datos" }: { section?: "datos" |
           <div className="hidden md:flex items-center gap-1.5">
             <Skeleton className="h-6 w-14 rounded-md" delay={140} />
             <Skeleton className="h-6 w-18 rounded-md" delay={180} />
+            <Skeleton className="h-6 w-20 rounded-md" delay={220} />
           </div>
         </div>
       </div>
@@ -501,13 +502,36 @@ export function StaffDetailSkeleton({ section = "datos" }: { section?: "datos" |
               </div>
             </div>
           </div>
-        ) : (
+        ) : section === "accesos" ? (
           <div className="mt-3.5 mx-auto max-w-6xl space-y-3.5">
             <div className={card}>
               <TableSkeleton rows={3} columns={6} />
             </div>
             <div className={card}>
               <TableSkeleton rows={6} columns={3} />
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3.5 mx-auto max-w-6xl space-y-3.5">
+            <div className="flex justify-between items-center">
+              <Skeleton className="h-8 w-64 rounded-lg" delay={80} />
+              <Skeleton className="h-8 w-48 rounded-lg" delay={120} />
+            </div>
+            <div className={card}>
+              <div className="divide-y divide-zinc-100 p-4 space-y-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex gap-3 pt-3 first:pt-0">
+                    <Skeleton className="size-8 shrink-0 rounded-lg" delay={i * 40} />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-4 w-36 rounded" delay={i * 40 + 20} />
+                        <Skeleton className="h-3 w-24 rounded" delay={i * 40 + 40} />
+                      </div>
+                      <Skeleton className="h-3 w-3/4 rounded" delay={i * 40 + 60} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

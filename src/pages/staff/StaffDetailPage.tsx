@@ -20,10 +20,11 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { departmentPaths } from "../../lib/departments";
 import type { DepartmentResponse } from "../../types/api";
 import type { DepartmentAccess, StaffDetail } from "../../types/permissions";
+import { StaffActivityTab } from "./StaffActivityTab";
 import { StaffOverview } from "./StaffOverview";
 
 interface StaffDetailPageProps {
-  section: "datos" | "accesos";
+  section: "datos" | "accesos" | "actividad";
 }
 
 const dateFormat = new Intl.DateTimeFormat("es-DO", {
@@ -141,6 +142,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const sections = [
     { label: "Datos", to: `/staff/${id}` },
     { label: "Accesos", to: `/staff/${id}/accesos` },
+    { label: "Actividad", to: `/staff/${id}/actividad` },
   ];
 
   if (error !== null && staff === null) {
@@ -198,7 +200,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                 formatDate={formatDate}
                 accessesTo={`/staff/${id}/accesos`}
               />
-            ) : (
+            ) : section === "accesos" ? (
               <div className="space-y-3.5">
                 {staff.isAdmin && (
                   <Alert variant="info">
@@ -378,6 +380,8 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                   )}
                 </DetailCard>
               </div>
+            ) : (
+              <StaffActivityTab staffId={staffId} staffName={fullName} />
             )}
           </div>
         </div>

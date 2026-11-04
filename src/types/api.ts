@@ -957,3 +957,34 @@ export interface SaveTicketVerdictRequest {
   name: string;
   isActive?: boolean;
 }
+
+export interface StaffActivityItem {
+  id: string;
+  category: "tickets" | "tasks" | "forms" | "system";
+  action: string;
+  title: string;
+  description: string;
+  entityType?: "ticket" | "task" | "claim" | "discrepancy" | "withdrawal" | "hca" | "audit";
+  entityId?: string;
+  linkTo?: string | null;
+  timestamp: string;
+  details?: string | null;
+}
+
+export interface StaffActivityCounts {
+  all: number;
+  tickets: number;
+  tasks: number;
+  forms: number;
+  system: number;
+}
+
+export interface StaffActivityResponse {
+  items: StaffActivityItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: StaffActivityCounts;
+}
+

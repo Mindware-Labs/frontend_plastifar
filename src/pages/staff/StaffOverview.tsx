@@ -3,6 +3,7 @@ import {
   Briefcase,
   Building2,
   Clock,
+  History,
   KeyRound,
   Mail,
   Phone,
@@ -318,6 +319,17 @@ export function StaffOverview({ staff, fullName, departmentLabel, formatDate, ac
                     ? "Hoy no puede hacer nada dentro del panel."
                     : "Suma de los permisos de los roles que tiene en cada departamento."}
               </p>
+
+              <Link
+                to={`/staff/${staff.id}/actividad`}
+                className="flex w-full items-center justify-between rounded-lg border border-zinc-200/80 bg-zinc-50/60 px-3 py-2 text-[12px] font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:bg-zinc-100/70"
+              >
+                <span className="flex items-center gap-1.5">
+                  <History className="size-3.5 text-zinc-500" />
+                  <span>Ver historial de actividad</span>
+                </span>
+                <ArrowRight className="size-3 text-zinc-400" />
+              </Link>
             </div>
           </DetailCard>
         </div>

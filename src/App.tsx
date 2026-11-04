@@ -119,6 +119,7 @@ export default function App() {
           <Route path="/staff" element={<StaffPage />} />
           <Route path="/staff/:id" element={<StaffDetailPage section="datos" />} />
           <Route path="/staff/:id/accesos" element={<StaffDetailPage section="accesos" />} />
+          <Route path="/staff/:id/actividad" element={<StaffDetailPage section="actividad" />} />
         </Route>
 
         <Route element={<PermissionRoute permission="roles.read"><Outlet /></PermissionRoute>}>
