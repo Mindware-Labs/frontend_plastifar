@@ -33,7 +33,7 @@ const schema = z.object({
     .trim()
     .min(2, "Al menos 2 caracteres")
     .max(120, "Máximo 120 caracteres"),
-  departmentId: z.string().min(1, "Elige un departamento"),
+  departmentId: z.string().optional(),
   priority: z.enum(["Emergencia", "Alta", "Normal", "Baja"]),
   suggestedForm: z.string().nullable().optional(),
   isActive: z.boolean(),
@@ -77,7 +77,8 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
     mode: "onTouched",
     defaultValues: {
       name: topic?.name ?? "",
-      departmentId: topic ? String(topic.defaultDepartmentId) : "",
+      departmentId:
+        topic?.defaultDepartmentId != null ? String(topic.defaultDepartmentId) : "",
       priority: (topic?.defaultPriority as FormValues["priority"]) ?? "Normal",
       suggestedForm: topic?.suggestedForm ?? "",
       isActive: topic?.isActive ?? true,
@@ -85,7 +86,6 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
   });
 
   const motivoName = useWatch({ control, name: "name" }) ?? "";
-  const motivoDepartment = useWatch({ control, name: "departmentId" }) ?? "";
   const motivoMissing = useMemo(
     () =>
       buildValidationItems([
@@ -95,14 +95,8 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
           short: "el nombre",
           valid: motivoName.trim().length >= 2,
         },
-        {
-          id: "motivo-department",
-          label: "Falta elegir el departamento",
-          short: "el departamento",
-          valid: motivoDepartment.trim().length > 0,
-        },
       ]),
-    [motivoName, motivoDepartment],
+    [motivoName],
   );
 
   function stateOf(field: keyof FormValues): FieldState {
@@ -115,7 +109,9 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
 
     const input: SaveTicketTopicRequest = {
       name: values.name.trim(),
-      defaultDepartmentId: Number(values.departmentId),
+      defaultDepartmentId: values.departmentId?.trim()
+        ? Number(values.departmentId)
+        : null,
       defaultPriority: values.priority,
       suggestedForm: values.suggestedForm || null,
       isActive: values.isActive,
@@ -222,14 +218,16 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
               id="motivo-department"
               size="sm"
               label="Departamento predeterminado"
-              required
               searchable
               name={field.name}
               value={field.value}
               onChange={field.onChange}
               onBlur={field.onBlur}
-              placeholder="Elige un departamento…"
-              options={departmentPathOptions(departments)}
+              placeholder="Sin departamento (opcional)…"
+              options={[
+                { value: "", label: "Sin departamento" },
+                ...departmentPathOptions(departments),
+              ]}
               state={stateOf("departmentId")}
               error={errors.departmentId?.message}
             />

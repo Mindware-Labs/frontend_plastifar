@@ -43,7 +43,7 @@ import { StaffPage } from "./pages/staff/StaffPage";
 import { RespuestasPage } from "./pages/respuestas/RespuestasPage";
 import { NotificationsLabPage } from "./pages/dev/NotificationsLabPage";
 import { TicketDetailPage } from "./pages/tickets/TicketDetailPage";
-import { TicketsPage } from "./pages/tickets/TicketsPage";
+import { TicketsListLayout } from "./pages/tickets/TicketsListLayout";
 import { ticketDetailReservedRedirect } from "./pages/tickets/ticketLegacy";
 
 function TicketDetailRoute() {
@@ -86,8 +86,10 @@ export default function App() {
         <Route element={<PermissionRoute permission="tickets.read"><Outlet /></PermissionRoute>}>
           {/* Rutas anidadas: historico/motivos/veredictos deben resolverse antes que :id numérico. */}
           <Route path="/tickets" element={<Outlet />}>
-            <Route index element={<TicketsPage origin="plastifar" />} />
-            <Route path="historico" element={<TicketsPage origin="legacy" />} />
+            <Route element={<TicketsListLayout />}>
+              <Route index />
+              <Route path="historico" />
+            </Route>
             {/* Motivos y veredictos llegaron con la rama de Tickets. Hubo un
               tiempo en que los motivos tambien se administraban desde
               /configuracion/motivos, contra la misma entidad y con otra mitad de

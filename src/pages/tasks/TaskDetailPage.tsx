@@ -3,18 +3,16 @@ import {
   ArrowUpRight,
   Building2,
   Check,
+  ClipboardList,
   Clock,
   Copy,
-  Eye,
   FileText,
   History,
   Lock,
-  Paperclip,
   Pencil,
   Plus,
   RotateCcw,
   Tag,
-  Upload,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -29,18 +27,24 @@ import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
+import { TaskDetailSkeleton } from "../../components/ui/Skeleton";
 import { Modal } from "../../components/ui/Modal";
 import { useReceipts } from "../../context/useReceipts";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
-import { formatBytes, formatDateTime } from "../../lib/format";
+import { formatDateTime } from "../../lib/format";
 import { PriorityCell } from "../tickets/ticketCells";
 import type { TaskDetail } from "../../types/tasks";
-import { TaskCompleteModal } from "./TaskCompleteModal";
+import { TaskUpdateModal } from "./TaskUpdateModal";
 import { TaskFormModal } from "./TaskFormModal";
 import { TaskReasonModal } from "./TaskReasonModal";
-import { TaskStatusCell } from "./taskCells";
+import { TaskStatusCell, taskStatusLabel } from "./taskCells";
 import { TaskTimelineSheet, type TaskDetailTab, type TaskTimelineItem } from "./TaskTimelineSheet";
+import {
+  TaskAttachmentInlineList,
+  attachmentsByKind,
+  mapSeguimientoAttachmentsToComments,
+} from "./taskAttachments";
 
 function formatDue(value: string | null) {
   if (!value) return "Sin fecha límite";
@@ -181,12 +185,13 @@ export function TaskDetailPage() {
   const id = Number(params.id);
 
   const [task, setTask] = useState<TaskDetail | null>(null);
+  const [loading, setLoading] = useState(Number.isFinite(id));
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TaskDetailTab>("datos");
 
   // Modals state
   const [editing, setEditing] = useState(false);
-  const [completing, setCompleting] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [reason, setReason] = useState<"cancel" | "reopen" | null>(null);
   const [showTimeline, setShowTimeline] = useState(false);
   const [showFullInstructions, setShowFullInstructions] = useState(false);
@@ -196,7 +201,8 @@ export function TaskDetailPage() {
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
-  const noteModalAnimation = useModalAnimation();
+  const { isExiting: noteModalExiting, requestClose: requestNoteModalClose, reset: resetNoteModalMotion } =
+    useModalAnimation();
   const fullInstructionsAnimation = useModalAnimation();
   const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -206,23 +212,56 @@ export function TaskDetailPage() {
     }
   }, [showNoteModal, newComment]);
 
-  // File upload state
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  useEffect(() => {
+    if (!showNoteModal) return;
+    resetNoteModalMotion();
+    setNoteFiles([]);
+    setCommentError(null);
+  }, [showNoteModal, resetNoteModalMotion]);
 
-  function load() {
+  const [noteFiles, setNoteFiles] = useState<File[]>([]);
+
+  function load(options?: { silent?: boolean }) {
     setError(null);
-    return tasksApi.get(id).then(setTask).catch((err) => {
+    if (!options?.silent) {
+      setLoading(true);
       setTask(null);
-      setError(err instanceof ApiError ? err.message : "No se pudo cargar la tarea");
-    });
+    }
+    return tasksApi
+      .get(id)
+      .then(setTask)
+      .catch((err) => {
+        setTask(null);
+        setError(err instanceof ApiError ? err.message : "No se pudo cargar la tarea");
+      })
+      .finally(() => {
+        if (!options?.silent) setLoading(false);
+      });
   }
 
   useEffect(() => {
     if (!Number.isFinite(id)) return;
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let active = true;
+    setLoading(true);
+    setTask(null);
+    setError(null);
+    tasksApi
+      .get(id)
+      .then((data) => {
+        if (!active) return;
+        setTask(data);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setTask(null);
+        setError(err instanceof ApiError ? err.message : "No se pudo cargar la tarea");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   async function handleSaveNote() {
@@ -234,40 +273,26 @@ export function TaskDetailPage() {
       setSubmittingComment(true);
       setCommentError(null);
       await tasksApi.comment(task.id, trimmed);
+      if (noteFiles.length > 0) {
+        const form = new FormData();
+        for (const file of noteFiles) form.append("Files", file);
+        const withFiles = await tasksApi.addAttachments(task.id, form);
+        setTask(withFiles);
+      } else {
+        await load({ silent: true });
+      }
       setNewComment("");
-      setShowNoteModal(false);
+      setNoteFiles([]);
       receipts.done({
         action: "nota-tarea",
         title: "Nota interna guardada",
         detail: task.number,
       });
-      await load();
+      requestNoteModalClose();
     } catch (err) {
       setCommentError(err instanceof Error ? err.message : "Error al guardar la nota");
     } finally {
       setSubmittingComment(false);
-    }
-  }
-
-  async function handleUploadFiles() {
-    if (!task || pendingFiles.length === 0) return;
-    try {
-      setIsUploading(true);
-      setUploadError(null);
-      const form = new FormData();
-      for (const file of pendingFiles) form.append("Files", file);
-      const updated = await tasksApi.addAttachments(task.id, form);
-      setTask(updated);
-      setPendingFiles([]);
-      receipts.done({
-        action: "subir-adjuntos-tarea",
-        title: "Archivos adjuntados",
-        detail: `${pendingFiles.length} ${pendingFiles.length === 1 ? "archivo añadido" : "archivos añadidos"} a la tarea.`,
-      });
-    } catch (err) {
-      setUploadError(err instanceof ApiError ? err.message : "No se pudieron adjuntar los archivos.");
-    } finally {
-      setIsUploading(false);
     }
   }
 
@@ -296,10 +321,14 @@ export function TaskDetailPage() {
     );
   }
 
-  if (error) {
+  if (loading) {
+    return <TaskDetailSkeleton />;
+  }
+
+  if (error || !task) {
     return (
       <div className="mx-auto w-full max-w-2xl py-6">
-        <ErrorRetry className="mb-3" onRetry={() => void load()}>{error}</ErrorRetry>
+        <ErrorRetry className="mb-3" onRetry={() => void load()}>{error ?? "No se pudo cargar la tarea"}</ErrorRetry>
         <Button variant="secondary" size="sm" onClick={() => navigate("/tareas")}>
           Volver a tareas
         </Button>
@@ -307,18 +336,8 @@ export function TaskDetailPage() {
     );
   }
 
-  if (!task) {
-    return (
-      <div className="flex flex-1 items-center justify-center py-20 text-zinc-400">
-        <span className="inline-flex items-center gap-2 text-[13px]">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-zinc-300" />
-          Cargando detalle de la tarea…
-        </span>
-      </div>
-    );
-  }
-
   const isClosed = task.status === "Completada" || task.status === "Cancelada";
+  const canUpdateTask = !isClosed && (task.canComplete || task.canComment);
 
   const byDate = (a: { createdAt: string }, b: { createdAt: string }) =>
     new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -328,6 +347,10 @@ export function TaskDetailPage() {
     ...pureEvents.map((e): TaskTimelineItem => ({ kind: "event", data: e, createdAt: e.createdAt })),
     ...task.comments.map((c): TaskTimelineItem => ({ kind: "comment", data: c, createdAt: c.createdAt })),
   ].sort(byDate);
+
+  const initialAttachments = attachmentsByKind(task.attachments, "Inicial");
+  const evidenceAttachments = attachmentsByKind(task.attachments, "Evidencia");
+  const noteAttachmentsMap = mapSeguimientoAttachmentsToComments(task.comments, task.attachments);
 
   const sections: ModuleHeaderSection[] = [
     {
@@ -339,11 +362,6 @@ export function TaskDetailPage() {
       label: `Notas (${task.comments.length})`,
       active: activeTab === "notas",
       onClick: () => setActiveTab("notas"),
-    },
-    {
-      label: `Adjuntos (${task.attachments.length})`,
-      active: activeTab === "adjuntos",
-      onClick: () => setActiveTab("adjuntos"),
     },
   ];
 
@@ -373,15 +391,15 @@ export function TaskDetailPage() {
               <span className="tabular-nums text-subtle">{timeline.length}</span>
             </Button>
 
-            {task.canComplete && (
+            {canUpdateTask && (
               <Button
                 type="button"
                 size="sm"
-                onClick={() => setCompleting(true)}
+                onClick={() => setUpdating(true)}
                 className="group font-heading font-semibold tracking-[-0.01em] shadow-xs hover:shadow-sm transition-all active:scale-[0.98]"
               >
-                <Check className="h-3.5 w-3.5" />
-                Completar
+                <ClipboardList className="h-3.5 w-3.5" />
+                Actualizar
               </Button>
             )}
 
@@ -468,7 +486,7 @@ export function TaskDetailPage() {
                         </div>
                         <div className="mt-1 flex items-baseline gap-2">
                           <span className="font-heading text-[15px] font-bold text-zinc-900 truncate">
-                            {task.status}
+                            {taskStatusLabel(task.status)}
                           </span>
                           {task.isOverdue && !isClosed && (
                             <span className="text-[11px] font-medium text-red-600 truncate">
@@ -677,8 +695,18 @@ export function TaskDetailPage() {
                                   <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-emerald-950">
                                     {task.completionComment}
                                   </p>
+                                  <TaskAttachmentInlineList
+                                    attachments={evidenceAttachments}
+                                    onOpen={(id) => void openAttachment(id, false)}
+                                    compact
+                                  />
                                 </div>
                               )}
+
+                              <TaskAttachmentInlineList
+                                attachments={initialAttachments}
+                                onOpen={(id) => void openAttachment(id, false)}
+                              />
 
                               {/* Banner de Cancelación */}
                               {task.cancelReason && (
@@ -827,7 +855,7 @@ export function TaskDetailPage() {
                           </div>
 
                           <div className="p-3.5 space-y-2.5">
-                            <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="grid grid-cols-2 gap-2 text-center">
                               <button
                                 type="button"
                                 onClick={() => setActiveTab("notas")}
@@ -838,19 +866,6 @@ export function TaskDetailPage() {
                                 </span>
                                 <span className="font-heading text-[16px] font-bold text-zinc-900 tabular-nums">
                                   {task.comments.length}
-                                </span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => setActiveTab("adjuntos")}
-                                className="rounded-lg border border-zinc-200/80 bg-zinc-50/60 p-2 text-left hover:border-zinc-300 hover:bg-zinc-100/70 transition-colors cursor-pointer group"
-                              >
-                                <span className="text-[10px] font-heading font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-600 block">
-                                  Adjuntos
-                                </span>
-                                <span className="font-heading text-[16px] font-bold text-zinc-900 tabular-nums">
-                                  {task.attachments.length}
                                 </span>
                               </button>
 
@@ -974,6 +989,11 @@ export function TaskDetailPage() {
 
                               <div className="p-3.5 text-[13px] leading-relaxed text-zinc-800">
                                 <p className="whitespace-pre-wrap">{comment.comment}</p>
+                                <TaskAttachmentInlineList
+                                  attachments={noteAttachmentsMap.get(comment.id) ?? []}
+                                  onOpen={(id) => void openAttachment(id, false)}
+                                  compact
+                                />
                               </div>
                             </article>
                           ))}
@@ -983,157 +1003,6 @@ export function TaskDetailPage() {
                   </div>
                 )}
 
-                {activeTab === "adjuntos" && (
-                  <div className="space-y-3">
-                    {isClosed ? (
-                      task.attachments.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-zinc-200/90 bg-zinc-50/50 px-6 py-6 text-center">
-                          <div className="mx-auto flex size-8 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500">
-                            <Paperclip className="size-4" strokeWidth={2.25} />
-                          </div>
-                          <p className="mt-2 font-heading text-[13.5px] font-semibold text-zinc-800">
-                            Sin evidencias adjuntas
-                          </p>
-                          <p className="mx-auto mt-0.5 max-w-sm text-[12px] leading-relaxed text-zinc-500">
-                            {task.status === "Completada"
-                              ? "Esta tarea se completó sin adjuntar evidencias ni archivos durante su ciclo de vida."
-                              : "Esta tarea fue cancelada sin adjuntar evidencias ni archivos durante su ciclo de vida."}
-                          </p>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1.5 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
-                              <Paperclip className="h-3 w-3 text-zinc-500" />
-                              <span>
-                                {task.attachments.length} {task.attachments.length === 1 ? "archivo adjunto" : "archivos adjuntos"}
-                              </span>
-                            </div>
-                            <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            {task.attachments.map((att) => (
-                              <div
-                                key={att.id}
-                                className="flex items-center justify-between gap-3 p-3 rounded-lg border border-zinc-200/80 bg-white hover:border-zinc-300 transition-all shadow-2xs"
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500">
-                                    <FileText className="size-4" />
-                                  </span>
-                                  <div className="min-w-0">
-                                    <span className="block truncate text-[12.5px] font-bold text-zinc-900" title={att.fileName}>
-                                      {att.fileName}
-                                    </span>
-                                    <span className="block text-[11px] text-zinc-400 tabular-nums">
-                                      {formatBytes(att.sizeBytes)} · {att.uploadedByName ?? "Sistema"}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <Button
-                                    type="button"
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => void openAttachment(att.id, false)}
-                                  >
-                                    <Eye className="size-3" />
-                                    Ver
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )
-                    ) : (
-                      <>
-                        {uploadError && <Alert variant="error">{uploadError}</Alert>}
-
-                        <TaskEvidenceUpload
-                          files={pendingFiles}
-                          onFilesChange={setPendingFiles}
-                          onReportError={setUploadError}
-                          label="Cargar nuevos archivos a la tarea"
-                          dropzoneTitle="Haz clic o arrastra archivos para adjuntarlos"
-                          dropzoneHint="Soporta imágenes, PDFs, hojas de cálculo o documentos (máx. 10 MB por archivo)"
-                        />
-
-                        {pendingFiles.length > 0 && (
-                          <div className="flex justify-end gap-2 pt-1">
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => setPendingFiles([])}
-                              disabled={isUploading}
-                            >
-                              Limpiar seleccionados
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => void handleUploadFiles()}
-                              isLoading={isUploading}
-                            >
-                              <Upload className="h-3.5 w-3.5" />
-                              Subir {pendingFiles.length} {pendingFiles.length === 1 ? "archivo" : "archivos"}
-                            </Button>
-                          </div>
-                        )}
-
-                        {task.attachments.length > 0 && (
-                          <div className="pt-2 space-y-2.5">
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-1.5 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
-                                <Paperclip className="h-3 w-3 text-zinc-500" />
-                                <span>
-                                  {task.attachments.length} {task.attachments.length === 1 ? "archivo guardado" : "archivos guardados"}
-                                </span>
-                              </div>
-                              <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                              {task.attachments.map((att) => (
-                                <div
-                                  key={att.id}
-                                  className="flex items-center justify-between gap-3 p-3 rounded-lg border border-zinc-200/80 bg-white hover:border-zinc-300 transition-all shadow-2xs"
-                                >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500">
-                                      <FileText className="size-4" />
-                                    </span>
-                                    <div className="min-w-0">
-                                      <span className="block truncate text-[12.5px] font-bold text-zinc-900" title={att.fileName}>
-                                        {att.fileName}
-                                      </span>
-                                      <span className="block text-[11px] text-zinc-400 tabular-nums">
-                                        {formatBytes(att.sizeBytes)} · {att.uploadedByName ?? "Sistema"}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <Button
-                                      type="button"
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={() => void openAttachment(att.id, false)}
-                                    >
-                                      <Eye className="size-3" />
-                                      Ver
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -1156,18 +1025,26 @@ export function TaskDetailPage() {
         />
       )}
 
-      {completing && (
-        <TaskCompleteModal
+      {updating && (
+        <TaskUpdateModal
           task={task}
-          onClose={() => setCompleting(false)}
-          onCompleted={(saved) => {
-            setCompleting(false);
+          onClose={() => setUpdating(false)}
+          onUpdated={(saved, mode) => {
+            setUpdating(false);
             setTask(saved);
-            receipts.done({
-              action: "completar-tarea",
-              title: "Tarea completada",
-              detail: `${saved.number} quedó registrada como completada.`,
-            });
+            if (mode === "complete") {
+              receipts.done({
+                action: "completar-tarea",
+                title: "Tarea completada",
+                detail: `${saved.number} quedó registrada como completada.`,
+              });
+            } else {
+              receipts.done({
+                action: "editar-tarea",
+                title: "Avance registrado",
+                detail: `${saved.number} · seguimiento guardado en el historial.`,
+              });
+            }
           }}
         />
       )}
@@ -1205,10 +1082,13 @@ export function TaskDetailPage() {
             </span>
           }
           onClose={() => {
-            if (!submittingComment) setShowNoteModal(false);
+            if (!submittingComment) {
+              setShowNoteModal(false);
+              resetNoteModalMotion();
+            }
           }}
-          isExiting={noteModalAnimation.isExiting}
-          onRequestClose={noteModalAnimation.requestClose}
+          isExiting={noteModalExiting}
+          onRequestClose={requestNoteModalClose}
           footer={
             <div className="flex w-full items-center justify-between gap-3">
               <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
@@ -1227,7 +1107,7 @@ export function TaskDetailPage() {
                   variant="secondary"
                   size="sm"
                   disabled={submittingComment}
-                  onClick={noteModalAnimation.requestClose}
+                  onClick={requestNoteModalClose}
                 >
                   Cancelar
                 </Button>
@@ -1270,17 +1150,27 @@ export function TaskDetailPage() {
               }}
               className="min-h-0 resize-none overflow-hidden text-[12.5px] py-2 leading-relaxed [field-sizing:content]"
               hint={
-                <span className="flex items-center justify-between text-[11px] text-zinc-400">
-                  <span>Nota para el equipo y registro del avance</span>
-                  <span className={`tabular-nums ${newComment.length > 3800 ? "text-brand-red font-medium" : ""}`}>
+                newComment.length > 0 ? (
+                  <span
+                    className={`block text-right text-[11px] tabular-nums text-zinc-400 ${newComment.length > 3800 ? "text-brand-red font-medium" : ""}`}
+                  >
                     {newComment.length} / 4000
                   </span>
-                </span>
+                ) : undefined
               }
               ref={(el) => {
                 noteTextareaRef.current = el;
                 if (el) autoResizeTextarea(el, 52);
               }}
+            />
+
+            <TaskEvidenceUpload
+              files={noteFiles}
+              onFilesChange={setNoteFiles}
+              onReportError={setCommentError}
+              label="Adjuntos (opcional)"
+              dropzoneTitle="Adjuntar archivos"
+              dropzoneHint="Máx. 10 MB por archivo"
             />
           </div>
         </Modal>
@@ -1321,6 +1211,10 @@ export function TaskDetailPage() {
                 {task.instructions}
               </p>
             </div>
+            <TaskAttachmentInlineList
+              attachments={initialAttachments}
+              onOpen={(id) => void openAttachment(id, false)}
+            />
           </div>
         </Modal>
       )}

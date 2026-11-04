@@ -194,6 +194,12 @@ export function TicketTasksTab({
     onActivity?.();
   };
 
+  const handleProgressSaved = (updated: TicketTaskResponse) => {
+    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    receipts.done({ action: "editar-tarea", title: "Avance registrado", detail: updated.title });
+    onActivity?.();
+  };
+
   const handleReopenTask = async (taskId: number) => {
     try {
       setReopeningId(taskId);
@@ -394,8 +400,8 @@ export function TicketTasksTab({
                         type="button"
                         onClick={() => setTaskToComplete(task)}
                         disabled={isClosed}
-                        title="Abrir formulario para completar la tarea"
-                        aria-label="Completar tarea"
+                        title="Registrar avance o completar la tarea"
+                        aria-label="Actualizar tarea"
                         className="flex size-4 shrink-0 items-center justify-center rounded-[4px] border-2 border-zinc-300 bg-white shadow-2xs transition-all hover:border-zinc-500 hover:bg-zinc-50 cursor-pointer active:scale-90"
                       />
                     ) : (
@@ -459,10 +465,10 @@ export function TicketTasksTab({
                           onClick={() => setTaskToComplete(task)}
                           disabled={isClosed}
                           className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer disabled:opacity-50"
-                          title="Registrar conclusión y evidencia (la tarea sigue pendiente hasta confirmar)"
+                          title="Registrar avance o marcar como completada"
                         >
                           <ListChecks className="size-3 text-zinc-500" />
-                          <span>Completar tarea</span>
+                          <span>Actualizar</span>
                         </button>
                       ))}
 
@@ -617,10 +623,12 @@ export function TicketTasksTab({
       />
 
       <CompleteTaskModal
+        ticketId={ticketId}
         task={taskToComplete}
         open={Boolean(taskToComplete)}
         onClose={() => setTaskToComplete(null)}
         onComplete={handleCompleteTask}
+        onProgressSaved={handleProgressSaved}
       />
 
       {taskToDelete && (

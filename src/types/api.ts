@@ -805,7 +805,7 @@ export interface TicketClientOption {
 export interface TicketTopicOption {
   id: number;
   name: string;
-  defaultDepartmentId: number;
+  defaultDepartmentId: number | null;
   defaultPriority: string;
   slaPolicyId: number | null;
   suggestedForm?: string | null;
@@ -879,8 +879,8 @@ export interface BulkActionResult {
 export interface TicketTopicResponse {
   id: number;
   name: string;
-  defaultDepartmentId: number;
-  defaultDepartmentName: string;
+  defaultDepartmentId: number | null;
+  defaultDepartmentName: string | null;
   /** Emergencia | Alta | Normal | Baja. */
   defaultPriority: string;
   suggestedForm?: string | null;
@@ -910,7 +910,7 @@ export interface TicketTopicListResponse {
 
 export interface SaveTicketTopicRequest {
   name: string;
-  defaultDepartmentId: number;
+  defaultDepartmentId: number | null;
   defaultPriority?: string;
   suggestedForm?: string | null;
   isActive?: boolean;

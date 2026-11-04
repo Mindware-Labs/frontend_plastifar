@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { TaskDetail, TaskStatus, UpdateTaskRequest } from "../../types/tasks";
 
 export const OPEN_TASK_STATUSES = ["Pendiente", "EnProgreso"] as const;
 
@@ -44,6 +45,37 @@ export const taskCommentSchema = z.object({
 export const taskReasonSchema = z.object({
   reason: z.string().trim().min(1, "El motivo es obligatorio").max(500, "Máximo 500 caracteres"),
 });
+
+export const taskProgressUpdateSchema = z.object({
+  note: z
+    .string()
+    .trim()
+    .min(1, "Describe el avance o la gestión realizada")
+    .max(4000, "Máximo 4000 caracteres"),
+  status: z.enum(OPEN_TASK_STATUSES),
+});
+
+export type TaskProgressUpdateValues = z.infer<typeof taskProgressUpdateSchema>;
+
+export function taskDetailToUpdateRequest(
+  task: TaskDetail,
+  status: TaskStatus = task.status as TaskStatus,
+): UpdateTaskRequest {
+  if (task.slaPolicyId == null) {
+    throw new Error("La tarea no tiene política SLA; edítala antes de cambiar el estado.");
+  }
+  return {
+    title: task.title,
+    instructions: task.instructions,
+    departmentId: task.departmentId,
+    assignedStaffId: task.assignedStaffId,
+    slaPolicyId: task.slaPolicyId,
+    status: status === "Completada" || status === "Cancelada" ? null : status,
+    clientId: task.clientId,
+    contactId: task.contactId,
+    dueDate: task.dueDate,
+  };
+}
 
 export function dueDateToApi(date: string, time?: string): string | null {
   if (!date || date.trim() === "") return null;

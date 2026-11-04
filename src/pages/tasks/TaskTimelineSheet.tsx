@@ -22,7 +22,7 @@ export type TaskTimelineItem =
   | { kind: "comment"; data: TaskComment; createdAt: string }
   | { kind: "event"; data: TaskEvent; createdAt: string };
 
-export type TaskDetailTab = "datos" | "notas" | "adjuntos";
+export type TaskDetailTab = "datos" | "notas";
 
 type TimelineFilter = "all" | "comments" | "events";
 

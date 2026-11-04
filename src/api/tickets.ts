@@ -120,6 +120,16 @@ export const ticketsApi = {
       body: form,
     }),
 
+  updateTask: (
+    ticketId: number,
+    taskId: number,
+    data: import("../types/api").UpdateTicketTaskRequest,
+  ) =>
+    apiRequest<import("../types/api").TicketTaskResponse>(`/api/tickets/${ticketId}/tasks/${taskId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
   completeTask: (ticketId: number, taskId: number, form: FormData) =>
     apiRequest<import("../types/api").TicketTaskResponse>(`/api/tickets/${ticketId}/tasks/${taskId}/complete`, {
       method: "POST",

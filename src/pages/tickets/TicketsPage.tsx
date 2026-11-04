@@ -1,5 +1,4 @@
 import {
-  ArrowUpDown,
   Building2,
   Check,
   ChevronDown,
@@ -68,19 +67,17 @@ interface TicketFilter {
 const filters: TicketFilter[] = [
   { key: "todos", label: "Todos", countKey: "all" },
   { key: "abiertos", label: "Abiertos", countKey: "open" },
-  { key: "por-vencer", label: "Por vencer", countKey: "upcoming" },
   { key: "vencidos", label: "Vencidos", countKey: "overdue" },
   { key: "espera", label: "En espera del cliente", countKey: "waitingOnClient" },
   { key: "cerrados", label: "Cerrados", countKey: "closed" },
 ];
 
-// Solo dos tags visibles en la barra principal; el resto queda en el menú Más.
-const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos"];
-const primaryFilters = filters.filter((f) => PRIMARY_FILTER_KEYS.includes(f.key));
-const secondaryFilters = filters.filter((f) => !PRIMARY_FILTER_KEYS.includes(f.key));
+const primaryFilters = filters.filter((f) => f.key === "todos" || f.key === "abiertos");
 
 // Múltiplos de 3 para mantener la simetría exacta de la cuadrícula 3×3 en escritorio.
 const CARD_PAGE_SIZES = [9, 18, 27, 45];
+
+const DEFAULT_SORT_VALUE = "actividad:desc";
 
 const sortFilterOptions: TicketFilterOption[] = [
   { value: "actividad:desc", label: "Actividad reciente" },
@@ -118,17 +115,17 @@ const priorityOptions = [
   { value: "Baja", label: "Baja" },
 ];
 
-const STATUS_MENU_WIDTH = 224;
+const SORT_MENU_WIDTH = 248;
 
-interface TicketStatusMenuProps {
-  options: TicketFilter[];
-  activeKey: TicketFilterKey;
-  counts?: TicketCounts;
-  onSelect: (key: TicketFilterKey) => void;
+interface TicketSortMenuProps {
+  sortValue: string;
+  sortOptions: TicketFilterOption[];
+  onSortChange: (value: string) => void;
+  hasOverdueTickets?: boolean;
 }
 
-/** Vistas de estado menos usadas, en un panel flotante (mismo patron que el filtro de la bandeja de correo). */
-function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatusMenuProps) {
+/** Orden de las tarjetas (sin vistas duplicadas respecto a los filtros del encabezado). */
+function TicketSortMenu({ sortValue, sortOptions, onSortChange, hasOverdueTickets }: TicketSortMenuProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ top: number; left: number; originX: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -174,14 +171,13 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
     }
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const left = Math.max(8, rect.right - STATUS_MENU_WIDTH);
+    const left = Math.max(8, rect.right - SORT_MENU_WIDTH);
     setAnchor({ top: rect.bottom + 6, left, originX: rect.left + rect.width / 2 - left });
     setOpen(true);
   }
 
-  const active = options.find((option) => option.key === activeKey);
-  const activeCount = active && counts ? counts[active.countKey] : 0;
-  const hasOverdueSecondary = (counts?.overdue ?? 0) > 0;
+  const activeSort = sortOptions.find((option) => option.value === sortValue);
+  const menuLabel = activeSort?.label ?? "Ordenar por";
 
   return (
     <div className="relative shrink-0">
@@ -192,28 +188,18 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={mounted ? panelId : undefined}
-        aria-label={active ? `Más vistas (activa: ${active.label})` : "Más vistas"}
-        title={active ? `Vista activa: ${active.label}` : "Más vistas"}
-        className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-          active || open
-            ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+        aria-label={`Ordenar por (activo: ${menuLabel})`}
+        title={`Orden: ${menuLabel}`}
+        className={`inline-flex h-7 w-[11rem] shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] font-medium transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+          open
+            ? "border-zinc-200 bg-white text-zinc-900 shadow-2xs"
+            : "border-transparent text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
         }`}
       >
-        <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
-        <span>{active ? active.label : "Más"}</span>
-        {active ? (
-          <span
-            className={`font-heading text-[10px] font-bold leading-none tabular-nums ${
-              active.key === "vencidos" && activeCount > 0 ? "text-brand-red" : "text-zinc-900"
-            }`}
-          >
-            {activeCount}
-          </span>
-        ) : (
-          hasOverdueSecondary && (
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-red" title="Hay tickets vencidos" />
-          )
+        <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+        <span className="min-w-0 truncate">{menuLabel}</span>
+        {hasOverdueTickets && (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red" title="Hay tickets vencidos" />
         )}
         <ChevronDown
           className={`h-3 w-3 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-zinc-700" : ""}`}
@@ -227,14 +213,14 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
             ref={panelRef}
             id={panelId}
             role="menu"
-            aria-label="Más vistas de estado"
+            aria-label="Ordenar tickets"
             aria-hidden={exiting}
             onKeyDown={handleMenuKeyDown}
             style={{
               position: "fixed",
               top: anchor.top,
               left: anchor.left,
-              width: STATUS_MENU_WIDTH,
+              width: SORT_MENU_WIDTH,
               transformOrigin: `${anchor.originX}px top`,
             }}
             className={`z-[60] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
@@ -243,43 +229,30 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
               }`}
           >
             <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
-              Vistas de estado
+              Ordenar por
             </div>
-            {options.map(({ key, label, countKey }) => {
-              const isActive = key === activeKey;
-              const count = counts?.[countKey] ?? 0;
-              const isOverdue = key === "vencidos" && count > 0;
+            {sortOptions.map(({ value, label }) => {
+              const isActive = value === sortValue;
               return (
                 <button
-                  key={key}
+                  key={value}
                   data-motion-item
                   type="button"
                   role="menuitemradio"
                   aria-checked={isActive}
                   onClick={() => {
-                    onSelect(key);
+                    onSortChange(value);
                     setOpen(false);
                     triggerRef.current?.focus();
                   }}
-                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left
-                    text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-                      isActive
-                        ? "bg-zinc-100 font-semibold text-zinc-900"
-                        : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-zinc-900"
-                    }`}
+                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                    isActive
+                      ? "bg-zinc-100 font-semibold text-zinc-900"
+                      : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-zinc-900"
+                  }`}
                 >
-                  <span className={isOverdue ? "font-semibold text-brand-red" : ""}>{label}</span>
-                  <span
-                    className={`rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums ${
-                      isOverdue
-                        ? "bg-red-50 text-brand-red font-bold"
-                        : isActive
-                        ? "bg-zinc-200 text-zinc-900"
-                        : "bg-zinc-100 text-zinc-500"
-                    }`}
-                  >
-                    {count}
-                  </span>
+                  <span>{label}</span>
+                  {isActive ? <Check className="size-3.5 shrink-0 text-zinc-600" aria-hidden /> : null}
                 </button>
               );
             })}
@@ -533,14 +506,33 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
   const [bulkPriority, setBulkPriority] = useState("Normal");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [staffOptions, setStaffOptions] = useState<TicketStaffOptionResponse[]>([]);
+  const prevOriginRef = useRef(origin);
+  const [listMotionKey, setListMotionKey] = useState(0);
+  const [listEnterMotion, setListEnterMotion] = useState<"forward" | "back">("forward");
 
   useEffect(() => {
     departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
   }, []);
 
+  useLayoutEffect(() => {
+    if (prevOriginRef.current === origin) return;
+    setListEnterMotion(origin === "legacy" ? "forward" : "back");
+    prevOriginRef.current = origin;
+    setFilter("todos");
+    setSelectedIds(new Set());
+    setListMotionKey((key) => key + 1);
+  }, [origin]);
+
+  // «Por vencer» ya no es vista aparte: mismo criterio que ordenar por SLA próximo a vencer.
+  useEffect(() => {
+    if (filter !== "por-vencer") return;
+    setFilter("todos");
+    setSort({ key: "sla", dir: "asc" });
+  }, [filter]);
+
   const canCreateTicket = can("tickets.create");
 
-  const { data, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
+  const { data, isStale, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
     fetch: ticketsApi.list,
     criteria: {
       pageSize,
@@ -559,8 +551,9 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
 
   useEffect(() => onTicketsChanged(refresh), [onTicketsChanged, refresh]);
 
-  const rows: TicketListItemResponse[] = data?.items ?? [];
-  const counts = data?.counts;
+  const listLoading = data === null || isStale;
+  const rows: TicketListItemResponse[] = isStale ? [] : (data?.items ?? []);
+  const counts = isStale ? undefined : data?.counts;
   const hasCriteria =
     Boolean(debouncedSearch) || filter !== "todos" || departmentId !== "todos" || priority !== "todas";
 
@@ -737,6 +730,7 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
               </span>
             ),
             to: TICKETS_LIST_ROUTES.actuales,
+            end: true,
           },
           {
             label: (
@@ -750,11 +744,15 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
               </span>
             ),
             to: TICKETS_LIST_ROUTES.historico,
+            end: true,
           },
         ]}
         summary={
           counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+            <div
+              key={origin}
+              className="animate-plf-header-fade flex flex-wrap items-center gap-1.5 tabular-nums"
+            >
               <HeaderTag
                 label={counts.all === 1 ? "ticket" : "tickets"}
                 count={counts.all}
@@ -809,21 +807,6 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
                 </>
               )}
 
-              {filter === "por-vencer" && (
-                <>
-                  <span aria-hidden className="text-zinc-300">·</span>
-                  <HeaderTag
-                    label="por vencer"
-                    count={counts.upcoming}
-                    active={filter === "por-vencer"}
-                    onClick={() => setFilter("por-vencer")}
-                    tone="amber"
-                    dot
-                    title="Filtrar por tickets por vencer"
-                  />
-                </>
-              )}
-
               {filter === "cerrados" && (
                 <>
                   <span aria-hidden className="text-zinc-300">·</span>
@@ -859,7 +842,12 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+      <div
+        key={listMotionKey}
+        className={`min-h-0 flex-1 overflow-y-auto pb-8 ${
+          listEnterMotion === "forward" ? "animate-plf-side-panel-in" : "animate-plf-side-panel-back"
+        }`}
+      >
         {/* Barra de herramientas en una sola línea: selección, búsqueda, filtros y orden a la izquierda; vistas de estado a la derecha */}
         <div className="mb-3.5 grid min-h-8">
           {showCriteria && (
@@ -915,15 +903,6 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
                   defaultIcon={priorityFilterDefaultIcon}
                   aria-label="Filtrar por prioridad"
                 />
-                <TicketFilterDropdown
-                  title="Ordenar tarjetas por"
-                  value={sortValue}
-                  onChange={handleSortChange}
-                  options={sortFilterOptions}
-                  defaultIcon={<ArrowUpDown className="h-3.5 w-3.5 text-zinc-500" />}
-                  aria-label="Ordenar tickets"
-                />
-
                 {(search || departmentId !== "todos" || priority !== "todas") && (
                   <button
                     type="button"
@@ -941,7 +920,7 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
                 )}
               </div>
 
-              {/* Vistas de estado: Todos y Abiertos a la vista, el resto en Más. Un solo control segmentado. */}
+              {/* Vista rápida: Todos y Abiertos; orden en el menú contiguo. */}
               <div
                 role="group"
                 aria-label="Vista de estado"
@@ -973,11 +952,11 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
                     </button>
                   );
                 })}
-                <TicketStatusMenu
-                  options={secondaryFilters}
-                  activeKey={filter}
-                  counts={counts}
-                  onSelect={setFilter}
+                <TicketSortMenu
+                  sortValue={sortValue}
+                  sortOptions={sortFilterOptions}
+                  onSortChange={handleSortChange}
+                  hasOverdueTickets={(counts?.overdue ?? 0) > 0}
                 />
               </div>
             </div>
@@ -1000,7 +979,7 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
         </div>
 
         {/* Superficie de resultados: las 9 tarjetas flotan directamente sobre el lienzo tintado (sin anidar tarjetas) */}
-        {!data ? (
+        {listLoading ? (
           error === null && <TicketCardsSkeleton count={pageSize} />
         ) : rows.length === 0 ? (
           <section className="overflow-hidden rounded-card border border-line bg-white shadow-card">
@@ -1046,7 +1025,7 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
               })}
             </div>
 
-            {data.total > 0 && (
+            {data && data.total > 0 && (
               <div className="mt-2">
                 <Pagination
                   page={data.page}

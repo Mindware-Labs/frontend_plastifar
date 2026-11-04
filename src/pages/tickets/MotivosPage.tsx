@@ -471,7 +471,13 @@ export function MotivosPage() {
                     )}
                     <Td className="text-[13px] font-medium text-ink">{topic.name}</Td>
                     <Td className="text-[12.5px] text-ink">
-                      {departmentPathById.get(topic.defaultDepartmentId) ?? topic.defaultDepartmentName}
+                      {topic.defaultDepartmentId == null ? (
+                        <span className="text-zinc-400 font-normal">—</span>
+                      ) : (
+                        departmentPathById.get(topic.defaultDepartmentId) ??
+                        topic.defaultDepartmentName ??
+                        "—"
+                      )}
                     </Td>
                     <Td>
                       <span

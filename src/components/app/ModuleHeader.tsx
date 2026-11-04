@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
-import type { ReactNode } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { useMemo, useRef, type ReactNode } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { useModuleHeaderSectionIndicator } from "../../hooks/useModuleHeaderSectionIndicator";
 
 /** Alinea bloques bajo el header con el título cuando hay botón volver (32px + gap-x-3). */
 export const MODULE_HEADER_TITLE_GUTTER_CLASS = "pl-11";
@@ -11,6 +12,8 @@ export const MODULE_HEADER_CONTENT_BAND_CLASS = "pl-11 pr-3 lg:pr-4";
 export interface ModuleHeaderSection {
   label: ReactNode;
   to?: string;
+  /** Igual que NavLink `end` (p. ej. /tickets sin absorber /tickets/historico). */
+  end?: boolean;
   active?: boolean;
   onClick?: () => void;
 }
@@ -56,6 +59,33 @@ export function ModuleHeader({
   className = "",
 }: ModuleHeaderProps) {
   const hasHeading = title !== undefined || summary !== undefined || backTo !== undefined || onBack !== undefined;
+  const location = useLocation();
+  const sectionsNavRef = useRef<HTMLElement>(null);
+
+  const activeSectionKey = useMemo(() => {
+    if (!sections?.length) return null;
+    let best: string | null = null;
+    for (const section of sections) {
+      if (!section.to) continue;
+      const end = section.end ?? true;
+      const matches = end
+        ? location.pathname === section.to
+        : location.pathname === section.to || location.pathname.startsWith(`${section.to}/`);
+      if (!matches) continue;
+      if (!best || section.to.length > best.length) best = section.to;
+    }
+    return best;
+  }, [sections, location.pathname]);
+
+  const { rect: sectionIndicator, motion: sectionIndicatorMotion } = useModuleHeaderSectionIndicator(
+    sectionsNavRef,
+    activeSectionKey,
+  );
+
+  const sectionIndicatorMotionClass =
+    sectionIndicatorMotion === "travel"
+      ? "transition-[left,width] duration-[320ms] ease-plf-spring motion-reduce:transition-none"
+      : "transition-none";
 
   return (
     <div
@@ -108,20 +138,33 @@ export function ModuleHeader({
 
         <div className="flex h-full items-center gap-3">
           {sections && sections.length > 0 && (
-            <nav aria-label="Secciones de la ficha" className="flex h-full items-center gap-1 self-stretch">
+            <nav
+              ref={sectionsNavRef}
+              aria-label="Secciones de la ficha"
+              className="relative flex h-full items-center gap-1 self-stretch"
+            >
+              <span
+                aria-hidden
+                className={`pointer-events-none absolute bottom-0 h-0.5 rounded-full bg-brand-red ${sectionIndicatorMotionClass}`}
+                style={{
+                  left: sectionIndicator.left,
+                  width: sectionIndicator.width,
+                  opacity: sectionIndicator.visible ? 1 : 0,
+                }}
+              />
               {sections.map((section, idx) => {
                 const navClass = (isActive: boolean) =>
-                  `flex h-full items-center border-b-2 px-2.5 text-[12.5px] font-medium transition-all duration-150 ease-out -mb-px whitespace-nowrap cursor-pointer select-none ` +
+                  `flex h-full items-center border-b-2 border-transparent px-2.5 text-[12.5px] font-medium transition-[color] duration-200 ease-out -mb-px whitespace-nowrap cursor-pointer select-none ` +
                   (isActive
-                    ? "border-brand-red text-zinc-900 font-semibold"
-                    : "border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300/80");
+                    ? "text-zinc-900 font-semibold"
+                    : "text-zinc-500 hover:text-zinc-900");
 
                 if (section.to) {
                   return (
                     <NavLink
                       key={section.to}
                       to={section.to}
-                      end
+                      end={section.end ?? true}
                       className={({ isActive }) => navClass(isActive)}
                     >
                       {section.label}
