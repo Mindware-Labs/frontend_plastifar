@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import { useAppleListMotion } from "../../hooks/useAppleListMotion";
 
 /** Deben coincidir con plf-composer-row-in / plf-composer-row-out en index.css. */
-export const COMPOSER_FIELD_ENTER_MS = 400;
-export const COMPOSER_FIELD_EXIT_MS = 400;
+export const COMPOSER_FIELD_ENTER_MS = 480;
+export const COMPOSER_FIELD_EXIT_MS = 480;
 
 export const COMPOSER_CC_KEY = "cc";
 export const COMPOSER_BCC_KEY = "bcc";

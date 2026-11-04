@@ -38,7 +38,9 @@ export function AppleMotionBlock({
   children,
 }: AppleMotionBlockProps) {
   const preset = ROW_PRESET_CLASS[rowPreset];
-  const collapsed = phase === "from" || phase === "hold" || phase === "out";
+  const collapseOnExit =
+    phase === "out" || (rowPreset === "composer" && phase === "arm");
+  const collapsed = phase === "from" || phase === "hold" || collapseOnExit;
   const ready = phase === "hold" || phase === "in" || phase === "arm" || phase === "out";
   const motion = phase === "out" || phase === "arm" ? "out" : phase === "idle" ? "idle" : "in";
 

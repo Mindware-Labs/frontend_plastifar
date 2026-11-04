@@ -153,6 +153,8 @@
   --ease-plf-spring: linear(0, 0.023 4.2%, 0.081 8.3%, 0.160 12.5%, 0.251 16.7%, 0.345 20.8%, 0.438 25%, 0.526 29.2%, 0.606 33.3%, 0.678 37.5%, 0.741 41.7%, 0.795 45.8%, 0.840 50%, 0.878 54.2%, 0.909 58.3%, 0.934 62.5%, 0.953 66.7%, 0.968 70.8%, 0.979 75%, 0.987 79.2%, 0.993 83.3%, 0.996 87.5%, 0.999 91.7%, 1.000 95.8%, 1);
   /* Curva de planeo ágil y premium: arranque inmediato con aterrizaje suave y sin lag */
   --ease-plf-glide: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Paneles laterales y filas de compositor (p. ej. comentarios de tarea). */
+  --ease-plf-panel: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 html {
@@ -964,21 +966,15 @@ input:-webkit-autofill:focus {
   animation: plf-apple-row-wash 480ms var(--ease-plf-spring) both;
 }
 
-/* CC/CCO al redactar: entrada/salida simétricas 400 ms (useComposerFieldMotion). */
+/* CC/CCO y respuestas a notas: mismo planeo que panel de comentarios (useComposerFieldMotion). */
 @keyframes plf-composer-row-in {
   0% {
     opacity: 0;
-    transform: translate3d(0, -6px, 0);
-    filter: blur(1px);
-  }
-  32% {
-    opacity: 1;
-    filter: blur(0);
+    transform: translate3d(0, 8px, 0) scale(0.985);
   }
   100% {
     opacity: 1;
     transform: none;
-    filter: none;
   }
 }
 
@@ -986,16 +982,10 @@ input:-webkit-autofill:focus {
   0% {
     opacity: 1;
     transform: none;
-    filter: none;
-  }
-  68% {
-    opacity: 1;
-    filter: blur(0);
   }
   100% {
     opacity: 0;
-    transform: translate3d(0, -6px, 0);
-    filter: blur(1px);
+    transform: translate3d(0, 8px, 0) scale(0.985);
   }
 }
 
@@ -1007,19 +997,26 @@ input:-webkit-autofill:focus {
   grid-template-rows: 0fr;
 }
 .plf-composer-row-shell[data-ready="true"] {
-  transition: grid-template-rows 400ms var(--ease-plf-spring);
+  transition: grid-template-rows 480ms var(--ease-plf-panel);
   will-change: grid-template-rows;
 }
 .plf-composer-row-shell[data-motion="out"][data-ready="true"] {
-  transition-duration: 400ms;
+  transition-duration: 480ms;
+}
+.plf-composer-row-shell > .plf-apple-row-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.plf-composer-row-shell[data-motion="idle"][data-collapsed="false"] > .plf-apple-row-clip {
+  overflow: visible;
 }
 
 .animate-plf-composer-row-in {
-  animation: plf-composer-row-in 400ms var(--ease-plf-spring) both;
+  animation: plf-composer-row-in 480ms var(--ease-plf-panel) both;
   will-change: transform, opacity;
 }
 .animate-plf-composer-row-out {
-  animation: plf-composer-row-out 400ms var(--ease-plf-spring) both;
+  animation: plf-composer-row-out 480ms var(--ease-plf-panel) both;
   will-change: transform, opacity;
 }
 
