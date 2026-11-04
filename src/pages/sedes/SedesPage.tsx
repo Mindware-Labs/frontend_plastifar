@@ -51,7 +51,7 @@ export function SedesPage() {
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, error, page, setPage, refresh } = usePagedList<
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<
     PagedSedeQuery,
     Awaited<ReturnType<typeof sedesApi.list>>
   >({
@@ -68,7 +68,8 @@ export function SedesPage() {
   useLoadErrorReceipt(error, "sedes-list", refresh);
   useActionErrorReceipt(actionError, "sedes-action");
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
 
@@ -334,6 +335,7 @@ export function SedesPage() {
           footer={
             data && data.total > 0 && (
               <Pagination
+                loading={listLoading}
                 page={page}
                 pageSize={pageSize}
                 total={data.total}
@@ -345,8 +347,8 @@ export function SedesPage() {
             )
           }
         >
-          {data === undefined ? (
-            !error && <TableSkeleton rows={6} columns={5} />
+          {listLoading ? (
+            error === null && <TableSkeleton rows={pageSize} columns={5} />
           ) : rows.length === 0 ? (
             <p className="py-14 text-center text-[13.5px] text-faint">
               {isFiltering
@@ -354,7 +356,8 @@ export function SedesPage() {
                 : "Todavía no hay ninguna sede registrada."}
             </p>
           ) : (
-            <DataTable>
+            <div className="plf-results-in">
+              <DataTable>
               <thead>
                 <HeadRow>
                   {canWrite && (
@@ -460,6 +463,7 @@ export function SedesPage() {
                 })}
               </tbody>
             </DataTable>
+            </div>
           )}
         </ListPanel>
       </div>

@@ -18,7 +18,7 @@ import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { Team } from "../../types/settings";
-import { freshCopy, staleClass } from "./catalogState";
+import { freshCopy } from "./catalogState";
 import { TeamModal } from "./TeamModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -56,7 +56,8 @@ export function TeamsSection() {
 
   useLoadErrorReceipt(error, "settings-teams-list", refresh);
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos" || onlyWithoutMembers;
 
@@ -212,6 +213,7 @@ export function TeamsSection() {
           data !== null &&
           data.total > 0 && (
             <Pagination
+              loading={listLoading}
               page={page}
               pageSize={pageSize}
               total={data.total}
@@ -223,7 +225,7 @@ export function TeamsSection() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={4} />
         ) : rows.length === 0 ? (
           <p className="py-14 text-center text-[13.5px] text-faint">
@@ -232,7 +234,7 @@ export function TeamsSection() {
               : "Todavía no hay ningún equipo registrado."}
           </p>
         ) : (
-          <div className={staleClass(isStale)}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

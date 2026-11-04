@@ -139,7 +139,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { data, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
+  const { data, isStale, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
     fetch: clientsApi.list,
     criteria: {
       pageSize,
@@ -154,7 +154,8 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
     pageKey: "pagina",
   });
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const unfiltered =
     chip === "todos" && salesRepId === "todos" && type === "todos" && !debouncedSearch;
@@ -459,13 +460,14 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
         footer={
           <ServerPagination
             data={data}
+            loading={listLoading}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
             noun="clientes"
           />
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
           <EmptyResult

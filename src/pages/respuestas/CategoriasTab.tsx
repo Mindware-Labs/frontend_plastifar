@@ -49,7 +49,7 @@ export function CategoriasTab({
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, error, setPage, refresh } = usePagedList({
+  const { data, isStale, error, setPage, refresh } = usePagedList({
     fetch: cannedCategoriesApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined },
     fallbackError: "No se pudieron cargar las categorías.",
@@ -68,7 +68,8 @@ export function CategoriasTab({
 
   useLoadErrorReceipt(error, "canned-categories-list", refresh);
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const hasSearch = Boolean(debouncedSearch);
 
   // Selección múltiple
@@ -189,6 +190,7 @@ export function CategoriasTab({
         footer={
           data !== null && data.total > 0 ? (
             <Pagination
+              loading={listLoading}
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
@@ -200,7 +202,7 @@ export function CategoriasTab({
           ) : undefined
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={canMailSend ? 6 : 5} />
         ) : rows.length === 0 ? (
           <ListEmptyState

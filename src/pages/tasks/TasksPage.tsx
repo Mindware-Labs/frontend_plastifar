@@ -116,7 +116,7 @@ export function TasksPage() {
     [departments],
   );
 
-  const { data, error, setPage, refresh } = usePagedList<TaskQuery, TaskListResponse>({
+  const { data, isStale, error, setPage, refresh } = usePagedList<TaskQuery, TaskListResponse>({
     fetch: tasksApi.list,
     criteria: {
       pageSize,
@@ -131,7 +131,8 @@ export function TasksPage() {
     fallbackError: "No se pudieron cargar las tareas",
   });
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
 
   // Multi-row selection
@@ -350,6 +351,7 @@ export function TasksPage() {
         footer={
           data !== null && (
             <Pagination
+              loading={listLoading}
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
@@ -361,7 +363,7 @@ export function TasksPage() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
           <EmptyResult

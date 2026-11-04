@@ -71,7 +71,7 @@ export function DepartmentsPage() {
   // Paginación real de servidor mediante usePagedList
   const {
     data,
-    // transición de página manejada en DataTable
+    isStale,
     error,
     page,
     setPage,
@@ -93,6 +93,9 @@ export function DepartmentsPage() {
     },
     fallbackError: "No se pudieron cargar los departamentos",
   });
+
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
 
   useLoadErrorReceipt(error, "departments-list", refresh);
 
@@ -132,7 +135,7 @@ export function DepartmentsPage() {
   }, [sedesList]);
 
   // Manejo de casillas de selección
-  const pageIds = useMemo(() => data?.items.map((d) => d.id) ?? [], [data?.items]);
+  const pageIds = useMemo(() => rows.map((d) => d.id), [rows]);
 
   const pageState: boolean | "mixed" = useMemo(() => {
     if (pageIds.length === 0) return false;
@@ -464,6 +467,7 @@ export function DepartmentsPage() {
           footer={
             data && data.total > 0 && (
               <Pagination
+                loading={listLoading}
                 page={page}
                 pageSize={pageSize}
                 total={data.total}
@@ -476,9 +480,9 @@ export function DepartmentsPage() {
             )
           }
         >
-          {data === null ? (
-            <TableSkeleton rows={8} columns={7} />
-          ) : data.items.length === 0 ? (
+          {listLoading ? (
+            <TableSkeleton rows={pageSize} columns={7} />
+          ) : rows.length === 0 ? (
             <p className="py-14 text-center text-[13.5px] text-faint">
               {isFiltering
                 ? "Ningún departamento coincide con este filtro o búsqueda."
@@ -510,7 +514,7 @@ export function DepartmentsPage() {
                   </HeadRow>
                 </thead>
                 <tbody>
-                  {data.items.map((d) => {
+                  {rows.map((d) => {
                     const checked = selectedIds.has(d.id);
                     const propios = d.staffCount ?? 0;
 

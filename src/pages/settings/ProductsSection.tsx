@@ -25,7 +25,7 @@ import {
   type Product,
   type ProductLine,
 } from "../../types/settings";
-import { freshCopy, staleClass, useReferenceData } from "./catalogState";
+import { freshCopy, useReferenceData } from "./catalogState";
 import { ProductImportModal } from "./ProductImportModal";
 import { ProductModal } from "./ProductModal";
 
@@ -100,7 +100,8 @@ export function ProductsSection() {
     },
   );
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const isFiltering =
     debouncedSearch !== "" || chip !== "todos" || plantId !== TODOS || productLineId !== TODOS;
@@ -294,6 +295,7 @@ export function ProductsSection() {
           data !== null &&
           data.total > 0 && (
             <Pagination
+              loading={listLoading}
               page={page}
               pageSize={pageSize}
               total={data.total}
@@ -305,7 +307,7 @@ export function ProductsSection() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={5} />
         ) : rows.length === 0 ? (
           <p className="py-14 text-center text-[13.5px] text-faint">
@@ -314,7 +316,7 @@ export function ProductsSection() {
               : "Todavía no hay ningún producto registrado. Crea uno o carga el catálogo desde un archivo."}
           </p>
         ) : (
-          <div className={staleClass(isStale)}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

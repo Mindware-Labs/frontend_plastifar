@@ -358,6 +358,7 @@ export function ReportsPage() {
                 {payload.data.total > 0 && (
                   <div className="mt-3">
                     <Pagination
+                      loading={isGenerating}
                       page={payload.data.page}
                       pageSize={payload.data.pageSize}
                       total={payload.data.total}

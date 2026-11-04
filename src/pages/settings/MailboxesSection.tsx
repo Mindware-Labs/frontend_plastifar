@@ -23,7 +23,7 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { DepartmentResponse } from "../../types/api";
 import { providerLabel, type Mailbox } from "../../types/settings";
-import { freshCopy, staleClass, useReferenceData } from "./catalogState";
+import { freshCopy, useReferenceData } from "./catalogState";
 import { MailboxModal } from "./MailboxModal";
 import { departmentPath } from "../../lib/departments";
 
@@ -88,7 +88,8 @@ export function MailboxesSection() {
     departmentsRef.reload,
   );
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
 
@@ -250,6 +251,7 @@ export function MailboxesSection() {
           data !== null &&
           data.total > 0 && (
             <Pagination
+              loading={listLoading}
               page={page}
               pageSize={pageSize}
               total={data.total}
@@ -261,7 +263,7 @@ export function MailboxesSection() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={6} />
         ) : rows.length === 0 ? (
           <ListEmptyState
@@ -281,7 +283,7 @@ export function MailboxesSection() {
             }
           />
         ) : (
-          <div className={staleClass(isStale)}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

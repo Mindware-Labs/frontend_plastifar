@@ -92,7 +92,7 @@ export function StaffPage() {
       .catch(() => setDepartments([]));
   }, []);
 
-  const { data, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
+  const { data, isStale, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
     fetch: staffApi.list,
     criteria: {
       pageSize,
@@ -109,7 +109,8 @@ export function StaffPage() {
   useLoadErrorReceipt(error, "staff-list", refresh);
   useActionErrorReceipt(bulkError, "staff-bulk");
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const unfiltered = filter === "todos" && departmentId === "todos" && !debouncedSearch;
 
@@ -484,13 +485,14 @@ export function StaffPage() {
           footer={
             <ServerPagination
               data={data}
+              loading={listLoading}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
               noun="colaboradores"
             />
           }
         >
-          {data === null ? (
+          {listLoading ? (
             error === null && <TableSkeleton rows={pageSize} columns={8} />
           ) : rows.length === 0 ? (
             <EmptyResult

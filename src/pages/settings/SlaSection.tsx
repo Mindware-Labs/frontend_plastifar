@@ -27,7 +27,7 @@ import { humanizeMinutes, workdayMinutes } from "../../lib/sla";
 import { invalidateActiveSlaPoliciesCache } from "../../lib/useActiveSlaPolicies";
 import { priorityFilterDefaultIcon, priorityFilterOptions } from "../../lib/priorityFilterOptions";
 import type { Holiday, Priority, SlaPolicy, SlaPolicyType } from "../../types/settings";
-import { freshCopy, staleClass, useReferenceData } from "./catalogState";
+import { freshCopy, useReferenceData } from "./catalogState";
 import { SlaModal } from "./SlaModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
@@ -87,7 +87,8 @@ export function SlaSection() {
   const holidaysRef = useReferenceData<Holiday[]>(loadHolidays, []);
   const holidays = holidaysRef.data;
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todas" || priority !== "todas" || typeFilter !== "todas";
 
@@ -366,6 +367,7 @@ export function SlaSection() {
           data !== null &&
           data.total > 0 && (
             <Pagination
+              loading={listLoading}
               page={page}
               pageSize={pageSize}
               total={data.total}
@@ -377,7 +379,7 @@ export function SlaSection() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={canWrite ? 10 : 9} />
         ) : rows.length === 0 ? (
           <ListEmptyState
@@ -395,7 +397,7 @@ export function SlaSection() {
             emptyDescription="Crea una política para definir plazos de respuesta y resolución en tickets y tareas."
           />
         ) : (
-          <div className={staleClass(isStale)}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>

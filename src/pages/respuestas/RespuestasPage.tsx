@@ -64,7 +64,7 @@ export function RespuestasPage() {
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, error, setPage, refresh } = usePagedList({
+  const { data, isStale, error, setPage, refresh } = usePagedList({
     fetch: cannedApi.list,
     criteria: {
       pageSize,
@@ -91,7 +91,8 @@ export function RespuestasPage() {
     loadCategories();
   }
 
-  const items = data?.items ?? null;
+  const listLoading = data === null || isStale;
+  const items = isStale ? [] : (data?.items ?? null);
 
   const parsedItems = useMemo(() => {
     return (items ?? []).map((item) => {
@@ -350,6 +351,7 @@ export function RespuestasPage() {
             footer={
               data !== null && data.total > 0 ? (
                 <Pagination
+                  loading={listLoading}
                   page={data.page}
                   pageSize={data.pageSize}
                   total={data.total}
@@ -361,7 +363,7 @@ export function RespuestasPage() {
               ) : undefined
             }
           >
-            {items === null ? (
+            {listLoading ? (
               error === null && <TableSkeleton rows={pageSize} columns={canMailSend ? 10 : 9} />
             ) : rows.length === 0 ? (
               <ListEmptyState

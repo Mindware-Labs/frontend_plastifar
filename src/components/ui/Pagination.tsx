@@ -14,6 +14,7 @@ interface PaginationProps {
   layout?: "toolbar" | "panel";
   pageSizes?: number[];
   rowsLabel?: string;
+  loading?: boolean;
 }
 
 const defaultPageSizes = [10, 25, 50];
@@ -279,6 +280,7 @@ export function Pagination({
   layout = "toolbar",
   pageSizes,
   rowsLabel,
+  loading = false,
 }: PaginationProps) {
   if (total === 0) return null;
 
@@ -287,27 +289,33 @@ export function Pagination({
 
   if (layout === "panel") {
     return (
-      <PanelPagination
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        totalPages={totalPages}
-        from={from}
-        to={to}
-        noun={noun}
-        nounSingular={nounSingular}
-        onPageChange={onPageChange}
-        onPageSizeChange={onPageSizeChange}
-        pageSizes={pageSizes}
-        rowsLabel={rowsLabel}
-      />
+      <div className={loading ? "pointer-events-none opacity-50 transition-opacity" : "transition-opacity"}>
+        <PanelPagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          totalPages={totalPages}
+          from={from}
+          to={to}
+          noun={noun}
+          nounSingular={nounSingular}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+          pageSizes={pageSizes}
+          rowsLabel={rowsLabel}
+        />
+      </div>
     );
   }
 
   const label = nounLabel(total, noun, nounSingular);
 
   return (
-    <div className="flex flex-nowrap items-center justify-between gap-3 py-2 text-[12px] text-subtle">
+    <div
+      className={`flex flex-nowrap items-center justify-between gap-3 py-2 text-[12px] text-subtle transition-opacity ${
+        loading ? "pointer-events-none opacity-50" : ""
+      }`}
+    >
       <p
         className="flex min-w-0 items-center gap-2.5 tabular-nums"
         title={`Mostrando ${from} a ${to} de ${total}`}

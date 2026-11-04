@@ -109,13 +109,14 @@ export function ClaimsPage() {
     dir: sort.dir,
   };
 
-  const { data, error, setPage, refresh } = usePagedList<ClaimQuery, ClaimListResponse>({
+  const { data, isStale, error, setPage, refresh } = usePagedList<ClaimQuery, ClaimListResponse>({
     fetch: claimsApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las reclamaciones. Vuelve a intentarlo.",
   });
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
 
   // Multi-row selection
@@ -368,6 +369,7 @@ export function ClaimsPage() {
         footer={
           data !== null && (
             <Pagination
+              loading={listLoading}
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
@@ -380,7 +382,7 @@ export function ClaimsPage() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={8} />
         ) : rows.length === 0 ? (
           <ListEmptyState

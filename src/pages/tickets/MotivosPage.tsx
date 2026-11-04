@@ -73,7 +73,7 @@ export function MotivosPage() {
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
 
-  const { data, error, setPage, refresh } = usePagedList<
+  const { data, isStale, error, setPage, refresh } = usePagedList<
     TicketTopicQuery,
     TicketTopicListResponse
   >({
@@ -95,7 +95,8 @@ export function MotivosPage() {
     departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
   }, []);
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
   const pageIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
@@ -394,6 +395,7 @@ export function MotivosPage() {
           footer={
             data !== null && data.total > 0 ? (
               <Pagination
+                loading={listLoading}
                 page={data.page}
                 pageSize={data.pageSize}
                 total={data.total}
@@ -405,7 +407,7 @@ export function MotivosPage() {
             ) : undefined
           }
         >
-          {!data ? (
+          {listLoading ? (
             error === null && <TableSkeleton rows={pageSize} columns={isAdmin ? 8 : 7} />
           ) : rows.length === 0 ? (
             <ListEmptyState

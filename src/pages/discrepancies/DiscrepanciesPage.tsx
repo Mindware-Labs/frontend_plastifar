@@ -76,13 +76,14 @@ export function DiscrepanciesPage() {
     dir: sort.dir,
   };
 
-  const { data, error, setPage, refresh } = usePagedList<DiscrepancyQuery, DiscrepancyListResponse>({
+  const { data, isStale, error, setPage, refresh } = usePagedList<DiscrepancyQuery, DiscrepancyListResponse>({
     fetch: discrepanciesApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las investigaciones. Vuelve a intentarlo.",
   });
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
   const pageIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
@@ -332,6 +333,7 @@ export function DiscrepanciesPage() {
         footer={
           data !== null && (
             <Pagination
+              loading={listLoading}
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
@@ -344,7 +346,7 @@ export function DiscrepanciesPage() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
           <ListEmptyState

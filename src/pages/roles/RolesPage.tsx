@@ -16,7 +16,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
@@ -82,7 +82,7 @@ export function RolesPage() {
   const [pageSize, setPageSize] = useState(10);
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, error, setPage, refresh } = usePagedList<RoleQuery, RoleListResponse>({
+  const { data, isStale, error, setPage, refresh } = usePagedList<RoleQuery, RoleListResponse>({
     fetch: rolesApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined, status: filter },
     fallbackError: "No se pudieron cargar los roles",
@@ -91,7 +91,8 @@ export function RolesPage() {
   useLoadErrorReceipt(error, "roles-list", refresh);
   useActionErrorReceipt(actionError, "roles-action");
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const unfiltered = filter === "todos" && !debouncedSearch;
 
@@ -394,6 +395,7 @@ export function RolesPage() {
           footer={
             data !== null && data.total > 0 ? (
               <Pagination
+                loading={listLoading}
                 page={data.page}
                 pageSize={data.pageSize}
                 total={data.total}
@@ -405,10 +407,8 @@ export function RolesPage() {
             ) : undefined
           }
         >
-        {data === null ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
+        {listLoading ? (
+          error === null && <TableSkeleton rows={pageSize} columns={6} />
         ) : (
           <div className="plf-results-in">
             <DataTable>

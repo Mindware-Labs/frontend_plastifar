@@ -117,7 +117,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   // Pestaña de Contactos
   const {
     data: contactPage,
-    // transición de página manejada en DataTable
+    isStale: contactsStale,
     error: contactsError,
     setPage: setContactPage,
     refresh: refreshContacts,
@@ -134,7 +134,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   // Pestaña de Historial de Tickets
   const {
     data: ticketPage,
-    // transición de página manejada en DataTable
+    isStale: ticketsStale,
     error: ticketsError,
     setPage: setTicketPage,
     refresh: refreshTickets,
@@ -149,12 +149,14 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     fallbackError: "No se pudieron cargar los tickets del cliente",
   });
 
-  const contactRows = contactPage?.items ?? [];
+  const contactsLoading = contactPage === null || contactsStale;
+  const contactRows = contactsStale ? [] : (contactPage?.items ?? []);
   const contactCounts = contactPage?.counts;
   const contactsUnfiltered = contactChip === "todos" && !debouncedContactSearch;
   const totalContacts = contactCounts?.all ?? client?.contactCount ?? 0;
 
-  const ticketRows = ticketPage?.items ?? [];
+  const ticketsLoading = ticketPage === null || ticketsStale;
+  const ticketRows = ticketsStale ? [] : (ticketPage?.items ?? []);
   const ticketCounts = ticketPage?.counts;
   const totalTickets = ticketCounts?.all ?? ticketPage?.total ?? client?.ticketCount ?? 0;
 
@@ -790,6 +792,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                 footer={
                   contactPage !== null && (
                     <Pagination
+                      loading={contactsLoading}
                       page={contactPage.page}
                       pageSize={contactPage.pageSize}
                       total={contactPage.total}
@@ -801,7 +804,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   )
                 }
               >
-                {contactPage === null ? (
+                {contactsLoading ? (
                   contactsError === null && <TableSkeleton rows={contactPageSize} columns={7} />
                 ) : contactRows.length === 0 ? (
                   contactsUnfiltered ? (
@@ -972,6 +975,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                 footer={
                   ticketPage !== null && (
                     <Pagination
+                      loading={ticketsLoading}
                       page={ticketPage.page}
                       pageSize={ticketPage.pageSize}
                       total={ticketPage.total}
@@ -983,7 +987,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   )
                 }
               >
-                {ticketPage === null ? (
+                {ticketsLoading ? (
                   ticketsError === null && <TableSkeleton rows={ticketPageSize} columns={7} />
                 ) : ticketRows.length === 0 ? (
                   <div className="py-12 text-center">
