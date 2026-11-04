@@ -532,6 +532,7 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
   const canCreateTicket = can("tickets.create");
 
   const { data, isStale, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
+    queryKey: ["tickets"],
     fetch: ticketsApi.list,
     criteria: {
       pageSize,

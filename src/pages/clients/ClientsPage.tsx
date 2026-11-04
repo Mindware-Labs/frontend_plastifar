@@ -156,6 +156,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
   }, []);
 
   const { data, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
+    queryKey: ["clients"],
     fetch: clientsApi.list,
     criteria: {
       pageSize,

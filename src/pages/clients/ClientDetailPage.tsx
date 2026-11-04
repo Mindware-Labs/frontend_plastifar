@@ -126,6 +126,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     setPage: setContactPage,
     refresh: refreshContacts,
   } = usePagedList<ContactQuery, ContactListResponse>({
+    queryKey: ["clients", clientId, "contacts"],
     fetch: (query) => clientsApi.contacts.list(clientId, query),
     criteria: {
       pageSize: contactPageSize,
@@ -143,6 +144,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     setPage: setTicketPage,
     refresh: refreshTickets,
   } = usePagedList<TicketQuery, TicketListResponse>({
+    queryKey: ["tickets", "by-client", clientId],
     fetch: (query) => ticketsApi.list(query),
     criteria: {
       clientId,

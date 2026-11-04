@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 import { ApiError } from "../api/client";
 
 interface PagedData {
@@ -7,6 +8,12 @@ interface PagedData {
 }
 
 interface Options<TQuery extends { page: number }, TData extends PagedData> {
+  /**
+   * Identifica el listado en la cache. Debe incluir todo lo que la funcion
+   * `fetch` lee por fuera de `criteria` (p. ej. el id del cliente en sus
+   * contactos): dos listados con la misma clave comparten datos.
+   */
+  queryKey: readonly unknown[];
   fetch: (query: TQuery) => Promise<TData>;
   /** Todo lo que no es la pagina. Cambiar cualquier criterio vuelve a la primera. */
   criteria: Omit<TQuery, "page">;
@@ -17,17 +24,30 @@ interface Options<TQuery extends { page: number }, TData extends PagedData> {
   pageKey?: string;
 }
 
-/** Listado paginado con descarte de respuestas obsoletas y persistencia de vista. */
+/**
+ * Listado paginado sobre TanStack Query.
+ *
+ * Conserva la interfaz de la version con `useEffect` —`data`, `isStale`,
+ * `error`, `page`, `setPage`, `refresh`— para que las pantallas no cambien:
+ *
+ * - `data` es la ultima respuesta, aunque sea de los criterios anteriores
+ *   (`keepPreviousData`): la tabla no se vacia mientras llega la nueva pagina.
+ * - `isStale` es true mientras se muestra esa respuesta anterior.
+ * - `error` es el mensaje en español del ultimo fallo, o null.
+ * - `refresh` relee en segundo plano sin marcar la vista como obsoleta.
+ *
+ * Lo que gana: volver a una lista ya visitada pinta al instante lo que habia y
+ * la relee detras, y dos montajes simultaneos (StrictMode) piden una sola vez.
+ * Las respuestas viejas se descartan solas porque cada pagina tiene su clave.
+ */
 export function usePagedList<TQuery extends { page: number }, TData extends PagedData>({
+  queryKey,
   fetch,
   criteria,
   fallbackError,
   enabled = true,
 }: Options<TQuery, TData>) {
   const [page, setPage] = useState(1);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [snapshot, setSnapshot] = useState<{ key: string; data: TData } | null>(null);
 
   const criteriaKey = JSON.stringify(criteria);
   const [lastCriteria, setLastCriteria] = useState(criteriaKey);
@@ -38,44 +58,30 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
 
   const queryJson = JSON.stringify({ ...criteria, page });
 
-  // La funcion de consulta se lee por ref: el efecto no debe reejecutarse por ella.
-  const fetchRef = useRef(fetch);
-  useEffect(() => {
-    fetchRef.current = fetch;
+  const query = useQuery({
+    queryKey: [...queryKey, "paged", queryJson],
+    queryFn: () => fetch(JSON.parse(queryJson) as TQuery),
+    enabled,
+    placeholderData: keepPreviousData,
   });
 
-  useEffect(() => {
-    if (!enabled) return;
-
-    let cancelled = false;
-
-    fetchRef
-      .current(JSON.parse(queryJson) as TQuery)
-      .then((data) => {
-        if (cancelled) return;
-        setSnapshot({ key: queryJson, data });
-        setError(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : fallbackError);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [queryJson, reloadKey, fallbackError, enabled]);
-
-  const data = snapshot?.data ?? null;
-  const isStale = snapshot !== null && snapshot.key !== queryJson;
+  const data = query.data ?? null;
+  const isStale = query.isPlaceholderData;
+  const error = query.error
+    ? query.error instanceof ApiError
+      ? query.error.message
+      : fallbackError
+    : null;
 
   // Borrar la ultima fila de la ultima pagina deja la pagina fuera de rango.
-  if (data && data.totalPages > 0 && page > data.totalPages) setPage(data.totalPages);
+  if (data && !isStale && data.totalPages > 0 && page > data.totalPages) setPage(data.totalPages);
 
+  const { refetch } = query;
   /** Tras cada cambio se relee la pagina en segundo plano sin marcar la vista como obsoleta. */
+  // Con `enabled: false` la version anterior tampoco pedia nada al refrescar.
   const refresh = useCallback(() => {
-    setReloadKey((value) => value + 1);
-  }, []);
+    if (enabled) void refetch();
+  }, [refetch, enabled]);
 
   return { data, isStale, error, page, setPage, refresh };
 }

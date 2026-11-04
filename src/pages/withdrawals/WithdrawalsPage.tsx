@@ -82,6 +82,7 @@ export function WithdrawalsPage() {
   };
 
   const { data, error, setPage, refresh } = usePagedList<WithdrawalQuery, WithdrawalListResponse>({
+    queryKey: ["withdrawals"],
     fetch: withdrawalsApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las solicitudes de retiro. Vuelve a intentarlo.",

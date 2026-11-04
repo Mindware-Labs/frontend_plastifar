@@ -50,6 +50,7 @@ export function TerritoriesSection() {
     PagedTerritoryQuery,
     Awaited<ReturnType<typeof territoriesApi.list>>
   >({
+    queryKey: ["territories"],
     fetch: territoriesApi.list,
     criteria: {
       pageSize,

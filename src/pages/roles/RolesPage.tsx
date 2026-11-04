@@ -83,6 +83,7 @@ export function RolesPage() {
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const { data, error, setPage, refresh } = usePagedList<RoleQuery, RoleListResponse>({
+    queryKey: ["roles"],
     fetch: rolesApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined, status: filter },
     fallbackError: "No se pudieron cargar los roles",

@@ -43,6 +43,7 @@ export function ProductLinesSection() {
   // Seccion 4.1: la pagina, el filtro, la busqueda y los contadores los resuelve
   // SQL. La vista solo dibuja lo que llega.
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    queryKey: ["product-lines"],
     fetch: settingsApi.productLines.list,
     criteria: {
       pageSize,

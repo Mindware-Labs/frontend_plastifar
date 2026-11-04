@@ -4,9 +4,8 @@ import React, { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { departmentsApi } from "../../api/departments";
-import { fetchAllPages } from "../../api/paging";
-import { rolesApi } from "../../api/roles";
 import { sedesApi } from "../../api/sedes";
+import { catalogs, fetchCatalog } from "../../lib/catalogQueries";
 import { Alert } from "../../components/ui/Alert";
 import {
   CheckboxField,
@@ -61,6 +60,7 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
   const { isExiting, requestClose } = useModalAnimation();
 
   const sedesRef = useReferenceData<Sede[]>(
+    ["sedes", "all"],
     async () => {
       const res = await sedesApi.list({ includeInactive: true, pageSize: 100 });
       return res.items;
@@ -69,7 +69,8 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
   );
 
   const rolesRef = useReferenceData<RoleResponse[]>(
-    () => fetchAllPages((page, pageSize) => rolesApi.list({ page, pageSize, dir: "asc" })),
+    catalogs.roles().queryKey,
+    () => fetchCatalog(catalogs.roles()),
     [],
   );
 

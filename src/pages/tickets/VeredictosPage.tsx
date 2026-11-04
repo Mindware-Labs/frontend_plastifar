@@ -46,6 +46,7 @@ export function VeredictosPage() {
     TicketVerdictQuery,
     TicketVerdictListResponse
   >({
+    queryKey: ["ticket-verdicts"],
     fetch: ticketVerdictsApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined, status },
     fallbackError: "No se pudieron cargar los veredictos",

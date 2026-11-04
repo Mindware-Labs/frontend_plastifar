@@ -77,6 +77,7 @@ export function DiscrepanciesPage() {
   };
 
   const { data, error, setPage, refresh } = usePagedList<DiscrepancyQuery, DiscrepancyListResponse>({
+    queryKey: ["discrepancies"],
     fetch: discrepanciesApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las investigaciones. Vuelve a intentarlo.",

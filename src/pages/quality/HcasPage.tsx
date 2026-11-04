@@ -106,6 +106,7 @@ export function HcasPage() {
   };
 
   const { data, error, setPage, refresh } = usePagedList<HcaQuery, SheetListResponse>({
+    queryKey: ["quality-sheets"],
     fetch: qualityApi.sheets.list,
     criteria,
     fallbackError: "No se pudieron cargar las HCA. Vuelve a intentarlo.",

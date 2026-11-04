@@ -50,6 +50,7 @@ export function PlantsSection() {
   // Seccion 4.1: la pagina, los filtros, la busqueda y los contadores los
   // resuelve SQL. La vista solo dibuja lo que llega.
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    queryKey: ["plants"],
     fetch: settingsApi.plants.list,
     criteria: {
       pageSize,

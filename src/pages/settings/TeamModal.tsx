@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
-import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { catalogs, fetchCatalog } from "../../lib/catalogQueries";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -64,7 +64,8 @@ export function TeamModal({ team, onClose, onSaved, onMembersChanged }: TeamModa
      falla, el campo conserva la que el equipo ya tenia y lo dice, en vez de
      vaciarla y borrar el dato al guardar. */
   const plantsRef = useReferenceData<Plant[]>(
-    () => fetchAllPages((page, pageSize) => settingsApi.plants.list({ page, pageSize })),
+    catalogs.plants().queryKey,
+    () => fetchCatalog(catalogs.plants()),
     [],
   );
 
@@ -225,6 +226,7 @@ interface TeamMembersProps {
  */
 function TeamMembers({ teamId, onChanged }: TeamMembersProps) {
   const membersRef = useReferenceData<TeamMember[] | null>(
+    ["teams", teamId, "members"],
     () => settingsApi.teams.members.list(teamId),
     null,
   );

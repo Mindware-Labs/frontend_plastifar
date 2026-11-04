@@ -44,6 +44,7 @@ export function TeamsSection() {
   // Seccion 4.1: la pagina, los filtros, la busqueda, los contadores y el
   // numero de integrantes los resuelve SQL. La vista solo dibuja lo que llega.
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    queryKey: ["teams"],
     fetch: settingsApi.teams.list,
     criteria: {
       pageSize,

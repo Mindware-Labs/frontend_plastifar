@@ -1,8 +1,8 @@
 import { Ban, CheckCircle2, Clock, Layers, ListTodo, Pencil, Plus, Power, Star, Ticket } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
-import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { catalogs, fetchCatalog } from "../../lib/catalogQueries";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -31,11 +31,6 @@ import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { SlaModal } from "./SlaModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
-
-const loadHolidays = () =>
-  fetchAllPages<Holiday>((page, pageSize) =>
-    settingsApi.holidays.list({ page, pageSize, status: "activos" }),
-  );
 
 function toRequest(policy: SlaPolicy): Omit<SlaPolicy, "id"> {
   return {
@@ -73,6 +68,7 @@ export function SlaSection() {
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    queryKey: ["sla-policies"],
     fetch: settingsApi.slaPolicies.list,
     criteria: {
       pageSize,
@@ -84,7 +80,7 @@ export function SlaSection() {
     fallbackError: "No se pudieron cargar las políticas de SLA",
   });
 
-  const holidaysRef = useReferenceData<Holiday[]>(loadHolidays, []);
+  const holidaysRef = useReferenceData<Holiday[]>(catalogs.activeHolidays().queryKey, () => fetchCatalog(catalogs.activeHolidays()), []);
   const holidays = holidaysRef.data;
 
   const rows = useMemo(() => data?.items ?? [], [data?.items]);

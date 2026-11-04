@@ -1,7 +1,7 @@
 import { Factory, FileUp, Layers, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
+import { catalogs, fetchCatalog } from "../../lib/catalogQueries";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -65,11 +65,13 @@ export function ProductsSection() {
      dos filtros y las opciones del dialogo. Un fallo no vacia la pantalla; los
      filtros quedan sin opciones y el dialogo conserva lo que el producto tenia. */
   const plantsRef = useReferenceData<Plant[]>(
-    () => fetchAllPages((page, size) => settingsApi.plants.list({ page, pageSize: size })),
+    catalogs.plants().queryKey,
+    () => fetchCatalog(catalogs.plants()),
     [],
   );
   const linesRef = useReferenceData<ProductLine[]>(
-    () => fetchAllPages((page, size) => settingsApi.productLines.list({ page, pageSize: size })),
+    catalogs.productLines().queryKey,
+    () => fetchCatalog(catalogs.productLines()),
     [],
   );
   const referencesFailed = plantsRef.failed || linesRef.failed;
@@ -77,6 +79,7 @@ export function ProductsSection() {
   // Seccion 4.1: la pagina, los filtros, la busqueda y los contadores los
   // resuelve SQL. La vista solo dibuja lo que llega.
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    queryKey: ["products"],
     fetch: settingsApi.products.list,
     criteria: {
       pageSize,

@@ -93,6 +93,7 @@ export function StaffPage() {
   }, []);
 
   const { data, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
+    queryKey: ["staff"],
     fetch: staffApi.list,
     criteria: {
       pageSize,

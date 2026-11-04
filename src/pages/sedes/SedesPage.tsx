@@ -55,6 +55,7 @@ export function SedesPage() {
     PagedSedeQuery,
     Awaited<ReturnType<typeof sedesApi.list>>
   >({
+    queryKey: ["sedes"],
     fetch: sedesApi.list,
     criteria: {
       pageSize,

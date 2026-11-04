@@ -3,7 +3,8 @@
 // Viven aparte de catalogSection.tsx porque mezclar hooks y componentes en un
 // mismo modulo rompe el refresco rapido de Vite.
 
-import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Contenedor de resultados sin velo blanco: la transición de página la ejecuta DataTable sobre las filas. */
 export function staleClass(_isStale: boolean): string {
@@ -20,42 +21,34 @@ export function staleClass(_isStale: boolean): string {
  * Un fallo aqui no vacia la pantalla: se expone en `failed` para que la seccion
  * lo diga con su reintento en vez de pintar guiones como si no hubiera datos.
  */
-export function useReferenceData<T>(load: () => Promise<T>, initial: T) {
-  const [data, setData] = useState<T>(initial);
-  const [failed, setFailed] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  // La funcion se lee por ref: la seccion la vuelve a crear en cada render y el
-  // efecto no debe reejecutarse por eso.
+export function useReferenceData<T>(
+  /** Clave en la cache de TanStack Query. Si `load` es un catalogo, la del catalogo. */
+  queryKey: readonly unknown[],
+  load: () => Promise<T>,
+  initial: T,
+) {
+  // La funcion se lee por ref: la seccion la vuelve a crear en cada render y la
+  // consulta no debe cambiar por eso.
   const loadRef = useRef(load);
   useEffect(() => {
     loadRef.current = load;
   });
 
-  useEffect(() => {
-    let cancelled = false;
+  const query = useQuery({
+    queryKey: ["reference", ...queryKey],
+    queryFn: () => loadRef.current(),
+  });
 
-    loadRef
-      .current()
-      .then((value) => {
-        if (cancelled) return;
-        setData(value);
-        setFailed(false);
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
+  // El valor inicial se fija una vez: quien llama suele pasar un `[]` literal
+  // nuevo en cada render, y devolverlo tal cual reejecutaba sus efectos.
+  const [fallback] = useState(initial);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadKey]);
+  const { refetch } = query;
+  const reload = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
-  function reload() {
-    setReloadKey((value) => value + 1);
-  }
-
-  return { data, failed, reload };
+  return { data: query.data ?? fallback, failed: query.isError, reload };
 }
 
 /**

@@ -110,6 +110,7 @@ export function ClaimsPage() {
   };
 
   const { data, error, setPage, refresh } = usePagedList<ClaimQuery, ClaimListResponse>({
+    queryKey: ["claims"],
     fetch: claimsApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las reclamaciones. Vuelve a intentarlo.",

@@ -65,6 +65,7 @@ export function RespuestasPage() {
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const { data, error, setPage, refresh } = usePagedList({
+    queryKey: ["canned"],
     fetch: cannedApi.list,
     criteria: {
       pageSize,

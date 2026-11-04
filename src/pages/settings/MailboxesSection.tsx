@@ -71,6 +71,7 @@ export function MailboxesSection() {
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
+    queryKey: ["mailboxes"],
     fetch: settingsApi.mailboxes.list,
     criteria: {
       pageSize,
@@ -80,7 +81,7 @@ export function MailboxesSection() {
     fallbackError: "No se pudieron cargar los buzones",
   });
 
-  const departmentsRef = useReferenceData<DepartmentResponse[]>(departmentsApi.list, []);
+  const departmentsRef = useReferenceData<DepartmentResponse[]>(["departments", "all"], departmentsApi.list, []);
   const departments = departmentsRef.data;
 
   useLoadErrorReceipt(error, "settings-mailboxes-list", refresh);

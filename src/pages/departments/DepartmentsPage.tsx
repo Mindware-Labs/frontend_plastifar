@@ -77,6 +77,7 @@ export function DepartmentsPage() {
     setPage,
     refresh,
   } = usePagedList<PagedDepartmentQuery, DepartmentListResponse>({
+    queryKey: ["departments"],
     fetch: departmentsApi.listPaged,
     criteria: {
       pageSize,
@@ -97,6 +98,7 @@ export function DepartmentsPage() {
   useLoadErrorReceipt(error, "departments-list", refresh);
 
   const { data: sedesList } = useReferenceData(
+    ["sedes", "active"],
     () => sedesApi.list({ includeInactive: false, pageSize: 100 }),
     null,
   );

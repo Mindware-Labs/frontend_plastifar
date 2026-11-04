@@ -1,5 +1,6 @@
 import { API_URL } from "../lib/env";
 import { decodeAccessToken } from "../lib/jwt";
+import { markAllStale } from "../lib/queryClient";
 import type { LoginResponse } from "../types/api";
 import { tokenStore } from "./tokenStore";
 
@@ -244,6 +245,10 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) throw await readError(response);
+
+  // Una escritura aceptada deja vieja la cache de lecturas (ver queryClient.ts).
+  const method = (options.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") markAllStale();
 
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
