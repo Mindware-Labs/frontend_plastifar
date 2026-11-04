@@ -112,6 +112,8 @@ export interface TaskDetail {
   contactName: string | null;
   emailId: number | null;
   emailSubject: string | null;
+  ticketId: number | null;
+  ticketNumber: string | null;
   origin: TaskOrigin;
   dueDate: string | null;
   slaPolicyId: number | null;
@@ -154,6 +156,7 @@ export interface UpdateTaskRequest {
   status: TaskStatus | null;
   clientId: number | null;
   contactId: number | null;
+  ticketId?: number | null;
   dueDate: string | null;
 }
 

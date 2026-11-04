@@ -33,9 +33,17 @@ export interface ClaimDocumentSheetProps {
   claim: CustomerClaim;
   onBack?: () => void;
   backLabel?: string;
+  /** Sustituye el código del ticket en cabecera e impresión (p. ej. TAR-… desde una tarea). */
+  contextCodeOverride?: string;
 }
 
-export function ClaimDocumentSheet({ claim, onBack, backLabel = "Volver" }: ClaimDocumentSheetProps) {
+export function ClaimDocumentSheet({
+  claim,
+  onBack,
+  backLabel = "Volver",
+  contextCodeOverride,
+}: ClaimDocumentSheetProps) {
+  const caseCode = contextCodeOverride?.trim() || claim.ticketNumber || String(claim.id);
   const [topicNames, setTopicNames] = useState<string[]>([]);
 
   useEffect(() => {
@@ -57,10 +65,10 @@ export function ClaimDocumentSheet({ claim, onBack, backLabel = "Volver" }: Clai
   return (
     <PrintSheet
       orientation="portrait"
-      title={`${CLAIM_FORM_CONTROL.code} · ${claim.ticketNumber || claim.id}`}
+      title={`${CLAIM_FORM_CONTROL.code} · ${caseCode}`}
       backLabel={backLabel}
       onBack={onBack}
-      filename={`${CLAIM_FORM_CONTROL.code}_${claim.ticketNumber || claim.id}.pdf`}
+      filename={`${CLAIM_FORM_CONTROL.code}_${caseCode}.pdf`}
       onExportExcel={() => exportClaimToExcel(claim)}
     >
       {/** Cabecera: A1:I1 y F3:F4 */}
@@ -77,7 +85,7 @@ export function ClaimDocumentSheet({ claim, onBack, backLabel = "Volver" }: Clai
             <span className="font-semibold">Fecha de la Reclamación:</span> {formatDay(claim.claimDate)}
           </p>
           <p>
-            <span className="font-semibold">Código:</span> <span className="font-mono">{claim.ticketNumber}</span>
+            <span className="font-semibold">Código:</span> <span className="font-mono">{caseCode}</span>
           </p>
         </div>
       </header>

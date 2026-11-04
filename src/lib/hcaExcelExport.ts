@@ -1,6 +1,7 @@
 import type { ActionPlanItem, CorrectiveActionSheet } from "../types/quality";
 import { qualityApi } from "../api/quality";
 import { formatDay } from "./dates";
+import { caseReferenceColumnLabel } from "./formCaseReference";
 import { hcaProductLabel } from "./hcaForm109";
 
 export async function downloadWorkbook(wb: any, filename: string): Promise<void> {
@@ -80,7 +81,7 @@ export async function exportHcaToExcel(
   if (fullSheet.clientName) {
     let clientLine = `Cliente: ${fullSheet.clientName}`;
     if (fullSheet.ticketNumber) {
-      clientLine += ` · Ticket: ${fullSheet.ticketNumber}`;
+      clientLine += ` · ${caseReferenceColumnLabel(fullSheet.ticketNumber)}: ${fullSheet.ticketNumber}`;
     }
     hechoParts.push(clientLine);
   }

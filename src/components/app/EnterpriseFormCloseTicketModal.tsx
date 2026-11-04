@@ -19,6 +19,8 @@ export interface EnterpriseFormCloseTicketModalProps {
   extraAlert?: ReactNode;
   receiptTitle?: string;
   receiptDetail?: string;
+  /** Cuando el formulario se abrió desde una tarea, el copy habla de tarea y usa su código. */
+  formHostKind?: "ticket" | "task";
   onClose: () => void;
   onSuccess: () => void;
   onTicketStatusChanged?: () => void;
@@ -34,16 +36,18 @@ export function EnterpriseFormCloseTicketModal({
   ticketId,
   formCode,
   recordNumber,
-  descriptionText = "El formulario ha sido registrado exitosamente. Puedes dar por concluido y cerrar este ticket indicando el veredicto oficial y el comentario de resolución.",
+  descriptionText,
   defaultReason,
   extraAlert,
-  receiptTitle = "Ticket cerrado y solucionado",
+  receiptTitle,
   receiptDetail,
+  formHostKind = "ticket",
   onClose,
   onSuccess,
   onTicketStatusChanged,
 }: EnterpriseFormCloseTicketModalProps) {
   const receipts = useReceipts();
+  const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
   const [closing, setClosing] = useState(false);
   const [verdicts, setVerdicts] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedVerdictId, setSelectedVerdictId] = useState<string>("");
@@ -78,6 +82,12 @@ export function EnterpriseFormCloseTicketModal({
 
   if (!open) return null;
 
+  const resolvedDescription =
+    descriptionText ??
+    `El formulario ha sido registrado exitosamente. Puedes dar por concluido y cerrar esta ${hostLabel} indicando el veredicto oficial y el comentario de resolución.`;
+  const resolvedReceiptTitle =
+    receiptTitle ?? (formHostKind === "task" ? "Tarea completada" : "Ticket cerrado y solucionado");
+
   const handleConfirmClose = async () => {
     if (ticketId <= 0) {
       onClose();
@@ -100,10 +110,10 @@ export function EnterpriseFormCloseTicketModal({
 
       receipts.done({
         action: "cerrar-ticket",
-        title: receiptTitle,
+        title: resolvedReceiptTitle,
         detail:
           receiptDetail ||
-          `El ticket ha sido marcado como solucionado en base a ${recordNumber}.`,
+          `La ${hostLabel} ha sido marcada como solucionada en base a ${recordNumber}.`,
       });
 
       onTicketStatusChanged?.();
@@ -111,9 +121,9 @@ export function EnterpriseFormCloseTicketModal({
     } catch (err) {
       receipts.failed({
         action: "error-cerrar-ticket",
-        title: "No se pudo cerrar el ticket",
+        title: `No se pudo cerrar la ${hostLabel}`,
         detail:
-          err instanceof ApiError ? err.message : "Error al actualizar estado del ticket",
+          err instanceof ApiError ? err.message : `Error al actualizar el estado de la ${hostLabel}`,
       });
     } finally {
       setClosing(false);
@@ -123,7 +133,7 @@ export function EnterpriseFormCloseTicketModal({
 
   return (
     <Modal
-      title="¿Deseas cerrar este ticket ahora?"
+      title={`¿Deseas cerrar esta ${hostLabel} ahora?`}
       eyebrow={`${formCode} · Resolución de caso`}
       onClose={onClose}
       maxWidth="max-w-xl"
@@ -136,7 +146,7 @@ export function EnterpriseFormCloseTicketModal({
             size="sm"
             onClick={onClose}
           >
-            Mantener ticket abierto
+            {formHostKind === "task" ? "Mantener tarea abierta" : "Mantener ticket abierto"}
           </Button>
           <Button
             type="button"
@@ -146,7 +156,7 @@ export function EnterpriseFormCloseTicketModal({
             onClick={handleConfirmClose}
           >
             <CheckCircle2 className="mr-1.5 size-4" />
-            {closing ? "Cerrando..." : "Sí, cerrar ticket"}
+            {closing ? "Cerrando..." : formHostKind === "task" ? "Sí, completar tarea" : "Sí, cerrar ticket"}
           </Button>
         </div>
       }
@@ -162,7 +172,7 @@ export function EnterpriseFormCloseTicketModal({
                 {recordNumber}
               </h4>
               <p className="text-xs leading-relaxed text-zinc-600">
-                {descriptionText}
+                {resolvedDescription}
               </p>
             </div>
           </div>

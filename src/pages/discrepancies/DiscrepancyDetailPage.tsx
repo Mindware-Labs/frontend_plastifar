@@ -19,6 +19,7 @@ import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useDetail } from "../../hooks/useDetail";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatInstant } from "../../lib/dates";
+import { caseReferenceColumnLabel } from "../../lib/formCaseReference";
 import { NOTIFICATION_ITEM, describeStatus } from "../../lib/discrepancies";
 import { formatQuantity } from "../../lib/numbers";
 import type {
@@ -220,7 +221,7 @@ export function DiscrepancyDetailPage() {
                 {discrepancy.hasSecurityFinding && <SecurityFindingBadge />}
               </span>
             </DetailRow>
-            <DetailRow label="Ticket">
+            <DetailRow label={caseReferenceColumnLabel(discrepancy.ticketNumber)}>
               <Link to={`/tickets/${discrepancy.ticketId}`} className="font-mono text-[12.5px] text-ink hover:text-brand-red">
                 {discrepancy.ticketNumber}
               </Link>

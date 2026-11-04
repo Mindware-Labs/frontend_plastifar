@@ -26,13 +26,18 @@ export interface DiscrepancyDocumentSheetProps {
   discrepancy: LoadDiscrepancy;
   onBack?: () => void;
   backLabel?: string;
+  contextCodeOverride?: string;
+  referenceKindLabel?: string;
 }
 
 export function DiscrepancyDocumentSheet({
   discrepancy,
   onBack,
   backLabel = "Volver",
+  contextCodeOverride,
+  referenceKindLabel = "Ticket",
 }: DiscrepancyDocumentSheetProps) {
+  const referenceCode = contextCodeOverride?.trim() || discrepancy.ticketNumber;
   const lines = padRows(discrepancy.lines ?? [], 6);
   const cell = "border border-black px-0.5 py-0.5 align-middle text-[8px] leading-tight";
   const checks = discrepancy.checks ?? [];
@@ -66,7 +71,8 @@ export function DiscrepancyDocumentSheet({
           <span className="font-semibold">Investigación:</span> <span className="font-mono">{discrepancy.number}</span>
         </span>
         <span>
-          <span className="font-semibold">Ticket:</span> <span className="font-mono">{discrepancy.ticketNumber}</span>
+          <span className="font-semibold">{referenceKindLabel}:</span>{" "}
+          <span className="font-mono">{referenceCode}</span>
         </span>
         <span>
           <span className="font-semibold">Fecha:</span> {formatDay(discrepancy.createdAt.slice(0, 10))}

@@ -19,13 +19,18 @@ export interface WithdrawalDocumentSheetProps {
   withdrawal: MerchandiseWithdrawal;
   onBack?: () => void;
   backLabel?: string;
+  contextCodeOverride?: string;
+  referenceKindLabel?: string;
 }
 
 export function WithdrawalDocumentSheet({
   withdrawal,
   onBack,
   backLabel = "Volver",
+  contextCodeOverride,
+  referenceKindLabel = "Ticket",
 }: WithdrawalDocumentSheetProps) {
+  const referenceCode = contextCodeOverride?.trim() || withdrawal.ticketNumber;
   const { day, month, year } = splitIsoDate(withdrawal.requestDate);
   const sortedLines = [...(withdrawal.lines ?? [])].sort((a, b) => a.position - b.position);
   const lines = padRows(sortedLines, 15);
@@ -45,8 +50,10 @@ export function WithdrawalDocumentSheet({
           <Logo height={42} />
           <div className="text-right text-[10px] text-zinc-700">
             <span className="font-mono font-semibold text-black">{withdrawal.number}</span>
-            {withdrawal.ticketNumber && (
-              <span className="ml-3 font-mono text-zinc-600">Ticket: {withdrawal.ticketNumber}</span>
+            {referenceCode && (
+              <span className="ml-3 font-mono text-zinc-600">
+                {referenceKindLabel}: {referenceCode}
+              </span>
             )}
           </div>
         </div>

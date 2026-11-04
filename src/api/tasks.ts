@@ -32,6 +32,12 @@ export const tasksApi = {
 
   get: (id: number) => apiRequest<TaskDetail>(`/api/tasks/${id}`),
 
+  /** Crea o reutiliza el ticket operativo de los PF-FOR de la tarea (sin vincular a mano). */
+  ensureFormTicket: (id: number) =>
+    apiRequest<{ ticketId: number; ticketNumber: string }>(`/api/tasks/${id}/form-ticket`, {
+      method: "POST",
+    }),
+
   senderMatch: (email: string) =>
     apiRequest<SenderMatch>(`/api/tasks/sender-match${toQuery({ email })}`),
 

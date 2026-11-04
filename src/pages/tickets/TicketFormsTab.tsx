@@ -63,6 +63,7 @@ import { HcaStatusBadge, PlanItemStatusBadge } from "../quality/StatusBadges";
 import { WithdrawalFormModal } from "../withdrawals/WithdrawalFormModal";
 import { WithdrawalStatusBadge } from "../withdrawals/WithdrawalStatusBadge";
 import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
+import { TaskFormHostLinkSubtitle, TaskScopeCodeKpi } from "../../lib/taskFormPresentation";
 
 export type EnterpriseFormType = "reclamacion" | "retiro" | "discrepancia" | "hca";
 
@@ -77,6 +78,12 @@ export interface RegisteredFormItem {
 
 interface TicketFormsTabProps {
   ticket: TicketDetailResponse;
+  /** En tareas independientes la UI es la misma pero el copy habla de la tarea. */
+  formScope?: "ticket" | "task";
+  standaloneTaskId?: number;
+  standaloneTaskStatus?: string;
+  taskNumber?: string;
+  taskTitle?: string;
   onHasFormsChanged?: (hasForms: boolean) => void;
   onTicketStatusChanged?: () => void;
   onViewDocument?: (form: RegisteredFormItem) => void;
@@ -95,12 +102,36 @@ interface CommonExtractedData {
 
 export function TicketFormsTab({
   ticket,
+  formScope = "ticket",
+  standaloneTaskId,
+  standaloneTaskStatus,
+  taskNumber,
+  taskTitle,
   onHasFormsChanged,
   onTicketStatusChanged,
   onViewDocument,
 }: TicketFormsTabProps) {
   const navigate = useNavigate();
   const { can } = usePermissions();
+  const scopeLabel = formScope === "task" ? "tarea" : "ticket";
+  const taskScopeCode = taskNumber?.trim() || "—";
+  const scopeCode = formScope === "task" ? taskScopeCode : ticket.number;
+  const scopeSubject = formScope === "task" ? (taskTitle ?? ticket.subject) : ticket.subject;
+  const scopeReferenceLabel = `${scopeCode} · ${scopeSubject}`;
+  const hostKindLabel = formScope === "task" ? "Tarea" : "Ticket";
+  const hostTaskProps =
+    formScope === "task"
+      ? { hostTaskId: standaloneTaskId, hostTaskStatus: standaloneTaskStatus }
+      : {};
+
+  /** En ficha de tarea: mismo ancho que Datos/Notas (sin pl-11 del header de tickets). */
+  const embeddedInTask = formScope === "task";
+  const inlineFormShellClass = embeddedInTask
+    ? "w-full min-w-0"
+    : `mt-3.5 w-full min-w-0 ${MODULE_HEADER_CONTENT_BAND_CLASS}`;
+  const formsTabShellClass = embeddedInTask
+    ? "min-w-0 w-full space-y-3.5 animate-plf-fade"
+    : `mt-3.5 min-w-0 space-y-4 animate-plf-fade ${MODULE_HEADER_CONTENT_BAND_CLASS}`;
 
   const canReadClaims = can("claims.read", ticket.departmentId ?? undefined);
   const canWriteClaims = can("claims.write", ticket.departmentId ?? undefined);
@@ -227,7 +258,7 @@ export function TicketFormsTab({
     setHcaInitialDefaults(initDefaults ?? {
       clientId: ticket.clientId ?? 0,
       ticketId: ticket.id,
-      description: ticket.subject,
+      description: scopeSubject,
     });
     setHcaModalOpen(true);
   };
@@ -355,7 +386,13 @@ export function TicketFormsTab({
       const hasAny = Boolean(foundClaim || foundWith.length > 0 || foundDisc.length > 0 || foundSheets.length > 0);
       onHasFormsChanged?.(hasAny);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Error al cargar los formularios del ticket");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : formScope === "task"
+            ? "Error al cargar los formularios de la tarea"
+            : "Error al cargar los formularios del ticket",
+      );
     } finally {
       setLoading(false);
     }
@@ -726,12 +763,15 @@ export function TicketFormsTab({
       handleOpenNewHca({
         clientId: ticket.clientId ?? 0,
         ticketId: ticket.id,
-        description: data.description || ticket.subject,
+        description: data.description || scopeSubject,
       });
     }
   };
 
-  if (loading) {
+  const inlineFormOpen =
+    claimModalOpen || withdrawalModalOpen || discrepancyModalOpen || hcaModalOpen;
+
+  if (loading && !inlineFormOpen) {
     return <TicketFormsSkeleton />;
   }
 
@@ -746,11 +786,11 @@ export function TicketFormsTab({
   // RENDER MODO PÁGINA: reclamación PF-FOR-034
   if (claimModalOpen) {
     return (
-      <div className={`mt-3.5 w-full min-w-0 ${MODULE_HEADER_CONTENT_BAND_CLASS}`}>
+      <div className={inlineFormShellClass}>
         <ClaimFormModal
           inline
           ticketId={ticket.id}
-          ticketNumber={ticket.number}
+          ticketNumber={scopeCode}
           ticketTopicId={ticket.topicId}
           clientName={ticket.clientName ?? "Cliente"}
           contactName={ticket.contactName ?? ticket.clientContactPersonName}
@@ -758,7 +798,9 @@ export function TicketFormsTab({
           clientPhone={ticket.clientPhone}
           clientContactPersonName={ticket.clientContactPersonName}
           ticketProducts={ticket.products}
-          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
+          fixedTicketLabel={scopeReferenceLabel}
+          formHostKind={formScope}
+          {...hostTaskProps}
           ticketStatus={ticket.status}
           onTicketStatusChanged={onTicketStatusChanged}
           claim={editingClaim}
@@ -785,15 +827,17 @@ export function TicketFormsTab({
   // RENDER MODO PÁGINA: Si el usuario inició o está editando el retiro de mercancía
   if (withdrawalModalOpen) {
     return (
-      <div className={`mt-3.5 w-full min-w-0 ${MODULE_HEADER_CONTENT_BAND_CLASS}`}>
+      <div className={inlineFormShellClass}>
         <WithdrawalFormModal
           inline
           withdrawal={editingWithdrawal}
           ticketId={ticket.id}
-          ticketNumber={ticket.number}
+          ticketNumber={scopeCode}
           ticketClientName={ticket.clientName ?? undefined}
           ticketProducts={ticket.products}
           initialLines={withdrawalInitialLines}
+          formHostKind={formScope}
+          {...hostTaskProps}
           ticketStatus={ticket.status}
           onTicketStatusChanged={onTicketStatusChanged}
           onClose={() => {
@@ -818,17 +862,19 @@ export function TicketFormsTab({
   // RENDER MODO PÁGINA: Si el usuario inició o está editando la discrepancia de cargas
   if (discrepancyModalOpen) {
     return (
-      <div className={`mt-3.5 w-full min-w-0 ${MODULE_HEADER_CONTENT_BAND_CLASS}`}>
+      <div className={inlineFormShellClass}>
         <DiscrepancyFormModal
           inline
           discrepancy={editingDiscrepancy}
           ticketId={ticket.id}
-          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
+          fixedTicketLabel={scopeReferenceLabel}
           ticketClientName={ticket.clientName ?? undefined}
           ticketClientId={ticket.clientId ?? undefined}
           ticketStatus={ticket.status}
           onTicketStatusChanged={onTicketStatusChanged}
           ticketProducts={ticket.products}
+          formHostKind={formScope}
+          {...hostTaskProps}
           initialData={discrepancyInitialData}
           onClose={() => {
             setDiscrepancyModalOpen(false);
@@ -851,16 +897,18 @@ export function TicketFormsTab({
 
   if (hcaModalOpen) {
     return (
-      <div className={`mt-3.5 w-full min-w-0 ${MODULE_HEADER_CONTENT_BAND_CLASS}`}>
+      <div className={inlineFormShellClass}>
         <HcaModal
           inline
           sheet={editingHca}
           productLines={productLines}
           defaults={hcaInitialDefaults}
-          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
+          fixedTicketLabel={scopeReferenceLabel}
           ticketClientName={ticket.clientName ?? undefined}
           ticketProductLineId={ticket.productLineId}
           ticketProducts={ticket.products}
+          formHostKind={formScope}
+          {...hostTaskProps}
           ticketStatus={ticket.status}
           onTicketStatusChanged={onTicketStatusChanged}
           onClose={() => {
@@ -882,7 +930,7 @@ export function TicketFormsTab({
   }
 
   return (
-    <div className={`mt-3.5 min-w-0 space-y-4 animate-plf-fade ${MODULE_HEADER_CONTENT_BAND_CLASS}`}>
+    <div className={formsTabShellClass}>
       {/* ZERO STATE: No forms registered yet */}
       {registeredForms.length === 0 ? (
         <div className="w-full min-w-0">
@@ -894,7 +942,8 @@ export function TicketFormsTab({
               aria-hidden={draftLandingExiting}
             >
               <EnterpriseFormDraftLandingView
-                ticketNumber={ticket.number}
+                hostKindLabel={hostKindLabel}
+                ticketNumber={scopeCode}
                 drafts={pendingDrafts}
                 onResume={(pickerKey) => openFormByPickerKey(pickerKey)}
                 onDiscard={(pickerKey) => {
@@ -916,10 +965,12 @@ export function TicketFormsTab({
                     <FileSpreadsheet className="size-5" />
                   </div>
                   <h3 className="mt-3 text-base font-semibold text-zinc-900">
-                    Formularios del Ciclo de Vida del Ticket
+                    {formScope === "task"
+                      ? "Formularios del Ciclo de Vida de la Tarea"
+                      : "Formularios del Ciclo de Vida del Ticket"}
                   </h3>
                   <p className="mt-1 max-w-xl text-xs text-zinc-500 leading-relaxed">
-                    Integra los procesos y formatos oficiales de Plastifar directamente en este ticket.
+                    Integra los procesos y formatos oficiales de Plastifar directamente en esta {scopeLabel}.
                     Puedes iniciar el formulario correspondiente ahora o dejarlo como borrador y completarlo
                     más adelante.
                   </p>
@@ -1065,9 +1116,13 @@ export function TicketFormsTab({
                       <HcaStatusBadge status={(activeForm.data as CorrectiveActionSheet).status} />
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Formulario empresarial vinculado a {ticket.number} · Plastifar S.A.
-                  </p>
+                  {formScope === "task" ? (
+                    <TaskFormHostLinkSubtitle taskNumber={taskScopeCode} />
+                  ) : (
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Formulario empresarial vinculado a {ticket.number} · Plastifar S.A.
+                    </p>
+                  )}
                 </div>
 
                 {/* Form Actions (Add another, Print, Edit, Switch, Link) */}
@@ -1076,7 +1131,7 @@ export function TicketFormsTab({
                     size="sm"
                     variant="primary"
                     onClick={() => setNewFormModalOpen(true)}
-                    title="Llenar o agregar otro formulario vinculado a este ticket"
+                    title={`Llenar o agregar otro formulario vinculado a esta ${scopeLabel}`}
                   >
                     <Plus className="size-3.5 mr-1" />
                     Llenar otro formulario
@@ -1221,9 +1276,11 @@ export function TicketFormsTab({
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                            Código reclamación
+                            {formScope === "task" ? "Código tarea" : "Código ticket"}
                           </span>
-                          <p className="mt-1 font-mono text-sm font-bold text-zinc-900">{c.ticketNumber}</p>
+                          <p className="mt-1 font-mono text-sm font-bold text-zinc-900">
+                            {formScope === "task" ? scopeCode : c.ticketNumber}
+                          </p>
                           <span className="text-[10.5px] text-zinc-500">Formato oficial PF-FOR-034</span>
                         </div>
 
@@ -1340,7 +1397,11 @@ export function TicketFormsTab({
                   return (
                     <div className="space-y-4">
                       {/* Executive Summary Cards */}
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div
+                        className={`grid grid-cols-2 gap-3 ${
+                          formScope === "task" ? "sm:grid-cols-2 lg:grid-cols-5" : "sm:grid-cols-4"
+                        }`}
+                      >
                         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                             No. Solicitud
@@ -1348,6 +1409,8 @@ export function TicketFormsTab({
                           <p className="mt-1 font-mono text-sm font-bold text-zinc-900">{w.number}</p>
                           <span className="text-[10.5px] text-zinc-500">Formato oficial PF-FOR-068</span>
                         </div>
+
+                        {formScope === "task" ? <TaskScopeCodeKpi taskNumber={taskScopeCode} /> : null}
 
                         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
@@ -1471,7 +1534,11 @@ export function TicketFormsTab({
                   return (
                     <div className="space-y-4">
                       {/* Executive Summary Cards */}
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div
+                        className={`grid grid-cols-2 gap-3 ${
+                          formScope === "task" ? "sm:grid-cols-2 lg:grid-cols-5" : "sm:grid-cols-4"
+                        }`}
+                      >
                         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                             No. Investigación
@@ -1483,6 +1550,8 @@ export function TicketFormsTab({
                             Formato oficial PF-FOR-291
                           </span>
                         </div>
+
+                        {formScope === "task" ? <TaskScopeCodeKpi taskNumber={taskScopeCode} /> : null}
 
                         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
@@ -1705,7 +1774,11 @@ export function TicketFormsTab({
 
                   return (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div
+                        className={`grid grid-cols-2 gap-3 ${
+                          formScope === "task" ? "sm:grid-cols-2 lg:grid-cols-5" : "sm:grid-cols-4"
+                        }`}
+                      >
                         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                             No. HCA
@@ -1713,6 +1786,8 @@ export function TicketFormsTab({
                           <p className="mt-1 font-mono text-sm font-bold text-zinc-900">{s.number}</p>
                           <span className="text-[10.5px] text-zinc-500">Formato oficial PF-FOR-109</span>
                         </div>
+
+                        {formScope === "task" ? <TaskScopeCodeKpi taskNumber={taskScopeCode} /> : null}
 
                         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
@@ -1937,7 +2012,7 @@ export function TicketFormsTab({
         <Modal
           title="Cambiar de Formulario"
           eyebrow="Migración entre procesos de Plastifar"
-          description="Selecciona el nuevo formulario empresarial al que deseas cambiar en este ticket."
+          description={`Selecciona el nuevo formulario empresarial al que deseas cambiar en esta ${scopeLabel}.`}
           onClose={() => setMigrationModalOpen(false)}
         >
           <div className="space-y-4">
@@ -1996,7 +2071,7 @@ export function TicketFormsTab({
                     Migrar datos comunes al nuevo formulario (Recomendado)
                   </span>
                   <p className="mt-0.5 text-[11.5px] text-amber-800 leading-relaxed">
-                    Transfiere automáticamente el cliente, la referencia de factura, las líneas de producto cargadas y la descripción o nota. El formulario actual permanecerá guardado en el ticket.
+                    {`Transfiere automáticamente el cliente, la referencia de factura, las líneas de producto cargadas y la descripción o nota. El formulario actual permanecerá guardado en esta ${scopeLabel}.`}
                   </p>
                 </div>
               </label>
@@ -2028,7 +2103,7 @@ export function TicketFormsTab({
       {newFormModalOpen && (
         <Modal
           title="Formulario oficial"
-          eyebrow={`Ticket ${ticket.number}`}
+          eyebrow={`${hostKindLabel} ${scopeCode}`}
           description="Selecciona el formato empresarial que deseas iniciar o retomar."
           onClose={() => setNewFormModalOpen(false)}
           maxWidth="max-w-2xl"
@@ -2101,7 +2176,8 @@ export function TicketFormsTab({
           open
           formCode={ENTERPRISE_FORM_PICKER_META[draftResumePrompt.pickerKey].formCode}
           formTitle={ENTERPRISE_FORM_PICKER_META[draftResumePrompt.pickerKey].title}
-          ticketNumber={ticket.number}
+          ticketNumber={scopeCode}
+          hostKindLabel={hostKindLabel}
           savedAtLabel={
             draftResumePrompt.savedAt
               ? formatInstant(new Date(draftResumePrompt.savedAt).toISOString())

@@ -13,6 +13,7 @@ export interface PendingEnterpriseDraft {
 }
 
 interface EnterpriseFormDraftLandingViewProps {
+  hostKindLabel?: string;
   ticketNumber: string;
   drafts: PendingEnterpriseDraft[];
   onResume: (pickerKey: EnterpriseFormPickerKey) => void;
@@ -23,6 +24,7 @@ interface EnterpriseFormDraftLandingViewProps {
 
 /** Vista inicial del ticket cuando hay borrador(es) local(es): prioriza retomar con claridad. */
 export function EnterpriseFormDraftLandingView({
+  hostKindLabel = "Ticket",
   ticketNumber,
   drafts,
   onResume,
@@ -38,7 +40,7 @@ export function EnterpriseFormDraftLandingView({
         </div>
         <div className="min-w-0 text-left">
           <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
-            Ticket {ticketNumber}
+            {hostKindLabel} {ticketNumber}
           </p>
           <h3 className="mt-0.5 font-heading text-base font-bold text-zinc-900 sm:text-[17px]">
             Borrador guardado

@@ -15,10 +15,11 @@ import {
   Tag,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { tasksApi } from "../../api/tasks";
+import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader, type ModuleHeaderSection } from "../../components/app/ModuleHeader";
 import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { Alert } from "../../components/ui/Alert";
@@ -27,10 +28,14 @@ import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
-import { TaskDetailSkeleton } from "../../components/ui/Skeleton";
+import { TaskDetailSkeleton, TicketFormsSkeleton } from "../../components/ui/Skeleton";
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../context/useAuth";
 import { useReceipts } from "../../context/useReceipts";
+import { usePermissions } from "../../hooks/usePermissions";
+import type { TicketDetailResponse } from "../../types/api";
+import { TaskFormDocumentView } from "./TaskFormDocumentView";
+import { TaskFormsTab, type RegisteredFormItem } from "./TaskFormsTab";
 import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
@@ -186,11 +191,23 @@ export function TaskDetailPage() {
   const receipts = useReceipts();
   const { user } = useAuth();
   const id = Number(params.id);
+  const { can } = usePermissions();
+  const [searchParams] = useSearchParams();
+  const initialUrlTab = searchParams.get("tab") as TaskDetailTab | null;
 
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [loading, setLoading] = useState(Number.isFinite(id));
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TaskDetailTab>("datos");
+  const [activeTab, setActiveTab] = useState<TaskDetailTab>(
+    initialUrlTab && ["datos", "notas", "formularios", "reclamacion"].includes(initialUrlTab)
+      ? initialUrlTab
+      : "datos",
+  );
+  const [hasForms, setHasForms] = useState<boolean | null>(null);
+  const [formTicket, setFormTicket] = useState<TicketDetailResponse | null>(null);
+  const [formTicketLoading, setFormTicketLoading] = useState(false);
+  const [formTicketError, setFormTicketError] = useState<string | null>(null);
+  const [viewingDocumentForm, setViewingDocumentForm] = useState<RegisteredFormItem | null>(null);
 
   // Modals state
   const [editing, setEditing] = useState(false);
@@ -266,6 +283,91 @@ export function TaskDetailPage() {
       active = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab") as TaskDetailTab | null;
+    if (tab && ["datos", "notas", "formularios", "reclamacion"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!viewingDocumentForm) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setViewingDocumentForm(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [viewingDocumentForm]);
+
+  const refreshFormTicket = useCallback(
+    ({ force = false }: { force?: boolean } = {}) => {
+      if (!Number.isFinite(id)) return Promise.resolve();
+
+      const linkedTicketId = task?.ticketId ?? null;
+      if (!force && linkedTicketId != null && formTicket?.id === linkedTicketId) {
+        return Promise.resolve();
+      }
+
+      const initialFormTicketLoad = formTicket == null;
+      if (initialFormTicketLoad) {
+        setFormTicketLoading(true);
+        setFormTicketError(null);
+      }
+
+      const ensureLinkedTicket = () =>
+        tasksApi.ensureFormTicket(id).then((ensured) => {
+          setTask((prev) =>
+            prev && prev.ticketId !== ensured.ticketId
+              ? { ...prev, ticketId: ensured.ticketId, ticketNumber: ensured.ticketNumber }
+              : prev,
+          );
+          return ensured.ticketId;
+        });
+
+      const resolveTicketId = (): Promise<number> => {
+        if (linkedTicketId != null) return Promise.resolve(linkedTicketId);
+        return ensureLinkedTicket();
+      };
+
+      const loadTicketDetail = (ticketId: number) =>
+        ticketsApi.getById(ticketId).catch(async (err) => {
+          if (linkedTicketId != null && err instanceof ApiError && err.status === 404) {
+            const freshId = await ensureLinkedTicket();
+            return ticketsApi.getById(freshId);
+          }
+          throw err;
+        });
+
+      return resolveTicketId()
+        .then(loadTicketDetail)
+        .then(setFormTicket)
+        .catch((err) => {
+          setFormTicket(null);
+          setFormTicketError(
+            err instanceof ApiError ? err.message : "No se pudieron cargar los formularios de la tarea",
+          );
+        })
+        .finally(() => {
+          if (initialFormTicketLoad) setFormTicketLoading(false);
+        });
+    },
+    [id, task?.ticketId, formTicket?.id],
+  );
+
+  /** Precarga el ticket de formularios en cuanto hay tarea (no esperar a abrir la pestaña). */
+  useEffect(() => {
+    if (!task) return;
+    const deptId = task.departmentId;
+    const canPrefetch =
+      can("claims.read", deptId) ||
+      can("withdrawals.read") ||
+      can("discrepancies.read") ||
+      can("quality.read");
+    if (!canPrefetch) return;
+    void refreshFormTicket();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- permisos estables; evitar re-fetch en cada render de `can`
+  }, [task?.id, task?.departmentId, refreshFormTicket]);
 
   async function replyToTaskNote(parentId: number, body: string) {
     if (!task) return;
@@ -366,6 +468,13 @@ export function TaskDetailPage() {
   const evidenceAttachments = attachmentsByKind(task.attachments, "Evidencia");
   const noteAttachmentsMap = mapSeguimientoAttachmentsToComments(task.comments, task.attachments);
 
+  const deptId = task.departmentId;
+  const canReadForms =
+    can("claims.read", deptId) ||
+    can("withdrawals.read") ||
+    can("discrepancies.read") ||
+    can("quality.read");
+
   const sections: ModuleHeaderSection[] = [
     {
       label: "Datos",
@@ -377,10 +486,36 @@ export function TaskDetailPage() {
       active: activeTab === "notas",
       onClick: () => setActiveTab("notas"),
     },
+    ...(canReadForms
+      ? [
+          {
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                Formularios
+                {hasForms && (
+                  <span className="size-1.5 rounded-full bg-brand-red" title="Tiene formularios registrados" />
+                )}
+              </span>
+            ),
+            active: activeTab === "formularios" || activeTab === "reclamacion",
+            onClick: () => setActiveTab("formularios"),
+          },
+        ]
+      : []),
   ];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {viewingDocumentForm ? (
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in">
+          <TaskFormDocumentView
+            form={viewingDocumentForm}
+            taskNumber={task.number}
+            onBack={() => setViewingDocumentForm(null)}
+          />
+        </div>
+      ) : (
+        <>
       <ModuleHeader
         backTo="/tareas"
         backLabel="Volver al listado de tareas"
@@ -914,8 +1049,45 @@ export function TaskDetailPage() {
                   </div>
                 )}
 
+                {canReadForms && (
+                  <div
+                    className={
+                      activeTab === "formularios" || activeTab === "reclamacion"
+                        ? "block space-y-3.5"
+                        : "hidden"
+                    }
+                  >
+                    {formTicketError ? (
+                      <div className="space-y-3">
+                        <Alert variant="error">{formTicketError}</Alert>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => void refreshFormTicket({ force: true })}
+                        >
+                          Reintentar
+                        </Button>
+                      </div>
+                    ) : formTicket ? (
+                      <TaskFormsTab
+                        task={task}
+                        formHostTicket={formTicket}
+                        onHasFormsChanged={(has) => setHasForms(has)}
+                        onFormsChanged={() => {
+                          void refreshFormTicket({ force: true });
+                          void load({ silent: true });
+                        }}
+                        onViewDocument={(form) => setViewingDocumentForm(form)}
+                      />
+                    ) : (
+                      <TicketFormsSkeleton />
+                    )}
+                  </div>
+                )}
+
                 {activeTab === "notas" && (
-                  <div className="space-y-2.5">
+                  <div className="space-y-3.5">
                     {task.comments.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-amber-200/80 bg-amber-50/20 px-6 py-8 text-center">
                         <div className="mx-auto flex size-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
@@ -1003,6 +1175,8 @@ export function TaskDetailPage() {
           </div>
         </div>
       </div>
+        </>
+      )}
 
       {editing && (
         <TaskFormModal
@@ -1011,6 +1185,9 @@ export function TaskDetailPage() {
           onSaved={(saved) => {
             setEditing(false);
             setTask(saved);
+            if (saved.ticketId !== task.ticketId) {
+              void refreshFormTicket({ force: true });
+            }
             receipts.done({
               action: "editar-tarea",
               title: "Tarea actualizada",

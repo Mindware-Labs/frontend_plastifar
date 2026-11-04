@@ -26,6 +26,8 @@ import { fetchAllPages } from "../../api/paging";
 import { qualityApi } from "../../api/quality";
 import { settingsApi } from "../../api/settings";
 import { EnterpriseFormCloseTicketModal } from "../../components/app/EnterpriseFormCloseTicketModal";
+import { EnterpriseFormCompleteTaskModal } from "../../components/app/EnterpriseFormCompleteTaskModal";
+import { shouldPromptEnterpriseFormHostClose } from "../../lib/enterpriseFormHostClose";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
@@ -468,6 +470,9 @@ export interface HcaFormModalProps {
   /** Productos del ticket: selector con pestañas como PF-FOR-291. */
   ticketProducts?: TicketProductResponse[];
   ticketStatus?: string;
+  formHostKind?: "ticket" | "task";
+  hostTaskId?: number;
+  hostTaskStatus?: string;
   onTicketStatusChanged?: () => void;
   onClose: () => void;
   onSaved: (sheet: CorrectiveActionSheet) => void;
@@ -487,11 +492,16 @@ export function HcaFormModal({
   ticketProductLineId,
   ticketProducts,
   ticketStatus,
+  formHostKind = "ticket",
+  hostTaskId,
+  hostTaskStatus,
   onTicketStatusChanged,
   onClose,
   onSaved,
 }: HcaFormModalProps) {
   const isEdit = sheet !== undefined;
+  const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
+  const contextCodeLabel = formHostKind === "task" ? "Tarea" : "Ticket";
   const draftTicketId = defaults?.ticketId ?? null;
   const draftStorageKey =
     !isEdit && draftTicketId ? enterpriseFormDraftKey("pf109", draftTicketId) : null;
@@ -1146,11 +1156,17 @@ export function HcaFormModal({
         detail: `PF-FOR-109 · ${detail.sheet.number}`,
       });
 
-      const isAlreadyClosed =
-        ticketStatus === "Solucionado" || ticketStatus === "Cancelado";
       const effectiveTicketId = Number(detail.sheet.ticketId ?? defaults?.ticketId ?? 0);
 
-      if (!isAlreadyClosed && effectiveTicketId > 0) {
+      if (
+        shouldPromptEnterpriseFormHostClose(
+          formHostKind,
+          effectiveTicketId,
+          hostTaskId,
+          ticketStatus,
+          hostTaskStatus,
+        )
+      ) {
         setCompletedSheet(detail.sheet);
         setShowClosePrompt(true);
       } else {
@@ -1411,7 +1427,7 @@ export function HcaFormModal({
     <div className="flex flex-col gap-4 animate-plf-fade max-w-4xl mx-auto w-full">
       {fixedTicketLabel && (
         <p className="text-[11px] text-zinc-500 leading-snug">
-          Ticket vinculado:{" "}
+          {contextCodeLabel} vinculada:{" "}
           <span className="font-medium text-zinc-700">{fixedTicketLabel}</span>
           {ticketClientName ? ` · ${ticketClientName}` : ""}
         </p>
@@ -1930,6 +1946,23 @@ function PlanMotionCell({
     const rawNumber = completedSheet.number || "";
     const cleanNumber = rawNumber.replace(/^HCA\s*[-–—]?\s*/i, "");
     const sheetCode = cleanNumber ? `HCA-${cleanNumber}` : rawNumber;
+
+    const taskNumberLabel = fixedTicketLabel?.split(" · ")[0]?.trim() ?? fixedTicketLabel?.split(" ")[0] ?? "Tarea";
+
+    if (formHostKind === "task" && hostTaskId) {
+      return (
+        <EnterpriseFormCompleteTaskModal
+          open={showClosePrompt}
+          taskId={hostTaskId}
+          taskNumber={taskNumberLabel}
+          formCode="PF-FOR-109"
+          recordNumber={sheetCode}
+          defaultComment={`Completada tras registrar ${sheetCode}`}
+          onClose={() => finishModal(completedSheet)}
+          onSuccess={() => onTicketStatusChanged?.()}
+        />
+      );
+    }
 
     return (
       <EnterpriseFormCloseTicketModal

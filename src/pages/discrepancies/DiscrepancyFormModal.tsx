@@ -33,6 +33,8 @@ import { discrepanciesApi } from "../../api/discrepancies";
 import { ticketsApi } from "../../api/tickets";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { EnterpriseFormCloseTicketModal } from "../../components/app/EnterpriseFormCloseTicketModal";
+import { EnterpriseFormCompleteTaskModal } from "../../components/app/EnterpriseFormCompleteTaskModal";
+import { shouldPromptEnterpriseFormHostClose } from "../../lib/enterpriseFormHostClose";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { Button } from "../../components/ui/Button";
@@ -259,6 +261,9 @@ interface DiscrepancyFormModalProps {
   };
   onClose: () => void;
   onSaved: (detail: DiscrepancyDetail) => void;
+  formHostKind?: "ticket" | "task";
+  hostTaskId?: number;
+  hostTaskStatus?: string;
   /** Si es true, se renderiza como una página completa dentro de la pestaña en vez de una ve... */
   inline?: boolean;
 }
@@ -301,8 +306,13 @@ export function DiscrepancyFormModal({
   onClose,
   onSaved,
   inline = false,
+  formHostKind = "ticket",
+  hostTaskId,
+  hostTaskStatus,
 }: DiscrepancyFormModalProps) {
   const isEdit = discrepancy !== undefined;
+  const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
+  const contextCodeLabel = formHostKind === "task" ? "Tarea" : "Ticket";
   const draftLoadedRef = useRef(false);
   const recommendedProductOptions = useMemo(
     () => ticketProductsToLookupOptions(ticketProducts),
@@ -378,8 +388,15 @@ export function DiscrepancyFormModal({
   const [effectiveTicketClientName, setEffectiveTicketClientName] = useState<string | undefined>(initialClientName);
   const [effectiveTicketClientId, setEffectiveTicketClientId] = useState<number | undefined>(initialClientId);
 
-  // Derivar número de ticket para autocompletar # Reclamo
+  const scopeDisplayCode = useMemo(() => {
+    if (formHostKind !== "task" || !fixedTicketLabel) return null;
+    const match = /^([A-Z0-9_-]+)\s*(?:[·–—\-:]|\s-\s)/i.exec(fixedTicketLabel.trim());
+    return match?.[1]?.trim() ?? fixedTicketLabel.split("·")[0]?.trim() ?? null;
+  }, [formHostKind, fixedTicketLabel]);
+
+  // Derivar número de caso para autocompletar # Reclamo
   const derivedTicketNumber =
+    scopeDisplayCode ||
     discrepancy?.ticketNumber ||
     (ticketLabel ? ticketLabel.split(" ")[0].trim() : "");
 
@@ -805,13 +822,17 @@ export function DiscrepancyFormModal({
         detail: `PF-FOR-291 · ${saved.discrepancy.number}`,
       });
 
-      const isAlreadyClosed =
-        ticketStatus === "Solucionado" ||
-        ticketStatus === "Cancelado";
-
       const effectiveTicketId = Number(values.ticketId || ticketId);
 
-      if (!isAlreadyClosed && effectiveTicketId > 0) {
+      if (
+        shouldPromptEnterpriseFormHostClose(
+          formHostKind,
+          effectiveTicketId,
+          hostTaskId,
+          ticketStatus,
+          hostTaskStatus,
+        )
+      ) {
         setCompletedDiscrepancy(saved);
         setShowClosePrompt(true);
       } else {
@@ -970,7 +991,7 @@ export function DiscrepancyFormModal({
           {ticketLabel && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
               <CheckCircle2 className="size-3 text-emerald-600" />
-              <span>Ticket vinculado</span>
+              <span>{contextCodeLabel} vinculada</span>
             </span>
           )}
         </div>
@@ -980,7 +1001,7 @@ export function DiscrepancyFormModal({
           {/** Columna 1: Ticket vinculado */}
           <div className="p-5 flex flex-col justify-center gap-1.5">
             <label className="font-heading text-[11.5px] font-semibold text-faint">
-              Ticket vinculado
+              {contextCodeLabel} vinculada
             </label>
             {ticketIdValue ? (
               <div className="flex items-center justify-between gap-2 h-9">
@@ -1244,6 +1265,7 @@ export function DiscrepancyFormModal({
                 ticketInheritedLabel={ticketInheritedLabel}
                 recommendedProductOptions={recommendedProductOptions}
                 ticketProductLabels={ticketProductLabels}
+                formHostKind={formHostKind}
                 canRemove={fields.length > 1 && !lineMotion.isExiting(activeField.id)}
                 onRemove={() => handleRemoveLine(activeIndex)}
               />
@@ -1511,16 +1533,33 @@ export function DiscrepancyFormModal({
   const renderClosePromptModal = () => {
     if (!showClosePrompt || !completedDiscrepancy) return null;
     const currentTicketId = Number(getValues("ticketId") || ticketId);
+    const taskNumberLabel = scopeDisplayCode ?? derivedTicketNumber ?? "Tarea";
+    const recordNumber = completedDiscrepancy.discrepancy.number;
+
+    if (formHostKind === "task" && hostTaskId) {
+      return (
+        <EnterpriseFormCompleteTaskModal
+          open={showClosePrompt}
+          taskId={hostTaskId}
+          taskNumber={taskNumberLabel}
+          formCode="PF-FOR-291"
+          recordNumber={recordNumber}
+          defaultComment={`Completada tras investigación de discrepancia ${recordNumber}`}
+          onClose={() => finishModal(completedDiscrepancy)}
+          onSuccess={() => onTicketStatusChanged?.()}
+        />
+      );
+    }
 
     return (
       <EnterpriseFormCloseTicketModal
         open={showClosePrompt}
         ticketId={currentTicketId}
         formCode="PF-FOR-291"
-        recordNumber={completedDiscrepancy.discrepancy.number}
+        recordNumber={recordNumber}
         descriptionText="La investigación de discrepancia ha sido registrada exitosamente. Puedes dar por concluido y cerrar este ticket indicando el veredicto oficial y el comentario de resolución."
-        defaultReason={`Cerrado tras completar investigación de discrepancia ${completedDiscrepancy.discrepancy.number}`}
-        receiptDetail={`El ticket ha sido marcado como solucionado en base a ${completedDiscrepancy.discrepancy.number}.`}
+        defaultReason={`Cerrado tras completar investigación de discrepancia ${recordNumber}`}
+        receiptDetail={`El ticket ha sido marcado como solucionado en base a ${recordNumber}.`}
         extraAlert={
           completedDiscrepancy.discrepancy.hasSecurityFinding ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 flex items-start gap-2">
@@ -1586,7 +1625,7 @@ export function DiscrepancyFormModal({
                   Caso:
                 </span>
                 <span className="font-mono text-xs font-bold text-zinc-900">
-                  {derivedTicketNumber || "Ticket"}
+                  {derivedTicketNumber || contextCodeLabel}
                 </span>
                 {effectiveTicketClientName && (
                   <>
@@ -1712,6 +1751,7 @@ interface DiscrepancyLineCardProps {
   ticketInheritedLabel: string;
   recommendedProductOptions: LookupOption[];
   ticketProductLabels: Map<string, string>;
+  formHostKind?: "ticket" | "task";
   canRemove: boolean;
   onRemove: () => void;
 }
@@ -1728,6 +1768,7 @@ function DiscrepancyLineCard({
   ticketInheritedLabel,
   recommendedProductOptions,
   ticketProductLabels,
+  formHostKind = "ticket",
   canRemove,
   onRemove,
 }: DiscrepancyLineCardProps) {
@@ -1806,7 +1847,7 @@ function DiscrepancyLineCard({
             <TextField
               size="sm"
               label="# Reclamo"
-              placeholder="El del ticket"
+              placeholder={formHostKind === "task" ? "El de la tarea" : "El del ticket"}
               error={lineErrors?.claimRef?.message}
               {...register(`lines.${index}.claimRef`)}
             />

@@ -1,3 +1,4 @@
+import { caseReferenceColumnLabel } from "./formCaseReference";
 import type { CorrectiveActionSheet } from "../types/quality";
 
 /** Control documental del PF-FOR-109 (plantilla V0). */
@@ -17,7 +18,7 @@ export function buildHcaHechoText(sheet: CorrectiveActionSheet): string {
   if (sheet.clientName) {
     let clientLine = `Cliente: ${sheet.clientName}`;
     if (sheet.ticketNumber) {
-      clientLine += ` · Ticket: ${sheet.ticketNumber}`;
+      clientLine += ` · ${caseReferenceColumnLabel(sheet.ticketNumber)}: ${sheet.ticketNumber}`;
     }
     parts.push(clientLine);
   }

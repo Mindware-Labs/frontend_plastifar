@@ -12,6 +12,8 @@ import { ticketsApi } from "../../api/tickets";
 import { withdrawalsApi } from "../../api/withdrawals";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { EnterpriseFormCloseTicketModal } from "../../components/app/EnterpriseFormCloseTicketModal";
+import { EnterpriseFormCompleteTaskModal } from "../../components/app/EnterpriseFormCompleteTaskModal";
+import { shouldPromptEnterpriseFormHostClose } from "../../lib/enterpriseFormHostClose";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { Alert } from "../../components/ui/Alert";
@@ -67,6 +69,9 @@ interface Props {
   onTicketStatusChanged?: () => void;
   /** Renderiza como vista embebida a página completa en lugar de ventana modal. */
   inline?: boolean;
+  formHostKind?: "ticket" | "task";
+  hostTaskId?: number;
+  hostTaskStatus?: string;
   onClose: () => void;
   onSaved: (detail: WithdrawalDetail) => void;
   onConflict?: (message: string) => void;
@@ -171,12 +176,17 @@ export function WithdrawalFormModal({
   ticketStatus,
   onTicketStatusChanged,
   inline = false,
+  formHostKind = "ticket",
+  hostTaskId,
+  hostTaskStatus,
   onClose,
   onSaved,
   onConflict,
 }: Props) {
   const receipts = useReceipts();
   const isEditing = Boolean(withdrawal);
+  const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
+  const contextCodeLabel = formHostKind === "task" ? "Tarea" : "Ticket";
   const lockedTicketId = fixedTicketId ?? withdrawal?.ticketId;
   const activeTicketId = lockedTicketId ?? 0;
   const draftStorageKey =
@@ -560,8 +570,16 @@ export function WithdrawalFormModal({
         detail: `${WITHDRAWAL_FORM_CONTROL.code} · ${saved.withdrawal.number}`,
       });
 
-      const isAlreadyClosed = ticketStatus === "Solucionado" || ticketStatus === "Cancelado";
-      if (!isEditing && !isAlreadyClosed && targetTicketId > 0 && onTicketStatusChanged) {
+      if (
+        !isEditing &&
+        shouldPromptEnterpriseFormHostClose(
+          formHostKind,
+          targetTicketId,
+          hostTaskId,
+          ticketStatus,
+          hostTaskStatus,
+        )
+      ) {
         setCompletedWithdrawal(saved);
         setShowClosePrompt(true);
       } else {
@@ -783,6 +801,7 @@ export function WithdrawalFormModal({
                 </div>
               )}
               <WithdrawalTicketContextBar
+                codeLabel={contextCodeLabel}
                 ticketNumber={displayTicketNumber ?? "—"}
                 companyName={inheritedClientName}
               />
@@ -1015,34 +1034,54 @@ export function WithdrawalFormModal({
 
       {/** Modal unificado al completar para cerrar el ticket si corresponde */}
       {showClosePrompt && completedWithdrawal && (
-        <EnterpriseFormCloseTicketModal
-          open={showClosePrompt}
-          ticketId={lockedTicketId ?? Number(selectedTicketId)}
-          formCode={WITHDRAWAL_FORM_CONTROL.code}
-          recordNumber={completedWithdrawal.withdrawal.number}
-          descriptionText="La solicitud de retiro ha sido registrada exitosamente. Puedes dar por concluido y cerrar este ticket indicando el veredicto oficial y el comentario de resolución."
-          defaultReason={`Cerrado tras registrar solicitud de retiro ${WITHDRAWAL_FORM_CONTROL.code} · ${completedWithdrawal.withdrawal.number}`}
-          receiptDetail={`El ticket quedó solucionado tras el retiro ${completedWithdrawal.withdrawal.number}.`}
-          onClose={() => {
-            const done = completedWithdrawal;
-            setShowClosePrompt(false);
-            setCompletedWithdrawal(null);
-            finishModal(done);
-          }}
-          onSuccess={() => {
-            onTicketStatusChanged?.();
-          }}
-          onTicketStatusChanged={onTicketStatusChanged}
-        />
+        <>
+          {formHostKind === "task" && hostTaskId ? (
+            <EnterpriseFormCompleteTaskModal
+              open={showClosePrompt}
+              taskId={hostTaskId}
+              taskNumber={fixedTicketNumber ?? ""}
+              formCode={WITHDRAWAL_FORM_CONTROL.code}
+              recordNumber={completedWithdrawal.withdrawal.number}
+              defaultComment={`Completada tras registrar solicitud de retiro ${WITHDRAWAL_FORM_CONTROL.code} · ${completedWithdrawal.withdrawal.number}`}
+              onClose={() => {
+                const done = completedWithdrawal;
+                setShowClosePrompt(false);
+                setCompletedWithdrawal(null);
+                finishModal(done);
+              }}
+              onSuccess={() => onTicketStatusChanged?.()}
+            />
+          ) : (
+            <EnterpriseFormCloseTicketModal
+              open={showClosePrompt}
+              ticketId={lockedTicketId ?? Number(selectedTicketId)}
+              formCode={WITHDRAWAL_FORM_CONTROL.code}
+              recordNumber={completedWithdrawal.withdrawal.number}
+              descriptionText="La solicitud de retiro ha sido registrada exitosamente. Puedes dar por concluido y cerrar este ticket indicando el veredicto oficial y el comentario de resolución."
+              defaultReason={`Cerrado tras registrar solicitud de retiro ${WITHDRAWAL_FORM_CONTROL.code} · ${completedWithdrawal.withdrawal.number}`}
+              receiptDetail={`El ticket quedó solucionado tras el retiro ${completedWithdrawal.withdrawal.number}.`}
+              onClose={() => {
+                const done = completedWithdrawal;
+                setShowClosePrompt(false);
+                setCompletedWithdrawal(null);
+                finishModal(done);
+              }}
+              onSuccess={() => onTicketStatusChanged?.()}
+              onTicketStatusChanged={onTicketStatusChanged}
+            />
+          )}
+        </>
       )}
     </>
   );
 }
 
 function WithdrawalTicketContextBar({
+  codeLabel = "Ticket",
   ticketNumber,
   companyName,
 }: {
+  codeLabel?: string;
   ticketNumber: string;
   companyName: string;
 }) {
@@ -1050,7 +1089,7 @@ function WithdrawalTicketContextBar({
     <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-zinc-200/90 bg-zinc-50/70 sm:grid-cols-2 sm:divide-x sm:divide-zinc-200/90">
       <div className="flex min-h-[3.25rem] min-w-0 flex-col justify-center gap-0.5 border-b border-zinc-200/90 px-4 py-3 sm:border-b-0">
         <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
-          Ticket
+          {codeLabel}
         </span>
         <span className="truncate font-mono text-[13px] font-semibold leading-snug text-zinc-900" title={ticketNumber}>
           {ticketNumber}

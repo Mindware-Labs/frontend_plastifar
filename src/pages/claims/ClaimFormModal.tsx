@@ -33,6 +33,8 @@ import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { EnterpriseFormCloseTicketModal } from "../../components/app/EnterpriseFormCloseTicketModal";
+import { EnterpriseFormCompleteTaskModal } from "../../components/app/EnterpriseFormCompleteTaskModal";
+import { shouldPromptEnterpriseFormHostClose } from "../../lib/enterpriseFormHostClose";
 import { EnterpriseFormSaveDraftButton } from "../../components/app/EnterpriseFormSaveDraftButton";
 import { EnterpriseFormSaveDraftConfirmModal } from "../../components/app/EnterpriseFormSaveDraftConfirmModal";
 import { ProductLookupField } from "../../components/app/ProductLookupField";
@@ -210,6 +212,9 @@ interface ClaimFormModalProps {
   ticketProducts?: TicketProductResponse[];
   inline?: boolean;
   fixedTicketLabel?: string;
+  formHostKind?: "ticket" | "task";
+  hostTaskId?: number;
+  hostTaskStatus?: string;
   ticketStatus?: string;
   onTicketStatusChanged?: () => void;
   /** Ausente = alta. */
@@ -269,6 +274,9 @@ export function ClaimFormModal({
   ticketProducts: ticketProductsProp,
   inline = false,
   fixedTicketLabel,
+  formHostKind = "ticket",
+  hostTaskId,
+  hostTaskStatus,
   ticketStatus,
   onTicketStatusChanged,
   claim,
@@ -277,6 +285,8 @@ export function ClaimFormModal({
   onSaved,
 }: ClaimFormModalProps) {
   const isEdit = claim !== undefined;
+  const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
+  const caseCodeDisplay = ticketNumber;
   const draftStorageKey =
     !isEdit && ticketId > 0 ? enterpriseFormDraftKey("pf034", ticketId) : null;
   const draftLoadedRef = useRef(false);
@@ -647,7 +657,11 @@ export function ClaimFormModal({
           <ClaimFormDivider title="Identificación del caso" />
 
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            <StaticField label="Código" value={ticketNumber} mono />
+            <StaticField
+              label={formHostKind === "task" ? "Código (tarea)" : "Código"}
+              value={caseCodeDisplay}
+              mono
+            />
             <Controller
               name="claimDate"
               control={control}
@@ -784,10 +798,15 @@ export function ClaimFormModal({
         detail: `${CLAIM_FORM_CONTROL.code} · ${saved.claim.ticketNumber}`,
       });
 
-      const isAlreadyClosed =
-        ticketStatus === "Solucionado" || ticketStatus === "Cancelado";
-
-      if (!isAlreadyClosed && ticketId > 0) {
+      if (
+        shouldPromptEnterpriseFormHostClose(
+          formHostKind,
+          ticketId,
+          hostTaskId,
+          ticketStatus,
+          hostTaskStatus,
+        )
+      ) {
         setCompletedClaim(saved);
         setShowClosePrompt(true);
       } else {
@@ -1302,13 +1321,29 @@ export function ClaimFormModal({
   const renderClosePromptModal = () => {
     if (!showClosePrompt || !completedClaim) return null;
     const savedClaim = completedClaim.claim;
+    const recordNumber = formHostKind === "task" ? caseCodeDisplay : savedClaim.ticketNumber;
+
+    if (formHostKind === "task" && hostTaskId) {
+      return (
+        <EnterpriseFormCompleteTaskModal
+          open={showClosePrompt}
+          taskId={hostTaskId}
+          taskNumber={caseCodeDisplay}
+          formCode={CLAIM_FORM_CONTROL.code}
+          recordNumber={recordNumber}
+          defaultComment={`Completada tras registrar reclamación ${CLAIM_FORM_CONTROL.code} · ${recordNumber}`}
+          onClose={() => finishModal(completedClaim)}
+          onSuccess={() => onTicketStatusChanged?.()}
+        />
+      );
+    }
 
     return (
       <EnterpriseFormCloseTicketModal
         open={showClosePrompt}
         ticketId={ticketId}
         formCode={CLAIM_FORM_CONTROL.code}
-        recordNumber={savedClaim.ticketNumber}
+        recordNumber={recordNumber}
         descriptionText="La reclamación quedó registrada correctamente. Puedes dar por concluido y cerrar este ticket indicando el veredicto oficial y el comentario de resolución."
         defaultReason={`Cerrado tras registrar reclamación ${CLAIM_FORM_CONTROL.code} · ${savedClaim.ticketNumber}`}
         receiptDetail={`El ticket quedó solucionado tras la reclamación ${savedClaim.ticketNumber}.`}

@@ -20,6 +20,10 @@ import type { RegisteredFormItem } from "./TicketFormsTab";
 interface TicketFormDocumentViewProps {
   form: RegisteredFormItem;
   onBack: () => void;
+  formHostKind?: "ticket" | "task";
+  /** Código de caso mostrado (p. ej. TAR-… en contexto tarea). */
+  contextCode?: string;
+  backLabel?: string;
 }
 
 /** Marcador mientras se recarga el registro: hoja en blanco con el mismo ancho que el documento. */
@@ -58,22 +62,47 @@ function DocumentPending({ error }: { error: string | null }) {
     </div>
   );
 }
-function TicketClaimDocument({ claimId, onBack }: { claimId: number; onBack: () => void }) {
+
+type DocContext = Pick<TicketFormDocumentViewProps, "formHostKind" | "contextCode" | "backLabel">;
+
+function TicketClaimDocument({
+  claimId,
+  onBack,
+  contextCode,
+  backLabel,
+}: { claimId: number; onBack: () => void } & DocContext) {
+  const displayCode = contextCode?.trim();
   const { data: claim, error } = usePrintRecord(
     claimId,
     async (id) => (await claimsApi.get(id)).claim,
     {
-      documentTitle: (record) => `${CLAIM_FORM_CONTROL.code} · ${record.ticketNumber}`,
+      documentTitle: (record) =>
+        `${CLAIM_FORM_CONTROL.code} · ${displayCode || record.ticketNumber || record.id}`,
       failed: "No se pudo cargar la reclamación.",
     },
   );
 
   if (claim === null) return <DocumentPending error={error} />;
 
-  return <ClaimDocumentSheet claim={claim} onBack={onBack} backLabel="Volver al ticket" />;
+  return (
+    <ClaimDocumentSheet
+      claim={claim}
+      onBack={onBack}
+      backLabel={backLabel ?? "Volver al ticket"}
+      contextCodeOverride={displayCode}
+    />
+  );
 }
 
-function TicketWithdrawalDocument({ withdrawalId, onBack }: { withdrawalId: number; onBack: () => void }) {
+function TicketWithdrawalDocument({
+  withdrawalId,
+  onBack,
+  formHostKind,
+  contextCode,
+  backLabel,
+}: { withdrawalId: number; onBack: () => void } & DocContext) {
+  const displayCode = contextCode?.trim();
+  const referenceKindLabel = formHostKind === "task" ? "Tarea" : "Ticket";
   const { data: detail, error } = usePrintRecord(
     withdrawalId,
     (id) => withdrawalsApi.get(id),
@@ -86,11 +115,25 @@ function TicketWithdrawalDocument({ withdrawalId, onBack }: { withdrawalId: numb
   if (detail === null) return <DocumentPending error={error} />;
 
   return (
-    <WithdrawalDocumentSheet withdrawal={detail.withdrawal} onBack={onBack} backLabel="Volver al ticket" />
+    <WithdrawalDocumentSheet
+      withdrawal={detail.withdrawal}
+      onBack={onBack}
+      backLabel={backLabel ?? "Volver al ticket"}
+      contextCodeOverride={displayCode}
+      referenceKindLabel={referenceKindLabel}
+    />
   );
 }
 
-function TicketDiscrepancyDocument({ discrepancyId, onBack }: { discrepancyId: number; onBack: () => void }) {
+function TicketDiscrepancyDocument({
+  discrepancyId,
+  onBack,
+  formHostKind,
+  contextCode,
+  backLabel,
+}: { discrepancyId: number; onBack: () => void } & DocContext) {
+  const displayCode = contextCode?.trim();
+  const referenceKindLabel = formHostKind === "task" ? "Tarea" : "Ticket";
   const { data: discrepancy, error } = usePrintRecord(
     discrepancyId,
     async (id) => (await discrepanciesApi.get(id)).discrepancy,
@@ -102,10 +145,18 @@ function TicketDiscrepancyDocument({ discrepancyId, onBack }: { discrepancyId: n
 
   if (discrepancy === null) return <DocumentPending error={error} />;
 
-  return <DiscrepancyDocumentSheet discrepancy={discrepancy} onBack={onBack} backLabel="Volver al ticket" />;
+  return (
+    <DiscrepancyDocumentSheet
+      discrepancy={discrepancy}
+      onBack={onBack}
+      backLabel={backLabel ?? "Volver al ticket"}
+      contextCodeOverride={displayCode}
+      referenceKindLabel={referenceKindLabel}
+    />
+  );
 }
 
-function TicketHcaDocument({ sheetId, onBack }: { sheetId: number; onBack: () => void }) {
+function TicketHcaDocument({ sheetId, onBack, backLabel }: { sheetId: number; onBack: () => void; backLabel?: string }) {
   const { data: detail, error } = usePrintRecord(sheetId, qualityApi.sheets.get, {
     documentTitle: (record) => `PF-FOR-109 · ${record.sheet.number}`,
     failed: "No se pudo cargar la HCA.",
@@ -118,27 +169,50 @@ function TicketHcaDocument({ sheetId, onBack }: { sheetId: number; onBack: () =>
       sheet={detail.sheet}
       planItems={detail.planItems}
       onBack={onBack}
-      backLabel="Volver al ticket"
+      backLabel={backLabel ?? "Volver al ticket"}
     />
   );
 }
 
 /** Documento oficial incrustado en el ticket: recarga el registro completo antes de pintar. */
-export function TicketFormDocumentView({ form, onBack }: TicketFormDocumentViewProps) {
+export function TicketFormDocumentView({
+  form,
+  onBack,
+  formHostKind = "ticket",
+  contextCode,
+  backLabel,
+}: TicketFormDocumentViewProps) {
+  const docContext: DocContext = { formHostKind, contextCode, backLabel };
+
   switch (form.type) {
     case "reclamacion":
-      return <TicketClaimDocument claimId={(form.data as CustomerClaim).id} onBack={onBack} />;
+      return (
+        <TicketClaimDocument claimId={(form.data as CustomerClaim).id} onBack={onBack} {...docContext} />
+      );
     case "retiro":
-      return <TicketWithdrawalDocument withdrawalId={(form.data as MerchandiseWithdrawal).id} onBack={onBack} />;
+      return (
+        <TicketWithdrawalDocument
+          withdrawalId={(form.data as MerchandiseWithdrawal).id}
+          onBack={onBack}
+          {...docContext}
+        />
+      );
     case "discrepancia":
       return (
         <TicketDiscrepancyDocument
           discrepancyId={(form.data as DiscrepancyDetail).discrepancy.id}
           onBack={onBack}
+          {...docContext}
         />
       );
     case "hca":
-      return <TicketHcaDocument sheetId={(form.data as CorrectiveActionSheet).id} onBack={onBack} />;
+      return (
+        <TicketHcaDocument
+          sheetId={(form.data as CorrectiveActionSheet).id}
+          onBack={onBack}
+          backLabel={backLabel}
+        />
+      );
     default:
       return <DocumentPending error="Tipo de formulario no soportado para vista de documento." />;
   }

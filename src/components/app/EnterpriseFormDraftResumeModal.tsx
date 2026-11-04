@@ -7,6 +7,7 @@ interface EnterpriseFormDraftResumeModalProps {
   formCode: string;
   formTitle: string;
   ticketNumber: string;
+  hostKindLabel?: string;
   savedAtLabel?: string | null;
   stepLabel?: string | null;
   onResume: () => void;
@@ -19,6 +20,7 @@ export function EnterpriseFormDraftResumeModal({
   formCode,
   formTitle,
   ticketNumber,
+  hostKindLabel = "Ticket",
   savedAtLabel,
   stepLabel,
   onResume,
@@ -29,7 +31,7 @@ export function EnterpriseFormDraftResumeModal({
   return (
     <Modal
       title="Borrador en progreso"
-      eyebrow={`${formCode} · ${ticketNumber}`}
+      eyebrow={`${formCode} · ${hostKindLabel} ${ticketNumber}`}
       onClose={onCancel}
       maxWidth="max-w-md"
       closeOnBackdropClick={false}

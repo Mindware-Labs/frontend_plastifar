@@ -11,6 +11,7 @@ import {
 import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
 import { formatDay, formatInstant } from "../../lib/dates";
+import { isTaskCaseReference } from "../../lib/formCaseReference";
 import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
 import { topicRequiresOther, type ClaimClosureCondition, type CustomerClaim } from "../../types/claims";
 import { ClaimStatusBadge } from "./ClaimStatusBadge";
@@ -57,7 +58,8 @@ export function ClaimExecutiveSummary({
               )}
             </div>
             <p className="mt-1 text-[11.5px] text-zinc-500">
-              Formulario oficial de reclamación vinculado al ticket{" "}
+              Formulario oficial de reclamación vinculado a la{" "}
+              {isTaskCaseReference(claim.ticketNumber) ? "tarea" : "ticket"}{" "}
               <Link
                 to={`/tickets/${claim.ticketId}`}
                 className="font-mono font-medium text-ink hover:text-brand-red transition-colors"
