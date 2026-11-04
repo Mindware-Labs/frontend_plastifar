@@ -474,11 +474,28 @@ export function TicketFormsTab({
   useEffect(() => {
     const formKey = searchParams.get("form");
     if (!formKey || registeredForms.length === 0) return;
-    if (!registeredForms.some((f) => f.key === formKey)) return;
+    const targetForm = registeredForms.find((f) => f.key === formKey);
+    if (!targetForm) return;
     setSelectedSubTabKey(formKey);
+    const shouldOpenEditor = searchParams.get("openForm") === "1";
     const next = new URLSearchParams(searchParams);
     next.delete("form");
+    next.delete("openForm");
     setSearchParams(next, { replace: true });
+    if (!shouldOpenEditor) return;
+    if (targetForm.type === "reclamacion") {
+      setEditingClaim(targetForm.data as CustomerClaim);
+      setClaimModalOpen(true);
+    } else if (targetForm.type === "retiro") {
+      setEditingWithdrawal(targetForm.data as MerchandiseWithdrawal);
+      setWithdrawalModalOpen(true);
+    } else if (targetForm.type === "discrepancia") {
+      setEditingDiscrepancy((targetForm.data as DiscrepancyDetail).discrepancy);
+      setDiscrepancyModalOpen(true);
+    } else if (targetForm.type === "hca") {
+      setEditingHca(targetForm.data as CorrectiveActionSheet);
+      setHcaModalOpen(true);
+    }
   }, [searchParams, registeredForms, setSearchParams]);
 
   const activeForm = useMemo(() => {
@@ -1239,12 +1256,26 @@ export function TicketFormsTab({
                               <span>Editar HCA</span>
                             </span>
                           </button>
+                        ) : activeForm.type === "reclamacion" ? (
+                          <button
+                            type="button"
+                            data-motion-item
+                            onClick={() => {
+                              setActionsMenuOpen(false);
+                              setEditingClaim(activeForm.data as CustomerClaim);
+                              setClaimModalOpen(true);
+                            }}
+                            className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <ArrowUpRight className="size-3.5 text-zinc-500" />
+                              <span>Ver ficha completa</span>
+                            </span>
+                          </button>
                         ) : (
                           <Link
                             to={
-                              activeForm.type === "reclamacion"
-                                ? `/reclamaciones/${(activeForm.data as CustomerClaim).id}`
-                                : activeForm.type === "retiro"
+                              activeForm.type === "retiro"
                                 ? `/retiros/${(activeForm.data as MerchandiseWithdrawal).id}`
                                 : `/discrepancias/${(activeForm.data as DiscrepancyDetail).discrepancy.id}`
                             }

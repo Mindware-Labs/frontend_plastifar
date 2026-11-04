@@ -5,7 +5,7 @@ import { claimsApi } from "../../api/claims";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
-import { Spinner } from "../../components/ui/Spinner";
+import { EnterpriseFormExecutiveSummarySkeleton } from "../../components/ui/Skeleton";
 import type { ClaimDetail } from "../../types/claims";
 import { ClaimExecutiveSummary } from "./ClaimExecutiveSummary";
 
@@ -74,9 +74,13 @@ export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps
             <Button
               size="sm"
               variant="primary"
+              disabled={!detail}
               onClick={() => {
+                if (!detail) return;
                 onClose();
-                navigate(`/reclamaciones/${claimId}`);
+                navigate(
+                  `/tickets/${detail.claim.ticketId}?tab=formularios&form=claim-${detail.claim.id}&openForm=1`,
+                );
               }}
             >
               <span>Ver ficha completa</span>
@@ -87,10 +91,7 @@ export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps
       )}
     >
       {loading ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-3">
-          <Spinner size="md" />
-          <p className="text-xs text-zinc-500 font-medium">Cargando resumen de la reclamación...</p>
-        </div>
+        <EnterpriseFormExecutiveSummarySkeleton />
       ) : error ? (
         <ErrorRetry onRetry={() => {
           setLoading(true);

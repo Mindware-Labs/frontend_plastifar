@@ -5,7 +5,7 @@ import { discrepanciesApi } from "../../api/discrepancies";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
-import { Spinner } from "../../components/ui/Spinner";
+import { EnterpriseFormExecutiveSummarySkeleton } from "../../components/ui/Skeleton";
 import type { DiscrepancyDetail } from "../../types/discrepancies";
 import { DiscrepancyExecutiveSummary } from "./DiscrepancyExecutiveSummary";
 
@@ -78,7 +78,7 @@ export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: Discrepancy
                 if (!detail) return;
                 onClose();
                 navigate(
-                  `/tickets/${detail.discrepancy.ticketId}?tab=formularios&form=discrepancy-${detail.discrepancy.id}`,
+                  `/tickets/${detail.discrepancy.ticketId}?tab=formularios&form=discrepancy-${detail.discrepancy.id}&openForm=1`,
                 );
               }}
             >
@@ -90,10 +90,7 @@ export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: Discrepancy
       )}
     >
       {loading ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-3">
-          <Spinner size="md" />
-          <p className="text-xs font-medium text-zinc-500">Cargando resumen…</p>
-        </div>
+        <EnterpriseFormExecutiveSummarySkeleton />
       ) : error ? (
         <ErrorRetry
           onRetry={() => {

@@ -221,7 +221,7 @@ export function TicketDetailSkeleton() {
     <div
       role="status"
       aria-label="Cargando ticket"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden animate-plf-apple-tab select-none"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden select-none"
     >
       {/* 1. Header estructural idéntico a ModuleHeader para 0 saltos de layout */}
       <div className="shrink-0 border-b border-zinc-200/80 -mx-3 lg:-mx-4 px-3 lg:px-4 mb-3 h-14 flex items-center justify-between gap-x-4">
@@ -417,7 +417,7 @@ export function StaffDetailSkeleton({ section = "datos" }: { section?: "datos" |
     <div
       role="status"
       aria-label="Cargando colaborador"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden animate-plf-apple-tab select-none"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden select-none"
     >
       {/* Cabecera idéntica a ModuleHeader */}
       <div className="shrink-0 border-b border-zinc-200/80 -mx-3 lg:-mx-4 px-3 lg:px-4 mb-3 h-14 flex items-center justify-between gap-x-4">
@@ -584,7 +584,7 @@ export function ClientDetailSkeleton({
     <div
       role="status"
       aria-label="Cargando cliente"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden animate-plf-apple-tab select-none"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden select-none"
     >
       <div className="mb-3 flex h-14 shrink-0 items-center justify-between gap-x-4 border-b border-zinc-200/80 -mx-3 px-3 lg:-mx-4 lg:px-4">
         <div className="flex shrink-0 items-center gap-x-3">
@@ -664,7 +664,7 @@ export function TaskDetailSkeleton() {
     <div
       role="status"
       aria-label="Cargando tarea"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden animate-plf-apple-tab select-none"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden select-none"
     >
       <div className="shrink-0 border-b border-zinc-200/80 -mx-3 lg:-mx-4 px-3 lg:px-4 mb-3 h-14 flex items-center justify-between gap-x-4">
         <div className="flex shrink-0 items-center gap-x-3">
@@ -792,7 +792,7 @@ export function TaskDetailSkeleton() {
  */
 export function TicketTasksSkeleton() {
   return (
-    <div role="status" aria-label="Cargando tareas" className="space-y-2.5 animate-plf-apple-tab">
+    <div role="status" aria-label="Cargando tareas" className="space-y-2.5 select-none">
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
@@ -823,7 +823,7 @@ export function TicketTasksSkeleton() {
  */
 export function TicketFormsSkeleton() {
   return (
-    <div role="status" aria-label="Cargando formularios" className="space-y-4 animate-plf-apple-tab">
+    <div role="status" aria-label="Cargando formularios" className="space-y-4 select-none">
       {/* Tira de sub-pestañas de formularios */}
       <div className="flex items-center gap-2 border-b border-zinc-200/80 pb-2">
         <Skeleton className="h-8 w-44 rounded-lg" delay={40} />
@@ -887,16 +887,71 @@ export function TicketFormsSkeleton() {
  */
 export function ActionPlanTableSkeleton() {
   return (
-    <div role="status" aria-label="Cargando plan de acción" className="divide-y divide-zinc-100 animate-plf-apple-tab">
+    <div role="status" aria-label="Cargando plan de acción" className="divide-y divide-zinc-100 select-none">
       {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="flex items-center justify-between p-3 gap-4">
-          <div className="w-[44%] space-y-1.5">
-            <Skeleton className="h-3.5 w-[85%] rounded" delay={i * 50} />
-            <Skeleton className="h-2.5 w-[60%] rounded" delay={i * 50 + 40} />
+          <div className="min-w-0 flex-[1.4] space-y-1.5">
+            <Skeleton className="h-3.5 w-full max-w-xs rounded" delay={i * 50} />
+            <Skeleton className="h-2.5 w-full max-w-[10rem] rounded" delay={i * 50 + 40} />
           </div>
-          <Skeleton className="h-3 w-28 rounded flex-1" delay={i * 50 + 60} />
-          <Skeleton className="h-3 w-24 rounded flex-1" delay={i * 50 + 80} />
-          <Skeleton className="h-5 w-20 rounded-full" delay={i * 50 + 100} />
+          <Skeleton className="h-3 w-28 shrink-0 rounded" delay={i * 50 + 60} />
+          <Skeleton className="h-3 w-24 shrink-0 rounded" delay={i * 50 + 80} />
+          <Skeleton className="h-5 w-20 shrink-0 rounded-full" delay={i * 50 + 100} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Esqueleto compartido para drawers de resumen (reclamación, discrepancia, HCA, retiro).
+ */
+export function EnterpriseFormExecutiveSummarySkeleton() {
+  return (
+    <div role="status" aria-label="Cargando resumen" className="space-y-4 pb-2 select-none">
+      <div className="rounded-xl border border-zinc-200/90 bg-white p-4.5 shadow-2xs">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Skeleton className="h-4 w-52 max-w-full shrink-0 rounded" />
+            <Skeleton className="h-5 w-16 shrink-0 rounded-full" delay={40} />
+          </div>
+          <Skeleton className="h-3 w-full max-w-lg rounded" delay={80} />
+          <Skeleton className="h-3 w-full max-w-sm rounded" delay={100} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5 space-y-2"
+          >
+            <Skeleton className="h-2.5 w-20 shrink-0 rounded" delay={i * 30} />
+            <Skeleton className="h-4 w-24 shrink-0 rounded" delay={i * 30 + 40} />
+            {i === 1 ? (
+              <Skeleton className="h-2.5 w-28 max-w-full shrink-0 rounded" delay={i * 30 + 60} />
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {[0, 1].map((block) => (
+        <div
+          key={block}
+          className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white p-4 shadow-2xs"
+        >
+          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2.5">
+            <Skeleton className="size-4 shrink-0 rounded" delay={block * 80} />
+            <Skeleton className="h-3 w-32 shrink-0 rounded" delay={block * 80 + 20} />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, row) => (
+              <div key={row} className="min-w-0 space-y-1.5">
+                <Skeleton className="h-2.5 w-16 shrink-0 rounded" delay={block * 80 + row * 25} />
+                <Skeleton className="h-3.5 w-full max-w-[9rem] rounded" delay={block * 80 + row * 25 + 15} />
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>

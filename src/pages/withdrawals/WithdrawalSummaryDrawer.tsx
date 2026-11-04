@@ -5,7 +5,7 @@ import { withdrawalsApi } from "../../api/withdrawals";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
-import { Spinner } from "../../components/ui/Spinner";
+import { EnterpriseFormExecutiveSummarySkeleton } from "../../components/ui/Skeleton";
 import type { WithdrawalDetail } from "../../types/withdrawals";
 import { WithdrawalExecutiveSummary } from "./WithdrawalExecutiveSummary";
 
@@ -78,7 +78,7 @@ export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSum
                 if (!detail) return;
                 onClose();
                 navigate(
-                  `/tickets/${detail.withdrawal.ticketId}?tab=formularios&form=withdrawal-${detail.withdrawal.id}`,
+                  `/tickets/${detail.withdrawal.ticketId}?tab=formularios&form=withdrawal-${detail.withdrawal.id}&openForm=1`,
                 );
               }}
             >
@@ -90,10 +90,7 @@ export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSum
       )}
     >
       {loading ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-3">
-          <Spinner size="md" />
-          <p className="text-xs font-medium text-zinc-500">Cargando resumen…</p>
-        </div>
+        <EnterpriseFormExecutiveSummarySkeleton />
       ) : error ? (
         <ErrorRetry
           onRetry={() => {

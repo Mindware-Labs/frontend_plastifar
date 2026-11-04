@@ -5,7 +5,7 @@ import { qualityApi, type SheetDetailResponse } from "../../api/quality";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
-import { Spinner } from "../../components/ui/Spinner";
+import { EnterpriseFormExecutiveSummarySkeleton } from "../../components/ui/Skeleton";
 import { HcaExecutiveSummary } from "./HcaExecutiveSummary";
 
 interface HcaSummaryDrawerProps {
@@ -73,9 +73,18 @@ export function HcaSummaryDrawer({ sheetId, onClose }: HcaSummaryDrawerProps) {
             <Button
               size="sm"
               variant="primary"
+              disabled={!detail}
               onClick={() => {
+                if (!detail) return;
                 onClose();
-                navigate(`/calidad/hca/${sheetId}`);
+                const ticketId = detail.sheet.ticketId;
+                if (ticketId != null) {
+                  navigate(
+                    `/tickets/${ticketId}?tab=formularios&form=sheet-${detail.sheet.id}&openForm=1`,
+                  );
+                } else {
+                  navigate(`/calidad/hca/${sheetId}`);
+                }
               }}
             >
               <span>Ver ficha completa</span>
@@ -86,10 +95,7 @@ export function HcaSummaryDrawer({ sheetId, onClose }: HcaSummaryDrawerProps) {
       )}
     >
       {loading ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-3">
-          <Spinner size="md" />
-          <p className="text-xs text-zinc-500 font-medium">Cargando resumen de la HCA...</p>
-        </div>
+        <EnterpriseFormExecutiveSummarySkeleton />
       ) : error ? (
         <ErrorRetry
           onRetry={() => {

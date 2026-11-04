@@ -177,12 +177,15 @@ export function TicketExecutiveSummary({ ticket, tasksCount }: TicketExecutiveSu
   );
 }
 
-const sectionHead = (
-  <div className="flex items-center gap-2 border-b border-zinc-100 bg-zinc-50/50 px-3 py-2">
-    <Skeleton className="size-4 rounded" />
-    <Skeleton className="h-2.5 w-20 rounded" />
-  </div>
-);
+function TicketSummarySectionHeadSkeleton({ blockIndex }: { blockIndex: number }) {
+  const base = blockIndex * 80;
+  return (
+    <div className="flex items-center gap-2 border-b border-zinc-100 bg-zinc-50/50 px-3 py-2">
+      <Skeleton className="size-4 shrink-0 rounded" delay={base} />
+      <Skeleton className="h-2.5 w-20 shrink-0 rounded" delay={base + 20} />
+    </div>
+  );
+}
 
 /** Esqueleto del resumen ejecutivo del ticket (misma rejilla que el contenido cargado). */
 export function TicketExecutiveSummarySkeleton() {
@@ -196,13 +199,13 @@ export function TicketExecutiveSummarySkeleton() {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-1.5">
-              <Skeleton className="h-5 w-[88px] rounded-md" />
-              <Skeleton className="h-5 w-16 rounded-md" delay={30} />
-              <Skeleton className="h-5 w-12 rounded-md" delay={60} />
+              <Skeleton className="h-5 w-[88px] shrink-0 rounded-md" />
+              <Skeleton className="h-5 w-16 shrink-0 rounded-md" delay={30} />
+              <Skeleton className="h-5 w-12 shrink-0 rounded-md" delay={60} />
             </div>
-            <Skeleton className="h-4 w-[92%] rounded" delay={80} />
-            <Skeleton className="h-4 w-[68%] rounded" delay={100} />
-            <Skeleton className="h-3 w-[55%] rounded" delay={120} />
+            <Skeleton className="h-4 w-full max-w-md rounded" delay={80} />
+            <Skeleton className="h-4 w-full max-w-xs rounded" delay={100} />
+            <Skeleton className="h-3 w-full max-w-[11rem] rounded" delay={120} />
           </div>
           <Skeleton className="h-5 w-20 shrink-0 rounded-md" delay={90} />
         </div>
@@ -211,20 +214,20 @@ export function TicketExecutiveSummarySkeleton() {
       <div className="grid grid-cols-3 gap-2">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="rounded-lg border border-zinc-200/80 bg-zinc-50/60 p-2 text-center space-y-1.5">
-            <Skeleton className="mx-auto h-2 w-12 rounded" delay={i * 40} />
-            <Skeleton className="mx-auto h-5 w-8 rounded" delay={i * 40 + 40} />
+            <Skeleton className="mx-auto h-2 w-12 shrink-0 rounded" delay={i * 40} />
+            <Skeleton className="mx-auto h-5 w-8 shrink-0 rounded" delay={i * 40 + 40} />
           </div>
         ))}
       </div>
 
       {[0, 1, 2].map((block) => (
         <div key={block} className="overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xs">
-          {sectionHead}
+          <TicketSummarySectionHeadSkeleton blockIndex={block} />
           <div className="space-y-0 divide-y divide-zinc-100 px-3 py-1">
             {Array.from({ length: block === 1 ? 2 : 4 }).map((_, row) => (
               <div key={row} className="flex items-center justify-between gap-3 py-2">
-                <Skeleton className="h-3 w-24 rounded" delay={block * 80 + row * 35} />
-                <Skeleton className="h-3 w-32 rounded" delay={block * 80 + row * 35 + 20} />
+                <Skeleton className="h-3 w-24 shrink-0 rounded" delay={block * 80 + row * 35} />
+                <Skeleton className="h-3 w-32 max-w-[45%] shrink-0 rounded" delay={block * 80 + row * 35 + 20} />
               </div>
             ))}
           </div>
