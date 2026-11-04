@@ -6,7 +6,8 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { cannedApi, cannedCategoriesApi } from "../../api/canned";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { SEGMENTED_TAB_COUNT_BADGE_CLASS } from "../../components/ui/SegmentedTabs";
@@ -35,6 +36,8 @@ import { CannedResponseStudio } from "./CannedResponseStudio";
 import { CategoriasTab } from "./CategoriasTab";
 import { RespuestasHelpSheet } from "./RespuestasHelpSheet";
 
+const NO_CATEGORIES: CategoriaResponseItem[] = [];
+
 /** Plantillas de correo y categorías con selección múltiple y gestión en lote. */
 export function RespuestasPage() {
   const { user } = useAuth();
@@ -43,7 +46,6 @@ export function RespuestasPage() {
 
   const [activeTab, setActiveTab] = useState<"plantillas" | "categorias">("plantillas");
 
-  const [categories, setCategories] = useState<CategoriaResponseItem[] | null>(null);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [pageSize, setPageSize] = useState(10);
@@ -65,6 +67,7 @@ export function RespuestasPage() {
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const { data, error, setPage, refresh } = usePagedList({
+    queryKey: ["canned"],
     fetch: cannedApi.list,
     criteria: {
       pageSize,
@@ -75,20 +78,22 @@ export function RespuestasPage() {
     fallbackError: "No se pudieron cargar las plantillas de correo.",
   });
 
-  function loadCategories() {
-    cannedCategoriesApi
-      .listAll()
-      .then(setCategories)
-      .catch(() => setCategories([]));
-  }
-
-  useEffect(loadCategories, []);
+  // Misma clave que el estudio de plantillas: comparten la lectura de categorías.
+  const categoriesQuery = useQuery({
+    queryKey: ["canned-categories", "all"],
+    queryFn: () => cannedCategoriesApi.listAll(),
+  });
+  // Si falla, el filtro queda sin categorías, como antes.
+  const categories: CategoriaResponseItem[] | null = categoriesQuery.isError
+    ? NO_CATEGORIES
+    : (categoriesQuery.data ?? null);
+  const { refetch: refetchCategories } = categoriesQuery;
 
   useLoadErrorReceipt(error, "plantillas-list", refresh);
 
   function reloadAll() {
     refresh();
-    loadCategories();
+    void refetchCategories();
   }
 
   const items = data?.items ?? null;

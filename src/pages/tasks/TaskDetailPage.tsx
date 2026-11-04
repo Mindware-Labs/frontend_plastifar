@@ -15,7 +15,8 @@ import {
   Tag,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { tasksApi } from "../../api/tasks";
@@ -195,9 +196,32 @@ export function TaskDetailPage() {
   const [searchParams] = useSearchParams();
   const initialUrlTab = searchParams.get("tab") as TaskDetailTab | null;
 
-  const [task, setTask] = useState<TaskDetail | null>(null);
-  const [loading, setLoading] = useState(Number.isFinite(id));
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  // Ficha de la tarea: cada id tiene su clave; con id invalido no se pide nada.
+  const taskQuery = useQuery({
+    queryKey: ["tasks", id],
+    queryFn: () => tasksApi.get(id),
+    enabled: Number.isFinite(id),
+  });
+  // Se espera la lectura de este montaje: la copia en cache podria sembrar la edicion con datos viejos.
+  const task = taskQuery.isFetchedAfterMount ? (taskQuery.data ?? null) : null;
+  const error =
+    taskQuery.isError && !taskQuery.isFetching
+      ? taskQuery.error instanceof ApiError
+        ? taskQuery.error.message
+        : "No se pudo cargar la tarea"
+      : null;
+  // Esqueleto mientras no hay tarea, o al reintentar tras un error (como la recarga completa de antes).
+  const loading = task === null ? error === null : taskQuery.isError && taskQuery.isFetching;
+  const setTask = useCallback(
+    (next: SetStateAction<TaskDetail | null>) => {
+      queryClient.setQueryData<TaskDetail | null>(["tasks", id], (current) =>
+        typeof next === "function" ? next(current ?? null) : next,
+      );
+    },
+    [queryClient, id],
+  );
+  const { refetch: refetchTask } = taskQuery;
   const [activeTab, setActiveTab] = useState<TaskDetailTab>(
     initialUrlTab && ["datos", "notas", "formularios", "reclamacion"].includes(initialUrlTab)
       ? initialUrlTab
@@ -241,48 +265,10 @@ export function TaskDetailPage() {
 
   const [noteFiles, setNoteFiles] = useState<File[]>([]);
 
-  function load(options?: { silent?: boolean }) {
-    setError(null);
-    if (!options?.silent) {
-      setLoading(true);
-      setTask(null);
-    }
-    return tasksApi
-      .get(id)
-      .then(setTask)
-      .catch((err) => {
-        setTask(null);
-        setError(err instanceof ApiError ? err.message : "No se pudo cargar la tarea");
-      })
-      .finally(() => {
-        if (!options?.silent) setLoading(false);
-      });
+  /** Relee la tarea; un fallo queda en la consulta (como antes, no se propaga). */
+  function load() {
+    return refetchTask();
   }
-
-  useEffect(() => {
-    if (!Number.isFinite(id)) return;
-    let active = true;
-    setLoading(true);
-    setTask(null);
-    setError(null);
-    tasksApi
-      .get(id)
-      .then((data) => {
-        if (!active) return;
-        setTask(data);
-      })
-      .catch((err) => {
-        if (!active) return;
-        setTask(null);
-        setError(err instanceof ApiError ? err.message : "No se pudo cargar la tarea");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [id]);
 
   useEffect(() => {
     const tab = searchParams.get("tab") as TaskDetailTab | null;
@@ -352,7 +338,7 @@ export function TaskDetailPage() {
           if (initialFormTicketLoad) setFormTicketLoading(false);
         });
     },
-    [id, task?.ticketId, formTicket?.id],
+    [id, task?.ticketId, formTicket?.id, setTask],
   );
 
   /** Precarga el ticket de formularios en cuanto hay tarea (no esperar a abrir la pestaña). */
@@ -372,7 +358,7 @@ export function TaskDetailPage() {
   async function replyToTaskNote(parentId: number, body: string) {
     if (!task) return;
     await tasksApi.comment(task.id, body, parentId);
-    await load({ silent: true });
+    await load();
     receipts.done({
       action: "nota-tarea-respuesta",
       title: "Respuesta guardada",
@@ -395,7 +381,7 @@ export function TaskDetailPage() {
         const withFiles = await tasksApi.addAttachments(task.id, form);
         setTask(withFiles);
       } else {
-        await load({ silent: true });
+        await load();
       }
       setNewComment("");
       setNoteFiles([]);
@@ -1076,7 +1062,7 @@ export function TaskDetailPage() {
                         onHasFormsChanged={(has) => setHasForms(has)}
                         onFormsChanged={() => {
                           void refreshFormTicket({ force: true });
-                          void load({ silent: true });
+                          void load();
                         }}
                         onViewDocument={(form) => setViewingDocumentForm(form)}
                       />

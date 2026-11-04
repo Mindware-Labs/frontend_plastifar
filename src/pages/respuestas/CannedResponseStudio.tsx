@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useQuery } from "@tanstack/react-query";
 import { cannedApi, cannedCategoriesApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
 import { Alert } from "../../components/ui/Alert";
@@ -42,6 +43,8 @@ import {
 import { CannedTemplateInline } from "./CannedTemplateInline";
 import { CannedVariableChips } from "./CannedVariableChips";
 
+const NO_CATEGORIES: CategoriaResponseItem[] = [];
+
 interface CannedResponseStudioProps {
   /** Presente = edición; ausente = nueva respuesta rápida. */
   item?: CannedResponseResponse;
@@ -66,7 +69,6 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
     return parseCanned(rawTitle, rawBody, item?.categoryName);
   }, [item, initialData]);
 
-  const [dbCategories, setDbCategories] = useState<CategoriaResponseItem[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
     item?.categoryId ?? initialData?.categoryId ?? null,
   );
@@ -95,27 +97,38 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
     [user],
   );
 
-  // Cargar categorías del catálogo de base de datos
-  function loadCategories() {
-    cannedCategoriesApi
-      .listAll()
-      .then((data) => {
-        setDbCategories(data);
-        if (selectedCategoryId) {
-          const match = data.find((c) => c.id === selectedCategoryId);
-          if (match) setCategoryName(match.name);
-        } else if (rawInit.category && rawInit.category !== "General") {
-          const match = data.find((c) => c.name.toLowerCase() === rawInit.category.toLowerCase());
-          if (match) {
-            setSelectedCategoryId(match.id);
-            setCategoryName(match.name);
-          }
-        }
-      })
-      .catch(() => {});
+  // Categorías del catálogo; misma clave que la lista de plantillas, así se comparte la petición.
+  const categoriesQuery = useQuery({
+    queryKey: ["canned-categories", "all"],
+    queryFn: () => cannedCategoriesApi.listAll(),
+  });
+  const dbCategories = categoriesQuery.data ?? NO_CATEGORIES;
+  const { refetch: refetchCategories } = categoriesQuery;
+
+  // Cada lectura nueva de este montaje ajusta la categoría elegida; la copia de la cache no.
+  const [syncedAt, setSyncedAt] = useState(0);
+  if (
+    categoriesQuery.isFetchedAfterMount &&
+    categoriesQuery.data &&
+    categoriesQuery.dataUpdatedAt !== syncedAt
+  ) {
+    const data = categoriesQuery.data;
+    setSyncedAt(categoriesQuery.dataUpdatedAt);
+    if (selectedCategoryId) {
+      const match = data.find((c) => c.id === selectedCategoryId);
+      if (match) setCategoryName(match.name);
+    } else if (rawInit.category && rawInit.category !== "General") {
+      const match = data.find((c) => c.name.toLowerCase() === rawInit.category.toLowerCase());
+      if (match) {
+        setSelectedCategoryId(match.id);
+        setCategoryName(match.name);
+      }
+    }
   }
 
-  useEffect(loadCategories, []);
+  function loadCategories() {
+    void refetchCategories();
+  }
 
   // Estilo del distintivo
   const currentCategoryColor = useMemo(() => {

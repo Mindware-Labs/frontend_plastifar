@@ -7,8 +7,9 @@ import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch, type UseFormRegisterReturn } from "react-hook-form";
 import { ApiError } from "../../api/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { clientsApi } from "../../api/clients";
-import { departmentsApi } from "../../api/departments";
+import { catalogs, fetchCatalog } from "../../lib/catalogQueries";
 import { staffApi } from "../../api/staff";
 import { tasksApi } from "../../api/tasks";
 import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
@@ -88,6 +89,7 @@ function bindAutoResizeTextarea(
 export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModalProps) {
   const isEdit = task !== undefined;
   const { can, isAdmin } = usePermissions();
+  const queryClient = useQueryClient();
   const [formError, setFormError] = useState<string | null>(null);
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [contacts, setContacts] = useState<Contact[]>(() => {
@@ -258,8 +260,8 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
 
   useEffect(() => {
     let cancelled = false;
-    departmentsApi
-      .list()
+    // Catalogo compartido: si esta fresco en cache no se vuelve a pedir.
+    fetchCatalog(catalogs.departments())
       .then((rows) => {
         if (cancelled) return;
         setDepartments(rows.filter((row) => row.isActive));
@@ -280,8 +282,12 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   useEffect(() => {
     if (!prefill?.senderEmail || isEdit) return;
     let cancelled = false;
-    tasksApi
-      .senderMatch(prefill.senderEmail)
+    const senderEmail = prefill.senderEmail;
+    queryClient
+      .fetchQuery({
+        queryKey: ["tasks", "sender-match", senderEmail],
+        queryFn: () => tasksApi.senderMatch(senderEmail),
+      })
       .then((match) => {
         if (cancelled || match.clientId == null) return;
         setValue("clientId", String(match.clientId));
@@ -291,7 +297,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     return () => {
       cancelled = true;
     };
-  }, [isEdit, prefill?.senderEmail, setValue]);
+  }, [isEdit, prefill?.senderEmail, setValue, queryClient]);
 
   useEffect(() => {
     if (clientId === "") {
@@ -315,8 +321,12 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     }
 
     let cancelled = false;
-    clientsApi.contacts
-      .list(numClientId, { page: 1, pageSize: 100, status: "activos" })
+    const contactsQuery = { page: 1, pageSize: 100, status: "activos" } as const;
+    queryClient
+      .fetchQuery({
+        queryKey: ["clients", numClientId, "contacts", contactsQuery],
+        queryFn: () => clientsApi.contacts.list(numClientId, contactsQuery),
+      })
       .then((page) => {
         if (cancelled) return;
         contactsCache.set(numClientId, page.items);
@@ -334,7 +344,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     return () => {
       cancelled = true;
     };
-  }, [clientId, contactTouched, getValues, setValue]);
+  }, [clientId, contactTouched, getValues, setValue, queryClient]);
 
   function stateOf(field: keyof TaskFormValues): FieldState {
     if (errors[field]) return "error";

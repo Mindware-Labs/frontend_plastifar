@@ -13,7 +13,9 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ApiError } from "../../api/client";
 import { ticketsApi } from "../../api/tickets";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { Avatar } from "../../components/ui/Avatar";
@@ -53,6 +55,18 @@ interface TicketTasksTabProps {
 
 type TaskFilter = "all" | "pending" | "completed" | "mine";
 
+const NO_TASKS: TicketTaskResponse[] = [];
+
+function withAddedComment(
+  tasks: TicketTaskResponse[],
+  added: { taskId: number; comment: TicketTaskCommentResponse } | null | undefined,
+): TicketTaskResponse[] {
+  if (!added) return tasks;
+  const target = tasks.find((t) => t.id === added.taskId);
+  if (!target || target.comments.some((c) => c.id === added.comment.id)) return tasks;
+  return tasks.map((t) => (t === target ? { ...t, comments: [...t.comments, added.comment] } : t));
+}
+
 export function TicketTasksTab({
   ticketId,
   isClosed,
@@ -69,9 +83,27 @@ export function TicketTasksTab({
   onActivity,
 }: TicketTasksTabProps) {
   const receipts = useReceipts();
-  const [tasks, setTasks] = useState<TicketTaskResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const tasksQuery = useQuery({
+    queryKey: ["tickets", ticketId, "tasks"],
+    queryFn: () => ticketsApi.getTasks(ticketId),
+  });
+  const loading = tasksQuery.isPending;
+  const error =
+    tasksQuery.isError && tasksQuery.data === undefined
+      ? tasksQuery.error instanceof ApiError
+        ? tasksQuery.error.message
+        : "Error al cargar las tareas."
+      : null;
+  // Los cambios propios se escriben en la cache: es la misma lista que se pinta.
+  const setTasks = useCallback(
+    (update: (prev: TicketTaskResponse[]) => TicketTaskResponse[]) => {
+      queryClient.setQueryData<TicketTaskResponse[]>(["tickets", ticketId, "tasks"], (prev) =>
+        prev ? update(prev) : prev,
+      );
+    },
+    [queryClient, ticketId],
+  );
   const [toastError, setToastError] = useState<string | null>(null);
   const [filter, setFilter] = useState<TaskFilter>("all");
 
@@ -80,21 +112,11 @@ export function TicketTasksTab({
   const [taskToDelete, setTaskToDelete] = useState<TicketTaskResponse | null>(null);
   const [reopeningId, setReopeningId] = useState<number | null>(null);
 
-  // El comentario agregado desde el panel lateral se funde en el render que lo trae, sin pasar por un efecto.
-  const [appliedComment, setAppliedComment] = useState(latestAddedComment);
-  if (latestAddedComment !== appliedComment) {
-    setAppliedComment(latestAddedComment);
-    if (latestAddedComment) {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === latestAddedComment.taskId &&
-          !t.comments.some((c) => c.id === latestAddedComment.comment.id)
-            ? { ...t, comments: [...t.comments, latestAddedComment.comment] }
-            : t,
-        ),
-      );
-    }
-  }
+  // El comentario agregado desde el panel lateral se pinta en el render que lo trae y se guarda en la cache.
+  const tasks = withAddedComment(tasksQuery.data ?? NO_TASKS, latestAddedComment);
+  useEffect(() => {
+    if (latestAddedComment) setTasks((prev) => withAddedComment(prev, latestAddedComment));
+  }, [latestAddedComment, setTasks]);
 
   const onTasksCountChangedRef = useRef(onTasksCountChanged);
   useEffect(() => {
@@ -157,32 +179,14 @@ export function TicketTasksTab({
     prevActiveId.current = currActiveId;
   }, [activeCommentsTaskId, tasks, filter]);
 
+  const tasksLength = tasksQuery.data?.length;
   useEffect(() => {
-    let active = true;
-    ticketsApi
-      .getTasks(ticketId)
-      .then((data) => {
-        if (!active) return;
-        setTasks(data);
-        setError(null);
-        onTasksCountChangedRef.current?.(data.length);
-      })
-      .catch((err: unknown) => {
-        if (active) setError(err instanceof Error ? err.message : "Error al cargar las tareas.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [ticketId]);
+    if (tasksLength !== undefined) onTasksCountChangedRef.current?.(tasksLength);
+  }, [tasksLength]);
 
   const handleCreateTask = async (formData: FormData) => {
     const created = await ticketsApi.createTask(ticketId, formData);
-    const data = await ticketsApi.getTasks(ticketId);
-    setTasks(data);
-    onTasksCountChanged?.(data.length);
+    await tasksQuery.refetch({ throwOnError: true });
     receipts.done({ action: "crear-tarea", title: "Tarea creada", detail: created.title });
     onActivity?.();
   };
@@ -220,11 +224,7 @@ export function TicketTasksTab({
     if (!taskToDelete) return;
     const deleted = taskToDelete;
     await ticketsApi.deleteTask(ticketId, deleted.id);
-    setTasks((prev) => {
-      const next = prev.filter((t) => t.id !== deleted.id);
-      onTasksCountChanged?.(next.length);
-      return next;
-    });
+    setTasks((prev) => prev.filter((t) => t.id !== deleted.id));
     receipts.done({ action: "eliminar-tarea", title: "Tarea eliminada", detail: deleted.title });
     onActivity?.();
   };

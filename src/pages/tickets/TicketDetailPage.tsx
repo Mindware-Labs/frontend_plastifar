@@ -35,7 +35,9 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
@@ -110,6 +112,8 @@ import { TicketTimelineSheet, type TicketDetailTab, type TimelineItem } from "./
 import { TicketFormsTab, type RegisteredFormItem } from "./TicketFormsTab";
 import { TicketFormDocumentView } from "./TicketFormDocumentView";
 import { usePermissions } from "../../hooks/usePermissions";
+
+const NO_STAFF: TicketStaffOptionResponse[] = [];
 
 /** El atajo se nombra con la tecla que la persona tiene delante, no con las dos. */
 const SAVE_SHORTCUT =
@@ -372,9 +376,22 @@ export function TicketDetailPage() {
   const navigate = useNavigate();
   const ticketId = parseTicketDetailId(id);
 
-  const [ticket, setTicket] = useState<TicketDetailResponse | null>(null);
-  const [loading, setLoading] = useState(ticketId != null);
-  const [error, setError] = useState<string | null>(ticketId != null ? null : "Identificador de ticket no válido.");
+  const ticketQuery = useQuery({
+    queryKey: ["tickets", ticketId],
+    queryFn: () => ticketsApi.getById(ticketId as number),
+    enabled: ticketId != null,
+  });
+  // Se espera la lectura de este montaje: la copia de la cache podria sembrar la edicion con datos viejos.
+  const ticket: TicketDetailResponse | null = ticketQuery.isFetchedAfterMount ? (ticketQuery.data ?? null) : null;
+  const loading = ticketId != null && !ticketQuery.isFetchedAfterMount;
+  const error =
+    ticketId == null
+      ? "Identificador de ticket no válido."
+      : ticketQuery.isError
+        ? ticketQuery.error instanceof ApiError
+          ? ticketQuery.error.message
+          : "No se pudo cargar el detalle del ticket o no tienes permiso para acceder a su departamento."
+        : null;
 
   const { user } = useAuth();
   // Formularios empresariales del ciclo de vida del ticket (PF-FOR-034, 068, 291, 109)
@@ -551,56 +568,19 @@ export function TicketDetailPage() {
 
   // Varias recargas seguidas (avisos del hub, acciones propias) solo dejan pintar la ultima pedida.
   const refreshSeq = useRef(0);
+  const { refetch: refetchTicket } = ticketQuery;
   const refreshTicket = useCallback(async () => {
     if (!ticketId) return;
     const seq = ++refreshSeq.current;
-    try {
-      const [ticketData, tasksData] = await Promise.all([
-        ticketsApi.getById(ticketId),
-        ticketsApi.getTasks(ticketId).catch(() => null),
-      ]);
-      if (seq !== refreshSeq.current) return;
-      setTicket(ticketData);
-      if (tasksData) {
-        setTasksCount(tasksData.length);
-      }
-    } catch (err) {
-      if (seq !== refreshSeq.current) return;
-      setError(
-        err instanceof Error
-          ? err.message
-          : "No se pudo cargar el detalle del ticket o no tienes permiso para acceder a su departamento.",
-      );
+    const [ticketResult, tasksData] = await Promise.all([
+      refetchTicket(),
+      ticketsApi.getTasks(ticketId).catch(() => null),
+    ]);
+    if (seq !== refreshSeq.current || ticketResult.isError) return;
+    if (tasksData) {
+      setTasksCount(tasksData.length);
     }
-  }, [ticketId]);
-
-  useEffect(() => {
-    if (!ticketId) return;
-    let active = true;
-
-    ticketsApi
-      .getById(ticketId)
-      .then((ticketData) => {
-        if (!active) return;
-        setTicket(ticketData);
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : "No se pudo cargar el detalle del ticket o no tienes permiso para acceder a su departamento.",
-        );
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [ticketId]);
+  }, [ticketId, refetchTicket]);
 
   const { onTicketsChanged, onTicketStatusChanged, onTicketNewMessage } = useEmailCounts();
   const receipts = useReceipts();
@@ -788,23 +768,15 @@ export function TicketDetailPage() {
   }, []);
 
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [assignableStaff, setAssignableStaff] = useState<TicketStaffOptionResponse[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
 
   // Una sola carga para la pestana de tareas y el modal de asignacion; este solo repite si aquella fallo.
-  useEffect(() => {
-    if (!ticketId) return;
-    let active = true;
-    ticketsApi
-      .getAssignableStaff(ticketId)
-      .then((list) => {
-        if (active) setAssignableStaff(list);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [ticketId]);
+  const assignableStaffQuery = useQuery({
+    queryKey: ["tickets", ticketId, "assignable-staff"],
+    queryFn: () => ticketsApi.getAssignableStaff(ticketId as number),
+    enabled: ticketId != null,
+  });
+  const assignableStaff = assignableStaffQuery.data ?? NO_STAFF;
   const [selectedStaffId, setSelectedStaffId] = useState("");
   const [assignComment, setAssignComment] = useState("");
   const [assigning, setAssigning] = useState(false);
@@ -1010,7 +982,7 @@ export function TicketDetailPage() {
     if (assignableStaff.length > 0) return;
     try {
       setLoadingStaff(true);
-      setAssignableStaff(await ticketsApi.getAssignableStaff(ticket.id));
+      await assignableStaffQuery.refetch({ throwOnError: true });
     } catch (err) {
       setAssignError(err instanceof Error ? err.message : "No se pudo cargar el personal asignable.");
     } finally {
@@ -1065,15 +1037,12 @@ export function TicketDetailPage() {
   const [editCatalogs, setEditCatalogs] = useState<TicketCreateOptionsResponse | null>(null);
   const [loadingEditCatalogs, setLoadingEditCatalogs] = useState(false);
   // Arbol entero, para rotular con el camino: el catalogo trae solo id y nombre.
-  const [editDepartmentTree, setEditDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
-
   // Carga el árbol de departamentos al entrar para mostrar la ruta jerárquica en la ficha y en el formulario de edición.
-  useEffect(() => {
-    departmentsApi
-      .list({ includeInactive: true })
-      .then(setEditDepartmentTree)
-      .catch(() => setEditDepartmentTree(undefined));
-  }, []);
+  const departmentTreeQuery = useQuery({
+    queryKey: ["departments", { includeInactive: true }],
+    queryFn: () => departmentsApi.list({ includeInactive: true }),
+  });
+  const editDepartmentTree: DepartmentResponse[] | undefined = departmentTreeQuery.data;
 
   const handleOpenEditModal = async () => {
     if (!ticket) return;
@@ -1092,10 +1061,7 @@ export function TicketDetailPage() {
 
     // Si falla, las opciones salen con su nombre, como antes.
     if (!editDepartmentTree) {
-      departmentsApi
-        .list({ includeInactive: true })
-        .then(setEditDepartmentTree)
-        .catch(() => setEditDepartmentTree(undefined));
+      void departmentTreeQuery.refetch();
     }
 
     if (!editCatalogs) {

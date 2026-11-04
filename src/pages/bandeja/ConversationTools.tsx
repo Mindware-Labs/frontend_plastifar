@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { StickyNote, UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
@@ -127,17 +128,16 @@ export function AssignmentControl({
   onNoteAdded,
 }: AssignmentProps) {
   const { user } = useAuth();
-  const [options, setOptions] = useState<StaffOptionResponse[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingAssignment, setPendingAssignment] = useState<{ staffId: number; staffName: string } | null>(null);
 
-  useEffect(() => {
-    emailsApi
-      .staffOptions()
-      .then(setOptions)
-      .catch(() => setOptions([]));
-  }, []);
+  // Equipo asignable; si falla, el selector queda solo con «Sin asignar» y quien ya la tiene.
+  const staffQuery = useQuery({
+    queryKey: ["staff", "options"],
+    queryFn: () => emailsApi.staffOptions(),
+  });
+  const options: StaffOptionResponse[] | null = staffQuery.isError ? [] : (staffQuery.data ?? null);
 
   async function assign(staffId: number | null) {
     if (busy) return;
