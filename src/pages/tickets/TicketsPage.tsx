@@ -78,8 +78,6 @@ const primaryFilters = filters.filter((f) => f.key === "todos" || f.key === "abi
 // Múltiplos de 3 para mantener la simetría exacta de la cuadrícula 3×3 en escritorio.
 const CARD_PAGE_SIZES = [9, 18, 27, 45];
 
-const DEFAULT_SORT_VALUE = "actividad:desc";
-
 const sortFilterOptions: TicketFilterOption[] = [
   { value: "actividad:desc", label: "Actividad reciente" },
   { value: "actividad:asc", label: "Actividad más antigua" },

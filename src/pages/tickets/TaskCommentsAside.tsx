@@ -10,7 +10,6 @@ import { prefersReducedMotion } from "../../hooks/motion";
 import { openOverlay } from "../../hooks/overlayStack";
 import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
 import { Avatar } from "../../components/ui/Avatar";
-import { formatDateTime } from "../../lib/format";
 import type { TicketTaskCommentResponse, TicketTaskResponse } from "../../types/api";
 
 // Curva de desaceleración larga, la de las hojas y paneles de iOS/macOS.

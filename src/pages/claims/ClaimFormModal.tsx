@@ -285,7 +285,6 @@ export function ClaimFormModal({
   onSaved,
 }: ClaimFormModalProps) {
   const isEdit = claim !== undefined;
-  const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
   const caseCodeDisplay = ticketNumber;
   const draftStorageKey =
     !isEdit && ticketId > 0 ? enterpriseFormDraftKey("pf034", ticketId) : null;

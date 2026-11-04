@@ -311,7 +311,6 @@ export function DiscrepancyFormModal({
   hostTaskStatus,
 }: DiscrepancyFormModalProps) {
   const isEdit = discrepancy !== undefined;
-  const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
   const contextCodeLabel = formHostKind === "task" ? "Tarea" : "Ticket";
   const draftLoadedRef = useRef(false);
   const recommendedProductOptions = useMemo(

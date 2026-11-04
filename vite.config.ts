@@ -36,11 +36,11 @@ function locatorWithPosixPaths(babel: unknown): PluginObj {
   return {
     visitor: {
       Program: {
-        enter(path, state) {
+        enter(path: unknown, state: unknown) {
           toPosix(state as unknown as LocatorState);
           enter(path, state as unknown as LocatorState);
         },
-        exit(path, state) {
+        exit(path: unknown, state: unknown) {
           toPosix(state as unknown as LocatorState);
           exit(path, state as unknown as LocatorState);
         },
@@ -72,8 +72,8 @@ const locatorInDev = {
 export default defineConfig({
   plugins: [locatorInDev, react(), tailwindcss(), stripCspInDev],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
+      alias: {
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   server: {

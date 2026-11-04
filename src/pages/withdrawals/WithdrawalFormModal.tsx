@@ -185,7 +185,6 @@ export function WithdrawalFormModal({
 }: Props) {
   const receipts = useReceipts();
   const isEditing = Boolean(withdrawal);
-  const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
   const contextCodeLabel = formHostKind === "task" ? "Tarea" : "Ticket";
   const lockedTicketId = fixedTicketId ?? withdrawal?.ticketId;
   const activeTicketId = lockedTicketId ?? 0;

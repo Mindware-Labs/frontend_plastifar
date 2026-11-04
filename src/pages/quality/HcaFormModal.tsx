@@ -500,7 +500,6 @@ export function HcaFormModal({
   onSaved,
 }: HcaFormModalProps) {
   const isEdit = sheet !== undefined;
-  const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
   const contextCodeLabel = formHostKind === "task" ? "Tarea" : "Ticket";
   const draftTicketId = defaults?.ticketId ?? null;
   const draftStorageKey =

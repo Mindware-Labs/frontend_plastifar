@@ -1,5 +1,9 @@
 /** Crece con el contenido; sin scroll interno si el contenedor lo permite. */
-export function autoResizeTextarea(textarea: HTMLTextAreaElement | null, minHeightPx = 96): void {
+export function autoResizeTextarea(
+  textarea: HTMLTextAreaElement | null,
+  minHeightPx = 96,
+  maxHeightPx?: number,
+): void {
   if (!textarea) return;
 
   // Preservar la posición de scroll del contenedor padre si existe
@@ -9,7 +13,8 @@ export function autoResizeTextarea(textarea: HTMLTextAreaElement | null, minHeig
   const prevHeight = textarea.style.height;
   textarea.style.height = "auto";
   const borderOffset = textarea.offsetHeight - textarea.clientHeight;
-  const targetHeight = Math.max(textarea.scrollHeight + borderOffset, minHeightPx);
+  let targetHeight = Math.max(textarea.scrollHeight + borderOffset, minHeightPx);
+  if (maxHeightPx != null) targetHeight = Math.min(targetHeight, maxHeightPx);
   const nextHeight = `${targetHeight}px`;
 
   if (prevHeight !== nextHeight) {

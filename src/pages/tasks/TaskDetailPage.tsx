@@ -205,7 +205,7 @@ export function TaskDetailPage() {
   );
   const [hasForms, setHasForms] = useState<boolean | null>(null);
   const [formTicket, setFormTicket] = useState<TicketDetailResponse | null>(null);
-  const [formTicketLoading, setFormTicketLoading] = useState(false);
+  const [, setFormTicketLoading] = useState(false);
   const [formTicketError, setFormTicketError] = useState<string | null>(null);
   const [viewingDocumentForm, setViewingDocumentForm] = useState<RegisteredFormItem | null>(null);
 

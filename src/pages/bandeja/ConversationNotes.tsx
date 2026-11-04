@@ -1,4 +1,4 @@
-import { ChevronDown, Plus, StickyNote, Trash2, X } from "lucide-react";
+import { ChevronDown, Plus, StickyNote, X } from "lucide-react";
 import {
   forwardRef,
   useCallback,
@@ -22,7 +22,6 @@ import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { useAuth } from "../../context/useAuth";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
-import { formatDateTime } from "../../lib/format";
 import type { EmailNoteResponse } from "../../types/api";
 import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
 
@@ -208,21 +207,6 @@ export const ConversationNotes = forwardRef<ConversationNotesHandle, Conversatio
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function handleRemove(note: EmailNoteResponse, event: React.MouseEvent) {
-    event.stopPropagation();
-    try {
-      await emailsApi.removeNote(note.id);
-      const nextNotes = (notes ?? []).filter((n) => n.id !== note.id);
-      setNotes(nextNotes);
-      onNotesCountChange?.(nextNotes.length);
-      if (nextNotes.length === 0) {
-        setShowAddForm(true);
-      }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar la nota");
     }
   }
 

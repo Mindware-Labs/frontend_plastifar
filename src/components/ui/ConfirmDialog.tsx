@@ -11,6 +11,7 @@ export interface ConfirmDialogProps {
   /** danger = destructivo e irreversible; warn = reversible pero con consecuencia. */
   tone?: ConfirmTone;
   icon?: ComponentType<{ className?: string }>;
+  eyebrow?: string;
   title: string;
   description: ReactNode;
   confirmLabel: string;
@@ -28,6 +29,7 @@ const toneClasses: Record<ConfirmTone, string> = {
 export function ConfirmDialog({
   tone = "danger",
   icon: Icon = AlertTriangle,
+  eyebrow,
   title,
   description,
   confirmLabel,
@@ -59,6 +61,7 @@ export function ConfirmDialog({
   return (
     <Modal
       title={title}
+      eyebrow={eyebrow}
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={handleCancel}

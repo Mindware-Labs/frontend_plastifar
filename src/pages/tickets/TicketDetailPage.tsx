@@ -680,7 +680,7 @@ export function TicketDetailPage() {
   };
 
   const sendReply = async () => {
-    if (!replyReady || replySending || replyCelebrating) return;
+    if (ticketId == null || !replyReady || replySending || replyCelebrating) return;
     try {
       setReplySending(true);
       setReplySendError(null);
@@ -727,7 +727,7 @@ export function TicketDetailPage() {
   const [noteSettle, triggerNoteSettle] = useSettle();
 
   const saveNote = async () => {
-    if (noteSending) return;
+    if (ticketId == null || noteSending) return;
     if (!noteBody.trim()) {
       setNoteSendError("Nota requerida");
       triggerNoteSettle();
@@ -938,6 +938,7 @@ export function TicketDetailPage() {
 
   const handleConfirmUpdateStatus = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (ticketId == null) return;
     // Previene envíos accidentales disparados inmediatamente al avanzar de paso (doble clic o activación residual)
     if (Date.now() - step2EnteredAtRef.current < 400) {
       return;
@@ -1009,7 +1010,7 @@ export function TicketDetailPage() {
     if (assignableStaff.length > 0) return;
     try {
       setLoadingStaff(true);
-      setAssignableStaff(await ticketsApi.getAssignableStaff(ticketId));
+      setAssignableStaff(await ticketsApi.getAssignableStaff(ticket.id));
     } catch (err) {
       setAssignError(err instanceof Error ? err.message : "No se pudo cargar el personal asignable.");
     } finally {
@@ -1019,6 +1020,7 @@ export function TicketDetailPage() {
 
   const handleConfirmAssign = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (ticketId == null) return;
     try {
       setAssigning(true);
       setAssignError(null);
@@ -1109,6 +1111,7 @@ export function TicketDetailPage() {
   };
 
   const submitTicketEdit = async () => {
+    if (ticketId == null) return;
     if (!editSubject.trim()) {
       setEditError("El asunto es obligatorio");
       triggerEditSettle();
@@ -1224,6 +1227,7 @@ export function TicketDetailPage() {
     ));
 
   const replyToInternalNote = async (parentId: number, body: string) => {
+    if (ticketId == null) return;
     const formData = new FormData();
     formData.append("Direction", "Interna");
     formData.append("BodyText", body);
@@ -3206,7 +3210,7 @@ export function TicketDetailPage() {
       )}
 
       {/* El mismo visor de la bandeja: se ve dentro y, si hace falta, se descarga desde ahi. */}
-      {preview && (
+      {preview && ticketId != null && (
         <AttachmentPreviewModal
           sourceId={ticketId}
           loadLink={(attachmentId, download) => ticketsApi.attachmentLink(ticketId, attachmentId, download)}

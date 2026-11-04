@@ -220,7 +220,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
               label="Departamento predeterminado"
               searchable
               name={field.name}
-              value={field.value}
+              value={field.value ?? ""}
               onChange={field.onChange}
               onBlur={field.onBlur}
               placeholder="Sin departamento (opcional)…"

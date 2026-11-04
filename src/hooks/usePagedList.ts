@@ -13,6 +13,8 @@ interface Options<TQuery extends { page: number }, TData extends PagedData> {
   fallbackError: string;
   /** Si es false, no se dispara la peticion (p. ej. esperar pestañas de bandeja). */
   enabled?: boolean;
+  /** Nombre del query param de pagina en la URL (reservado; compatibilidad con listados). */
+  pageKey?: string;
 }
 
 /** Listado paginado con descarte de respuestas obsoletas y persistencia de vista. */

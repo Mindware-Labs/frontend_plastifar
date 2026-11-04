@@ -4,6 +4,15 @@ import { createPortal } from "react-dom";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 
+export type DrawerSize = "sm" | "md" | "lg" | "xl";
+
+const DRAWER_SIZE_MAX_WIDTH: Record<DrawerSize, string> = {
+  sm: "max-w-sm",
+  md: "max-w-[460px]",
+  lg: "max-w-xl",
+  xl: "max-w-2xl",
+};
+
 export interface DrawerProps {
   title: string;
   /** Línea corta sobre el título: sitúa la acción dentro del módulo. */
@@ -13,7 +22,10 @@ export interface DrawerProps {
   /** Acciones del pie, separadas del cuerpo por un filete. */
   footer?: ReactNode | ((helpers: { requestClose: () => void; close: () => void }) => ReactNode);
   children: ReactNode;
+  size?: DrawerSize;
   maxWidth?: string;
+  /** Compatibilidad con paneles que ya animan por fuera. */
+  animated?: boolean;
   /** Si el padre ya controla la animación de salida */
   isExiting?: boolean;
   onRequestClose?: () => void;
@@ -32,11 +44,14 @@ export function Drawer({
   onClose,
   footer,
   children,
-  maxWidth = "max-w-[460px]",
+  size,
+  maxWidth,
+  animated: _animated = true,
   isExiting: externalIsExiting,
   onRequestClose: externalRequestClose,
   closeOnBackdropClick = true,
 }: DrawerProps) {
+  const resolvedMaxWidth = maxWidth ?? (size ? DRAWER_SIZE_MAX_WIDTH[size] : "max-w-[460px]");
   const motion = useDialogMotion(onClose, { variant: "drawer", exiting: externalIsExiting });
   const { isExiting, requestClose, scrimRef, panelRef } = motion;
   const doRequestClose = externalRequestClose ?? requestClose;
@@ -65,7 +80,7 @@ export function Drawer({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className={`m-2.5 flex h-[calc(100%-1.25rem)] w-full ${maxWidth}
+        className={`m-2.5 flex h-[calc(100%-1.25rem)] w-full ${resolvedMaxWidth}
           flex-col overflow-hidden rounded-card border border-line bg-white shadow-dialog will-change-[transform,opacity] ${
             isExiting ? "pointer-events-none" : ""
           }`}
