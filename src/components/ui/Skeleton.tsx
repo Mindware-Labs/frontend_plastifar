@@ -1,8 +1,4 @@
-import {
-  MODULE_HEADER_CONTENT_BAND_CLASS,
-  MODULE_HEADER_SYMMETRIC_BAND_CLASS,
-  MODULE_HEADER_TITLE_GUTTER_CLASS,
-} from "../app/ModuleHeader";
+import { MODULE_HEADER_SYMMETRIC_BAND_CLASS, MODULE_HEADER_TITLE_GUTTER_CLASS } from "../app/ModuleHeader";
 
 /**
  * Marcador de carga.

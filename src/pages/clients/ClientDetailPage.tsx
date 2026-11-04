@@ -55,6 +55,7 @@ import { resolveStaffLabel } from "../../lib/lookups";
 import type { TicketListResponse, TicketQuery } from "../../types/api";
 import type { Client, Contact } from "../../types/clients";
 import { PriorityCell, StatusCell } from "../tickets/ticketCells";
+import { TicketSummaryDrawer } from "../tickets/TicketSummaryDrawer";
 import { ClientModal } from "./ClientModal";
 import { ContactModal } from "./ContactModal";
 
@@ -106,6 +107,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const [ticketSearch, setTicketSearch] = useState("");
   const [ticketChip, setTicketChip] = useState<"todos" | "abiertos" | "cerrados">("todos");
   const [ticketPageSize, setTicketPageSize] = useState(10);
+  const [summaryTicketId, setSummaryTicketId] = useState<number | null>(null);
 
   const clientId = Number(id);
   useDynamicBreadcrumb(client?.name ?? null);
@@ -1020,11 +1022,16 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
                       <tbody>
                         {ticketRows.map((ticket) => (
-                          <Row key={ticket.id}>
+                          <Row
+                            key={ticket.id}
+                            className="cursor-pointer"
+                            onClick={() => setSummaryTicketId(ticket.id)}
+                          >
                             <Td className="font-mono text-[12.5px] font-semibold text-zinc-900 tabular-nums">
                               <Link
                                 to={`/tickets/${ticket.id}`}
                                 className="text-brand-red hover:underline"
+                                onClick={(event) => event.stopPropagation()}
                               >
                                 {ticket.number || formatTicketCode(ticket.id)}
                               </Link>
@@ -1033,6 +1040,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                               <Link
                                 to={`/tickets/${ticket.id}`}
                                 className="hover:text-brand-red transition-colors line-clamp-1"
+                                onClick={(event) => event.stopPropagation()}
                               >
                                 {ticket.subject}
                               </Link>
@@ -1084,6 +1092,13 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
               detail: `${updated.name} (${updated.code})`,
             });
           }}
+        />
+      )}
+
+      {summaryTicketId !== null && (
+        <TicketSummaryDrawer
+          ticketId={summaryTicketId}
+          onClose={() => setSummaryTicketId(null)}
         />
       )}
 
