@@ -12,8 +12,11 @@ interface Options<TQuery extends { page: number }, TData extends PagedData> {
    * Identifica el listado en la cache. Debe incluir todo lo que la funcion
    * `fetch` lee por fuera de `criteria` (p. ej. el id del cliente en sus
    * contactos): dos listados con la misma clave comparten datos.
+   *
+   * Opcional: sin ella la clave sale de `fallbackError`, que es distinto en cada
+   * listado. Asi las pantallas que no se migraron siguen funcionando sin tocarlas.
    */
-  queryKey: readonly unknown[];
+  queryKey?: readonly unknown[];
   fetch: (query: TQuery) => Promise<TData>;
   /** Todo lo que no es la pagina. Cambiar cualquier criterio vuelve a la primera. */
   criteria: Omit<TQuery, "page">;
@@ -59,19 +62,34 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
   const queryJson = JSON.stringify({ ...criteria, page });
 
   const query = useQuery({
-    queryKey: [...queryKey, "paged", queryJson],
+    queryKey: [...(queryKey ?? ["paged-list", fallbackError]), "paged", queryJson],
     queryFn: () => fetch(JSON.parse(queryJson) as TQuery),
     enabled,
     placeholderData: keepPreviousData,
   });
 
-  const data = query.data ?? null;
-  const isStale = query.isPlaceholderData;
-  const error = query.error
-    ? query.error instanceof ApiError
-      ? query.error.message
-      : fallbackError
-    : null;
+  /*
+   * `keepPreviousData` solo cubre la espera: si la pagina nueva FALLA, TanStack
+   * deja `data` en undefined y la tabla se vaciaba. La version anterior
+   * conservaba las ultimas filas buenas (atenuadas) junto al aviso, y el aviso
+   * seguia hasta la siguiente carga correcta. Se guarda aqui esa ultima
+   * respuesta buena y el ultimo error para reproducirlo.
+   */
+  const [lastGood, setLastGood] = useState<TData | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
+
+  if (query.data && !query.isPlaceholderData && query.data !== lastGood) {
+    setLastGood(query.data);
+    if (lastError !== null) setLastError(null);
+  }
+  if (query.isError) {
+    const message = query.error instanceof ApiError ? query.error.message : fallbackError;
+    if (message !== lastError) setLastError(message);
+  }
+
+  const data = query.data ?? (query.isError ? lastGood : null);
+  const isStale = query.isPlaceholderData || (query.isError && lastGood !== null);
+  const error = lastError;
 
   // Borrar la ultima fila de la ultima pagina deja la pagina fuera de rango.
   if (data && !isStale && data.totalPages > 0 && page > data.totalPages) setPage(data.totalPages);

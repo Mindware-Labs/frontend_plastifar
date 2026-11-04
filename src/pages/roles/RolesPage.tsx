@@ -1,5 +1,6 @@
 import { Ban, CheckCircle2, KeyRound, Lock, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { useSearchParams } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
@@ -68,14 +69,12 @@ export function RolesPage() {
   const [permissionDrawerRole, setPermissionDrawerRole] = useState<RoleResponse | null>(null);
 
   // Catálogo completo de permisos en caché para el drawer
-  const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
-
-  useEffect(() => {
-    permissionsApi
-      .matrix()
-      .then(setMatrix)
-      .catch(() => {});
-  }, []);
+  // Un fallo es silencioso: el drawer se queda sin catalogo, como antes.
+  const matrixQuery = useQuery({
+    queryKey: ["permissions", "matrix"],
+    queryFn: () => permissionsApi.matrix(),
+  });
+  const matrix: PermissionMatrixResponse | null = matrixQuery.data ?? null;
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("todos");
@@ -248,7 +247,6 @@ export function RolesPage() {
         <PermissionsView
           title="Roles y Permisos"
           headerExtra={tabSwitcher}
-          onMatrixLoaded={setMatrix}
         />
       </div>
     );

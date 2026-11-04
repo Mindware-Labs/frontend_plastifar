@@ -1,7 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { ApiError } from "../../api/client";
 
 interface Options<T> {
+  /**
+   * Nombre del recurso en la cache. La clave lleva ademas `"print"`: estas
+   * vistas suelen transformar la respuesta (`.claim`, `.discrepancy`) y no
+   * deben compartir entrada con la ficha, que guarda la respuesta entera.
+   * Opcional: sin el, la clave sale de `failed`, distinto en cada vista.
+   */
+  resource?: string;
   /** Título de la pestaña, que es el nombre que el navegador propone al guardar en PDF. */
   documentTitle: (data: T) => string;
   failed: string;
@@ -15,40 +23,42 @@ const PRINT_DELAY_MS = 300;
  * diálogo de impresión en cuanto está pintado. La ventana existe para eso.
  */
 export function usePrintRecord<T>(id: number, fetch: (id: number) => Promise<T>, options: Options<T>) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: [options.resource ?? options.failed, id, "print"],
+    queryFn: () => fetch(id),
+  });
 
-  const fetchRef = useRef(fetch);
-  const optionsRef = useRef(options);
+  // Solo la lectura de este montaje: se imprime lo que hay en el servidor ahora.
+  const data = query.isFetchedAfterMount ? (query.data ?? null) : null;
+  const error = query.isError
+    ? query.error instanceof ApiError
+      ? query.error.message
+      : options.failed
+    : null;
+
+  const titleRef = useRef(options.documentTitle);
   useEffect(() => {
-    fetchRef.current = fetch;
-    optionsRef.current = options;
+    titleRef.current = options.documentTitle;
   });
 
   useEffect(() => {
-    let cancelled = false;
-    fetchRef
-      .current(id)
-      .then((value) => {
-        if (cancelled) return;
-        setData(value);
-        document.title = optionsRef.current.documentTitle(value);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : optionsRef.current.failed);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+    if (data !== null) document.title = titleRef.current(data);
+  }, [data]);
 
+  // El diálogo se abre una vez por registro, no con cada relectura en segundo plano.
+  const printedFor = useRef<number | null>(null);
   useEffect(() => {
-    if (data === null) return;
+    if (data === null || printedFor.current === id) return;
     if (window.location.search.includes("mode=print")) {
-      const timer = window.setTimeout(() => window.print(), PRINT_DELAY_MS);
+      // Se marca al abrir el dialogo, no antes: si el efecto se limpia antes de
+      // tiempo (StrictMode, relectura), el siguiente lo vuelve a programar.
+      const timer = window.setTimeout(() => {
+        printedFor.current = id;
+        window.print();
+      }, PRINT_DELAY_MS);
       return () => window.clearTimeout(timer);
     }
-  }, [data]);
+  }, [data, id]);
 
   return { data, error };
 }

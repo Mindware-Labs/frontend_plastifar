@@ -1,6 +1,5 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection } from "@microsoft/signalr";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { refreshSession } from "../api/client";
 import { emailsApi } from "../api/emails";
 import { tokenStore } from "../api/tokenStore";
@@ -29,7 +28,6 @@ import {
 } from "./useEmailCounts";
 
 const BASE_TITLE = "Plastifar · Panel interno";
-const COUNTS_KEY = ["emails", "counts"] as const;
 
 /** Un token a punto de vencer no sirve para negociar: se rota antes de entregarlo al hub. */
 const TOKEN_MARGIN_MS = 30_000;
@@ -49,24 +47,7 @@ async function freshAccessToken(): Promise<string> {
 
 /** Contadores del menu y canal en vivo: viven arriba porque los comparten la barra y la bandeja. */
 export function EmailCountsProvider({ children }: { children: ReactNode }) {
-  const queryClient = useQueryClient();
-  /*
-   * Contadores de carpetas sobre TanStack Query. Antes se pedian al montar y
-   * otra vez en cuanto conectaba SignalR (dos peticiones seguidas en cada
-   * carga, cuatro en desarrollo). Ahora el montaje y el primer aviso del hub
-   * comparten la misma peticion si la primera sigue en vuelo.
-   */
-  const countsQuery = useQuery({
-    queryKey: COUNTS_KEY,
-    queryFn: () => emailsApi.counts(),
-  });
-  const counts = countsQuery.data ?? null;
-
-  /** La bandeja ya trae los contadores en su listado: se escriben en la cache sin pedirlos aparte. */
-  const setCounts = useCallback(
-    (next: EmailFolderCounts) => queryClient.setQueryData(COUNTS_KEY, next),
-    [queryClient],
-  );
+  const [counts, setCounts] = useState<EmailFolderCounts | null>(null);
   const listeners = useRef(new Set<Listener>());
   const arrivalListeners = useRef(new Set<ArrivalListener>());
   const assignmentListeners = useRef(new Set<AssignmentListener>());
@@ -78,11 +59,12 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
   const ticketSlaListeners = useRef(new Set<TicketSlaListener>());
   const connectionRef = useRef<HubConnection | null>(null);
 
-  // `cancelRefetch: false`: si ya hay una lectura en vuelo, se reutiliza en vez
-  // de cancelarla y lanzar otra. Un fallo deja los ultimos contadores, como antes.
   const refresh = useCallback(() => {
-    void queryClient.refetchQueries({ queryKey: COUNTS_KEY }, { cancelRefetch: false });
-  }, [queryClient]);
+    emailsApi
+      .counts()
+      .then(setCounts)
+      .catch(() => undefined);
+  }, []);
 
   const onInboxChanged = useCallback((listener: Listener) => {
     listeners.current.add(listener);
@@ -145,6 +127,8 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
       return [];
     }
   }, []);
+
+  useEffect(refresh, [refresh]);
 
   // El titulo de la pestana cuenta lo que hay sin leer: se ve desde cualquier otra ventana.
   useEffect(() => {

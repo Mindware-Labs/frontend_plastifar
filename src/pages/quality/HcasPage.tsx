@@ -10,10 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchAllPages } from "../../api/paging";
-import { productLinesApi } from "../../api/productLines";
 import { qualityApi } from "../../api/quality";
-import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -39,6 +36,7 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
+import { usePlantsCatalog, useProductLinesCatalog } from "../../lib/catalogQueries";
 import { formatDay } from "../../lib/dates";
 import { exportHcasListToExcel, exportHcasListToPdf } from "../../lib/hcaListExport";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
@@ -56,13 +54,17 @@ type SortKey = "fecha" | "numero" | "cliente";
  * queda asentado permanentemente en el sistema con su estado completado y se consulta
  * de inmediato desde el drawer o la vista completa.
  */
+const EMPTY_PLANTS: Plant[] = [];
+const EMPTY_PRODUCT_LINES: ProductLine[] = [];
+
 export function HcasPage() {
   const navigate = useNavigate();
   const receipts = useReceipts();
   const { can } = usePermissions();
 
-  const [plants, setPlants] = useState<Plant[]>([]);
-  const [productLines, setProductLines] = useState<ProductLine[]>([]);
+  // Catálogos compartidos con el formulario; si fallan, los filtros quedan vacíos como antes.
+  const plants = usePlantsCatalog().data ?? EMPTY_PLANTS;
+  const productLines = useProductLinesCatalog().data ?? EMPTY_PRODUCT_LINES;
 
   const [search, setSearch] = useState("");
   const [clientId, setClientId] = useState("todos");
@@ -82,16 +84,6 @@ export function HcasPage() {
 
   const debouncedSearch = useDebouncedValue(search).trim();
   const canWrite = can("quality.write");
-
-  useEffect(() => {
-    fetchAllPages<Plant>((page, size) => settingsApi.plants.list({ page, pageSize: size }))
-      .then(setPlants)
-      .catch(() => setPlants([]));
-
-    fetchAllPages<ProductLine>((page, size) => productLinesApi.list({ page, pageSize: size }))
-      .then(setProductLines)
-      .catch(() => setProductLines([]));
-  }, []);
 
   const criteria: Omit<HcaQuery, "page"> = {
     pageSize,

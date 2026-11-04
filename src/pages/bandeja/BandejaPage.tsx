@@ -384,7 +384,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     EmailQuery,
     EmailListResponse
   >({
-    queryKey: ["emails"],
     fetch: emailsApi.list,
     criteria: {
       pageSize,

@@ -13,6 +13,7 @@ export function ClaimPrintPage() {
     claimId,
     async (key) => (await claimsApi.get(key)).claim,
     {
+      resource: "claims",
       documentTitle: (record) => `${CLAIM_FORM_CONTROL.code} · ${record.ticketNumber}`,
       failed: "No se pudo cargar la reclamación.",
     },

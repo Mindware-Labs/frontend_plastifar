@@ -77,7 +77,6 @@ export function MotivosPage() {
     TicketTopicQuery,
     TicketTopicListResponse
   >({
-    queryKey: ["ticket-topics"],
     fetch: ticketTopicsApi.list,
     criteria: {
       pageSize,

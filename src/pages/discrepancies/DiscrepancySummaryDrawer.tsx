@@ -1,12 +1,12 @@
 import { ArrowUpRight, Printer } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { discrepanciesApi } from "../../api/discrepancies";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Spinner } from "../../components/ui/Spinner";
-import type { DiscrepancyDetail } from "../../types/discrepancies";
 import { DiscrepancyExecutiveSummary } from "./DiscrepancyExecutiveSummary";
 
 interface DiscrepancySummaryDrawerProps {
@@ -16,34 +16,16 @@ interface DiscrepancySummaryDrawerProps {
 
 export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: DiscrepancySummaryDrawerProps) {
   const navigate = useNavigate();
-  const [detail, setDetail] = useState<DiscrepancyDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError(null);
-
-    discrepanciesApi
-      .get(discrepancyId)
-      .then((data) => {
-        if (!active) return;
-        setDetail(data);
-      })
-      .catch(() => {
-        if (!active) return;
-        setError("No se pudo cargar el resumen de la investigación.");
-      })
-      .finally(() => {
-        if (!active) return;
-        setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [discrepancyId]);
+  const query = useQuery({ queryKey: ["discrepancies", discrepancyId], queryFn: () => discrepanciesApi.get(discrepancyId) });
+  // El reintento mostraba su propio texto de error; se conserva.
+  const [retriedId, setRetriedId] = useState<number | null>(null);
+  const detail = query.data ?? null;
+  const loading = query.isPending || (query.isError && query.isFetching);
+  const error = query.isError
+    ? retriedId === discrepancyId
+      ? "Error al cargar."
+      : "No se pudo cargar el resumen de la investigación."
+    : null;
 
   return (
     <Drawer
@@ -97,13 +79,8 @@ export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: Discrepancy
       ) : error ? (
         <ErrorRetry
           onRetry={() => {
-            setLoading(true);
-            setError(null);
-            discrepanciesApi
-              .get(discrepancyId)
-              .then(setDetail)
-              .catch(() => setError("Error al cargar."))
-              .finally(() => setLoading(false));
+            setRetriedId(discrepancyId);
+            void query.refetch();
           }}
         >
           {error}

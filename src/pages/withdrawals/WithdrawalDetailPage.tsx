@@ -29,6 +29,7 @@ export function WithdrawalDetailPage() {
   const withdrawalId = Number(id);
 
   const { data: detail, setData: setDetail, error, reload } = useDetail(withdrawalId, withdrawalsApi.get, {
+    resource: "withdrawals",
     notFound: "La solicitud de retiro no existe o no tienes acceso.",
     failed: "No se pudo cargar la solicitud de retiro. Vuelve a intentarlo.",
   });

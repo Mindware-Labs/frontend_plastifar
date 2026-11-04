@@ -18,7 +18,8 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import {
@@ -28,8 +29,6 @@ import {
   type ContactQuery,
 } from "../../api/clients";
 import { ticketsApi } from "../../api/tickets";
-import { fetchAllPages } from "../../api/paging";
-import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
@@ -56,7 +55,8 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { formatDateTime, formatPhoneNumber, formatTicketCode } from "../../lib/format";
 import { resolveStaffLabel } from "../../lib/lookups";
 import type { TicketListResponse, TicketQuery } from "../../types/api";
-import type { Client, Contact, Territory } from "../../types/clients";
+import { useTerritoriesCatalog } from "../../lib/catalogQueries";
+import type { Client, ClientDetailResponse, Contact, Territory } from "../../types/clients";
 import { PriorityCell, StatusCell } from "../tickets/ticketCells";
 import { ClientModal } from "./ClientModal";
 import { ContactModal } from "./ContactModal";
@@ -79,6 +79,9 @@ const contactChips: { key: ContactChipKey; label: string; countKey: keyof Contac
   { key: "inactivos", label: "Inactivos", countKey: "inactive" },
 ];
 
+const NO_CONTACTS: Contact[] = [];
+const NO_TERRITORIES: Territory[] = [];
+
 const TYPE_ICONS: Record<string, typeof Truck> = {
   Distribuidor: Truck,
   Mayorista: Boxes,
@@ -92,12 +95,9 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const canWrite = can("clients.write");
   const receipts = useReceipts();
 
-  const [client, setClient] = useState<Client | null>(null);
-  const [previewContacts, setPreviewContacts] = useState<Contact[]>([]);
-  const [territories, setTerritories] = useState<Territory[]>([]);
-  const [salesRepName, setSalesRepName] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  /** Fallos de acciones y de la relectura tras un cambio; el de la carga sale de la consulta. */
+  const [actionError, setError] = useState<string | null>(null);
   const [busyContactId, setBusyContactId] = useState<number | null>(null);
 
   const [editingClient, setEditingClient] = useState(false);
@@ -113,6 +113,56 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const [ticketPageSize, setTicketPageSize] = useState(10);
 
   const clientId = Number(id);
+
+  // Al cambiar de cliente se olvida el error del anterior, como hacia la carga inicial.
+  const [lastClientId, setLastClientId] = useState(clientId);
+  if (clientId !== lastClientId) {
+    setLastClientId(clientId);
+    setError(null);
+  }
+
+  // La ficha anterior sigue a la vista mientras llega la de otro id.
+  const record = useQuery({
+    queryKey: ["clients", clientId],
+    queryFn: () => clientsApi.get(clientId),
+    enabled: Boolean(id),
+    placeholderData: keepPreviousData,
+  });
+  // Al abrir la ficha se espera la lectura de este montaje: la copia de la cache
+  // podria sembrar el modal de edicion con datos ya cambiados.
+  const fresh = record.isFetchedAfterMount ? record.data : undefined;
+  const client: Client | null = fresh?.client ?? null;
+  const previewContacts: Contact[] = fresh?.contacts ?? NO_CONTACTS;
+  const loadError =
+    record.isError && !record.isFetching
+      ? record.error instanceof ApiError
+        ? record.error.message
+        : "No se pudo cargar la ficha del cliente"
+      : null;
+  const error = actionError ?? loadError;
+
+  function setClient(updated: Client) {
+    queryClient.setQueryData<ClientDetailResponse>(["clients", clientId], (current) =>
+      current ? { ...current, client: updated } : current,
+    );
+  }
+
+  const territoriesQuery = useTerritoriesCatalog();
+  const territories: Territory[] = territoriesQuery.data ?? NO_TERRITORIES;
+  const referenceError =
+    territoriesQuery.isError && !territoriesQuery.isFetching
+      ? "No se pudieron cargar los territorios: abajo aparecen sin nombre, y el diálogo de edición se abrirá con esa lista vacía."
+      : null;
+
+  const salesRepStaffId = client?.salesRepStaffId ?? null;
+  const salesRepQuery = useQuery({
+    queryKey: ["staff", salesRepStaffId, "label"],
+    queryFn: () => resolveStaffLabel(String(salesRepStaffId)),
+    enabled: salesRepStaffId !== null,
+    placeholderData: keepPreviousData,
+  });
+  const salesRepName = salesRepStaffId === null ? null : (salesRepQuery.data ?? null);
+
   useDynamicBreadcrumb(client?.name ?? null);
 
   const debouncedContactSearch = useDebouncedValue(contactSearch).trim();
@@ -164,73 +214,30 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const ticketCounts = ticketPage?.counts;
   const totalTickets = ticketCounts?.all ?? ticketPage?.total ?? client?.ticketCount ?? 0;
 
-  function reload() {
-    return clientsApi.get(clientId).then(({ client: loaded, contacts }) => {
-      setClient(loaded);
-      setPreviewContacts(contacts ?? []);
-    });
-  }
-
-  function refreshAfterContactChange() {
+  async function refreshAfterContactChange() {
     refreshContacts();
-    return reload().catch((err) => {
-      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la ficha del cliente");
-    });
+    const result = await record.refetch();
+    if (result.isError) {
+      setError(
+        result.error instanceof ApiError ? result.error.message : "No se pudo actualizar la ficha del cliente",
+      );
+    }
   }
 
   function loadRecord() {
     setError(null);
-    return reload().catch((err) => {
-      setError(err instanceof ApiError ? err.message : "No se pudo cargar la ficha del cliente");
-    });
+    return record.refetch();
   }
 
   function loadReferenceData() {
-    setReferenceError(null);
-    return Promise.all([
-      fetchAllPages<Territory>((page, pageSize) => territoriesApi.list({ page, pageSize })).then(
-        setTerritories,
-      ),
-    ]).catch(() =>
-      setReferenceError(
-        "No se pudieron cargar los territorios: abajo aparecen sin nombre, y el diálogo de edición se abrirá con esa lista vacía.",
-      ),
-    );
+    return territoriesQuery.refetch();
   }
-
-  useEffect(() => {
-    if (!id) return;
-    void loadRecord();
-    void loadReferenceData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
 
   function territoryName(territoryId: number) {
     const territory = territories.find((t) => t.id === territoryId);
     if (!territory || territory.code === "UNASSIGNED") return "—";
     return territory.name;
   }
-
-  useEffect(() => {
-    const staffId = client?.salesRepStaffId ?? null;
-    if (staffId === null) {
-      setSalesRepName(null);
-      return;
-    }
-
-    let cancelled = false;
-    resolveStaffLabel(String(staffId))
-      .then((name) => {
-        if (!cancelled) setSalesRepName(name);
-      })
-      .catch(() => {
-        if (!cancelled) setSalesRepName(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [client?.salesRepStaffId]);
 
   async function makePrimary(contact: Contact) {
     setBusyContactId(contact.id);

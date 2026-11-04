@@ -117,7 +117,6 @@ export function TasksPage() {
   );
 
   const { data, error, setPage, refresh } = usePagedList<TaskQuery, TaskListResponse>({
-    queryKey: ["tasks"],
     fetch: tasksApi.list,
     criteria: {
       pageSize,

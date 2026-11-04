@@ -8,7 +8,8 @@ import {
   TrendingUp,
   UserCheck,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { reportsApi, type ClientsReport, type QualityReport } from "../../api/reports";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -110,78 +111,77 @@ const monthFormat = new Intl.DateTimeFormat("es-DO", { month: "short" });
  */
 const CLOSURE_GOAL = 0.85;
 
-export function DashboardPage() {
-  const [quality, setQuality] = useState<QualityReport | null>(null);
+interface BoardData {
+  quality: QualityReport;
   /** El mismo reporte, un periodo atras. Es contra esto que comparan las fichas. */
-  const [previous, setPrevious] = useState<QualityReport | null>(null);
-  const [clients, setClients] = useState<ClientsReport | null>(null);
+  previous: QualityReport;
+  clients: ClientsReport;
+}
+
+export function DashboardPage() {
   const [period, setPeriod] = useState<PeriodKey>("12m");
-  /** Cada clic en "Actualizar" o "Reintentar" sube este contador y relanza la carga. */
-  const [reloadTick, setReloadTick] = useState(0);
 
   const periodEntry = PERIODS.find((entry) => entry.key === period) ?? PERIODS[2];
   const range = useMemo(() => periodRange(periodEntry.months), [periodEntry.months]);
   const before = useMemo(() => previousRange(periodEntry.months), [periodEntry.months]);
 
+  // Una sola consulta con los tres reportes: llegan juntos, asi las pastillas
+  // nunca comparan la ventana nueva contra la anterior de otro periodo.
+  const board = useQuery({
+    queryKey: ["dashboard", "calidad", range.from, range.to, before.from, before.to],
+    queryFn: async (): Promise<BoardData> => {
+      const [quality, previous, clients] = await Promise.all([
+        reportsApi.quality(range.from, range.to),
+        reportsApi.quality(before.from, before.to),
+        reportsApi.clients(),
+      ]);
+      return { quality, previous, clients };
+    },
+  });
+
   /*
-   * Carga y error se derivan de la peticion en curso: mientras la ultima peticion
-   * resuelta no sea la actual, el tablero esta cargando, y un error solo cuenta
-   * si es de la peticion actual.
+   * Lo que se pinta es la ultima carga completa que salio bien: al cambiar de
+   * periodo o al fallar, el tablero anterior se queda a la vista (atenuado
+   * mientras carga) en vez de vaciarse.
    */
-  const requestKey = `${range.from}|${range.to}|${before.from}|${before.to}|${reloadTick}`;
-  const [settledKey, setSettledKey] = useState<string | null>(null);
-  const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
-  const isLoading = settledKey !== requestKey;
-  const error = failure?.key === requestKey ? failure.message : null;
-
-  const load = useCallback(() => setReloadTick((tick) => tick + 1), []);
-
-  useLoadErrorReceipt(error, "dashboard-calidad", load);
-
+  const [shown, setShown] = useState<BoardData | null>(null);
   /**
    * El periodo por defecto se ajusta UNA vez a la data que existe. Doce meses
    * fijos en una operacion que arranco hace dos dejaban diez columnas en cero y
    * el tablero se leia como si el reporte estuviera roto.
    */
-  const autoRanged = useRef(false);
+  const [autoRanged, setAutoRanged] = useState(false);
+  if (board.isSuccess && board.data !== shown) {
+    setShown(board.data);
+    if (!autoRanged) {
+      setAutoRanged(true);
+      const withActivity = board.data.quality.byMonth.filter((m) => m.opened > 0 || m.closed > 0).length;
+      const fits = withActivity === 0 ? undefined : PERIODS.find((entry) => entry.months >= withActivity);
+      if (fits && fits.key !== period) setPeriod(fits.key);
+    }
+  }
+  const quality = shown?.quality ?? null;
+  const previous = shown?.previous ?? null;
+  const clients = shown?.clients ?? null;
 
-  useEffect(() => {
-    let ignore = false;
-    Promise.all([
-      reportsApi.quality(range.from, range.to),
-      reportsApi.quality(before.from, before.to),
-      reportsApi.clients(),
-    ])
-      .then(([q, p, c]) => {
-        if (ignore) return;
-        setQuality(q);
-        setPrevious(p);
-        setClients(c);
+  /*
+   * Carga y error se derivan de la peticion en curso: mientras haya una en
+   * vuelo el tablero esta cargando, y un error solo cuenta cuando ya no se esta
+   * reintentando (asi un segundo fallo vuelve a avisar).
+   */
+  const isLoading = board.isFetching;
+  const error =
+    board.isError && !board.isFetching
+      ? board.error instanceof ApiError
+        ? `${board.error.message} Vuelve a intentarlo.`
+        : "No se pudo cargar el tablero. Vuelve a intentarlo."
+      : null;
 
-        if (autoRanged.current) return;
-        autoRanged.current = true;
-        const withActivity = q.byMonth.filter((m) => m.opened > 0 || m.closed > 0).length;
-        if (withActivity === 0) return;
-        const fits = PERIODS.find((entry) => entry.months >= withActivity);
-        if (fits && fits.key !== period) setPeriod(fits.key);
-      })
-      .catch((err) => {
-        if (ignore) return;
-        setFailure({
-          key: requestKey,
-          message:
-            err instanceof ApiError
-              ? `${err.message} Vuelve a intentarlo.`
-              : "No se pudo cargar el tablero. Vuelve a intentarlo.",
-        });
-      })
-      .finally(() => {
-        if (!ignore) setSettledKey(requestKey);
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [range.from, range.to, before.from, before.to, period, requestKey]);
+  const { refetch } = board;
+  /** "Actualizar" y "Reintentar" relanzan la carga del periodo actual. */
+  const load = useCallback(() => void refetch(), [refetch]);
+
+  useLoadErrorReceipt(error, "dashboard-calidad", load);
 
   const months = useMemo(
     () =>

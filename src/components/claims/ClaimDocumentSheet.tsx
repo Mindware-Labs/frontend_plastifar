@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
-import { fetchAllPages } from "../../api/paging";
-import { ticketTopicsApi } from "../../api/ticketTopics";
+import { useMemo } from "react";
 import { Logo } from "../Logo";
 import { PrintCell, PrintSheet } from "../print/PrintSheet";
 import { padRows } from "../print/rows";
+import { useActiveTicketTopicsCatalog } from "../../lib/catalogQueries";
 import { exportClaimToExcel } from "../../lib/claimExcelExport";
 import { CLAIM_FORM_CONTROL, yesNo } from "../../lib/claims";
 import { formatDay } from "../../lib/dates";
@@ -44,17 +43,17 @@ export function ClaimDocumentSheet({
   contextCodeOverride,
 }: ClaimDocumentSheetProps) {
   const caseCode = contextCodeOverride?.trim() || claim.ticketNumber || String(claim.id);
-  const [topicNames, setTopicNames] = useState<string[]>([]);
+  const topicsQuery = useActiveTicketTopicsCatalog();
+  const topics = topicsQuery.data;
+  const topicsFailed = topicsQuery.isError;
 
-  useEffect(() => {
-    fetchAllPages((page, pageSize) => ticketTopicsApi.list({ page, pageSize, status: "activos" }))
-      .then((topics) => {
-        const names = topics.map((t) => t.name);
-        if (!names.some((name) => name === claim.reason)) names.unshift(claim.reason);
-        setTopicNames(names);
-      })
-      .catch(() => setTopicNames([claim.reason]));
-  }, [claim.reason]);
+  // Mientras carga, ninguna; si falla, solo el motivo de la reclamación.
+  const topicNames = useMemo(() => {
+    if (!topics) return topicsFailed ? [claim.reason] : [];
+    const names = topics.map((t) => t.name);
+    if (!names.some((name) => name === claim.reason)) names.unshift(claim.reason);
+    return names;
+  }, [topics, topicsFailed, claim.reason]);
 
   const lines = padRows(claim.lines ?? [], 3);
   const affectedAreas = claim.affectedAreas ?? [];

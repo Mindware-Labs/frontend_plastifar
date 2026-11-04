@@ -41,6 +41,7 @@ export function DiscrepancyDetailPage() {
   const { can } = usePermissions();
 
   const { data: detail, setData: setDetail, error, reload: retry } = useDetail(discrepancyId, discrepanciesApi.get, {
+    resource: "discrepancies",
     notFound: "La investigación no existe o no tienes acceso.",
     failed: "No se pudo cargar la investigación. Vuelve a intentarlo.",
   });

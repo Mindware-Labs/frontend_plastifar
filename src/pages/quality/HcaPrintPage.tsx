@@ -12,6 +12,7 @@ export function HcaPrintPage() {
   const { id } = useParams();
   const sheetId = Number(id);
   const { data: detail, error } = usePrintRecord(sheetId, qualityApi.sheets.get, {
+    resource: "quality-sheets",
     documentTitle: (record) => `PF-FOR-109 · ${record.sheet.number}`,
     failed: "No se pudo cargar la HCA.",
   });

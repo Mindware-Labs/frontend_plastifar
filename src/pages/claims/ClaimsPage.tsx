@@ -10,9 +10,6 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { claimsApi, type ClaimListResponse, type ClaimQuery } from "../../api/claims";
-import { fetchAllPages } from "../../api/paging";
-import { settingsApi } from "../../api/settings";
-import { ticketTopicsApi } from "../../api/ticketTopics";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
@@ -38,6 +35,7 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { exportClaimsListToExcel, exportClaimsListToPdf } from "../../lib/claimExcelExport";
+import { useActiveTicketTopicsCatalog, usePlantsCatalog } from "../../lib/catalogQueries";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import { formatAmount } from "../../lib/numbers";
@@ -57,11 +55,15 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
   { key: "Cerrada", label: "Cerradas", status: "Cerrada", countKey: "closed" },
 ];
 
+const EMPTY_PLANTS: Plant[] = [];
+const EMPTY_TOPICS: TicketTopicResponse[] = [];
+
 /** RF-R8: listado paginado de reclamaciones con selección múltiple, exportación en común (... */
 export function ClaimsPage() {
   const receipts = useReceipts();
-  const [plants, setPlants] = useState<Plant[]>([]);
-  const [topics, setTopics] = useState<TicketTopicResponse[]>([]);
+  // Catálogos compartidos con el formulario: si fallan, el filtro queda vacío como antes.
+  const plants = usePlantsCatalog().data ?? EMPTY_PLANTS;
+  const topics = useActiveTicketTopicsCatalog().data ?? EMPTY_TOPICS;
 
   const [search, setSearch] = useState("");
   const [reason, setReason] = useState("todos");
@@ -80,21 +82,6 @@ export function ClaimsPage() {
   const [selectionCache, setSelectionCache] = useState<Map<number, ClaimSummary>>(() => new Map());
 
   const debouncedSearch = useDebouncedValue(search).trim();
-
-  // Las plantas son catálogo acotado: se recorren enteras para el filtro.
-  useEffect(() => {
-    fetchAllPages<Plant>((page, size) => settingsApi.plants.list({ page, pageSize: size }))
-      .then(setPlants)
-      .catch(() => setPlants([]));
-  }, []);
-
-  useEffect(() => {
-    fetchAllPages<TicketTopicResponse>((page, size) =>
-      ticketTopicsApi.list({ page, pageSize: size, status: "activos" }),
-    )
-      .then(setTopics)
-      .catch(() => setTopics([]));
-  }, []);
 
   const criteria: Omit<ClaimQuery, "page"> = {
     pageSize,

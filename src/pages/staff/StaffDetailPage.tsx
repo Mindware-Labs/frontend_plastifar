@@ -1,8 +1,8 @@
 import { KeyRound, Pencil, Plus, Star, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
-import { departmentsApi } from "../../api/departments";
 import { permissionsApi } from "../../api/permissions";
 import { staffApi } from "../../api/staff";
 import { DetailLoadError } from "../../components/app/DetailLoadError";
@@ -20,6 +20,7 @@ import { RowAction } from "../../components/ui/RowAction";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { usePermissions } from "../../hooks/usePermissions";
+import { catalogs } from "../../lib/catalogQueries";
 import { departmentPaths } from "../../lib/departments";
 import type { DepartmentResponse } from "../../types/api";
 import type {
@@ -28,6 +29,8 @@ import type {
   StaffDetail,
 } from "../../types/permissions";
 import { AccessModal } from "./AccessModal";
+
+const NO_DEPARTMENTS: DepartmentResponse[] = [];
 
 interface StaffDetailPageProps {
   section: "datos" | "accesos";
@@ -61,12 +64,52 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
    */
   const canManageAccess = canWrite && can("roles.read");
 
-  const [staff, setStaff] = useState<StaffDetail | null>(null);
-  const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
-  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const staffId = Number(id);
+  const queryClient = useQueryClient();
+
+  // Cada colaborador tiene su clave: una respuesta del anterior ya no puede pisar la ficha.
+  const staffKey = ["staff", staffId, "department-access"] as const;
+  const staffQuery = useQuery({
+    queryKey: staffKey,
+    queryFn: () => staffApi.getDepartmentAccess(staffId),
+    enabled: Boolean(id),
+  });
+  const staff: StaffDetail | null = staffQuery.data ?? null;
+
+  /** Fallos de las acciones y de su refresco; el de la carga sale de la consulta. */
+  const [actionError, setError] = useState<string | null>(null);
+  const [errorStaffId, setErrorStaffId] = useState(staffId);
+  if (errorStaffId !== staffId) {
+    setErrorStaffId(staffId);
+    setError(null);
+  }
+  const loadError =
+    staffQuery.isError && !staffQuery.isFetching
+      ? staffQuery.error instanceof ApiError
+        ? staffQuery.error.message
+        : "No se pudo cargar la ficha del colaborador"
+      : null;
+  const error = actionError ?? loadError;
+
+  /** Los catalogos que solo alimentan el dialogo de accesos. */
+  const matrixQuery = useQuery({
+    queryKey: ["permissions", "matrix"],
+    queryFn: () => permissionsApi.matrix(),
+    enabled: canManageAccess,
+  });
+  const departmentsQuery = useQuery({ ...catalogs.departments(), enabled: canManageAccess });
+  // Como con el Promise.all de antes: si falta cualquiera de los dos, no se usa ninguno.
+  const referenceLoaded = matrixQuery.data !== undefined && departmentsQuery.data !== undefined;
+  const matrix: PermissionMatrixResponse | null = referenceLoaded ? matrixQuery.data! : null;
+  const departments: DepartmentResponse[] = referenceLoaded ? departmentsQuery.data! : NO_DEPARTMENTS;
   /** Fallo de los catalogos de apoyo: degrada el alta, no tumba la ficha. */
-  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const referenceError =
+    canManageAccess &&
+    (matrixQuery.isError || departmentsQuery.isError) &&
+    !matrixQuery.isFetching &&
+    !departmentsQuery.isFetching
+      ? "No se pudieron cargar los roles ni los departamentos: por ahora no se puede otorgar ni cambiar un acceso."
+      : null;
   // Igual que en la ficha de cliente: mientras una accion sobre un acceso esta
   // en vuelo su fila se atenua y sus controles no aceptan un segundo click, que
   // es lo que provocaba dos PUT y dos recargas resolviendo en desorden.
@@ -75,10 +118,16 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const [modal, setModal] = useState<"nuevo" | DepartmentAccess | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
-  const staffId = Number(id);
-
+  /**
+   * Refresco tras una mutacion. Se lee directo y se escribe en la cache para que
+   * su fallo lo maneje quien llama (como antes) sin dejar la consulta en error.
+   */
   function reload() {
-    return staffApi.getDepartmentAccess(staffId).then(setStaff);
+    return staffApi
+      .getDepartmentAccess(staffId)
+      .then((data) => {
+        queryClient.setQueryData(staffKey, data);
+      });
   }
 
   /** Refresco tras una mutacion: el fallo se dice, no se pierde en la consola. */
@@ -92,47 +141,18 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
 
   function load() {
     setError(null);
-    return staffApi
-      .getDepartmentAccess(staffId)
-      .then(setStaff)
-      .catch((err) => {
-        setError(
-          err instanceof ApiError ? err.message : "No se pudo cargar la ficha del colaborador",
-        );
-      });
+    return staffQuery.refetch();
   }
 
   /**
-   * Los catalogos que solo alimentan el dialogo de accesos viajan aparte: en un
-   * unico Promise.all, un 403 de la matriz —que exige roles.read, un permiso que
-   * esta ruta no pide— rechazaba la promesa entera y dejaba la ficha en su
-   * estado de error, sin datos, sin accesos y sin permiso efectivo.
+   * Los catalogos que solo alimentan el dialogo de accesos viajan aparte de la
+   * ficha: un 403 de la matriz —que exige roles.read, un permiso que esta ruta
+   * no pide— no debe dejar la ficha en su estado de error, sin datos, sin
+   * accesos y sin permiso efectivo.
    */
   function loadReferenceData() {
-    setReferenceError(null);
-    return Promise.all([permissionsApi.matrix(), departmentsApi.list()])
-      .then(([data, depts]) => {
-        setMatrix(data);
-        setDepartments(depts);
-      })
-      .catch(() =>
-        setReferenceError(
-          "No se pudieron cargar los roles ni los departamentos: por ahora no se puede otorgar ni cambiar un acceso.",
-        ),
-      );
+    return Promise.all([matrixQuery.refetch(), departmentsQuery.refetch()]);
   }
-
-  useEffect(() => {
-    if (!id) return;
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  useEffect(() => {
-    if (!canManageAccess) return;
-    void loadReferenceData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManageAccess]);
 
   const fullName = staff ? `${staff.firstName} ${staff.lastName}` : "";
   useDynamicBreadcrumb(staff ? fullName : null);

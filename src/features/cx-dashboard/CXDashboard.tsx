@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useRef, type CSSProperties } from "react";
 import "./dashboard.css";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { AgentPerformance } from "./components/AgentPerformance";
@@ -81,30 +82,16 @@ const DIAS = 30;
 
 export function CXDashboard({ query }: { query?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [data, setData] = useState<DashboardResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  const dashboard = useQuery({
+    queryKey: ["dashboard", DIAS],
+    queryFn: () => dashboardApi.get(DIAS),
+  });
+  const data: DashboardResponse | null = dashboard.data ?? null;
+  // El error se mantiene mientras se reintenta y solo se limpia con un acierto, como antes.
+  const error = dashboard.isError ? "No se pudo cargar el tablero" : null;
+  const { refetch } = dashboard;
 
-  useEffect(() => {
-    let cancelado = false;
-
-    dashboardApi
-      .get(DIAS)
-      .then((respuesta) => {
-        if (cancelado) return;
-        setData(respuesta);
-        setError(null);
-      })
-      .catch(() => {
-        if (!cancelado) setError("No se pudo cargar el tablero");
-      });
-
-    return () => {
-      cancelado = true;
-    };
-  }, [reloadKey]);
-
-  useLoadErrorReceipt(error, "cx-dashboard", () => setReloadKey((k) => k + 1));
+  useLoadErrorReceipt(error, "cx-dashboard", () => void refetch());
 
   /* Lo que la barra de aplicación muestra cuando esta pantalla ya scrolleó. El
      ítem `danger` es el único que sobrevive al condensado, así que lleva lo

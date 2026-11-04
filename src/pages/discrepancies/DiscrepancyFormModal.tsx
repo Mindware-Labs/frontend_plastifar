@@ -16,6 +16,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
@@ -424,11 +425,13 @@ export function DiscrepancyFormModal({
     cacheTicketInfo(initialTicketId, initialTicketLabel, initialClientName, initialClientId);
   }
 
-  // Consulta en segundo plano si falta el cliente
+  // Consulta en segundo plano si falta el cliente. Se mantiene como efecto (se
+  // repite al quitar el ticket), pero comparte la petición y la caché del ticket.
+  const queryClient = useQueryClient();
   useEffect(() => {
     if (initialTicketId && !effectiveTicketClientName) {
-      ticketsApi
-        .getById(initialTicketId)
+      queryClient
+        .fetchQuery({ queryKey: ["tickets", initialTicketId], queryFn: () => ticketsApi.getById(initialTicketId) })
         .then((t) => {
           const label = `${t.number} · ${t.subject}`;
           setTicketLabel(label);
@@ -438,7 +441,7 @@ export function DiscrepancyFormModal({
         })
         .catch(() => {});
     }
-  }, [initialTicketId, effectiveTicketClientName]);
+  }, [initialTicketId, effectiveTicketClientName, queryClient]);
 
   const defaultClientIdForLines = initialClientId ? String(initialClientId) : "";
 

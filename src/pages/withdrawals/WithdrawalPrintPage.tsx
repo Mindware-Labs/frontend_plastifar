@@ -12,6 +12,7 @@ export function WithdrawalPrintPage() {
     withdrawalId,
     (key) => withdrawalsApi.get(key),
     {
+      resource: "withdrawals",
       documentTitle: (record) => `${WITHDRAWAL_FORM_CONTROL.code} · ${record.withdrawal.number}`,
       failed: "No se pudo cargar la solicitud de retiro.",
     },

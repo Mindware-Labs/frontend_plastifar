@@ -13,6 +13,7 @@ export function DiscrepancyPrintPage() {
     discrepancyId,
     async (key) => (await discrepanciesApi.get(key)).discrepancy,
     {
+      resource: "discrepancies",
       documentTitle: (record) => `${DISCREPANCY_FORM_CONTROL.code} · ${record.number}`,
       failed: "No se pudo cargar la investigación.",
     },

@@ -6,6 +6,7 @@ import {
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { ticketsApi } from "../../api/tickets";
@@ -248,25 +249,20 @@ export function WithdrawalFormModal({
   const requestClose = inline ? inlineMotion.requestClose : modalAnimation.requestClose;
 
   // Resolver cliente y número de ticket cuando cambia el ticket elegido
+  const idToLookup = lockedTicketId ?? (selectedTicketId ? Number(selectedTicketId) : 0);
+  const lookupEnabled = !!idToLookup && !(lockedTicketId && fixedClientName && fixedTicketNumber);
+  const ticketQuery = useQuery({
+    queryKey: ["tickets", idToLookup],
+    queryFn: () => ticketsApi.getById(idToLookup),
+    enabled: lookupEnabled,
+  });
+  // Una consulta desactivada aún devuelve lo cacheado: si no toca buscar, se ignora.
+  const lookedUpTicket = lookupEnabled ? ticketQuery.data : undefined;
   useEffect(() => {
-    const idToLookup = lockedTicketId ?? (selectedTicketId ? Number(selectedTicketId) : 0);
-    if (!idToLookup) return;
-    if (lockedTicketId && fixedClientName && fixedTicketNumber) return;
-
-    let active = true;
-    ticketsApi
-      .getById(idToLookup)
-      .then((t) => {
-        if (!active) return;
-        if (t.clientName) setResolvedClientName(t.clientName);
-        if (t.number) setResolvedTicketNumber(t.number);
-      })
-      .catch(() => {});
-
-    return () => {
-      active = false;
-    };
-  }, [lockedTicketId, selectedTicketId, fixedClientName, fixedTicketNumber]);
+    if (!lookedUpTicket) return;
+    if (lookedUpTicket.clientName) setResolvedClientName(lookedUpTicket.clientName);
+    if (lookedUpTicket.number) setResolvedTicketNumber(lookedUpTicket.number);
+  }, [lookedUpTicket]);
 
   // Restaurar borrador si existe
   useEffect(() => {

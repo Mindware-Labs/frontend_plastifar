@@ -1,7 +1,8 @@
 import { ArrowUpRight, Printer } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { qualityApi, type SheetDetailResponse } from "../../api/quality";
+import { qualityApi } from "../../api/quality";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
@@ -15,34 +16,16 @@ interface HcaSummaryDrawerProps {
 
 export function HcaSummaryDrawer({ sheetId, onClose }: HcaSummaryDrawerProps) {
   const navigate = useNavigate();
-  const [detail, setDetail] = useState<SheetDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError(null);
-
-    qualityApi.sheets
-      .get(sheetId)
-      .then((data) => {
-        if (!active) return;
-        setDetail(data);
-      })
-      .catch(() => {
-        if (!active) return;
-        setError("No se pudo cargar el resumen de la HCA.");
-      })
-      .finally(() => {
-        if (!active) return;
-        setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [sheetId]);
+  const query = useQuery({ queryKey: ["quality-sheets", sheetId], queryFn: () => qualityApi.sheets.get(sheetId) });
+  // El reintento mostraba su propio texto de error; se conserva.
+  const [retriedId, setRetriedId] = useState<number | null>(null);
+  const detail = query.data ?? null;
+  const loading = query.isPending || (query.isError && query.isFetching);
+  const error = query.isError
+    ? retriedId === sheetId
+      ? "Error al cargar."
+      : "No se pudo cargar el resumen de la HCA."
+    : null;
 
   return (
     <Drawer
@@ -93,13 +76,8 @@ export function HcaSummaryDrawer({ sheetId, onClose }: HcaSummaryDrawerProps) {
       ) : error ? (
         <ErrorRetry
           onRetry={() => {
-            setLoading(true);
-            setError(null);
-            qualityApi.sheets
-              .get(sheetId)
-              .then(setDetail)
-              .catch(() => setError("Error al cargar."))
-              .finally(() => setLoading(false));
+            setRetriedId(sheetId);
+            void query.refetch();
           }}
         >
           {error}

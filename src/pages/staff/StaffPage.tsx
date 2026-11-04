@@ -1,7 +1,7 @@
 import { Building2, LogOut, Pencil, Plus, Trash2, UserCheck, UserX } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -27,11 +27,14 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
 import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { idParam } from "../../lib/idParam";
+import { catalogs } from "../../lib/catalogQueries";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPath } from "../../lib/departments";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
 import { StaffModal } from "./StaffModal";
 import { PAGE_SIZES } from "../../lib/pageSizes";
+
+const NO_DEPARTMENTS: DepartmentResponse[] = [];
 
 type FilterKey = "todos" | "activos" | "inactivos" | "administradores";
 type SortKey = "nombre" | "correo" | "departamento" | "rol" | "estado";
@@ -63,7 +66,9 @@ export function StaffPage() {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
 
-  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
+  const departmentsQuery = useQuery(catalogs.departments());
+  // Si fallan, el filtro y los nombres quedan vacios, como antes.
+  const departments: DepartmentResponse[] = departmentsQuery.isError ? NO_DEPARTMENTS : (departmentsQuery.data ?? NO_DEPARTMENTS);
   const [busyId, setBusyId] = useState<number | null>(null);
   // Confirmacion propia del panel; null = ninguna pendiente.
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(
@@ -84,13 +89,6 @@ export function StaffPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   /** Lo que falló en una acción en lote, dicho por nombre y no por conteo. */
   const [bulkError, setBulkError] = useState<string | null>(null);
-
-  useEffect(() => {
-    departmentsApi
-      .list()
-      .then(setDepartments)
-      .catch(() => setDepartments([]));
-  }, []);
 
   const { data, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
     queryKey: ["staff"],

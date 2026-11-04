@@ -5,11 +5,9 @@ import {
   Printer,
   User,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
-import { fetchAllPages } from "../../api/paging";
-import { productLinesApi } from "../../api/productLines";
 import { qualityApi } from "../../api/quality";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { HcaDocumentSheet } from "../../components/quality/HcaDocumentSheet";
@@ -22,6 +20,7 @@ import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useReceipts } from "../../context/useReceipts";
 import { useDetail } from "../../hooks/useDetail";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useProductLinesCatalog } from "../../lib/catalogQueries";
 import { formatDay } from "../../lib/dates";
 import type { ProductLine } from "../../types/settings";
 import { HcaFormModal } from "./HcaFormModal";
@@ -32,6 +31,8 @@ import { HcaStatusBadge, PlanItemStatusBadge } from "./StatusBadges";
  * Presenta el formulario completado de manera permanente, idéntico al esquema de Discrepancia,
  * con alternancia fluida al documento oficial, edición completa e impresión.
  */
+const EMPTY_PRODUCT_LINES: ProductLine[] = [];
+
 export function HcaDetailPage() {
   const { id } = useParams();
   const sheetId = Number(id);
@@ -40,22 +41,18 @@ export function HcaDetailPage() {
   const receipts = useReceipts();
 
   const { data: detail, setData: setDetail, error, reload: retry } = useDetail(sheetId, qualityApi.sheets.get, {
+    resource: "quality-sheets",
     notFound: "La HCA no existe o no tienes acceso.",
     failed: "No se pudo cargar la HCA. Vuelve a intentarlo.",
   });
 
-  const [productLines, setProductLines] = useState<ProductLine[]>([]);
+  // Catálogo compartido con el formulario de edición; si falla, queda vacío como antes.
+  const productLines = useProductLinesCatalog().data ?? EMPTY_PRODUCT_LINES;
   const [actionError, setActionError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [viewingDocument, setViewingDocument] = useState(() => searchParams.get("documento") === "1");
 
   useDynamicBreadcrumb(detail?.sheet.number ?? null);
-
-  useEffect(() => {
-    fetchAllPages<ProductLine>((page, size) => productLinesApi.list({ page, pageSize: size }))
-      .then(setProductLines)
-      .catch(() => setProductLines([]));
-  }, []);
 
   async function reload() {
     try {

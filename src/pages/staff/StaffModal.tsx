@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import React, { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import React, { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
@@ -35,6 +36,8 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+const NO_ROLES: RoleResponse[] = [];
+
 const EMAIL_CONFLICT_PREFIX = "Ya existe un staff con ese correo";
 
 function conflictField(message: string): "email" | null {
@@ -54,9 +57,14 @@ interface StaffModalProps {
 export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalProps) {
   const { user } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
-  const [roles, setRoles] = useState<RoleResponse[]>([]);
+  // Catalogo de roles activos; si falla, la lista queda vacia.
+  const rolesQuery = useQuery({
+    queryKey: ["roles", "list", { page: 1, pageSize: 100 }],
+    queryFn: () => rolesApi.list({ page: 1, pageSize: 100 }).then((res) => res.items),
+  });
+  const roles: RoleResponse[] = rolesQuery.isError ? NO_ROLES : (rolesQuery.data ?? NO_ROLES);
   // Nace cargando: el catalogo se pide al montar
-  const [loadingRoles, setLoadingRoles] = useState(true);
+  const loadingRoles = rolesQuery.isPending;
   const { isExiting, requestClose } = useModalAnimation();
   const isEdit = staff !== undefined;
   const isSelf = isEdit && staff.id === user?.staffId;
@@ -82,47 +90,25 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
     },
   });
 
-  // Carga de catálogo de roles activos
+  // En edición, si el objeto staff no traía primaryRoleId, se consulta su acceso principal.
+  // Un fallo es silencioso: se conserva el estado actual.
+  const needsPrimaryAccess = isEdit && !!staff && !staff.primaryRoleId;
+  const accessQuery = useQuery({
+    queryKey: ["staff", staff?.id ?? 0, "department-access"],
+    queryFn: () => staffApi.getDepartmentAccess(staff!.id),
+    enabled: needsPrimaryAccess,
+  });
+  // Se aplica una sola vez: una relectura no pisa el rol que ya se eligio.
+  const accessApplied = useRef(false);
   useEffect(() => {
-    let mounted = true;
-    rolesApi
-      .list({ page: 1, pageSize: 100 })
-      .then((res) => {
-        if (mounted) setRoles(res.items);
-      })
-      .catch(() => {
-        if (mounted) setRoles([]);
-      })
-      .finally(() => {
-        if (mounted) setLoadingRoles(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // En edición, si el objeto staff no traía primaryRoleId, se consulta su acceso principal
-  useEffect(() => {
-    if (!isEdit || !staff || staff.primaryRoleId) return;
-    let mounted = true;
-    staffApi
-      .getDepartmentAccess(staff.id)
-      .then((detail) => {
-        if (!mounted) return;
-        const primary = detail.accesses.find((a) => a.isPrimary) ?? detail.accesses[0];
-        if (primary) {
-          setValue("primaryRoleId", String(primary.roleId), { shouldValidate: true });
-        }
-      })
-      .catch(() => {
-        // En caso de fallo silencioso se conserva el estado actual
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [isEdit, staff, setValue]);
+    const detail = accessQuery.data;
+    if (!detail || !needsPrimaryAccess || accessApplied.current) return;
+    accessApplied.current = true;
+    const primary = detail.accesses.find((a) => a.isPrimary) ?? detail.accesses[0];
+    if (primary) {
+      setValue("primaryRoleId", String(primary.roleId), { shouldValidate: true });
+    }
+  }, [accessQuery.data, needsPrimaryAccess, setValue]);
 
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";

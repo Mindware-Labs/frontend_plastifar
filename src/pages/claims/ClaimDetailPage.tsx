@@ -3,8 +3,6 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
-import { fetchAllPages } from "../../api/paging";
-import { productLinesApi } from "../../api/productLines";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -15,6 +13,7 @@ import { Tooltip } from "../../components/ui/Tooltip";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useDetail } from "../../hooks/useDetail";
 import { usePermissions } from "../../hooks/usePermissions";
+import { catalogs, fetchCatalog } from "../../lib/catalogQueries";
 import { describeStatus } from "../../lib/claims";
 import type { ProductLine } from "../../types/settings";
 import { HcaModal } from "../quality/HcaModal";
@@ -31,6 +30,7 @@ export function ClaimDetailPage() {
   const { can } = usePermissions();
 
   const { data: detail, setData: setDetail, error, reload: retry } = useDetail(claimId, claimsApi.get, {
+    resource: "claims",
     notFound: "La reclamación no existe o no tienes acceso.",
     failed: "No se pudo cargar la reclamación. Vuelve a intentarlo.",
   });
@@ -72,7 +72,7 @@ export function ClaimDetailPage() {
   async function startHca() {
     setOpeningHca("cargando");
     try {
-      const lines = await fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize }));
+      const lines = await fetchCatalog(catalogs.productLines());
       setOpeningHca(lines);
     } catch {
       setOpeningHca(null);

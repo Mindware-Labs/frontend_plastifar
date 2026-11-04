@@ -1,12 +1,12 @@
 import { ArrowUpRight, Printer } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Spinner } from "../../components/ui/Spinner";
-import type { ClaimDetail } from "../../types/claims";
 import { ClaimExecutiveSummary } from "./ClaimExecutiveSummary";
 
 interface ClaimSummaryDrawerProps {
@@ -16,34 +16,16 @@ interface ClaimSummaryDrawerProps {
 
 export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps) {
   const navigate = useNavigate();
-  const [detail, setDetail] = useState<ClaimDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError(null);
-
-    claimsApi
-      .get(claimId)
-      .then((data) => {
-        if (!active) return;
-        setDetail(data);
-      })
-      .catch(() => {
-        if (!active) return;
-        setError("No se pudo cargar el resumen de la reclamación.");
-      })
-      .finally(() => {
-        if (!active) return;
-        setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [claimId]);
+  const query = useQuery({ queryKey: ["claims", claimId], queryFn: () => claimsApi.get(claimId) });
+  // El reintento mostraba su propio texto de error; se conserva.
+  const [retriedId, setRetriedId] = useState<number | null>(null);
+  const detail = query.data ?? null;
+  const loading = query.isPending || (query.isError && query.isFetching);
+  const error = query.isError
+    ? retriedId === claimId
+      ? "Error al cargar."
+      : "No se pudo cargar el resumen de la reclamación."
+    : null;
 
   return (
     <Drawer
@@ -93,9 +75,8 @@ export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps
         </div>
       ) : error ? (
         <ErrorRetry onRetry={() => {
-          setLoading(true);
-          setError(null);
-          claimsApi.get(claimId).then(setDetail).catch(() => setError("Error al cargar.")).finally(() => setLoading(false));
+          setRetriedId(claimId);
+          void query.refetch();
         }}>
           {error}
         </ErrorRetry>

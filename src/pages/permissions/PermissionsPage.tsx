@@ -1,5 +1,6 @@
 import { Check, Layers, Lock } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { ApiError } from "../../api/client";
@@ -82,19 +83,43 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   // No fija estado de forma sincrona: al montar eso era un render extra antes
   // de la primera pintura. `isRefetching` arranca en true y lo apaga el
   // `finally`; quien reintenta lo vuelve a encender desde su propio manejador.
+  const queryClient = useQueryClient();
+  const matrixQuery = useQuery({
+    queryKey: ["permissions", "matrix"],
+    queryFn: () => permissionsApi.matrix(),
+  });
+
+  /*
+   * La matriz se edita en local (grants/original), asi que la respuesta solo se
+   * copia al terminar una carga pedida --el montaje o un reintento--, nunca en
+   * una relectura cualquiera: asi no se pisan cambios sin guardar. Tampoco se
+   * pinta lo que hubiera en cache: se espera la lectura fresca, como antes.
+   */
+  const loadPending = useRef(true);
+  const { refetch: refetchMatrix } = matrixQuery;
   const load = useCallback(() => {
-    permissionsApi
-      .matrix()
-      .then((data) => {
-        setMatrix(data);
-        setGrants(data.grants);
-        setOriginal(data.grants);
-        setVisibleRoles(data.roles.map((role) => String(role.id)));
-        onMatrixLoaded?.(data);
-      })
-      .catch(() => setError("No se pudo cargar el catálogo de permisos. Vuelve a intentarlo."))
-      .finally(() => setIsRefetching(false));
-  }, [onMatrixLoaded]);
+    loadPending.current = true;
+    void refetchMatrix();
+  }, [refetchMatrix]);
+
+  useEffect(() => {
+    if (!loadPending.current || matrixQuery.isFetching) return;
+    if (matrixQuery.isError) {
+      loadPending.current = false;
+      setError("No se pudo cargar el catálogo de permisos. Vuelve a intentarlo.");
+      setIsRefetching(false);
+      return;
+    }
+    const data = matrixQuery.data;
+    if (!matrixQuery.isSuccess || !data) return;
+    loadPending.current = false;
+    setMatrix(data);
+    setGrants(data.grants);
+    setOriginal(data.grants);
+    setVisibleRoles(data.roles.map((role) => String(role.id)));
+    onMatrixLoaded?.(data);
+    setIsRefetching(false);
+  }, [matrixQuery.isFetching, matrixQuery.isError, matrixQuery.isSuccess, matrixQuery.data, onMatrixLoaded]);
 
   useLoadErrorReceipt(error, "permissions-matrix", load);
   useConfigNoticeReceipt(
@@ -103,10 +128,6 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
     "Modo consulta",
     "Para cambiar los permisos de un rol necesitas el permiso roles.write.",
   );
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const catalog = useMemo(() => (matrix ? flattenPermissions(matrix.groups) : []), [matrix]);
   const editableRoles = useMemo(
@@ -240,7 +261,9 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   async function refreshAfterSave() {
     setIsRefetching(true);
     try {
+      // Lectura directa: si falla, lo dice el guardado, y la consulta no queda en error.
       const fresh = await permissionsApi.matrix();
+      queryClient.setQueryData(["permissions", "matrix"], fresh);
       const freshIds = fresh.roles.map((role) => String(role.id));
       setMatrix(fresh);
       setGrants(fresh.grants);

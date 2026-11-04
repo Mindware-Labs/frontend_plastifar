@@ -1,9 +1,8 @@
 import { BarChart3, Download, Lock, ShieldAlert, SlidersHorizontal } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
-import { fetchAllPages } from "../../api/paging";
-import { productLinesApi } from "../../api/productLines";
 import {
   reportsApi,
   type AuditReport,
@@ -11,16 +10,14 @@ import {
   type ClientsReport,
   type QualityReport,
 } from "../../api/reports";
-import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { Pagination } from "../../components/ui/Pagination";
 import { usePermissions } from "../../hooks/usePermissions";
-import type { Territory } from "../../types/clients";
+import { catalogs } from "../../lib/catalogQueries";
 import { REPORT_CATALOG, type ReportDefinition } from "../../types/reports";
-import type { ProductLine } from "../../types/settings";
 import { ReportFilters, type ReferenceData, type ReportCriteria } from "./ReportFilters";
 import { AuditSliceResult, ClientsResult, QualityResult } from "./results";
 import { defaultRange } from "./useDateRange";
@@ -110,33 +107,28 @@ export function ReportsPage() {
   const [isExporting, setIsExporting] = useState(false);
   /** Un fallo al exportar no invalida el reporte que se esta viendo: va aparte. */
   const [exportError, setExportError] = useState<string | null>(null);
-  const [reference, setReference] = useState<ReferenceData>({
-    productLines: [],
-    territories: [],
-    clientTypes: CLIENT_TYPES,
-  });
-
   // Solo los catalogos acotados —lineas y territorios— se precargan, y enteros:
   // el corte de 200 dejaba fuera cualquiera que pasara de ahi. Cliente,
   // responsable y vendedor no se precargan: sus tres selectores buscan en el
   // servidor porque ni la cartera ni el personal tienen tope.
-  useEffect(() => {
-    if (!canRead) return;
-    void Promise.all([
-      fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize })),
-      fetchAllPages<Territory>((page, pageSize) => territoriesApi.list({ page, pageSize })),
-    ])
-      .then(([lines, territories]) =>
-        setReference({
-          productLines: lines.map((l) => ({ value: String(l.id), label: l.name })),
-          territories: territories.map((t) => ({ value: String(t.id), label: t.name })),
-          clientTypes: CLIENT_TYPES,
-        }),
-      )
-      // Un catalogo que no llega deja su selector vacio, y eso ya se ve. No es
-      // motivo para tumbar la pantalla: el reporte se puede generar sin acotar.
-      .catch(() => undefined);
-  }, [canRead]);
+  const linesQuery = useQuery({ ...catalogs.productLines(), enabled: canRead });
+  const territoriesQuery = useQuery({ ...catalogs.territories(), enabled: canRead });
+  const lines = linesQuery.data;
+  const territories = territoriesQuery.data;
+  // Un catalogo que no llega deja su selector vacio, y eso ya se ve. No es
+  // motivo para tumbar la pantalla: el reporte se puede generar sin acotar.
+  // Como antes, los dos selectores se llenan juntos o ninguno.
+  const reference = useMemo<ReferenceData>(
+    () =>
+      lines && territories
+        ? {
+            productLines: lines.map((l) => ({ value: String(l.id), label: l.name })),
+            territories: territories.map((t) => ({ value: String(t.id), label: t.name })),
+            clientTypes: CLIENT_TYPES,
+          }
+        : { productLines: [], territories: [], clientTypes: CLIENT_TYPES },
+    [lines, territories],
+  );
 
   const num = (value: string) => (value === "" ? undefined : Number(value));
 

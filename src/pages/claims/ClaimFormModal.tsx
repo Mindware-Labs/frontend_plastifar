@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Check,
@@ -24,10 +25,7 @@ import {
 import { z } from "zod";
 import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
-import { fetchAllPages } from "../../api/paging";
-import { settingsApi } from "../../api/settings";
 import { ticketsApi } from "../../api/tickets";
-import { ticketTopicsApi } from "../../api/ticketTopics";
 import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
@@ -53,6 +51,7 @@ import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/Form
 import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
+import { useActiveTicketTopicsCatalog, usePlantsCatalog } from "../../lib/catalogQueries";
 import { CLAIM_FORM_CONTROL } from "../../lib/claims";
 import {
   focusFormFieldByName,
@@ -78,6 +77,10 @@ import {
 } from "../../types/claims";
 import type { TicketProductResponse, TicketTopicResponse } from "../../types/api";
 import { PLANT_COUNTRIES, type Plant } from "../../types/settings";
+
+const EMPTY_PLANTS: Plant[] = [];
+const EMPTY_TOPICS: TicketTopicResponse[] = [];
+const EMPTY_TICKET_PRODUCTS: TicketProductResponse[] = [];
 
 const PHONE_CHARS_REGEX = /^[0-9+\s\-().extx]+$/i;
 
@@ -297,11 +300,23 @@ export function ClaimFormModal({
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [saveDraftConfirmOpen, setSaveDraftConfirmOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [plants, setPlants] = useState<Plant[] | null>(null);
-  const [topics, setTopics] = useState<TicketTopicResponse[]>([]);
-  const [ticketProductsFetched, setTicketProductsFetched] = useState<TicketProductResponse[] | undefined>(
-    undefined,
-  );
+  // Las plantas son catálogo acotado (16 en la fuente): se recorren enteras. Una planta des...
+  // Catálogos compartidos con la lista que abre el modal: se piden una sola vez.
+  // Si fallan, quedan vacíos como antes.
+  const plantsQuery = usePlantsCatalog();
+  const plants: Plant[] | null = plantsQuery.data ?? (plantsQuery.isError ? EMPTY_PLANTS : null);
+  const topicsQuery = useActiveTicketTopicsCatalog();
+  const topics: TicketTopicResponse[] = topicsQuery.data ?? EMPTY_TOPICS;
+  const ticketQuery = useQuery({
+    queryKey: ["tickets", ticketId],
+    queryFn: () => ticketsApi.getById(ticketId),
+    enabled: ticketProductsProp === undefined,
+  });
+  const ticketProductsFetched: TicketProductResponse[] | undefined = ticketQuery.data
+    ? (ticketQuery.data.products ?? EMPTY_TICKET_PRODUCTS)
+    : ticketQuery.isError
+      ? EMPTY_TICKET_PRODUCTS
+      : undefined;
 
   const ticketProducts = ticketProductsProp ?? ticketProductsFetched;
 
@@ -337,37 +352,6 @@ export function ClaimFormModal({
     contactPhoneProp,
     clientPhoneProp,
   );
-
-  // Las plantas son catálogo acotado (16 en la fuente): se recorren enteras. Una planta des...
-  useEffect(() => {
-    fetchAllPages<Plant>((page, pageSize) => settingsApi.plants.list({ page, pageSize }))
-      .then(setPlants)
-      .catch(() => setPlants([]));
-  }, []);
-
-  useEffect(() => {
-    fetchAllPages<TicketTopicResponse>((page, pageSize) =>
-      ticketTopicsApi.list({ page, pageSize, status: "activos" }),
-    )
-      .then(setTopics)
-      .catch(() => setTopics([]));
-  }, []);
-
-  useEffect(() => {
-    if (ticketProductsProp !== undefined) return;
-    let cancelled = false;
-    ticketsApi
-      .getById(ticketId)
-      .then((ticket) => {
-        if (!cancelled) setTicketProductsFetched(ticket.products ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setTicketProductsFetched([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [ticketId, ticketProductsProp]);
 
   const {
     control,

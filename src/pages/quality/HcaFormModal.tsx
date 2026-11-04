@@ -22,7 +22,6 @@ import {
 } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
-import { fetchAllPages } from "../../api/paging";
 import { qualityApi } from "../../api/quality";
 import { settingsApi } from "../../api/settings";
 import { EnterpriseFormCloseTicketModal } from "../../components/app/EnterpriseFormCloseTicketModal";
@@ -58,6 +57,7 @@ import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
+import { usePlantsCatalog } from "../../lib/catalogQueries";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import {
   clearEnterpriseFormDraft,
@@ -482,6 +482,8 @@ export interface HcaFormModalProps {
  * PF-FOR-109 · Hecho, Causa y Acción — flujo editorial en 4 pasos,
  * alineado al formato empresarial y en la línea visual de discrepancia de cargas.
  */
+const EMPTY_PLANTS: Plant[] = [];
+
 export function HcaFormModal({
   inline = false,
   sheet,
@@ -509,7 +511,8 @@ export function HcaFormModal({
   const receipts = useReceipts();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [saveDraftConfirmOpen, setSaveDraftConfirmOpen] = useState(false);
-  const [plants, setPlants] = useState<Plant[]>([]);
+  // Catálogo compartido con la lista; si falla, queda vacío como antes.
+  const plants = usePlantsCatalog().data ?? EMPTY_PLANTS;
   const [loadingExtras, setLoadingExtras] = useState(isEdit);
   const originalParticipants = useRef<HcaParticipant[]>(sheet?.participants ?? []);
   const savedResultRef = useRef<CorrectiveActionSheet | null>(null);
@@ -520,12 +523,6 @@ export function HcaFormModal({
   const elaboradoLabel =
     sheet?.createdByName ??
     ([user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "Usuario actual");
-
-  useEffect(() => {
-    fetchAllPages<Plant>((page, pageSize) => settingsApi.plants.list({ page, pageSize }))
-      .then(setPlants)
-      .catch(() => setPlants([]));
-  }, []);
 
   const {
     control,

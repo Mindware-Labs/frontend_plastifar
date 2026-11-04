@@ -1,12 +1,12 @@
 import { ArrowUpRight, Printer } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { withdrawalsApi } from "../../api/withdrawals";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Spinner } from "../../components/ui/Spinner";
-import type { WithdrawalDetail } from "../../types/withdrawals";
 import { WithdrawalExecutiveSummary } from "./WithdrawalExecutiveSummary";
 
 interface WithdrawalSummaryDrawerProps {
@@ -16,34 +16,16 @@ interface WithdrawalSummaryDrawerProps {
 
 export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSummaryDrawerProps) {
   const navigate = useNavigate();
-  const [detail, setDetail] = useState<WithdrawalDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError(null);
-
-    withdrawalsApi
-      .get(withdrawalId)
-      .then((data) => {
-        if (!active) return;
-        setDetail(data);
-      })
-      .catch(() => {
-        if (!active) return;
-        setError("No se pudo cargar el resumen de la solicitud.");
-      })
-      .finally(() => {
-        if (!active) return;
-        setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [withdrawalId]);
+  const query = useQuery({ queryKey: ["withdrawals", withdrawalId], queryFn: () => withdrawalsApi.get(withdrawalId) });
+  // El reintento mostraba su propio texto de error; se conserva.
+  const [retriedId, setRetriedId] = useState<number | null>(null);
+  const detail = query.data ?? null;
+  const loading = query.isPending || (query.isError && query.isFetching);
+  const error = query.isError
+    ? retriedId === withdrawalId
+      ? "Error al cargar."
+      : "No se pudo cargar el resumen de la solicitud."
+    : null;
 
   return (
     <Drawer
@@ -97,13 +79,8 @@ export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSum
       ) : error ? (
         <ErrorRetry
           onRetry={() => {
-            setLoading(true);
-            setError(null);
-            withdrawalsApi
-              .get(withdrawalId)
-              .then(setDetail)
-              .catch(() => setError("Error al cargar."))
-              .finally(() => setLoading(false));
+            setRetriedId(withdrawalId);
+            void query.refetch();
           }}
         >
           {error}

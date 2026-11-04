@@ -1,10 +1,8 @@
 import { Ban, Building2, CheckCircle2, MapPin, Pencil, Plus, Trash2, UserCheck, UserCog, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { clientsApi, type ClientQuery } from "../../api/clients";
-import { fetchAllPages } from "../../api/paging";
-import { staffApi } from "../../api/staff";
-import { territoriesApi } from "../../api/territories";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Avatar } from "../../components/ui/Avatar";
@@ -30,6 +28,7 @@ import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useReceipts } from "../../context/useReceipts";
 import { useSort } from "../../hooks/useSort";
+import { catalogs, useTerritoriesCatalog } from "../../lib/catalogQueries";
 import { idParam } from "../../lib/idParam";
 import {
   resolveStaffLabel,
@@ -86,17 +85,35 @@ const TYPE_OPTIONS = [
 
 const TYPE_KEYS = TYPE_OPTIONS.map((option) => option.value);
 
+const NO_TERRITORIES: Territory[] = [];
+
 export function ClientsPage() {
   const navigate = useNavigate();
   const { can } = usePermissions();
   const receipts = useReceipts();
   const canWrite = can("clients.write");
 
-  const [territories, setTerritories] = useState<Territory[]>([]);
-  const [salesReps, setSalesReps] = useState<{ id: number; name: string }[]>([]);
+  // Catalogo acotado: se recorre entero. Con el tope de cien, un territorio
+  // mas alla de esa cifra no existia para el filtro ni para la tabla.
+  const territoriesQuery = useTerritoriesCatalog();
+  // Los SELECTORES de vendedor ya no salen de aqui: buscan en el servidor.
+  // Esta lista solo resuelve el nombre de la columna «Vendedor», porque el
+  // DTO del listado trae el id y no el nombre. Se recorre entera para no
+  // pintar «Sin vendedor» sobre un cliente que si lo tiene; el arreglo de
+  // fondo es que el API devuelva `salesRepName` en la fila.
+  const staffQuery = useQuery(catalogs.activeStaff());
+  const territories: Territory[] = territoriesQuery.data ?? NO_TERRITORIES;
+  const staff = staffQuery.data;
+  const salesReps = useMemo(
+    () => (staff ?? []).map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })),
+    [staff],
+  );
   // Misma politica que la ficha: los catalogos de apoyo degradan la pantalla,
   // no la tumban, pero su fallo se dice y se puede reintentar.
-  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const referenceError =
+    (territoriesQuery.isError && !territoriesQuery.isFetching) || (staffQuery.isError && !staffQuery.isFetching)
+      ? "No se pudieron cargar los territorios ni los vendedores: la tabla los muestra como «—» y sus dos filtros quedan vacíos."
+      : null;
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Client>();
 
   // Criterios en la URL: volver desde la ficha deja el listado como estaba.
@@ -126,34 +143,9 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
   }
 
   function loadReferenceData() {
-    setReferenceError(null);
-    return Promise.all([
-      // Catalogo acotado: se recorre entero. Con el tope de cien, un territorio
-      // mas alla de esa cifra no existia para el filtro ni para la tabla.
-      fetchAllPages<Territory>((page, pageSize) => territoriesApi.list({ page, pageSize })).then(
-        setTerritories,
-      ),
-      // Los SELECTORES de vendedor ya no salen de aqui: buscan en el servidor.
-      // Esta lista solo resuelve el nombre de la columna «Vendedor», porque el
-      // DTO del listado trae el id y no el nombre. Se recorre entera para no
-      // pintar «Sin vendedor» sobre un cliente que si lo tiene; el arreglo de
-      // fondo es que el API devuelva `salesRepName` en la fila.
-      fetchAllPages((page, pageSize) =>
-        staffApi.list({ page, pageSize, status: "activos", sort: "nombre", dir: "asc" }),
-      ).then((items) =>
-        setSalesReps(items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))),
-      ),
-    ]).catch(() =>
-      setReferenceError(
-        "No se pudieron cargar los territorios ni los vendedores: la tabla los muestra como «—» y sus dos filtros quedan vacíos.",
-      ),
-    );
+    void territoriesQuery.refetch();
+    void staffQuery.refetch();
   }
-
-  useEffect(() => {
-    void loadReferenceData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const { data, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
     queryKey: ["clients"],
