@@ -11,10 +11,16 @@ export function AlignedClampBody({
   alignToId,
   onExpand,
   children,
+  label = "Haz clic para ver el mensaje completo",
+  innerClassName = "p-4",
 }: {
   alignToId: string;
   onExpand: () => void;
   children: React.ReactNode;
+  /** Texto del aviso que aparece cuando el contenido se recorta. */
+  label?: string;
+  /** Relleno del contenido medido (por defecto `p-4`). */
+  innerClassName?: string;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -69,7 +75,7 @@ export function AlignedClampBody({
       style={clamped ? { maxHeight } : undefined}
       className={clamped ? "relative overflow-hidden" : "relative"}
     >
-      <div ref={innerRef} className="p-4">
+      <div ref={innerRef} className={innerClassName}>
         {children}
       </div>
       {clamped && (
@@ -79,7 +85,7 @@ export function AlignedClampBody({
           className="absolute inset-x-0 bottom-0 flex h-20 cursor-pointer items-end justify-center bg-gradient-to-t from-white via-white/95 to-transparent pb-3 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25"
         >
           <span className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-[11.5px] font-medium text-zinc-600 shadow-2xs transition-colors hover:border-zinc-300 hover:text-zinc-900">
-            Haz clic para ver el mensaje completo
+            {label}
             <ArrowRight className="size-3" />
           </span>
         </button>
