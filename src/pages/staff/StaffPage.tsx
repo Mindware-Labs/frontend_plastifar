@@ -22,6 +22,7 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useReceipts } from "../../context/useReceipts";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
@@ -62,6 +63,7 @@ export function StaffPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
+  const receipts = useReceipts();
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -272,12 +274,40 @@ export function StaffPage() {
     });
   }
 
-  /** El error sube al dialogo, que lo muestra sin cerrarse. */
-  async function runOnRow(id: number, action: () => Promise<void>) {
+  interface RowReceipt {
+    action: string;
+    doneTitle: string;
+    doneDetail?: string;
+    failedTitle: string;
+  }
+
+  /** Recibo de éxito o fallo; sin recibo, el error sube al diálogo de confirmación. */
+  async function runOnRow(
+    id: number,
+    action: () => Promise<void>,
+    receipt?: RowReceipt,
+  ) {
     setBusyId(id);
     try {
       await action();
+      if (receipt) {
+        receipts.done({
+          action: receipt.action,
+          title: receipt.doneTitle,
+          detail: receipt.doneDetail,
+        });
+      }
       refresh();
+    } catch (err) {
+      if (receipt) {
+        receipts.failed({
+          action: receipt.action,
+          title: receipt.failedTitle,
+          detail: err instanceof Error ? err.message : undefined,
+        });
+      } else {
+        throw err;
+      }
     } finally {
       setBusyId(null);
     }
@@ -296,7 +326,13 @@ export function StaffPage() {
         </>
       ),
       confirmLabel: "Desactivar",
-      onConfirm: () => runOnRow(member.id, () => staffApi.deactivate(member.id)),
+      onConfirm: () =>
+        runOnRow(member.id, () => staffApi.deactivate(member.id), {
+          action: "desactivar-staff",
+          doneTitle: "Colaborador desactivado",
+          doneDetail: fullName(member),
+          failedTitle: "No se pudo desactivar el colaborador",
+        }),
     });
   }
 
@@ -313,7 +349,13 @@ export function StaffPage() {
         </>
       ),
       confirmLabel: "Reactivar",
-      onConfirm: () => runOnRow(member.id, () => staffApi.activate(member.id)),
+      onConfirm: () =>
+        runOnRow(member.id, () => staffApi.activate(member.id), {
+          action: "reactivar-staff",
+          doneTitle: "Colaborador reactivado",
+          doneDetail: fullName(member),
+          failedTitle: "No se pudo reactivar el colaborador",
+        }),
     });
   }
 
@@ -330,7 +372,13 @@ export function StaffPage() {
         </>
       ),
       confirmLabel: "Cerrar sesiones",
-      onConfirm: () => runOnRow(member.id, () => staffApi.revokeSessions(member.id)),
+      onConfirm: () =>
+        runOnRow(member.id, () => staffApi.revokeSessions(member.id), {
+          action: "revocar-sesiones-staff",
+          doneTitle: "Sesiones cerradas",
+          doneDetail: fullName(member),
+          failedTitle: "No se pudieron cerrar las sesiones",
+        }),
     });
   }
 
@@ -347,7 +395,13 @@ export function StaffPage() {
         </>
       ),
       confirmLabel: "Eliminar",
-      onConfirm: () => runOnRow(member.id, () => staffApi.remove(member.id)),
+      onConfirm: () =>
+        runOnRow(member.id, () => staffApi.remove(member.id), {
+          action: "eliminar-staff",
+          doneTitle: "Colaborador eliminado",
+          doneDetail: fullName(member),
+          failedTitle: "No se pudo eliminar el colaborador",
+        }),
     });
   }
 

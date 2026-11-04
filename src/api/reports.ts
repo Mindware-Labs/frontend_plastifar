@@ -60,6 +60,8 @@ export interface AuditLogRow {
    * compuestos ("12:3" para un acceso departamental) que no son un numero.
    */
   entityId: string;
+  /** Nombre legible del registro auditado (persona, cliente, etc.). */
+  subjectLabel?: string | null;
   action: string;
   createdAt: string;
 }

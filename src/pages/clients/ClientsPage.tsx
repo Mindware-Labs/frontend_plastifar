@@ -343,6 +343,7 @@ export function ClientsPage() {
             title: "Cliente eliminado",
             detail: `${client.name} (${client.code})`,
           });
+          refresh();
         } catch (err) {
           receipts.failed({
             action: "eliminar-cliente",
@@ -350,7 +351,6 @@ export function ClientsPage() {
             detail: err instanceof Error ? err.message : undefined,
           });
         }
-        refresh();
       },
     });
   }

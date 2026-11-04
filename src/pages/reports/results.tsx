@@ -347,10 +347,17 @@ export function AuditSliceResult({
               <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
                 {instantFormat.format(new Date(item.createdAt))}
               </Td>
-              <Td className="text-[12.5px] text-brand-gray">{item.actor}</Td>
+              <Td className="text-[12.5px] text-brand-gray">
+                {item.actor?.trim() ? item.actor : "Colaborador eliminado"}
+                <span className="font-mono text-[11px] text-faint"> #{item.actorId}</span>
+              </Td>
               <Td className="text-[12.5px] text-brand-gray">{item.action}</Td>
               <Td className="text-[12.5px] text-faint">
-                {item.entity} <span className="font-mono text-[11px]">{item.entityId}</span>
+                {item.entity}
+                {item.subjectLabel ? (
+                  <span className="text-brand-gray"> · {item.subjectLabel}</span>
+                ) : null}
+                <span className="font-mono text-[11px] text-faint"> #{item.entityId}</span>
               </Td>
             </Row>
           ))}
