@@ -341,9 +341,9 @@ export function StaffPage() {
       title: "Eliminar colaborador",
       description: (
         <>
-          Se eliminará permanentemente a{" "}
-          <strong className="font-semibold text-ink">{fullName(member)}</strong>. Esta acción no se
-          puede deshacer. Si ya tiene actividad registrada en el sistema, desactívalo en su lugar.
+          Se quitará del directorio a{" "}
+          <strong className="font-semibold text-ink">{fullName(member)}</strong>. Sus tickets,
+          correos e historial se conservan; ya no podrá iniciar sesión.
         </>
       ),
       confirmLabel: "Eliminar",

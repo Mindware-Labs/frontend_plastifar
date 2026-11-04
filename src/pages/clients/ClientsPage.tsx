@@ -329,9 +329,9 @@ export function ClientsPage() {
       title: "Eliminar cliente",
       description: (
         <>
-          Se eliminará permanentemente a{" "}
-          <strong className="font-semibold text-ink">{client.name}</strong>. Esta acción no se puede
-          deshacer.
+          Se quitará del directorio a{" "}
+          <strong className="font-semibold text-ink">{client.name}</strong>. Tickets e historial
+          vinculados se conservan; el código quedará libre para un cliente nuevo.
         </>
       ),
       confirmLabel: "Eliminar",
