@@ -1,24 +1,32 @@
 import { useEffect, useRef } from "react";
 import { useReceipts } from "../context/useReceipts";
 
+/*
+ * Los tres ganchos toman SOLO la funcion del contexto (`failed`, `done`), que
+ * es estable, y no el contexto entero. El contexto cambia cada vez que entra un
+ * aviso; depender de el volvia a disparar el efecto con el mismo error, que
+ * agregaba otro aviso, que cambiaba el contexto… y React cortaba con «Maximum
+ * update depth exceeded».
+ */
+
 /** Error de listado o catálogo: toast persistente con reintento, sin banner en la página. */
 export function useLoadErrorReceipt(
   message: string | null | undefined,
   action: string,
   onRetry: () => void,
 ) {
-  const receipts = useReceipts();
+  const { failed } = useReceipts();
   const retryRef = useRef(onRetry);
   retryRef.current = onRetry;
 
   useEffect(() => {
     if (!message) return;
-    receipts.failed({
+    failed({
       action,
       title: message,
       undo: { label: "Reintentar", run: () => retryRef.current() },
     });
-  }, [message, action, receipts]);
+  }, [message, action, failed]);
 }
 
 /** Aviso de configuración o contexto: toast breve al detectarse, sin ocupar layout. */
@@ -28,7 +36,7 @@ export function useConfigNoticeReceipt(
   title: string,
   detail?: string,
 ) {
-  const receipts = useReceipts();
+  const { done } = useReceipts();
   const wasActive = useRef(false);
 
   useEffect(() => {
@@ -38,16 +46,16 @@ export function useConfigNoticeReceipt(
     }
     if (wasActive.current) return;
     wasActive.current = true;
-    receipts.done({ action, title, detail });
-  }, [active, action, title, detail, receipts]);
+    done({ action, title, detail });
+  }, [active, action, title, detail, done]);
 }
 
 /** Fallo puntual de una acción (guardar, toggle, etc.). */
 export function useActionErrorReceipt(message: string | null | undefined, action: string) {
-  const receipts = useReceipts();
+  const { failed } = useReceipts();
 
   useEffect(() => {
     if (!message) return;
-    receipts.failed({ action, title: message });
-  }, [message, action, receipts]);
+    failed({ action, title: message });
+  }, [message, action, failed]);
 }

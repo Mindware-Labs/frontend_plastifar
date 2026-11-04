@@ -53,7 +53,9 @@ function TestingRing({ className = "" }: { className?: string }) {
 export function MailboxesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
-  const receipts = useReceipts();
+  // Las funciones, no el contexto: el contexto cambia con cada aviso y
+  // volvia a disparar el efecto de abajo con el mismo resultado.
+  const { done, failed } = useReceipts();
 
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -106,13 +108,13 @@ export function MailboxesSection() {
   useEffect(() => {
     if (!testResult) return;
     if (testResult.result.ok) {
-      receipts.done({ action: "mailbox-test", title: testResult.result.message });
+      done({ action: "mailbox-test", title: testResult.result.message });
     } else {
-      receipts.failed({ action: "mailbox-test", title: testResult.result.message });
+      failed({ action: "mailbox-test", title: testResult.result.message });
     }
     const timer = window.setTimeout(() => setTestResult(null), TEST_RESULT_TTL);
     return () => window.clearTimeout(timer);
-  }, [testResult, receipts]);
+  }, [testResult, done, failed]);
 
   function askToggle(mailbox: Mailbox) {
     setConfirmation({
