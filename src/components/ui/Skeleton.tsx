@@ -540,6 +540,122 @@ export function StaffDetailSkeleton({ section = "datos" }: { section?: "datos" |
   );
 }
 
+/** Esqueleto de la ficha de cliente (misma arquitectura que la pestaña Datos). */
+export function ClientDetailSkeleton({
+  section = "datos",
+}: {
+  section?: "datos" | "contactos" | "historial";
+}) {
+  const cardHead = (delay: number, width = "w-28") => (
+    <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/50 px-4 py-2.5">
+      <div className="flex items-center gap-2">
+        <Skeleton className="size-4 rounded" delay={delay} />
+        <Skeleton className={`h-3 ${width} rounded`} delay={delay + 20} />
+      </div>
+      <Skeleton className="h-3 w-14 rounded" delay={delay + 40} />
+    </div>
+  );
+  const rows = (count: number, delay: number) => (
+    <div className="divide-y divide-zinc-100 px-4 py-1">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex items-center justify-between gap-3 py-2.5">
+          <Skeleton className="h-3 w-20 rounded" delay={delay + i * 40} />
+          <Skeleton className="h-3 w-32 rounded" delay={delay + i * 40 + 20} />
+        </div>
+      ))}
+    </div>
+  );
+  const card = "overflow-hidden rounded-card border border-line bg-white shadow-card";
+  const listPanel = (
+    <div className={`${card} mt-3.5`}>
+      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-3 py-2.5">
+        <Skeleton className="h-8 w-[260px] rounded-lg" delay={80} />
+        <Skeleton className="h-8 w-32 rounded-lg" delay={120} />
+      </div>
+      <TableSkeleton rows={8} columns={7} />
+      <div className="flex items-center justify-between border-t border-zinc-100 px-3 py-2.5">
+        <Skeleton className="h-3 w-24 rounded" delay={200} />
+        <Skeleton className="h-8 w-48 rounded-lg" delay={220} />
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      role="status"
+      aria-label="Cargando cliente"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden animate-plf-apple-tab select-none"
+    >
+      <div className="mb-3 flex h-14 shrink-0 items-center justify-between gap-x-4 border-b border-zinc-200/80 -mx-3 px-3 lg:-mx-4 lg:px-4">
+        <div className="flex shrink-0 items-center gap-x-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200/90 bg-white p-2 shadow-2xs">
+            <Skeleton className="h-3.5 w-3.5 rounded" />
+          </div>
+          <Skeleton className="h-5 w-44 rounded-md" />
+          <span aria-hidden className="hidden h-4 w-px bg-zinc-200/90 sm:inline-block" />
+          <div className="hidden items-center gap-1.5 md:flex">
+            <Skeleton className="h-6 w-14 rounded-md" delay={140} />
+            <Skeleton className="h-6 w-16 rounded-md" delay={180} />
+          </div>
+        </div>
+        <Skeleton className="hidden h-8 w-28 rounded-lg sm:block" delay={200} />
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto pr-0.5 pb-8">
+        <div className="mx-auto w-full max-w-6xl">
+          {section === "datos" ? (
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="space-y-2.5 rounded-card border border-zinc-200/80 bg-white p-3 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-2.5 w-16 rounded" delay={i * 40} />
+                      <Skeleton className="size-2 rounded-full" delay={i * 40} />
+                    </div>
+                    <Skeleton className="h-4 w-24 rounded" delay={i * 40 + 60} />
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
+                <div className="space-y-3.5 lg:col-span-2">
+                  <div className={card}>
+                    {cardHead(100, "w-40")}
+                    {rows(4, 160)}
+                  </div>
+                  <div className={card}>
+                    {cardHead(220, "w-48")}
+                    {rows(4, 260)}
+                  </div>
+                </div>
+                <div className="space-y-3.5">
+                  <div className={card}>
+                    {cardHead(150, "w-28")}
+                    {rows(3, 180)}
+                  </div>
+                  <div className={card}>
+                    {cardHead(220, "w-32")}
+                    <div className="space-y-2 p-3.5">
+                      {Array.from({ length: 2 }).map((_, i) => (
+                        <Skeleton key={i} className="h-10 w-full rounded-lg" delay={280 + i * 40} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            listPanel
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Esqueleto de la ficha de tarea (misma arquitectura que ticket: header, métricas, rejilla).
  */

@@ -39,12 +39,11 @@ import { DetailCard } from "../../components/ui/DetailCard";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { PageSpinner } from "../../components/ui/PageSpinner";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { StatTile } from "../../components/ui/StatTile";
-import { TableSkeleton } from "../../components/ui/Skeleton";
+import { ClientDetailSkeleton, TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useReceipts } from "../../context/useReceipts";
@@ -301,9 +300,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   }
 
   if (client === null) {
-    return (
-      <PageSpinner />
-    );
+    return <ClientDetailSkeleton section={section} />;
   }
 
   const TypeIcon = TYPE_ICONS[client.type] ?? Store;
@@ -372,7 +369,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
             {section === "datos" && (
             <div className="space-y-3.5">
               {/* 1. Métrica rápida compacta */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <StatTile
                   label="Estado"
                   indicator={<span className={`h-2 w-2 rounded-full ${client.isActive ? "bg-emerald-500" : "bg-zinc-300"}`} />}
@@ -593,13 +590,16 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                             )}
 
                             {primaryContact.email && (
-                              <div className="flex items-center justify-between">
-                                <span className="text-zinc-500 flex items-center gap-1.5">
+                              <div className="flex items-start justify-between gap-3">
+                                <span className="flex shrink-0 items-center gap-1.5 text-zinc-500">
                                   <Mail className="h-3 w-3 text-zinc-400" />
                                   Correo
                                 </span>
-                                <div className="flex items-center gap-1 text-zinc-800 truncate max-w-[150px]">
-                                  <a href={`mailto:${primaryContact.email}`} className="hover:text-brand-red truncate" title={primaryContact.email}>
+                                <div className="flex min-w-0 items-start justify-end gap-1 text-right text-zinc-800">
+                                  <a
+                                    href={`mailto:${primaryContact.email}`}
+                                    className="break-all hover:text-brand-red"
+                                  >
                                     {primaryContact.email}
                                   </a>
                                   <CopyButton text={primaryContact.email} label="Copiar correo" />
