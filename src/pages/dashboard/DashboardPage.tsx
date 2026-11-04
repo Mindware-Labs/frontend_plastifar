@@ -15,6 +15,7 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Board, KpiRow, PeriodTabs, RefreshButton, type KpiItem } from "./board";
 import { CategoryBars, HealthGauge, SeriesLegend, TrendArea } from "./boardCharts";
+import { DashboardSkeleton } from "./DashboardSkeleton";
 import { TerritoriesTable } from "./TerritoriesTable";
 import { formatDecimal, formatInteger, formatPercent } from "./format";
 import { localIso } from "../reports/useDateRange";
@@ -108,26 +109,6 @@ const monthFormat = new Intl.DateTimeFormat("es-DO", { month: "short" });
  * y dibujarlo en otro archivo con otro numero es como se desincronizan.
  */
 const CLOSURE_GOAL = 0.85;
-
-/** Esqueleto con la MISMA reparticion que el tablero cargado: al llegar los
- *  datos lo unico que cambia es que las cajas se llenan, no que saltan. */
-function DashboardSkeleton() {
-  const box = "animate-pulse rounded-edge border border-line bg-canvas";
-  return (
-    <div aria-hidden className="flex flex-col gap-4">
-      <div className={`h-[112px] shrink-0 ${box}`} />
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className={`h-[320px] xl:col-span-8 ${box}`} />
-        <div className={`h-[320px] xl:col-span-4 ${box}`} />
-      </div>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className={`h-[340px] xl:col-span-5 ${box}`} />
-        <div className={`h-[340px] xl:col-span-7 ${box}`} />
-      </div>
-      <span className="sr-only">Cargando el tablero…</span>
-    </div>
-  );
-}
 
 export function DashboardPage() {
   const [quality, setQuality] = useState<QualityReport | null>(null);

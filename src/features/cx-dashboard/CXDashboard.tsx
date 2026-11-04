@@ -12,7 +12,7 @@ import { TicketTrend } from "./components/TicketTrend";
 import { dashboardApi, type DashboardResponse } from "../../api/dashboard";
 import { DashboardContext } from "./dashboardContext";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
-import { TableSkeleton } from "../../components/ui/Skeleton";
+import { DashboardSkeleton } from "./components/DashboardSkeleton";
 import { S } from "./styles";
 import { usePageChrome } from "../../layouts/usePageChrome";
 
@@ -61,6 +61,20 @@ const WIDE: CSSProperties = {
  * abajo. Tres franjas alineadas y una cuarta corrida se lee como un error de
  * maquetacion, no como una decision.
  */
+
+/** Zona de scroll del tablero. La comparten el esqueleto y la pantalla cargada. */
+const SCROLL: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  minWidth: 0,
+  overflowY: "auto",
+  overflowX: "hidden",
+  margin: "0 -3px",
+  padding: "2px 3px 32px",
+  display: "flex",
+  flexDirection: "column",
+  gap: S.xl,
+};
 
 /** La ventana, en días. Ver «LA VENTANA NO SE ELIGE» arriba. */
 const DIAS = 30;
@@ -122,10 +136,15 @@ export function CXDashboard({ query }: { query?: string }) {
      ese medio segundo la pantalla estaría mintiendo sobre lo único que la
      persona vino a mirar. */
   if (data === null) {
+    /* Mismo marco que el tablero cargado —cabecera y zona de scroll con su
+       relleno y su separacion entre bandas— para que al llegar los datos las
+       tarjetas se llenen en su sitio en vez de reemplazar una tabla. */
     return (
-      <div className="cxhub" style={{ padding: "2px 3px" }}>
+      <div className="cxhub" style={{ display: "flex", flexDirection: "column", height: "100%", minWidth: 0 }}>
         <ModuleHeader title="Dashboard" summary="Cargando el tablero de operaciones…" />
-        <TableSkeleton rows={10} columns={4} />
+        <div className="cx-scroll" style={SCROLL}>
+          <DashboardSkeleton />
+        </div>
       </div>
     );
   }
@@ -141,22 +160,7 @@ export function CXDashboard({ query }: { query?: string }) {
           su contenido; sin eso la caja crece y el overflow nunca se activa. El
           relleno lateral de 3 px le da sitio al anillo de foco, que si no queda
           cortado contra el borde del scroll. */}
-      <div
-        ref={scrollRef}
-        className="cx-scroll"
-        style={{
-          flex: 1,
-          minHeight: 0,
-          minWidth: 0,
-          overflowY: "auto",
-          overflowX: "hidden",
-          margin: "0 -3px",
-          padding: "2px 3px 32px",
-          display: "flex",
-          flexDirection: "column",
-          gap: S.xl,
-        }}
-      >
+      <div ref={scrollRef} className="cx-scroll" style={SCROLL}>
         {/* 1 — LO URGENTE, Y EL CONTEXTO.
             `plf-band` escalona la entrada de las cinco bandas. Arranca desde
             un estado ya visible y se corta a los 180 ms: en una superficie de
