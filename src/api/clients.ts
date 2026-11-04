@@ -14,7 +14,6 @@ export interface ClientQuery {
   page: number;
   pageSize: number;
   search?: string;
-  territoryId?: number;
   salesRepId?: number;
   type?: string;
   /** todos | activos | inactivos | sinvendedor */

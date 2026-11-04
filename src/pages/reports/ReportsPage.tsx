@@ -11,14 +11,12 @@ import {
   type ClientsReport,
   type QualityReport,
 } from "../../api/reports";
-import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { Pagination } from "../../components/ui/Pagination";
 import { usePermissions } from "../../hooks/usePermissions";
-import type { Territory } from "../../types/clients";
 import { REPORT_CATALOG, type ReportDefinition } from "../../types/reports";
 import type { ProductLine } from "../../types/settings";
 import { ReportFilters, type ReferenceData, type ReportCriteria } from "./ReportFilters";
@@ -54,7 +52,6 @@ function emptyCriteria(): ReportCriteria {
     clientId: "",
     productLineId: "",
     responsibleStaffId: "",
-    territoryId: "",
     salesRepStaffId: "",
     clientType: "",
     activeOnly: false,
@@ -112,7 +109,6 @@ export function ReportsPage() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [reference, setReference] = useState<ReferenceData>({
     productLines: [],
-    territories: [],
     clientTypes: CLIENT_TYPES,
   });
 
@@ -122,19 +118,13 @@ export function ReportsPage() {
   // servidor porque ni la cartera ni el personal tienen tope.
   useEffect(() => {
     if (!canRead) return;
-    void Promise.all([
-      fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize })),
-      fetchAllPages<Territory>((page, pageSize) => territoriesApi.list({ page, pageSize })),
-    ])
-      .then(([lines, territories]) =>
+    void fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize }))
+      .then((lines) =>
         setReference({
           productLines: lines.map((l) => ({ value: String(l.id), label: l.name })),
-          territories: territories.map((t) => ({ value: String(t.id), label: t.name })),
           clientTypes: CLIENT_TYPES,
         }),
       )
-      // Un catalogo que no llega deja su selector vacio, y eso ya se ve. No es
-      // motivo para tumbar la pantalla: el reporte se puede generar sin acotar.
       .catch(() => undefined);
   }, [canRead]);
 
@@ -159,7 +149,6 @@ export function ReportsPage() {
           case "clientes":
             return reportsApi
               .clients({
-                territoryId: num(values.territoryId),
                 salesRepStaffId: num(values.salesRepStaffId),
                 type: values.clientType === "" ? undefined : values.clientType,
                 activeOnly: values.activeOnly ? true : undefined,
@@ -247,7 +236,6 @@ export function ReportsPage() {
           clientId: num(criteria.clientId),
           productLineId: num(criteria.productLineId),
           responsibleStaffId: num(criteria.responsibleStaffId),
-          territoryId: num(criteria.territoryId),
           salesRepStaffId: num(criteria.salesRepStaffId),
           type: criteria.clientType === "" ? undefined : criteria.clientType,
           activeOnly: criteria.activeOnly ? true : undefined,

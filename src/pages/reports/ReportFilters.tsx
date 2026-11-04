@@ -23,7 +23,6 @@ export interface ReportCriteria {
   clientId: string;
   productLineId: string;
   responsibleStaffId: string;
-  territoryId: string;
   salesRepStaffId: string;
   clientType: string;
   activeOnly: boolean;
@@ -41,7 +40,6 @@ export interface ReferenceOption {
  */
 export interface ReferenceData {
   productLines: ReferenceOption[];
-  territories: ReferenceOption[];
   clientTypes: ReferenceOption[];
 }
 
@@ -197,16 +195,6 @@ export function ReportFilters({
           clearLabel="Cualquiera"
           search={searchActiveStaff}
           resolveSelectedLabel={resolveStaffLabel}
-        />
-      )}
-
-      {has("territory") && (
-        <SelectField
-          label="Territorio"
-          id={`${id}-territorio`}
-          value={criteria.territoryId}
-          onChange={(value) => set({ territoryId: value })}
-          options={[{ value: ANY, label: "Todos los territorios" }, ...reference.territories]}
         />
       )}
 

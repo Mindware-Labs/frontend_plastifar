@@ -1,10 +1,9 @@
-import { Ban, Building2, CheckCircle2, MapPin, Pencil, Plus, Trash2, UserCheck, UserCog, Users } from "lucide-react";
+import { Ban, Building2, CheckCircle2, Pencil, Plus, Trash2, UserCheck, UserCog, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { clientsApi, type ClientQuery } from "../../api/clients";
 import { fetchAllPages } from "../../api/paging";
 import { staffApi } from "../../api/staff";
-import { territoriesApi } from "../../api/territories";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Avatar } from "../../components/ui/Avatar";
@@ -33,11 +32,9 @@ import { useSort } from "../../hooks/useSort";
 import { idParam } from "../../lib/idParam";
 import {
   resolveStaffLabel,
-  resolveTerritoryLabel,
   searchActiveStaff,
-  searchTerritories,
 } from "../../lib/lookups";
-import type { Client, ClientListResponse, Territory } from "../../types/clients";
+import type { Client, ClientListResponse } from "../../types/clients";
 import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
 import { ClientModal } from "./ClientModal";
 import { ReassignSalesRepModal } from "./ReassignSalesRepModal";
@@ -51,13 +48,12 @@ type ChipKey = "todos" | "activos" | "inactivos" | "sinVendedor";
  * clicable para tipo, vendedor ni contactos: el servidor ignoraria el parametro
  * y la tabla se quedaria igual despues de pulsarla, que es peor que no poder.
  */
-type SortKey = "nombre" | "codigo" | "territorio" | "estado" | "fecha";
+type SortKey = "nombre" | "codigo" | "estado" | "fecha";
 
 const COLUMNS: ColumnOption[] = [
   { id: "cliente", label: "Cliente", locked: true },
   { id: "codigo", label: "Código" },
   { id: "tipo", label: "Tipo" },
-  { id: "territorio", label: "Territorio" },
   { id: "vendedor", label: "Vendedor" },
   { id: "contactos", label: "Contactos" },
   { id: "estado", label: "Estado" },
@@ -92,7 +88,6 @@ export function ClientsPage() {
   const receipts = useReceipts();
   const canWrite = can("clients.write");
 
-  const [territories, setTerritories] = useState<Territory[]>([]);
   const [salesReps, setSalesReps] = useState<{ id: number; name: string }[]>([]);
   // Misma politica que la ficha: los catalogos de apoyo degradan la pantalla,
   // no la tumban, pero su fallo se dice y se puede reintentar.
@@ -101,7 +96,6 @@ export function ClientsPage() {
 
   // Criterios en la URL: volver desde la ficha deja el listado como estaba.
   const [search, setSearch] = useUrlState<string>("q", "");
-  const [territoryId, setTerritoryId] = useUrlState<string>("territorio", "todos");
   const [salesRepId, setSalesRepId] = useUrlState<string>("vendedor", "todos");
   const [type, setType] = useUrlState<string>("tipo", "todos", TYPE_KEYS);
   const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIP_KEYS);
@@ -127,27 +121,17 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
 
   function loadReferenceData() {
     setReferenceError(null);
-    return Promise.all([
-      // Catalogo acotado: se recorre entero. Con el tope de cien, un territorio
-      // mas alla de esa cifra no existia para el filtro ni para la tabla.
-      fetchAllPages<Territory>((page, pageSize) => territoriesApi.list({ page, pageSize })).then(
-        setTerritories,
-      ),
-      // Los SELECTORES de vendedor ya no salen de aqui: buscan en el servidor.
-      // Esta lista solo resuelve el nombre de la columna «Vendedor», porque el
-      // DTO del listado trae el id y no el nombre. Se recorre entera para no
-      // pintar «Sin vendedor» sobre un cliente que si lo tiene; el arreglo de
-      // fondo es que el API devuelva `salesRepName` en la fila.
-      fetchAllPages((page, pageSize) =>
-        staffApi.list({ page, pageSize, status: "activos", sort: "nombre", dir: "asc" }),
-      ).then((items) =>
+    return fetchAllPages((page, pageSize) =>
+      staffApi.list({ page, pageSize, status: "activos", sort: "nombre", dir: "asc" }),
+    )
+      .then((items) =>
         setSalesReps(items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))),
-      ),
-    ]).catch(() =>
-      setReferenceError(
-        "No se pudieron cargar los territorios ni los vendedores: la tabla los muestra como «—» y sus dos filtros quedan vacíos.",
-      ),
-    );
+      )
+      .catch(() =>
+        setReferenceError(
+          "No se pudieron cargar los vendedores: la tabla los muestra como «—» y su filtro queda vacío.",
+        ),
+      );
   }
 
   useEffect(() => {
@@ -160,7 +144,6 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
     criteria: {
       pageSize,
       search: debouncedSearch || undefined,
-      territoryId: idParam(territoryId),
       salesRepId: idParam(salesRepId),
       type: type === "todos" ? undefined : type,
       status: chipToStatus[chip],
@@ -174,17 +157,15 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const unfiltered =
-    chip === "todos" && territoryId === "todos" && salesRepId === "todos" && type === "todos" && !debouncedSearch;
+    chip === "todos" && salesRepId === "todos" && type === "todos" && !debouncedSearch;
 
   /* Los tres criterios que viven detras del boton. */
   const filtrosPuestos =
-    (territoryId !== "todos" ? 1 : 0) +
     (salesRepId !== "todos" ? 1 : 0) +
     (type !== "todos" ? 1 : 0);
 
   /** Quita solo lo del panel; la busqueda y las pastillas no se tocan. */
   function clearNarrowFilters() {
-    setTerritoryId("todos");
     setSalesRepId("todos");
     setType("todos");
     setPage(1);
@@ -193,7 +174,6 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
   /** Quita los cinco recortes de una vez: es la salida del estado vacio. */
   function clearFilters() {
     setSearch("");
-    setTerritoryId("todos");
     setSalesRepId("todos");
     setType("todos");
     setChip("todos");
@@ -219,18 +199,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
    * ordenar IsActive de menor a mayor pondria a los inactivos arriba, y nadie
    * abre el listado para ver primero lo que ya no opera.
    */
-  function territoryName(id: number) {
-    const territory = territories.find((t) => t.id === id);
-    if (!territory || territory.code === "UNASSIGNED") return "—";
-    return territory.name;
-  }
 
-  function territoryLookupLabel(id: number | null) {
-    if (id === null) return null;
-    const territory = territories.find((t) => t.id === id);
-    if (!territory || territory.code === "UNASSIGNED") return null;
-    return territory.name;
-  }
 
   function repName(id: number | null) {
     if (id === null) return null;
@@ -452,19 +421,6 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
             />
 
             <LookupFilterDropdown
-              title="Seleccionar territorio"
-              aria-label="Filtrar por territorio"
-              placeholder="Todos los territorios"
-              searchPlaceholder="Buscar territorio…"
-              defaultIcon={<MapPin className="h-3.5 w-3.5 text-zinc-500" />}
-              value={territoryId === "todos" ? "" : territoryId}
-              selectedLabel={territoryId === "todos" ? null : territoryLookupLabel(Number(territoryId))}
-              resolveSelectedLabel={resolveTerritoryLabel}
-              search={searchTerritories}
-              onChange={(value) => setTerritoryId(value === "" ? "todos" : value)}
-            />
-
-            <LookupFilterDropdown
               title="Seleccionar vendedor"
               aria-label="Filtrar por vendedor"
               placeholder="Todos los vendedores"
@@ -543,7 +499,6 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
                   <Th sort={sortOf("nombre")}>Cliente</Th>
                   {isVisible("codigo") && <Th sort={sortOf("codigo")}>Código</Th>}
                   {isVisible("tipo") && <Th>Tipo</Th>}
-                  {isVisible("territorio") && <Th sort={sortOf("territorio")}>Territorio</Th>}
                   {isVisible("vendedor") && <Th>Vendedor</Th>}
                   {isVisible("contactos") && <Th>Contactos</Th>}
                   {isVisible("estado") && <Th sort={sortOf("estado")}>Estado</Th>}
@@ -602,9 +557,6 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
                       <Td>
                         <Badge tone="neutral">{client.type}</Badge>
                       </Td>
-                    )}
-                    {isVisible("territorio") && (
-                      <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{territoryName(client.territoryId)}</Td>
                     )}
                     {isVisible("vendedor") && (
                       <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
@@ -692,7 +644,6 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
       {modal !== null && (
         <ClientModal
           client={modal === "nuevo" ? undefined : modal}
-          territories={territories}
           onClose={() => setModal(null)}
           onSaved={(savedClient) => {
             const isEdit = modal !== "nuevo";

@@ -37,7 +37,6 @@ import { ProductsSection } from "./pages/settings/ProductsSection";
 import { SlaSection } from "./pages/settings/SlaSection";
 import { TeamsSection } from "./pages/settings/TeamsSection";
 
-import { TerritoriesSection } from "./pages/settings/TerritoriesSection";
 import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
 import { StaffPage } from "./pages/staff/StaffPage";
 import { RespuestasPage } from "./pages/respuestas/RespuestasPage";
@@ -193,18 +192,6 @@ export default function App() {
             seccion 11): la parte del documento que no toca la Bandeja. */}
 
 
-        {/* Territorios y lineas de producto se mudaron al modulo que las usa:
-            el territorio es obligatorio al registrar un cliente y alimenta el
-            ranking por zona; la linea de producto es el eje por el que Calidad
-            sigue las reclamaciones. Ninguna de las dos es configuracion del
-            sistema, y en «Configuracion» solo estaban porque era el cajon. */}
-        <Route path="/clientes/territorios" element={<TerritoriesSection />} />
-
-        {/* Las rutas viejas siguen respondiendo. Estan en marcadores, en
-            correos y en la memoria de quien lleva un año usando el panel;
-            moverlas sin dejar el rastro convierte una reorganizacion del menu
-            en un enlace roto. */}
-        <Route path="/configuracion/territorios" element={<Navigate to="/clientes/territorios" replace />} />
 
         {/* El servidor ya exige reports.read en los tres endpoints; sin este
             guard la pantalla se pintaba entera y se llenaba de 403. */}

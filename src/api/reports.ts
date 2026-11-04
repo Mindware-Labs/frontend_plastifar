@@ -36,7 +36,6 @@ export interface QualityFilters {
 
 /** Lo que acota el reporte de Clientes. Es una foto: no lleva rango. */
 export interface ClientsFilters {
-  territoryId?: number;
   salesRepStaffId?: number;
   type?: string;
   activeOnly?: boolean;
@@ -46,7 +45,6 @@ export interface ClientsReport {
   total: number;
   active: number;
   withoutSalesRep: number;
-  byTerritory: { territory: string; total: number; active: number }[];
   bySalesRep: { salesRep: string; clients: number }[];
 }
 

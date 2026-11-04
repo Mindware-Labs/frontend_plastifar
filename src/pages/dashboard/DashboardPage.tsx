@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
-  MapPin,
   TrendingUp,
   UserCheck,
 } from "lucide-react";
@@ -15,7 +14,6 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Board, KpiRow, PeriodTabs, RefreshButton, type KpiItem } from "./board";
 import { CategoryBars, HealthGauge, SeriesLegend, TrendArea } from "./boardCharts";
-import { TerritoriesTable } from "./TerritoriesTable";
 import { formatDecimal, formatInteger, formatPercent } from "./format";
 import { localIso } from "../reports/useDateRange";
 
@@ -219,11 +217,11 @@ export function DashboardPage() {
     previous?.averageClosureDays ?? null,
   );
 
-  const territories = useMemo(
+  const salesReps = useMemo(
     () =>
-      (clients?.byTerritory ?? [])
-        .filter((entry) => entry.total > 0)
-        .map((entry) => ({ name: entry.territory, value: entry.total })),
+      (clients?.bySalesRep ?? [])
+        .filter((entry) => entry.clients > 0)
+        .map((entry) => ({ name: entry.salesRep, value: entry.clients })),
     [clients],
   );
 
@@ -390,16 +388,12 @@ export function DashboardPage() {
               </Board>
             </div>
 
-            {/* 3 — COMPARACION POR CATEGORIA + TABLA DE CIERRE. */}
+            {/* 3 — CARTERA POR VENDEDOR */}
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
               <Board
-                title="Cartera por territorio"
-                hint="Los siete territorios con más clientes."
-                // Sin piso propio: la fila la mide la tabla, que es la que tiene
-                // largo real. Con 340 px de minimo este panel estiraba siete
-                // barras de 18 px sobre medio metro de aire, en un tablero
-                // pedido a densidad de mesa de trabajo.
-                className="xl:col-span-5"
+                title="Cartera por vendedor"
+                hint="Los siete vendedores con más clientes asignados."
+                className="xl:col-span-12"
                 actions={
                   <span
                     aria-hidden
@@ -409,22 +403,7 @@ export function DashboardPage() {
                   </span>
                 }
               >
-                <CategoryBars data={territories} unit="clientes" />
-              </Board>
-
-              <Board
-                title="Detalle por territorio"
-                hint="Participación y actividad de cada zona."
-                className="min-h-[340px] xl:col-span-7"
-                bodyClassName="!p-0 overflow-y-auto"
-                actions={
-                  <span className="flex items-center gap-1.5 text-[11.5px] text-faint">
-                    <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    {formatInteger(territories.length)} con cartera
-                  </span>
-                }
-              >
-                <TerritoriesTable report={clients} />
+                <CategoryBars data={salesReps} unit="clientes" />
               </Board>
             </div>
 

@@ -28,8 +28,6 @@ import {
   type ContactQuery,
 } from "../../api/clients";
 import { ticketsApi } from "../../api/tickets";
-import { fetchAllPages } from "../../api/paging";
-import { territoriesApi } from "../../api/territories";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
@@ -56,7 +54,7 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { formatDateTime, formatPhoneNumber, formatTicketCode } from "../../lib/format";
 import { resolveStaffLabel } from "../../lib/lookups";
 import type { TicketListResponse, TicketQuery } from "../../types/api";
-import type { Client, Contact, Territory } from "../../types/clients";
+import type { Client, Contact } from "../../types/clients";
 import { PriorityCell, StatusCell } from "../tickets/ticketCells";
 import { ClientModal } from "./ClientModal";
 import { ContactModal } from "./ContactModal";
@@ -94,10 +92,8 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
   const [client, setClient] = useState<Client | null>(null);
   const [previewContacts, setPreviewContacts] = useState<Contact[]>([]);
-  const [territories, setTerritories] = useState<Territory[]>([]);
   const [salesRepName, setSalesRepName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [referenceError, setReferenceError] = useState<string | null>(null);
   const [busyContactId, setBusyContactId] = useState<number | null>(null);
 
   const [editingClient, setEditingClient] = useState(false);
@@ -183,31 +179,11 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     });
   }
 
-  function loadReferenceData() {
-    setReferenceError(null);
-    return Promise.all([
-      fetchAllPages<Territory>((page, pageSize) => territoriesApi.list({ page, pageSize })).then(
-        setTerritories,
-      ),
-    ]).catch(() =>
-      setReferenceError(
-        "No se pudieron cargar los territorios: abajo aparecen sin nombre, y el diálogo de edición se abrirá con esa lista vacía.",
-      ),
-    );
-  }
-
   useEffect(() => {
     if (!id) return;
     void loadRecord();
-    void loadReferenceData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-
-  function territoryName(territoryId: number) {
-    const territory = territories.find((t) => t.id === territoryId);
-    if (!territory || territory.code === "UNASSIGNED") return "—";
-    return territory.name;
-  }
 
   useEffect(() => {
     const staffId = client?.salesRepStaffId ?? null;
@@ -356,8 +332,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
         summary={
           <div className="flex items-center gap-1.5 text-[12px] text-zinc-500">
             <span className="font-medium text-zinc-700">{client.type}</span>
-            <span aria-hidden className="text-zinc-300">·</span>
-            <span>{territoryName(client.territoryId)}</span>
+
             {client.taxId && (
               <>
                 <span aria-hidden className="text-zinc-300">·</span>
@@ -390,10 +365,6 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
             <ErrorRetry className="mb-3" onRetry={() => void loadRecord()}>{error}</ErrorRetry>
           )}
 
-          {referenceError !== null && (
-            <ErrorRetry className="mb-3" onRetry={() => void loadReferenceData()}>{referenceError}</ErrorRetry>
-          )}
-
           {/* Animación de entrada fluida estilo Apple */}
           <div key={section} className="animate-plf-apple-tab">
             {section === "datos" && (
@@ -418,14 +389,6 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   <div className="mt-1">
                     <span className="font-heading text-[15px] font-bold text-zinc-900 truncate block">
                       {client.type}
-                    </span>
-                  </div>
-                </StatTile>
-
-                <StatTile label="Territorio" indicator={<MapPin className="h-3.5 w-3.5 text-zinc-400" />}>
-                  <div className="mt-1">
-                    <span className="font-heading text-[15px] font-bold text-zinc-900 truncate block">
-                      {territoryName(client.territoryId)}
                     </span>
                   </div>
                 </StatTile>
@@ -475,13 +438,6 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                         <span className="inline-flex items-center gap-1.5 text-zinc-800 font-medium">
                           <TypeIcon className="h-3.5 w-3.5 text-zinc-400" />
                           {client.type}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between py-2 text-[12.5px]">
-                        <span className="text-zinc-500 font-medium">Territorio</span>
-                        <span className="text-zinc-800 font-medium">
-                          {territoryName(client.territoryId)}
                         </span>
                       </div>
 
@@ -1115,7 +1071,6 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       {editingClient && (
         <ClientModal
           client={client}
-          territories={territories}
           onClose={() => setEditingClient(false)}
           onSaved={(updated) => {
             setClient(updated);

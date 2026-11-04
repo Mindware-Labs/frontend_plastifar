@@ -57,8 +57,17 @@ const detailPatterns: BreadcrumbPattern[] = [
   {
     path: "/tickets/:id",
     build: (subject) => [
+      { label: "Tickets y Tareas", to: "/tickets" },
       { label: "Tickets", to: "/tickets" },
       { label: subject ?? "Ticket" },
+    ],
+  },
+  {
+    path: "/tareas/:id",
+    build: (title) => [
+      { label: "Tickets y Tareas", to: "/tickets" },
+      { label: "Tareas", to: "/tareas" },
+      { label: title ?? "Tarea" },
     ],
   },
   {
@@ -94,7 +103,7 @@ const detailPatterns: BreadcrumbPattern[] = [
     // El numero del ticket es el «Código:» de la reclamación (docs/plan/03, pregunta 3).
     path: "/reclamaciones/:id",
     build: (ticketNumber) => [
-      { label: "Tickets", to: "/tickets" },
+      { label: "Tickets y Tareas", to: "/tickets" },
       { label: "Reclamaciones", to: "/reclamaciones" },
       { label: ticketNumber ?? "Reclamación" },
     ],
@@ -102,7 +111,7 @@ const detailPatterns: BreadcrumbPattern[] = [
   {
     path: "/discrepancias/:id",
     build: (number) => [
-      { label: "Tickets", to: "/tickets" },
+      { label: "Tickets y Tareas", to: "/tickets" },
       { label: "Discrepancias", to: "/discrepancias" },
       { label: number ?? "Investigación" },
     ],
@@ -111,7 +120,7 @@ const detailPatterns: BreadcrumbPattern[] = [
     // La impresión vive fuera del layout y no lleva breadcrumb, como las de sus hermanos.
     path: "/retiros/:id",
     build: (number) => [
-      { label: "Tickets", to: "/tickets" },
+      { label: "Tickets y Tareas", to: "/tickets" },
       { label: "Retiros", to: "/retiros" },
       { label: number ?? "Solicitud de retiro" },
     ],
