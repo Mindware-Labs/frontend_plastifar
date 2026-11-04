@@ -66,6 +66,8 @@ function FormDivider({ title }: { title: string }) {
 
 const contactsCache = new Map<number, Contact[]>();
 
+const DUE_DATE_PAST_MESSAGE = "La fecha límite no puede ser una fecha que ya pasó.";
+
 function bindAutoResizeTextarea(
   field: UseFormRegisterReturn,
   minHeightPx: number,
@@ -222,10 +224,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
   useEffect(() => {
     if (isEdit) return;
     if (dueDateIsPast) {
-      setError("dueDate", {
-        type: "manual",
-        message: "La fecha límite no puede ser una fecha que ya pasó.",
-      });
+      setError("dueDate", { type: "manual", message: DUE_DATE_PAST_MESSAGE });
     } else {
       clearErrors("dueDate");
     }
@@ -352,13 +351,21 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     }
   }
 
+  function focusFirstTaskMissing() {
+    const first = taskFormMissing[0];
+    if (!first) return;
+    if (first.id === "task-form-sla") {
+      document.getElementById("task-form-sla")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      return;
+    }
+    focusFormField(first.id);
+  }
+
   async function onSubmit(values: TaskFormValues) {
     setFormError(null);
     if (!isEdit && values.dueDate && isPastDueDate(values.dueDate, values.dueTime)) {
-      setError("dueDate", {
-        type: "manual",
-        message: "La fecha límite no puede ser una fecha que ya pasó.",
-      });
+      setError("dueDate", { type: "manual", message: DUE_DATE_PAST_MESSAGE });
+      focusFormField("dueDate");
       return;
     }
     try {
@@ -366,13 +373,23 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
       onSaved(saved);
       requestClose();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "No se pudo guardar la tarea");
+      const message = err instanceof ApiError ? err.message : "No se pudo guardar la tarea";
+      if (message.includes("fecha límite") || message.includes("fecha que ya pasó")) {
+        setError("dueDate", { type: "manual", message });
+        focusFormField("dueDate");
+        return;
+      }
+      setFormError(message);
     }
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLFormElement>) {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       event.preventDefault();
+      if (!isEdit && taskFormMissing.length > 0) {
+        focusFirstTaskMissing();
+        return;
+      }
       void handleSubmit(onSubmit)();
     }
   }
@@ -470,6 +487,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
               ready={taskFormMissing.length === 0}
               busy={isSubmitting}
               missingItems={taskFormMissing}
+              onInvalidClick={focusFirstTaskMissing}
               onFocusField={(id) => {
                 if (id === "task-form-sla") {
                   document.getElementById("task-form-sla")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -613,6 +631,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
             name="dueDate"
             render={({ field }) => (
               <DateField
+                id="dueDate"
                 label="Fecha y hora límite"
                 placeholder="Sin fecha límite"
                 value={field.value}
