@@ -1,26 +1,25 @@
-/**
- * Ajusta la altura del area de texto a su contenido, con un minimo en px.
- * Con `maxHeight` se detiene ahi y activa el scroll propio; sin el, crece sin limite
- * y no toca `overflowY`.
- */
-export function autoResizeTextarea(
-  textarea: HTMLTextAreaElement | null,
-  minHeight: number,
-  maxHeight?: number,
-) {
+/** Crece con el contenido; sin scroll interno si el contenedor lo permite. */
+export function autoResizeTextarea(textarea: HTMLTextAreaElement | null, minHeightPx = 96): void {
   if (!textarea) return;
+
+  // Preservar la posición de scroll del contenedor padre si existe
+  const scrollParent = textarea.closest(".overflow-y-auto") as HTMLElement | null;
+  const prevScrollTop = scrollParent ? scrollParent.scrollTop : null;
+
+  const prevHeight = textarea.style.height;
   textarea.style.height = "auto";
   const borderOffset = textarea.offsetHeight - textarea.clientHeight;
-  const targetHeight = Math.max(textarea.scrollHeight + borderOffset, minHeight);
-  if (maxHeight === undefined) {
-    textarea.style.height = `${targetHeight}px`;
-    return;
-  }
-  if (targetHeight >= maxHeight) {
-    textarea.style.height = `${maxHeight}px`;
-    textarea.style.overflowY = "auto";
+  const targetHeight = Math.max(textarea.scrollHeight + borderOffset, minHeightPx);
+  const nextHeight = `${targetHeight}px`;
+
+  if (prevHeight !== nextHeight) {
+    textarea.style.height = nextHeight;
   } else {
-    textarea.style.height = `${targetHeight}px`;
-    textarea.style.overflowY = "hidden";
+    textarea.style.height = prevHeight;
+  }
+
+  // Si el cambio de alto temporal descolocó el scroll del modal, restaurarlo inmediatamente
+  if (scrollParent && prevScrollTop !== null && scrollParent.scrollTop !== prevScrollTop) {
+    scrollParent.scrollTop = prevScrollTop;
   }
 }

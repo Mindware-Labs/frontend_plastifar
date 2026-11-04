@@ -10,11 +10,7 @@ interface DiscrepancyDecisionModalProps {
   onSaved: (detail: DiscrepancyDetail) => void;
 }
 
-/**
- * RF-D5: aprobar o devolver con nota. La nota es obligatoria al devolver
- * (sección 13); al aprobar es opcional. Si quien realizó puede aprobar está
- * abierto (pregunta 1): aquí no se impide, y el servidor tampoco.
- */
+/** RF-D5: aprobar o devolver con nota. La nota es obligatoria al devolver (sección 13); al... */
 export function DiscrepancyDecisionModal({ discrepancy, decision, onClose, onSaved }: DiscrepancyDecisionModalProps) {
   const approving = decision === "aprobar";
 

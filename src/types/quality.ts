@@ -64,8 +64,9 @@ export interface CorrectiveActionSheet {
   description: string;
   /** Contencion aplicada de inmediato. */
   immediateAction: string | null;
-  /** Dueño de la HCA. */
-  responsibleStaffId: number;
+  /** Dueño de la HCA; nulo si el responsable es solo nombre manual. */
+  responsibleStaffId: number | null;
+  responsibleManualName: string | null;
   responsibleName: string;
   /** Fecha comprometida de cierre, en ISO corto: es un dia, no un instante. */
   dueDate: string;
@@ -108,7 +109,8 @@ export interface ActionPlanItem {
   id: number;
   sheetId: number;
   description: string;
-  responsibleStaffId: number;
+  responsibleStaffId: number | null;
+  responsibleManualName: string | null;
   /** Resuelto por el servidor: la tabla ya no lo busca contra una lista topada. */
   responsibleName: string;
   /** Fecha comprometida, ISO corto. */
@@ -167,4 +169,37 @@ export interface CreditRequest {
 export interface QualityStaff {
   id: number;
   name: string;
+}
+
+export interface SheetCounts {
+  all: number;
+  open: number;
+  inAnalysis: number;
+  inExecution: number;
+  inVerification: number;
+  closed: number;
+}
+
+export interface SheetListResponse {
+  items: CorrectiveActionSheet[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: SheetCounts;
+}
+
+export interface HcaQuery {
+  page: number;
+  pageSize?: number;
+  search?: string;
+  clientId?: number;
+  plantId?: number;
+  productLineId?: number;
+  from?: string;
+  to?: string;
+  status?: string;
+  sort?: string;
+  dir?: "asc" | "desc";
+  [key: string]: string | number | boolean | undefined;
 }

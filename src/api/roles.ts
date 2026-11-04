@@ -31,4 +31,10 @@ export const rolesApi = {
     }),
 
   remove: (id: number) => apiRequest<void>(`/api/roles/${id}`, { method: "DELETE" }),
+
+  bulk: (input: { ids: number[]; action: "activate" | "deactivate" | "delete" }) =>
+    apiRequest<import("../types/api").BulkActionResult>("/api/roles/bulk", {
+      method: "POST",
+      body: JSON.stringify({ ids: input.ids, action: input.action }),
+    }),
 };

@@ -1,8 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useId, useState, type ReactNode } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
+import { SubmitValidationButton } from "./SubmitValidationButton";
 import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
 import { TextAreaField } from "../ui/Field";
@@ -63,6 +65,7 @@ export function ReasonModal({
   afterField,
 }: ReasonModalProps) {
   const formId = useId();
+  const reasonFieldId = `${formId}-text`;
   const [formError, setFormError] = useState<string | null>(null);
 
   const maxMessage = `Máximo ${field.max} caracteres`;
@@ -74,12 +77,27 @@ export function ReasonModal({
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: { text: field.defaultValue ?? "" },
   });
+
+  const textValue = watch("text") ?? "";
+  const reasonMissing = useMemo(() => {
+    if (!field.min) return [];
+    const trimmed = textValue.trim();
+    return buildValidationItems([
+      {
+        id: reasonFieldId,
+        label: field.minMessage ?? `Completa «${field.label}» (mín. ${field.min} caracteres)`,
+        short: field.label.toLowerCase(),
+        valid: trimmed.length >= field.min,
+      },
+    ]);
+  }, [field.label, field.min, field.minMessage, reasonFieldId, textValue]);
 
   async function submit(values: z.infer<typeof schema>) {
     setFormError(null);
@@ -107,9 +125,17 @@ export function ReasonModal({
           <Button type="button" variant="secondary" onClick={onClose}>
             {cancelLabel}
           </Button>
-          <Button type="submit" form={formId} variant={submitVariant} isLoading={isSubmitting}>
+          <SubmitValidationButton
+            formId={formId}
+            ready={reasonMissing.length === 0}
+            busy={isSubmitting}
+            missingItems={reasonMissing}
+            onFocusField={focusFormField}
+            variant={submitVariant}
+            hintText="Para continuar, completa lo siguiente:"
+          >
             {submitLabel}
-          </Button>
+          </SubmitValidationButton>
         </>
       }
     >
@@ -117,6 +143,7 @@ export function ReasonModal({
         {formError && <Alert variant="error">{formError}</Alert>}
         {children}
         <TextAreaField
+          id={reasonFieldId}
           label={field.label}
           required={Boolean(field.min)}
           rows={3}

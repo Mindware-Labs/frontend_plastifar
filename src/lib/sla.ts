@@ -170,3 +170,146 @@ export function humanizeMinutes(minutes: number, perWorkday?: number | null): st
   const restHours = hours % 24;
   return restHours === 0 ? `${days} d` : `${days} d ${restHours} h`;
 }
+
+
+export type SlaTimeUnit = "minutos" | "horas" | "dias" | "semanas" | "meses";
+
+export const SLA_TIME_UNITS: { value: SlaTimeUnit; label: string; shortLabel: string }[] = [
+  { value: "minutos", label: "Minutos", shortLabel: "min" },
+  { value: "horas", label: "Horas", shortLabel: "h" },
+  { value: "dias", label: "Días", shortLabel: "d" },
+  { value: "semanas", label: "Semanas", shortLabel: "sem" },
+  { value: "meses", label: "Meses", shortLabel: "mes" },
+];
+
+export function durationToMinutes(
+  quantity: number,
+  unit: SlaTimeUnit,
+  businessHoursOnly: boolean,
+  workdayMins?: number | null,
+  workdaysCount: number = 5,
+): number {
+  const qty = Math.max(0, quantity);
+  if (!businessHoursOnly) {
+    switch (unit) {
+      case "minutos":
+        return qty;
+      case "horas":
+        return qty * 60;
+      case "dias":
+        return qty * 1440;
+      case "semanas":
+        return qty * 10080;
+      case "meses":
+        return qty * 43200; // 30 días continuos
+    }
+  }
+
+  // Horario laboral
+  const dayMins = workdayMins && workdayMins > 0 ? workdayMins : 540;
+  const daysInWeek = workdaysCount > 0 ? workdaysCount : 5;
+
+  switch (unit) {
+    case "minutos":
+      return qty;
+    case "horas":
+      return qty * 60;
+    case "dias":
+      return qty * dayMins;
+    case "semanas":
+      return qty * dayMins * daysInWeek;
+    case "meses":
+      return qty * dayMins * daysInWeek * 4;
+  }
+}
+
+export function minutesToDuration(
+  minutes: number,
+  businessHoursOnly: boolean,
+  workdayMins?: number | null,
+  workdaysCount: number = 5,
+): { value: number; unit: SlaTimeUnit } {
+  if (minutes <= 0) return { value: 1, unit: "horas" };
+
+  if (!businessHoursOnly) {
+    if (minutes >= 43200 && minutes % 43200 === 0) {
+      return { value: minutes / 43200, unit: "meses" };
+    }
+    if (minutes >= 10080 && minutes % 10080 === 0) {
+      return { value: minutes / 10080, unit: "semanas" };
+    }
+    if (minutes >= 1440 && minutes % 1440 === 0) {
+      return { value: minutes / 1440, unit: "dias" };
+    }
+    if (minutes >= 60 && minutes % 60 === 0) {
+      return { value: minutes / 60, unit: "horas" };
+    }
+    return { value: minutes, unit: "minutos" };
+  }
+
+  const dayMins = workdayMins && workdayMins > 0 ? workdayMins : 540;
+  const daysInWeek = workdaysCount > 0 ? workdaysCount : 5;
+  const monthMins = dayMins * daysInWeek * 4;
+  const weekMins = dayMins * daysInWeek;
+
+  if (monthMins > 0 && minutes >= monthMins && minutes % monthMins === 0) {
+    return { value: minutes / monthMins, unit: "meses" };
+  }
+  if (weekMins > 0 && minutes >= weekMins && minutes % weekMins === 0) {
+    return { value: minutes / weekMins, unit: "semanas" };
+  }
+  if (dayMins > 0 && minutes >= dayMins && minutes % dayMins === 0) {
+    return { value: minutes / dayMins, unit: "dias" };
+  }
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return { value: minutes / 60, unit: "horas" };
+  }
+  return { value: minutes, unit: "minutos" };
+}
+
+export function formatEquivalence(
+  quantity: number,
+  unit: SlaTimeUnit,
+  minutes: number,
+  businessHoursOnly: boolean,
+): string {
+  if (minutes <= 0 || quantity <= 0) return "";
+
+  if (unit === "minutos") {
+    if (minutes >= 60) {
+      const h = (minutes / 60).toFixed(1).replace(/\.0$/, "");
+      return `${minutes} min = ${h} h`;
+    }
+    return `${minutes} min`;
+  }
+
+  const h = (minutes / 60).toFixed(1).replace(/\.0$/, "");
+  const formattedMinutes = minutes.toLocaleString("es-DO");
+
+  if (unit === "horas") {
+    return `${quantity} h = ${formattedMinutes} min`;
+  }
+
+  if (unit === "dias") {
+    if (businessHoursOnly) {
+      return `${quantity} d laborables = ${h} h de jornada (${formattedMinutes} min)`;
+    }
+    return `${quantity} d = ${quantity * 24} h (${formattedMinutes} min continuos)`;
+  }
+
+  if (unit === "semanas") {
+    if (businessHoursOnly) {
+      return `${quantity} sem = ${h} h laborales (${formattedMinutes} min)`;
+    }
+    return `${quantity} sem = ${quantity * 7} d (${formattedMinutes} min continuos)`;
+  }
+
+  if (unit === "meses") {
+    if (businessHoursOnly) {
+      return `${quantity} mes${quantity > 1 ? "es" : ""} = ${h} h laborales (${formattedMinutes} min)`;
+    }
+    return `${quantity} mes${quantity > 1 ? "es" : ""} = ${quantity * 30} d (${formattedMinutes} min continuos)`;
+  }
+
+  return `${minutes.toLocaleString("es-DO")} min`;
+}

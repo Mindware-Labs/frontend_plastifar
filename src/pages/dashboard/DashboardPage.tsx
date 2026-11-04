@@ -12,8 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { reportsApi, type ClientsReport, type QualityReport } from "../../api/reports";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Board, KpiRow, PeriodTabs, RefreshButton, type KpiItem } from "./board";
 import { CategoryBars, HealthGauge, SeriesLegend, TrendArea } from "./boardCharts";
 import { TerritoriesTable } from "./TerritoriesTable";
@@ -156,6 +155,8 @@ export function DashboardPage() {
 
   const load = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
+  useLoadErrorReceipt(error, "dashboard-calidad", load);
+
   /**
    * El periodo por defecto se ajusta UNA vez a la data que existe. Doce meses
    * fijos en una operacion que arranco hace dos dejaban diez columnas en cero y
@@ -241,7 +242,7 @@ export function DashboardPage() {
       {
         icon: ClipboardList,
         label: "HCA abiertas",
-        to: "/calidad/hca",
+        to: "/reportes?reporte=hca-por-periodo",
         value: formatInteger(quality.openedInRange),
         hint: "Contra el período anterior",
         delta: openedDelta,
@@ -253,7 +254,7 @@ export function DashboardPage() {
       {
         icon: CheckCircle2,
         label: "HCA cerradas",
-        to: "/calidad/hca?estado=cerradas",
+        to: "/reportes?reporte=hca-por-periodo",
         value: formatInteger(quality.closedInRange),
         hint: "Contra el período anterior",
         delta: closedDelta,
@@ -276,7 +277,7 @@ export function DashboardPage() {
       {
         icon: Clock,
         label: "Cierre promedio",
-        to: "/calidad/hca?estado=cerradas",
+        to: "/reportes?reporte=hca-por-periodo",
         value:
           quality.averageClosureDays === null
             ? "Sin datos"
@@ -330,17 +331,6 @@ export function DashboardPage() {
           `visible` y el anillo de foco de una ficha quedaba cortado contra el
           borde; el relleno le da sitio y el margen negativo lo devuelve. */}
       <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 pt-4 pb-8">
-        {error && (
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-[240px] flex-1">
-              <Alert variant="error">{error}</Alert>
-            </div>
-            <Button size="sm" variant="secondary" onClick={load} disabled={isLoading}>
-              Reintentar
-            </Button>
-          </div>
-        )}
-
         {!ready ? (
           error === null && <DashboardSkeleton />
         ) : (

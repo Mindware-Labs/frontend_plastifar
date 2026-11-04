@@ -11,8 +11,7 @@ import { FormSection } from "../../components/ui/FormSection";
 import { Modal } from "../../components/ui/Modal";
 import type { ClaimDetail, CustomerClaim } from "../../types/claims";
 
-// Espejo de ClaimRules.ValidateTreatment: aquí solo largos. Qué hace falta para
-// cerrar lo dice el servidor en la ficha, no este diálogo.
+// Espejo de ClaimRules.ValidateTreatment: aquí solo largos. Qué hace falta para cerrar lo...
 const schema = z.object({
   firstResponseCorrection: z.string().trim().max(4000, "Máximo 4000 caracteres"),
   requiresCorrectiveAction: z.string(),

@@ -1,13 +1,11 @@
-// Espejo de api/Dtos/ClaimDtos.cs (docs/plan/03, sección 6).
-//
-// Las enumeraciones viajan como texto legible, tal como las escribe el
-// PF-FOR-034. Los nombres de cliente, contacto y departamento llegan resueltos
-// desde el ticket: el formulario no los duplica.
-
-export const CLAIM_REASONS = ["Sobrante", "Faltante", "Contaminación", "Cruce", "Otros"] as const;
-export type ClaimReason = (typeof CLAIM_REASONS)[number];
+// Espejo de api/Dtos/ClaimDtos.cs; las enumeraciones viajan como texto legible del PF-FOR-034.
 
 export const CLAIM_AREAS = ["Calidad", "Almacén", "Ventas"] as const;
+
+/** Motivo «Otros» del catálogo de tickets: exige texto libre en el PF-FOR-034. */
+export function topicRequiresOther(topicName: string): boolean {
+  return topicName.trim().toLowerCase() === "otros";
+}
 export type ClaimAffectedArea = (typeof CLAIM_AREAS)[number];
 
 export const CLAIM_DEFECT_MOMENTS = ["Recibo", "Uso"] as const;
@@ -59,7 +57,9 @@ export interface CustomerClaim {
   /** ISO corto: es un día, no un instante. */
   claimDate: string;
   country: string | null;
-  reason: ClaimReason;
+  topicId: number;
+  /** Nombre del motivo en el catálogo de tickets. */
+  reason: string;
   reasonOther: string | null;
   affectedAreas: ClaimAffectedArea[];
   plants: ClaimPlant[];
@@ -122,7 +122,9 @@ export interface ClaimSummary {
   departmentId: number | null;
   departmentName: string | null;
   claimDate: string;
-  reason: ClaimReason;
+  topicId: number;
+  /** Nombre del motivo en el catálogo de tickets. */
+  reason: string;
   reasonOther: string | null;
   plants: string[];
   currency: string | null;
@@ -146,7 +148,10 @@ export interface ClaimLineInput {
 export interface SaveClaimRequest {
   claimDate: string;
   country: string | null;
-  reason: ClaimReason;
+  contactName: string | null;
+  contactPhone: string | null;
+  clientPhone: string | null;
+  topicId: number;
   reasonOther: string | null;
   affectedAreas: ClaimAffectedArea[];
   plantIds: number[];

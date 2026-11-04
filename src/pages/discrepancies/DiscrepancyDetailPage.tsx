@@ -1,17 +1,17 @@
-import { CreditCard, Pencil, Printer, RotateCcw, ShieldAlert, ShieldCheck, ThumbsDown, ThumbsUp } from "lucide-react";
+import { AlertTriangle, Check, CreditCard, Pencil, RotateCcw, ShieldAlert, ShieldCheck, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
-import { ConditionChecklist } from "../../components/app/ConditionChecklist";
-import { DetailLoadError } from "../../components/app/DetailLoadError";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { ProductNameCode } from "../../components/app/ProductNameCode";
+import { DocumentDropdown } from "../../components/app/DocumentDropdown";
+import { exportDiscrepancyToExcel } from "../../lib/discrepancyExcelExport";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { PageSpinner } from "../../components/ui/PageSpinner";
 import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { Tooltip } from "../../components/ui/Tooltip";
@@ -19,9 +19,14 @@ import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useDetail } from "../../hooks/useDetail";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatInstant } from "../../lib/dates";
+import { caseReferenceColumnLabel } from "../../lib/formCaseReference";
 import { NOTIFICATION_ITEM, describeStatus } from "../../lib/discrepancies";
 import { formatQuantity } from "../../lib/numbers";
-import type { DiscrepancyLine, SecurityCheckResult } from "../../types/discrepancies";
+import type {
+  DiscrepancyCompletionCondition,
+  DiscrepancyLine,
+  SecurityCheckResult,
+} from "../../types/discrepancies";
 import { CreditRequestModal } from "../quality/CreditRequestModal";
 import { DiscrepancyDecisionModal } from "./DiscrepancyDecisionModal";
 import { DiscrepancyFormModal } from "./DiscrepancyFormModal";
@@ -29,11 +34,7 @@ import { DiscrepancyStatusBadge, SecurityFindingBadge } from "./DiscrepancyStatu
 
 type CheckChoice = "" | SecurityCheckResult;
 
-/**
- * Detalle de la investigación: líneas, nota, puntos de seguridad y la ficha
- * de realización y aprobación. Un hallazgo de seguridad se muestra destacado
- * en la cabecera (sección 11 y 15).
- */
+/** Detalle de la investigación: líneas, nota, puntos de seguridad y la ficha de realizació... */
 export function DiscrepancyDetailPage() {
   const { id } = useParams();
   const discrepancyId = Number(id);
@@ -78,9 +79,10 @@ export function DiscrepancyDetailPage() {
 
   if (error) {
     return (
-      <DetailLoadError className="max-w-[960px]" title="Investigación de discrepancia" onRetry={retry}>
-        {error}
-      </DetailLoadError>
+      <div className="max-w-[960px]">
+        <ModuleHeader title="Investigación de discrepancia" />
+        <ErrorRetry onRetry={retry}>{error}</ErrorRetry>
+      </div>
     );
   }
 
@@ -134,10 +136,17 @@ export function DiscrepancyDetailPage() {
 
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button size="sm" variant="secondary" onClick={() => window.open(`/discrepancias/${discrepancy.id}/imprimir`, "_blank")}>
-        <Printer className="h-[15px] w-[15px]" />
-        Imprimir
-      </Button>
+      <DocumentDropdown
+        onExportExcel={async () => {
+          try {
+            await exportDiscrepancyToExcel(detail);
+          } catch {
+            setActionError("No se pudo exportar la investigación a Excel");
+          }
+        }}
+        onExportPdf={() => window.open(`/discrepancias/${discrepancy.id}/imprimir?mode=pdf`, "_blank")}
+        onPrint={() => window.open(`/discrepancias/${discrepancy.id}/imprimir?mode=print`, "_blank")}
+      />
       {canWrite && investigating && (
         <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
           <Pencil className="h-[15px] w-[15px]" />
@@ -212,7 +221,7 @@ export function DiscrepancyDetailPage() {
                 {discrepancy.hasSecurityFinding && <SecurityFindingBadge />}
               </span>
             </DetailRow>
-            <DetailRow label="Ticket">
+            <DetailRow label={caseReferenceColumnLabel(discrepancy.ticketNumber)}>
               <Link to={`/tickets/${discrepancy.ticketId}`} className="font-mono text-[12.5px] text-ink hover:text-brand-red">
                 {discrepancy.ticketNumber}
               </Link>
@@ -322,7 +331,7 @@ export function DiscrepancyDetailPage() {
             )}
             {investigating && (
               <DetailRow label="Para completar" wide>
-                <ConditionChecklist conditions={completionConditions} />
+                <ConditionList conditions={completionConditions} />
               </DetailRow>
             )}
           </DetailGroup>
@@ -347,7 +356,7 @@ export function DiscrepancyDetailPage() {
               Se sella «Realizado por» con tu nombre y la fecha de hoy. Después solo queda que quien aprueba la firme o la devuelva.
               {anyPositive && " Hay un punto positivo: se enviará el aviso automático a Seguridad y Logística, que no sustituye la notificación formal."}
               <div className="mt-3">
-                <ConditionChecklist conditions={completionConditions} />
+                <ConditionList conditions={completionConditions} />
               </div>
             </>
           }
@@ -411,7 +420,8 @@ function LinesTable({ lines, canCredit, onCredit }: { lines: DiscrepancyLine[]; 
               </span>
             </Td>
             <Td>
-              <ProductNameCode name={line.productName} code={line.productCode} />
+              <span className="block text-[12.5px] text-ink">{line.productName}</span>
+              <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
             </Td>
             <Td className="text-right tabular-nums">{line.surplusQuantity > 0 ? formatQuantity(line.surplusQuantity) : "—"}</Td>
             <Td className="text-right tabular-nums">{line.shortageQuantity > 0 ? formatQuantity(line.shortageQuantity) : "—"}</Td>
@@ -422,9 +432,7 @@ function LinesTable({ lines, canCredit, onCredit }: { lines: DiscrepancyLine[]; 
                 <span className="flex flex-wrap items-center gap-1.5">
                   <span className="text-brand-green">Sí</span>
                   {line.creditRequestNumber ? (
-                    <Link to="/calidad/creditos" className="font-mono text-[11.5px] text-ink hover:text-brand-red">
-                      {line.creditRequestNumber}
-                    </Link>
+                    <span className="font-mono text-[11.5px] text-ink">{line.creditRequestNumber}</span>
                   ) : canCredit ? (
                     <Button size="sm" variant="ghost" onClick={() => onCredit(line)}>
                       <CreditCard className="h-[14px] w-[14px]" />
@@ -443,5 +451,28 @@ function LinesTable({ lines, canCredit, onCredit }: { lines: DiscrepancyLine[]; 
         ))}
       </tbody>
     </DataTable>
+  );
+}
+
+function ConditionList({ conditions }: { conditions: DiscrepancyCompletionCondition[] }) {
+  return (
+    <ul className="flex flex-col gap-1.5">
+      {conditions.map((condition) => (
+        <li key={condition.id} className={`flex items-start gap-2 text-[13px] leading-relaxed ${condition.met ? "text-brand-gray" : "text-warn"}`}>
+          {condition.met ? (
+            <Check aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-green" />
+          ) : (
+            <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn" />
+          )}
+          <span className="flex flex-col gap-0.5">
+            <span>
+              {condition.label}
+              <span className="sr-only">{condition.met ? ": cumplida" : ": falta"}</span>
+            </span>
+            {!condition.met && <span className="text-[12.5px]">{condition.missing}</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -1,71 +1,153 @@
 import { Ban, CheckCircle2, Gavel, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ApiError } from "../../api/client";
 import { ticketVerdictsApi, type TicketVerdictQuery } from "../../api/ticketVerdicts";
-import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { EmptyResult } from "../../components/ui/EmptyResult";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { Spinner } from "../../components/ui/Spinner";
+import { SelectBox } from "../../components/ui/SelectBox";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { ListPanel } from "../../components/ui/ListPanel";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
-import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
-import { useRowRun } from "../../hooks/useRowRun";
-import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
+import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { formatDateTime } from "../../lib/format";
-import { staleClass } from "../../lib/listState";
 import type { TicketVerdictListResponse, TicketVerdictResponse } from "../../types/api";
 import { VeredictoModal } from "./VeredictoModal";
-import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type StatusFilter = "todos" | "activos" | "inactivos";
-
-const STATUS_KEYS: StatusFilter[] = ["todos", "activos", "inactivos"];
 
 /** Gestión del catálogo de veredictos para tickets solucionados. */
 export function VeredictosPage() {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
 
-  const [search, setSearch] = useUrlState<string>("q", "");
-  const [status, setStatus] = useUrlState<StatusFilter>("estado", "todos", STATUS_KEYS);
-  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
-  const { modal, setModal, busyId, setBusyId, ask, dialog } = useCatalogActions<TicketVerdictResponse>();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("todos");
+  const [pageSize, setPageSize] = useState(10);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
+  const [modal, setModal] = useState<"nuevo" | TicketVerdictResponse | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<
+  const { data, error, setPage, refresh } = usePagedList<
     TicketVerdictQuery,
     TicketVerdictListResponse
   >({
     fetch: ticketVerdictsApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined, status },
     fallbackError: "No se pudieron cargar los veredictos",
-    pageKey: "pagina",
   });
 
-  const rows = data?.items ?? [];
-  const counts = data?.counts;
-  const filtered = Boolean(debouncedSearch) || status !== "todos";
+  useLoadErrorReceipt(error, "veredictos-list", refresh);
+  useActionErrorReceipt(actionError, "veredictos-action");
 
-  function clearAll() {
-    setSearch("");
-    setStatus("todos");
+  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const counts = data?.counts;
+  const pageIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
+
+  async function runBulk(action: "activate" | "deactivate" | "delete") {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    setActionError(null);
+    try {
+      const result = await ticketVerdictsApi.bulk({
+        ids: Array.from(selectedIds),
+        action,
+      });
+      if (action === "delete" && result.updatedCount < result.totalRequested) {
+        setActionError(
+          `Se eliminaron ${result.updatedCount} de ${result.totalRequested}. Los demás están en uso en tickets; desactívalos en su lugar.`,
+        );
+      }
+      clearSelection();
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo completar la acción en lote");
+    } finally {
+      setBulkBusy(false);
+    }
   }
 
-  const { actionError, run } = useRowRun(setBusyId, refresh);
+  function askBulkActivate() {
+    setConfirmation({
+      tone: "warn",
+      icon: CheckCircle2,
+      eyebrow: "Tickets · Veredictos",
+      title: `Activar ${selectedIds.size} veredictos`,
+      description: "Volverán a ofrecerse al marcar tickets como solucionados.",
+      confirmLabel: "Activar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("activate");
+      },
+    });
+  }
+
+  function askBulkDeactivate() {
+    setConfirmation({
+      tone: "danger",
+      icon: Ban,
+      eyebrow: "Tickets · Veredictos",
+      title: `Desactivar ${selectedIds.size} veredictos`,
+      description: "Dejarán de ofrecerse en tickets nuevos. Los tickets que ya los usan no cambian.",
+      confirmLabel: "Desactivar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("deactivate");
+      },
+    });
+  }
+
+  function askBulkDelete() {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      eyebrow: "Tickets · Veredictos",
+      title: `Eliminar ${selectedIds.size} veredictos`,
+      description:
+        "Solo se borran los que ningún ticket usa. El resto se omitirá y tendrás que desactivarlos.",
+      confirmLabel: "Eliminar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("delete");
+      },
+    });
+  }
+
+  async function run(id: number, action: () => Promise<unknown>) {
+    setBusyId(id);
+    setActionError(null);
+    try {
+      await action();
+      // Relee la página: totales y contadores los manda el servidor, no se adivinan aquí.
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo completar la acción");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   function askToggleActive(verdict: TicketVerdictResponse) {
     if (verdict.isActive) {
-      ask({
+      setConfirmation({
         tone: "danger",
         icon: Ban,
+        eyebrow: "Tickets · Veredictos",
         title: "Desactivar veredicto",
         description: (
           <>
@@ -83,9 +165,10 @@ export function VeredictosPage() {
   }
 
   function askDelete(verdict: TicketVerdictResponse) {
-    ask({
+    setConfirmation({
       tone: "danger",
       icon: Trash2,
+      eyebrow: "Tickets · Veredictos",
       title: "Eliminar veredicto",
       description: (
         <>
@@ -103,47 +186,52 @@ export function VeredictosPage() {
       <ModuleHeader
         title="Veredictos"
         summary={
-          <HeaderCounts counts={counts} loadingLabel="Cargando los veredictos…">
-            {(counts) => (
-              <>
-                <HeaderTag
-                  label={counts.all === 1 ? "veredicto" : "veredictos"}
-                  count={counts.all}
-                  active={status === "todos"}
-                  onClick={() => {
-                    setStatus("todos");
-                    setPage(1);
-                  }}
-                  tone="neutral"
-                  title="Mostrar todos los veredictos"
-                />
-                <HeaderTag
-                  label={counts.active === 1 ? "activo" : "activos"}
-                  count={counts.active}
-                  active={status === "activos"}
-                  onClick={() => {
-                    setStatus("activos");
-                    setPage(1);
-                  }}
-                  tone="emerald"
-                  dot
-                  title="Filtrar por veredictos activos"
-                />
-                <HeaderTag
-                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                  count={counts.inactive}
-                  active={status === "inactivos"}
-                  onClick={() => {
-                    setStatus("inactivos");
-                    setPage(1);
-                  }}
-                  tone="red"
-                  dot
-                  title="Filtrar por veredictos inactivos"
-                />
-              </>
-            )}
-          </HeaderCounts>
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "veredicto" : "veredictos"}
+                count={counts.all}
+                active={status === "todos"}
+                onClick={() => {
+                  setStatus("todos");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todos los veredictos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={status === "activos"}
+                onClick={() => {
+                  setStatus("activos");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por veredictos activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                count={counts.inactive}
+                active={status === "inactivos"}
+                onClick={() => {
+                  setStatus("inactivos");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por veredictos inactivos"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando los veredictos…
+            </span>
+          )
         }
         action={
           isAdmin && (
@@ -156,44 +244,107 @@ export function VeredictosPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar por veredicto…"
-              className="w-[260px] sm:w-[280px]"
+        <ListPanel
+          selection={
+            isAdmin && selectedIds.size > 0
+              ? {
+                  count: selectedIds.size,
+                  pageState,
+                  busy: bulkBusy,
+                  onTogglePage: togglePage,
+                  onClear: clearSelection,
+                  actions: [
+                    {
+                      key: "activate",
+                      label: "Activar",
+                      icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
+                      onClick: askBulkActivate,
+                    },
+                    {
+                      key: "deactivate",
+                      label: "Desactivar",
+                      icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
+                      onClick: askBulkDeactivate,
+                    },
+                    {
+                      key: "delete",
+                      label: "Eliminar",
+                      icon: <Trash2 aria-hidden className="h-3.5 w-3.5 text-rose-600" />,
+                      onClick: askBulkDelete,
+                    },
+                  ],
+                }
+              : undefined
+          }
+          toolbar={
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por veredicto…"
+                className="w-[260px] sm:w-[280px]"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  title="Limpiar búsqueda"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
+                >
+                  <X className="h-3.5 w-3.5 text-zinc-400" />
+                  <span>Limpiar</span>
+                </button>
+              )}
+            </div>
+          }
+          footer={
+            data !== null && data.total > 0 ? (
+              <Pagination
+                page={data.page}
+                pageSize={data.pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="veredictos"
+              />
+            ) : undefined
+          }
+        >
+          {!data ? (
+            error === null && <TableSkeleton rows={pageSize} columns={isAdmin ? 6 : 5} />
+          ) : rows.length === 0 ? (
+            <ListEmptyState
+              icon={Gavel}
+              isFiltered={Boolean(debouncedSearch || status !== "todos")}
+              filteredTitle="Ningún veredicto coincide con este filtro o búsqueda."
+              onClearFilters={() => {
+                setSearch("");
+                setStatus("todos");
+              }}
+              emptyTitle="Todavía no hay veredictos en el catálogo."
+              emptyDescription="Los veredictos cierran tickets con una resolución estandarizada para reportes y seguimiento."
             />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                title="Limpiar búsqueda"
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
-              >
-                <X className="h-3.5 w-3.5 text-zinc-400" />
-                <span>Limpiar</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {(error || actionError) && (
-          <div className="mb-3">
-            <Alert variant="error">{error ?? actionError}</Alert>
-          </div>
-        )}
-
-        {!data ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
-        ) : (
-          // Atenuada mientras llega la página nueva: la anterior se queda para no dar un salto en blanco.
-          <div className={staleClass(isStale)}>
-            <DataTable>
+          ) : (
+            <div className="plf-results-in">
+              <DataTable>
               <thead>
                 <HeadRow>
+                  {isAdmin && (
+                    <Th className="w-10 text-center">
+                      <div className="flex items-center justify-center">
+                        <SelectBox
+                          checked={pageState}
+                          onToggle={togglePage}
+                          label={
+                            pageState === true
+                              ? "Quitar la selección de esta página"
+                              : "Seleccionar toda la página"
+                          }
+                        />
+                      </div>
+                    </Th>
+                  )}
                   <Th>Veredicto</Th>
                   <Th>Tickets</Th>
                   <Th>Estado</Th>
@@ -202,8 +353,21 @@ export function VeredictosPage() {
                 </HeadRow>
               </thead>
               <tbody>
-                {rows.map((verdict) => (
-                  <Row key={verdict.id} busy={busyId === verdict.id}>
+                {rows.map((verdict) => {
+                  const checked = selectedIds.has(verdict.id);
+                  return (
+                  <Row key={verdict.id} busy={busyId === verdict.id || bulkBusy} data-checked={checked}>
+                    {isAdmin && (
+                      <Td className="w-10 text-center">
+                        <div className="flex items-center justify-center">
+                          <SelectBox
+                            checked={checked}
+                            onToggle={() => toggleSelect(verdict.id)}
+                            label={`Seleccionar ${verdict.name}`}
+                          />
+                        </div>
+                      </Td>
+                    )}
                     <Td className="text-[13px] font-medium text-ink">{verdict.name}</Td>
                     <Td className="text-[12.5px] text-subtle">{verdict.ticketCount}</Td>
                     <Td>
@@ -239,34 +403,16 @@ export function VeredictosPage() {
                       </Td>
                     )}
                   </Row>
-                ))}
+                  );
+                })}
               </tbody>
-            </DataTable>
-
-            {rows.length === 0 &&
-              (filtered ? (
-                <EmptyResult message="Ningún veredicto coincide con el filtro." onClear={clearAll} />
-              ) : (
-                <div className="flex flex-col items-center gap-2 py-14 text-center">
-                  <Gavel className="h-6 w-6 text-faint" />
-                  <p className="text-[13.5px] text-faint">Todavía no hay veredictos en el catálogo.</p>
-                </div>
-              ))}
-
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="veredictos"
-            />
-          </div>
-        )}
+              </DataTable>
+            </div>
+          )}
+        </ListPanel>
       </div>
 
-      {dialog}
+      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
 
       {modal !== null && (
         <VeredictoModal

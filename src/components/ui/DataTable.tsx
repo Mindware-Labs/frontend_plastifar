@@ -1,5 +1,13 @@
 import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
-import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  type HTMLAttributes,
+  type ReactNode,
+  type TdHTMLAttributes,
+  type ThHTMLAttributes,
+} from "react";
+import { animateTablePageTurn, consumePageDirection } from "../../hooks/motion";
 import { useInListPanel } from "./listPanelContext";
 
 /**
@@ -21,16 +29,54 @@ export function DataTable({
   fixed = false,
   bare = false,
   className = "",
+  tableClassName = "",
   children,
 }: {
   fixed?: boolean;
   bare?: boolean;
   className?: string;
+  tableClassName?: string;
   children: ReactNode;
 }) {
   const inPanel = useInListPanel();
+  const tableRef = useRef<HTMLTableElement>(null);
+  const prevRowKeysRef = useRef<string[] | null>(null);
+
+  useLayoutEffect(() => {
+    const table = tableRef.current;
+    const tbody = table?.querySelector("tbody");
+    if (!tbody) return;
+
+    const rows = Array.from(tbody.querySelectorAll<HTMLTableRowElement>(":scope > tr"));
+    const currentKeys = rows.map((row) => {
+      const cells = row.cells;
+      const c0 = cells[0]?.textContent?.trim() ?? "";
+      const c1 = cells[1]?.textContent?.trim() ?? "";
+      const c2 = cells[2]?.textContent?.trim() ?? "";
+      return `${c0}|${c1}|${c2}`.slice(0, 64);
+    });
+
+    const prevKeys = prevRowKeysRef.current;
+    prevRowKeysRef.current = currentKeys;
+
+    if (prevKeys === null || rows.length === 0) return;
+
+    const sameLength = prevKeys.length === currentKeys.length;
+    const unchangedCount = currentKeys.filter((k, i) => prevKeys[i] === k).length;
+
+    // Si las filas son las mismas (ej. marcar un checkbox o editar un estado en línea), no reanimamos la página.
+    if (sameLength && unchangedCount >= Math.max(1, currentKeys.length - 1)) {
+      return;
+    }
+
+    animateTablePageTurn(tbody, consumePageDirection());
+  });
+
   const table = (
-    <table className={`w-full border-collapse text-left ${fixed ? "table-fixed" : ""}`}>
+    <table
+      ref={tableRef}
+      className={`w-full border-collapse text-left ${fixed ? "table-fixed" : ""} ${tableClassName}`.trim()}
+    >
       {children}
     </table>
   );

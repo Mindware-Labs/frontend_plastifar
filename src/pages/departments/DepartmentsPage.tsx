@@ -3,6 +3,7 @@ import {
   Building,
   CheckCircle2,
   Lock,
+  Pencil,
   Plus,
   Power,
   Shield,
@@ -13,57 +14,51 @@ import {
 import { useMemo, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { sedesApi } from "../../api/sedes";
-import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ClearFiltersButton, FilterDropdown, type FilterOption } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Modal } from "../../components/ui/Modal";
-import { ListPagination } from "../../components/ui/ListPagination";
+import { Pagination } from "../../components/ui/Pagination";
+import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { TableSelectionBar } from "../../components/ui/TableSelectionBar";
-import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
-import { staleClass } from "../../lib/listState";
 import type {
   DepartmentListResponse,
   DepartmentQuery,
   DepartmentResponse,
   DepartmentType,
 } from "../../types/api";
-import { LoadErrorAlert } from "../settings/catalogSection";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { useReferenceData } from "../settings/catalogState";
-import { CatalogRowActions } from "../settings/CatalogRowActions";
 import { DepartmentModal } from "./DepartmentModal";
-import { idParam } from "../../lib/idParam";
-import { PAGE_SIZES } from "../../lib/pageSizes";
 
-const CHIPS = ["todos", "activos", "inactivos"] as const;
-type ChipKey = (typeof CHIPS)[number];
+type ChipKey = "todos" | "activos" | "inactivos";
 type TypeKey = "todos" | DepartmentType;
-const TYPES: readonly TypeKey[] = ["todos", "Publico", "Privado"];
 type PagedDepartmentQuery = DepartmentQuery & { page: number };
 
 export function DepartmentsPage() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const { modal, setModal, busyId, confirm, ask, dialog } = useCatalogActions<DepartmentResponse>();
-  const [search, setSearch] = useUrlState<string>("q", "");
-  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
-  const [typeChip, setTypeChip] = useUrlState<TypeKey>("tipo", "todos", TYPES);
-  const [selectedSedeId, setSelectedSedeId] = useUrlState<string>("sede", "todas");
-  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [chip, setChip] = useState<ChipKey>("todos");
+  const [typeChip, setTypeChip] = useState<TypeKey>("todos");
+  const [selectedSedeId, setSelectedSedeId] = useState<string>("todas");
+  const [pageSize, setPageSize] = useState(10);
+  const [modal, setModal] = useState<"nuevo" | DepartmentResponse | null>(null);
+  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   // Selección múltiple y acciones en lote
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -76,7 +71,7 @@ export function DepartmentsPage() {
   // Paginación real de servidor mediante usePagedList
   const {
     data,
-    isStale,
+    // transición de página manejada en DataTable
     error,
     page,
     setPage,
@@ -92,13 +87,14 @@ export function DepartmentsPage() {
           ? undefined
           : selectedSedeId === "sin-sede"
             ? -1
-            : idParam(selectedSedeId),
+            : Number(selectedSedeId),
       type: typeChip === "todos" ? undefined : typeChip,
       includeInactive: true,
     },
     fallbackError: "No se pudieron cargar los departamentos",
-    pageKey: "pagina",
   });
+
+  useLoadErrorReceipt(error, "departments-list", refresh);
 
   const { data: sedesList } = useReferenceData(
     () => sedesApi.list({ includeInactive: false, pageSize: 100 }),
@@ -188,7 +184,7 @@ export function DepartmentsPage() {
   }
 
   function askBulkActivate() {
-    ask({
+    setConfirmation({
       icon: Power,
       title: `Activar ${selectedIds.size} departamentos`,
       description: `¿Deseas activar los ${selectedIds.size} departamentos seleccionados? Volverán a estar disponibles en la creación de tickets.`,
@@ -200,7 +196,7 @@ export function DepartmentsPage() {
   }
 
   function askBulkDeactivate() {
-    ask({
+    setConfirmation({
       tone: "warn",
       icon: Power,
       title: `Desactivar ${selectedIds.size} departamentos`,
@@ -213,7 +209,7 @@ export function DepartmentsPage() {
   }
 
   function askBulkDelete() {
-    ask({
+    setConfirmation({
       tone: "danger",
       icon: Trash2,
       title: `Eliminar ${selectedIds.size} departamentos`,
@@ -228,15 +224,8 @@ export function DepartmentsPage() {
   const isFiltering =
     debouncedSearch !== "" || chip !== "todos" || typeChip !== "todos" || selectedSedeId !== "todas";
 
-  function clearFilters() {
-    setSearch("");
-    setTypeChip("todos");
-    setChip("todos");
-    setSelectedSedeId("todas");
-  }
-
   function askToggle(department: DepartmentResponse) {
-    confirm(department.id, {
+    setConfirmation({
       tone: "warn",
       icon: Power,
       title: department.isActive ? "Desactivar departamento" : "Reactivar departamento",
@@ -264,24 +253,29 @@ export function DepartmentsPage() {
       ),
       confirmLabel: department.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        const current = await departmentsApi.get(department.id);
-        await departmentsApi.update(current.id, {
-          name: current.name,
-          parentId: current.parentId ?? null,
-          sedeId: current.sedeId ?? null,
-          isActive: !current.isActive,
-          type: current.type ?? "Publico",
-          defaultRoleId: current.defaultRoleId ?? null,
-          mailboxId: current.mailboxId ?? null,
-          managerStaffId: current.managerStaffId ?? null,
-        });
-        refresh();
+        setBusyId(department.id);
+        try {
+          const current = await departmentsApi.get(department.id);
+          await departmentsApi.update(current.id, {
+            name: current.name,
+            parentId: current.parentId ?? null,
+            sedeId: current.sedeId ?? null,
+            isActive: !current.isActive,
+            type: current.type ?? "Publico",
+            defaultRoleId: current.defaultRoleId ?? null,
+            mailboxId: current.mailboxId ?? null,
+            managerStaffId: current.managerStaffId ?? null,
+          });
+          refresh();
+        } finally {
+          setBusyId(null);
+        }
       },
     });
   }
 
   function askDelete(department: DepartmentResponse) {
-    confirm(department.id, {
+    setConfirmation({
       tone: "danger",
       icon: Trash2,
       title: "Eliminar departamento",
@@ -293,8 +287,13 @@ export function DepartmentsPage() {
       ),
       confirmLabel: "Eliminar",
       onConfirm: async () => {
-        await departmentsApi.remove(department.id);
-        refresh();
+        setBusyId(department.id);
+        try {
+          await departmentsApi.remove(department.id);
+          refresh();
+        } finally {
+          setBusyId(null);
+        }
       },
     });
   }
@@ -304,59 +303,66 @@ export function DepartmentsPage() {
       <ModuleHeader
         title="Departamentos"
         badge={
-          <HeaderCounts counts={counts} loadingLabel="Cargando departamentos…">
-            {(counts) => (
-              <>
-                <HeaderTag
-                  label={counts.all === 1 ? "departamento" : "departamentos"}
-                  count={counts.all}
-                  active={chip === "todos" && typeChip === "todos"}
-                  onClick={() => {
-                    setChip("todos");
-                    setTypeChip("todos");
-                  }}
-                  tone="neutral"
-                  title="Mostrar todos los departamentos"
-                />
-                <HeaderTag
-                  label={counts.active === 1 ? "activo" : "activos"}
-                  count={counts.active}
-                  active={chip === "activos"}
-                  onClick={() => setChip("activos")}
-                  tone="emerald"
-                  dot
-                  title="Filtrar por departamentos activos"
-                />
-                <HeaderTag
-                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                  count={counts.inactive}
-                  active={chip === "inactivos"}
-                  onClick={() => setChip("inactivos")}
-                  tone="red"
-                  dot
-                  title="Filtrar por departamentos inactivos"
-                />
-                <HeaderTag
-                  label={counts.publicos === 1 ? "público" : "públicos"}
-                  count={counts.publicos}
-                  active={typeChip === "Publico"}
-                  onClick={() => setTypeChip(typeChip === "Publico" ? "todos" : "Publico")}
-                  tone="blue"
-                  dot
-                  title="Filtrar por departamentos públicos"
-                />
-                <HeaderTag
-                  label={counts.privados === 1 ? "privado" : "privados"}
-                  count={counts.privados}
-                  active={typeChip === "Privado"}
-                  onClick={() => setTypeChip(typeChip === "Privado" ? "todos" : "Privado")}
-                  tone="amber"
-                  dot
-                  title="Filtrar por departamentos privados"
-                />
-              </>
-            )}
-          </HeaderCounts>
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "departamento" : "departamentos"}
+                count={counts.all}
+                active={chip === "todos" && typeChip === "todos"}
+                onClick={() => {
+                  setChip("todos");
+                  setTypeChip("todos");
+                }}
+                tone="neutral"
+                title="Mostrar todos los departamentos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={chip === "activos"}
+                onClick={() => setChip("activos")}
+                tone="emerald"
+                dot
+                title="Filtrar por departamentos activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                count={counts.inactive}
+                active={chip === "inactivos"}
+                onClick={() => setChip("inactivos")}
+                tone="red"
+                dot
+                title="Filtrar por departamentos inactivos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.publicos === 1 ? "público" : "públicos"}
+                count={counts.publicos}
+                active={typeChip === "Publico"}
+                onClick={() => setTypeChip(typeChip === "Publico" ? "todos" : "Publico")}
+                tone="blue"
+                dot
+                title="Filtrar por departamentos públicos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.privados === 1 ? "privado" : "privados"}
+                count={counts.privados}
+                active={typeChip === "Privado"}
+                onClick={() => setTypeChip(typeChip === "Privado" ? "todos" : "Privado")}
+                tone="amber"
+                dot
+                title="Filtrar por departamentos privados"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando departamentos…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -367,10 +373,6 @@ export function DepartmentsPage() {
           )
         }
       />
-
-      {error && (
-        <LoadErrorAlert message={error} onRetry={refresh} />
-      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         <ListPanel
@@ -446,39 +448,44 @@ export function DepartmentsPage() {
                     searchPlaceholder="Buscar sede…"
                   />
                   {(search || typeChip !== "todos" || chip !== "todos" || selectedSedeId !== "todas") && (
-                    <ClearFiltersButton onClick={clearFilters} />
+                    <ClearFiltersButton
+                      onClick={() => {
+                        setSearch("");
+                        setTypeChip("todos");
+                        setChip("todos");
+                        setSelectedSedeId("todas");
+                      }}
+                    />
                   )}
                 </div>
               )}
             </div>
           }
           footer={
-            <ListPagination
-              data={data}
-              page={page}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="departamentos"
-              nounSingular="departamento"
-            />
+            data && data.total > 0 && (
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="departamentos"
+                nounSingular="departamento"
+              />
+            )
           }
         >
           {data === null ? (
             <TableSkeleton rows={8} columns={7} />
           ) : data.items.length === 0 ? (
-            isFiltering ? (
-              <EmptyResult
-                message="Ningún departamento coincide con este filtro o búsqueda."
-                onClear={clearFilters}
-              />
-            ) : (
-              <p className="py-14 text-center text-[13.5px] text-faint">
-                Todavía no hay ningún departamento registrado.
-              </p>
-            )
+            <p className="py-14 text-center text-[13.5px] text-faint">
+              {isFiltering
+                ? "Ningún departamento coincide con este filtro o búsqueda."
+                : "Todavía no hay ningún departamento registrado."}
+            </p>
           ) : (
-            <div className={staleClass(isStale)}>
+            <div className="plf-results-in">
               <DataTable>
                 <thead>
                   <HeadRow>
@@ -588,14 +595,29 @@ export function DepartmentsPage() {
                         {/* 8. ACCIONES */}
                         {canWrite && (
                           <Td>
-                            <CatalogRowActions
-                              name={d.name}
-                              isActive={d.isActive}
-                              busy={busyId === d.id}
-                              onEdit={() => setModal(d)}
-                              onToggle={() => askToggle(d)}
-                              onDelete={propios === 0 ? () => askDelete(d) : undefined}
-                            />
+                            <div className="flex items-center justify-end gap-1">
+                              <RowAction
+                                label={`Editar ${d.name}`}
+                                icon={Pencil}
+                                onClick={() => setModal(d)}
+                                disabled={busyId === d.id}
+                              />
+                              <RowAction
+                                label={d.isActive ? `Desactivar ${d.name}` : `Reactivar ${d.name}`}
+                                icon={Power}
+                                onClick={() => askToggle(d)}
+                                disabled={busyId === d.id}
+                              />
+                              {propios === 0 && (
+                                <RowAction
+                                  label={`Eliminar ${d.name}`}
+                                  icon={Trash2}
+                                  danger
+                                  onClick={() => askDelete(d)}
+                                  disabled={busyId === d.id}
+                                />
+                              )}
+                            </div>
                           </Td>
                         )}
                       </Row>
@@ -634,7 +656,7 @@ export function DepartmentsPage() {
               </select>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setBulkSedeModalOpen(false)}>
+              <Button variant="ghost" onClick={() => setBulkSedeModalOpen(false)}>
                 Cancelar
               </Button>
               <Button
@@ -661,7 +683,7 @@ export function DepartmentsPage() {
         />
       )}
 
-      {dialog}
+      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
     </div>
   );
 }

@@ -4,5 +4,6 @@ import { useCallback, useState } from "react";
 export function useModalAnimation() {
   const [isExiting, setIsExiting] = useState(false);
   const requestClose = useCallback(() => setIsExiting(true), []);
-  return { isExiting, requestClose };
+  const reset = useCallback(() => setIsExiting(false), []);
+  return { isExiting, requestClose, reset };
 }

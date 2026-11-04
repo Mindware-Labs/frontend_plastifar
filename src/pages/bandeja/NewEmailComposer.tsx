@@ -1,13 +1,21 @@
-import { PenLine, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { PenLine, Paperclip, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "../../context/useAuth";
+import {
+  buildCannedVariableContext,
+  parseRecipientAddress,
+  replaceRecipientVariablesInBlocks,
+  replaceRecipientVariablesInText,
+  type CannedVariableContext,
+} from "../../lib/cannedVariables";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
 import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button as PfButton } from "../../components/ui/Button";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
-import { useNoticeInset, useReceipts } from "../../context/useReceipts";
-import { useEmailAttachments } from "../../hooks/useEmailAttachments";
+import { useNoticeInset } from "../../context/useReceipts";
+import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { formatBytes } from "../../lib/format";
 import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
@@ -15,15 +23,42 @@ import { SendValidationButton } from "./SendValidationButton";
 import { CannedPicker } from "./CannedPicker";
 import { textToBlocks } from "./textToBlocks";
 import { RecipientInput } from "./RecipientInput";
-import { AttachFilesButton } from "./AttachFilesButton";
+import {
+  hasInvalidRecipients,
+  optionalRecipientFieldValidationItems,
+  recipientFieldValidationItems,
+} from "../../lib/recipientValidation";
 import { type ValidationItem } from "./sendValidation";
+import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
+import { ComposerSendSuccessLayer } from "./ComposerSendSuccessLayer";
+import {
+  invalidateMailContactDirectory,
+  useMailContactDirectory,
+} from "../../hooks/useMailContactDirectory";
+import {
+  useComposerSendCelebration,
+  type ComposerSendCelebrationPayload,
+} from "./useComposerSendCelebration";
+import {
+  COMPOSER_BCC_KEY,
+  COMPOSER_CC_KEY,
+  useComposerFieldMotion,
+} from "./useComposerFieldMotion";
 
 interface NewEmailComposerProps {
   onSent: () => void;
   onCancel: () => void;
+  /** Salida del panel en BandejaPage (animación de cierre tras enviar). */
+  panelExiting?: boolean;
 }
 
-export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
+const MAX_FILES = 5;
+const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
+const VALID_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function NewEmailComposer({ onSent, onCancel, panelExiting = false }: NewEmailComposerProps) {
+  const { user } = useAuth();
+  const directory = useMailContactDirectory();
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
   const [ccOpen, setCcOpen] = useState(false);
@@ -33,29 +68,79 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const [blocks, setBlocks] = useState<unknown>(null);
   const [initialBlocks, setInitialBlocks] = useState<unknown>(null);
   const [editorKey, setEditorKey] = useState(0);
+  const [files, setFiles] = useState<File[]>([]);
+  const {
+    isShowing: showAttachedFeedback,
+    isExiting: attachedExiting,
+    trigger: triggerAttachedFeedback,
+  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const attachments = useEmailAttachments(setError);
-  const { files, setFiles, addFiles } = attachments;
-  const receipts = useReceipts();
   const containerRef = useRef<HTMLDivElement>(null);
   const toRef = useRef<HTMLInputElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
+  const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
+  const { celebration, celebrate, isCelebrating, isExiting } = useComposerSendCelebration();
+  const [sendHold, setSendHold] = useState<ComposerSendCelebrationPayload | null>(null);
+  const successPayload = celebration ?? sendHold;
+  const successVisible = successPayload !== null;
+  const fileRef = useRef<HTMLInputElement>(null);
   // La marca del envio nace con el editor: un reintento la repite y no duplica el correo.
   const tokenRef = useRef(crypto.randomUUID());
+  const prevCtxRef = useRef<CannedVariableContext | undefined>(undefined);
+
+  const cannedVariableContext = useMemo(() => {
+    const parsed = parseRecipientAddress(to);
+    const contactEmail = parsed.email;
+    const directoryMatch = contactEmail
+      ? directory.find((c) => c.email.toLowerCase() === contactEmail.toLowerCase())
+      : undefined;
+    const contactName = parsed.name || directoryMatch?.name || contactEmail;
+    return buildCannedVariableContext({ user, contactName, contactEmail });
+  }, [directory, to, user]);
+
+  // Si el usuario insertó una plantilla antes de escribir el destinatario en "Para",
+  // sustituimos la variable en cuanto el correo del destinatario es válido.
+  useEffect(() => {
+    const nextEmail = cannedVariableContext.contactEmail?.trim();
+    if (!nextEmail || !VALID_EMAIL_RE.test(nextEmail)) return;
+
+    const prevCtx = prevCtxRef.current;
+    const { blocks: updatedBlocks, changed } = replaceRecipientVariablesInBlocks(
+      blocks,
+      prevCtx,
+      cannedVariableContext,
+    );
+    if (changed) {
+      setInitialBlocks(updatedBlocks);
+      setBlocks(updatedBlocks);
+      setEditorKey((key) => key + 1);
+    }
+
+    setSubject((current) => {
+      if (!current) return current;
+      return replaceRecipientVariablesInText(current, prevCtx, cannedVariableContext);
+    });
+
+    prevCtxRef.current = cannedVariableContext;
+  }, [blocks, cannedVariableContext]);
 
   useEffect(() => {
     toRef.current?.focus();
   }, []);
 
   // El texto elegido se suma a lo escrito; el editor se vuelve a montar porque solo lee el contenido inicial.
-  function insertCanned(text: string) {
+  function insertCanned(text: string, suggestedSubject?: string) {
+    if (suggestedSubject && !subject.trim()) {
+      setSubject(suggestedSubject);
+    }
     const next = [...(Array.isArray(blocks) ? (blocks as unknown[]) : []), ...textToBlocks(text)];
     setInitialBlocks(next);
     setBlocks(next);
     setEditorKey((key) => key + 1);
+    prevCtxRef.current = cannedVariableContext;
   }
 
   useNoticeInset(44);
@@ -68,32 +153,69 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
     if (bccOpen) bccRef.current?.focus();
   }, [bccOpen]);
 
+  function addFiles(incoming: File[]) {
+    if (incoming.length === 0) return;
+
+    const merged = [...files, ...incoming];
+    const total = merged.reduce((sum, file) => sum + file.size, 0);
+
+    if (merged.length > MAX_FILES) {
+      setError(`No se pueden adjuntar más de ${MAX_FILES} archivos.`);
+      return;
+    }
+
+    if (total > MAX_TOTAL_BYTES) {
+      setError("Los adjuntos superan los 10 MB en total.");
+      return;
+    }
+
+    setError(null);
+    setFiles(merged);
+    triggerAttachedFeedback();
+  }
+
   async function handleSend() {
-    if (sending || !ready) return;
+    if (sending || isCelebrating || !ready) return;
     setSending(true);
     setError(null);
+
+    const { blocks: resolvedBlocks } = replaceRecipientVariablesInBlocks(
+      blocks,
+      prevCtxRef.current,
+      cannedVariableContext,
+    );
+    const resolvedSubject = replaceRecipientVariablesInText(
+      subject,
+      prevCtxRef.current,
+      cannedVariableContext,
+    );
 
     try {
       await emailsApi.compose({
         to,
         cc: cc.trim() || undefined,
         bcc: bcc.trim() || undefined,
-        subject,
-        body,
-        bodyHtml: blocksToEmailHtml(blocks),
+        subject: resolvedSubject,
+        body: blocksToText(resolvedBlocks),
+        bodyHtml: blocksToEmailHtml(resolvedBlocks),
         files,
         clientToken: tokenRef.current,
       });
-      receipts.done({
-        action: "componer",
-        title: "Correo enviado",
-        detail: "Lo encuentras en Enviados",
+      setSending(false);
+      invalidateMailContactDirectory();
+      const celebrationPayload: ComposerSendCelebrationPayload = {
+        kind: "compose",
+        title: "Correo enviado correctamente",
+        detail: to.trim() || "Tu mensaje ya salió hacia el destinatario.",
+        subject: resolvedSubject.trim() || undefined,
+        attachmentsCount: files.length > 0 ? files.length : undefined,
+      };
+      celebrate(celebrationPayload, () => {
+        setSendHold(celebrationPayload);
+        onSent();
       });
-
-      onSent();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo enviar el correo");
-    } finally {
       setSending(false);
     }
   }
@@ -101,13 +223,15 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   const body = blocksToText(blocks);
 
   const missingItems: ValidationItem[] = [];
-  if (!to.trim()) {
-    missingItems.push({
+  missingItems.push(
+    ...recipientFieldValidationItems(to, {
       id: "to",
-      label: "Falta el destinatario (Para)",
-      short: "el destinatario (Para)",
-    });
-  }
+      emptyLabel: "Falta el destinatario (Para)",
+      emptyShort: "el destinatario (Para)",
+    }),
+  );
+  missingItems.push(...optionalRecipientFieldValidationItems(cc, { id: "cc", fieldLabel: "CC" }));
+  missingItems.push(...optionalRecipientFieldValidationItems(bcc, { id: "bcc", fieldLabel: "CCO" }));
   if (!subject.trim()) {
     missingItems.push({
       id: "subject",
@@ -128,6 +252,10 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   function handleFocusField(fieldId: string) {
     if (fieldId === "to") {
       toRef.current?.focus();
+    } else if (fieldId === "cc") {
+      ccRef.current?.focus();
+    } else if (fieldId === "bcc") {
+      bccRef.current?.focus();
     } else if (fieldId === "subject") {
       subjectRef.current?.focus();
     } else if (fieldId === "body") {
@@ -139,179 +267,241 @@ export function NewEmailComposer({ onSent, onCancel }: NewEmailComposerProps) {
   return (
     <div
       ref={containerRef}
-      className="flex h-full flex-col bg-white"
+      className="relative flex h-full w-full flex-1 min-h-0 flex-col overflow-hidden bg-white"
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
         addFiles(Array.from(event.dataTransfer.files));
       }}
     >
-      <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
-        <PenLine className="h-3.5 w-3.5 shrink-0 text-brand-red" />
-        <span className="text-[12.5px] font-semibold text-zinc-900">Correo nuevo</span>
-        <button
-          type="button"
-          onClick={onCancel}
-          aria-label="Descartar el correo"
-          title="Descartar el correo"
-          className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-        <span className={fieldLabelClass}>Para</span>
-        <RecipientInput
-          inputRef={toRef}
-          value={to}
-          onChange={setTo}
-          placeholder="correo@dominio.com, otro@dominio.com"
+      {successVisible && successPayload ? (
+        <ComposerSendSuccessLayer
+          kind={successPayload.kind}
+          title={successPayload.title}
+          detail={successPayload.detail}
+          subject={successPayload.subject}
+          attachmentsCount={successPayload.attachmentsCount}
+          exiting={isExiting || (sendHold !== null && panelExiting)}
+          fillPanel
         />
-        {!ccOpen && (
-          <button
-            type="button"
-            onClick={() => setCcOpen(true)}
-            title="Agregar copia"
-            className={fieldToggleClass}
-          >
-            CC
-          </button>
-        )}
-        {!bccOpen && (
-          <button
-            type="button"
-            onClick={() => setBccOpen(true)}
-            title="Agregar copia oculta"
-            className={fieldToggleClass}
-          >
-            CCO
-          </button>
-        )}
-      </div>
-
-      {ccOpen && (
-        <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-          <span className={fieldLabelClass}>CC</span>
-          <RecipientInput
-            inputRef={ccRef}
-            value={cc}
-            onChange={setCc}
-            placeholder="correo@dominio.com, otro@dominio.com"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setCcOpen(false);
-              setCc("");
-            }}
-            aria-label="Quitar la copia"
-            title="Quitar la copia"
-            className={fieldCloseClass}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      )}
-
-      {bccOpen && (
-        <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-          <span className={fieldLabelClass}>CCO</span>
-          <RecipientInput
-            inputRef={bccRef}
-            value={bcc}
-            onChange={setBcc}
-            placeholder="Nadie más ve a quién va esta copia"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setBccOpen(false);
-              setBcc("");
-            }}
-            aria-label="Quitar la copia oculta"
-            title="Quitar la copia oculta"
-            className={fieldCloseClass}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      )}
-
-      <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
-        <span className={fieldLabelClass}>Asunto</span>
-        <input
-          ref={subjectRef}
-          value={subject}
-          onChange={(event) => setSubject(event.target.value)}
-          placeholder="De qué se trata"
-          className="min-w-0 flex-1 bg-transparent text-[12.5px] font-medium text-zinc-900 outline-none placeholder:font-normal placeholder:text-zinc-400"
-        />
-      </div>
-
-      <div
-        className="min-h-0 flex-1 overflow-y-auto"
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-            if (ready) handleSend();
-          }
-        }}
-      >
-        <LazyBlockEditor key={editorKey} initialContent={initialBlocks} onChange={setBlocks} placeholder="Escribe el mensaje…" />
-      </div>
-
-      {files.length > 0 && (
-        <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-100 px-4 py-2">
-          {files.map((file, position) => (
-            <span
-              key={`${file.name}-${position}`}
-              className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-zinc-800 shadow-2xs"
+      ) : (
+        <>
+          <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
+            <PenLine className="h-3.5 w-3.5 shrink-0 text-brand-red" />
+            <span className="text-[12.5px] font-semibold text-zinc-900">Correo nuevo</span>
+            <button
+              type="button"
+              onClick={onCancel}
+              aria-label="Descartar el correo"
+              title="Descartar el correo"
+              className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer"
             >
-              <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
-                <AnimatedCheckIcon size={10} strokeWidth={3} />
-              </span>
-              <span className="max-w-[160px] truncate">{file.name}</span>
-              <span className="text-zinc-400">· {formatBytes(file.size)}</span>
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
+            <span className={fieldLabelClass}>Para</span>
+            <RecipientInput
+              inputRef={toRef}
+              value={to}
+              onChange={setTo}
+              invalid={hasInvalidRecipients(to)}
+              placeholder="correo@dominio.com, otro@dominio.com"
+            />
+            {!ccOpen && (
               <button
                 type="button"
-                onClick={() => setFiles(files.filter((_, at) => at !== position))}
-                aria-label={`Quitar ${file.name}`}
-                className="text-zinc-400 transition-colors hover:text-brand-red cursor-pointer"
+                onClick={() => setCcOpen(true)}
+                title="Agregar copia"
+                className={fieldToggleClass}
               >
-                <X className="h-3 w-3" />
+                CC
               </button>
+            )}
+            {!bccOpen && (
+              <button
+                type="button"
+                onClick={() => setBccOpen(true)}
+                title="Agregar copia oculta"
+                className={fieldToggleClass}
+              >
+                CCO
+              </button>
+            )}
+          </div>
+
+          <ComposerFieldMotionRow open={ccOpen} phase={fieldMotion.phaseFor(COMPOSER_CC_KEY)}>
+            <span className={fieldLabelClass}>CC</span>
+            <RecipientInput
+              inputRef={ccRef}
+              value={cc}
+              onChange={setCc}
+              invalid={hasInvalidRecipients(cc)}
+              placeholder="correo@dominio.com, otro@dominio.com"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                fieldMotion.requestRemove(COMPOSER_CC_KEY, () => {
+                  setCcOpen(false);
+                  setCc("");
+                });
+              }}
+              aria-label="Quitar la copia"
+              title="Quitar la copia"
+              className={fieldCloseClass}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </ComposerFieldMotionRow>
+
+          <ComposerFieldMotionRow open={bccOpen} phase={fieldMotion.phaseFor(COMPOSER_BCC_KEY)}>
+            <span className={fieldLabelClass}>CCO</span>
+            <RecipientInput
+              inputRef={bccRef}
+              value={bcc}
+              onChange={setBcc}
+              invalid={hasInvalidRecipients(bcc)}
+              placeholder="Nadie más ve a quién va esta copia"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                fieldMotion.requestRemove(COMPOSER_BCC_KEY, () => {
+                  setBccOpen(false);
+                  setBcc("");
+                });
+              }}
+              aria-label="Quitar la copia oculta"
+              title="Quitar la copia oculta"
+              className={fieldCloseClass}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </ComposerFieldMotionRow>
+
+          <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
+            <span className={fieldLabelClass}>Asunto</span>
+            <input
+              ref={subjectRef}
+              value={subject}
+              onChange={(event) => setSubject(event.target.value)}
+              placeholder="De qué se trata"
+              className="min-w-0 flex-1 bg-transparent text-[12.5px] font-medium text-zinc-900 outline-none placeholder:font-normal placeholder:text-zinc-400"
+            />
+          </div>
+
+          <div
+            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden no-scrollbar"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                if (ready) handleSend();
+              }
+            }}
+          >
+            <LazyBlockEditor
+              key={editorKey}
+              initialContent={initialBlocks}
+              onChange={setBlocks}
+              placeholder="Escribe el mensaje…"
+            />
+          </div>
+
+          {files.length > 0 && (
+            <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-100 px-4 py-2">
+              {files.map((file, position) => (
+                <span
+                  key={`${file.name}-${position}`}
+                  className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-emerald-950 shadow-2xs"
+                >
+                  <span
+                    className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe"
+                    title="Adjuntado correctamente"
+                  >
+                    <AnimatedCheckIcon size={10} strokeWidth={3} />
+                  </span>
+                  <span className="max-w-[160px] truncate">{file.name}</span>
+                  <span className="text-zinc-400">· {formatBytes(file.size)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFiles(files.filter((_, at) => at !== position))}
+                    aria-label={`Quitar ${file.name}`}
+                    className="text-zinc-400 transition-colors hover:text-brand-red cursor-pointer"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {error && (
+            <div className="shrink-0 px-4 py-2">
+              <Alert variant="error">{error}</Alert>
+            </div>
+          )}
+
+          <div className="flex shrink-0 items-center gap-2 border-t border-zinc-100 px-4 py-2.5 bg-zinc-50/30">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium shadow-2xs outline-none transition-all duration-300 cursor-pointer ${
+                showAttachedFeedback
+                  ? attachedExiting
+                    ? "border-emerald-200 bg-emerald-50/40 text-emerald-600 ring-1 ring-emerald-100/50"
+                    : "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200/70 font-semibold"
+                  : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20"
+              }`}
+            >
+              {showAttachedFeedback ? (
+                <span
+                  className={`inline-flex items-center gap-1.5 ${
+                    attachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+                  }`}
+                >
+                  <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
+                    <AnimatedCheckIcon size={11} strokeWidth={3} />
+                  </span>
+                  <span>¡Adjuntado!</span>
+                </span>
+              ) : (
+                <>
+                  <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
+                  Adjuntar
+                </>
+              )}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                addFiles(Array.from(event.target.files ?? []));
+                event.target.value = "";
+              }}
+            />
+            <CannedPicker onPick={insertCanned} variableContext={cannedVariableContext} />
+            <span className="truncate text-[11px] font-medium text-zinc-400">
+              Sale de la casilla de soporte, con tu nombre y tu firma.
             </span>
-          ))}
-        </div>
+
+            <div className="ml-auto flex shrink-0 gap-2">
+              <PfButton variant="ghost" size="sm" className="h-8 px-3" onClick={onCancel}>
+                Descartar
+              </PfButton>
+              <SendValidationButton
+                ready={ready && !isCelebrating}
+                sending={sending}
+                missingItems={missingItems}
+                onSend={handleSend}
+                onFocusField={handleFocusField}
+                size="md"
+              />
+            </div>
+          </div>
+        </>
       )}
-
-      {error && (
-        <div className="shrink-0 px-4 py-2">
-          <Alert variant="error">{error}</Alert>
-        </div>
-      )}
-
-      <div className="flex shrink-0 items-center gap-2 border-t border-zinc-100 px-4 py-2.5 bg-zinc-50/30">
-        <AttachFilesButton attachments={attachments} />
-        <CannedPicker onPick={insertCanned} />
-        <span className="truncate text-[11px] font-medium text-zinc-400">
-          Sale de la casilla de soporte, con tu nombre y tu firma.
-        </span>
-
-        <div className="ml-auto flex shrink-0 gap-2">
-          <PfButton variant="ghost" size="sm" className="h-8 px-3" onClick={onCancel}>
-            Descartar
-          </PfButton>
-          <SendValidationButton
-            ready={ready}
-            sending={sending}
-            missingItems={missingItems}
-            onSend={handleSend}
-            onFocusField={handleFocusField}
-            size="md"
-          />
-        </div>
-      </div>
     </div>
   );
 }

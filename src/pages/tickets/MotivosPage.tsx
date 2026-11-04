@@ -12,43 +12,39 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { ticketTopicsApi, type TicketTopicQuery } from "../../api/ticketTopics";
-import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { EmptyResult } from "../../components/ui/EmptyResult";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { Spinner } from "../../components/ui/Spinner";
+import { SelectBox } from "../../components/ui/SelectBox";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { ListPanel } from "../../components/ui/ListPanel";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { useAuth } from "../../context/useAuth";
-import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
-import { useRowRun } from "../../hooks/useRowRun";
-import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
+import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
-import { staleClass } from "../../lib/listState";
 import type {
   DepartmentResponse,
   TicketTopicListResponse,
   TicketTopicResponse,
 } from "../../types/api";
 import { MotivoModal } from "./MotivoModal";
-import { FilterDropdown, type FilterOption } from "../../components/ui/FilterDropdown";
-import { PAGE_SIZES } from "../../lib/pageSizes";
+import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 
 type StatusFilter = "todos" | "activos" | "inactivos";
-
-const STATUS_KEYS: StatusFilter[] = ["todos", "activos", "inactivos"];
-const PRIORITY_KEYS = ["todas", "Emergencia", "Alta", "Normal", "Baja"];
 
 /** El tono no decora: dice cuánta prisa mete cada motivo en el SLA del ticket. */
 const priorityClass: Record<string, string> = {
@@ -64,19 +60,20 @@ export function MotivosPage() {
   const isAdmin = Boolean(user?.isAdmin);
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
-  const [departmentParam, setDepartmentParam] = useUrlState<string>("departamento", "todos");
-  const [priority, setPriority] = useUrlState<string>("prioridad", "todas", PRIORITY_KEYS);
-  const [search, setSearch] = useUrlState<string>("q", "");
-  const [status, setStatus] = useUrlState<StatusFilter>("estado", "todos", STATUS_KEYS);
-  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
-  // Un id que no es numero (enlace editado a mano) cuenta como «todos».
-  const departmentId: number | "todos" =
-    departmentParam === "todos" || Number.isNaN(Number(departmentParam)) ? "todos" : Number(departmentParam);
-  const { modal, setModal, busyId, setBusyId, ask, dialog } = useCatalogActions<TicketTopicResponse>();
+  const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
+  const [priority, setPriority] = useState<string>("todas");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("todos");
+  const [pageSize, setPageSize] = useState(10);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
+  const [modal, setModal] = useState<"nuevo" | TicketTopicResponse | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<
+  const { data, error, setPage, refresh } = usePagedList<
     TicketTopicQuery,
     TicketTopicListResponse
   >({
@@ -89,32 +86,109 @@ export function MotivosPage() {
       priority: priority === "todas" ? undefined : priority,
     },
     fallbackError: "No se pudieron cargar los motivos",
-    pageKey: "pagina",
   });
+
+  useLoadErrorReceipt(error, "motivos-list", refresh);
+  useActionErrorReceipt(actionError, "motivos-action");
 
   useEffect(() => {
     departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
   }, []);
 
-  const rows = data?.items ?? [];
+  const rows = useMemo(() => data?.items ?? [], [data?.items]);
   const counts = data?.counts;
-  const filtered =
-    Boolean(debouncedSearch) || status !== "todos" || departmentId !== "todos" || priority !== "todas";
+  const pageIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
 
-  function clearAll() {
-    setSearch("");
-    setDepartmentParam("todos");
-    setPriority("todas");
-    setStatus("todos");
+  async function runBulk(action: "activate" | "deactivate" | "delete") {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    setActionError(null);
+    try {
+      const result = await ticketTopicsApi.bulk({
+        ids: Array.from(selectedIds),
+        action,
+      });
+      if (action === "delete" && result.updatedCount < result.totalRequested) {
+        setActionError(
+          `Se eliminaron ${result.updatedCount} de ${result.totalRequested}. Los demás están en uso en tickets; desactívalos en su lugar.`,
+        );
+      }
+      clearSelection();
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo completar la acción en lote");
+    } finally {
+      setBulkBusy(false);
+    }
   }
 
-  const { actionError, run } = useRowRun(setBusyId, refresh);
+  function askBulkActivate() {
+    setConfirmation({
+      tone: "warn",
+      icon: CheckCircle2,
+      eyebrow: "Tickets · Motivos",
+      title: `Activar ${selectedIds.size} motivos`,
+      description: "Volverán a ofrecerse al crear o clasificar tickets.",
+      confirmLabel: "Activar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("activate");
+      },
+    });
+  }
+
+  function askBulkDeactivate() {
+    setConfirmation({
+      tone: "danger",
+      icon: Ban,
+      eyebrow: "Tickets · Motivos",
+      title: `Desactivar ${selectedIds.size} motivos`,
+      description: "Dejarán de ofrecerse en tickets nuevos. Los tickets que ya los usan no cambian.",
+      confirmLabel: "Desactivar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("deactivate");
+      },
+    });
+  }
+
+  function askBulkDelete() {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      eyebrow: "Tickets · Motivos",
+      title: `Eliminar ${selectedIds.size} motivos`,
+      description:
+        "Solo se borran los que ningún ticket usa. El resto se omitirá y tendrás que desactivarlos.",
+      confirmLabel: "Eliminar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("delete");
+      },
+    });
+  }
+
+  async function run(id: number, action: () => Promise<unknown>) {
+    setBusyId(id);
+    setActionError(null);
+    try {
+      await action();
+      // Relee la página: totales y contadores los manda el servidor, no se adivinan aquí.
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo completar la acción");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   function askToggleActive(topic: TicketTopicResponse) {
     if (topic.isActive) {
-      ask({
+      setConfirmation({
         tone: "danger",
         icon: Ban,
+        eyebrow: "Tickets · Motivos",
         title: "Desactivar motivo",
         description: (
           <>
@@ -132,9 +206,10 @@ export function MotivosPage() {
   }
 
   function askDelete(topic: TicketTopicResponse) {
-    ask({
+    setConfirmation({
       tone: "danger",
       icon: Trash2,
+      eyebrow: "Tickets · Motivos",
       title: "Eliminar motivo",
       description: (
         <>
@@ -151,7 +226,7 @@ export function MotivosPage() {
   // El camino, no el nombre: dos departamentos pueden llamarse igual.
   const departmentPathById = departmentPaths(departments);
 
-  const priorityFilterOptions: FilterOption[] = [
+  const priorityFilterOptions: TicketFilterOption[] = [
     {
       value: "todas",
       label: "Todas las prioridades",
@@ -184,47 +259,52 @@ export function MotivosPage() {
       <ModuleHeader
         title="Motivos"
         summary={
-          <HeaderCounts counts={counts} loadingLabel="Cargando los motivos…">
-            {(counts) => (
-              <>
-                <HeaderTag
-                  label={counts.all === 1 ? "motivo" : "motivos"}
-                  count={counts.all}
-                  active={status === "todos"}
-                  onClick={() => {
-                    setStatus("todos");
-                    setPage(1);
-                  }}
-                  tone="neutral"
-                  title="Mostrar todos los motivos"
-                />
-                <HeaderTag
-                  label={counts.active === 1 ? "activo" : "activos"}
-                  count={counts.active}
-                  active={status === "activos"}
-                  onClick={() => {
-                    setStatus("activos");
-                    setPage(1);
-                  }}
-                  tone="emerald"
-                  dot
-                  title="Filtrar por motivos activos"
-                />
-                <HeaderTag
-                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                  count={counts.inactive}
-                  active={status === "inactivos"}
-                  onClick={() => {
-                    setStatus("inactivos");
-                    setPage(1);
-                  }}
-                  tone="red"
-                  dot
-                  title="Filtrar por motivos inactivos"
-                />
-              </>
-            )}
-          </HeaderCounts>
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "motivo" : "motivos"}
+                count={counts.all}
+                active={status === "todos"}
+                onClick={() => {
+                  setStatus("todos");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todos los motivos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={status === "activos"}
+                onClick={() => {
+                  setStatus("activos");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por motivos activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                count={counts.inactive}
+                active={status === "inactivos"}
+                onClick={() => {
+                  setStatus("inactivos");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por motivos inactivos"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando los motivos…
+            </span>
+          )
         }
         action={
           isAdmin && (
@@ -237,65 +317,132 @@ export function MotivosPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar por motivo o departamento…"
-              className="w-[280px]"
-            />
-            <FilterDropdown
-              title="Seleccionar departamento"
-              value={String(departmentId)}
-              onChange={setDepartmentParam}
-              options={departmentOptions}
-              defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
-              aria-label="Filtrar por departamento"
-            />
-            <FilterDropdown
-              title="Seleccionar prioridad"
-              value={priority}
-              onChange={setPriority}
-              options={priorityFilterOptions}
-              defaultIcon={<Flag className="h-4 w-4 text-zinc-500" />}
-              aria-label="Filtrar por prioridad"
-            />
+        <ListPanel
+          selection={
+            isAdmin && selectedIds.size > 0
+              ? {
+                  count: selectedIds.size,
+                  pageState,
+                  busy: bulkBusy,
+                  onTogglePage: togglePage,
+                  onClear: clearSelection,
+                  actions: [
+                    {
+                      key: "activate",
+                      label: "Activar",
+                      icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
+                      onClick: askBulkActivate,
+                    },
+                    {
+                      key: "deactivate",
+                      label: "Desactivar",
+                      icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
+                      onClick: askBulkDeactivate,
+                    },
+                    {
+                      key: "delete",
+                      label: "Eliminar",
+                      icon: <Trash2 aria-hidden className="h-3.5 w-3.5 text-rose-600" />,
+                      onClick: askBulkDelete,
+                    },
+                  ],
+                }
+              : undefined
+          }
+          toolbar={
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por motivo o departamento…"
+                className="w-[280px]"
+              />
+              <TicketFilterDropdown
+                title="Seleccionar departamento"
+                value={String(departmentId)}
+                onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
+                options={departmentOptions}
+                defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
+                aria-label="Filtrar por departamento"
+              />
+              <TicketFilterDropdown
+                title="Seleccionar prioridad"
+                value={priority}
+                onChange={setPriority}
+                options={priorityFilterOptions}
+                defaultIcon={<Flag className="h-4 w-4 text-zinc-500" />}
+                aria-label="Filtrar por prioridad"
+              />
 
-            {(search || departmentId !== "todos" || priority !== "todas") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  setDepartmentParam("todos");
-                  setPriority("todas");
-                }}
-                title="Limpiar filtros"
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
-              >
-                <X className="h-3.5 w-3.5 text-zinc-400" />
-                <span>Limpiar</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {(error || actionError) && (
-          <div className="mb-3">
-            <Alert variant="error">{error ?? actionError}</Alert>
-          </div>
-        )}
-
-        {!data ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
-        ) : (
-          // Atenuada mientras llega la página nueva: la anterior se queda para no dar un salto en blanco.
-          <div className={staleClass(isStale)}>
-            <DataTable>
+              {(search || departmentId !== "todos" || priority !== "todas") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setDepartmentId("todos");
+                    setPriority("todas");
+                  }}
+                  title="Limpiar filtros"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
+                >
+                  <X className="h-3.5 w-3.5 text-zinc-400" />
+                  <span>Limpiar</span>
+                </button>
+              )}
+            </div>
+          }
+          footer={
+            data !== null && data.total > 0 ? (
+              <Pagination
+                page={data.page}
+                pageSize={data.pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="motivos"
+              />
+            ) : undefined
+          }
+        >
+          {!data ? (
+            error === null && <TableSkeleton rows={pageSize} columns={isAdmin ? 8 : 7} />
+          ) : rows.length === 0 ? (
+            <ListEmptyState
+              icon={Tag}
+              isFiltered={Boolean(
+                debouncedSearch || status !== "todos" || departmentId !== "todos" || priority !== "todas",
+              )}
+              filteredTitle="Ningún motivo coincide con este filtro o búsqueda."
+              onClearFilters={() => {
+                setSearch("");
+                setStatus("todos");
+                setDepartmentId("todos");
+                setPriority("todas");
+              }}
+              emptyTitle="Todavía no hay motivos en el catálogo."
+              emptyDescription="Los motivos clasifican los tickets y sugieren el formulario a usar en cada caso."
+            />
+          ) : (
+            <div className="plf-results-in">
+              <DataTable>
               <thead>
                 <HeadRow>
+                  {isAdmin && (
+                    <Th className="w-10 text-center">
+                      <div className="flex items-center justify-center">
+                        <SelectBox
+                          checked={pageState}
+                          onToggle={togglePage}
+                          label={
+                            pageState === true
+                              ? "Quitar la selección de esta página"
+                              : "Seleccionar toda la página"
+                          }
+                        />
+                      </div>
+                    </Th>
+                  )}
                   <Th>Motivo</Th>
                   <Th>Departamento</Th>
                   <Th>Prioridad</Th>
@@ -307,11 +454,30 @@ export function MotivosPage() {
                 </HeadRow>
               </thead>
               <tbody>
-                {rows.map((topic) => (
-                  <Row key={topic.id} busy={busyId === topic.id}>
+                {rows.map((topic) => {
+                  const checked = selectedIds.has(topic.id);
+                  return (
+                  <Row key={topic.id} busy={busyId === topic.id || bulkBusy} data-checked={checked}>
+                    {isAdmin && (
+                      <Td className="w-10 text-center">
+                        <div className="flex items-center justify-center">
+                          <SelectBox
+                            checked={checked}
+                            onToggle={() => toggleSelect(topic.id)}
+                            label={`Seleccionar ${topic.name}`}
+                          />
+                        </div>
+                      </Td>
+                    )}
                     <Td className="text-[13px] font-medium text-ink">{topic.name}</Td>
                     <Td className="text-[12.5px] text-ink">
-                      {departmentPathById.get(topic.defaultDepartmentId) ?? topic.defaultDepartmentName}
+                      {topic.defaultDepartmentId == null ? (
+                        <span className="text-zinc-400 font-normal">—</span>
+                      ) : (
+                        departmentPathById.get(topic.defaultDepartmentId) ??
+                        topic.defaultDepartmentName ??
+                        "—"
+                      )}
                     </Td>
                     <Td>
                       <span
@@ -375,34 +541,16 @@ export function MotivosPage() {
                       </Td>
                     )}
                   </Row>
-                ))}
+                  );
+                })}
               </tbody>
-            </DataTable>
-
-            {rows.length === 0 &&
-              (filtered ? (
-                <EmptyResult message="Ningún motivo coincide con el filtro." onClear={clearAll} />
-              ) : (
-                <div className="flex flex-col items-center gap-2 py-14 text-center">
-                  <Tag className="h-6 w-6 text-faint" />
-                  <p className="text-[13.5px] text-faint">Todavía no hay motivos en el catálogo.</p>
-                </div>
-              ))}
-
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="motivos"
-            />
-          </div>
-        )}
+              </DataTable>
+            </div>
+          )}
+        </ListPanel>
       </div>
 
-      {dialog}
+      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
 
       {modal !== null && (
         <MotivoModal

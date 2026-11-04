@@ -8,6 +8,7 @@ import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, u
 import { ticketsApi } from "../../api/tickets";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { openOverlay } from "../../hooks/overlayStack";
+import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
 import { Avatar } from "../../components/ui/Avatar";
 import { formatDateTime } from "../../lib/format";
 import type { TicketTaskCommentResponse, TicketTaskResponse } from "../../types/api";
@@ -17,11 +18,7 @@ const APPLE_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
 const ENTER_MS = 480;
 const EXIT_MS = 320;
 
-/**
- * Fotogramas cerrado/abierto del panel. En escritorio el panel es una columna: se anima su
- * ancho y su margen para que la lista de tareas ceda y recupere el espacio de forma continua,
- * en lugar de saltar. En pantallas estrechas (apilado) solo se desliza y se desvanece.
- */
+/** Fotogramas cerrado/abierto del panel: anima ancho y margen en escritorio, o desplazamiento y opacidad en móvil. */
 function panelFrames(el: HTMLElement): [Keyframe, Keyframe] {
   if (window.matchMedia("(min-width: 1024px)").matches) {
     const style = getComputedStyle(el);
@@ -41,10 +38,11 @@ interface TaskCommentsAsideProps {
   ticketId: number;
   currentStaffId: number;
   currentStaffName?: string;
+  /** Sin permiso o ticket de solo lectura: ver comentarios, no redactar. */
+  canComment?: boolean;
   onClose: () => void;
   onCommentAdded: (taskId: number, comment: TicketTaskCommentResponse) => void;
   className?: string;
-  targetHeight?: number | null;
 }
 
 export interface TaskCommentsAsideHandle {
@@ -58,10 +56,10 @@ export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskComment
       ticketId,
       currentStaffId,
       currentStaffName,
+      canComment = true,
       onClose,
       onCommentAdded,
       className = "",
-      targetHeight,
     },
     ref,
   ) {
@@ -159,10 +157,7 @@ export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskComment
       aria-label="Comentarios de la tarea"
       className={className}
     >
-      <div
-        style={targetHeight ? { height: `${targetHeight}px` } : undefined}
-        className="flex flex-col h-[520px] max-h-[calc(100vh-6rem)] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xs lg:min-w-[360px]"
-      >
+      <div className="flex flex-col h-[520px] max-h-[calc(100vh-6rem)] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-2xs lg:min-w-[360px]">
         {/* Cabecera del panel lateral: Comentarios al extremo izquierdo, X al extremo derecho */}
         <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-zinc-100 px-3.5 bg-white">
           <div className="flex items-center gap-2 min-w-0">
@@ -206,41 +201,32 @@ export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskComment
               </p>
             </div>
           ) : (
-            task.comments.map((comment) => {
-              const isMyComment = comment.authorStaffId === currentStaffId;
-
-              return (
-                <div
-                  key={comment.id}
-                  className="rounded-lg border border-zinc-200/80 bg-white p-2.5 shadow-2xs space-y-1.5 transition-colors hover:border-zinc-300"
-                >
-                  <div className="flex items-center justify-between gap-2 text-[11px]">
-                    <div className="flex items-center gap-1.5 min-w-0 font-medium text-zinc-800">
-                      <Avatar name={comment.authorStaffName} seed={comment.authorStaffId} size={17} />
-                      <span className="font-semibold text-zinc-900 truncate max-w-[130px]" title={comment.authorStaffName}>
-                        {comment.authorStaffName}
-                      </span>
-                      {isMyComment && (
-                        <span className="rounded bg-brand-red/10 px-1 py-0.2 font-heading text-[8.5px] font-bold text-brand-red">
-                          Tú
-                        </span>
-                      )}
-                    </div>
-                    <span className="shrink-0 text-[10px] text-zinc-400 tabular-nums">
-                      {formatDateTime(comment.createdAt)}
-                    </span>
-                  </div>
-                  <p className="text-[12px] leading-relaxed text-zinc-700 whitespace-pre-wrap break-words">
-                    {comment.comment}
-                  </p>
-                </div>
-              );
-            })
+            <InternalNoteThread
+              density="compact"
+              notes={task.comments.map((comment) => ({
+                id: comment.id,
+                parentId: comment.parentId ?? null,
+                authorStaffId: comment.authorStaffId,
+                authorName: comment.authorStaffName,
+                body: comment.comment,
+                createdAt: comment.createdAt,
+              }))}
+              currentStaffId={currentStaffId}
+              canReply={canComment}
+              onReply={async (parentId, body) => {
+                const newComment = await ticketsApi.addTaskComment(ticketId, task.id, {
+                  comment: body,
+                  parentId,
+                });
+                onCommentAdded(task.id, newComment);
+              }}
+            />
           )}
           <div ref={commentsEndRef} />
         </div>
 
         {/* Input para redactar nuevo comentario: fijo en la parte inferior */}
+        {canComment ? (
         <div className="shrink-0 bg-white border-t border-zinc-100 p-3">
           {error && (
             <div className="mb-2 rounded-md bg-red-50 border border-red-200/80 p-2 text-[11px] text-red-600">
@@ -323,6 +309,11 @@ export const TaskCommentsAside = forwardRef<TaskCommentsAsideHandle, TaskComment
             </div>
           </div>
         </div>
+        ) : (
+          <div className="shrink-0 border-t border-zinc-100 bg-zinc-50/60 px-3 py-2.5 text-center text-[11px] text-zinc-500">
+            Solo lectura: no puedes añadir comentarios en este ticket.
+          </div>
+        )}
       </div>
     </aside>
   );

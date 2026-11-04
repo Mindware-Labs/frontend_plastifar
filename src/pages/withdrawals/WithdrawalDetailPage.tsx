@@ -1,19 +1,20 @@
-import { Ban, PackageCheck, Pencil, Printer, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Ban, PackageCheck, Pencil, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { withdrawalsApi } from "../../api/withdrawals";
-import { DetailLoadError } from "../../components/app/DetailLoadError";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { ProductNameCode } from "../../components/app/ProductNameCode";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
+import { DocumentDropdown } from "../../components/app/DocumentDropdown";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { PageSpinner } from "../../components/ui/PageSpinner";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useDetail } from "../../hooks/useDetail";
 import { formatDay, formatInstant } from "../../lib/dates";
 import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
+import { exportWithdrawalToExcel } from "../../lib/withdrawalExcelExport";
 import { describeStatus } from "../../lib/withdrawals";
 import type { WithdrawalDetail, WithdrawalLine } from "../../types/withdrawals";
 import { WithdrawalCancelModal } from "./WithdrawalCancelModal";
@@ -22,17 +23,7 @@ import { WithdrawalDecisionModal } from "./WithdrawalDecisionModal";
 import { WithdrawalFormModal } from "./WithdrawalFormModal";
 import { WithdrawalStatusBadge } from "./WithdrawalStatusBadge";
 
-/**
- * Ficha de la solicitud: datos, líneas con lo recogido y la diferencia, y las
- * tres firmas (vendedor, aprobación y almacén). Qué botón se ofrece lo decide
- * el servidor (`canEdit`, `canDecide`, `canComplete`, `canCancel`).
- *
- * Integración diferida (docs/plan/02, módulo de tickets y tareas): RF-W7 pide
- * esta misma información como pestaña «Retiro de mercancía» del detalle del
- * ticket, con GET /api/tickets/{id}/withdrawals. Esa pestaña vive en
- * TicketDetailPage, que es del módulo de tickets; por ahora la ficha enlaza
- * al ticket y no al revés.
- */
+/** Ficha de la solicitud: datos, líneas con lo recogido y la diferencia, y las tres firmas... */
 export function WithdrawalDetailPage() {
   const { id } = useParams();
   const withdrawalId = Number(id);
@@ -69,9 +60,10 @@ export function WithdrawalDetailPage() {
 
   if (error) {
     return (
-      <DetailLoadError className="max-w-[960px]" title="Solicitud de retiro" onRetry={reload}>
-        {error}
-      </DetailLoadError>
+      <div className="max-w-[960px]">
+        <ModuleHeader title="Solicitud de retiro" />
+        <ErrorRetry onRetry={reload}>{error}</ErrorRetry>
+      </div>
     );
   }
 
@@ -86,10 +78,11 @@ export function WithdrawalDetailPage() {
 
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button size="sm" variant="secondary" onClick={() => window.open(`/retiros/${withdrawal.id}/imprimir`, "_blank")}>
-        <Printer className="h-[15px] w-[15px]" />
-        Imprimir
-      </Button>
+      <DocumentDropdown
+        onExportExcel={() => exportWithdrawalToExcel(detail)}
+        onExportPdf={() => window.open(`/retiros/${withdrawal.id}/imprimir?mode=pdf`, "_blank")}
+        onPrint={() => window.open(`/retiros/${withdrawal.id}/imprimir?mode=print`, "_blank")}
+      />
       {canEdit && (
         <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
           <Pencil className="h-[15px] w-[15px]" />
@@ -270,7 +263,8 @@ function LinesTable({ lines, currency, withdrawn }: { lines: WithdrawalLine[]; c
         {lines.map((line) => (
           <Row key={line.id}>
             <Td>
-              <ProductNameCode name={line.productName} code={line.productCode} />
+              <span className="block text-[12.5px] text-ink">{line.productName}</span>
+              <span className="font-mono text-[11px] text-faint">{line.productCode}</span>
             </Td>
             <Td className="whitespace-nowrap text-right tabular-nums">
               {formatQuantity(line.quantity)} <span className="text-faint">{line.quantityUnit}</span>

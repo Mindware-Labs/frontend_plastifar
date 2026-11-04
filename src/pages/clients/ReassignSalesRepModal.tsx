@@ -39,6 +39,7 @@ export function ReassignSalesRepModal({ client, onClose, onSaved }: ReassignSale
         salesRepStaffId: values.salesRepStaffId === "" ? null : Number(values.salesRepStaffId),
         phone: fresh.phone,
         email: fresh.email,
+        contactPersonName: fresh.contactPersonName,
         address: fresh.address,
         notes: fresh.notes,
         isActive: fresh.isActive,

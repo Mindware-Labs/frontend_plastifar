@@ -17,6 +17,7 @@ interface InboxTriageEmptyStateProps {
   folder: FolderKey;
   counts?: { all: number; unlinked: number; linked: number; unanswered: number };
   folderCounts?: EmailFolderCounts;
+  canCompose: boolean;
   onCompose: () => void;
   onSelectTicketFilter: (filter: "todos" | "sin-ticket" | "sin-responder") => void;
   activeTicketFilter: string;
@@ -39,6 +40,7 @@ export function InboxTriageEmptyState({
   folder,
   counts,
   folderCounts,
+  canCompose,
   onCompose,
   onSelectTicketFilter,
   activeTicketFilter,
@@ -53,7 +55,7 @@ export function InboxTriageEmptyState({
   const linkedCount = counts?.linked ?? 0;
 
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-y-auto overflow-x-hidden p-6">
+    <div className="relative flex h-full w-full flex-1 min-h-0 flex-col items-center justify-center overflow-hidden p-6">
       {/* Fondo con aros geométricos decorativos (eco sutil del isotipo Plastifar) */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden select-none">
         <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-brand-red/[0.04]" />
@@ -88,7 +90,7 @@ export function InboxTriageEmptyState({
 
         {/* Tarjetas operativas de estado (solo en bandeja de entrada) */}
         {isInbox && counts && (
-          <div className="mt-6 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-3">
+          <div className="plf-stagger mt-6 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-3">
             {/* 1. Sin responder */}
             <button
               type="button"
@@ -190,10 +192,12 @@ export function InboxTriageEmptyState({
 
         {/* Botones de acción principal */}
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
-          <PfButton size="sm" className="h-8 px-4 gap-1.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]" onClick={onCompose}>
-            <PenLine className="h-4 w-4" />
-            Escribir un correo
-          </PfButton>
+          {canCompose && (
+            <PfButton size="sm" className="h-8 px-4 gap-1.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]" onClick={onCompose}>
+              <PenLine className="h-4 w-4" />
+              Escribir un correo
+            </PfButton>
+          )}
 
           {isInbox && unansweredCount > 0 && activeTicketFilter !== "sin-responder" && (
             <button

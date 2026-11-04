@@ -9,7 +9,6 @@ import { clientsApi } from "../api/clients";
 import { settingsApi } from "../api/settings";
 import { staffApi } from "../api/staff";
 import { territoriesApi } from "../api/territories";
-import { idParam } from "./idParam";
 import type { LookupResult } from "../components/ui/LookupSelect";
 
 /**
@@ -69,13 +68,16 @@ export function searchStaff(status?: string) {
 /** Solo colaboradores activos: es lo que se ofrece para asignar trabajo. */
 export const searchActiveStaff = searchStaff("activos");
 
+const staffLabelCache = new Map<string, string>();
+
 /** Nombre de un colaborador por id, para pintar lo ya seleccionado. */
 export async function resolveStaffLabel(value: string): Promise<string | null> {
-  const id = idParam(value);
-  // Un id que no es entero (un enlace editado a mano) no se pide al servidor.
-  if (id === undefined) return null;
-  const person = await staffApi.getDepartmentAccess(id);
-  return `${person.firstName} ${person.lastName}`;
+  const cached = staffLabelCache.get(value);
+  if (cached !== undefined) return cached;
+  const person = await staffApi.getById(Number(value));
+  const label = `${person.firstName} ${person.lastName}`;
+  staffLabelCache.set(value, label);
+  return label;
 }
 
 /**
@@ -105,19 +107,13 @@ export async function searchProducts(term: string): Promise<LookupResult> {
  * nombrándolo.
  */
 export async function resolveProductLabel(value: string): Promise<string | null> {
-  const id = idParam(value);
-  // Un id que no es entero (un enlace editado a mano) no se pide al servidor.
-  if (id === undefined) return null;
-  const product = await settingsApi.products.get(id);
+  const product = await settingsApi.products.get(Number(value));
   return `${product.code} · ${product.name}${product.isActive ? "" : " (inactivo)"}`;
 }
 
 /** Nombre de un cliente por id, para pintar lo ya seleccionado. */
 export async function resolveClientLabel(value: string): Promise<string | null> {
-  const id = idParam(value);
-  // Un id que no es entero (un enlace editado a mano) no se pide al servidor.
-  if (id === undefined) return null;
-  const { client } = await clientsApi.get(id);
+  const { client } = await clientsApi.get(Number(value));
   return client.name;
 }
 
@@ -141,9 +137,6 @@ export async function searchTerritories(term: string): Promise<LookupResult> {
 
 /** Nombre de un territorio por id, para pintar lo ya seleccionado. */
 export async function resolveTerritoryLabel(value: string): Promise<string | null> {
-  const id = idParam(value);
-  // Un id que no es entero (un enlace editado a mano) no se pide al servidor.
-  if (id === undefined) return null;
-  const territory = await territoriesApi.get(id);
+  const territory = await territoriesApi.get(Number(value));
   return territory.name;
 }

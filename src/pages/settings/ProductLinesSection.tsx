@@ -1,42 +1,42 @@
 import { Ban, CheckCircle2, Pencil, Plus } from "lucide-react";
+import { useState } from "react";
 import { settingsApi } from "../../api/settings";
-import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
+import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { ListBody } from "../../components/ui/ListBody";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { ListPagination } from "../../components/ui/ListPagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { Pagination } from "../../components/ui/Pagination";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useReceipts } from "../../context/useReceipts";
-import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import type { ProductLine } from "../../types/settings";
-import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy } from "./catalogState";
+import { freshCopy, staleClass } from "./catalogState";
 import { ProductLineModal } from "./ProductLineModal";
-import { PAGE_SIZES } from "../../lib/pageSizes";
 
-const CHIPS = ["todas", "activas", "inactivas"] as const;
-type ChipKey = (typeof CHIPS)[number];
+type ChipKey = "todas" | "activas" | "inactivas";
 
 export function ProductLinesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
   const receipts = useReceipts();
 
-  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<ProductLine, "nueva">();
+  const [busyId, setBusyId] = useState<number | null>(null);
 
-  const [search, setSearch] = useUrlState<string>("q", "");
-  const [chip, setChip] = useUrlState<ChipKey>("estado", "todas", CHIPS);
-  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
+  const [search, setSearch] = useState("");
+  const [chip, setChip] = useState<ChipKey>("todas");
+  const [pageSize, setPageSize] = useState(10);
+
+  const [modal, setModal] = useState<"nueva" | ProductLine | null>(null);
+  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
@@ -50,8 +50,9 @@ export function ProductLinesSection() {
       status: chip === "todas" ? undefined : chip,
     },
     fallbackError: "No se pudieron cargar las líneas de producto",
-    pageKey: "pagina",
   });
+
+  useLoadErrorReceipt(error, "settings-product-lines-list", refresh);
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -59,11 +60,6 @@ export function ProductLinesSection() {
   // criterio, que nada coincide. Los contadores no distinguen ese caso: se
   // calculan sobre el filtro base, no sobre la tabla entera.
   const isFiltering = debouncedSearch !== "" || chip !== "todas";
-
-  function clearFilters() {
-    setSearch("");
-    setChip("todas");
-  }
 
   /**
    * RF-K5: no se desactiva la ultima linea en uso. La regla la aplica el
@@ -73,7 +69,7 @@ export function ProductLinesSection() {
    */
   function askToggle(line: ProductLine) {
     const willDeactivate = line.isActive;
-    confirm(line.id, {
+    setConfirmation({
       tone: "warn",
       icon: willDeactivate ? Ban : CheckCircle2,
       title: willDeactivate ? "Desactivar línea" : "Reactivar línea",
@@ -90,6 +86,7 @@ export function ProductLinesSection() {
       ),
       confirmLabel: willDeactivate ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
+        setBusyId(line.id);
         try {
           const current = await freshCopy(settingsApi.productLines.get, line);
           const nextActive = !current.isActive;
@@ -110,6 +107,8 @@ export function ProductLinesSection() {
             title: willDeactivate ? "No se pudo desactivar la línea" : "No se pudo reactivar la línea",
             detail: err instanceof Error ? err.message : undefined,
           });
+        } finally {
+          setBusyId(null);
         }
       },
     });
@@ -118,49 +117,54 @@ export function ProductLinesSection() {
   return (
     <>
       <ModuleHeader
-        title="Líneas de producto"
+        title="Líneas de productos"
         summary={
-          <HeaderCounts counts={counts} loadingLabel="Cargando las líneas de producto…">
-            {(counts) => (
-              <>
-                <HeaderTag
-                  label={counts.all === 1 ? "línea" : "líneas"}
-                  count={counts.all}
-                  active={chip === "todas"}
-                  onClick={() => {
-                    setChip("todas");
-                    setPage(1);
-                  }}
-                  tone="neutral"
-                  title="Mostrar todas las líneas de producto"
-                />
-                <HeaderTag
-                  label={counts.active === 1 ? "activa" : "activas"}
-                  count={counts.active}
-                  active={chip === "activas"}
-                  onClick={() => {
-                    setChip("activas");
-                    setPage(1);
-                  }}
-                  tone="emerald"
-                  dot
-                  title="Filtrar por líneas activas"
-                />
-                <HeaderTag
-                  label={counts.inactive === 1 ? "inactiva" : "inactivas"}
-                  count={counts.inactive}
-                  active={chip === "inactivas"}
-                  onClick={() => {
-                    setChip("inactivas");
-                    setPage(1);
-                  }}
-                  tone="red"
-                  dot
-                  title="Filtrar por líneas inactivas"
-                />
-              </>
-            )}
-          </HeaderCounts>
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "línea" : "líneas"}
+                count={counts.all}
+                active={chip === "todas"}
+                onClick={() => {
+                  setChip("todas");
+                  setPage(1);
+                }}
+                tone="neutral"
+                title="Mostrar todas las líneas de producto"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activa" : "activas"}
+                count={counts.active}
+                active={chip === "activas"}
+                onClick={() => {
+                  setChip("activas");
+                  setPage(1);
+                }}
+                tone="emerald"
+                dot
+                title="Filtrar por líneas activas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactiva" : "inactivas"}
+                count={counts.inactive}
+                active={chip === "inactivas"}
+                onClick={() => {
+                  setChip("inactivas");
+                  setPage(1);
+                }}
+                tone="red"
+                dot
+                title="Filtrar por líneas inactivas"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando las líneas de producto…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -171,8 +175,6 @@ export function ProductLinesSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <ListPanel
         toolbar={
@@ -187,73 +189,75 @@ export function ProductLinesSection() {
           </>
         }
         footer={
-          <ListPagination
-            data={data}
-            page={page}
-            pageSize={pageSize}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            noun="líneas"
-          />
+          data !== null &&
+          data.total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              noun="líneas"
+            />
+          )
         }
       >
-        <ListBody
-          data={data}
-          error={error}
-          isStale={isStale}
-          skeletonRows={pageSize}
-          skeletonColumns={4}
-          empty={
-            isFiltering
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={4} />
+        ) : rows.length === 0 ? (
+          <p className="py-14 text-center text-[13.5px] text-faint">
+            {isFiltering
               ? "Ninguna línea coincide con este filtro o búsqueda."
-              : "Todavía no hay ninguna línea de producto configurada."
-          }
-          onClear={isFiltering ? clearFilters : undefined}
-        >
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Código</Th>
-                <Th>Línea</Th>
-                <Th>Estado</Th>
-                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+              : "Todavía no hay ninguna línea de producto configurada."}
+          </p>
+        ) : (
+          <div className={staleClass(isStale)}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Código</Th>
+                  <Th>Línea</Th>
+                  <Th>Estado</Th>
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
 
-            <tbody>
-              {rows.map((line) => (
-                <Row key={line.id} busy={busyId === line.id}>
-                  <Td>
-                    <span className="font-mono text-[12px] text-brand-gray">{line.code}</span>
-                  </Td>
-                  <Td className="text-[12.5px] font-medium text-ink">{line.name}</Td>
-                  <Td>
-                    <StatusDot active={line.isActive} />
-                  </Td>
-                  {canWrite && (
+              <tbody>
+                {rows.map((line) => (
+                  <Row key={line.id} busy={busyId === line.id}>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Editar ${line.name}`}
-                          icon={Pencil}
-                          onClick={() => setModal(line)}
-                          disabled={busyId === line.id}
-                        />
-                        <RowAction
-                          label={line.isActive ? `Desactivar ${line.name}` : `Reactivar ${line.name}`}
-                          icon={line.isActive ? Ban : CheckCircle2}
-                          onClick={() => askToggle(line)}
-                          disabled={busyId === line.id}
-                          danger={line.isActive}
-                        />
-                      </div>
+                      <span className="font-mono text-[12px] text-brand-gray">{line.code}</span>
                     </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-        </ListBody>
+                    <Td className="text-[12.5px] font-medium text-ink">{line.name}</Td>
+                    <Td>
+                      <StatusDot active={line.isActive} />
+                    </Td>
+                    {canWrite && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Editar ${line.name}`}
+                            icon={Pencil}
+                            onClick={() => setModal(line)}
+                            disabled={busyId === line.id}
+                          />
+                          <RowAction
+                            label={line.isActive ? `Desactivar ${line.name}` : `Reactivar ${line.name}`}
+                            icon={line.isActive ? Ban : CheckCircle2}
+                            onClick={() => askToggle(line)}
+                            disabled={busyId === line.id}
+                            danger={line.isActive}
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
       </ListPanel>
 
       {modal !== null && (
@@ -272,7 +276,7 @@ export function ProductLinesSection() {
         />
       )}
 
-      {dialog}
+      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
     </>
   );
 }

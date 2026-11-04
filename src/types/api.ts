@@ -48,6 +48,8 @@ export interface StaffResponse {
   /** Usuario en el sistema anterior (RF-O9). Nulo cuando no lo tiene. */
   legacyUsername: string | null;
   primaryRoleId?: number | null;
+  /** Nombre del rol del acceso principal (ALL ACCESS, LIMITED ACCESS, …). */
+  primaryRoleName?: string | null;
 }
 
 /** Respuesta paginada del listado de personal (GET /api/staff). */
@@ -115,40 +117,13 @@ export interface DepartmentResponse {
   id: number;
   name: string;
   isActive: boolean;
-  /**
-   * Departamento padre, o `null` en los de primer nivel.
-   *
-   * La operación real no tiene cuatro departamentos planos sino más de
-   * veinticinco en dos niveles —«VENTAS INTERNACIONALES / Florida»,
-   * «PLASTIFAR CENTROAMERICA / Compras»—, y el sistema al que este panel
-   * reemplaza ya los modela así.
-   *
-   * Es OPCIONAL a propósito: mientras el servidor no lo envíe, todo el panel
-   * sigue funcionando exactamente como hoy, con la lista plana. El día que
-   * empiece a enviarlo, la jerarquía aparece sola en los selectores y en los
-   * filtros. Así el frontend deja de ser lo que bloquea el cambio.
-   */
+  /** Departamento padre, o `null` en los de primer nivel (opcional mientras el servidor no lo envíe). */
   parentId?: number | null;
-  /**
-   * Colaboradores cuyo departamento primario es este.
-   *
-   * Opcional por la misma razón que `parentId`: un desplegable no lo necesita y
-   * no debe romperse si algún día llega recortado. La pantalla de
-   * administración sí lo usa, porque es la mitad de la consecuencia de un
-   * departamento —a cuánta gente afecta lo que se decida sobre él— y enterarse
-   * por un 409 después de pulsar «Eliminar» es enterarse tarde.
-   */
+  /** Colaboradores cuyo departamento primario es este (usado en la pantalla de administración). */
   staffCount?: number;
-  /**
-   * Tipo del departamento en la operación real. Se guarda y se muestra; todavía
-   * no cambia ninguna regla de visibilidad. Opcional por la misma razón que el
-   * resto: un desplegable no lo necesita.
-   */
+  /** Tipo del departamento en la operación real (opcional en desplegables). */
   type?: DepartmentType;
-  /**
-   * Rol que la operación asigna al departamento. Es un dato guardado, no un
-   * permiso: lo que cada persona puede sale del rol de su acceso.
-   */
+  /** Rol por defecto asignado al departamento (dato informativo, no permiso efectivo). */
   defaultRoleId?: number | null;
   defaultRoleName?: string | null;
   mailboxId?: number | null;
@@ -200,14 +175,7 @@ export const DEPARTMENT_TYPES: { value: DepartmentType; label: string }[] = [
   { value: "Privado", label: "Privado" },
 ];
 
-/**
- * Alta o movimiento de un departamento.
- *
- * `parentId` es el campo con consecuencias: no reordena un renglón del
- * organigrama, redefine sobre qué puede la gente que tiene un rol en el nuevo
- * padre. El servidor lo valida de nuevo —que el padre exista y que el
- * movimiento no cierre un ciclo— porque esta capa es una cortesía.
- */
+/** Alta o movimiento de un departamento (`parentId` redefine la jerarquía de permisos). */
 export interface SaveDepartmentRequest {
   name: string;
   parentId: number | null;
@@ -424,6 +392,7 @@ export interface EmailNoteResponse {
   authorName: string;
   body: string;
   createdAt: string;
+  parentId?: number | null;
 }
 
 /** Direccion conocida, para completar el "Para" mientras se escribe. */
@@ -432,13 +401,44 @@ export interface ContactResponse {
   name: string | null;
 }
 
+export interface CategoriaResponseItem {
+  id: number;
+  name: string;
+  description: string | null;
+  color: string | null;
+  responseCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoriaResponseListResponse {
+  items: CategoriaResponseItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 export interface CannedResponseResponse {
   id: number;
   title: string;
   body: string;
+  categoryId?: number | null;
+  categoryName?: string | null;
   createdByStaffId: number;
   createdByName: string;
+  createdAt: string;
   updatedAt: string;
+  usageCount: number;
+  lastUsedAt: string | null;
+}
+
+export interface CannedResponseListResponse {
+  items: CannedResponseResponse[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 }
 
 /** Quien esta escribiendo en que conversacion; active false = dejo de hacerlo. */
@@ -447,6 +447,13 @@ export interface ComposingPresence {
   staffId: number;
   name: string;
   active: boolean;
+}
+
+export interface TicketProductResponse {
+  id: number;
+  productId: number;
+  productCode: string;
+  productName: string;
 }
 
 export interface TicketListItemResponse {
@@ -478,8 +485,11 @@ export interface TicketListItemResponse {
   lastActivityAt: string;
   createdAt: string;
   updatedAt: string;
-  topicSuggestedForm?: string | null;
-  topicSuggestedFormLabel?: string | null;
+  products?: TicketProductResponse[];
+  /** Id en osTicket si el ticket fue migrado. */
+  legacyTicketId?: number | null;
+  /** full | readOnly — alcance sobre este ticket según departamento y reglas transversales. */
+  accessLevel?: "full" | "readOnly" | null;
 }
 
 export interface TicketCounts {
@@ -489,6 +499,10 @@ export interface TicketCounts {
   overdue: number;
   waitingOnClient: number;
   closed: number;
+  /** Tickets sin LegacyTicketId (bandeja Plastifar). */
+  plastifar: number;
+  /** Tickets migrados de osTicket. */
+  legacy: number;
 }
 
 export interface TicketListResponse {
@@ -506,6 +520,8 @@ export interface TicketQuery {
   search?: string;
   /** todos | abiertos | por-vencer | vencidos | espera | cerrados */
   status?: string;
+  /** Pestaña de bandeja (GET /api/tickets/inbox-tabs). */
+  inboxTabId?: string;
   departmentId?: number;
   assignedStaffId?: number;
   priority?: string;
@@ -516,6 +532,8 @@ export interface TicketQuery {
   /** numero | asunto | cliente | departamento | prioridad | estado | sla | actividad */
   sort?: string;
   dir?: "asc" | "desc";
+  /** plastifar | legacy */
+  origin?: string;
 }
 
 export interface TicketAttachmentResponse {
@@ -547,6 +565,7 @@ export interface TicketMessageResponse {
   deliveryDetail?: string | null;
   /** La solicitud que abrio el caso, no un mensaje mas del hilo. */
   isOrigin?: boolean;
+  parentId?: number | null;
 }
 
 export interface TicketEventResponse {
@@ -579,6 +598,8 @@ export interface TicketDetailResponse {
   clientId: number | null;
   clientName: string | null;
   clientCode: string | null;
+  clientPhone: string | null;
+  clientContactPersonName: string | null;
   contactId: number | null;
   contactName: string | null;
   contactEmail: string | null;
@@ -609,15 +630,27 @@ export interface TicketDetailResponse {
   events: TicketEventResponse[];
   watchers: TicketWatcherResponse[];
   attachments: TicketAttachmentResponse[];
+  products?: TicketProductResponse[];
   requesterEmail?: string | null;
   requesterName?: string | null;
   verdictId: number | null;
   verdictName: string | null;
   topicSuggestedForm?: string | null;
   topicSuggestedFormLabel?: string | null;
-  // Campos retrocompatibles
-  code?: string;
-  source?: string;
+  accessLevel?: "full" | "readOnly" | null;
+}
+
+export interface TicketInboxTabResponse {
+  id: string;
+  departmentId: number | null;
+  label: string;
+  /** full | readOnly | global */
+  mode: string;
+  ticketCount?: number | null;
+}
+
+export interface TicketInboxTabsResponse {
+  tabs: TicketInboxTabResponse[];
 }
 
 export interface AssignTicketRequest {
@@ -669,6 +702,7 @@ export interface TicketTaskCommentResponse {
   authorStaffName: string;
   comment: string;
   createdAt: string;
+  parentId?: number | null;
 }
 
 export interface TicketTaskResponse {
@@ -692,13 +726,6 @@ export interface TicketTaskResponse {
   comments: TicketTaskCommentResponse[];
 }
 
-export interface CreateTicketTaskRequest {
-  title: string;
-  description?: string | null;
-  assignedStaffId?: number | null;
-  dueDate?: string | null;
-}
-
 export interface UpdateTicketTaskRequest {
   title?: string | null;
   description?: string | null;
@@ -709,6 +736,7 @@ export interface UpdateTicketTaskRequest {
 
 export interface CreateTicketTaskCommentRequest {
   comment: string;
+  parentId?: number | null;
 }
 
 export interface TicketStaffOptionResponse {
@@ -781,7 +809,7 @@ export interface TicketClientOption {
 export interface TicketTopicOption {
   id: number;
   name: string;
-  defaultDepartmentId: number;
+  defaultDepartmentId: number | null;
   defaultPriority: string;
   slaPolicyId: number | null;
   suggestedForm?: string | null;
@@ -814,8 +842,10 @@ export interface CreateManualTicketRequest {
   contactId?: number | null;
   topicId?: number | null;
   productLineId?: number | null;
+  productIds?: number[] | null;
   subject: string;
   initialMessage?: string | null;
+  slaPolicyId?: number | null;
   priority?: string | null;
   departmentId?: number | null;
   assignedStaffId?: number | null;
@@ -828,6 +858,7 @@ export interface UpdateTicketDetailsRequest {
   priority?: string | null;
   departmentId?: number | null;
   productLineId?: number | null;
+  productIds?: number[] | null;
 }
 
 export interface BulkAssignTicketsRequest {
@@ -852,8 +883,8 @@ export interface BulkActionResult {
 export interface TicketTopicResponse {
   id: number;
   name: string;
-  defaultDepartmentId: number;
-  defaultDepartmentName: string;
+  defaultDepartmentId: number | null;
+  defaultDepartmentName: string | null;
   /** Emergencia | Alta | Normal | Baja. */
   defaultPriority: string;
   suggestedForm?: string | null;
@@ -883,7 +914,7 @@ export interface TicketTopicListResponse {
 
 export interface SaveTicketTopicRequest {
   name: string;
-  defaultDepartmentId: number;
+  defaultDepartmentId: number | null;
   defaultPriority?: string;
   suggestedForm?: string | null;
   isActive?: boolean;

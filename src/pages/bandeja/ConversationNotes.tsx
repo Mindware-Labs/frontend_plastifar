@@ -1,18 +1,63 @@
 import { ChevronDown, Plus, StickyNote, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
+import { AppleMotionBlock } from "../../components/ui/AppleMotionBlock";
+import { TEXTAREA_AUTO_GROW_CLASS, TEXTAREA_ONE_LINE_MIN_PX } from "../../components/ui/Field";
+import { useAppleListMotion } from "../../hooks/useAppleListMotion";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
+import {
+  COMPOSER_FIELD_ENTER_MS,
+  COMPOSER_FIELD_EXIT_MS,
+} from "./useComposerFieldMotion";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { useAuth } from "../../context/useAuth";
+import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { formatDateTime } from "../../lib/format";
 import type { EmailNoteResponse } from "../../types/api";
-import { resizeNoteTextarea } from "./noteTextarea";
+import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
 
 interface ConversationNotesProps {
   emailId: number;
   /** Permite sincronizar la cantidad de notas con el exterior si se necesita. */
   onNotesCountChange?: (count: number) => void;
 }
+
+export interface ConversationNotesHandle {
+  appendNote: (note: EmailNoteResponse) => void;
+}
+
+const POPOVER_ADD_FORM_KEY = "popover-add-form";
+const ADD_NOTE_PANEL_FORM_KEY = "add-note-panel-form";
+
+function mergeNotes(
+  fetched: EmailNoteResponse[],
+  local: EmailNoteResponse[] | null,
+): EmailNoteResponse[] {
+  if (!local?.length) return fetched;
+  const byId = new Map(fetched.map((note) => [note.id, note]));
+  for (const note of local) {
+    if (!byId.has(note.id)) byId.set(note.id, note);
+  }
+  return [...byId.values()].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+}
+
+/** Misma gramática que TextAreaField autoGrow: una línea al inicio, crece sin scroll interno. */
+const NOTE_TEXTAREA_CLASS = `w-full rounded-edge border bg-white px-3 py-2.5 text-[13px] leading-relaxed text-ink outline-none
+  transition-[height,border-color,box-shadow] duration-200 ease-plf-spring motion-reduce:transition-none placeholder:text-faint
+  border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10 shadow-2xs
+  ${TEXTAREA_AUTO_GROW_CLASS}`;
 
 function formatNoteTime(iso: string): string {
   const date = new Date(iso);
@@ -29,7 +74,8 @@ function formatNoteTime(iso: string): string {
   return date.toLocaleDateString("es-419", { day: "2-digit", month: "short" });
 }
 
-export function ConversationNotes({ emailId, onNotesCountChange }: ConversationNotesProps) {
+export const ConversationNotes = forwardRef<ConversationNotesHandle, ConversationNotesProps>(
+  function ConversationNotes({ emailId, onNotesCountChange }, ref) {
   const { user } = useAuth();
   const [notes, setNotes] = useState<EmailNoteResponse[] | null>(null);
   const [open, setOpen] = useState(false);
@@ -42,6 +88,36 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
   const triggerRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { mounted, exiting, ref: popoverRef } = useDisclosureMotion<HTMLDivElement>(open);
+
+  const addFormKeys = useMemo(() => (showAddForm ? [POPOVER_ADD_FORM_KEY] : []), [showAddForm]);
+  const addFormMotion = useAppleListMotion(addFormKeys, {
+    minItems: 0,
+    enterMs: COMPOSER_FIELD_ENTER_MS,
+    exitMs: COMPOSER_FIELD_EXIT_MS,
+  });
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      appendNote(note) {
+        setNotes((prev) => {
+          const list = prev ?? [];
+          if (list.some((item) => item.id === note.id)) return prev;
+          const next = [...list, note];
+          onNotesCountChange?.(next.length);
+          return next;
+        });
+      },
+    }),
+    [onNotesCountChange],
+  );
+
+  const closeAddForm = useCallback(() => {
+    addFormMotion.requestRemove(POPOVER_ADD_FORM_KEY, () => {
+      setShowAddForm(false);
+      setDraft("");
+    });
+  }, [addFormMotion]);
 
   const closePopover = useCallback(() => setOpen(false), []);
 
@@ -62,8 +138,11 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
       .notes(emailId)
       .then((list) => {
         if (!cancelled) {
-          setNotes(list);
-          onNotesCountChange?.(list.length);
+          setNotes((prev) => {
+            const merged = mergeNotes(list, prev);
+            onNotesCountChange?.(merged.length);
+            return merged;
+          });
         }
       })
       .catch(() => {
@@ -103,14 +182,14 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
     if (open && (notes?.length === 0 || showAddForm)) {
       setTimeout(() => {
         textareaRef.current?.focus();
-        resizeNoteTextarea(textareaRef.current);
+        autoResizeTextarea(textareaRef.current, TEXTAREA_ONE_LINE_MIN_PX);
       }, 80);
     }
   }, [open, showAddForm, notes]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (open && (notes?.length === 0 || showAddForm)) {
-      resizeNoteTextarea(textareaRef.current);
+      autoResizeTextarea(textareaRef.current, TEXTAREA_ONE_LINE_MIN_PX);
     }
   }, [open, showAddForm, notes, draft]);
 
@@ -124,8 +203,7 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
       const nextNotes = [...(notes ?? []), newNote];
       setNotes(nextNotes);
       onNotesCountChange?.(nextNotes.length);
-      setDraft("");
-      setShowAddForm(false);
+      closeAddForm();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");
     } finally {
@@ -279,89 +357,219 @@ export function ConversationNotes({ emailId, onNotesCountChange }: ConversationN
             </div>
           </div>
 
-          {/* Listado de todas las notas */}
-          <div className="flex max-h-56 flex-col gap-2 overflow-y-auto pr-0.5">
-            {[...(notes ?? [])].reverse().map((note) => (
-              <div
-                key={note.id}
-                data-motion-item
-                className="group/item relative rounded-lg border border-amber-200/90 bg-amber-50/70 p-2.5 shadow-2xs transition-colors
-                  hover:bg-amber-50"
-              >
-                <div className="flex items-center justify-between text-[10.5px]">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="font-semibold text-amber-950">{note.authorName}</span>
-                    <span className="text-amber-300">·</span>
-                    <span className="text-amber-800/80">{formatDateTime(note.createdAt)}</span>
-                  </div>
-                  {(user?.staffId === note.staffId || user?.isAdmin) && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleRemove(note, e)}
-                      aria-label="Borrar esta nota"
-                      title="Borrar nota"
-                      className="text-amber-400 opacity-60 transition-opacity hover:text-brand-red hover:opacity-100"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-                <p className="mt-1.5 whitespace-pre-wrap text-[12px] leading-relaxed text-amber-950 font-normal">
-                  {note.body}
-                </p>
-              </div>
-            ))}
+          <div className="max-h-64 overflow-y-auto pr-0.5">
+            <InternalNoteThread
+              density="compact"
+              notes={(notes ?? []).map((note) => ({
+                id: note.id,
+                parentId: note.parentId ?? null,
+                authorStaffId: note.staffId,
+                authorName: note.authorName,
+                body: note.body,
+                createdAt: note.createdAt,
+              }))}
+              currentStaffId={user?.staffId}
+              canReply={Boolean(user)}
+              onReply={async (parentId, body) => {
+                const created = await emailsApi.addNote(emailId, body, parentId);
+                setNotes((prev) => {
+                  const list = prev ?? [];
+                  const next = mergeNotes(list, [created]);
+                  onNotesCountChange?.(next.length);
+                  return next;
+                });
+              }}
+            />
           </div>
 
-          {/* Formulario para agregar nota */}
+          {/* Formulario para agregar nota (misma entrada que CC/CCO) */}
           {(showAddForm || count === 0) && (
-            <div className={`flex flex-col gap-1.5 ${count > 0 ? "mt-3 border-t border-zinc-100 pt-2.5" : ""}`}>
-              <textarea
-                ref={textareaRef}
-                value={draft}
-                onChange={(event) => {
-                  setDraft(event.target.value);
-                  resizeNoteTextarea(event.target);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Escribe una nota para el equipo… (Ctrl+Enter para guardar)"
-                rows={2}
-                maxLength={4000}
-                className="w-full min-h-[60px] max-h-[340px] resize-none overflow-hidden rounded-lg border border-zinc-200
-                  bg-white px-3 py-2 text-[12px] leading-relaxed text-zinc-900 shadow-2xs outline-none transition-all placeholder:text-zinc-400
-                  focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20"
-              />
-              {error && <span className="text-[11px] font-medium text-brand-red-dark">{error}</span>}
-              <div className="flex items-center justify-between pt-0.5">
-                <span className="text-[11px] text-zinc-400">Ctrl+Enter para guardar</span>
-                <div className="flex items-center gap-1.5">
-                  {count > 0 && (
+            <AppleMotionBlock
+              phase={addFormMotion.phaseFor(POPOVER_ADD_FORM_KEY)}
+              rowPreset="composer"
+              className={count > 0 ? "mt-3 border-t border-zinc-100 pt-2.5" : ""}
+            >
+              <div className="flex flex-col gap-1.5">
+                <textarea
+                  ref={textareaRef}
+                  value={draft}
+                  onChange={(event) => {
+                    setDraft(event.target.value);
+                    autoResizeTextarea(event.target, TEXTAREA_ONE_LINE_MIN_PX);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Escribe una nota para el equipo… (Ctrl+Enter para guardar)"
+                  rows={1}
+                  maxLength={4000}
+                  className={NOTE_TEXTAREA_CLASS}
+                />
+                {error && <span className="text-[11px] font-medium text-brand-red-dark">{error}</span>}
+                <div className="flex items-center justify-between pt-0.5">
+                  <span className="text-[11px] text-zinc-400">Ctrl+Enter para guardar</span>
+                  <div className="flex items-center gap-1.5">
+                    {count > 0 && (
+                      <button
+                        type="button"
+                        onClick={closeAddForm}
+                        className="h-7 rounded-lg px-2 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => {
-                        setShowAddForm(false);
-                        setDraft("");
-                      }}
-                      className="h-7 rounded-lg px-2 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+                      onClick={handleAdd}
+                      disabled={busy || !draft.trim()}
+                      className="h-7 rounded-lg border border-zinc-900 bg-zinc-900 px-2.5 text-[11px] font-semibold text-white
+                        shadow-2xs outline-none transition-all hover:bg-zinc-800 disabled:opacity-40 active:scale-95"
                     >
-                      Cancelar
+                      {busy ? "Guardando…" : "Guardar nota"}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleAdd}
-                    disabled={busy || !draft.trim()}
-                    className="h-7 rounded-lg border border-zinc-900 bg-zinc-900 px-2.5 text-[11px] font-semibold text-white
-                      shadow-2xs outline-none transition-all hover:bg-zinc-800 disabled:opacity-40 active:scale-95"
-                  >
-                    {busy ? "Guardando…" : "Guardar nota"}
-                  </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </AppleMotionBlock>
           )}
         </div>
       )}
     </div>
   );
+},
+);
+
+interface AddNotePanelProps {
+  emailId: number;
+  onNoteAdded: (note: EmailNoteResponse) => void;
 }
+
+/** El creador se mantiene al pie de la conversacion, donde estaba antes. */
+export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const formKeys = useMemo(() => (open ? [ADD_NOTE_PANEL_FORM_KEY] : []), [open]);
+  const formMotion = useAppleListMotion(formKeys, {
+    minItems: 0,
+    enterMs: COMPOSER_FIELD_ENTER_MS,
+    exitMs: COMPOSER_FIELD_EXIT_MS,
+  });
+
+  const closeForm = useCallback(
+    (afterClose?: () => void) => {
+      formMotion.requestRemove(ADD_NOTE_PANEL_FORM_KEY, () => {
+        setOpen(false);
+        setDraft("");
+        afterClose?.();
+      });
+    },
+    [formMotion],
+  );
+
+  function toggleForm() {
+    if (open) {
+      closeForm();
+      return;
+    }
+    if (formMotion.isExiting(ADD_NOTE_PANEL_FORM_KEY)) return;
+    setOpen(true);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setTimeout(() => {
+      textareaRef.current?.focus();
+      autoResizeTextarea(textareaRef.current, TEXTAREA_ONE_LINE_MIN_PX);
+    }, 120);
+    return () => window.clearTimeout(id);
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (open) autoResizeTextarea(textareaRef.current, TEXTAREA_ONE_LINE_MIN_PX);
+  }, [open, draft]);
+
+  async function add() {
+    const body = draft.trim();
+    if (!body || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const newNote = await emailsApi.addNote(emailId, body);
+      closeForm(() => onNoteAdded(newNote));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="shrink-0 border-t border-zinc-200/80 bg-zinc-50/50">
+      <button
+        type="button"
+        onClick={toggleForm}
+        className="group flex w-full items-center gap-2.5 px-4 py-2 text-left outline-none transition-colors hover:bg-zinc-100/70 select-none cursor-pointer"
+      >
+        <div className="flex size-5.5 shrink-0 items-center justify-center rounded-md bg-amber-100/90 text-amber-700 shadow-2xs">
+          <StickyNote className="h-3 w-3" />
+        </div>
+        <span className="font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-600 group-hover:text-zinc-900 transition-colors">
+          Agregar nota interna
+        </span>
+        <span className="ml-auto rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-zinc-600 shadow-2xs group-hover:border-zinc-300 group-hover:text-zinc-900 transition-all">
+          {open || formMotion.isExiting(ADD_NOTE_PANEL_FORM_KEY) ? "Ocultar" : "Mostrar"}
+        </span>
+      </button>
+
+      {open && (
+        <AppleMotionBlock phase={formMotion.phaseFor(ADD_NOTE_PANEL_FORM_KEY)} rowPreset="composer">
+          <div className="flex flex-col gap-2.5 px-4 pb-3.5 pt-1">
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                autoResizeTextarea(event.target, TEXTAREA_ONE_LINE_MIN_PX);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                  event.preventDefault();
+                  void add();
+                }
+              }}
+              placeholder="Escribe una nota para el equipo… (Ctrl+Enter para guardar)"
+              rows={1}
+              maxLength={4000}
+              className={NOTE_TEXTAREA_CLASS}
+            />
+            {error && <span className="text-[11px] font-medium text-brand-red-dark">{error}</span>}
+            <div className="flex items-center justify-between pt-0.5">
+              <span className="text-[11px] text-zinc-400">Ctrl+Enter para guardar</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => closeForm()}
+                  className="h-7.5 rounded-lg px-2.5 text-[11.5px] font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={add}
+                  disabled={busy || !draft.trim()}
+                  className="h-7.5 rounded-lg border border-zinc-900 bg-zinc-900 px-3 text-[11.5px] font-semibold text-white shadow-2xs
+                    transition-all hover:bg-zinc-800 active:scale-95 disabled:opacity-40 cursor-pointer"
+                >
+                  {busy ? "Guardando…" : "Guardar nota"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </AppleMotionBlock>
+      )}
+    </div>
+  );
+}
+

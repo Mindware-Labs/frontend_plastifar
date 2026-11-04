@@ -50,7 +50,9 @@ const MOVE_TOOLS: Record<Exclude<FolderKey, "sent">, Tool[]> = {
 
 interface SelectionBarProps {
   folder: Exclude<FolderKey, "sent">;
-  /** Eliminar definitivamente es de administradores: a los demas no se les muestra. */
+  /** Archivar, destacar, papelera y restaurar exigen mail.manage. */
+  canManage: boolean;
+  /** Eliminar definitivamente exige mail.delete. */
   canDelete: boolean;
   count: number;
   pageState: boolean | "mixed";
@@ -66,8 +68,17 @@ const toolClass =
   "text-zinc-600 shadow-2xs outline-none transition-all duration-150 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 " +
   "active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 disabled:cursor-not-allowed disabled:opacity-40";
 
+const MANAGE_ACTIONS = new Set<EmailBulkAction>([
+  "archive",
+  "star",
+  "unstar",
+  "trash",
+  "restore",
+]);
+
 export function SelectionBar({
   folder,
+  canManage,
   canDelete,
   count,
   pageState,
@@ -77,9 +88,11 @@ export function SelectionBar({
   onClear,
   onAction,
 }: SelectionBarProps) {
-  const tools = [...READ_TOOLS, ...MOVE_TOOLS[folder]].filter(
-    (tool) => tool.action !== "delete" || canDelete,
-  );
+  const tools = [...READ_TOOLS, ...MOVE_TOOLS[folder]].filter((tool) => {
+    if (tool.action === "delete") return canDelete;
+    if (MANAGE_ACTIONS.has(tool.action)) return canManage;
+    return true;
+  });
 
   return (
     <div

@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { ApiError } from "../api/client";
-import { useUrlNumber } from "./useUrlState";
 
 interface PagedData {
   page: number;
@@ -13,8 +11,8 @@ interface Options<TQuery extends { page: number }, TData extends PagedData> {
   /** Todo lo que no es la pagina. Cambiar cualquier criterio vuelve a la primera. */
   criteria: Omit<TQuery, "page">;
   fallbackError: string;
-  /** Parametro de la URL donde se guarda la pagina (p. ej. "pagina"). Sin el, la pagina no sobrevive a la navegacion. */
-  pageKey?: string;
+  /** Si es false, no se dispara la peticion (p. ej. esperar pestañas de bandeja). */
+  enabled?: boolean;
 }
 
 /** Listado paginado con descarte de respuestas obsoletas y persistencia de vista. */
@@ -22,27 +20,21 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
   fetch,
   criteria,
   fallbackError,
-  pageKey,
+  enabled = true,
 }: Options<TQuery, TData>) {
-  const [page, setPage] = useUrlNumber(pageKey, 1);
+  const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<{ key: string; data: TData } | null>(null);
 
   const criteriaKey = JSON.stringify(criteria);
   const [lastCriteria, setLastCriteria] = useState(criteriaKey);
-  // Si filtros y pagina llegan juntos desde la URL (atras/adelante, un enlace),
-  // la pagina de la URL manda: no se vuelve a la primera.
-  const locationKey = useLocation().key;
-  const [lastLocation, setLastLocation] = useState(locationKey);
   if (criteriaKey !== lastCriteria) {
     setLastCriteria(criteriaKey);
-    if (locationKey === lastLocation) setPage(1);
+    setPage(1);
   }
-  if (locationKey !== lastLocation) setLastLocation(locationKey);
 
   const queryJson = JSON.stringify({ ...criteria, page });
-  const queryKey = `${queryJson}|${reloadKey}`;
 
   // La funcion de consulta se lee por ref: el efecto no debe reejecutarse por ella.
   const fetchRef = useRef(fetch);
@@ -51,13 +43,15 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
   });
 
   useEffect(() => {
+    if (!enabled) return;
+
     let cancelled = false;
 
     fetchRef
       .current(JSON.parse(queryJson) as TQuery)
       .then((data) => {
         if (cancelled) return;
-        setSnapshot({ key: `${queryJson}|${reloadKey}`, data });
+        setSnapshot({ key: queryJson, data });
         setError(null);
       })
       .catch((err) => {
@@ -68,15 +62,15 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
     return () => {
       cancelled = true;
     };
-  }, [queryJson, reloadKey, fallbackError]);
+  }, [queryJson, reloadKey, fallbackError, enabled]);
 
   const data = snapshot?.data ?? null;
-  const isStale = snapshot !== null && snapshot.key !== queryKey;
+  const isStale = snapshot !== null && snapshot.key !== queryJson;
 
   // Borrar la ultima fila de la ultima pagina deja la pagina fuera de rango.
   if (data && data.totalPages > 0 && page > data.totalPages) setPage(data.totalPages);
 
-  /** Tras cada cambio se relee la pagina: totales y contadores vienen del servidor. */
+  /** Tras cada cambio se relee la pagina en segundo plano sin marcar la vista como obsoleta. */
   const refresh = useCallback(() => {
     setReloadKey((value) => value + 1);
   }, []);

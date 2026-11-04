@@ -1,45 +1,47 @@
 import {
-  AlertOctagon,
-  AlertTriangle,
   Building2,
-  CheckCircle2,
+  Check,
   ChevronDown,
   Clock,
-  Flag,
+  Copy,
+  Lock,
+  Package,
   Plus,
   SlidersHorizontal,
   Ticket as TicketIcon,
   X,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { animateCardGridPageTurn, consumePageDirection } from "../../hooks/motion";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
 import { useNavigate } from "react-router-dom";
-import { FilterDropdown, type FilterOption } from "../../components/ui/FilterDropdown";
+import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
+import { priorityFilterDefaultIcon, priorityFilterOptions } from "../../lib/priorityFilterOptions";
+import { formatTicketProductsSummary } from "../../lib/ticketProducts";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { SEGMENTED_TAB_COUNT_BADGE_CLASS } from "../../components/ui/SegmentedTabs";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
-import { EmptyResult } from "../../components/ui/EmptyResult";
+import type { SortDir } from "../../components/ui/DataTable";
 import { Modal } from "../../components/ui/Modal";
 import { Pagination } from "../../components/ui/Pagination";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Select } from "../../components/ui/Select";
 import { SelectBox } from "../../components/ui/SelectBox";
-import { Spinner } from "../../components/ui/Spinner";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { TicketCardsSkeleton } from "../../components/ui/Skeleton";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
-import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { formatActivityDate, formatSlaRemaining } from "../../lib/format";
-import { idParam } from "../../lib/idParam";
 import type {
   DepartmentResponse,
   TicketCounts,
@@ -48,10 +50,11 @@ import type {
   TicketQuery,
   TicketStaffOptionResponse,
 } from "../../types/api";
+import { usePermissions } from "../../hooks/usePermissions";
 import { CreateTicketModal } from "./CreateTicketModal";
 import { AssigneeCell, PriorityCell, SlaCell, StatusCell } from "./ticketCells";
 import { TicketSelectionBar } from "./TicketSelectionBar";
-import { PAGE_SIZES } from "../../lib/pageSizes";
+import { TICKETS_LIST_ROUTES, type TicketOriginFilter } from "./ticketLegacy";
 
 type TicketFilterKey = "todos" | "abiertos" | "por-vencer" | "vencidos" | "espera" | "cerrados";
 type SortKey = "numero" | "asunto" | "cliente" | "departamento" | "prioridad" | "estado" | "sla" | "actividad";
@@ -65,32 +68,27 @@ interface TicketFilter {
 const filters: TicketFilter[] = [
   { key: "todos", label: "Todos", countKey: "all" },
   { key: "abiertos", label: "Abiertos", countKey: "open" },
-  { key: "por-vencer", label: "Por vencer", countKey: "upcoming" },
   { key: "vencidos", label: "Vencidos", countKey: "overdue" },
   { key: "espera", label: "En espera del cliente", countKey: "waitingOnClient" },
   { key: "cerrados", label: "Cerrados", countKey: "closed" },
 ];
 
-// Solo dos tags visibles en la barra principal; el resto queda en el menú Más.
-const FILTER_KEYS = filters.map((f) => f.key);
-const PRIMARY_FILTER_KEYS: TicketFilterKey[] = ["todos", "abiertos"];
-const primaryFilters = filters.filter((f) => PRIMARY_FILTER_KEYS.includes(f.key));
-const secondaryFilters = filters.filter((f) => !PRIMARY_FILTER_KEYS.includes(f.key));
+const primaryFilters = filters.filter((f) => f.key === "todos" || f.key === "abiertos");
 
-// Tabla de anchos fijos: el asunto absorbe lo que sobra y las columnas secundarias entran por escalones.
-const columns: { key: SortKey; label: string; className: string }[] = [
-  { key: "numero", label: "Número", className: "w-[100px]" },
-  { key: "asunto", label: "Asunto", className: "" },
-  { key: "cliente", label: "Cliente", className: "hidden w-[160px] lg:table-cell" },
-  { key: "departamento", label: "Departamento", className: "hidden w-[125px] 2xl:table-cell" },
-  { key: "prioridad", label: "Prioridad", className: "hidden w-[96px] md:table-cell" },
-  { key: "estado", label: "Estado", className: "w-[115px]" },
-  { key: "sla", label: "SLA", className: "w-[110px]" },
-  { key: "actividad", label: "Actividad", className: "hidden w-[120px] xl:table-cell" },
+// Múltiplos de 3 para mantener la simetría exacta de la cuadrícula 3×3 en escritorio.
+const CARD_PAGE_SIZES = [9, 18, 27, 45];
+
+const DEFAULT_SORT_VALUE = "actividad:desc";
+
+const sortFilterOptions: TicketFilterOption[] = [
+  { value: "actividad:desc", label: "Actividad reciente" },
+  { value: "actividad:asc", label: "Actividad más antigua" },
+  { value: "sla:asc", label: "SLA próximo a vencer" },
+  { value: "prioridad:desc", label: "Mayor prioridad" },
+  { value: "numero:desc", label: "Código (recientes)" },
+  { value: "cliente:asc", label: "Cliente (A–Z)" },
+  { value: "departamento:asc", label: "Departamento (A–Z)" },
 ];
-
-const SELECT_COLUMN = "w-10 px-2 text-center";
-const ASSIGNED_COLUMN = "hidden w-[145px] lg:table-cell";
 
 const clientColors = [
   "bg-sky-400",
@@ -118,19 +116,17 @@ const priorityOptions = [
   { value: "Baja", label: "Baja" },
 ];
 
-const PRIORITY_KEYS = ["todas", ...priorityOptions.map((option) => option.value)];
+const SORT_MENU_WIDTH = 248;
 
-const STATUS_MENU_WIDTH = 224;
-
-interface TicketStatusMenuProps {
-  options: TicketFilter[];
-  activeKey: TicketFilterKey;
-  counts?: TicketCounts;
-  onSelect: (key: TicketFilterKey) => void;
+interface TicketSortMenuProps {
+  sortValue: string;
+  sortOptions: TicketFilterOption[];
+  onSortChange: (value: string) => void;
+  hasOverdueTickets?: boolean;
 }
 
-/** Vistas de estado menos usadas, en un panel flotante (mismo patron que el filtro de la bandeja de correo). */
-function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatusMenuProps) {
+/** Orden de las tarjetas (sin vistas duplicadas respecto a los filtros del encabezado). */
+function TicketSortMenu({ sortValue, sortOptions, onSortChange, hasOverdueTickets }: TicketSortMenuProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ top: number; left: number; originX: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -176,14 +172,13 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
     }
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const left = Math.max(8, rect.right - STATUS_MENU_WIDTH);
+    const left = Math.max(8, rect.right - SORT_MENU_WIDTH);
     setAnchor({ top: rect.bottom + 6, left, originX: rect.left + rect.width / 2 - left });
     setOpen(true);
   }
 
-  const active = options.find((option) => option.key === activeKey);
-  const activeCount = active && counts ? counts[active.countKey] : 0;
-  const hasOverdueSecondary = (counts?.overdue ?? 0) > 0;
+  const activeSort = sortOptions.find((option) => option.value === sortValue);
+  const menuLabel = activeSort?.label ?? "Ordenar por";
 
   return (
     <div className="relative shrink-0">
@@ -194,28 +189,18 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={mounted ? panelId : undefined}
-        aria-label={active ? `Más vistas (activa: ${active.label})` : "Más vistas"}
-        title={active ? `Vista activa: ${active.label}` : "Más vistas"}
-        className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-          active || open
-            ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+        aria-label={`Ordenar por (activo: ${menuLabel})`}
+        title={`Orden: ${menuLabel}`}
+        className={`inline-flex h-7 w-[11rem] shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] font-medium transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+          open
+            ? "border-zinc-200 bg-white text-zinc-900 shadow-2xs"
+            : "border-transparent text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
         }`}
       >
-        <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
-        <span>{active ? active.label : "Más"}</span>
-        {active ? (
-          <span
-            className={`font-heading text-[10px] font-bold leading-none tabular-nums ${
-              active.key === "vencidos" && activeCount > 0 ? "text-brand-red" : "text-zinc-900"
-            }`}
-          >
-            {activeCount}
-          </span>
-        ) : (
-          hasOverdueSecondary && (
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-red" title="Hay tickets vencidos" />
-          )
+        <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+        <span className="min-w-0 truncate">{menuLabel}</span>
+        {hasOverdueTickets && (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red" title="Hay tickets vencidos" />
         )}
         <ChevronDown
           className={`h-3 w-3 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-zinc-700" : ""}`}
@@ -229,14 +214,14 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
             ref={panelRef}
             id={panelId}
             role="menu"
-            aria-label="Más vistas de estado"
+            aria-label="Ordenar tickets"
             aria-hidden={exiting}
             onKeyDown={handleMenuKeyDown}
             style={{
               position: "fixed",
               top: anchor.top,
               left: anchor.left,
-              width: STATUS_MENU_WIDTH,
+              width: SORT_MENU_WIDTH,
               transformOrigin: `${anchor.originX}px top`,
             }}
             className={`z-[60] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
@@ -245,43 +230,30 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
               }`}
           >
             <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
-              Vistas de estado
+              Ordenar por
             </div>
-            {options.map(({ key, label, countKey }) => {
-              const isActive = key === activeKey;
-              const count = counts?.[countKey] ?? 0;
-              const isOverdue = key === "vencidos" && count > 0;
+            {sortOptions.map(({ value, label }) => {
+              const isActive = value === sortValue;
               return (
                 <button
-                  key={key}
+                  key={value}
                   data-motion-item
                   type="button"
                   role="menuitemradio"
                   aria-checked={isActive}
                   onClick={() => {
-                    onSelect(key);
+                    onSortChange(value);
                     setOpen(false);
                     triggerRef.current?.focus();
                   }}
-                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left
-                    text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-                      isActive
-                        ? "bg-zinc-100 font-semibold text-zinc-900"
-                        : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-zinc-900"
-                    }`}
+                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                    isActive
+                      ? "bg-zinc-100 font-semibold text-zinc-900"
+                      : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-zinc-900"
+                  }`}
                 >
-                  <span className={isOverdue ? "font-semibold text-brand-red" : ""}>{label}</span>
-                  <span
-                    className={`rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums ${
-                      isOverdue
-                        ? "bg-red-50 text-brand-red font-bold"
-                        : isActive
-                        ? "bg-zinc-200 text-zinc-900"
-                        : "bg-zinc-100 text-zinc-500"
-                    }`}
-                  >
-                    {count}
-                  </span>
+                  <span>{label}</span>
+                  {isActive ? <Check className="size-3.5 shrink-0 text-zinc-600" aria-hidden /> : null}
                 </button>
               );
             })}
@@ -292,22 +264,240 @@ function TicketStatusMenu({ options, activeKey, counts, onSelect }: TicketStatus
   );
 }
 
+interface TicketCardProps {
+  ticket: TicketListItemResponse;
+  checked: boolean;
+  department: string | null;
+  onToggleSelect: (id: number) => void;
+  onOpen: (id: number) => void;
+}
 
-/** Bandeja de tickets: cada fila abre el detalle; marcar filas cambia la barra de criterios por la de acciones. */
-export function TicketsPage() {
+/**
+ * Ficha arquitectónica simétrica de ticket.
+ *
+ * Diseñada en cuatro zonas de altura determinista para que las 9 tarjetas de la
+ * cuadrícula 3×3 mantengan una alineación horizontal y vertical idéntica:
+ * 1. Barra superior (`h-6`): Selección + Código íntegro a la izquierda; Prioridad + Estado a la derecha.
+ * 2. Núcleo de asunto (`h-[40px]`): Hasta 2 líneas en Onest (`line-clamp-2`) con altura bloqueada.
+ * 3. Panel hundido (`rounded-inset`): 2 franjas de ancho completo (Cliente con código y Departamento con ruta)
+ *    + 1 franja inferior bisecada al 50/50 (Motivo | Compromiso SLA).
+ * 4. Pie operativo (`h-7`): Responsable con avatar a la izquierda; Productos + Actividad a la derecha.
+ */
+function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: TicketCardProps) {
+  const [copied, setCopied] = useState(false);
+  const sla = formatSlaRemaining(t.resolutionDueAt, Boolean(t.pausedAt), t.status, t.closedAt);
+  const activity = formatActivityDate(t.lastActivityAt);
+  const client = t.clientName && t.clientName !== "Sin cliente" ? t.clientName : null;
+  const clientCode = t.clientCode && t.clientCode !== "-" ? t.clientCode : null;
+  const productsSummary = formatTicketProductsSummary(t.products);
+  const productCount = t.products?.length ?? 0;
+
+  return (
+    <article
+      tabIndex={0}
+      role="button"
+      aria-label={`Abrir ticket ${t.number}: ${t.subject}`}
+      data-checked={checked || undefined}
+      onClick={() => onOpen(t.id)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(t.id);
+        }
+      }}
+      className={`group relative flex flex-col justify-between rounded-card border bg-white p-4 outline-none transition-all duration-180 ${
+        checked
+          ? "border-brand-red/45 ring-2 ring-brand-red/12 shadow-card"
+          : "border-line shadow-card hover:border-hairline-hover/70 focus-visible:ring-2 focus-visible:ring-brand-red/25"
+      }`}
+    >
+      {/* Zona 1: Cabecera de Identidad y Estado (Simetría bilateral) */}
+      <div className="flex h-6 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <SelectBox
+            checked={checked}
+            label={`Seleccionar ${t.number}`}
+            onToggle={() => onToggleSelect(t.id)}
+          />
+          <span className="font-heading text-[12.5px] font-bold tabular-nums tracking-[0.01em] text-ink">
+            {t.number}
+          </span>
+          <button
+            type="button"
+            title={`Copiar código ${t.number}`}
+            aria-label={`Copiar código ${t.number}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              void navigator.clipboard.writeText(t.number);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1400);
+            }}
+            className="inline-flex size-5 shrink-0 items-center justify-center rounded text-faint opacity-0 transition-opacity hover:bg-canvas hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+          >
+            {copied ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+          </button>
+          {t.accessLevel === "readOnly" && (
+            <span
+              title="Solo lectura"
+              className="inline-flex items-center text-faint"
+              aria-label="Ticket de solo lectura"
+            >
+              <Lock className="size-3" />
+            </span>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <PriorityCell priority={t.priority} />
+          <span aria-hidden className="h-3 w-px bg-line" />
+          <StatusCell status={t.status} />
+        </div>
+      </div>
+
+      {/* Zona 2: Núcleo del Asunto (Altura bloqueada de 40px = 2 líneas exactas para alineación de fila) */}
+      <div className="mt-2.5 flex h-[40px] items-start">
+        <h3
+          className="line-clamp-2 font-heading text-[13.5px] font-bold leading-[20px] tracking-[-0.012em] text-ink transition-colors group-hover:text-brand-red"
+          title={t.subject}
+        >
+          {t.subject}
+        </h3>
+      </div>
+
+      {/* Zona 3: Panel Hundido Simétrico (Cliente + Departamento a ancho completo + Bisección 50/50 Motivo/SLA) */}
+      <div className="mt-3 overflow-hidden rounded-inset border border-line bg-canvas/85 divide-y divide-line">
+        {/* Fila 1: Cliente (ancho completo, eje de rótulo fijo en 78px y código a la derecha) */}
+        <div
+          className="grid h-8.5 grid-cols-[78px_1fr] items-center gap-2.5 px-3"
+          title={client ? `${client}${clientCode ? ` (#${clientCode})` : ""}` : "Sin cliente asignado"}
+        >
+          <div className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className={`h-2 w-2 shrink-0 rounded-full ${
+                client ? getClientDotColor(client) : "bg-zinc-300"
+              }`}
+            />
+            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
+              Cliente
+            </span>
+          </div>
+
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <span
+              className={`truncate text-[12px] ${
+                client ? "font-semibold text-ink" : "font-normal text-faint"
+              }`}
+            >
+              {client ?? "Sin cliente"}
+            </span>
+            {clientCode && (
+              <span className="shrink-0 rounded border border-line bg-white px-1.5 py-0.5 font-heading text-[10px] font-bold leading-none tabular-nums text-subtle">
+                #{clientCode}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Fila 2: Departamento (ancho completo, mismo eje de rótulo de 78px) */}
+        <div
+          className="grid h-8.5 grid-cols-[78px_1fr] items-center gap-2.5 px-3"
+          title={department ?? "Sin departamento"}
+        >
+          <div className="flex items-center gap-1.5">
+            <Building2 aria-hidden className="size-3 shrink-0 text-faint" />
+            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
+              Depto.
+            </span>
+          </div>
+
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <span
+              className={`truncate text-[12px] ${
+                department ? "font-medium text-ink" : "font-normal text-faint"
+              }`}
+            >
+              {department ?? "Sin departamento"}
+            </span>
+          </div>
+        </div>
+
+        {/* Fila 3: Bisección Simétrica 50/50 (Motivo | Compromiso SLA) */}
+        <div className="grid h-[48px] grid-cols-2 divide-x divide-line bg-white/55">
+          <div
+            className="flex min-w-0 flex-col justify-center gap-0.5 px-3"
+            title={t.topicName ?? "Sin motivo"}
+          >
+            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
+              Motivo
+            </span>
+            <span className="truncate text-[11.5px] font-medium text-ink">
+              {t.topicName ?? "Sin motivo"}
+            </span>
+          </div>
+
+          <div className="flex min-w-0 flex-col justify-center gap-0.5 px-3">
+            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
+              Compromiso SLA
+            </span>
+            <div className="flex min-w-0 items-center">
+              <SlaCell sla={sla} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Zona 4: Pie Operativo Simétrico (Responsable a la izquierda; Productos y Actividad a la derecha) */}
+      <div className="mt-3 flex h-7 items-center justify-between gap-2 border-t border-line-soft pt-2.5">
+        <div className="min-w-0 flex-1">
+          <AssigneeCell id={t.assignedStaffId} name={t.assignedStaffName} />
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2 text-[11.5px] text-subtle">
+          {productsSummary && (
+            <span
+              className="inline-flex max-w-[130px] items-center gap-1 truncate rounded-md border border-line bg-canvas px-1.5 py-0.5 text-[10.5px] font-medium text-subtle"
+              title={productsSummary}
+            >
+              <Package aria-hidden className="size-3 shrink-0 text-faint" />
+              <span className="truncate">
+                {productCount === 1 ? productsSummary : `${productCount} prod.`}
+              </span>
+            </span>
+          )}
+          <span
+            className="inline-flex items-center gap-1 whitespace-nowrap text-[11.5px] font-medium tabular-nums text-subtle"
+            title={`Última actividad: ${activity.full}`}
+          >
+            <Clock aria-hidden className="size-3 shrink-0 text-faint" />
+            {activity.compact}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+interface TicketsPageProps {
+  origin?: TicketOriginFilter;
+}
+
+/** Bandeja de tickets en cuadrícula simétrica 3×3 (9 por vista por defecto). */
+export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
   const navigate = useNavigate();
   const receipts = useReceipts();
   const { onTicketsChanged } = useEmailCounts();
+  const { can, isAdmin } = usePermissions();
+  const canReadAllDepartments = isAdmin || can("tickets.read_all");
 
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
-  // Criterios en la URL: volver desde el detalle deja la bandeja como estaba.
-  const [search, setSearch] = useUrlState<string>("q", "");
-  const [filter, setFilter] = useUrlState<TicketFilterKey>("estado", "todos", FILTER_KEYS);
-  const [departmentParam, setDepartmentParam] = useUrlState<string>("departamento", "todos");
-  const departmentId: number | "todos" = idParam(departmentParam) ?? "todos";
-  const [priority, setPriority] = useUrlState<string>("prioridad", "todas", PRIORITY_KEYS);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<TicketFilterKey>("todos");
+  const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
+  const [priority, setPriority] = useState<string>("todas");
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "actividad", dir: "desc" });
-  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
+  const [pageSize, setPageSize] = useState(9);
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -317,10 +507,31 @@ export function TicketsPage() {
   const [bulkPriority, setBulkPriority] = useState("Normal");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [staffOptions, setStaffOptions] = useState<TicketStaffOptionResponse[]>([]);
+  const prevOriginRef = useRef(origin);
+  const [listMotionKey, setListMotionKey] = useState(0);
+  const [listEnterMotion, setListEnterMotion] = useState<"forward" | "back">("forward");
 
   useEffect(() => {
     departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
   }, []);
+
+  useLayoutEffect(() => {
+    if (prevOriginRef.current === origin) return;
+    setListEnterMotion(origin === "legacy" ? "forward" : "back");
+    prevOriginRef.current = origin;
+    setFilter("todos");
+    setSelectedIds(new Set());
+    setListMotionKey((key) => key + 1);
+  }, [origin]);
+
+  // «Por vencer» ya no es vista aparte: mismo criterio que ordenar por SLA próximo a vencer.
+  useEffect(() => {
+    if (filter !== "por-vencer") return;
+    setFilter("todos");
+    setSort({ key: "sla", dir: "asc" });
+  }, [filter]);
+
+  const canCreateTicket = can("tickets.create");
 
   const { data, isStale, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
     fetch: ticketsApi.list,
@@ -330,19 +541,39 @@ export function TicketsPage() {
       departmentId: departmentId === "todos" ? undefined : departmentId,
       priority: priority === "todas" ? undefined : priority,
       status: filter,
+      origin,
       sort: sort.key,
       dir: sort.dir,
     },
     fallbackError: "No se pudieron cargar los tickets",
-    pageKey: "pagina",
   });
+
+  useLoadErrorReceipt(error, "tickets-list", refresh);
 
   useEffect(() => onTicketsChanged(refresh), [onTicketsChanged, refresh]);
 
-  const rows: TicketListItemResponse[] = data?.items ?? [];
-  const counts = data?.counts;
+  const listLoading = data === null || isStale;
+  const rows: TicketListItemResponse[] = isStale ? [] : (data?.items ?? []);
+  const counts = isStale ? undefined : data?.counts;
   const hasCriteria =
     Boolean(debouncedSearch) || filter !== "todos" || departmentId !== "todos" || priority !== "todas";
+
+  const cardsGridRef = useRef<HTMLDivElement>(null);
+  const prevCardIdsRef = useRef<string | null>(null);
+  const currentCardIds = rows.map((row) => row.id).join(",");
+
+  useLayoutEffect(() => {
+    const grid = cardsGridRef.current;
+    if (!grid || rows.length === 0) return;
+
+    const prev = prevCardIdsRef.current;
+    prevCardIdsRef.current = currentCardIds;
+
+    // En el primer montaje actúa plf-results-in; si los IDs son los mismos (ej. marcar selección), no reanimamos.
+    if (prev === null || prev === currentCardIds) return;
+
+    animateCardGridPageTurn(grid, consumePageDirection(), 3);
+  }, [currentCardIds, rows.length]);
 
   const visibleIds = rows.map((row) => row.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
@@ -407,14 +638,16 @@ export function TicketsPage() {
   function clearCriteria() {
     setSearch("");
     setFilter("todos");
-    setDepartmentParam("todos");
+    setDepartmentId("todos");
     setPriority("todas");
   }
 
-  function toggleSort(key: SortKey) {
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
-    );
+  const sortValue = `${sort.key}:${sort.dir}`;
+  function handleSortChange(next: string) {
+    const [nextKey, nextDir] = next.split(":") as [SortKey, SortDir];
+    if (nextKey && (nextDir === "asc" || nextDir === "desc")) {
+      setSort({ key: nextKey, dir: nextDir });
+    }
   }
 
   function openBulkAssign() {
@@ -461,46 +694,62 @@ export function TicketsPage() {
 
   const bulkIds = () => Array.from(selectedIds);
 
-  const departmentOptions = buildDepartmentFilterOptions(departments);
-  // Dos departamentos pueden llamarse igual bajo padres distintos: la columna
-  // rotula con el camino, como el filtro, y cae al nombre si el id no está.
+  const departmentOptions = useMemo(
+    () =>
+      buildDepartmentFilterOptions(
+        canReadAllDepartments
+          ? departments
+          : departments.filter((department) => can("tickets.read", department.id)),
+      ),
+    [can, canReadAllDepartments, departments],
+  );
+
+  useEffect(() => {
+    if (departmentId === "todos") return;
+    const allowed = departmentOptions.some((option) => Number(option.value) === departmentId);
+    if (!allowed) setDepartmentId("todos");
+  }, [departmentId, departmentOptions]);
+  // Rotula cada departamento con su ruta jerárquica para distinguir nombres repetidos y cae al nombre si falta el id.
   const departmentPathById = departmentPaths(departments);
 
-  const priorityFilterOptions: FilterOption[] = [
-    {
-      value: "todas",
-      label: "Todas las prioridades",
-      icon: <Flag className="h-4 w-4 text-zinc-500" />,
-    },
-    {
-      value: "Emergencia",
-      label: "Emergencia",
-      icon: <AlertOctagon className="h-4 w-4 text-brand-red" />,
-    },
-    {
-      value: "Alta",
-      label: "Alta",
-      icon: <AlertTriangle className="h-4 w-4 text-amber-500" />,
-    },
-    {
-      value: "Normal",
-      label: "Normal",
-      icon: <CheckCircle2 className="h-4 w-4 text-zinc-500" />,
-    },
-    {
-      value: "Baja",
-      label: "Baja",
-      icon: <Clock className="h-4 w-4 text-zinc-400" />,
-    },
-  ];
+  const priorityFilterOpts = priorityFilterOptions() as TicketFilterOption[];
 
   return (
     <div className="flex h-full flex-col">
       <ModuleHeader
         title="Tickets"
+        sections={[
+          {
+            label: (
+              <span className="flex items-center gap-1.5">
+                <span>Actuales</span>
+                {counts != null && (
+                  <span className={SEGMENTED_TAB_COUNT_BADGE_CLASS}>{counts.plastifar}</span>
+                )}
+              </span>
+            ),
+            to: TICKETS_LIST_ROUTES.actuales,
+            end: true,
+          },
+          {
+            label: (
+              <span className="flex items-center gap-1.5">
+                <span>Histórico</span>
+                {counts != null && (
+                  <span className={SEGMENTED_TAB_COUNT_BADGE_CLASS}>{counts.legacy}</span>
+                )}
+              </span>
+            ),
+            to: TICKETS_LIST_ROUTES.historico,
+            end: true,
+          },
+        ]}
         summary={
           counts ? (
-            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+            <div
+              key={origin}
+              className="animate-plf-header-fade flex flex-wrap items-center gap-1.5 tabular-nums"
+            >
               <HeaderTag
                 label={counts.all === 1 ? "ticket" : "tickets"}
                 count={counts.all}
@@ -555,21 +804,6 @@ export function TicketsPage() {
                 </>
               )}
 
-              {filter === "por-vencer" && (
-                <>
-                  <span aria-hidden className="text-zinc-300">·</span>
-                  <HeaderTag
-                    label="por vencer"
-                    count={counts.upcoming}
-                    active={filter === "por-vencer"}
-                    onClick={() => setFilter("por-vencer")}
-                    tone="amber"
-                    dot
-                    title="Filtrar por tickets por vencer"
-                  />
-                </>
-              )}
-
               {filter === "cerrados" && (
                 <>
                   <span aria-hidden className="text-zinc-300">·</span>
@@ -592,20 +826,27 @@ export function TicketsPage() {
           )
         }
         action={
-          <Button
-            size="sm"
-            onClick={() => setCreateModalOpen(true)}
-            className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
-            <span>Nuevo ticket</span>
-          </Button>
+          canCreateTicket && origin === "plastifar" ? (
+            <Button
+              size="sm"
+              onClick={() => setCreateModalOpen(true)}
+              className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              <span>Nuevo ticket</span>
+            </Button>
+          ) : undefined
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {/* Barra de herramientas en una sola línea: búsqueda y filtros a la izquierda, vistas de estado a la derecha */}
-        <div className="mb-3 grid min-h-8">
+      <div
+        key={listMotionKey}
+        className={`min-h-0 flex-1 overflow-y-auto pb-8 ${
+          listEnterMotion === "forward" ? "animate-plf-side-panel-in" : "animate-plf-side-panel-back"
+        }`}
+      >
+        {/* Barra de herramientas en una sola línea: selección, búsqueda, filtros y orden a la izquierda; vistas de estado a la derecha */}
+        <div className="mb-3.5 grid min-h-8">
           {showCriteria && (
             <div
               inert={criteriaExiting ? true : undefined}
@@ -614,37 +855,57 @@ export function TicketsPage() {
               }`}
             >
               <div className="flex flex-wrap items-center gap-2">
+                {visibleIds.length > 0 && (
+                  <div
+                    className="inline-flex h-8 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-2.5 shadow-2xs"
+                    title={
+                      pageState === true
+                        ? "Quitar la selección de esta página"
+                        : "Seleccionar las tarjetas de esta página"
+                    }
+                  >
+                    <SelectBox
+                      checked={pageState}
+                      label={
+                        pageState === true
+                          ? "Quitar la selección de esta página"
+                          : "Seleccionar toda la página"
+                      }
+                      onToggle={togglePage}
+                    />
+                  </div>
+                )}
+
                 <SearchInput
                   value={search}
                   onChange={setSearch}
                   placeholder="Buscar por número, asunto o cliente…"
-                  className="w-[280px] sm:w-[300px]"
+                  className="w-[260px] sm:w-[290px]"
                 />
-                <FilterDropdown
+                <TicketFilterDropdown
                   title="Seleccionar departamento"
                   value={String(departmentId)}
-                  onChange={setDepartmentParam}
+                  onChange={(next) => setDepartmentId(next === "todos" ? "todos" : Number(next))}
                   options={departmentOptions}
                   defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
                   aria-label="Filtrar por departamento"
                   searchable
                   searchPlaceholder="Buscar departamento…"
                 />
-                <FilterDropdown
+                <TicketFilterDropdown
                   title="Seleccionar prioridad"
                   value={priority}
                   onChange={setPriority}
-                  options={priorityFilterOptions}
-                  defaultIcon={<Flag className="h-4 w-4 text-zinc-500" />}
+                  options={priorityFilterOpts}
+                  defaultIcon={priorityFilterDefaultIcon}
                   aria-label="Filtrar por prioridad"
                 />
-
                 {(search || departmentId !== "todos" || priority !== "todas") && (
                   <button
                     type="button"
                     onClick={() => {
                       setSearch("");
-                      setDepartmentParam("todos");
+                      setDepartmentId("todos");
                       setPriority("todas");
                     }}
                     title="Limpiar filtros"
@@ -656,7 +917,7 @@ export function TicketsPage() {
                 )}
               </div>
 
-              {/* Vistas de estado: Todos y Abiertos a la vista, el resto en Más. Un solo control segmentado. */}
+              {/* Vista rápida: Todos y Abiertos; orden en el menú contiguo. */}
               <div
                 role="group"
                 aria-label="Vista de estado"
@@ -688,11 +949,11 @@ export function TicketsPage() {
                     </button>
                   );
                 })}
-                <TicketStatusMenu
-                  options={secondaryFilters}
-                  activeKey={filter}
-                  counts={counts}
-                  onSelect={setFilter}
+                <TicketSortMenu
+                  sortValue={sortValue}
+                  sortOptions={sortFilterOptions}
+                  onSortChange={handleSortChange}
+                  hasOverdueTickets={(counts?.overdue ?? 0) > 0}
                 />
               </div>
             </div>
@@ -714,178 +975,69 @@ export function TicketsPage() {
           )}
         </div>
 
-        {error && (
-          <div className="mb-3">
-            <Alert variant="error">{error}</Alert>
-          </div>
-        )}
-
-        {!data ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
-        ) : (
-          // Atenuada mientras llega la pagina nueva: la anterior se queda para no dar un salto en blanco.
-          <div className={`transition-opacity ${isStale ? "opacity-60" : ""}`}>
-            <DataTable fixed>
-              <thead>
-                <HeadRow>
-                  <Th className={SELECT_COLUMN}>
-                    <div className="flex items-center justify-center">
-                      <SelectBox
-                        checked={pageState}
-                        label={pageState === true ? "Quitar la selección de esta página" : "Seleccionar toda la página"}
-                        onToggle={togglePage}
-                      />
-                    </div>
-                  </Th>
-                  {columns.map(({ key, label, className }) => (
-                    <Th
-                      key={key}
-                      className={className}
-                      sort={{ dir: sort.key === key ? sort.dir : null, onToggle: () => toggleSort(key) }}
-                    >
-                      {label}
-                    </Th>
-                  ))}
-                  <Th className={ASSIGNED_COLUMN}>Asignado</Th>
-                </HeadRow>
-              </thead>
-              <tbody>
-                {rows.map((t) => {
-                  const checked = selectedIds.has(t.id);
-                  const sla = formatSlaRemaining(t.resolutionDueAt, Boolean(t.pausedAt), t.status, t.closedAt);
-                  const activity = formatActivityDate(t.lastActivityAt);
-                  const client = t.clientName && t.clientName !== "Sin cliente" ? t.clientName : null;
-                  const clientCode = t.clientCode && t.clientCode !== "-" ? t.clientCode : null;
-                  const department =
-                    t.departmentName && t.departmentName !== "Sin departamento"
-                      ? ((t.departmentId != null ? departmentPathById.get(t.departmentId) : undefined) ??
-                        t.departmentName)
-                      : null;
-                  const open = () => navigate(`/tickets/${t.id}`);
-
-                  return (
-                    <Row
-                      key={t.id}
-                      tabIndex={0}
-                      data-checked={checked}
-                      onClick={open}
-                      onKeyDown={(event) => {
-                        if (event.target !== event.currentTarget) return;
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          open();
-                        }
-                      }}
-                      className="group cursor-pointer outline-none focus-visible:bg-zinc-50"
-                    >
-                      <Td className={SELECT_COLUMN}>
-                        <div className="flex items-center justify-center">
-                          <SelectBox
-                            checked={checked}
-                            label={`Seleccionar ${t.number}`}
-                            onToggle={() => toggleSelect(t.id)}
-                          />
-                        </div>
-                      </Td>
-
-                      <Td className={columns[0].className}>
-                        <span className="font-heading text-[11.5px] font-bold tabular-nums tracking-[0.01em] text-zinc-800">
-                          {t.number}
-                        </span>
-                      </Td>
-
-                      <Td className={columns[1].className}>
-                        <div className="min-w-0">
-                          <p className="truncate text-[12.5px] font-medium text-zinc-900 leading-snug" title={t.subject}>
-                            {t.subject}
-                          </p>
-                          <p className="truncate text-[11px] text-zinc-500 font-normal leading-tight mt-0.5">
-                            {t.topicName ?? "Sin motivo"}
-                            {department && <span className="text-zinc-400 2xl:hidden"> · {department}</span>}
-                            {t.productLineName && <span className="text-zinc-400"> · {t.productLineName}</span>}
-                          </p>
-                        </div>
-                      </Td>
-
-                      <Td className={columns[2].className}>
-                        {client ? (
-                          <div className="flex items-center gap-1.5 min-w-0" title={`${client}${clientCode ? ` (${clientCode})` : ""}`}>
-                            <span
-                              aria-hidden
-                              className={`h-2 w-2 shrink-0 rounded-full ${getClientDotColor(client)}`}
-                            />
-                            <span className="truncate text-[12.5px] font-medium text-zinc-800">
-                              {client}
-                            </span>
-                            {clientCode && (
-                              <span className="shrink-0 text-[11px] font-normal text-zinc-400 tabular-nums">
-                                #{clientCode}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-[12px] text-zinc-400">—</span>
-                        )}
-                      </Td>
-
-                      <Td className={`${columns[3].className} truncate text-[12px] text-zinc-600`}>
-                        {department ?? <span className="text-zinc-300">—</span>}
-                      </Td>
-
-                      <Td className={columns[4].className}>
-                        <PriorityCell priority={t.priority} />
-                      </Td>
-
-                      <Td className={columns[5].className}>
-                        <StatusCell status={t.status} />
-                      </Td>
-
-                      <Td className={columns[6].className}>
-                        <SlaCell sla={sla} />
-                      </Td>
-
-                      <Td className={`${columns[7].className} truncate whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500`}>
-                        <span className="truncate" title={activity.full}>{activity.compact}</span>
-                      </Td>
-
-                      <Td className={ASSIGNED_COLUMN}>
-                        <AssigneeCell id={t.assignedStaffId} name={t.assignedStaffName} />
-                      </Td>
-                    </Row>
-                  );
-                })}
-              </tbody>
-            </DataTable>
-
-            {rows.length === 0 &&
-              (hasCriteria ? (
-                <EmptyResult message="Ningún ticket coincide con estos criterios." onClear={clearCriteria} />
-              ) : (
-                <div className="flex flex-col items-center gap-3 py-14 text-center">
-                  <span
-                    aria-hidden
-                    className="flex size-9 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
-                  >
-                    <TicketIcon className="size-4" strokeWidth={2.25} />
-                  </span>
-                  <p className="text-[13px] font-medium text-zinc-700">Todavía no hay tickets.</p>
-                  <p className="max-w-xs text-[12px] leading-relaxed text-zinc-400">
-                    Se crean desde un correo de la bandeja o a mano con «Nuevo ticket».
-                  </p>
-                </div>
-              ))}
-
-            <Pagination
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              totalPages={data.totalPages}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="tickets"
+        {/* Superficie de resultados: las 9 tarjetas flotan directamente sobre el lienzo tintado (sin anidar tarjetas) */}
+        {listLoading ? (
+          error === null && <TicketCardsSkeleton count={pageSize} />
+        ) : rows.length === 0 ? (
+          <section className="overflow-hidden rounded-card border border-line bg-white shadow-card">
+            <ListEmptyState
+              icon={TicketIcon}
+              isFiltered={hasCriteria}
+              filteredTitle="Ningún ticket coincide con estos criterios."
+              onClearFilters={clearCriteria}
+              emptyTitle={
+                origin === "legacy" ? "El histórico está vacío." : "Todavía no hay tickets."
+              }
+              emptyDescription={
+                origin === "legacy"
+                  ? "Aquí verás los tickets migrados del sistema anterior."
+                  : "Se crean desde un correo de la bandeja o a mano con «Nuevo ticket»."
+              }
             />
+          </section>
+        ) : (
+          <div className="plf-results-in">
+            <div
+              ref={cardsGridRef}
+              className="grid auto-rows-fr grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3"
+            >
+              {rows.map((t) => {
+                const checked = selectedIds.has(t.id);
+                const department =
+                  t.departmentName && t.departmentName !== "Sin departamento"
+                    ? ((t.departmentId != null ? departmentPathById.get(t.departmentId) : undefined) ??
+                      t.departmentName)
+                    : null;
+
+                return (
+                  <TicketCard
+                    key={t.id}
+                    ticket={t}
+                    checked={checked}
+                    department={department}
+                    onToggleSelect={toggleSelect}
+                    onOpen={(id) => navigate(`/tickets/${id}`)}
+                  />
+                );
+              })}
+            </div>
+
+            {data && data.total > 0 && (
+              <div className="mt-2">
+                <Pagination
+                  page={data.page}
+                  pageSize={data.pageSize}
+                  total={data.total}
+                  totalPages={data.totalPages}
+                  onPageChange={setPage}
+                  onPageSizeChange={setPageSize}
+                  pageSizes={CARD_PAGE_SIZES}
+                  rowsLabel="Tarjetas"
+                  noun="tickets"
+                  nounSingular="ticket"
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -893,9 +1045,9 @@ export function TicketsPage() {
       {createModalOpen && (
         <CreateTicketModal
           onClose={() => setCreateModalOpen(false)}
-          onCreated={(created, targetUrl) => {
+          onCreated={(created) => {
             refresh();
-            navigate(targetUrl || `/tickets/${created.id}`);
+            navigate(`/tickets/${created.id}`);
             receipts.done({
               action: "crear-ticket",
               title: "Ticket creado",
@@ -907,6 +1059,7 @@ export function TicketsPage() {
 
       {bulkModal === "asignar" && (
         <Modal
+          eyebrow="Tickets · Acciones en lote"
           title="Asignar tickets"
           description={`Elige quién atenderá los ${selectedIds.size} tickets seleccionados.`}
           onClose={() => {
@@ -963,6 +1116,7 @@ export function TicketsPage() {
 
       {bulkModal === "prioridad" && (
         <Modal
+          eyebrow="Tickets · Acciones en lote"
           title="Cambiar prioridad"
           description={`Nueva prioridad para los ${selectedIds.size} tickets seleccionados.`}
           onClose={() => {

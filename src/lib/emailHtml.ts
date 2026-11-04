@@ -4,13 +4,12 @@ const SANS =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 const MONO = "'SF Mono', SFMono-Regular, Consolas, 'Courier New', monospace";
 const INK = "#1B1B1D";
-const BODY = "#515151";
 const MUTED = "#8A8A90";
 const LINE = "#E7E7EA";
 const CANVAS = "#F5F5F6";
 const RED = "#E4002B";
 
-const TEXT = `font-family:${SANS}; font-size:14px; line-height:1.65; color:${BODY};`;
+const TEXT = `font-family:${SANS}; font-size:14px; line-height:1.65; color:${INK};`;
 
 interface StyledText {
   type?: string;

@@ -1,7 +1,4 @@
-// Espejo de api/Dtos/WithdrawalDtos.cs (docs/plan/04, sección 6).
-//
-// Estados, motivos y origen del error viajan como texto legible. Cliente,
-// ticket y nombres llegan resueltos desde el servidor.
+// Espejo de api/Dtos/WithdrawalDtos.cs; estados, motivos y origen del error viajan como texto legible.
 
 /** Estados de la solicitud, en el orden en que avanzan (8.1). */
 export const WITHDRAWAL_STATUSES = ["Solicitado", "Aprobado", "Rechazado", "Retirado", "Cancelado"] as const;

@@ -1,6 +1,24 @@
-import { AlertTriangle, FileSpreadsheet, Plus, Truck, Wrench } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  ArrowUpRight,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  FileSpreadsheet,
+  FileText,
+  MinusCircle,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  PlusCircle,
+  ShieldCheck,
+  Truck,
+  Users,
+  Wrench,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
@@ -10,37 +28,110 @@ import { qualityApi } from "../../api/quality";
 import { withdrawalsApi } from "../../api/withdrawals";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { Spinner } from "../../components/ui/Spinner";
+import { Modal } from "../../components/ui/Modal";
+import { TicketFormsSkeleton, ActionPlanTableSkeleton } from "../../components/ui/Skeleton";
+import { EnterpriseFormDraftBadge } from "../../components/app/EnterpriseFormDraftBadge";
+import { prefersReducedMotion } from "../../hooks/motion";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { usePermissions } from "../../hooks/usePermissions";
+import { MODULE_HEADER_CONTENT_BAND_CLASS } from "../../components/app/ModuleHeader";
+import { EnterpriseFormDraftLandingView } from "../../components/app/EnterpriseFormDraftLandingView";
+import { EnterpriseFormDraftResumeModal } from "../../components/app/EnterpriseFormDraftResumeModal";
+import { formatDay, formatInstant } from "../../lib/dates";
+import {
+  ENTERPRISE_FORM_PICKER_META,
+  type EnterpriseFormPickerKey,
+  clearEnterpriseFormDraft,
+  enterpriseFormDraftKeyForPicker,
+  readEnterpriseFormDraft,
+} from "../../lib/enterpriseFormDrafts";
+import { buildHcaHechoText, hcaProductLabel } from "../../lib/hcaForm109";
+import { formatAmount } from "../../lib/numbers";
+import { isPlanItemOverdue, isPlanItemSettled } from "../../lib/quality";
 import type { TicketDetailResponse } from "../../types/api";
 import type { CustomerClaim } from "../../types/claims";
 import type { DiscrepancyDetail, LoadDiscrepancy } from "../../types/discrepancies";
-import type { CorrectiveActionSheet } from "../../types/quality";
+import type { ActionPlanItem, CorrectiveActionSheet } from "../../types/quality";
 import type { ProductLine } from "../../types/settings";
 import type { MerchandiseWithdrawal } from "../../types/withdrawals";
 import { ClaimFormModal } from "../claims/ClaimFormModal";
+import { ClaimStatusBadge } from "../claims/ClaimStatusBadge";
 import { DiscrepancyFormModal } from "../discrepancies/DiscrepancyFormModal";
+import { DiscrepancyStatusBadge } from "../discrepancies/DiscrepancyStatusBadge";
 import { HcaModal } from "../quality/HcaModal";
+import { HcaStatusBadge, PlanItemStatusBadge } from "../quality/StatusBadges";
 import { WithdrawalFormModal } from "../withdrawals/WithdrawalFormModal";
-import { ActiveFormHeader } from "./forms/ActiveFormHeader";
-import { ClaimFormSummary } from "./forms/ClaimFormSummary";
-import { DiscrepancyFormSummary } from "./forms/DiscrepancyFormSummary";
-import { HcaFormSummary } from "./forms/HcaFormSummary";
-import { MigrateFormModal } from "./forms/MigrateFormModal";
-import { NewFormPickerModal } from "./forms/NewFormPickerModal";
-import type { CommonExtractedData, EnterpriseFormType, MigrationSource, RegisteredForm } from "./forms/ticketForms";
-import { WithdrawalFormSummary } from "./forms/WithdrawalFormSummary";
+import { WithdrawalStatusBadge } from "../withdrawals/WithdrawalStatusBadge";
+import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
+import { TaskFormHostLinkSubtitle, TaskScopeCodeKpi } from "../../lib/taskFormPresentation";
 
-export type { EnterpriseFormType } from "./forms/ticketForms";
+export type EnterpriseFormType = "reclamacion" | "retiro" | "discrepancia" | "hca";
+
+export interface RegisteredFormItem {
+  key: string;
+  type: EnterpriseFormType;
+  code: string;
+  title: string;
+  badgeText: string;
+  data: any;
+}
 
 interface TicketFormsTabProps {
   ticket: TicketDetailResponse;
+  /** En tareas independientes la UI es la misma pero el copy habla de la tarea. */
+  formScope?: "ticket" | "task";
+  standaloneTaskId?: number;
+  standaloneTaskStatus?: string;
+  taskNumber?: string;
+  taskTitle?: string;
   onHasFormsChanged?: (hasForms: boolean) => void;
   onTicketStatusChanged?: () => void;
+  onViewDocument?: (form: RegisteredFormItem) => void;
 }
 
-export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChanged }: TicketFormsTabProps) {
+interface CommonExtractedData {
+  invoiceRef: string;
+  description: string;
+  lines: Array<{
+    productId: string;
+    quantity: string;
+    unitPrice: string;
+    productName?: string;
+  }>;
+}
+
+export function TicketFormsTab({
+  ticket,
+  formScope = "ticket",
+  standaloneTaskId,
+  standaloneTaskStatus,
+  taskNumber,
+  taskTitle,
+  onHasFormsChanged,
+  onTicketStatusChanged,
+  onViewDocument,
+}: TicketFormsTabProps) {
+  const navigate = useNavigate();
   const { can } = usePermissions();
+  const scopeLabel = formScope === "task" ? "tarea" : "ticket";
+  const taskScopeCode = taskNumber?.trim() || "—";
+  const scopeCode = formScope === "task" ? taskScopeCode : ticket.number;
+  const scopeSubject = formScope === "task" ? (taskTitle ?? ticket.subject) : ticket.subject;
+  const scopeReferenceLabel = `${scopeCode} · ${scopeSubject}`;
+  const hostKindLabel = formScope === "task" ? "Tarea" : "Ticket";
+  const hostTaskProps =
+    formScope === "task"
+      ? { hostTaskId: standaloneTaskId, hostTaskStatus: standaloneTaskStatus }
+      : {};
+
+  /** En ficha de tarea: mismo ancho que Datos/Notas (sin pl-11 del header de tickets). */
+  const embeddedInTask = formScope === "task";
+  const inlineFormShellClass = embeddedInTask
+    ? "w-full min-w-0"
+    : `mt-3.5 w-full min-w-0 ${MODULE_HEADER_CONTENT_BAND_CLASS}`;
+  const formsTabShellClass = embeddedInTask
+    ? "min-w-0 w-full space-y-3.5 animate-plf-fade"
+    : `mt-3.5 min-w-0 space-y-4 animate-plf-fade ${MODULE_HEADER_CONTENT_BAND_CLASS}`;
 
   const canReadClaims = can("claims.read", ticket.departmentId ?? undefined);
   const canWriteClaims = can("claims.write", ticket.departmentId ?? undefined);
@@ -63,7 +154,47 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   // Selected sub-tab when forms exist
   const [selectedSubTabKey, setSelectedSubTabKey] = useState<string | null>(null);
   const [newFormModalOpen, setNewFormModalOpen] = useState(false);
+  const [draftResumePrompt, setDraftResumePrompt] = useState<{
+    pickerKey: EnterpriseFormPickerKey;
+    savedAt?: number;
+    step?: number;
+    start: () => void;
+  } | null>(null);
+  const [draftLandingDismissed, setDraftLandingDismissed] = useState(false);
+  const [draftLandingExiting, setDraftLandingExiting] = useState(false);
+  const [officialGridStaggerIn, setOfficialGridStaggerIn] = useState(false);
+  const [draftRefreshToken, setDraftRefreshToken] = useState(0);
+  const DRAFT_LANDING_EXIT_MS = 360;
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const actionsMenuContainerRef = useRef<HTMLDivElement>(null);
+  const { mounted: menuMounted, exiting: menuExiting, ref: menuPanelRef } = useDisclosureMotion<HTMLDivElement>(actionsMenuOpen);
+
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (!actionsMenuOpen) return;
+    function handlePointerDown(e: PointerEvent) {
+      const target = e.target as Node;
+      if (
+        actionsMenuContainerRef.current?.contains(target) ||
+        menuPanelRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setActionsMenuOpen(false);
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setActionsMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [actionsMenuOpen, menuPanelRef]);
+
+
 
   // Modal open states
   const [claimModalOpen, setClaimModalOpen] = useState(false);
@@ -101,143 +232,186 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
   const [hcaModalOpen, setHcaModalOpen] = useState(false);
   const [editingHca, setEditingHca] = useState<CorrectiveActionSheet | undefined>(undefined);
   const [hcaInitialDefaults, setHcaInitialDefaults] = useState<{ clientId: number; ticketId: number | null; description?: string } | undefined>(undefined);
-
-  // Migration modal state
-  const [migrationModalOpen, setMigrationModalOpen] = useState(false);
-  const [migratingFromSource, setMigratingFromSource] = useState<MigrationSource | null>(null);
-  const [migrationTargetType, setMigrationTargetType] = useState<EnterpriseFormType>("reclamacion");
-  const [migrateCommonFields, setMigrateCommonFields] = useState(true);
+  const [hcaPlanBySheetId, setHcaPlanBySheetId] = useState<Record<number, ActionPlanItem[] | undefined>>({});
 
   // Helpers to start new forms
-  const handleOpenNewClaim = useCallback((initData?: typeof claimInitialData) => {
+  const handleOpenNewClaim = (initData?: typeof claimInitialData) => {
     setEditingClaim(undefined);
     setClaimInitialData(initData);
     setClaimModalOpen(true);
-  }, []);
+  };
 
-  const handleOpenNewWithdrawal = useCallback((initLines?: typeof withdrawalInitialLines) => {
+  const handleOpenNewWithdrawal = (initLines?: typeof withdrawalInitialLines) => {
     setEditingWithdrawal(undefined);
     setWithdrawalInitialLines(initLines);
     setWithdrawalModalOpen(true);
-  }, []);
+  };
 
-  const handleOpenNewDiscrepancy = useCallback((initData?: typeof discrepancyInitialData) => {
+  const handleOpenNewDiscrepancy = (initData?: typeof discrepancyInitialData) => {
     setEditingDiscrepancy(undefined);
     setDiscrepancyInitialData(initData);
     setDiscrepancyModalOpen(true);
-  }, []);
+  };
 
-  const handleOpenNewHca = useCallback(
-    (initDefaults?: typeof hcaInitialDefaults) => {
-      setEditingHca(undefined);
-      setHcaInitialDefaults(initDefaults ?? {
-        clientId: ticket.clientId ?? 0,
-        ticketId: ticket.id,
-        description: ticket.subject,
-      });
-      setHcaModalOpen(true);
-    },
-    [ticket.clientId, ticket.id, ticket.subject],
-  );
+  const handleOpenNewHca = (initDefaults?: typeof hcaInitialDefaults) => {
+    setEditingHca(undefined);
+    setHcaInitialDefaults(initDefaults ?? {
+      clientId: ticket.clientId ?? 0,
+      ticketId: ticket.id,
+      description: scopeSubject,
+    });
+    setHcaModalOpen(true);
+  };
 
-  // ?openForm= abre el formulario pedido (ajuste durante el render, una vez por URL)...
-  const [openFormParams, setOpenFormParams] = useState<URLSearchParams | null>(null);
-  if (openFormParams !== searchParams) {
-    setOpenFormParams(searchParams);
-    const formToOpen = searchParams.get("openForm");
-    if (formToOpen === "Reclamacion" || formToOpen?.toLowerCase() === "reclamacion") {
-      handleOpenNewClaim();
-    } else if (formToOpen === "RetiroMercancia" || formToOpen?.toLowerCase().includes("retiro")) {
-      handleOpenNewWithdrawal();
-    } else if (formToOpen === "DiscrepanciaCarga" || formToOpen?.toLowerCase().includes("discrepancia")) {
-      handleOpenNewDiscrepancy();
-    } else if (formToOpen === "Hca" || formToOpen?.toLowerCase() === "hca") {
-      handleOpenNewHca();
+  function openFormByPickerKey(pickerKey: EnterpriseFormPickerKey) {
+    switch (pickerKey) {
+      case "Reclamacion":
+        handleOpenNewClaim();
+        break;
+      case "RetiroMercancia":
+        handleOpenNewWithdrawal();
+        break;
+      case "DiscrepanciaCarga":
+        handleOpenNewDiscrepancy();
+        break;
+      case "Hca":
+        handleOpenNewHca();
+        break;
     }
   }
 
-  // ...y se retira de la URL para no reabrirlo.
+  function beginFormStart(pickerKey: EnterpriseFormPickerKey, start: () => void) {
+    const draftKey = enterpriseFormDraftKeyForPicker(pickerKey, ticket.id);
+    const draft = readEnterpriseFormDraft<{ savedAt?: number; step?: number }>(draftKey);
+    if (!draft) {
+      start();
+      return;
+    }
+    setDraftResumePrompt({
+      pickerKey,
+      savedAt: typeof draft.savedAt === "number" ? draft.savedAt : undefined,
+      step: typeof draft.step === "number" ? draft.step : undefined,
+      start,
+    });
+  }
+
+  function bumpDraftRefresh() {
+    setDraftRefreshToken((value) => value + 1);
+  }
+
+  function handleReturnFromInlineForm() {
+    setDraftLandingDismissed(false);
+    setDraftLandingExiting(false);
+    setOfficialGridStaggerIn(false);
+    bumpDraftRefresh();
+  }
+
+  function beginBrowseOfficialForms() {
+    if (prefersReducedMotion()) {
+      setDraftLandingDismissed(true);
+      return;
+    }
+    setDraftLandingExiting(true);
+  }
+
   useEffect(() => {
-    if (!searchParams.has("openForm")) return;
+    if (!draftLandingExiting) return;
+    const timer = window.setTimeout(() => {
+      setDraftLandingDismissed(true);
+      setDraftLandingExiting(false);
+      setOfficialGridStaggerIn(true);
+    }, DRAFT_LANDING_EXIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [draftLandingExiting]);
+
+  useEffect(() => {
+    const formToOpen = searchParams.get("openForm");
+    if (!formToOpen) return;
+
     const next = new URLSearchParams(searchParams);
     next.delete("openForm");
     setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
 
-  // Load product lines for HCA
+    if (formToOpen === "Reclamacion" || formToOpen.toLowerCase() === "reclamacion") {
+      handleOpenNewClaim();
+    } else if (formToOpen === "RetiroMercancia" || formToOpen.toLowerCase().includes("retiro")) {
+      handleOpenNewWithdrawal();
+    } else if (formToOpen === "DiscrepanciaCarga" || formToOpen.toLowerCase().includes("discrepancia")) {
+      handleOpenNewDiscrepancy();
+    } else if (formToOpen === "Hca" || formToOpen.toLowerCase() === "hca") {
+      handleOpenNewHca();
+    }
+  }, [searchParams]);
+
+  // Migration modal state
+  const [migrationModalOpen, setMigrationModalOpen] = useState(false);
+  const [migratingFromSource, setMigratingFromSource] = useState<{
+    type: EnterpriseFormType;
+    label: string;
+    data: CommonExtractedData;
+  } | null>(null);
+  const [migrationTargetType, setMigrationTargetType] = useState<EnterpriseFormType>("reclamacion");
+  const [migrateCommonFields, setMigrateCommonFields] = useState(true);
+
+  // Load product lines for HCA only when HCA sheets exist
   useEffect(() => {
+    if (sheets.length === 0 || productLines.length > 0) return;
     fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize }))
       .then(setProductLines)
       .catch(() => setProductLines([]));
-  }, []);
+  }, [sheets.length, productLines.length]);
 
-  /*
-   * Carga de formularios. Se relanza al cambiar de ticket (o de permisos) y cuando
-   * `reloadForms` sube el contador tras guardar. El spinner y el error se reinician
-   * desde quien pide la carga, no desde el efecto.
-   */
-  const [reloadTick, setReloadTick] = useState(0);
-  const reloadForms = () => {
+  const fetchAllForms = async () => {
     setLoading(true);
     setError(null);
-    setReloadTick((tick) => tick + 1);
+    try {
+      const [claimRes, withRes, discRes, sheetRes] = await Promise.allSettled([
+        canReadClaims ? claimsApi.getByTicket(ticket.id) : Promise.reject("no-permission"),
+        canReadWithdrawals ? withdrawalsApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
+        canReadDiscrepancies ? discrepanciesApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
+        canReadQuality ? qualityApi.sheets.listByTicket(ticket.id) : Promise.reject("no-permission"),
+      ]);
+
+      const foundClaim = claimRes.status === "fulfilled" ? claimRes.value.claim : null;
+      const foundWith = withRes.status === "fulfilled" ? withRes.value.map((d) => d.withdrawal) : [];
+      const foundDisc = discRes.status === "fulfilled" ? discRes.value : [];
+      const foundSheets = sheetRes.status === "fulfilled" ? sheetRes.value : [];
+
+      setClaim(foundClaim);
+      setWithdrawals(foundWith);
+      setDiscrepancies(foundDisc);
+      setSheets(foundSheets);
+      setHcaPlanBySheetId({});
+
+      const hasAny = Boolean(foundClaim || foundWith.length > 0 || foundDisc.length > 0 || foundSheets.length > 0);
+      onHasFormsChanged?.(hasAny);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : formScope === "task"
+            ? "Error al cargar los formularios de la tarea"
+            : "Error al cargar los formularios del ticket",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const formsKey = `${ticket.id}|${canReadClaims}|${canReadWithdrawals}|${canReadDiscrepancies}|${canReadQuality}`;
-  const [loadedFormsKey, setLoadedFormsKey] = useState(formsKey);
-  if (loadedFormsKey !== formsKey) {
-    setLoadedFormsKey(formsKey);
-    setLoading(true);
-    setError(null);
-  }
-
-  // El padre pasa una flecha nueva en cada render: se lee por ref para no relanzar la carga.
-  const onHasFormsChangedRef = useRef(onHasFormsChanged);
   useEffect(() => {
-    onHasFormsChangedRef.current = onHasFormsChanged;
-  }, [onHasFormsChanged]);
-
-  useEffect(() => {
-    let ignore = false;
-    const fetchAllForms = async () => {
-      try {
-        const [claimRes, withRes, discRes, sheetRes] = await Promise.allSettled([
-          canReadClaims ? claimsApi.getByTicket(ticket.id) : Promise.reject("no-permission"),
-          canReadWithdrawals ? withdrawalsApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
-          canReadDiscrepancies ? discrepanciesApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
-          canReadQuality ? qualityApi.sheets.listByTicket(ticket.id) : Promise.reject("no-permission"),
-        ]);
-
-        const foundClaim = claimRes.status === "fulfilled" ? claimRes.value.claim : null;
-        const foundWith = withRes.status === "fulfilled" ? withRes.value.map((d) => d.withdrawal) : [];
-        const foundDisc = discRes.status === "fulfilled" ? discRes.value : [];
-        const foundSheets = sheetRes.status === "fulfilled" ? sheetRes.value : [];
-        if (ignore) return;
-
-        setClaim(foundClaim);
-        setWithdrawals(foundWith);
-        setDiscrepancies(foundDisc);
-        setSheets(foundSheets);
-
-        const hasAny = Boolean(foundClaim || foundWith.length > 0 || foundDisc.length > 0 || foundSheets.length > 0);
-        onHasFormsChangedRef.current?.(hasAny);
-      } catch (err) {
-        if (!ignore) {
-          setError(err instanceof ApiError ? err.message : "Error al cargar los formularios del ticket");
-        }
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    };
-    void fetchAllForms();
-    return () => {
-      ignore = true;
-    };
-  }, [ticket.id, canReadClaims, canReadWithdrawals, canReadDiscrepancies, canReadQuality, reloadTick]);
+    fetchAllForms();
+  }, [ticket.id]);
 
   // Build the list of active forms for navigation
   const registeredForms = useMemo(() => {
-    const list: RegisteredForm[] = [];
+    const list: Array<{
+      key: string;
+      type: EnterpriseFormType;
+      code: string;
+      title: string;
+      badgeText: string;
+      data: any;
+    }> = [];
 
     if (claim) {
       list.push({
@@ -286,19 +460,78 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     return list;
   }, [claim, withdrawals, discrepancies, sheets]);
 
-  // Set default selected sub-tab (ajuste durante el render: converge en una pasada)
-  if (registeredForms.length > 0) {
-    if (!selectedSubTabKey || !registeredForms.some((f) => f.key === selectedSubTabKey)) {
-      setSelectedSubTabKey(registeredForms[0].key);
+  // Set default selected sub-tab
+  useEffect(() => {
+    if (registeredForms.length > 0) {
+      if (!selectedSubTabKey || !registeredForms.some((f) => f.key === selectedSubTabKey)) {
+        setSelectedSubTabKey(registeredForms[0].key);
+      }
+    } else {
+      setSelectedSubTabKey(null);
     }
-  } else if (selectedSubTabKey !== null) {
-    setSelectedSubTabKey(null);
-  }
+  }, [registeredForms, selectedSubTabKey]);
+
+  useEffect(() => {
+    const formKey = searchParams.get("form");
+    if (!formKey || registeredForms.length === 0) return;
+    if (!registeredForms.some((f) => f.key === formKey)) return;
+    setSelectedSubTabKey(formKey);
+    const next = new URLSearchParams(searchParams);
+    next.delete("form");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, registeredForms, setSearchParams]);
 
   const activeForm = useMemo(() => {
     if (!selectedSubTabKey) return registeredForms[0] ?? null;
     return registeredForms.find((f) => f.key === selectedSubTabKey) ?? registeredForms[0] ?? null;
   }, [selectedSubTabKey, registeredForms]);
+
+  const activeFormIndex = useMemo(() => {
+    return Math.max(
+      0,
+      registeredForms.findIndex((f) => f.key === activeForm?.key)
+    );
+  }, [registeredForms, activeForm?.key]);
+
+  useEffect(() => {
+    if (activeForm?.type !== "hca") return;
+    const sheetId = (activeForm.data as CorrectiveActionSheet).id;
+    if (hcaPlanBySheetId[sheetId] !== undefined) return;
+
+    let cancelled = false;
+    qualityApi.planItems
+      .list(sheetId, { page: 1, pageSize: 50 })
+      .then((res) => {
+        if (!cancelled) {
+          setHcaPlanBySheetId((prev) => ({ ...prev, [sheetId]: res.items }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHcaPlanBySheetId((prev) => ({ ...prev, [sheetId]: [] }));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeForm?.key, activeForm?.type, hcaPlanBySheetId]);
+
+  const getPrintPath = (form: NonNullable<typeof activeForm>): string => {
+    if (form.type === "reclamacion") {
+      return `/reclamaciones/${(form.data as CustomerClaim).id}/imprimir`;
+    }
+    if (form.type === "retiro") {
+      return `/retiros/${(form.data as MerchandiseWithdrawal).id}/imprimir`;
+    }
+    if (form.type === "discrepancia") {
+      return `/discrepancias/${(form.data as DiscrepancyDetail).discrepancy.id}/imprimir`;
+    }
+    if (form.type === "hca") {
+      return `/calidad/hca/${(form.data as CorrectiveActionSheet).id}/imprimir`;
+    }
+    return "";
+  };
 
   // Suggested form from ticket topic
   const suggestedFormRaw = ticket.topicSuggestedForm; // "Reclamacion" | "RetiroMercancia" | "DiscrepanciaCarga" | "Hca" | null
@@ -316,7 +549,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         icon: Plus,
         btnLabel: "Iniciar reclamación",
         disabled: !canWriteClaims,
-        action: () => handleOpenNewClaim(),
+        action: () => beginFormStart("Reclamacion", () => handleOpenNewClaim()),
       },
       {
         key: "RetiroMercancia",
@@ -329,7 +562,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         icon: Truck,
         btnLabel: "Iniciar retiro",
         disabled: !canWriteWithdrawals,
-        action: () => handleOpenNewWithdrawal(),
+        action: () => beginFormStart("RetiroMercancia", () => handleOpenNewWithdrawal()),
       },
       {
         key: "DiscrepanciaCarga",
@@ -342,7 +575,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         icon: AlertTriangle,
         btnLabel: "Iniciar discrepancia",
         disabled: !canWriteDiscrepancies,
-        action: () => handleOpenNewDiscrepancy(),
+        action: () => beginFormStart("DiscrepanciaCarga", () => handleOpenNewDiscrepancy()),
       },
       {
         key: "Hca",
@@ -355,7 +588,7 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
         icon: Wrench,
         btnLabel: "Iniciar hoja HCA",
         disabled: !canWriteQuality,
-        action: () => handleOpenNewHca(),
+        action: () => beginFormStart("Hca", () => handleOpenNewHca()),
       },
     ];
 
@@ -367,17 +600,53 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       if (b.key === suggestedFormRaw) return 1;
       return 0;
     });
-  }, [
-    suggestedFormRaw,
-    canWriteClaims,
-    canWriteWithdrawals,
-    canWriteDiscrepancies,
-    canWriteQuality,
-    handleOpenNewClaim,
-    handleOpenNewWithdrawal,
-    handleOpenNewDiscrepancy,
-    handleOpenNewHca,
-  ]);
+  }, [suggestedFormRaw, canWriteClaims, canWriteWithdrawals, canWriteDiscrepancies, canWriteQuality]);
+
+  const pendingDrafts = useMemo(() => {
+    void draftRefreshToken;
+    const pickerKeys: EnterpriseFormPickerKey[] = [
+      "Reclamacion",
+      "RetiroMercancia",
+      "DiscrepanciaCarga",
+      "Hca",
+    ];
+    return pickerKeys.flatMap((pickerKey) => {
+      const draftKey = enterpriseFormDraftKeyForPicker(pickerKey, ticket.id);
+      const draft = readEnterpriseFormDraft<{ savedAt?: number; step?: number }>(draftKey);
+      if (!draft) return [];
+      const meta = ENTERPRISE_FORM_PICKER_META[pickerKey];
+      const catalog = availableForms.find((form) => form.key === pickerKey);
+      return [
+        {
+          pickerKey,
+          draftKey,
+          formCode: meta.formCode,
+          title: catalog?.title ?? meta.title,
+          dept: catalog?.dept,
+          savedAtLabel:
+            typeof draft.savedAt === "number"
+              ? formatInstant(new Date(draft.savedAt).toISOString())
+              : null,
+          stepLabel: typeof draft.step === "number" ? `Paso ${draft.step}` : null,
+        },
+      ];
+    });
+  }, [availableForms, draftRefreshToken, ticket.id]);
+
+  const draftPickerKeySet = useMemo(
+    () => new Set(pendingDrafts.map((draft) => draft.pickerKey)),
+    [pendingDrafts],
+  );
+
+  const draftLandingVisible =
+    registeredForms.length === 0 &&
+    pendingDrafts.length > 0 &&
+    (!draftLandingDismissed || draftLandingExiting);
+
+  const zeroStateOfficialGridVisible =
+    registeredForms.length === 0 &&
+    (pendingDrafts.length === 0 || draftLandingDismissed) &&
+    !draftLandingExiting;
 
   // Helper to trigger form migration
   const handleTriggerMigration = (currentForm: NonNullable<typeof activeForm>) => {
@@ -494,18 +763,16 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
       handleOpenNewHca({
         clientId: ticket.clientId ?? 0,
         ticketId: ticket.id,
-        description: data.description || ticket.subject,
+        description: data.description || scopeSubject,
       });
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Spinner size="md" />
-        <p className="mt-3 text-xs text-zinc-500">Cargando formularios asociados al ticket...</p>
-      </div>
-    );
+  const inlineFormOpen =
+    claimModalOpen || withdrawalModalOpen || discrepancyModalOpen || hcaModalOpen;
+
+  if (loading && !inlineFormOpen) {
+    return <TicketFormsSkeleton />;
   }
 
   if (error) {
@@ -516,30 +783,40 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     );
   }
 
-  // RENDER MODO PÁGINA: Si el usuario inició o está editando la discrepancia de cargas
-  if (discrepancyModalOpen) {
+  // RENDER MODO PÁGINA: reclamación PF-FOR-034
+  if (claimModalOpen) {
     return (
-      <div className="mt-3.5 w-full">
-        <DiscrepancyFormModal
+      <div className={inlineFormShellClass}>
+        <ClaimFormModal
           inline
-          discrepancy={editingDiscrepancy}
           ticketId={ticket.id}
-          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
-          ticketClientName={ticket.clientName ?? undefined}
-          ticketClientId={ticket.clientId ?? undefined}
+          ticketNumber={scopeCode}
+          ticketTopicId={ticket.topicId}
+          clientName={ticket.clientName ?? "Cliente"}
+          contactName={ticket.contactName ?? ticket.clientContactPersonName}
+          contactPhone={ticket.contactPhone}
+          clientPhone={ticket.clientPhone}
+          clientContactPersonName={ticket.clientContactPersonName}
+          ticketProducts={ticket.products}
+          fixedTicketLabel={scopeReferenceLabel}
+          formHostKind={formScope}
+          {...hostTaskProps}
           ticketStatus={ticket.status}
           onTicketStatusChanged={onTicketStatusChanged}
-          initialData={discrepancyInitialData}
+          claim={editingClaim}
+          initialData={claimInitialData}
           onClose={() => {
-            setDiscrepancyModalOpen(false);
-            setEditingDiscrepancy(undefined);
-            setDiscrepancyInitialData(undefined);
+            setClaimModalOpen(false);
+            setEditingClaim(undefined);
+            setClaimInitialData(undefined);
+            handleReturnFromInlineForm();
           }}
           onSaved={() => {
-            setDiscrepancyModalOpen(false);
-            setEditingDiscrepancy(undefined);
-            setDiscrepancyInitialData(undefined);
-            reloadForms();
+            setClaimModalOpen(false);
+            setEditingClaim(undefined);
+            setClaimInitialData(undefined);
+            handleReturnFromInlineForm();
+            fetchAllForms();
             onTicketStatusChanged?.();
           }}
         />
@@ -547,171 +824,1183 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
     );
   }
 
+  // RENDER MODO PÁGINA: Si el usuario inició o está editando el retiro de mercancía
+  if (withdrawalModalOpen) {
+    return (
+      <div className={inlineFormShellClass}>
+        <WithdrawalFormModal
+          inline
+          withdrawal={editingWithdrawal}
+          ticketId={ticket.id}
+          ticketNumber={scopeCode}
+          ticketClientName={ticket.clientName ?? undefined}
+          ticketProducts={ticket.products}
+          initialLines={withdrawalInitialLines}
+          formHostKind={formScope}
+          {...hostTaskProps}
+          ticketStatus={ticket.status}
+          onTicketStatusChanged={onTicketStatusChanged}
+          onClose={() => {
+            setWithdrawalModalOpen(false);
+            setEditingWithdrawal(undefined);
+            setWithdrawalInitialLines(undefined);
+            handleReturnFromInlineForm();
+          }}
+          onSaved={() => {
+            setWithdrawalModalOpen(false);
+            setEditingWithdrawal(undefined);
+            setWithdrawalInitialLines(undefined);
+            handleReturnFromInlineForm();
+            fetchAllForms();
+            onTicketStatusChanged?.();
+          }}
+        />
+      </div>
+    );
+  }
+
+  // RENDER MODO PÁGINA: Si el usuario inició o está editando la discrepancia de cargas
+  if (discrepancyModalOpen) {
+    return (
+      <div className={inlineFormShellClass}>
+        <DiscrepancyFormModal
+          inline
+          discrepancy={editingDiscrepancy}
+          ticketId={ticket.id}
+          fixedTicketLabel={scopeReferenceLabel}
+          ticketClientName={ticket.clientName ?? undefined}
+          ticketClientId={ticket.clientId ?? undefined}
+          ticketStatus={ticket.status}
+          onTicketStatusChanged={onTicketStatusChanged}
+          ticketProducts={ticket.products}
+          formHostKind={formScope}
+          {...hostTaskProps}
+          initialData={discrepancyInitialData}
+          onClose={() => {
+            setDiscrepancyModalOpen(false);
+            setEditingDiscrepancy(undefined);
+            setDiscrepancyInitialData(undefined);
+            handleReturnFromInlineForm();
+          }}
+          onSaved={() => {
+            setDiscrepancyModalOpen(false);
+            setEditingDiscrepancy(undefined);
+            setDiscrepancyInitialData(undefined);
+            handleReturnFromInlineForm();
+            fetchAllForms();
+            onTicketStatusChanged?.();
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (hcaModalOpen) {
+    return (
+      <div className={inlineFormShellClass}>
+        <HcaModal
+          inline
+          sheet={editingHca}
+          productLines={productLines}
+          defaults={hcaInitialDefaults}
+          fixedTicketLabel={scopeReferenceLabel}
+          ticketClientName={ticket.clientName ?? undefined}
+          ticketProductLineId={ticket.productLineId}
+          ticketProducts={ticket.products}
+          formHostKind={formScope}
+          {...hostTaskProps}
+          ticketStatus={ticket.status}
+          onTicketStatusChanged={onTicketStatusChanged}
+          onClose={() => {
+            setHcaModalOpen(false);
+            setEditingHca(undefined);
+            setHcaInitialDefaults(undefined);
+            handleReturnFromInlineForm();
+          }}
+          onSaved={() => {
+            setHcaModalOpen(false);
+            setEditingHca(undefined);
+            setHcaInitialDefaults(undefined);
+            handleReturnFromInlineForm();
+            fetchAllForms();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="mt-3.5 space-y-4 animate-plf-fade">
+    <div className={formsTabShellClass}>
       {/* ZERO STATE: No forms registered yet */}
       {registeredForms.length === 0 ? (
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-2xs">
-          <div className="flex flex-col items-center text-center">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-brand-red/10 text-brand-red">
-              <FileSpreadsheet className="size-5" />
+        <div className="w-full min-w-0">
+          {draftLandingVisible ? (
+            <div
+              key="enterprise-draft-landing"
+              className={draftLandingExiting ? "animate-plf-check-out" : "animate-plf-check-in"}
+              style={draftLandingExiting ? { pointerEvents: "none" } : undefined}
+              aria-hidden={draftLandingExiting}
+            >
+              <EnterpriseFormDraftLandingView
+                hostKindLabel={hostKindLabel}
+                ticketNumber={scopeCode}
+                drafts={pendingDrafts}
+                onResume={(pickerKey) => openFormByPickerKey(pickerKey)}
+                onDiscard={(pickerKey) => {
+                  const draft = pendingDrafts.find((item) => item.pickerKey === pickerKey);
+                  if (draft) clearEnterpriseFormDraft(draft.draftKey);
+                  bumpDraftRefresh();
+                }}
+                onBrowseForms={beginBrowseOfficialForms}
+                browseDisabled={draftLandingExiting}
+              />
             </div>
-            <h3 className="mt-3 text-base font-semibold text-zinc-900">
-              Formularios del Ciclo de Vida del Ticket
-            </h3>
-            <p className="mt-1 max-w-xl text-xs text-zinc-500 leading-relaxed">
-              Integra los procesos y formatos oficiales de Plastifar directamente en este ticket. Puedes iniciar el formulario correspondiente ahora o dejarlo como borrador y completarlo más adelante.
-            </p>
-          </div>
+          ) : null}
 
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {availableForms.map((form) => {
-              const isRecommended = form.key === suggestedFormRaw;
-              const Icon = form.icon;
-
-              return (
-                <div
-                  key={form.key}
-                  className={`flex flex-col justify-between rounded-xl border p-4.5 transition-all ${
-                    isRecommended
-                      ? "border-brand-red/40 bg-brand-red/5 ring-1 ring-brand-red/30 shadow-xs"
-                      : "border-zinc-200 bg-white hover:border-zinc-300"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className={`font-heading text-[10.5px] font-bold uppercase tracking-wider ${form.codeColor}`}>
-                        {form.code}
-                      </span>
-                      {isRecommended && (
-                        <span className="inline-flex items-center rounded-md border border-brand-red/20 bg-brand-red/10 px-2.5 py-0.5 text-xs font-semibold text-brand-red">
-                          Recomendado según el motivo
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="mt-1.5 text-sm font-semibold text-zinc-900">{form.title}</h4>
-                    <p className="mt-1 text-xs text-zinc-500 leading-relaxed">
-                      {form.description}
-                    </p>
-                    {isRecommended && ticket.topicName && (
-                      <p className="mt-2 text-[11.5px] font-medium text-brand-red/90 leading-snug">
-                        Formato oficial sugerido para casos clasificados como {ticket.topicName}.
-                      </p>
-                    )}
+          {zeroStateOfficialGridVisible ? (
+            <div key="enterprise-official-grid" className="animate-plf-apple-tab">
+              <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-2xs">
+                <div className="flex flex-col items-center text-center">
+                  <div className="flex size-11 items-center justify-center rounded-xl bg-brand-red/10 text-brand-red">
+                    <FileSpreadsheet className="size-5" />
                   </div>
-                  <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between">
-                    <span className="text-[11px] text-zinc-400">{form.dept}</span>
-                    <Button
-                      size="sm"
-                      variant={isRecommended ? "primary" : "secondary"}
-                      disabled={form.disabled}
-                      onClick={form.action}
-                      className={isRecommended ? "font-heading font-semibold" : undefined}
-                    >
-                      <Icon className="size-3.5" />
-                      {form.btnLabel}
-                    </Button>
-                  </div>
+                  <h3 className="mt-3 text-base font-semibold text-zinc-900">
+                    {formScope === "task"
+                      ? "Formularios del Ciclo de Vida de la Tarea"
+                      : "Formularios del Ciclo de Vida del Ticket"}
+                  </h3>
+                  <p className="mt-1 max-w-xl text-xs text-zinc-500 leading-relaxed">
+                    Integra los procesos y formatos oficiales de Plastifar directamente en esta {scopeLabel}.
+                    Puedes iniciar el formulario correspondiente ahora o dejarlo como borrador y completarlo
+                    más adelante.
+                  </p>
                 </div>
-              );
-            })}
-          </div>
+
+                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {availableForms.map((form, formIndex) => {
+                    const isRecommended = form.key === suggestedFormRaw;
+                    const hasDraft = draftPickerKeySet.has(form.key as EnterpriseFormPickerKey);
+                    const Icon = form.icon;
+
+                    return (
+                      <div
+                        key={form.key}
+                        className={`flex flex-col justify-between rounded-xl border p-4.5 transition-all ${
+                          isRecommended
+                            ? "border-brand-red/40 bg-brand-red/5 ring-1 ring-brand-red/30 shadow-xs"
+                            : hasDraft
+                              ? "border-brand-red/25 bg-brand-red/[0.03] ring-1 ring-brand-red/10 hover:border-brand-red/35"
+                              : "border-zinc-200 bg-white hover:border-zinc-300"
+                        } ${officialGridStaggerIn ? "animate-plf-list-row-in" : ""}`}
+                        style={
+                          officialGridStaggerIn
+                            ? { animationDelay: `${formIndex * 45}ms` }
+                            : undefined
+                        }
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <span
+                              className={`font-heading text-[10.5px] font-bold uppercase tracking-wider ${form.codeColor}`}
+                            >
+                              {form.code}
+                            </span>
+                            <div className="flex shrink-0 flex-col items-end gap-1">
+                              {isRecommended ? (
+                                <span className="inline-flex items-center rounded-md border border-brand-red/20 bg-brand-red/10 px-2.5 py-0.5 text-xs font-semibold text-brand-red">
+                                  Recomendado según el motivo
+                                </span>
+                              ) : null}
+                              {hasDraft ? <EnterpriseFormDraftBadge /> : null}
+                            </div>
+                          </div>
+                          <h4 className="mt-1.5 text-sm font-semibold text-zinc-900">{form.title}</h4>
+                          <p className="mt-1 text-xs text-zinc-500 leading-relaxed">{form.description}</p>
+                          {isRecommended && ticket.topicName ? (
+                            <p className="mt-2 text-[11.5px] font-medium text-brand-red/90 leading-snug">
+                              Formato oficial sugerido para casos clasificados como {ticket.topicName}.
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3">
+                          <span className="text-[11px] text-zinc-400">{form.dept}</span>
+                          <Button
+                            size="sm"
+                            variant={isRecommended ? "primary" : "secondary"}
+                            disabled={form.disabled}
+                            onClick={form.action}
+                            className={isRecommended ? "font-heading font-semibold" : undefined}
+                          >
+                            <Icon className="size-3.5" />
+                            {form.btnLabel}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
         /* REGISTERED FORMS VIEW */
         <div className="space-y-3">
-          {/* Top Sub-tabs & Add Form Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 pb-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {registeredForms.map((item) => {
-                const isSelected = item.key === activeForm?.key;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setSelectedSubTabKey(item.key)}
-                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                      isSelected
-                        ? "bg-zinc-900 text-white shadow-xs"
-                        : "bg-white text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 border border-zinc-200"
-                    }`}
-                  >
-                    <span
-                      className={`font-mono text-[10px] font-bold uppercase ${
-                        isSelected ? "text-zinc-300" : "text-zinc-400"
-                      }`}
-                    >
-                      {item.code}
-                    </span>
-                    <span>{item.title}</span>
-                    <span
-                      className={`rounded px-1.5 py-0.2 text-[10px] ${
-                        isSelected ? "bg-zinc-800 text-zinc-200" : "bg-zinc-100 text-zinc-600"
-                      }`}
-                    >
-                      {item.badgeText}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Add another form action */}
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => setNewFormModalOpen(true)}
-                title="Llenar o agregar otro formulario vinculado a este ticket"
+          {/* Sub-tabs switcher only if there are 2 or more forms */}
+          {registeredForms.length > 1 && (
+            <div className="min-w-0 max-w-full pb-1">
+              <FormLineTabStrip
+                activeIndex={activeFormIndex}
+                tabCount={registeredForms.length}
               >
-                <Plus className="size-3.5 mr-1" />
-                Llenar otro formulario
-              </Button>
+                {registeredForms.map((item, idx) => {
+                  const isSelected = item.key === activeForm?.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      {...formLineTabIndexAttr(idx)}
+                      onClick={() => setSelectedSubTabKey(item.key)}
+                      className={`inline-flex shrink-0 whitespace-nowrap items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-brand-red/10 border border-brand-red/30 text-brand-red shadow-2xs font-semibold"
+                          : "bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border border-zinc-200"
+                      }`}
+                    >
+                      <span className={`font-mono text-[10px] font-bold uppercase ${isSelected ? "text-brand-red" : "text-zinc-400"}`}>
+                        {item.code}
+                      </span>
+                      <span>{item.title}</span>
+                      <span className={`rounded px-1.5 py-0.2 text-[10px] ${isSelected ? "bg-brand-red/15 text-brand-red font-semibold" : "bg-zinc-100 text-zinc-600"}`}>
+                        {item.badgeText}
+                      </span>
+                    </button>
+                  );
+                })}
+              </FormLineTabStrip>
             </div>
-          </div>
+          )}
 
           {/* ACTIVE FORM DETAILS */}
           {activeForm && (
             <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-2xs">
               {/* Form Card Header */}
-              <ActiveFormHeader
-                activeForm={activeForm}
-                ticketNumber={ticket.number}
-                onEdit={() => {
-                  if (activeForm.type === "reclamacion") {
-                    setEditingClaim(activeForm.data as CustomerClaim);
-                    setClaimModalOpen(true);
-                  } else if (activeForm.type === "retiro") {
-                    setEditingWithdrawal(activeForm.data as MerchandiseWithdrawal);
-                    setWithdrawalModalOpen(true);
-                  } else if (activeForm.type === "discrepancia") {
-                    setEditingDiscrepancy((activeForm.data as DiscrepancyDetail).discrepancy);
-                    setDiscrepancyModalOpen(true);
-                  } else if (activeForm.type === "hca") {
-                    setEditingHca(activeForm.data as CorrectiveActionSheet);
-                    setHcaModalOpen(true);
-                  }
-                }}
-                onMigrate={() => handleTriggerMigration(activeForm)}
-              />
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-heading text-[11px] font-bold uppercase tracking-wider text-brand-red bg-brand-red/10 px-2 py-0.5 rounded">
+                      {activeForm.code}
+                    </span>
+                    <h3 className="text-sm font-semibold text-zinc-900">{activeForm.title}</h3>
+
+                    {activeForm.type === "reclamacion" && (
+                      <ClaimStatusBadge status={(activeForm.data as CustomerClaim).status} />
+                    )}
+                    {activeForm.type === "retiro" && (
+                      <WithdrawalStatusBadge status={(activeForm.data as MerchandiseWithdrawal).status} />
+                    )}
+                    {activeForm.type === "discrepancia" && (
+                      <div className="flex items-center gap-1.5">
+                        <DiscrepancyStatusBadge
+                          status={(activeForm.data as DiscrepancyDetail).discrepancy.status}
+                        />
+                        {((activeForm.data as DiscrepancyDetail).discrepancy.checks || []).some((c) => c.result === "Positivo") && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                            <AlertTriangle className="size-3 text-amber-600" />
+                            Novedad de seguridad
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {activeForm.type === "hca" && (
+                      <HcaStatusBadge status={(activeForm.data as CorrectiveActionSheet).status} />
+                    )}
+                  </div>
+                  {formScope === "task" ? (
+                    <TaskFormHostLinkSubtitle taskNumber={taskScopeCode} />
+                  ) : (
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Formulario empresarial vinculado a {ticket.number} · Plastifar S.A.
+                    </p>
+                  )}
+                </div>
+
+                {/* Form Actions (Add another, Print, Edit, Switch, Link) */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => setNewFormModalOpen(true)}
+                    title={`Llenar o agregar otro formulario vinculado a esta ${scopeLabel}`}
+                  >
+                    <Plus className="size-3.5 mr-1" />
+                    Llenar otro formulario
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      if (onViewDocument) {
+                        onViewDocument(activeForm);
+                        return;
+                      }
+                      const path = getPrintPath(activeForm);
+                      if (path) navigate(path);
+                    }}
+                    title="Ver y exportar documento oficial (Excel, PDF e impresión)"
+                  >
+                    <FileText className="size-3.5 mr-1 text-zinc-600" />
+                    Documento
+                  </Button>
+
+                  {/* Dropdown with more options */}
+                  <div className="relative" ref={actionsMenuContainerRef}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setActionsMenuOpen((prev) => !prev);
+                      }}
+                      className="gap-1.5"
+                      title="Más opciones del formulario"
+                    >
+                      <MoreHorizontal className="size-3.5 text-zinc-600" />
+                      <span>Más opciones</span>
+                      <ChevronDown
+                        className={`size-3 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
+                          actionsMenuOpen ? "rotate-180 text-zinc-700" : "group-hover:text-zinc-600"
+                        }`}
+                      />
+                    </Button>
+
+                    {menuMounted && (
+                      <div
+                        ref={menuPanelRef}
+                        style={menuExiting ? { pointerEvents: "none" } : undefined}
+                        aria-hidden={menuExiting}
+                        className="absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-zinc-200/90 bg-white/95 backdrop-blur-xs py-1 shadow-lg z-30"
+                      >
+                        {/* Edit Form Button */}
+                        <button
+                          type="button"
+                          data-motion-item
+                          onClick={() => {
+                            setActionsMenuOpen(false);
+                            if (activeForm.type === "reclamacion") {
+                              setEditingClaim(activeForm.data as CustomerClaim);
+                              setClaimModalOpen(true);
+                            } else if (activeForm.type === "retiro") {
+                              setEditingWithdrawal(activeForm.data as MerchandiseWithdrawal);
+                              setWithdrawalModalOpen(true);
+                            } else if (activeForm.type === "discrepancia") {
+                              setEditingDiscrepancy((activeForm.data as DiscrepancyDetail).discrepancy);
+                              setDiscrepancyModalOpen(true);
+                            } else if (activeForm.type === "hca") {
+                              setEditingHca(activeForm.data as CorrectiveActionSheet);
+                              setHcaModalOpen(true);
+                            }
+                          }}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                        >
+                          <Pencil className="size-3.5 text-zinc-500" />
+                          <span>Editar datos</span>
+                        </button>
+
+                        {/* Switch / Migrate Form Button */}
+                        <button
+                          type="button"
+                          data-motion-item
+                          onClick={() => {
+                            setActionsMenuOpen(false);
+                            handleTriggerMigration(activeForm);
+                          }}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                        >
+                          <ArrowLeftRight className="size-3.5 text-amber-600" />
+                          <span>Cambiar de formulario</span>
+                        </button>
+
+                        <div className="my-1 border-t border-zinc-100" />
+
+                        {activeForm.type === "hca" ? (
+                          <button
+                            type="button"
+                            data-motion-item
+                            onClick={() => {
+                              setEditingHca(activeForm.data as CorrectiveActionSheet);
+                              setHcaModalOpen(true);
+                              setActionsMenuOpen(false);
+                            }}
+                            className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <ArrowUpRight className="size-3.5 text-zinc-500" />
+                              <span>Editar HCA</span>
+                            </span>
+                          </button>
+                        ) : (
+                          <Link
+                            to={
+                              activeForm.type === "reclamacion"
+                                ? `/reclamaciones/${(activeForm.data as CustomerClaim).id}`
+                                : activeForm.type === "retiro"
+                                ? `/retiros/${(activeForm.data as MerchandiseWithdrawal).id}`
+                                : `/discrepancias/${(activeForm.data as DiscrepancyDetail).discrepancy.id}`
+                            }
+                            data-motion-item
+                            onClick={() => setActionsMenuOpen(false)}
+                            className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <ArrowUpRight className="size-3.5 text-zinc-500" />
+                              <span>Ver ficha completa</span>
+                            </span>
+                          </Link>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* Form Content Overview */}
               <div className="mt-4">
                 {/* 1. RECLAMACIÓN DETAILS */}
-                {activeForm.type === "reclamacion" && <ClaimFormSummary claim={activeForm.data as CustomerClaim} />}
+                {activeForm.type === "reclamacion" && (() => {
+                  const c = activeForm.data as CustomerClaim;
+                  const reasonLabel = c.reasonOther ? `${c.reason} (${c.reasonOther})` : c.reason;
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            {formScope === "task" ? "Código tarea" : "Código ticket"}
+                          </span>
+                          <p className="mt-1 font-mono text-sm font-bold text-zinc-900">
+                            {formScope === "task" ? scopeCode : c.ticketNumber}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500">Formato oficial PF-FOR-034</span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Fecha del caso
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900">{formatDay(c.claimDate)}</p>
+                          <span className="text-[10.5px] text-zinc-500 truncate block" title={reasonLabel}>
+                            Motivo: {reasonLabel}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Recepción
+                          </span>
+                          <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{c.receivedByName}</p>
+                          <span className="text-[10.5px] text-zinc-500">Recibida {formatDay(c.receivedAt)}</span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Monto & estado
+                          </span>
+                          <p className="mt-1 text-sm font-semibold tabular-nums text-zinc-900">
+                            {c.currency ? formatAmount(c.totalAmount, c.currency) : c.totalAmount}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500 inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            {c.invoiceRef ? `Factura ${c.invoiceRef}` : "Sin factura"}
+                            <ClaimStatusBadge status={c.status} />
+                          </span>
+                        </div>
+                      </div>
+
+                      {c.description?.trim() && (
+                        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-2xs">
+                          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                            <FileText className="size-3.5 text-zinc-400" />
+                            <span>Descripción de la reclamación</span>
+                          </div>
+                          <p className="mt-2.5 whitespace-pre-wrap text-xs leading-relaxed text-zinc-800">
+                            {c.description}
+                          </p>
+                        </div>
+                      )}
+
+                      {c.comments?.trim() && (
+                        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-2xs">
+                          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                            <FileText className="size-3.5 text-zinc-400" />
+                            <span>Comentarios</span>
+                          </div>
+                          <p className="mt-2.5 whitespace-pre-wrap text-xs leading-relaxed text-zinc-800">
+                            {c.comments.trim()}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5">
+                          <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-zinc-700">
+                            Productos reclamados ({c.lines.length})
+                          </h4>
+                          <span className="text-[11px] text-zinc-500">Cantidades y montos por línea</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="border-b border-zinc-200/80 bg-zinc-50/80 text-[10.5px] font-bold uppercase text-zinc-500">
+                              <tr>
+                                <th className="p-3">Producto</th>
+                                <th className="p-3 text-right">Facturado</th>
+                                <th className="p-3 text-right">Recibido</th>
+                                <th className="p-3 text-right">Defectuoso</th>
+                                <th className="p-3 text-right">P. unitario</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                              {c.lines.map((l) => (
+                                <tr key={l.id} className="transition-colors hover:bg-zinc-50/50">
+                                  <td className="p-3">
+                                    <p className="font-semibold text-zinc-900">{l.productName}</p>
+                                    {l.productCode && (
+                                      <span className="font-mono text-[10.5px] text-zinc-400">{l.productCode}</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-right tabular-nums">{l.invoicedQuantity ?? "—"}</td>
+                                  <td className="p-3 text-right tabular-nums">{l.receivedQuantity ?? "—"}</td>
+                                  <td className="p-3 text-right">
+                                    {l.defectiveQuantity != null && l.defectiveQuantity > 0 ? (
+                                      <span className="inline-flex items-center rounded-md border border-rose-200/80 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-brand-red tabular-nums">
+                                        {l.defectiveQuantity}
+                                      </span>
+                                    ) : (
+                                      <span className="text-zinc-400">—</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-right tabular-nums">
+                                    {l.unitPrice !== null ? formatAmount(l.unitPrice, c.currency ?? "DOP") : "—"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* 2. RETIRO DETAILS */}
-                {activeForm.type === "retiro" && (
-                  <WithdrawalFormSummary withdrawal={activeForm.data as MerchandiseWithdrawal} />
-                )}
+                {activeForm.type === "retiro" && (() => {
+                  const w = activeForm.data as MerchandiseWithdrawal;
+                  return (
+                    <div className="space-y-4">
+                      {/* Executive Summary Cards */}
+                      <div
+                        className={`grid grid-cols-2 gap-3 ${
+                          formScope === "task" ? "sm:grid-cols-2 lg:grid-cols-5" : "sm:grid-cols-4"
+                        }`}
+                      >
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            No. Solicitud
+                          </span>
+                          <p className="mt-1 font-mono text-sm font-bold text-zinc-900">{w.number}</p>
+                          <span className="text-[10.5px] text-zinc-500">Formato oficial PF-FOR-068</span>
+                        </div>
+
+                        {formScope === "task" ? <TaskScopeCodeKpi taskNumber={taskScopeCode} /> : null}
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Fecha & motivo
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900">{formatDay(w.requestDate)}</p>
+                          <span className="text-[10.5px] text-zinc-500 block truncate" title={w.reason}>
+                            {w.reason}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Vendedor & origen
+                          </span>
+                          <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{w.requestedByName}</p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            Origen: {w.errorOrigin ?? "Sin especificar"}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Valor total & estado
+                          </span>
+                          <p className="mt-1 text-sm font-semibold tabular-nums text-zinc-900">
+                            {w.currency ? formatAmount(w.totalValue, w.currency) : w.totalValue}
+                          </p>
+                          <span className="mt-0.5 inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-zinc-500">
+                            <WithdrawalStatusBadge status={w.status} />
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Productos a retirar */}
+                      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                        <div className="flex items-center justify-between border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5">
+                          <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-zinc-700">
+                            Productos a retirar ({w.lines.length})
+                          </h4>
+                          <span className="text-[11px] text-zinc-500">Renglones de la solicitud PF-FOR-068</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="border-b border-zinc-200/80 bg-zinc-50/80 text-[10.5px] font-bold uppercase text-zinc-500">
+                              <tr>
+                                <th className="p-3">Código</th>
+                                <th className="p-3">Descripción</th>
+                                <th className="p-3 text-right">Cant.</th>
+                                <th className="p-3">Unid / Empaque</th>
+                                <th className="p-3 text-right">P. Unit.</th>
+                                <th className="p-3 text-right">Valor</th>
+                                {w.status === "Retirado" && <th className="p-3 text-right">Retirado</th>}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                              {w.lines.map((l) => (
+                                <tr key={l.id} className="transition-colors hover:bg-zinc-50/50">
+                                  <td className="p-3 font-mono text-[11px] font-semibold text-zinc-600">
+                                    {l.productCode}
+                                  </td>
+                                  <td className="p-3 font-semibold text-zinc-900">{l.productName}</td>
+                                  <td className="p-3 text-right font-medium tabular-nums">
+                                    {l.quantity} <span className="text-zinc-500">{l.quantityUnit}</span>
+                                  </td>
+                                  <td className="p-3 font-mono text-[11px] text-zinc-600">{l.packDetail || "—"}</td>
+                                  <td className="p-3 text-right tabular-nums">
+                                    {l.unitPrice !== null ? formatAmount(l.unitPrice, w.currency ?? "DOP") : "—"}
+                                  </td>
+                                  <td className="p-3 text-right font-semibold tabular-nums text-zinc-900">
+                                    {l.lineValue !== null ? formatAmount(l.lineValue, w.currency ?? "DOP") : "—"}
+                                  </td>
+                                  {w.status === "Retirado" && (
+                                    <td className="p-3 text-right tabular-nums">
+                                      {l.withdrawnQuantity !== null ? `${l.withdrawnQuantity} ${l.quantityUnit}` : "—"}
+                                    </td>
+                                  )}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Firmas del documento PF-FOR-068 */}
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="rounded-xl border border-zinc-200 bg-white p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Firma Vendedor
+                          </span>
+                          <p className="mt-1 text-xs font-semibold text-zinc-900">{w.requestedByName || "—"}</p>
+                        </div>
+                        <div className="rounded-xl border border-zinc-200 bg-white p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Firma Almacén
+                          </span>
+                          <p className="mt-1 text-xs font-semibold text-zinc-900">
+                            {w.warehouseStaffName || "Pendiente de retiro"}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-zinc-200 bg-white p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Firma Cliente
+                          </span>
+                          <p className="mt-1 text-xs font-semibold text-zinc-900">
+                            {w.customerSignerName || "Pendiente de retiro"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* 3. DISCREPANCIA DETAILS */}
-                {activeForm.type === "discrepancia" && (
-                  <DiscrepancyFormSummary detail={activeForm.data as DiscrepancyDetail} />
-                )}
+                {activeForm.type === "discrepancia" && (() => {
+                  const detail = activeForm.data as DiscrepancyDetail;
+                  const d = detail.discrepancy;
+                  const checks = d.checks || [];
+                  const positiveChecks = checks.filter((c) => c.result === "Positivo");
 
-                {/* 4. HCA DETAILS */}
-                {activeForm.type === "hca" && <HcaFormSummary sheet={activeForm.data as CorrectiveActionSheet} />}
+                  return (
+                    <div className="space-y-4">
+                      {/* Executive Summary Cards */}
+                      <div
+                        className={`grid grid-cols-2 gap-3 ${
+                          formScope === "task" ? "sm:grid-cols-2 lg:grid-cols-5" : "sm:grid-cols-4"
+                        }`}
+                      >
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            No. Investigación
+                          </span>
+                          <p className="mt-1 font-mono text-sm font-bold text-zinc-900">
+                            {d.number}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            Formato oficial PF-FOR-291
+                          </span>
+                        </div>
+
+                        {formScope === "task" ? <TaskScopeCodeKpi taskNumber={taskScopeCode} /> : null}
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Fecha de Registro
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900">
+                            {formatDay(d.createdAt)}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            Registrado por {d.createdByName || "Sistema"}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Investigador / Despacho
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900 truncate">
+                            {d.performedByName || "En investigación"}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            {d.performedAt ? `Completada ${formatDay(d.performedAt)}` : "En curso"}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Dictamen & Aprobación
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900 truncate">
+                            {d.approvedByName || "Pendiente"}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            {d.approvedAt ? `Aprobada ${formatDay(d.approvedAt)}` : "Sin aprobación"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Operational Note / Root Cause */}
+                      {d.note && (
+                        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-2xs">
+                          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500 font-heading">
+                            <FileText className="size-3.5 text-zinc-400" />
+                            <span>Nota Operativa / Causa Investigada</span>
+                          </div>
+                          <p className="mt-2.5 text-xs text-zinc-800 leading-relaxed whitespace-pre-wrap">
+                            {d.note}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Discrepancy Lines Table */}
+                      <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-2xs">
+                        <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5 flex items-center justify-between">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 font-heading">
+                            Líneas en Discrepancia ({d.lines.length})
+                          </h4>
+                          <span className="text-[11px] text-zinc-500">
+                            Detalle de producto y balance de despacho
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-zinc-50/80 text-[10.5px] uppercase font-bold text-zinc-500 border-b border-zinc-200/80">
+                              <tr>
+                                <th className="p-3">Factura</th>
+                                <th className="p-3">Producto</th>
+                                <th className="p-3">Problemática</th>
+                                <th className="p-3">Despachador</th>
+                                <th className="p-3">Apta N/C</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                              {d.lines.map((line) => {
+                                const isShortage = line.shortageQuantity > 0;
+                                const isSurplus = line.surplusQuantity > 0;
+                                return (
+                                  <tr key={line.id} className="hover:bg-zinc-50/50 transition-colors">
+                                    <td className="p-3 font-mono font-medium text-zinc-800">
+                                      {line.invoiceRef}
+                                    </td>
+                                    <td className="p-3">
+                                      <p className="font-semibold text-zinc-900">{line.productName}</p>
+                                      {line.productCode && (
+                                        <span className="font-mono text-[10.5px] text-zinc-400">
+                                          {line.productCode}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="p-3">
+                                      {isShortage ? (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 border border-rose-200/80 px-2.5 py-0.5 text-xs font-semibold text-brand-red">
+                                          <MinusCircle className="size-3" />
+                                          Faltante: {line.shortageQuantity} und
+                                        </span>
+                                      ) : isSurplus ? (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                                          <PlusCircle className="size-3" />
+                                          Sobrante: {line.surplusQuantity} und
+                                        </span>
+                                      ) : (
+                                        <span className="text-zinc-400 text-xs">Sin diferencia</span>
+                                      )}
+                                    </td>
+                                    <td className="p-3 text-zinc-700">
+                                      <p className="font-medium text-zinc-800">{line.dispatcherName}</p>
+                                      {line.supervisorName && (
+                                        <span className="text-[10.5px] text-zinc-400">
+                                          Sup: {line.supervisorName}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="p-3">
+                                      {line.qualifiesForCreditNote === true ? (
+                                        <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 text-[10.5px] font-bold uppercase text-emerald-700">
+                                          Apta N/C
+                                        </span>
+                                      ) : line.qualifiesForCreditNote === false ? (
+                                        <span className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-0.5 text-[10.5px] text-zinc-600">
+                                          No apta
+                                        </span>
+                                      ) : (
+                                        <span className="text-zinc-400">—</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* 9-Point Security Checklist Table */}
+                      <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-2xs">
+                        <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 font-heading">
+                              Protocolo de Chequeo de Seguridad (9 Puntos)
+                            </h4>
+                            <span className="font-mono text-[10px] text-zinc-400 font-bold">
+                              PF-FOR-291
+                            </span>
+                          </div>
+                          <span className="text-[11px]">
+                            {positiveChecks.length > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 font-semibold text-amber-800">
+                                <AlertTriangle className="size-3 text-amber-600" />
+                                {positiveChecks.length} {positiveChecks.length === 1 ? "hallazgo reportado" : "hallazgos reportados"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2.5 py-0.5 font-medium text-zinc-600">
+                                <ShieldCheck className="size-3 text-emerald-600" />
+                                9/9 conformes
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="divide-y divide-zinc-100">
+                          {checks.map((chk) => {
+                            const isPositive = chk.result === "Positivo";
+                            const isEvaluated = chk.result !== null && chk.result !== undefined;
+                            return (
+                              <div
+                                key={chk.itemNumber}
+                                className={`px-4 py-3 flex items-start justify-between gap-3 text-xs transition-colors ${
+                                  isPositive ? "bg-amber-50/50" : "hover:bg-zinc-50/50"
+                                }`}
+                              >
+                                <div className="flex items-start gap-3 min-w-0 flex-1">
+                                  {isPositive ? (
+                                    <span className="flex size-5 shrink-0 items-center justify-center rounded bg-amber-100 font-mono text-[10px] font-bold text-amber-900">
+                                      {String(chk.itemNumber).padStart(2, "0")}
+                                    </span>
+                                  ) : (
+                                    <span className="flex size-5 shrink-0 items-center justify-center rounded bg-zinc-100 font-mono text-[10px] font-bold text-zinc-600">
+                                      {String(chk.itemNumber).padStart(2, "0")}
+                                    </span>
+                                  )}
+                                  <p className="text-xs text-zinc-700 leading-relaxed">
+                                    {chk.text}
+                                  </p>
+                                </div>
+                                <div className="shrink-0">
+                                  {isPositive ? (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
+                                      <AlertTriangle className="size-3 text-amber-600" />
+                                      Positivo
+                                    </span>
+                                  ) : isEvaluated ? (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700">
+                                      <Check className="size-3 text-emerald-600" strokeWidth={2.5} />
+                                      Negativo
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-zinc-400">Sin evaluar</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 4. HCA DETAILS — resumen ejecutivo (mismo lenguaje que discrepancia) */}
+                {activeForm.type === "hca" && (() => {
+                  const s = activeForm.data as CorrectiveActionSheet;
+                  const planItems = hcaPlanBySheetId[s.id];
+                  const causes = [...(s.causes ?? [])].sort((a, b) => a.position - b.position);
+                  const participants = s.participants ?? [];
+                  const acknowledgedCount = participants.filter((p) => p.acknowledgedAt).length;
+                  const openPlanCount =
+                    planItems?.filter((item) => !isPlanItemSettled(item)).length ?? 0;
+                  const overduePlanCount =
+                    planItems?.filter((item) => isPlanItemOverdue(item) && !isPlanItemSettled(item)).length ?? 0;
+                  const productLabel = hcaProductLabel(s);
+
+                  return (
+                    <div className="space-y-4">
+                      <div
+                        className={`grid grid-cols-2 gap-3 ${
+                          formScope === "task" ? "sm:grid-cols-2 lg:grid-cols-5" : "sm:grid-cols-4"
+                        }`}
+                      >
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            No. HCA
+                          </span>
+                          <p className="mt-1 font-mono text-sm font-bold text-zinc-900">{s.number}</p>
+                          <span className="text-[10.5px] text-zinc-500">Formato oficial PF-FOR-109</span>
+                        </div>
+
+                        {formScope === "task" ? <TaskScopeCodeKpi taskNumber={taskScopeCode} /> : null}
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Fecha de registro
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900">{formatDay(s.detectedAt)}</p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            Elaborado por {s.createdByName || "—"}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Responsable HCA
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900 truncate">{s.responsibleName}</p>
+                          <span className="text-[10.5px] text-zinc-500">
+                            Cierre comprometido {formatDay(s.dueDate)}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
+                          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            Producto & estado
+                          </span>
+                          <p className="mt-1 text-sm font-semibold text-zinc-900 truncate" title={productLabel}>
+                            {productLabel}
+                          </p>
+                          <span className="text-[10.5px] text-zinc-500 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            {s.plantName ? `Planta ${s.plantName}` : "Sin planta"}
+                            <span className="inline-flex">
+                              <HcaStatusBadge status={s.status} />
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-2xs">
+                        <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500 font-heading">
+                          <FileText className="size-3.5 text-zinc-400" />
+                          <span>Hecho / no conformidad</span>
+                        </div>
+                        <p className="mt-2.5 text-xs text-zinc-800 leading-relaxed whitespace-pre-wrap">
+                          {buildHcaHechoText(s)}
+                        </p>
+                      </div>
+
+                      {s.comments?.trim() && (
+                        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-2xs">
+                          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500 font-heading">
+                            <FileText className="size-3.5 text-zinc-400" />
+                            <span>Comentarios de cierre</span>
+                          </div>
+                          <p className="mt-2.5 text-xs text-zinc-800 leading-relaxed whitespace-pre-wrap">
+                            {s.comments.trim()}
+                          </p>
+                        </div>
+                      )}
+
+                      {causes.length > 0 && (
+                        <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-2xs">
+                          <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5 flex items-center justify-between">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 font-heading">
+                              Causas identificadas ({causes.length})
+                            </h4>
+                            <span className="font-mono text-[10px] text-zinc-400 font-bold">PF-FOR-109</span>
+                          </div>
+                          <div className="divide-y divide-zinc-100">
+                            {causes.map((cause, index) => (
+                              <div
+                                key={cause.id}
+                                className="px-4 py-3 flex items-start gap-3 text-xs hover:bg-zinc-50/50 transition-colors"
+                              >
+                                <span className="flex size-5 shrink-0 items-center justify-center rounded bg-zinc-100 font-mono text-[10px] font-bold text-zinc-600">
+                                  {String(index + 1).padStart(2, "0")}
+                                </span>
+                                <p className="text-xs text-zinc-700 leading-relaxed">{cause.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-2xs">
+                        <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 font-heading">
+                              Plan de acción
+                              {planItems !== undefined ? ` (${planItems.length})` : ""}
+                            </h4>
+                            <span className="font-mono text-[10px] text-zinc-400 font-bold shrink-0">
+                              PF-FOR-109
+                            </span>
+                          </div>
+                          <span className="text-[11px] shrink-0">
+                            {planItems === undefined ? (
+                              <span className="text-zinc-400">Cargando…</span>
+                            ) : overduePlanCount > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 font-semibold text-amber-800">
+                                <AlertTriangle className="size-3 text-amber-600" />
+                                {overduePlanCount}{" "}
+                                {overduePlanCount === 1 ? "acción vencida" : "acciones vencidas"}
+                              </span>
+                            ) : openPlanCount > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2.5 py-0.5 font-medium text-zinc-600">
+                                {openPlanCount} pendiente{openPlanCount === 1 ? "" : "s"}
+                              </span>
+                            ) : planItems.length > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 font-semibold text-emerald-700">
+                                <Check className="size-3" strokeWidth={2.5} />
+                                Plan al día
+                              </span>
+                            ) : (
+                              <span className="text-zinc-400">Sin acciones</span>
+                            )}
+                          </span>
+                        </div>
+                        {planItems === undefined ? (
+                          <ActionPlanTableSkeleton />
+                        ) : planItems.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-zinc-50/80 text-[10.5px] uppercase font-bold text-zinc-500 border-b border-zinc-200/80">
+                                <tr>
+                                  <th className="p-3 w-[44%]">Acción (qué)</th>
+                                  <th className="p-3">Quién</th>
+                                  <th className="p-3">Cuándo</th>
+                                  <th className="p-3">Estado</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                                {planItems.map((item) => {
+                                  const itemOverdue = isPlanItemOverdue(item) && !isPlanItemSettled(item);
+                                  const hasEvidence =
+                                    Boolean(item.evidenceNotes?.trim()) || item.attachments.length > 0;
+                                  return (
+                                    <tr key={item.id} className="hover:bg-zinc-50/50 transition-colors">
+                                      <td className="p-3 align-top">
+                                        <p className="font-medium text-zinc-900 whitespace-pre-wrap">
+                                          {item.description}
+                                        </p>
+                                        {hasEvidence && (
+                                          <span className="mt-1 inline-flex items-center gap-1 text-[10.5px] text-zinc-500">
+                                            <CheckCircle2 className="size-3 text-emerald-600" />
+                                            Con evidencia registrada
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="p-3 align-top font-medium text-zinc-800">
+                                        {item.responsibleName}
+                                      </td>
+                                      <td className="p-3 align-top tabular-nums">{formatDay(item.dueDate)}</td>
+                                      <td className="p-3 align-top">
+                                        <PlanItemStatusBadge status={item.status} overdue={itemOverdue} />
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="px-4 py-6 text-xs text-zinc-500">No hay acciones en el plan.</p>
+                        )}
+                      </div>
+
+                      {participants.length > 0 && (
+                        <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-2xs">
+                          <div className="border-b border-zinc-200/80 bg-zinc-50/60 px-4 py-2.5 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 font-heading">
+                                Participantes ({participants.length})
+                              </h4>
+                              <Users className="size-3.5 text-zinc-400" />
+                            </div>
+                            <span className="text-[11px]">
+                              {acknowledgedCount === participants.length ? (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 font-semibold text-emerald-700">
+                                  <Check className="size-3" strokeWidth={2.5} />
+                                  Todos confirmaron
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2.5 py-0.5 font-medium text-zinc-600">
+                                  {acknowledgedCount}/{participants.length} confirmados
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="divide-y divide-zinc-100">
+                            {participants.map((participant) => (
+                              <div
+                                key={participant.id}
+                                className="px-4 py-3 flex items-center justify-between gap-3 text-xs hover:bg-zinc-50/50 transition-colors"
+                              >
+                                <p className="font-medium text-zinc-800">{participant.name}</p>
+                                <div className="shrink-0">
+                                  {participant.acknowledgedAt ? (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                      <Check className="size-3" strokeWidth={2.5} />
+                                      {formatDay(participant.acknowledgedAt.slice(0, 10))}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-zinc-400">Pendiente de confirmación</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -720,73 +2009,191 @@ export function TicketFormsTab({ ticket, onHasFormsChanged, onTicketStatusChange
 
       {/* MODAL: CAMBIAR DE FORMULARIO (MIGRACIÓN) */}
       {migrationModalOpen && migratingFromSource && (
-        <MigrateFormModal
-          migratingFromSource={migratingFromSource}
-          migrationTargetType={migrationTargetType}
-          onTargetChange={setMigrationTargetType}
-          migrateCommonFields={migrateCommonFields}
-          onMigrateCommonFieldsChange={setMigrateCommonFields}
+        <Modal
+          title="Cambiar de Formulario"
+          eyebrow="Migración entre procesos de Plastifar"
+          description={`Selecciona el nuevo formulario empresarial al que deseas cambiar en esta ${scopeLabel}.`}
           onClose={() => setMigrationModalOpen(false)}
-          onContinue={handleExecuteMigration}
-        />
+        >
+          <div className="space-y-4">
+            <div className="rounded-lg bg-zinc-50 p-3 border border-zinc-200 text-xs">
+              <span className="font-heading text-[10px] font-bold uppercase text-zinc-400">Formulario actual:</span>
+              <p className="font-semibold text-zinc-800 mt-0.5">{migratingFromSource.label}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+                ¿A qué formulario deseas cambiar?
+              </label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {[
+                  { id: "reclamacion", code: "PF-FOR-034", label: "Reclamación de Clientes", desc: "Quejas, averías y diferencias" },
+                  { id: "retiro", code: "PF-FOR-068", label: "Solicitud de Retiro", desc: "Recogida de mercancía física" },
+                  { id: "discrepancia", code: "PF-FOR-291", label: "Discrepancia de Cargas", desc: "Sobrantes/faltantes en despacho" },
+                  { id: "hca", code: "PF-FOR-109", label: "Hecho, Causa y Acción", desc: "Calidad y causa raíz interna" },
+                ]
+                  .filter((opt) => opt.id !== migratingFromSource.type)
+                  .map((opt) => {
+                    const isSelected = migrationTargetType === opt.id;
+                    return (
+                      <div
+                        key={opt.id}
+                        onClick={() => setMigrationTargetType(opt.id as EnterpriseFormType)}
+                        className={`cursor-pointer rounded-lg border p-3 text-xs transition-all ${
+                          isSelected
+                            ? "border-brand-red bg-brand-red/5 ring-1 ring-brand-red/30"
+                            : "border-zinc-200 bg-white hover:border-zinc-300"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] font-bold uppercase text-brand-red">{opt.code}</span>
+                          {isSelected && <CheckCircle2 className="size-3.5 text-brand-red" />}
+                        </div>
+                        <p className="mt-1 font-semibold text-zinc-900">{opt.label}</p>
+                        <p className="mt-0.5 text-[11px] text-zinc-500">{opt.desc}</p>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Checkbox for data migration */}
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 text-xs">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={migrateCommonFields}
+                  onChange={(e) => setMigrateCommonFields(e.target.checked)}
+                  className="mt-0.5 size-4 rounded border-amber-300 text-brand-red focus:ring-brand-red"
+                />
+                <div>
+                  <span className="font-semibold text-amber-900">
+                    Migrar datos comunes al nuevo formulario (Recomendado)
+                  </span>
+                  <p className="mt-0.5 text-[11.5px] text-amber-800 leading-relaxed">
+                    {`Transfiere automáticamente el cliente, la referencia de factura, las líneas de producto cargadas y la descripción o nota. El formulario actual permanecerá guardado en esta ${scopeLabel}.`}
+                  </p>
+                </div>
+              </label>
+
+              {migrateCommonFields && migratingFromSource.data.lines.length > 0 && (
+                <div className="mt-2.5 pt-2.5 border-t border-amber-200/60 text-[11px] text-amber-900">
+                  <span className="font-medium">Se transferirán:</span> {migratingFromSource.data.lines.length} producto(s)
+                  {migratingFromSource.data.invoiceRef ? ` · Factura: ${migratingFromSource.data.invoiceRef}` : ""}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
+              <Button variant="secondary" size="sm" onClick={() => setMigrationModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleExecuteMigration}>
+                Continuar al nuevo formulario
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* FORM MODALS */}
-      {/* 1. Reclamación Modal */}
-      {claimModalOpen && (
-        <ClaimFormModal
-          ticketId={ticket.id}
-          ticketNumber={ticket.number}
-          clientName={ticket.clientName ?? "Cliente"}
-          claim={editingClaim}
-          initialData={claimInitialData}
-          onClose={() => setClaimModalOpen(false)}
-          onSaved={() => {
-            setClaimModalOpen(false);
-            reloadForms();
-          }}
-        />
-      )}
 
-      {/* 2. Retiro Modal */}
-      {withdrawalModalOpen && (
-        <WithdrawalFormModal
-          withdrawal={editingWithdrawal}
-          fixedTicketId={ticket.id}
-          fixedTicketLabel={`${ticket.number} · ${ticket.subject}`}
-          initialLines={withdrawalInitialLines}
-          onClose={() => setWithdrawalModalOpen(false)}
-          onSaved={() => {
-            setWithdrawalModalOpen(false);
-            reloadForms();
-          }}
-        />
-      )}
-
-
-      {/* 4. HCA Modal */}
-      {hcaModalOpen && (
-        <HcaModal
-          sheet={editingHca}
-          productLines={productLines}
-          defaults={hcaInitialDefaults}
-          onClose={() => setHcaModalOpen(false)}
-          onSaved={() => {
-            setHcaModalOpen(false);
-            reloadForms();
-          }}
-        />
-      )}
 
       {/* 5. Modal para elegir nuevo formulario */}
       {newFormModalOpen && (
-        <NewFormPickerModal
-          availableForms={availableForms}
-          suggestedFormRaw={suggestedFormRaw}
-          ticketNumber={ticket.number}
+        <Modal
+          title="Formulario oficial"
+          eyebrow={`${hostKindLabel} ${scopeCode}`}
+          description="Selecciona el formato empresarial que deseas iniciar o retomar."
           onClose={() => setNewFormModalOpen(false)}
-        />
+          maxWidth="max-w-2xl"
+          footer={
+            <div className="flex w-full items-center justify-end">
+              <Button type="button" variant="secondary" size="sm" onClick={() => setNewFormModalOpen(false)}>
+                Cancelar
+              </Button>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {availableForms.map((form) => {
+              const isRecommended = form.key === suggestedFormRaw;
+              const Icon = form.icon;
+              const pickerKey = form.key as EnterpriseFormPickerKey;
+              const hasDraft = readEnterpriseFormDraft(
+                enterpriseFormDraftKeyForPicker(pickerKey, ticket.id),
+              );
+              return (
+                <button
+                  key={form.key}
+                  type="button"
+                  disabled={form.disabled}
+                  onClick={() => {
+                    setNewFormModalOpen(false);
+                    form.action();
+                  }}
+                  className={`flex min-h-[9.5rem] flex-col rounded-xl border p-4 text-left transition-all ${
+                    isRecommended
+                      ? "border-brand-red/40 bg-brand-red/[0.04] ring-1 ring-brand-red/20 hover:bg-brand-red/[0.07]"
+                      : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/80"
+                  } ${form.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span
+                      className={`font-heading text-[10px] font-bold uppercase tracking-[0.08em] ${form.codeColor}`}
+                    >
+                      {form.code}
+                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {isRecommended ? (
+                        <span className="rounded-md border border-brand-red/20 bg-brand-red/10 px-1.5 py-0.5 text-[10px] font-bold text-brand-red">
+                          Recomendado
+                        </span>
+                      ) : null}
+                      {hasDraft ? <EnterpriseFormDraftBadge className="px-1.5 py-0.5 text-[10px]" /> : null}
+                    </div>
+                  </div>
+                  <span className="mt-2 text-[13px] font-semibold leading-snug text-zinc-900">{form.title}</span>
+                  <span className="mt-1 line-clamp-2 flex-1 text-[11.5px] leading-relaxed text-zinc-500">
+                    {form.description}
+                  </span>
+                  <div className="mt-3 flex items-center justify-between border-t border-zinc-100 pt-2.5 text-[10.5px] text-zinc-400">
+                    <span>{form.dept}</span>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-700">
+                      Iniciar
+                      <Icon className="size-3" />
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Modal>
       )}
+
+      {draftResumePrompt ? (
+        <EnterpriseFormDraftResumeModal
+          open
+          formCode={ENTERPRISE_FORM_PICKER_META[draftResumePrompt.pickerKey].formCode}
+          formTitle={ENTERPRISE_FORM_PICKER_META[draftResumePrompt.pickerKey].title}
+          ticketNumber={scopeCode}
+          hostKindLabel={hostKindLabel}
+          savedAtLabel={
+            draftResumePrompt.savedAt
+              ? formatInstant(new Date(draftResumePrompt.savedAt).toISOString())
+              : null
+          }
+          stepLabel={
+            draftResumePrompt.step ? `Paso ${draftResumePrompt.step}` : null
+          }
+          onResume={() => {
+            const start = draftResumePrompt.start;
+            setDraftResumePrompt(null);
+            start();
+          }}
+          onCancel={() => setDraftResumePrompt(null)}
+        />
+      ) : null}
     </div>
   );
 }

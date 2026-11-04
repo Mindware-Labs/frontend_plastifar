@@ -3,9 +3,7 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { formatTicketCode } from "../../lib/format";
 
-/** Pastilla de enlace o creación rápida de ticket vinculado a una conversación. */
-
-/** thread: la conversación nació en Tickets. manual: alguien lo creó desde este correo. */
+/** thread: la conversación nació en Tickets; manual: creado desde este correo. */
 export type TicketProvenance = "thread" | "manual";
 
 interface TicketChipProps {

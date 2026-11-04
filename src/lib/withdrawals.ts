@@ -1,22 +1,11 @@
-// Cálculo y texto de la solicitud de retiro de mercancía, sin React dentro.
-//
-// Valor = cantidad × precio; sin precio, sin valor; total = suma de las líneas
-// con valor (docs/plan/04, regla 5). La pantalla lo muestra mientras se
-// escribe; el valor guardado es el que calcula el servidor. Espejo de
-// `WithdrawalRules.Compute` y `WithdrawalRules.Total` en el backend.
+// Cálculo y texto de la solicitud de retiro de mercancía (PF-FOR-068), espejo de WithdrawalRules.
 
 import type { WithdrawalStatus } from "../types/withdrawals";
 
-/**
- * Lo más que cabe en el valor de una línea y en el total: numeric(14,2) en
- * la base, `WithdrawalRules.MaxAmount` en el servidor.
- */
+/** Máximo admisible en el valor de una línea y en el total: numeric(14,2) en la base. */
 export const MAX_WITHDRAWAL_AMOUNT = 999_999_999_999.99;
 
-/**
- * Tope de cantidad solicitada, cantidad retirada y precio unitario por línea.
- * Espejo de `WithdrawalRules.MaxLineInput` en el servidor.
- */
+/** Tope de cantidad solicitada, cantidad retirada y precio unitario por línea. */
 export const MAX_LINE_INPUT = 1_000_000_000;
 
 /** La cantidad se escala a centésimas (2 decimales). */
@@ -28,17 +17,6 @@ const MILLIONTHS_PER_CENT = 10_000n;
 /** Media unidad del divisor anterior, para redondear alejándose de cero. */
 const HALF_CENT_IN_MILLIONTHS = MILLIONTHS_PER_CENT / 2n;
 
-/**
- * Cantidad (hasta 2 decimales) por precio (hasta 4), redondeado a céntimos
- * alejándose de cero como `MidpointRounding.AwayFromZero` en el servidor.
- *
- * Se calcula en enteros escalados con BigInt: cantidad en centésimas y precio
- * en diezmilésimas dan el producto en millonésimas, exacto. En coma flotante
- * algunos valores con medio céntimo quedan apenas por debajo: 1.005 es en
- * realidad 1.00499999999999989…, y `Math.round(1.005 * 100) / 100` da 1.00
- * donde el servidor guarda 1.01. (2.5 × 0.01, en cambio, da 0.025000…001 y
- * redondea bien: no sirve de ejemplo.)
- */
 function lineCents(quantity: number, unitPrice: number): bigint {
   const millionths =
     BigInt(Math.round(quantity * QUANTITY_SCALE)) * BigInt(Math.round(unitPrice * PRICE_SCALE));
@@ -55,8 +33,6 @@ function isLineInput(value: number): boolean {
 
 export function computeLineValue(quantity: number | null, unitPrice: number | null): number | null {
   if (unitPrice === null) return null;
-  // Fuera de rango no se calcula: el esquema ya muestra el error del campo, y
-  // escalar un número enorme daría Infinity, que BigInt no admite.
   if (!isLineInput(unitPrice) || !isLineInput(quantity ?? 0)) return null;
   return Number(lineCents(quantity ?? 0, unitPrice)) / 100;
 }
@@ -83,6 +59,16 @@ export function describeStatus(status: WithdrawalStatus, requiresApproval: boole
     default:
       return "Cancelada. Es un estado final.";
   }
+}
+
+/** Parte una fecha ISO YYYY-MM-DD en día, mes y año para la casilla FECHA del PF-FOR-068. */
+export function splitIsoDate(isoDateString: string | null | undefined): {
+  day: string;
+  month: string;
+  year: string;
+} {
+  const [year = "", month = "", day = ""] = (isoDateString ?? "").slice(0, 10).split("-");
+  return { day, month, year };
 }
 
 /** Control documental del pie del PF-FOR-068, tal como está en la plantilla. */

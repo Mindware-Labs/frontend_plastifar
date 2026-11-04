@@ -1,6 +1,8 @@
 import {
   Archive,
   ArchiveRestore,
+  ArrowUpRight,
+  ChevronDown,
   CornerUpLeft,
   Download,
   Forward,
@@ -10,46 +12,85 @@ import {
   RotateCcw,
   ShieldAlert,
   Star,
+  Ticket as TicketIcon,
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { Alert } from "../../components/ui/Alert";
+import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Button as PfButton } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { Spinner } from "../../components/ui/Spinner";
+import { MailReadingPaneSkeleton } from "../../components/ui/Skeleton";
+import { TaskChip } from "../../components/app/TaskChip";
 import { TicketChip } from "../../components/app/TicketChip";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
-import { useReceipts } from "../../context/useReceipts";
+import { useNoticeInset, useReceipts } from "../../context/useReceipts";
+import { usePermissions } from "../../hooks/usePermissions";
 import { Avatar, AvatarFallback } from "../../components/shadcn/avatar";
 import { Button } from "../../components/shadcn/button";
 import { Separator } from "../../components/shadcn/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/shadcn/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "../../components/shadcn/popover";
 import {
   formatBytes,
   formatDateTime,
   formatEmailListDate,
+  formatTicketCode,
 } from "../../lib/format";
-import type { ComposingPresence, EmailAttachmentResponse, EmailDetailResponse } from "../../types/api";
+import type {
+  ComposingPresence,
+  EmailAttachmentResponse,
+  EmailDetailResponse,
+  EmailNoteResponse,
+} from "../../types/api";
 import { EmailBodyFrame } from "../../components/ui/EmailBodyFrame";
+import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { openOverlay } from "../../hooks/overlayStack";
-import { useEmailAttachments } from "../../hooks/useEmailAttachments";
+import { useSidePanelMotion } from "../../hooks/useSidePanelMotion";
+import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { blocksToEmailHtml, blocksToText } from "../../lib/emailHtml";
 import { clearDraft, readDraft, writeDraft } from "../../lib/drafts";
 import { DELIVERY_LABELS, initialsFromName } from "../../lib/format";
 import { CreateTicketModal } from "../tickets/CreateTicketModal";
+import type { EmailLinkedTask } from "../../types/tasks";
+import { TaskFormModal } from "../tasks/TaskFormModal";
 import { AttachmentPreviewModal } from "./AttachmentPreviewModal";
+import {
+  buildCannedVariableContext,
+  parseRecipientAddress,
+  replaceRecipientVariablesInBlocks,
+  type CannedVariableContext,
+} from "../../lib/cannedVariables";
+import { CannedPicker } from "./CannedPicker";
 import { textToBlocks } from "./textToBlocks";
 import { AssignmentControl } from "./ConversationTools";
-import { AddNotePanel } from "./AddNotePanel";
-import { ConversationNotes } from "./ConversationNotes";
-import { ReplyComposer } from "./ReplyComposer";
-import { firstLine, getThreadMessageBadge, ticketsNote } from "./threadMessage";
-import { TicketsOriginPopover } from "./TicketsOriginPopover";
+import { AddNotePanel, ConversationNotes, type ConversationNotesHandle } from "./ConversationNotes";
+import { RecipientInput } from "./RecipientInput";
+import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
+import { ComposerSendSuccessLayer } from "./ComposerSendSuccessLayer";
+import { invalidateMailContactDirectory } from "../../hooks/useMailContactDirectory";
+import {
+  useComposerSendCelebration,
+  type ComposerSendCelebrationPayload,
+} from "./useComposerSendCelebration";
+import {
+  COMPOSER_BCC_KEY,
+  COMPOSER_CC_KEY,
+  useComposerFieldMotion,
+} from "./useComposerFieldMotion";
+import { fieldLabelClass, fieldToggleClass, fieldCloseClass } from "./toolbarStyles";
+import { MailToolbarIconButton } from "./MailToolbarIconButton";
+import { SendValidationButton } from "./SendValidationButton";
+import {
+  hasInvalidRecipients,
+  optionalRecipientFieldValidationItems,
+  recipientFieldValidationItems,
+} from "../../lib/recipientValidation";
 import { type ValidationItem } from "./sendValidation";
 
 /** Que adjunto se esta mirando: puede ser del correo o de una respuesta nuestra. */
@@ -59,16 +100,29 @@ interface PreviewTarget {
   index: number;
 }
 
+const MAX_FILES = 5;
+const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
+
 interface EmailDetailPaneProps {
   emailId: number;
+  /** Estado de destacado sincronizado desde la lista para evitar recargas. */
+  starred?: boolean;
   /** Avisa al panel de la lista para que refresque (el correo puede salir del filtro actual). */
   onTicketCreated: () => void;
   /** El correo cambió de carpeta: ya no pertenece a la vista actual. */
   onMoved: () => void;
+  /** Tras enviar respuesta o reenvío y completar la confirmación visual. */
+  onSent?: () => void;
   /** El correo cambió su estado de destacado. */
   onStarred?: (starred: boolean) => void;
   /** Cierra el panel y deja la lista sin seleccion. */
   onClose: () => void;
+}
+
+/** Su unico trabajo es existir: mientras el editor este abierto, el recibo se corre hacia arriba. */
+function ComposerInset() {
+  useNoticeInset(44);
+  return null;
 }
 
 interface MoveKind {
@@ -123,20 +177,155 @@ const deliveryTone: Record<string, string> = {
 /** Estados que merecen un aviso al abrir el correo, no solo una etiqueta en la tira. */
 const alertingStatuses = new Set(["Queued", "Bounced", "Complained", "Failed"]);
 
+/** La acotacion cuando el correo no se escribio desde aca. Null si salio de la bandeja. */
+function ticketsNote(message: { direction: string; origin?: string }): string | null {
+  if (message.origin !== "Tickets") return null;
+
+  return message.direction === "Outbound"
+    ? "Esta respuesta se envió desde el módulo de tickets."
+    : "El cliente responde a un correo que se envió desde el módulo de tickets.";
+}
+
+interface TicketsOriginPopoverProps {
+  note: string;
+  ticketId: number | null;
+}
+
+/** Indicador flotante en barra de herramientas con acceso al ticket vinculado. */
+function TicketsOriginPopover({ note, ticketId }: TicketsOriginPopoverProps) {
+  return (
+    <Popover>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Ver información de origen del ticket"
+              className="group/origin inline-flex h-7 cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 bg-white pl-1 pr-2.5 text-zinc-700 shadow-2xs outline-none transition-[background-color,border-color,color] duration-200 ease-out hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 focus-visible:ring-2 focus-visible:ring-brand-red/25 data-[state=open]:border-zinc-300 data-[state=open]:bg-zinc-100 data-[state=open]:shadow-none motion-reduce:transition-none"
+            >
+              <span className="flex size-5 items-center justify-center rounded-md bg-brand-red/10 text-brand-red transition-colors duration-200 group-hover/origin:bg-brand-red group-hover/origin:text-white group-data-[state=open]/origin:bg-brand-red group-data-[state=open]/origin:text-white">
+                <TicketIcon className="size-3" strokeWidth={2.25} />
+              </span>
+              <span className="font-heading text-[10px] font-bold uppercase leading-none tracking-[0.08em]">
+                Origen: Tickets
+              </span>
+            </button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Información de origen en Tickets</TooltipContent>
+      </Tooltip>
+
+      <PopoverContent align="start" sideOffset={6} className="w-80 p-3.5">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2.5 border-b border-line-soft pb-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-brand-red/20 bg-brand-red/8 text-brand-red shadow-2xs">
+              <TicketIcon className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-brand-red-dark">
+                Módulo de Tickets
+              </h4>
+              <p className="text-[11px] text-subtle">Origen del correo</p>
+            </div>
+          </div>
+
+          <p className="text-[12px] leading-relaxed text-ink">
+            {note}
+          </p>
+
+          {ticketId && (
+            <div className="border-t border-line-soft pt-2.5">
+              <Link
+                to={`/tickets/${ticketId}`}
+                className="group flex w-full items-center justify-between rounded-edge border border-brand-red/25 bg-brand-red/[0.04] px-3 py-1.5 text-xs font-semibold text-brand-red-dark shadow-2xs transition-all hover:border-brand-red hover:bg-brand-red hover:text-white cursor-pointer"
+                title="Abrir este ticket en el módulo de Tickets"
+              >
+                <span>Ver ticket {formatTicketCode(ticketId)}</span>
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </Link>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+
+/** A partir de cuántos mensajes del hilo se puede plegar la lista inferior. */
+const THREAD_HISTORY_COLLAPSE_AT = 4;
+/** Cuántas filas se ven con la lista plegada (las más recientes). */
+const THREAD_HISTORY_COLLAPSED_VISIBLE = 2;
+
+function getThreadMessageBadge(message: { direction: string; subject?: string }) {
+  if (message.direction !== "Outbound") {
+    return {
+      label: "Recibido por",
+      className: "bg-zinc-100 text-zinc-700 border border-zinc-200/90",
+    };
+  }
+
+  const sub = (message.subject ?? "").trim().toLowerCase();
+  const isReply = sub.startsWith("re:");
+
+  if (isReply) {
+    return {
+      label: "Respondido a",
+      className: "bg-brand-red/10 text-brand-red-dark border border-brand-red/20",
+    };
+  }
+
+  return {
+    label: "Enviado a",
+    className: "bg-sky-500/10 text-sky-800 border border-sky-500/25",
+  };
+}
+
 type ComposerMode = "reply" | "forward";
 
+/** Primer renglon con contenido: es el resumen que cabe en una linea de la lista. */
+function firstLine(text: string) {
+  return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
+}
+
 /** El cuerpo del correo viene de un remitente externo: se muestra siempre via EmailBodyFrame, nunca inyectado. */
-export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, onClose }: EmailDetailPaneProps) {
+export function EmailDetailPane({
+  emailId,
+  starred: starredProp,
+  onTicketCreated,
+  onMoved,
+  onSent,
+  onStarred,
+  onClose,
+}: EmailDetailPaneProps) {
   const navigate = useNavigate();
   const [email, setEmail] = useState<EmailDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+  const permissions = usePermissions();
+  const canCreateTask = permissions.can("tasks.create");
+  const canMailSend = permissions.can("mail.send");
+  const canMailManage = permissions.can("mail.manage");
+  const canMailDelete = permissions.can("mail.delete");
+  const canSeeLinkedTasks =
+    permissions.can("tasks.read") ||
+    permissions.can("tasks.create") ||
+    permissions.can("tasks.edit");
   const [justCreatedTicketId, setJustCreatedTicketId] = useState<number | null>(null);
+  const [linkedTasks, setLinkedTasks] = useState<EmailLinkedTask[]>([]);
+  const [linkedTasksKey, setLinkedTasksKey] = useState(0);
+  const [justCreatedTaskId, setJustCreatedTaskId] = useState<number | null>(null);
   const [moving, setMoving] = useState(false);
   const [starring, setStarring] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
+
+  useEffect(() => {
+    if (!canMailSend && replyOpen) setReplyOpen(false);
+  }, [canMailSend, replyOpen]);
+
   const [composerMode, setComposerMode] = useState<ComposerMode>("reply");
   const [replyBlocks, setReplyBlocks] = useState<unknown>(null);
   const [draftBlocks, setDraftBlocks] = useState<unknown>(null);
@@ -147,40 +336,109 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   const [replyBcc, setReplyBcc] = useState("");
   const [bccOpen, setBccOpen] = useState(false);
   const [includeAttachments, setIncludeAttachments] = useState(true);
+  const [files, setFiles] = useState<File[]>([]);
+  const {
+    isShowing: showAttachedFeedback,
+    isExiting: attachedExiting,
+    trigger: triggerAttachedFeedback,
+  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [sending, setSending] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
-  const attachments = useEmailAttachments(setReplyError);
-  const { files, setFiles } = attachments;
+  const fileRef = useRef<HTMLInputElement>(null);
   const toRef = useRef<HTMLInputElement>(null);
   const ccRef = useRef<HTMLInputElement>(null);
   const bccRef = useRef<HTMLInputElement>(null);
+  const fieldMotion = useComposerFieldMotion(ccOpen, bccOpen);
+  const { celebration, celebrate, isCelebrating, isExiting } = useComposerSendCelebration();
   const replyContainerRef = useRef<HTMLDivElement>(null);
+  const {
+    mounted: composerMounted,
+    exiting: composerExiting,
+    ref: composerPanelRef,
+    snap: snapComposer,
+  } = useSidePanelMotion(replyOpen);
+  const [replySendHold, setReplySendHold] = useState<ComposerSendCelebrationPayload | null>(null);
+  const [detailReveal, setDetailReveal] = useState(false);
+  const replySuccessPayload = celebration ?? replySendHold;
+  const replySuccessVisible = replySuccessPayload !== null;
   const [openReplyId, setOpenReplyId] = useState<number | null>(null);
+  const [threadHistoryExpanded, setThreadHistoryExpanded] = useState(false);
   const [composers, setComposers] = useState<ComposingPresence[]>([]);
   const [editorKey, setEditorKey] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [dangerousToDownload, setDangerousToDownload] = useState<EmailAttachmentResponse | null>(null);
   const { user } = useAuth();
-  const isAdmin = Boolean(user?.isAdmin);
+  const prevVarCtxRef = useRef<CannedVariableContext | undefined>(undefined);
+
+  const cannedVariableContext = useMemo(() => {
+    if (!email) return undefined;
+    const inbound = email.direction === "Inbound";
+    const threadEmail = inbound ? email.fromEmail : (email.toEmails[0] ?? email.fromEmail);
+    const threadName = inbound ? (email.fromName ?? email.fromEmail) : threadEmail;
+
+    if (composerMode === "forward" && forwardTo.trim()) {
+      const parsedForward = parseRecipientAddress(forwardTo);
+      if (parsedForward.email) {
+        return buildCannedVariableContext({
+          user,
+          contactName: parsedForward.name ?? parsedForward.email,
+          contactEmail: parsedForward.email,
+          ticketId: email.ticketId,
+        });
+      }
+    }
+
+    return buildCannedVariableContext({
+      user,
+      contactName: threadName,
+      contactEmail: threadEmail,
+      ticketId: email.ticketId,
+    });
+  }, [composerMode, email, forwardTo, user]);
+
+  useEffect(() => {
+    if (!cannedVariableContext) return;
+    const nextEmail = cannedVariableContext.contactEmail?.trim();
+    if (!nextEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) return;
+
+    const { blocks: updatedBlocks, changed } = replaceRecipientVariablesInBlocks(
+      replyBlocks,
+      prevVarCtxRef.current,
+      cannedVariableContext,
+    );
+    if (changed) {
+      setDraftBlocks(updatedBlocks);
+      setReplyBlocks(updatedBlocks);
+      setEditorKey((key) => key + 1);
+    }
+    prevVarCtxRef.current = cannedVariableContext;
+  }, [cannedVariableContext, replyBlocks]);
 
   // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
   const replyText = blocksToText(replyBlocks);
   const [reloadKey, setReloadKey] = useState(0);
-  const [notesRefreshKey, setNotesRefreshKey] = useState(0);
+  const conversationNotesRef = useRef<ConversationNotesHandle>(null);
+  const handleNoteAdded = useCallback((note: EmailNoteResponse) => {
+    conversationNotesRef.current?.appendNote(note);
+  }, []);
   const { onInboxChanged, onComposing, setComposing, whoIsComposing } = useEmailCounts();
   const receipts = useReceipts();
   const isForward = composerMode === "forward";
 
   // Al reenviar el comentario es opcional: lo que no puede faltar es a quien va.
   const replyMissingItems: ValidationItem[] = [];
-  if (isForward && forwardTo.trim() === "") {
-    replyMissingItems.push({
-      id: "to",
-      label: "Falta el destinatario (Para)",
-      short: "el destinatario (Para)",
-    });
+  if (isForward) {
+    replyMissingItems.push(
+      ...recipientFieldValidationItems(forwardTo, {
+        id: "to",
+        emptyLabel: "Falta el destinatario (Para)",
+        emptyShort: "el destinatario (Para)",
+      }),
+    );
   }
+  replyMissingItems.push(...optionalRecipientFieldValidationItems(replyCc, { id: "cc", fieldLabel: "CC" }));
+  replyMissingItems.push(...optionalRecipientFieldValidationItems(replyBcc, { id: "bcc", fieldLabel: "CCO" }));
   if (!isForward && replyText.trim() === "") {
     replyMissingItems.push({
       id: "body",
@@ -193,6 +451,10 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   function handleFocusReplyField(fieldId: string) {
     if (fieldId === "to") {
       toRef.current?.focus();
+    } else if (fieldId === "cc") {
+      ccRef.current?.focus();
+    } else if (fieldId === "bcc") {
+      bccRef.current?.focus();
     } else if (fieldId === "body") {
       const editorEl = replyContainerRef.current?.querySelector('[contenteditable="true"]');
       if (editorEl instanceof HTMLElement) editorEl.focus();
@@ -215,6 +477,27 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
       cancelled = true;
     };
   }, [emailId, reloadKey]);
+
+  useEffect(() => {
+    if (!canSeeLinkedTasks) {
+      setLinkedTasks([]);
+      return;
+    }
+
+    let cancelled = false;
+    emailsApi
+      .linkedTasks(emailId)
+      .then((items) => {
+        if (!cancelled) setLinkedTasks(items);
+      })
+      .catch(() => {
+        if (!cancelled) setLinkedTasks([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emailId, linkedTasksKey, canSeeLinkedTasks]);
 
   useEffect(() => onInboxChanged(() => setReloadKey((current) => current + 1)), [onInboxChanged]);
 
@@ -260,6 +543,23 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   }, [replyOpen, emailId, replyBlocks, replyText, replyCc, replyBcc, forwardTo, isForward]);
 
   useEffect(() => {
+    setThreadHistoryExpanded(false);
+    setOpenReplyId(null);
+  }, [emailId]);
+
+  useEffect(() => {
+    if (composerMounted || !replySendHold) return;
+    setReplySendHold(null);
+    setDetailReveal(true);
+  }, [composerMounted, replySendHold]);
+
+  useEffect(() => {
+    if (!detailReveal) return;
+    const timer = window.setTimeout(() => setDetailReveal(false), 480);
+    return () => window.clearTimeout(timer);
+  }, [detailReveal]);
+
+  useEffect(() => {
     if (ccOpen) ccRef.current?.focus();
   }, [ccOpen]);
 
@@ -283,7 +583,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   }, [openReplyId]);
 
   async function handleReply() {
-    if (!email || sending || !replyReady) return;
+    if (!email || sending || isCelebrating || !replyReady) return;
     setSending(true);
     setReplyError(null);
 
@@ -303,28 +603,41 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       // En cola: el proveedor no respondio y saldra solo; conviene decirlo en vez de "enviado".
       const queued = sent.deliveryStatus === "Queued";
-      receipts.done({
-        action: isForward ? "reenviar" : "responder",
-        title: queued
-          ? "Guardado en la cola de salida"
-          : isForward
-            ? "Correo reenviado"
-            : "Respuesta enviada",
-        detail: queued
-          ? "El proveedor no respondió; se reintentará solo"
-          : isForward
-            ? forwardTo
-            : (email.fromName ?? email.fromEmail),
-      });
+      const receiptTitle = queued
+        ? "Guardado en la cola de salida"
+        : isForward
+          ? "Correo reenviado correctamente"
+          : "Respuesta enviada correctamente";
+      const receiptDetail = queued
+        ? "El proveedor no respondió; se reintentará solo"
+        : isForward
+          ? forwardTo
+          : (email.fromName ?? email.fromEmail);
 
-      clearDraft(String(email.id));
-      // El reenvio abre conversacion propia: no forma parte de este hilo.
-      if (!isForward) {
-        setEmail({ ...email, thread: [...(email.thread ?? []), sent] });
-        setOpenReplyId(sent.id);
-      }
-      resetComposer();
-      setReplyOpen(false);
+      const totalAttachments =
+        files.length + (isForward && includeAttachments ? email.attachments.length : 0);
+
+      setSending(false);
+      invalidateMailContactDirectory();
+      const celebrationPayload: ComposerSendCelebrationPayload = {
+        kind: queued ? "queued" : isForward ? "forward" : "reply",
+        title: receiptTitle,
+        detail: receiptDetail,
+        subject: email.subject ? `${isForward ? "Fwd" : "Re"}: ${email.subject}` : undefined,
+        attachmentsCount: totalAttachments > 0 ? totalAttachments : undefined,
+      };
+      celebrate(celebrationPayload, () => {
+        setReplySendHold(celebrationPayload);
+        clearDraft(String(email.id));
+        // El reenvio abre conversacion propia: no forma parte de este hilo.
+        if (!isForward) {
+          setEmail({ ...email, thread: [...(email.thread ?? []), sent] });
+        }
+        resetComposer();
+        snapComposer();
+        setReplyOpen(false);
+        onSent?.();
+      });
     } catch (err) {
       setReplyError(
         err instanceof ApiError
@@ -333,7 +646,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             ? "No se pudo reenviar el correo"
             : "No se pudo enviar la respuesta",
       );
-    } finally {
       setSending(false);
     }
   }
@@ -373,6 +685,27 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
     }
   }
 
+  function addFiles(incoming: File[]) {
+    if (incoming.length === 0) return;
+
+    const merged = [...files, ...incoming];
+    const total = merged.reduce((sum, file) => sum + file.size, 0);
+
+    if (merged.length > MAX_FILES) {
+      setReplyError(`No se pueden adjuntar más de ${MAX_FILES} archivos.`);
+      return;
+    }
+
+    if (total > MAX_TOTAL_BYTES) {
+      setReplyError("Los adjuntos superan los 10 MB en total.");
+      return;
+    }
+
+    setReplyError(null);
+    setFiles(merged);
+    triggerAttachedFeedback();
+  }
+
   function openComposer(mode: ComposerMode) {
     tokenRef.current = crypto.randomUUID();
     setComposerMode(mode);
@@ -396,6 +729,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   }
 
   function closeComposer() {
+    if (!isCelebrating) setReplySendHold(null);
     setReplyOpen(false);
     setReplyError(null);
   }
@@ -407,6 +741,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
     setDraftBlocks(next);
     setReplyBlocks(next);
     setEditorKey((key) => key + 1);
+    prevVarCtxRef.current = cannedVariableContext;
   }
 
   async function handleExport() {
@@ -466,21 +801,23 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   async function handleMove(move: MoveKind) {
     if (!email || moving) return;
     setMoving(true);
+    const movedEmail = email;
+
+    onMoved();
 
     try {
-      await move.run(email.id);
-      onMoved();
+      await move.run(movedEmail.id);
 
       receipts.done({
         action: move.action,
         title: move.done,
-        detail: email.fromName ?? email.fromEmail,
+        detail: movedEmail.fromName ?? movedEmail.fromEmail,
         undo: move.action === "restaurar"
           ? undefined
           : {
               label: "Devolver a la bandeja",
               run: async () => {
-                await emailsApi.restore(email.id);
+                await emailsApi.restore(movedEmail.id);
                 onMoved();
               },
             },
@@ -499,18 +836,22 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
   async function handleToggleStar() {
     if (!email || starring) return;
+    const previousStarred = starredProp ?? email.starred;
+    const nextStarred = !previousStarred;
     setStarring(true);
-    const nextStarred = !email.starred;
+    setEmail({ ...email, starred: nextStarred });
+    onStarred?.(nextStarred);
+
     try {
       await emailsApi.toggleStar(email.id, nextStarred);
-      setEmail({ ...email, starred: nextStarred });
       receipts.done({
         action: nextStarred ? "destacar" : "quitar-destacado",
         title: nextStarred ? "Añadido a destacados" : "Quitado de destacados",
-        detail: email.subject || "(sin asunto)",
+        detail: email.subject || (email.fromName ?? email.fromEmail),
       });
-      onStarred?.(nextStarred);
     } catch (err) {
+      setEmail({ ...email, starred: previousStarred });
+      onStarred?.(previousStarred);
       receipts.failed({
         action: "destacar",
         title: "No se pudo actualizar destacados",
@@ -530,14 +871,11 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   }
 
   if (!email) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Spinner />
-      </div>
-    );
+    return <MailReadingPaneSkeleton />;
   }
 
   const displayName = email.fromName ?? email.fromEmail;
+  const isStarred = starredProp ?? email.starred;
   const isOutbound = email.direction === "Outbound";
   // Quienes ya estaban en el hilo: el servidor ya descarto nuestra casilla y al remitente.
   const replyAll = email.otherRecipients ?? [];
@@ -548,75 +886,100 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
   // El correo abierto ya se ve completo arriba: en la tira va el resto de la conversacion.
   const others = thread.filter((message) => message.id !== email.id);
   const openReply = thread.find((message) => message.id === openReplyId) ?? null;
+  const threadHistoryCollapsible = others.length >= THREAD_HISTORY_COLLAPSE_AT;
+  const threadHistoryHiddenCount = Math.max(0, others.length - THREAD_HISTORY_COLLAPSED_VISIBLE);
+  const visibleThreadOthers =
+    threadHistoryCollapsible && !threadHistoryExpanded
+      ? others.slice(-THREAD_HISTORY_COLLAPSED_VISIBLE)
+      : others;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full w-full flex-1 min-h-0 flex-col overflow-hidden bg-white">
+      {replySuccessVisible && replySuccessPayload && (
+        <ComposerSendSuccessLayer
+          kind={replySuccessPayload.kind}
+          title={replySuccessPayload.title}
+          detail={replySuccessPayload.detail}
+          subject={replySuccessPayload.subject}
+          attachmentsCount={replySuccessPayload.attachmentsCount}
+          exiting={isExiting || (replySendHold !== null && composerExiting)}
+          fillPanel
+        />
+      )}
       <div className="flex h-10 shrink-0 items-center px-2">
         <div className="flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`${toolButtonClass} ${email.starred ? "text-amber-500 hover:text-amber-600" : ""}`}
-                disabled={starring}
-                onClick={handleToggleStar}
-                aria-label={email.starred ? "Quitar de destacados" : "Destacar"}
-              >
-                <Star className={`h-4 w-4 ${email.starred ? "fill-amber-400 text-amber-500" : ""}`} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{email.starred ? "Quitar de destacados" : "Destacar"}</TooltipContent>
-          </Tooltip>
+          {canMailManage && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <MailToolbarIconButton
+                  variant="ghost"
+                  size="icon"
+                  pending={false}
+                  disabled={starring}
+                  buttonClassName={`${toolButtonClass} ${isStarred ? "text-amber-500 hover:text-amber-600" : ""}`}
+                  onClick={handleToggleStar}
+                  aria-label={isStarred ? "Quitar de destacados" : "Destacar"}
+                >
+                  <Star
+                    className={`h-4 w-4 ${isStarred ? "fill-amber-400 text-amber-500" : ""}`}
+                  />
+                </MailToolbarIconButton>
+              </TooltipTrigger>
+              <TooltipContent>{isStarred ? "Quitar de destacados" : "Destacar"}</TooltipContent>
+            </Tooltip>
+          )}
 
-          {isInInbox ? (
+          {canMailManage && isInInbox ? (
             <>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
+                  <MailToolbarIconButton
                     variant="ghost"
                     size="icon"
-                    className={toolButtonClass}
-                    disabled={moving}
+                    pending={moving}
+                    buttonClassName={toolButtonClass}
                     onClick={() => handleMove(MOVES.archivar)}
+                    aria-label="Archivar"
                   >
                     <Archive />
-                  </Button>
+                  </MailToolbarIconButton>
                 </TooltipTrigger>
                 <TooltipContent>Archivar</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
+                  <MailToolbarIconButton
                     variant="ghost"
                     size="icon"
-                    className={toolButtonClass}
-                    disabled={moving}
+                    pending={moving}
+                    buttonClassName={toolButtonClass}
                     onClick={() => handleMove(MOVES.papelera)}
+                    aria-label="Mover a la papelera"
                   >
                     <Trash2 />
-                  </Button>
+                  </MailToolbarIconButton>
                 </TooltipTrigger>
                 <TooltipContent>Mover a la papelera</TooltipContent>
               </Tooltip>
             </>
-          ) : (
+          ) : canMailManage ? (
             <>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
+                  <MailToolbarIconButton
                     variant="ghost"
                     size="icon"
-                    className={toolButtonClass}
-                    disabled={moving}
+                    pending={moving}
+                    buttonClassName={toolButtonClass}
                     onClick={() => handleMove(MOVES.restaurar)}
+                    aria-label="Restaurar a la bandeja"
                   >
                     <ArchiveRestore />
-                  </Button>
+                  </MailToolbarIconButton>
                 </TooltipTrigger>
                 <TooltipContent>Restaurar a la bandeja</TooltipContent>
               </Tooltip>
-              {email.folder === "Trash" && isAdmin && (
+              {email.folder === "Trash" && canMailDelete && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -633,7 +996,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 </Tooltip>
               )}
             </>
-          )}
+          ) : null}
 
           {ticketsNote(email) && !email.ticketId && (
             <TicketsOriginPopover
@@ -644,13 +1007,15 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
-          <AssignmentControl
-            emailId={email.id}
-            assignedStaffId={email.assignedStaffId ?? null}
-            assignedStaffName={email.assignedStaffName ?? null}
-            onChanged={(staffId, name) => setEmail({ ...email, assignedStaffId: staffId, assignedStaffName: name })}
-            onNoteAdded={() => setNotesRefreshKey((k) => k + 1)}
-          />
+          {canMailManage && (
+            <AssignmentControl
+              emailId={email.id}
+              assignedStaffId={email.assignedStaffId ?? null}
+              assignedStaffName={email.assignedStaffName ?? null}
+              onChanged={(staffId, name) => setEmail({ ...email, assignedStaffId: staffId, assignedStaffName: name })}
+              onNoteAdded={handleNoteAdded}
+            />
+          )}
 
           <TicketChip
             ticketId={email.ticketId}
@@ -661,6 +1026,16 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
             active={isCreateTicketModalOpen}
             onCreate={() => setIsCreateTicketModalOpen(true)}
           />
+
+          {canSeeLinkedTasks && (
+            <TaskChip
+              tasks={linkedTasks}
+              justCreatedId={justCreatedTaskId}
+              onSettled={() => setJustCreatedTaskId(null)}
+              active={isCreateTaskModalOpen}
+              onCreate={canCreateTask ? () => setIsCreateTaskModalOpen(true) : undefined}
+            />
+          )}
 
           <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-line" />
 
@@ -715,7 +1090,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           </div>
 
           <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
-            <ConversationNotes key={notesRefreshKey} emailId={email.id} />
+            <ConversationNotes ref={conversationNotesRef} emailId={email.id} />
             <span className="whitespace-nowrap text-[11px] font-medium text-zinc-400">
               {formatDateTime(email.createdAt)}
             </span>
@@ -736,47 +1111,265 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
       <Separator className="bg-zinc-100" />
 
       {/* Columna: los avisos ocupan lo suyo y el cuerpo se queda con el resto, sin desbordar sobre el pie. */}
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        {replyOpen && (
-          <ReplyComposer
-            containerRef={replyContainerRef}
-            isForward={isForward}
-            subject={email.subject}
-            fromEmail={email.fromEmail}
-            replyAll={replyAll}
-            originalAttachmentCount={email.attachments.length}
-            toRef={toRef}
-            forwardTo={forwardTo}
-            onForwardToChange={setForwardTo}
-            ccRef={ccRef}
-            cc={replyCc}
-            onCcChange={setReplyCc}
-            ccOpen={ccOpen}
-            onCcOpenChange={setCcOpen}
-            bccRef={bccRef}
-            bcc={replyBcc}
-            onBccChange={setReplyBcc}
-            bccOpen={bccOpen}
-            onBccOpenChange={setBccOpen}
-            includeAttachments={includeAttachments}
-            onIncludeAttachmentsChange={setIncludeAttachments}
-            editorKey={editorKey}
-            draftBlocks={draftBlocks}
-            onBlocksChange={setReplyBlocks}
-            attachments={attachments}
-            error={replyError}
-            onInsertCanned={insertCanned}
-            ready={replyReady}
-            sending={sending}
-            missingItems={replyMissingItems}
-            onSend={handleReply}
-            onFocusField={handleFocusReplyField}
-            onClose={closeComposer}
-          />
+      <div
+        className={`relative flex min-h-0 flex-1 flex-col ${detailReveal ? "animate-plf-receipt-in" : ""}`}
+      >
+        {composerMounted && !replySuccessVisible && (
+          <div
+            ref={(node) => {
+              composerPanelRef.current = node;
+              replyContainerRef.current = node;
+            }}
+            aria-hidden={composerExiting}
+            className={`absolute inset-0 z-20 flex flex-col bg-white ${composerExiting ? "pointer-events-none" : ""}`}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              addFiles(Array.from(event.dataTransfer.files));
+            }}
+          >
+            <div className="flex shrink-0 items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-2">
+              {isForward ? (
+                <Forward className="h-3.5 w-3.5 shrink-0 text-brand-red" />
+              ) : (
+                <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-brand-red" />
+              )}
+              <span className="shrink-0 text-[12.5px] font-semibold text-zinc-900">
+                {isForward ? "Reenviar" : "Responder"}
+              </span>
+              <span className="truncate text-[11.5px] text-zinc-500">
+                {email.subject ? `${isForward ? "Fwd" : "Re"}: ${email.subject}` : "(sin asunto)"}
+              </span>
+              <button
+                type="button"
+                onClick={closeComposer}
+                aria-label="Cerrar el editor"
+                title="Cerrar el editor"
+                className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-zinc-400/20 cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="flex shrink-0 items-center gap-3 border-b border-zinc-100 px-4 py-1.5 transition-colors focus-within:bg-zinc-50/50">
+              <span className={fieldLabelClass}>Para</span>
+              {isForward ? (
+                <RecipientInput
+                  inputRef={toRef}
+                  value={forwardTo}
+                  onChange={setForwardTo}
+                  invalid={hasInvalidRecipients(forwardTo)}
+                  placeholder="correo@dominio.com, otro@dominio.com"
+                  autoFocus
+                />
+              ) : (
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-zinc-900">
+                  {email.fromEmail}
+                </span>
+              )}
+              {!isForward && !ccOpen && replyAll.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCcOpen(true);
+                    setReplyCc(replyAll.join(", "));
+                  }}
+                  title="Copiar a todos los de la conversación"
+                  className={fieldToggleClass}
+                >
+                  Todos
+                </button>
+              )}
+              {!ccOpen && (
+                <button type="button" onClick={() => setCcOpen(true)} title="Agregar copia" className={fieldToggleClass}>
+                  CC
+                </button>
+              )}
+              {!bccOpen && (
+                <button
+                  type="button"
+                  onClick={() => setBccOpen(true)}
+                  title="Agregar copia oculta"
+                  className={fieldToggleClass}
+                >
+                  CCO
+                </button>
+              )}
+            </div>
+
+            <ComposerFieldMotionRow open={ccOpen} phase={fieldMotion.phaseFor(COMPOSER_CC_KEY)}>
+              <span className={fieldLabelClass}>CC</span>
+              <RecipientInput
+                inputRef={ccRef}
+                value={replyCc}
+                onChange={setReplyCc}
+                invalid={hasInvalidRecipients(replyCc)}
+                placeholder="correo@dominio.com, otro@dominio.com"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  fieldMotion.requestRemove(COMPOSER_CC_KEY, () => {
+                    setCcOpen(false);
+                    setReplyCc("");
+                  });
+                }}
+                aria-label="Quitar la copia"
+                title="Quitar la copia"
+                className={fieldCloseClass}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </ComposerFieldMotionRow>
+
+            <ComposerFieldMotionRow open={bccOpen} phase={fieldMotion.phaseFor(COMPOSER_BCC_KEY)}>
+              <span className={fieldLabelClass}>CCO</span>
+              <RecipientInput
+                inputRef={bccRef}
+                value={replyBcc}
+                onChange={setReplyBcc}
+                invalid={hasInvalidRecipients(replyBcc)}
+                placeholder="Nadie más ve a quién va esta copia"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  fieldMotion.requestRemove(COMPOSER_BCC_KEY, () => {
+                    setBccOpen(false);
+                    setReplyBcc("");
+                  });
+                }}
+                aria-label="Quitar la copia oculta"
+                title="Quitar la copia oculta"
+                className={fieldCloseClass}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </ComposerFieldMotionRow>
+
+            {isForward && email.attachments.length > 0 && (
+              <label className="flex shrink-0 cursor-pointer items-center gap-2 border-b border-zinc-100 bg-zinc-50/40 px-4 py-1.5 text-[12px] font-medium text-zinc-700">
+                <input
+                  type="checkbox"
+                  checked={includeAttachments}
+                  onChange={(event) => setIncludeAttachments(event.target.checked)}
+                  className="h-3.5 w-3.5 accent-brand-red rounded"
+                />
+                Incluir {email.attachments.length === 1 ? "el adjunto original" : `los ${email.attachments.length} adjuntos originales`}
+              </label>
+            )}
+
+            <div
+              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden no-scrollbar"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                  if (replyReady) handleReply();
+                }
+              }}
+            >
+              <LazyBlockEditor
+                key={editorKey}
+                initialContent={draftBlocks}
+                onChange={setReplyBlocks}
+                placeholder={isForward ? "Comentario opcional…" : "Escribe la respuesta…"}
+              />
+            </div>
+
+            {files.length > 0 && (
+              <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-zinc-100 px-4 py-2 bg-zinc-50/30">
+                {files.map((file, position) => (
+                  <span
+                    key={`${file.name}-${position}`}
+                    className="animate-plf-check-in inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80
+                      bg-emerald-50/50 px-2.5 py-1 text-[11.5px] font-medium text-emerald-950 shadow-2xs"
+                  >
+                    <span className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-3xs animate-plf-check-breathe" title="Adjuntado correctamente">
+                      <AnimatedCheckIcon size={10} strokeWidth={3} />
+                    </span>
+                    <span className="max-w-[160px] truncate">{file.name}</span>
+                    <span className="text-zinc-400 text-[10.5px] tabular-nums">{formatBytes(file.size)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFiles(files.filter((_, at) => at !== position))}
+                      aria-label={`Quitar ${file.name}`}
+                      className="text-zinc-400 transition-colors hover:text-brand-red ml-0.5 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {replyError && (
+              <div className="shrink-0 px-4 pb-2 pt-2">
+                <Alert variant="error">{replyError}</Alert>
+              </div>
+            )}
+
+            <ComposerInset />
+            <div className="flex shrink-0 items-center gap-2 border-t border-zinc-100 px-4 py-2.5 bg-zinc-50/30">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium shadow-2xs outline-none transition-all duration-300 cursor-pointer ${
+                  showAttachedFeedback
+                    ? attachedExiting
+                      ? "border-emerald-200 bg-emerald-50/40 text-emerald-600 ring-1 ring-emerald-100/50"
+                      : "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200/70 font-semibold"
+                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-zinc-400/20"
+                }`}
+              >
+                {showAttachedFeedback ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 ${
+                      attachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+                    }`}
+                  >
+                    <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 animate-plf-check-breathe">
+                      <AnimatedCheckIcon size={11} strokeWidth={3} />
+                    </span>
+                    <span>¡Adjuntado!</span>
+                  </span>
+                ) : (
+                  <>
+                    <Paperclip className="h-3.5 w-3.5 text-zinc-500" />
+                    Adjuntar
+                  </>
+                )}
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  addFiles(Array.from(event.target.files ?? []));
+                  event.target.value = "";
+                }}
+              />
+              <CannedPicker onPick={insertCanned} variableContext={cannedVariableContext} />
+              <span className="truncate text-[11px] font-medium text-zinc-400">
+                Hasta {MAX_FILES} archivos, 10 MB · también puedes soltarlos aquí
+              </span>
+
+              <div className="ml-auto flex shrink-0 gap-2">
+                <PfButton variant="ghost" size="sm" className="h-8 px-3" onClick={closeComposer}>
+                  Cancelar
+                </PfButton>
+                <SendValidationButton
+                  ready={replyReady && !isCelebrating}
+                  sending={sending}
+                  missingItems={replyMissingItems}
+                  onSend={handleReply}
+                  onFocusField={handleFocusReplyField}
+                />
+              </div>
+            </div>
+          </div>
         )}
 
         {openReply && (
-          <div className="absolute inset-0 z-10 flex flex-col bg-white">
+          <div key={openReply.id} className="absolute inset-0 z-10 flex flex-col bg-white animate-plf-apple-tab">
             <div className="flex shrink-0 items-start gap-2.5 border-b border-line px-4 py-2.5">
               {(() => {
                 const openBadge = getThreadMessageBadge(openReply);
@@ -836,7 +1429,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                         ? `Se reintentará solo. ${openReply.deliveryDetail ?? ""}`
                         : (openReply.deliveryDetail ?? "El proveedor no dio más detalle.")}
                     </span>
-                    {openReply.deliveryStatus === "Failed" && (
+                    {openReply.deliveryStatus === "Failed" && canMailSend && (
                       <PfButton
                         size="sm"
                         variant="ghost"
@@ -861,7 +1454,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
               </div>
             )}
 
-            {openReply.bodyHtml && openReply.direction === "Inbound" ? (
+            {openReply.bodyHtml ? (
               <EmailBodyFrame
                 key={openReply.id}
                 html={openReply.bodyHtml}
@@ -921,7 +1514,6 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         ) : (
           <p className="min-h-0 flex-1 p-4 text-[13px] text-subtle">Este correo no tiene contenido.</p>
         )}
-      </div>
 
       {email.attachments.length > 0 && (
         <>
@@ -971,14 +1563,42 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
         </>
       )}
 
-      <AddNotePanel emailId={email.id} onNoteAdded={() => setNotesRefreshKey((k) => k + 1)} />
+      {canMailManage && (
+        <AddNotePanel emailId={email.id} onNoteAdded={handleNoteAdded} />
+      )}
 
       <Separator className="bg-line" />
 
       <div className="shrink-0 px-4 py-2.5">
         {others.length > 0 && (
-          <div className="mb-2 max-h-40 overflow-y-auto pr-0.5">
-            {others.map((reply) => {
+          <div className="mb-2">
+            {threadHistoryCollapsible && (
+              <div className="mb-1 flex items-center justify-between gap-2 px-1.5">
+                <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
+                  {others.length} {others.length === 1 ? "acción" : "acciones"} en el hilo
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setThreadHistoryExpanded((open) => !open)}
+                  aria-expanded={threadHistoryExpanded}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-heading text-[11px] font-semibold text-brand-red outline-none transition-colors hover:bg-brand-red/8 focus-visible:ring-2 focus-visible:ring-brand-red/20"
+                >
+                  {threadHistoryExpanded ? "Ocultar" : "Mostrar"}
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                      threadHistoryExpanded ? "rotate-180" : ""
+                    }`}
+                    aria-hidden
+                  />
+                </button>
+              </div>
+            )}
+            <div
+              className={`pr-0.5 ${
+                threadHistoryExpanded ? "max-h-72 overflow-y-auto" : threadHistoryCollapsible ? "" : "max-h-40 overflow-y-auto"
+              }`}
+            >
+            {visibleThreadOthers.map((reply) => {
               const badge = getThreadMessageBadge(reply);
               const contactName =
                 reply.direction === "Outbound"
@@ -1046,36 +1666,50 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
                 </button>
               );
             })}
+            </div>
+            {threadHistoryCollapsible && !threadHistoryExpanded && threadHistoryHiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setThreadHistoryExpanded(true)}
+                className="mt-0.5 w-full rounded-edge px-1.5 py-1 text-left text-[11px] font-medium text-subtle outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/15"
+              >
+                y {threadHistoryHiddenCount} {threadHistoryHiddenCount === 1 ? "acción más" : "acciones más"}…
+              </button>
+            )}
           </div>
         )}
 
         {/* Dos botones iguales a todo el ancho; lo enviado no se responde, asi que queda solo reenviar. */}
-        <div className={`grid gap-2 ${isOutbound ? "grid-cols-1" : "grid-cols-2"}`}>
-          {!isOutbound && (
+        {canMailSend && (
+          <div className={`grid gap-2 ${isOutbound ? "grid-cols-1" : "grid-cols-2"}`}>
+            {!isOutbound && (
+              <button
+                type="button"
+                onClick={() => openComposer("reply")}
+                title={`Responder a ${email.fromName ?? email.fromEmail}`}
+                className={composerOpenerClass}
+              >
+                <CornerUpLeft className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
+                Responder
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => openComposer("reply")}
-              title={`Responder a ${email.fromName ?? email.fromEmail}`}
+              onClick={() => openComposer("forward")}
+              title="Reenviar este correo a otra dirección"
               className={composerOpenerClass}
             >
-              <CornerUpLeft className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
-              Responder
+              <Forward className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
+              Reenviar
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => openComposer("forward")}
-            title="Reenviar este correo a otra dirección"
-            className={composerOpenerClass}
-          >
-            <Forward className="h-3.5 w-3.5 text-zinc-400 transition-colors group-hover:text-zinc-700" />
-            Reenviar
-          </button>
-        </div>
+          </div>
+        )}
+      </div>
       </div>
 
       {confirmingDelete && (
         <ConfirmDialog
+          eyebrow="Papelera"
           icon={Trash2}
           title="Eliminar definitivamente"
           description={
@@ -1096,6 +1730,7 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
 
       {dangerousToDownload && (
         <ConfirmDialog
+          eyebrow="Adjuntos"
           icon={ShieldAlert}
           title="Archivo potencialmente peligroso"
           description={
@@ -1133,22 +1768,52 @@ export function EmailDetailPane({ emailId, onTicketCreated, onMoved, onStarred, 
           emailId={email.id}
           initialSubject={email.subject}
           initialMessage={email.bodyText || ""}
-          senderEmail={email.fromEmail}
-          senderName={email.fromName ?? undefined}
+          senderEmail={
+            isOutbound ? (email.toEmails[0] ?? email.fromEmail) : email.fromEmail
+          }
+          senderName={isOutbound ? undefined : (email.fromName ?? undefined)}
+          emailDirection={isOutbound ? "outbound" : "inbound"}
           initialAssignedStaffId={email.assignedStaffId}
           onClose={() => setIsCreateTicketModalOpen(false)}
-          onCreated={(created, targetUrl) => {
+          onCreated={(created) => {
             setEmail({ ...email, ticketId: created.id });
             setJustCreatedTicketId(created.id);
             onTicketCreated();
             setIsCreateTicketModalOpen(false);
-            if (targetUrl) {
-              navigate(targetUrl);
-            }
+            navigate(`/tickets/${created.id}`);
             receipts.done({
               action: "crear-ticket",
               title: "Ticket creado",
               detail: `${created.code} · ${created.subject}`,
+            });
+          }}
+        />
+      )}
+
+      {isCreateTaskModalOpen && email && (
+        <TaskFormModal
+          prefill={{
+            emailId: email.id,
+            title: email.subject || "",
+            instructions: email.bodyText || "",
+            senderEmail: email.fromEmail,
+            attachments: email.attachments.map((file) => ({
+              id: file.id,
+              fileName: file.fileName,
+              sizeBytes: file.sizeBytes,
+              available: file.available,
+              dangerous: file.dangerous,
+            })),
+          }}
+          onClose={() => setIsCreateTaskModalOpen(false)}
+          onSaved={(task) => {
+            setIsCreateTaskModalOpen(false);
+            setJustCreatedTaskId(task.id);
+            setLinkedTasksKey((k) => k + 1);
+            receipts.done({
+              action: "crear-tarea",
+              title: "Tarea creada",
+              detail: `${task.number} · ${task.title}`,
             });
           }}
         />

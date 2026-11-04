@@ -1,48 +1,52 @@
 import {
   Bell,
   BellOff,
-  ChevronLeft,
-  ChevronRight,
+  ChevronDown,
   Inbox,
   Plus,
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
+import { useSidePanelMotion } from "../../hooks/useSidePanelMotion";
+import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
 import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { emailsApi, type EmailQuery } from "../../api/emails";
-import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { NotificationsModal } from "../../components/app/NotificationsModal";
-import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { SearchInput } from "../../components/ui/SearchInput";
-import { Spinner } from "../../components/ui/Spinner";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { Pagination } from "../../components/ui/Pagination";
+import { InboxListSkeleton, MailReadingPaneSkeleton, Skeleton } from "../../components/ui/Skeleton";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../../components/shadcn/resizable";
 import { ScrollArea } from "../../components/shadcn/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/shadcn/tooltip";
-import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
+import { usePermissions } from "../../hooks/usePermissions";
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useHasOpenedNotifications, useNotifyPrefs } from "../../hooks/useNotifyPrefs";
 import { markNotificationsOpened } from "../../lib/notifications";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import type { EmailBulkAction, EmailListResponse, EmailSummaryResponse } from "../../types/api";
 import { ConversationRow } from "./ConversationRow";
-import { conversations } from "./conversationsLabel";
-import { EmailFilterMenu, type EmailFilterOption, type TicketFilter } from "./EmailFilterMenu";
 import { EmailDetailPane } from "./EmailDetailPane";
 import { NewEmailComposer } from "./NewEmailComposer";
 import { FilterButton, FilterChips } from "./SearchFilters";
 import { EMPTY_FILTERS, countActive, toQueryParams, type AdvancedFilters } from "./filterCriteria";
 import { SelectionBar } from "./SelectionBar";
 import { InboxTriageEmptyState } from "./InboxTriageEmptyState";
+import { MailReadingPaneShell } from "./MailReadingPaneShell";
 
 export type FolderKey = "inbox" | "archived" | "starred" | "trash" | "sent";
+type TicketFilter = "todos" | "sin-ticket" | "sin-responder" | "mios";
 
 const folderMeta: Record<FolderKey, { title: string; emptyText: string }> = {
   inbox: { title: "Bandeja", emptyText: "Todavía no llegó ningún correo." },
@@ -52,18 +56,205 @@ const folderMeta: Record<FolderKey, { title: string; emptyText: string }> = {
   sent: { title: "Enviados", emptyText: "Todavía no enviaste ningún correo." },
 };
 
-const primaryFilters: EmailFilterOption[] = [
+const primaryFilters: {
+  key: TicketFilter;
+  label: string;
+  countKey: keyof EmailListResponse["counts"];
+}[] = [
   { key: "todos", label: "Todos", countKey: "all" },
   { key: "sin-responder", label: "Pendientes", countKey: "unanswered" },
 ];
 
-const secondaryFilters: EmailFilterOption[] = [
+const secondaryFilters: {
+  key: TicketFilter;
+  label: string;
+  countKey: keyof EmailListResponse["counts"];
+}[] = [
   { key: "sin-ticket", label: "Sin ticket", countKey: "unlinked" },
   { key: "mios", label: "Míos", countKey: "mine" },
 ];
 
-/** Cada pagina se pide al servidor: entra lo que se ve, no la bandeja entera. */
-const PAGE_SIZE = 15;
+const STATUS_MENU_WIDTH = 200;
+
+interface EmailFilterMenuProps {
+  options: typeof secondaryFilters;
+  activeKey: TicketFilter;
+  counts?: EmailListResponse["counts"];
+  assignedUnseen?: number;
+  onSelect: (key: TicketFilter) => void;
+  className?: string;
+}
+
+function EmailFilterMenu({
+  options,
+  activeKey,
+  counts,
+  assignedUnseen,
+  onSelect,
+  className = "",
+}: EmailFilterMenuProps) {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<{ top: number; left: number; originX: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
+  const { mounted, exiting, ref: panelRef, snap } = useDisclosureMotion<HTMLDivElement>(open);
+  const handleMenuKeyDown = useMenuKeyboard(panelRef, open);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+    function handleViewportChange() {
+      setOpen(false);
+      snap();
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener("resize", handleViewportChange);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener("resize", handleViewportChange);
+    };
+  }, [open, snap, panelRef]);
+
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const left = Math.max(8, rect.right - STATUS_MENU_WIDTH);
+    setAnchor({ top: rect.bottom + 6, left, originX: rect.left + rect.width / 2 - left });
+    setOpen(true);
+  }
+
+  const active = options.find((option) => option.key === activeKey);
+  const activeCount = active && counts ? counts[active.countKey] : 0;
+  const hasUnseen = Boolean(assignedUnseen && assignedUnseen > 0);
+
+  return (
+    <div className={`relative min-w-0 w-full ${className}`}>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={toggle}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={mounted ? panelId : undefined}
+        aria-label={active ? `Más filtros (activo: ${active.label})` : "Más filtros"}
+        title={active ? `Filtro activo: ${active.label}` : "Más filtros"}
+        className={`inline-flex h-8 w-full min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-[12px] shadow-2xs transition-all outline-none select-none cursor-pointer active:scale-[0.98] ${
+          active
+            ? "border border-zinc-300 bg-zinc-100 font-semibold text-zinc-900"
+            : "border border-zinc-200 bg-white font-medium text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+        }`}
+      >
+        <span className="flex items-center gap-1 min-w-0 truncate">
+          <span className="truncate">{active ? active.label : "Más"}</span>
+          {active ? (
+            <span className="rounded-full bg-zinc-200 px-1.5 py-0.2 text-[10px] font-bold text-zinc-800 tabular-nums">
+              {activeCount}
+            </span>
+          ) : (
+            hasUnseen && (
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red" title="Tienes correos asignados sin ver" />
+            )
+          )}
+        </span>
+        <ChevronDown
+          className={`h-3 w-3 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-zinc-700" : ""}`}
+        />
+      </button>
+
+      {mounted &&
+        anchor &&
+        createPortal(
+          <div
+            ref={panelRef}
+            id={panelId}
+            role="menu"
+            aria-label="Más filtros de correo"
+            aria-hidden={exiting}
+            onKeyDown={handleMenuKeyDown}
+            style={{
+              position: "fixed",
+              top: anchor.top,
+              left: anchor.left,
+              width: STATUS_MENU_WIDTH,
+              transformOrigin: `${anchor.originX}px top`,
+            }}
+            className={`z-[60] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
+              bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] ${
+                exiting ? "pointer-events-none" : ""
+              }`}
+          >
+            <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
+              Vistas secundarias
+            </div>
+            {options.map(({ key, label, countKey }) => {
+              const isActive = key === activeKey;
+              const count = counts?.[countKey] ?? 0;
+              const showDot = key === "mios" && hasUnseen;
+              return (
+                <button
+                  key={key}
+                  data-motion-item
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={isActive}
+                  onClick={() => {
+                    onSelect(key);
+                    setOpen(false);
+                    triggerRef.current?.focus();
+                  }}
+                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left
+                    text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                      isActive
+                        ? "bg-zinc-100 font-semibold text-zinc-900"
+                        : "font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900"
+                    }`}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    {showDot && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-brand-red shadow-[0_0_6px_rgba(228,0,43,0.5)]" />
+                    )}
+                    <span>{label}</span>
+                  </span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[10.5px] font-bold tabular-nums ${
+                      isActive ? "bg-zinc-200 text-zinc-800" : "bg-zinc-100 text-zinc-500"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+function conversations(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? `conversación ${singular}` : `conversaciones ${plural}`}`;
+}
 
 interface BulkMeta {
   /** Clave de fusion de los recibos: dos archivados seguidos se cuentan juntos. */
@@ -142,35 +333,73 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   const [ticketFilter, setTicketFilter] = useState<TicketFilter>("todos");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
+  const {
+    mounted: composeMounted,
+    exiting: composeExiting,
+    ref: composePanelRef,
+    snap: snapCompose,
+  } = useSidePanelMotion(composing);
+  const [emptyPaneReveal, setEmptyPaneReveal] = useState(false);
+  const composeMountedRef = useRef(composeMounted);
   const [checked, setChecked] = useState<Set<number>>(() => new Set());
   const [busy, setBusy] = useState(false);
+  const [starOverrides, setStarOverrides] = useState<Record<number, boolean>>({});
+  const [starPendingIds, setStarPendingIds] = useState<Set<number>>(() => new Set());
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [editingAlerts, setEditingAlerts] = useState(false);
   const lastToggled = useRef<number | null>(null);
   const [params, setParams] = useSearchParams();
-  const { counts, refresh: refreshCounts, onInboxChanged } = useEmailCounts();
+  const { counts, setFolderCounts, onInboxChanged } = useEmailCounts();
   const receipts = useReceipts();
-  // Eliminar definitivamente y vaciar la papelera son de administradores.
-  const isAdmin = Boolean(useAuth().user?.isAdmin);
+  const { can } = usePermissions();
+  const canMailSend = can("mail.send");
+  const canMailManage = can("mail.manage");
+  const canMailDelete = can("mail.delete");
   const prefs = useNotifyPrefs();
   const hasOpenedAlerts = useHasOpenedNotifications();
   const debouncedSearch = useDebouncedValue(search).trim();
+  const [pageSize, setPageSize] = useState(10);
   const meta = folderMeta[folder];
   const selectable = folder !== "sent";
 
-  const { data, isStale, error, page, setPage, refresh } = usePagedList<EmailQuery, EmailListResponse>(
-    {
-      fetch: emailsApi.list,
-      criteria: {
-        pageSize: PAGE_SIZE,
-        folder,
-        filter: ticketFilter,
-        search: debouncedSearch || undefined,
-        ...toQueryParams(filters),
-      },
-      fallbackError: "No se pudo cargar la bandeja",
+  useEffect(() => {
+    if (!canMailSend && composing) setComposing(false);
+  }, [canMailSend, composing]);
+
+  useEffect(() => {
+    const wasMounted = composeMountedRef.current;
+    composeMountedRef.current = composeMounted;
+    if (wasMounted && !composeMounted && selectedId === null) {
+      setEmptyPaneReveal(true);
+    }
+  }, [composeMounted, selectedId]);
+
+  useEffect(() => {
+    if (!emptyPaneReveal) return;
+    const timer = window.setTimeout(() => setEmptyPaneReveal(false), 480);
+    return () => window.clearTimeout(timer);
+  }, [emptyPaneReveal]);
+
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<
+    EmailQuery,
+    EmailListResponse
+  >({
+    fetch: emailsApi.list,
+    criteria: {
+      pageSize,
+      folder,
+      filter: ticketFilter,
+      search: debouncedSearch || undefined,
+      ...toQueryParams(filters),
     },
-  );
+    fallbackError: "No se pudo cargar la bandeja",
+  });
+
+  useLoadErrorReceipt(error, "bandeja-list", refresh);
+
+  useEffect(() => {
+    if (data?.folderCounts) setFolderCounts(data.folderCounts);
+  }, [data?.folderCounts, setFolderCounts]);
 
   // El aviso llega en cualquier momento: se guarda la recarga vigente para no resuscribirse.
   const refreshRef = useRef(refresh);
@@ -188,8 +417,26 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     if (requestedId !== null) setParams({}, { replace: true });
   }, [requestedId, setParams]);
 
-  const rows = data?.items ?? [];
+  const rows = isStale ? [] : (data?.items ?? []);
+  const listLoading = data === null || isStale;
   const unfiltered = !debouncedSearch && countActive(filters) === 0;
+
+  useEffect(() => {
+    setStarOverrides((current) => {
+      if (Object.keys(current).length === 0) return current;
+      const next = { ...current };
+      let changed = false;
+      for (const [idRaw, starred] of Object.entries(current)) {
+        const id = Number(idRaw);
+        const row = rows.find((email) => email.id === id);
+        if (row && row.starred === starred) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [rows]);
 
   // Lo marcado que ya no esta en pantalla (cambio de pagina, de carpeta o de filtro) deja de contar.
   const visibleKey = rows.map((email) => email.id).join(",");
@@ -214,7 +461,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
   function refreshAll() {
     refresh();
-    refreshCounts();
   }
 
   // Un correo movido a otra carpeta ya no pertenece a esta vista: se cierra el panel de lectura.
@@ -225,6 +471,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
   // Abrir una conversacion la marca leida, y si se la acaban de asignar, tambien "vista".
   function handleOpen(email: EmailSummaryResponse) {
+    if (composing) setComposing(false);
     setSelectedId(email.id);
 
     if (email.unread) {
@@ -244,16 +491,41 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
   async function handleToggleStar(id: number) {
     const target = rows.find((row) => row.id === id);
-    if (!target) return;
-    const nextStarred = !target.starred;
+    if (!target || starPendingIds.has(id)) return;
+
+    const currentStarred = starOverrides[id] ?? target.starred;
+    const nextStarred = !currentStarred;
+
+    setStarOverrides((current) => ({ ...current, [id]: nextStarred }));
+    setStarPendingIds((current) => new Set(current).add(id));
+
+    if (folder === "starred" && !nextStarred && selectedId === id) {
+      setSelectedId(null);
+    }
+
     try {
       await emailsApi.toggleStar(id, nextStarred);
+      receipts.done({
+        action: nextStarred ? "destacar" : "quitar-destacado",
+        title: nextStarred ? "Añadido a destacados" : "Quitado de destacados",
+        detail: target.subject || (target.fromName ?? target.fromEmail),
+      });
       refresh();
-      refreshCounts();
     } catch {
+      setStarOverrides((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
       receipts.failed({
         action: "destacar",
         title: "No se pudo actualizar destacados",
+      });
+    } finally {
+      setStarPendingIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
       });
     }
   }
@@ -340,6 +612,11 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     const info = BULK[action];
     setBusy(true);
 
+    if ((info.closesOpen || (folder === "starred" && action === "unstar")) && selectedId !== null && ids.includes(selectedId)) {
+      setSelectedId(null);
+    }
+    setChecked(new Set());
+
     try {
       const { affected } = await emailsApi.bulk(ids, action);
       const kept = ids.length - affected;
@@ -359,10 +636,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
           : undefined,
       });
 
-      if ((info.closesOpen || (folder === "starred" && action === "unstar")) && selectedId !== null && ids.includes(selectedId)) {
-        setSelectedId(null);
-      }
-      setChecked(new Set());
       refreshAll();
     } catch (err) {
       receipts.failed({
@@ -385,6 +658,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     }
 
     setConfirmation({
+      eyebrow: "Papelera",
       title: "Eliminar definitivamente",
       description: (
         <>
@@ -405,6 +679,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     const total = counts?.trash.total ?? data?.total ?? 0;
 
     setConfirmation({
+      eyebrow: "Papelera",
       title: "Vaciar la papelera",
       description: (
         <>
@@ -445,19 +720,20 @@ export function BandejaPage({ folder }: BandejaPageProps) {
         <ModuleHeader
           title={meta.title}
           summary={
-            <HeaderCounts counts={data} loadingLabel="Cargando correos…">
-              {(list) => (
-                <>
-                  <HeaderTag
-                    label={folderTotal === 1 ? "conversación" : "conversaciones"}
-                    count={folderTotal}
-                    active={ticketFilter === "todos"}
-                    onClick={() => setTicketFilter("todos")}
-                    tone="neutral"
-                    title={`Mostrar todos los correos de ${meta.title}`}
-                  />
+            data ? (
+              <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+                <HeaderTag
+                  label={folderTotal === 1 ? "conversación" : "conversaciones"}
+                  count={folderTotal}
+                  active={ticketFilter === "todos"}
+                  onClick={() => setTicketFilter("todos")}
+                  tone="neutral"
+                  title={`Mostrar todos los correos de ${meta.title}`}
+                />
 
-                  {folderUnread > 0 && (
+                {folderUnread > 0 && (
+                  <>
+                    <span aria-hidden className="text-zinc-300">·</span>
                     <HeaderTag
                       label="sin leer"
                       count={folderUnread}
@@ -468,24 +744,30 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                       dotPulse
                       title={`${folderUnread} correos sin leer`}
                     />
-                  )}
+                  </>
+                )}
 
-                  {folder === "inbox" && (list.counts.unanswered > 0 || ticketFilter === "sin-responder") && (
+                {folder === "inbox" && (data.counts.unanswered > 0 || ticketFilter === "sin-responder") && (
+                  <>
+                    <span aria-hidden className="text-zinc-300">·</span>
                     <HeaderTag
                       label="sin responder"
-                      count={list.counts.unanswered}
+                      count={data.counts.unanswered}
                       active={ticketFilter === "sin-responder"}
                       onClick={() => setTicketFilter("sin-responder")}
                       tone="red"
                       dot
                       title="Filtrar por correos sin responder"
                     />
-                  )}
+                  </>
+                )}
 
-                  {folder === "inbox" && (Boolean(counts?.assignedUnseen) || ticketFilter === "mios") && (
+                {folder === "inbox" && (Boolean(counts?.assignedUnseen) || ticketFilter === "mios") && (
+                  <>
+                    <span aria-hidden className="text-zinc-300">·</span>
                     <HeaderTag
                       label="míos"
-                      count={list.counts.mine}
+                      count={data.counts.mine}
                       active={ticketFilter === "mios"}
                       onClick={() => setTicketFilter("mios")}
                       tone="blue"
@@ -493,14 +775,19 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                       dotPulse={Boolean(counts?.assignedUnseen)}
                       title="Filtrar por mis conversaciones asignadas"
                     />
-                  )}
-                </>
-              )}
-            </HeaderCounts>
+                  </>
+                )}
+              </div>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+                Cargando correos…
+              </span>
+            )
           }
           action={
             <div className="flex items-center gap-2">
-              {folder === "trash" && isAdmin && (
+              {folder === "trash" && canMailDelete && (
                 <button
                   type="button"
                   onClick={confirmEmptyTrash}
@@ -599,30 +886,42 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                 )}
               </div>
 
-              <Button
-                size="sm"
-                onClick={() => setComposing(true)}
-                className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
-              >
-                <Plus className="h-4 w-4" strokeWidth={2.5} />
-                <span>Redactar</span>
-              </Button>
+              {canMailSend && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSelectedId(null);
+                    setComposing(true);
+                  }}
+                  className="h-8 gap-1.5 px-3.5 text-[12.5px] font-semibold shadow-2xs active:scale-[0.98]"
+                >
+                  <Plus className="h-4 w-4" strokeWidth={2.5} />
+                  <span>Redactar</span>
+                </Button>
+              )}
             </div>
           }
         />
 
-        {error && (
-          <div className="mb-3 shrink-0">
-            <Alert variant="error">{error}</Alert>
-          </div>
-        )}
-
         {data === null ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Spinner />
+          <div className="min-h-0 flex-1">
+            <ResizablePanelGroup className="h-full rounded-xl border border-zinc-200/80 bg-white shadow-2xs overflow-hidden">
+              <ResizablePanel defaultSize="26%" minSize="20%" maxSize="45%" className="flex flex-col">
+                <div className="flex shrink-0 flex-col gap-2.5 px-3.5 pt-3 pb-2.5">
+                  <Skeleton className="h-8 w-full rounded-lg" />
+                </div>
+                <ScrollArea className="min-h-0 flex-1">
+                  <InboxListSkeleton rows={9} />
+                </ScrollArea>
+              </ResizablePanel>
+              <ResizableHandle withHandle className="bg-zinc-200/80" />
+              <ResizablePanel minSize="35%" className="flex flex-col">
+                <MailReadingPaneSkeleton />
+              </ResizablePanel>
+            </ResizablePanelGroup>
           </div>
         ) : (
-          <div className={`min-h-0 flex-1 transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className="min-h-0 flex-1">
             <ResizablePanelGroup className="h-full rounded-xl border border-zinc-200/80 bg-white shadow-2xs overflow-hidden">
               <ResizablePanel defaultSize="26%" minSize="20%" maxSize="45%" className="flex flex-col">
                 <div className="flex shrink-0 flex-col gap-2.5 px-3.5 pt-3 pb-2.5">
@@ -711,7 +1010,8 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                       >
                         <SelectionBar
                           folder={folder as Exclude<FolderKey, "sent">}
-                          canDelete={isAdmin}
+                          canManage={canMailManage}
+                          canDelete={canMailDelete}
                           count={isSelecting ? checked.size : preservedSelection.count}
                           pageState={isSelecting ? pageState : preservedSelection.pageState}
                           busy={busy}
@@ -726,95 +1026,124 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                 </div>
 
                 <ScrollArea className="min-h-0 flex-1">
-                  {rows.length === 0 ? (
-                    <div className="flex h-48 flex-col items-center justify-center gap-2 px-6 text-center">
-                      <Inbox className="h-7 w-7 text-zinc-300" />
-                      <p className="text-[12.5px] text-zinc-500">
-                        {unfiltered ? meta.emptyText : "Ningún correo coincide con esta búsqueda."}
-                      </p>
+                  {listLoading ? (
+                    <div className="p-3 pt-0">
+                      <InboxListSkeleton rows={pageSize} />
                     </div>
+                  ) : rows.length === 0 ? (
+                    <ListEmptyState
+                      icon={Inbox}
+                      isFiltered={!unfiltered}
+                      filteredTitle="Ningún correo coincide con esta búsqueda."
+                      onClearFilters={() => {
+                        setSearch("");
+                        setFilters(EMPTY_FILTERS);
+                      }}
+                      emptyTitle={meta.emptyText}
+                    />
                   ) : (
                     <div className="flex flex-col gap-1 p-3 pt-0">
                       {rows.map((email) => (
                         <ConversationRow
                           key={email.id}
                           email={email}
+                          starred={starOverrides[email.id] ?? email.starred}
+                          starPending={starPendingIds.has(email.id)}
                           selected={selectedId === email.id}
                           checked={checked.has(email.id)}
                           selecting={checked.size > 0}
                           selectable={selectable}
                           onOpen={() => handleOpen(email)}
                           onToggle={(shiftKey) => toggleChecked(email, shiftKey)}
-                          onToggleStar={() => handleToggleStar(email.id)}
+                          onToggleStar={canMailManage ? () => handleToggleStar(email.id) : undefined}
                         />
                       ))}
                     </div>
                   )}
                 </ScrollArea>
 
-                {data.totalPages > 1 && (
-                  <div className="flex shrink-0 items-center justify-between gap-2 border-t border-zinc-200/80 px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => setPage(page - 1)}
-                      disabled={page <= 1}
-                      aria-label="Página anterior"
-                      className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-white"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="text-[11.5px] font-medium text-zinc-500 tabular-nums">
-                      {page} de {data.totalPages} · {data.total} conversaciones
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setPage(page + 1)}
-                      disabled={page >= data.totalPages}
-                      aria-label="Página siguiente"
-                      className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 shadow-2xs outline-none transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-white"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
+                {data !== null && data.total > 0 && (
+                  <div className="shrink-0 border-t border-zinc-200/80 bg-zinc-50 px-3">
+                    <Pagination
+                      layout="panel"
+                      page={page}
+                      pageSize={pageSize}
+                      total={data.total}
+                      totalPages={data.totalPages}
+                      onPageChange={setPage}
+                      onPageSizeChange={setPageSize}
+                      noun="conversaciones"
+                      nounSingular="conversación"
+                    />
                   </div>
                 )}
               </ResizablePanel>
 
               <ResizableHandle withHandle className="bg-zinc-200/80 hover:bg-zinc-300" />
 
-              <ResizablePanel minSize="35%" className="flex flex-col">
-                {composing ? (
-                  <NewEmailComposer
-                    onSent={() => {
-                      setComposing(false);
-                      refreshAll();
-                    }}
-                    onCancel={() => setComposing(false)}
-                  />
-                ) : selectedId ? (
-                  <EmailDetailPane
-                    key={selectedId}
-                    emailId={selectedId}
-                    onTicketCreated={refresh}
-                    onMoved={handleMoved}
-                    onStarred={(starred) => {
-                      refresh();
-                      refreshCounts();
-                      if (folder === "starred" && !starred) {
+              <ResizablePanel minSize="35%" className="flex h-full min-h-0 flex-col overflow-hidden">
+                <MailReadingPaneShell
+                  key={selectedId != null ? `detail-${selectedId}` : "reading-pane"}
+                >
+                  {composeMounted ? (
+                    <div
+                      ref={composePanelRef as React.RefObject<HTMLDivElement | null>}
+                      aria-hidden={composeExiting}
+                      className={`flex h-full w-full flex-1 min-h-0 flex-col overflow-hidden bg-white ${
+                        composeExiting ? "pointer-events-none" : ""
+                      }`}
+                    >
+                      <NewEmailComposer
+                        panelExiting={composeExiting}
+                        onSent={() => {
+                          snapCompose();
+                          setSelectedId(null);
+                          setComposing(false);
+                          setEmptyPaneReveal(true);
+                          refreshAll();
+                        }}
+                        onCancel={() => setComposing(false)}
+                      />
+                    </div>
+                  ) : selectedId ? (
+                    <EmailDetailPane
+                      emailId={selectedId}
+                      starred={starOverrides[selectedId]}
+                      onTicketCreated={refresh}
+                      onMoved={handleMoved}
+                      onSent={() => {
                         setSelectedId(null);
-                      }
-                    }}
-                    onClose={() => setSelectedId(null)}
-                  />
-                ) : (
-                  <InboxTriageEmptyState
-                    folder={folder}
-                    counts={data.counts}
-                    folderCounts={data.folderCounts}
-                    onCompose={() => setComposing(true)}
-                    onSelectTicketFilter={(f) => setTicketFilter(f)}
-                    activeTicketFilter={ticketFilter}
-                  />
-                )}
+                        setEmptyPaneReveal(true);
+                        refreshAll();
+                      }}
+                      onStarred={(starred) => {
+                        if (selectedId != null) {
+                          setStarOverrides((current) => ({ ...current, [selectedId]: starred }));
+                        }
+                        if (folder === "starred" && !starred) {
+                          setSelectedId(null);
+                        }
+                        refresh();
+                      }}
+                      onClose={() => setSelectedId(null)}
+                    />
+                  ) : (
+                    <div className={`flex h-full w-full flex-1 min-h-0 flex-col ${emptyPaneReveal ? "animate-plf-receipt-in" : ""}`}>
+                      <InboxTriageEmptyState
+                        folder={folder}
+                        counts={data.counts}
+                        folderCounts={data.folderCounts}
+                        canCompose={canMailSend}
+                        onCompose={() => {
+                          setSelectedId(null);
+                          setComposing(true);
+                        }}
+                        onSelectTicketFilter={(f) => setTicketFilter(f)}
+                        activeTicketFilter={ticketFilter}
+                      />
+                    </div>
+                  )}
+                </MailReadingPaneShell>
               </ResizablePanel>
             </ResizablePanelGroup>
           </div>

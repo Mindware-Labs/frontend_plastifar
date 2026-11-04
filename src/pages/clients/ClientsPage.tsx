@@ -155,7 +155,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
     fetch: clientsApi.list,
     criteria: {
       pageSize,
@@ -220,12 +220,16 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
    * abre el listado para ver primero lo que ya no opera.
    */
   function territoryName(id: number) {
-    return territories.find((territory) => territory.id === id)?.name ?? "—";
+    const territory = territories.find((t) => t.id === id);
+    if (!territory || territory.code === "UNASSIGNED") return "—";
+    return territory.name;
   }
 
   function territoryLookupLabel(id: number | null) {
     if (id === null) return null;
-    return territories.find((territory) => territory.id === id)?.name ?? null;
+    const territory = territories.find((t) => t.id === id);
+    if (!territory || territory.code === "UNASSIGNED") return null;
+    return territory.name;
   }
 
   function repName(id: number | null) {
@@ -517,7 +521,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
             onClear={unfiltered ? undefined : clearFilters}
           />
         ) : (
-          <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>
@@ -618,13 +622,20 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
                     )}
                     {isVisible("contactos") && (
                       <Td>
-                        {client.contactCount === 0 ? (
-                          <span className="text-[12.5px] text-faint">Ninguno</span>
-                        ) : (
+                        {client.contactCount > 0 ? (
                           <span className="inline-flex items-center gap-1.5 text-[12.5px] tabular-nums text-brand-gray">
                             <Users aria-hidden className="h-3.5 w-3.5 text-faint" />
                             {client.contactCount}
                           </span>
+                        ) : client.contactPersonName || client.phone || client.email ? (
+                          <span
+                            className="text-[12.5px] text-brand-gray"
+                            title="Teléfono, correo o persona en la ficha del cliente"
+                          >
+                            En ficha
+                          </span>
+                        ) : (
+                          <span className="text-[12.5px] text-faint">Ninguno</span>
                         )}
                       </Td>
                     )}

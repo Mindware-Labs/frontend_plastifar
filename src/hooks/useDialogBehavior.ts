@@ -23,7 +23,7 @@ export function useDialogBehavior(panelRef: RefObject<HTMLElement | null>, onClo
     const firstField = panel?.querySelector<HTMLElement>(
       "input:not([type='hidden']):not([data-skip-autofocus]), select, textarea",
     );
-    (firstField ?? panel?.querySelector<HTMLElement>("button"))?.focus();
+    (firstField ?? panel?.querySelector<HTMLElement>("button"))?.focus({ preventScroll: true });
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {

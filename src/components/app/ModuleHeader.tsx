@@ -1,10 +1,19 @@
 import { ArrowLeft } from "lucide-react";
-import type { ReactNode } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { useMemo, type ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { SegmentedTabs, type SegmentedTabItem } from "../ui/SegmentedTabs";
+
+/** Alinea bloques bajo el header con el título cuando hay botón volver (32px + gap-x-3). */
+export const MODULE_HEADER_TITLE_GUTTER_CLASS = "pl-11";
+
+/** Misma franja horizontal: eje del PLT-… a la izquierda y borde del layout a la derecha. */
+export const MODULE_HEADER_CONTENT_BAND_CLASS = "pl-11 pr-3 lg:pr-4";
 
 export interface ModuleHeaderSection {
   label: ReactNode;
   to?: string;
+  /** Igual que NavLink `end` (p. ej. /tickets sin absorber /tickets/historico). */
+  end?: boolean;
   active?: boolean;
   onClick?: () => void;
 }
@@ -12,6 +21,8 @@ export interface ModuleHeaderSection {
 interface ModuleHeaderProps {
   /** Enlace opcional para volver atrás (p. ej. a la tabla o listado principal). */
   backTo?: string;
+  /** Acción de retorno opcional (en vez de un enlace de navegación). */
+  onBack?: () => void;
   /** Texto del tooltip y aria-label del botón volver. */
   backLabel?: string;
   /** Titulo de la pagina. */
@@ -37,6 +48,7 @@ interface ModuleHeaderProps {
 
 export function ModuleHeader({
   backTo,
+  onBack,
   backLabel,
   title,
   badge,
@@ -46,7 +58,37 @@ export function ModuleHeader({
   action,
   className = "",
 }: ModuleHeaderProps) {
-  const hasHeading = title !== undefined || summary !== undefined || backTo !== undefined;
+  const hasHeading = title !== undefined || summary !== undefined || backTo !== undefined || onBack !== undefined;
+  const location = useLocation();
+
+  const sectionItems: SegmentedTabItem[] | null = useMemo(() => {
+    if (!sections?.length) return null;
+    return sections.map((section, idx) => ({
+      key: section.to ?? `section-${idx}`,
+      label: section.label,
+      to: section.to,
+      end: section.end,
+      onClick: section.onClick,
+    }));
+  }, [sections]);
+
+  const activeSectionKey = useMemo(() => {
+    if (!sections?.length) return null;
+    let routeKey: string | null = null;
+    for (const section of sections) {
+      if (!section.to) continue;
+      const end = section.end ?? true;
+      const matches = end
+        ? location.pathname === section.to
+        : location.pathname === section.to || location.pathname.startsWith(`${section.to}/`);
+      if (!matches) continue;
+      if (!routeKey || section.to.length > routeKey.length) routeKey = section.to;
+    }
+    if (routeKey) return routeKey;
+    const activeIdx = sections.findIndex((section) => !section.to && section.active);
+    if (activeIdx >= 0) return `section-${activeIdx}`;
+    return null;
+  }, [sections, location.pathname]);
 
   return (
     <div
@@ -57,7 +99,18 @@ export function ModuleHeader({
       <div className="flex h-full items-center justify-between gap-x-4">
         {hasHeading ? (
           <div className="flex shrink-0 items-center gap-x-3">
-            {backTo && (
+            {onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                title={backLabel ?? "Volver"}
+                aria-label={backLabel ?? "Volver"}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-2.5 text-xs font-semibold text-zinc-700 hover:text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50 transition-all shadow-2xs shrink-0 cursor-pointer"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {backLabel && <span>{backLabel}</span>}
+              </button>
+            ) : backTo ? (
               <Link
                 to={backTo}
                 title={backLabel ?? "Volver"}
@@ -66,7 +119,7 @@ export function ModuleHeader({
               >
                 <ArrowLeft className="h-4 w-4" />
               </Link>
-            )}
+            ) : null}
             {title && (
               <div className="flex items-center gap-2">
                 <h1 className="font-heading text-[20px] font-bold leading-none tracking-[-0.02em] text-zinc-900">
@@ -87,40 +140,12 @@ export function ModuleHeader({
         ) : null}
 
         <div className="flex h-full items-center gap-3">
-          {sections && sections.length > 0 && (
-            <nav aria-label="Secciones de la ficha" className="flex h-full items-center gap-1 self-stretch">
-              {sections.map((section, idx) => {
-                const navClass = (isActive: boolean) =>
-                  `flex h-full items-center border-b-2 px-2.5 text-[12.5px] font-medium transition-all duration-150 ease-out -mb-px whitespace-nowrap cursor-pointer select-none ` +
-                  (isActive
-                    ? "border-brand-red text-zinc-900 font-semibold"
-                    : "border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300/80");
-
-                if (section.to) {
-                  return (
-                    <NavLink
-                      key={section.to}
-                      to={section.to}
-                      end
-                      className={({ isActive }) => navClass(isActive)}
-                    >
-                      {section.label}
-                    </NavLink>
-                  );
-                }
-
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={section.onClick}
-                    className={`${navClass(Boolean(section.active))} bg-transparent border-t-0 border-x-0 outline-none`}
-                  >
-                    {section.label}
-                  </button>
-                );
-              })}
-            </nav>
+          {sectionItems && sectionItems.length > 0 && (
+            <SegmentedTabs
+              items={sectionItems}
+              activeKey={activeSectionKey}
+              ariaLabel="Secciones de la ficha"
+            />
           )}
 
           {action && <div className="flex items-center gap-2 shrink-0">{action}</div>}

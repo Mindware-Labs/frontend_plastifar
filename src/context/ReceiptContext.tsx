@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { ReceiptContext, type Receipt, type ReceiptInput } from "./useReceipts";
 
 /** Dos acciones iguales seguidas se cuentan en un solo recibo en vez de apilar torres. */
@@ -61,9 +61,10 @@ export function ReceiptProvider({ children }: { children: ReactNode }) {
     return () => setInset(0);
   }, []);
 
-  return (
-    <ReceiptContext.Provider value={{ receipts, done, failed, dismiss, inset, reserveInset }}>
-      {children}
-    </ReceiptContext.Provider>
+  const value = useMemo(
+    () => ({ receipts, done, failed, dismiss, inset, reserveInset }),
+    [receipts, done, failed, dismiss, inset, reserveInset],
   );
+
+  return <ReceiptContext.Provider value={value}>{children}</ReceiptContext.Provider>;
 }

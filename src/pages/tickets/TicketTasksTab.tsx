@@ -3,6 +3,7 @@ import {
   Check,
   CheckCircle2,
   CheckSquare,
+  ListChecks,
   ChevronRight,
   Eye,
   FileText,
@@ -16,16 +17,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ticketsApi } from "../../api/tickets";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { Avatar } from "../../components/ui/Avatar";
-import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
-import { Spinner } from "../../components/ui/Spinner";
+import { TicketTasksSkeleton } from "../../components/ui/Skeleton";
 import { Toast } from "../../components/ui/Toast";
 import { useReceipts } from "../../context/useReceipts";
 import { formatBytes, formatDateTime } from "../../lib/format";
 import type {
-  CreateTicketTaskRequest,
   TicketStaffOptionResponse,
   TicketTaskAttachmentResponse,
   TicketTaskCommentResponse,
@@ -33,12 +32,17 @@ import type {
 } from "../../types/api";
 import { CompleteTaskModal } from "./CompleteTaskModal";
 import { CreateTaskModal } from "./CreateTaskModal";
+import { TaskStatusCell } from "../tasks/taskCells";
 
 interface TicketTasksTabProps {
   ticketId: number;
   isClosed: boolean;
   assignableStaff: TicketStaffOptionResponse[];
   currentStaffId: number;
+  canCreateTask: boolean;
+  canEditTask: boolean;
+  canCommentTask: boolean;
+  canDeleteTask: boolean;
   onTasksCountChanged?: (count: number) => void;
   activeCommentsTaskId?: number | null;
   onToggleTaskComments?: (task: TicketTaskResponse) => void;
@@ -54,6 +58,10 @@ export function TicketTasksTab({
   isClosed,
   assignableStaff,
   currentStaffId,
+  canCreateTask,
+  canEditTask,
+  canCommentTask,
+  canDeleteTask,
   onTasksCountChanged,
   activeCommentsTaskId,
   onToggleTaskComments,
@@ -170,10 +178,11 @@ export function TicketTasksTab({
     };
   }, [ticketId]);
 
-  const handleCreateTask = async (taskData: CreateTicketTaskRequest) => {
-    const created = await ticketsApi.createTask(ticketId, taskData);
-    setTasks((prev) => [created, ...prev]);
-    onTasksCountChanged?.(tasks.length + 1);
+  const handleCreateTask = async (formData: FormData) => {
+    const created = await ticketsApi.createTask(ticketId, formData);
+    const data = await ticketsApi.getTasks(ticketId);
+    setTasks(data);
+    onTasksCountChanged?.(data.length);
     receipts.done({ action: "crear-tarea", title: "Tarea creada", detail: created.title });
     onActivity?.();
   };
@@ -182,6 +191,12 @@ export function TicketTasksTab({
     const updated = await ticketsApi.completeTask(ticketId, taskId, formData);
     setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
     receipts.done({ action: "completar-tarea", title: "Tarea completada", detail: updated.title });
+    onActivity?.();
+  };
+
+  const handleProgressSaved = (updated: TicketTaskResponse) => {
+    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    receipts.done({ action: "editar-tarea", title: "Avance registrado", detail: updated.title });
     onActivity?.();
   };
 
@@ -227,6 +242,29 @@ export function TicketTasksTab({
     }
   };
 
+  const renderAttachmentButtons = (task: TicketTaskResponse) =>
+    task.attachments.map((att) => {
+      const isImg = att.contentType.startsWith("image/");
+      return (
+        <button
+          key={att.id}
+          type="button"
+          onClick={() => void handleOpenEvidenceFile(task.id, att)}
+          title={`Abrir: ${att.fileName}`}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11.5px] font-medium text-zinc-800 transition-colors hover:border-zinc-300 hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-brand-red/25"
+        >
+          {isImg ? (
+            <ImageIcon className="size-3 text-brand-red" />
+          ) : (
+            <FileText className="size-3 text-zinc-500" />
+          )}
+          <span className="truncate max-w-[150px]">{att.fileName}</span>
+          <span className="text-[10px] text-zinc-400 tabular-nums">({formatBytes(att.sizeBytes)})</span>
+          <Eye className="size-3 text-zinc-400 ml-0.5" />
+        </button>
+      );
+    });
+
   const pendingTasks = tasks.filter((t) => t.status !== "Completada" && t.status !== "Cancelada");
   const completedTasks = tasks.filter((t) => t.status === "Completada");
   const myTasks = tasks.filter((t) => t.assignedStaffId === currentStaffId);
@@ -259,23 +297,22 @@ export function TicketTasksTab({
           ]}
         />
 
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => setShowCreateModal(true)}
-          disabled={isClosed}
-          title={isClosed ? "No se pueden crear tareas en un ticket cerrado." : undefined}
-        >
-          <Plus className="h-[14px] w-[14px]" />
-          Nueva tarea
-        </Button>
+        {canCreateTask && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => setShowCreateModal(true)}
+            disabled={isClosed}
+            title={isClosed ? "No se pueden crear tareas en un ticket cerrado." : undefined}
+          >
+            <Plus className="h-[14px] w-[14px]" />
+            Nueva tarea
+          </Button>
+        )}
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12 text-zinc-400">
-          <Spinner className="size-5 text-brand-red" />
-          <span className="ml-2.5 text-[13px]">Cargando tareas...</span>
-        </div>
+        <TicketTasksSkeleton />
       ) : error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-[13px] text-red-700">
           {error}
@@ -293,7 +330,7 @@ export function TicketTasksTab({
             Asigna acciones a colaboradores o a ti mismo para investigar el caso, contactar a fábrica o
             verificar inventario con evidencia documentada.
           </p>
-          {!isClosed && (
+          {!isClosed && canCreateTask && (
             <Button
               type="button"
               size="sm"
@@ -340,25 +377,38 @@ export function TicketTasksTab({
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     {/* Botón interactivo de estado / Checkbox */}
                     {isCompleted ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleReopenTask(task.id)}
-                        disabled={isClosed || reopeningId === task.id}
-                        title="Tarea completada. Haz clic para reabrir"
-                        className="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-emerald-600 border border-emerald-600 text-white shadow-2xs transition-all active:scale-90 cursor-pointer"
-                      >
-                        <Check className="size-2.5 stroke-[2.75]" />
-                      </button>
-                    ) : (
+                      canEditTask ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleReopenTask(task.id)}
+                          disabled={isClosed || reopeningId === task.id}
+                          title="Tarea completada. Haz clic para reabrir"
+                          className="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-emerald-600 border border-emerald-600 text-white shadow-2xs transition-all active:scale-90 cursor-pointer"
+                        >
+                          <Check className="size-2.5 stroke-[2.75]" />
+                        </button>
+                      ) : (
+                        <span
+                          aria-hidden
+                          className="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-emerald-600 border border-emerald-600 text-white shadow-2xs"
+                        >
+                          <Check className="size-2.5 stroke-[2.75]" />
+                        </span>
+                      )
+                    ) : canEditTask ? (
                       <button
                         type="button"
                         onClick={() => setTaskToComplete(task)}
                         disabled={isClosed}
-                        title="Marcar como completada y adjuntar evidencia"
-                        className="group/btn flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-zinc-300 bg-white shadow-2xs transition-all hover:border-emerald-600 hover:bg-emerald-50/50 cursor-pointer active:scale-90"
-                      >
-                        <Check className="size-2.5 text-transparent transition-colors group-hover/btn:text-emerald-600 stroke-[2.75]" />
-                      </button>
+                        title="Registrar avance o completar la tarea"
+                        aria-label="Actualizar tarea"
+                        className="flex size-4 shrink-0 items-center justify-center rounded-[4px] border-2 border-zinc-300 bg-white shadow-2xs transition-all hover:border-zinc-500 hover:bg-zinc-50 cursor-pointer active:scale-90"
+                      />
+                    ) : (
+                      <span
+                        aria-hidden
+                        className="flex size-4 shrink-0 items-center justify-center rounded-[4px] border-2 border-zinc-300 bg-white shadow-2xs"
+                      />
                     )}
 
                     <div className="min-w-0 flex-1">
@@ -372,13 +422,7 @@ export function TicketTasksTab({
                         </h4>
 
                         {/* Status Badge */}
-                        {isCompleted ? (
-                          <Badge tone="completed">Completada</Badge>
-                        ) : task.status === "EnProgreso" ? (
-                          <Badge tone="amber">En progreso</Badge>
-                        ) : (
-                          <Badge tone="neutral">Pendiente</Badge>
-                        )}
+                        <TaskStatusCell status={isCompleted ? "Completada" : task.status} />
 
                         {/* Due date tag */}
                         {task.dueDate && (
@@ -403,38 +447,41 @@ export function TicketTasksTab({
 
                   {/* Acciones de la cabecera del mismo tamaño que las etiquetas */}
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {isCompleted ? (
+                    {canEditTask &&
+                      (isCompleted ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleReopenTask(task.id)}
+                          disabled={isClosed || reopeningId === task.id}
+                          title="Reabrir esta tarea para continuar trabajando en ella"
+                          className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer disabled:opacity-50"
+                        >
+                          <RotateCcw className="size-3 text-zinc-400" />
+                          <span>{reopeningId === task.id ? "Reabriendo..." : "Reabrir"}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setTaskToComplete(task)}
+                          disabled={isClosed}
+                          className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer disabled:opacity-50"
+                          title="Registrar avance o marcar como completada"
+                        >
+                          <ListChecks className="size-3 text-zinc-500" />
+                          <span>Actualizar</span>
+                        </button>
+                      ))}
+
+                    {canDeleteTask && (
                       <button
                         type="button"
-                        onClick={() => void handleReopenTask(task.id)}
-                        disabled={isClosed || reopeningId === task.id}
-                        title="Reabrir esta tarea para continuar trabajando en ella"
-                        className="inline-flex items-center gap-1 rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-700 shadow-2xs transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95 cursor-pointer disabled:opacity-50"
+                        onClick={() => setTaskToDelete(task)}
+                        title="Eliminar tarea"
+                        className="flex size-[22px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-red-600 transition-colors cursor-pointer active:scale-95"
                       >
-                        <RotateCcw className="size-3 text-zinc-400" />
-                        <span>{reopeningId === task.id ? "Reabriendo..." : "Reabrir"}</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setTaskToComplete(task)}
-                        disabled={isClosed}
-                        className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50/90 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 shadow-2xs transition-colors hover:bg-emerald-100 hover:border-emerald-300 active:scale-95 cursor-pointer disabled:opacity-50"
-                        title="Marcar tarea como completada"
-                      >
-                        <Check className="size-3 stroke-[2.5]" />
-                        <span>Completar</span>
+                        <Trash2 className="size-3" />
                       </button>
                     )}
-
-                    <button
-                      type="button"
-                      onClick={() => setTaskToDelete(task)}
-                      title="Eliminar tarea"
-                      className="flex size-[22px] items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-red-600 transition-colors cursor-pointer active:scale-95"
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
                   </div>
                 </div>
 
@@ -444,6 +491,15 @@ export function TicketTasksTab({
                     <p className="text-[12.5px] leading-relaxed text-zinc-600 whitespace-pre-line">
                       {task.description}
                     </p>
+                  </div>
+                )}
+
+                {!isCompleted && task.attachments.length > 0 && (
+                  <div className="mt-3 ml-7.5 rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-3">
+                    <p className="font-heading text-[10.5px] font-bold uppercase tracking-[0.06em] text-zinc-500 mb-1.5">
+                      Documentos adjuntos ({task.attachments.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">{renderAttachmentButtons(task)}</div>
                   </div>
                 )}
 
@@ -469,33 +525,9 @@ export function TicketTasksTab({
                     {task.attachments.length > 0 && (
                       <div className="pt-1">
                         <p className="font-heading text-[10.5px] font-bold uppercase tracking-[0.06em] text-zinc-500 mb-1.5">
-                          Archivos de evidencia ({task.attachments.length}):
+                          Archivos adjuntos ({task.attachments.length})
                         </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {task.attachments.map((att) => {
-                            const isImg = att.contentType.startsWith("image/");
-                            return (
-                              <button
-                                key={att.id}
-                                type="button"
-                                onClick={() => void handleOpenEvidenceFile(task.id, att)}
-                                title={`Abrir evidencia: ${att.fileName}`}
-                                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11.5px] font-medium text-zinc-800 transition-colors hover:border-zinc-300 hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-brand-red/25"
-                              >
-                                {isImg ? (
-                                  <ImageIcon className="size-3 text-brand-red" />
-                                ) : (
-                                  <FileText className="size-3 text-zinc-500" />
-                                )}
-                                <span className="truncate max-w-[150px]">{att.fileName}</span>
-                                <span className="text-[10px] text-zinc-400 tabular-nums">
-                                  ({formatBytes(att.sizeBytes)})
-                                </span>
-                                <Eye className="size-3 text-zinc-400 ml-0.5" />
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <div className="flex flex-wrap gap-1.5">{renderAttachmentButtons(task)}</div>
                       </div>
                     )}
                   </div>
@@ -549,7 +581,9 @@ export function TicketTasksTab({
                     title={
                       isCommentsActive
                         ? "Cerrar panel de comentarios"
-                        : `Ver y escribir comentarios (${task.comments.length})`
+                        : canCommentTask
+                          ? `Ver y escribir comentarios (${task.comments.length})`
+                          : `Ver comentarios (${task.comments.length})`
                     }
                   >
                     <MessageSquare
@@ -581,7 +615,7 @@ export function TicketTasksTab({
 
       {/* Modales */}
       <CreateTaskModal
-        open={showCreateModal}
+        open={showCreateModal && canCreateTask}
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateTask}
         assignableStaff={assignableStaff}
@@ -589,10 +623,12 @@ export function TicketTasksTab({
       />
 
       <CompleteTaskModal
+        ticketId={ticketId}
         task={taskToComplete}
         open={Boolean(taskToComplete)}
         onClose={() => setTaskToComplete(null)}
         onComplete={handleCompleteTask}
+        onProgressSaved={handleProgressSaved}
       />
 
       {taskToDelete && (

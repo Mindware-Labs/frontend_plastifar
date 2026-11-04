@@ -91,14 +91,6 @@ const detailPatterns: BreadcrumbPattern[] = [
     ],
   },
   {
-    path: "/calidad/hca/:id",
-    build: (number) => [
-      { label: "Calidad", to: "/calidad/hca" },
-      { label: "HCA", to: "/calidad/hca" },
-      { label: number ?? "HCA" },
-    ],
-  },
-  {
     // El numero del ticket es el «Código:» de la reclamación (docs/plan/03, pregunta 3).
     path: "/reclamaciones/:id",
     build: (ticketNumber) => [
@@ -122,24 +114,6 @@ const detailPatterns: BreadcrumbPattern[] = [
       { label: "Tickets", to: "/tickets" },
       { label: "Retiros", to: "/retiros" },
       { label: number ?? "Solicitud de retiro" },
-    ],
-  },
-  {
-    path: "/calidad/hca/:id/plan",
-    build: (number, { id }) => [
-      { label: "Calidad", to: "/calidad/hca" },
-      { label: "HCA", to: "/calidad/hca" },
-      { label: number ?? "HCA", to: `/calidad/hca/${id}` },
-      { label: "Plan de acción" },
-    ],
-  },
-  {
-    path: "/calidad/hca/:id/cierre",
-    build: (number, { id }) => [
-      { label: "Calidad", to: "/calidad/hca" },
-      { label: "HCA", to: "/calidad/hca" },
-      { label: number ?? "HCA", to: `/calidad/hca/${id}` },
-      { label: "Cierre" },
     ],
   },
   {

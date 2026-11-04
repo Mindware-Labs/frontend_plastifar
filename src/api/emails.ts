@@ -12,6 +12,7 @@ import type {
   EmailThreadMessageResponse,
   EmptyTrashResponse,
 } from "../types/api";
+import type { EmailLinkedTask } from "../types/tasks";
 
 export interface EmailQuery {
   page: number;
@@ -74,6 +75,8 @@ export const emailsApi = {
 
   get: (id: number) => apiRequest<EmailDetailResponse>(`/api/emails/${id}`),
 
+  linkedTasks: (id: number) => apiRequest<EmailLinkedTask[]>(`/api/emails/${id}/tasks`),
+
   // download fuerza la descarga: sin el, los tipos que el navegador sabe mostrar se abren.
   attachmentLink: (emailId: number, attachmentId: number, download = false) =>
     apiRequest<AttachmentLinkResponse>(
@@ -123,12 +126,17 @@ export const emailsApi = {
 
   notes: (id: number) => apiRequest<EmailNoteResponse[]>(`/api/emails/${id}/notes`),
 
-  addNote: (id: number, body: string) =>
-    apiRequest<EmailNoteResponse>(`/api/emails/${id}/notes`, { method: "POST", body: JSON.stringify({ body }) }),
+  addNote: (id: number, body: string, parentId?: number | null) =>
+    apiRequest<EmailNoteResponse>(`/api/emails/${id}/notes`, {
+      method: "POST",
+      body: JSON.stringify({ body, parentId: parentId ?? null }),
+    }),
 
   removeNote: (noteId: number) => apiRequest<void>(`/api/emails/notes/${noteId}`, { method: "DELETE" }),
 
   contacts: (q: string) => apiRequest<ContactResponse[]>(`/api/emails/contacts${toQuery({ q })}`),
+
+  contactDirectory: () => apiRequest<ContactResponse[]>("/api/emails/contact-directory"),
 
   // El archivo llega con la sesion: se baja como blob y se entrega al navegador.
   exportConversation: (id: number) => apiBlob(`/api/emails/${id}/export`),

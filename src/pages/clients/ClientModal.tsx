@@ -6,12 +6,15 @@ import {
   Store,
   Truck,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
 import {
   CheckboxField,
   LookupField,
@@ -20,14 +23,12 @@ import {
   TextField,
   type FieldState,
 } from "../../components/ui/Field";
-import { FormDivider } from "../../components/ui/FormDivider";
 import { Modal } from "../../components/ui/Modal";
-import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatPhoneNumber } from "../../lib/format";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
-import { fieldForServerError, type FieldRule } from "../../lib/serverFieldErrors";
 import type { Client, ClientType, SaveClientRequest } from "../../types/clients";
+import { fieldForServerError, type FieldRule } from "./serverFieldErrors";
 
 /**
  * 4 tipos de cliente con micro-ícono y etiqueta compacta.
@@ -56,6 +57,7 @@ const schema = z.object({
   type: z.string().min(1, "Elige el tipo de cliente"),
   territoryId: z.string().min(1, "Elige el territorio"),
   salesRepStaffId: z.string(),
+  contactPersonName: z.string().trim().max(120, "Máximo 120 caracteres"),
   phone: z
     .string()
     .trim()
@@ -100,6 +102,17 @@ interface ClientModalProps {
   onSaved: (client: Client) => void;
 }
 
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
+
 export function ClientModal({ client, territories, onClose, onSaved }: ClientModalProps) {
   const isEdit = client !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
@@ -121,6 +134,7 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
       type: client?.type ?? "Detallista",
       territoryId: client ? String(client.territoryId) : "",
       salesRepStaffId: client?.salesRepStaffId ? String(client.salesRepStaffId) : "",
+      contactPersonName: client?.contactPersonName ?? "",
       phone: client?.phone ? formatPhoneNumber(client.phone) : "",
       email: client?.email ?? "",
       address: client?.address ?? "",
@@ -130,6 +144,33 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
   });
 
   const notesValue = useWatch({ control, name: "notes" }) ?? "";
+  const clientName = useWatch({ control, name: "name" }) ?? "";
+  const clientType = useWatch({ control, name: "type" }) ?? "";
+  const clientTerritory = useWatch({ control, name: "territoryId" }) ?? "";
+  const clientFormMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "name",
+          label: "Falta el nombre del cliente",
+          short: "el nombre",
+          valid: clientName.trim().length >= 2,
+        },
+        {
+          id: "type",
+          label: "Falta el tipo de cliente",
+          short: "el tipo",
+          valid: clientType.trim().length > 0,
+        },
+        {
+          id: "territoryId",
+          label: "Falta elegir el territorio",
+          short: "el territorio",
+          valid: clientTerritory.trim().length > 0,
+        },
+      ]),
+    [clientName, clientType, clientTerritory],
+  );
 
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
@@ -147,6 +188,7 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
       type: values.type as ClientType,
       territoryId: Number(values.territoryId),
       salesRepStaffId: values.salesRepStaffId === "" ? null : Number(values.salesRepStaffId),
+      contactPersonName: values.contactPersonName.trim() === "" ? null : values.contactPersonName.trim(),
       phone: values.phone.trim() === "" ? null : values.phone.trim(),
       email: values.email.trim() === "" ? null : values.email.trim(),
       address: values.address.trim() === "" ? null : values.address.trim(),
@@ -180,7 +222,8 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
 
   return (
     <Modal
-      size="lg"
+      maxWidth="max-w-xl"
+      eyebrow={isEdit ? `Cliente #${client.id} · ${client.code}` : "Código asignado automáticamente"}
       title={isEdit ? `Editar ${client.name}` : "Nuevo cliente"}
       description={
         isEdit
@@ -191,14 +234,33 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <FormModalFooter
-          shortcut
-          formId="client-form"
-          isEdit={isEdit}
-          createLabel="Crear cliente"
-          isSubmitting={isSubmitting}
-          onCancel={requestClose}
-        />
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <SubmitValidationButton
+              formId="client-form"
+              ready={clientFormMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={clientFormMissing}
+              onFocusField={focusFormField}
+              hintText="Para guardar el cliente, completa lo siguiente:"
+            >
+              {isEdit ? "Guardar cambios" : "Crear cliente"}
+            </SubmitValidationButton>
+          </div>
+        </div>
       }
     >
       <form
@@ -340,6 +402,15 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
 
         {/* 4. CONTACTO Y UBICACIÓN */}
         <FormDivider title="Contacto" />
+
+        <TextField
+          size="sm"
+          label="Persona de contacto"
+          placeholder="Nombre de quien atiende pedidos o reclamos"
+          state={stateOf("contactPersonName")}
+          error={errors.contactPersonName?.message}
+          {...register("contactPersonName")}
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <Controller

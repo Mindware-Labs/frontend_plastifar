@@ -11,13 +11,7 @@ import { MAILBOX_PROVIDERS, type Mailbox } from "../../types/settings";
 import { departmentOptions } from "../../lib/departments";
 import { applyServerError } from "../../lib/formErrors";
 
-/**
- * Espejo de la validacion del servidor en POST/PUT /api/settings/mailboxes:
- * correo unico y valido, nombre visible y departamento obligatorios, y una
- * referencia al secreto en vez de la credencial en si — la credencial la
- * guarda quien tenga acceso a la configuracion protegida del servidor, no
- * este formulario.
- */
+/** Validación de buzón (guarda solo la referencia al secreto en el servidor). */
 const schema = z.object({
   address: z.string().trim().min(1, "Indica el correo").email("Correo inválido"),
   displayName: z.string().trim().min(2, "Al menos 2 caracteres").max(80, "Máximo 80 caracteres"),

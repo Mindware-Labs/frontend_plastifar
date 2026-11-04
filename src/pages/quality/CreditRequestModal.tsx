@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
-import { qualityApi, type SaveCreditRequestRequest } from "../../api/quality";
+import type { SaveCreditRequestRequest } from "../../api/quality";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import {
@@ -15,7 +15,7 @@ import {
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
-import { CURRENCIES, type CreditRequest } from "../../types/quality";
+import { CURRENCIES } from "../../types/quality";
 
 // Espejo de la validacion del servidor de POST /api/quality/credit-requests.
 const schema = z.object({
@@ -43,13 +43,12 @@ interface CreditRequestModalProps {
    * endpoint que deja el vínculo. Sin esto, alta manual.
    */
   defaults?: { clientId: number; invoiceRef: string | null; reason?: string };
-  submit?: (data: SaveCreditRequestRequest) => Promise<unknown>;
+  submit: (data: SaveCreditRequestRequest) => Promise<unknown>;
   onClose: () => void;
-  onSaved: (request: CreditRequest | null) => void;
+  onSaved: () => void;
 }
 
-/** RF-Q7: alta de solicitud con monto, motivo y referencia de factura. Nace de
- *  un ticket cuando exista la Bandeja; hasta entonces, alta manual. */
+/** Alta de solicitud de crédito desde una línea de discrepancia (regla 12). */
 export function CreditRequestModal({ defaults, submit, onClose, onSaved }: CreditRequestModalProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -89,12 +88,8 @@ export function CreditRequestModal({ defaults, submit, onClose, onSaved }: Credi
     };
 
     try {
-      if (submit) {
-        await submit(request);
-        onSaved(null);
-      } else {
-        onSaved(await qualityApi.creditRequests.create(request));
-      }
+      await submit(request);
+      onSaved();
       onClose();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "No se pudo crear la solicitud");

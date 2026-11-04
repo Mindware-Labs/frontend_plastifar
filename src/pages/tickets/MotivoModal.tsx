@@ -1,18 +1,19 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertOctagon, AlertTriangle, Check, Clock, Flag, Power } from "lucide-react";
-import React, { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import React, { useMemo, useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
 import { ticketTopicsApi } from "../../api/ticketTopics";
 import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
 import { SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { departmentPathOptions } from "../../lib/departments";
-import { applyServerError } from "../../lib/formErrors";
 import type { DepartmentResponse, SaveTicketTopicRequest, TicketTopicResponse } from "../../types/api";
-import { FormDivider } from "../../components/ui/FormDivider";
 
 const PRIORITIES: {
   value: "Emergencia" | "Alta" | "Normal" | "Baja";
@@ -32,13 +33,24 @@ const schema = z.object({
     .trim()
     .min(2, "Al menos 2 caracteres")
     .max(120, "Máximo 120 caracteres"),
-  departmentId: z.string().min(1, "Elige un departamento"),
+  departmentId: z.string().optional(),
   priority: z.enum(["Emergencia", "Alta", "Normal", "Baja"]),
   suggestedForm: z.string().nullable().optional(),
   isActive: z.boolean(),
 });
 
 type FormValues = z.infer<typeof schema>;
+
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
 
 interface MotivoModalProps {
   /** Sin motivo = alta. */
@@ -65,12 +77,27 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
     mode: "onTouched",
     defaultValues: {
       name: topic?.name ?? "",
-      departmentId: topic ? String(topic.defaultDepartmentId) : "",
+      departmentId:
+        topic?.defaultDepartmentId != null ? String(topic.defaultDepartmentId) : "",
       priority: (topic?.defaultPriority as FormValues["priority"]) ?? "Normal",
       suggestedForm: topic?.suggestedForm ?? "",
       isActive: topic?.isActive ?? true,
     },
   });
+
+  const motivoName = useWatch({ control, name: "name" }) ?? "";
+  const motivoMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "motivo-name",
+          label: "Falta el nombre del motivo",
+          short: "el nombre",
+          valid: motivoName.trim().length >= 2,
+        },
+      ]),
+    [motivoName],
+  );
 
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
@@ -82,7 +109,9 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
 
     const input: SaveTicketTopicRequest = {
       name: values.name.trim(),
-      defaultDepartmentId: Number(values.departmentId),
+      defaultDepartmentId: values.departmentId?.trim()
+        ? Number(values.departmentId)
+        : null,
       defaultPriority: values.priority,
       suggestedForm: values.suggestedForm || null,
       isActive: values.isActive,
@@ -97,17 +126,13 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
       onSaved();
       requestClose();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError("name", { message: err.message });
+        setFocus("name");
+        return;
+      }
       const fallback = isEdit ? "No se pudo guardar el motivo" : "No se pudo crear el motivo";
-      setFormError(
-        applyServerError(err, {
-          setError,
-          setFocus,
-          rules: [{ field: "name" }],
-          statuses: [409],
-          focusable: ["name"],
-          fallback,
-        }),
-      );
+      setFormError(err instanceof ApiError ? err.message : fallback);
     }
   }
 
@@ -120,7 +145,8 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
 
   return (
     <Modal
-      size="lg"
+      maxWidth="max-w-xl"
+      eyebrow={isEdit ? `Tickets · Motivo #${topic.id}` : "Tickets · Motivos"}
       title={isEdit ? `Editar ${topic.name}` : "Nuevo motivo"}
       description={
         isEdit
@@ -131,14 +157,33 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <FormModalFooter
-          shortcut
-          formId="motivo-form"
-          isEdit={isEdit}
-          createLabel="Crear motivo"
-          isSubmitting={isSubmitting}
-          onCancel={requestClose}
-        />
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <SubmitValidationButton
+              formId="motivo-form"
+              ready={motivoMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={motivoMissing}
+              onFocusField={focusFormField}
+              hintText="Para guardar el motivo, completa lo siguiente:"
+            >
+              {isEdit ? "Guardar cambios" : "Crear motivo"}
+            </SubmitValidationButton>
+          </div>
+        </div>
       }
     >
       <form
@@ -154,6 +199,7 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
         <FormDivider title="Identificación" />
 
         <TextField
+          id="motivo-name"
           size="sm"
           label="Nombre del motivo"
           placeholder="Ej. Reclamación de calidad, Devolución, Faltante de despacho…"
@@ -169,16 +215,19 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
           control={control}
           render={({ field }) => (
             <SelectField
+              id="motivo-department"
               size="sm"
               label="Departamento predeterminado"
-              required
               searchable
               name={field.name}
               value={field.value}
               onChange={field.onChange}
               onBlur={field.onBlur}
-              placeholder="Elige un departamento…"
-              options={departmentPathOptions(departments)}
+              placeholder="Sin departamento (opcional)…"
+              options={[
+                { value: "", label: "Sin departamento" },
+                ...departmentPathOptions(departments),
+              ]}
               state={stateOf("departmentId")}
               error={errors.departmentId?.message}
             />

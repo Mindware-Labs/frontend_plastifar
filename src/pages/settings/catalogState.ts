@@ -5,6 +5,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
+/** Contenedor de resultados sin velo blanco: la transición de página la ejecuta DataTable sobre las filas. */
+export function staleClass(_isStale: boolean): string {
+  void _isStale;
+  return "plf-results-in";
+}
+
 /**
  * Catalogo de apoyo de una seccion: departamentos, politicas, los años que
  * tienen feriados. No es el listado que se pagina --ese lo lleva usePagedList

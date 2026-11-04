@@ -2,50 +2,56 @@ import {
   Ban,
   Building,
   CheckCircle2,
+  Pencil,
   Plus,
+  Power,
   Trash2,
 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ApiError } from "../../api/client";
 import { sedesApi } from "../../api/sedes";
-import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { ListPagination } from "../../components/ui/ListPagination";
+import { Pagination } from "../../components/ui/Pagination";
+import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
-import { useCatalogActions } from "../../hooks/useCatalogActions";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
+import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import type { Sede, SedeQuery } from "../../types/sedes";
-import { LoadErrorAlert } from "../settings/catalogSection";
-import { CatalogRowActions } from "../settings/CatalogRowActions";
 import { SedeModal } from "./SedeModal";
-import { PAGE_SIZES } from "../../lib/pageSizes";
 
-const CHIPS = ["todos", "activos", "inactivos"] as const;
-type ChipKey = (typeof CHIPS)[number];
+type ChipKey = "todos" | "activos" | "inactivos";
 type PagedSedeQuery = SedeQuery & { page: number };
 
 export function SedesPage() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
 
-  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Sede>();
-  const [search, setSearch] = useUrlState<string>("q", "");
-  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
-  const [pageSize, setPageSize] = useUrlNumber("tam", 15, PAGE_SIZES);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [chip, setChip] = useState<ChipKey>("todos");
+  const [pageSize, setPageSize] = useState(15);
+
+  const [modal, setModal] = useState<"nuevo" | Sede | null>(null);
+  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, isStale, error, page, setPage, refresh } = usePagedList<
+  const { data, error, page, setPage, refresh } = usePagedList<
     PagedSedeQuery,
     Awaited<ReturnType<typeof sedesApi.list>>
   >({
@@ -57,21 +63,91 @@ export function SedesPage() {
       includeInactive: true,
     },
     fallbackError: "No se pudieron cargar las sedes",
-    pageKey: "pagina",
   });
+
+  useLoadErrorReceipt(error, "sedes-list", refresh);
+  useActionErrorReceipt(actionError, "sedes-action");
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
 
-  function clearFilters() {
-    setSearch("");
-    setChip("todos");
+  const pageIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } =
+    useTablePageSelection(pageIds);
+
+  async function runBulk(action: "activate" | "deactivate" | "delete") {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    setActionError(null);
+    try {
+      const result = await sedesApi.bulk({
+        ids: Array.from(selectedIds),
+        action,
+      });
+      if (result.updatedCount < result.totalRequested) {
+        const skipped = result.totalRequested - result.updatedCount;
+        setActionError(
+          action === "delete"
+            ? `Se eliminaron ${result.updatedCount} de ${result.totalRequested}. ${skipped} tienen departamentos asignados.`
+            : `Se actualizaron ${result.updatedCount} de ${result.totalRequested} sedes.`,
+        );
+      }
+      clearSelection();
+      refresh();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "No se pudo completar la acción en lote");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function askBulkActivate() {
+    setConfirmation({
+      tone: "warn",
+      icon: CheckCircle2,
+      title: `Reactivar ${selectedIds.size} sedes`,
+      description: "Volverán a ofrecerse al asignar sede a un departamento.",
+      confirmLabel: "Reactivar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("activate");
+      },
+    });
+  }
+
+  function askBulkDeactivate() {
+    setConfirmation({
+      tone: "warn",
+      icon: Ban,
+      title: `Desactivar ${selectedIds.size} sedes`,
+      description: "Dejarán de ofrecerse en selectores; los departamentos que ya las usan las conservan.",
+      confirmLabel: "Desactivar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("deactivate");
+      },
+    });
+  }
+
+  function askBulkDelete() {
+    setConfirmation({
+      tone: "danger",
+      icon: Trash2,
+      title: `Eliminar ${selectedIds.size} sedes`,
+      description:
+        "Solo se borran las que no tienen departamentos. Las demás se omitirán; desactívalas si no las necesitas.",
+      confirmLabel: "Eliminar",
+      onConfirm: () => {
+        setConfirmation(null);
+        void runBulk("delete");
+      },
+    });
   }
 
   function askToggle(sede: Sede) {
     const willDeactivate = sede.isActive;
-    confirm(sede.id, {
+    setConfirmation({
       tone: "warn",
       icon: willDeactivate ? Ban : CheckCircle2,
       title: willDeactivate ? "Desactivar sede" : "Reactivar sede",
@@ -98,19 +174,24 @@ export function SedesPage() {
       ),
       confirmLabel: willDeactivate ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
-        const current = await sedesApi.get(sede.id);
-        await sedesApi.update(current.id, {
-          name: current.name,
-          address: current.address,
-          isActive: !current.isActive,
-        });
-        refresh();
+        setBusyId(sede.id);
+        try {
+          const current = await sedesApi.get(sede.id);
+          await sedesApi.update(current.id, {
+            name: current.name,
+            address: current.address,
+            isActive: !current.isActive,
+          });
+          refresh();
+        } finally {
+          setBusyId(null);
+        }
       },
     });
   }
 
   function askDelete(sede: Sede) {
-    confirm(sede.id, {
+    setConfirmation({
       tone: "danger",
       icon: Trash2,
       title: "Eliminar sede",
@@ -122,8 +203,13 @@ export function SedesPage() {
       ),
       confirmLabel: "Eliminar",
       onConfirm: async () => {
-        await sedesApi.remove(sede.id);
-        refresh();
+        setBusyId(sede.id);
+        try {
+          await sedesApi.remove(sede.id);
+          refresh();
+        } finally {
+          setBusyId(null);
+        }
       },
     });
   }
@@ -133,38 +219,43 @@ export function SedesPage() {
       <ModuleHeader
         title="Sedes"
         summary={
-          <HeaderCounts counts={counts} loadingLabel="Cargando catálogo de sedes…">
-            {(counts) => (
-              <>
-                <HeaderTag
-                  label={counts.all === 1 ? "sede" : "sedes"}
-                  count={counts.all}
-                  active={chip === "todos"}
-                  onClick={() => setChip("todos")}
-                  tone="neutral"
-                  title="Mostrar todas las sedes"
-                />
-                <HeaderTag
-                  label={counts.active === 1 ? "activa" : "activas"}
-                  count={counts.active}
-                  active={chip === "activos"}
-                  onClick={() => setChip("activos")}
-                  tone="emerald"
-                  dot
-                  title="Filtrar por sedes activas"
-                />
-                <HeaderTag
-                  label={counts.inactive === 1 ? "inactiva" : "inactivas"}
-                  count={counts.inactive}
-                  active={chip === "inactivos"}
-                  onClick={() => setChip("inactivos")}
-                  tone="red"
-                  dot
-                  title="Filtrar por sedes inactivas"
-                />
-              </>
-            )}
-          </HeaderCounts>
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "sede" : "sedes"}
+                count={counts.all}
+                active={chip === "todos"}
+                onClick={() => setChip("todos")}
+                tone="neutral"
+                title="Mostrar todas las sedes"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activa" : "activas"}
+                count={counts.active}
+                active={chip === "activos"}
+                onClick={() => setChip("activos")}
+                tone="emerald"
+                dot
+                title="Filtrar por sedes activas"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactiva" : "inactivas"}
+                count={counts.inactive}
+                active={chip === "inactivos"}
+                onClick={() => setChip("inactivos")}
+                tone="red"
+                dot
+                title="Filtrar por sedes inactivas"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando catálogo de sedes…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -175,8 +266,6 @@ export function SedesPage() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         <ListPanel
@@ -201,39 +290,88 @@ export function SedesPage() {
                   ]}
                 />
                 {isFiltering && (
-                  <ClearFiltersButton onClick={clearFilters} />
+                  <ClearFiltersButton
+                    onClick={() => {
+                      setSearch("");
+                      setChip("todos");
+                    }}
+                  />
                 )}
               </div>
             </div>
           }
+          selection={
+            canWrite && selectedIds.size > 0
+              ? {
+                  count: selectedIds.size,
+                  pageState,
+                  busy: bulkBusy,
+                  onTogglePage: togglePage,
+                  onClear: clearSelection,
+                  actions: [
+                    {
+                      key: "activate",
+                      label: "Reactivar",
+                      icon: <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-emerald-600" />,
+                      onClick: askBulkActivate,
+                    },
+                    {
+                      key: "deactivate",
+                      label: "Desactivar",
+                      icon: <Ban aria-hidden className="h-3.5 w-3.5 text-amber-600" />,
+                      onClick: askBulkDeactivate,
+                    },
+                    {
+                      key: "delete",
+                      label: "Eliminar",
+                      icon: <Trash2 aria-hidden className="h-3.5 w-3.5 text-brand-red" />,
+                      onClick: askBulkDelete,
+                    },
+                  ],
+                }
+              : undefined
+          }
           footer={
-            <ListPagination
-              data={data}
-              page={page}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-              noun="sedes"
-            />
+            data && data.total > 0 && (
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={data.total}
+                totalPages={data.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                noun="sedes"
+              />
+            )
           }
         >
-          {data === null ? (
+          {data === undefined ? (
             !error && <TableSkeleton rows={6} columns={5} />
           ) : rows.length === 0 ? (
-            isFiltering ? (
-              <EmptyResult
-                message="Ninguna sede coincide con este filtro o búsqueda."
-                onClear={clearFilters}
-              />
-            ) : (
-              <p className="py-14 text-center text-[13.5px] text-faint">
-                Todavía no hay ninguna sede registrada.
-              </p>
-            )
+            <p className="py-14 text-center text-[13.5px] text-faint">
+              {isFiltering
+                ? "Ninguna sede coincide con este filtro o búsqueda."
+                : "Todavía no hay ninguna sede registrada."}
+            </p>
           ) : (
             <DataTable>
               <thead>
                 <HeadRow>
+                  {canWrite && (
+                    <Th className="w-10 text-center">
+                      <div className="flex items-center justify-center">
+                        <SelectBox
+                          checked={pageState}
+                          onToggle={togglePage}
+                          label={
+                            pageState === true
+                              ? "Quitar la selección de esta página"
+                              : "Seleccionar toda la página"
+                          }
+                        />
+                      </div>
+                    </Th>
+                  )}
                   <Th>Nombre de la sede</Th>
                   <Th>Dirección / Ubicación</Th>
                   <Th className="w-36 text-center">Departamentos</Th>
@@ -241,9 +379,22 @@ export function SedesPage() {
                   {canWrite && <Th className="w-24 text-right">Acciones</Th>}
                 </HeadRow>
               </thead>
-              <tbody className={isStale ? "opacity-60 transition-opacity" : ""}>
-                {rows.map((sede) => (
-                  <Row key={sede.id} busy={busyId === sede.id}>
+              <tbody>
+                {rows.map((sede) => {
+                  const checked = selectedIds.has(sede.id);
+                  return (
+                  <Row key={sede.id} busy={busyId === sede.id || bulkBusy} data-checked={checked}>
+                    {canWrite && (
+                      <Td className="w-10 text-center">
+                        <div className="flex items-center justify-center">
+                          <SelectBox
+                            checked={checked}
+                            onToggle={() => toggleSelect(sede.id)}
+                            label={`Seleccionar ${sede.name}`}
+                          />
+                        </div>
+                      </Td>
+                    )}
                     {/* 1. NOMBRE */}
                     <Td>
                       <div className="flex items-center gap-2.5">
@@ -279,18 +430,34 @@ export function SedesPage() {
                     {/* 5. ACCIONES */}
                     {canWrite && (
                       <Td>
-                        <CatalogRowActions
-                          name={sede.name}
-                          isActive={sede.isActive}
-                          busy={busyId === sede.id}
-                          onEdit={() => setModal(sede)}
-                          onToggle={() => askToggle(sede)}
-                          onDelete={sede.departmentCount === 0 ? () => askDelete(sede) : undefined}
-                        />
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Editar ${sede.name}`}
+                            icon={Pencil}
+                            onClick={() => setModal(sede)}
+                            disabled={busyId === sede.id}
+                          />
+                          <RowAction
+                            label={sede.isActive ? `Desactivar ${sede.name}` : `Reactivar ${sede.name}`}
+                            icon={Power}
+                            onClick={() => askToggle(sede)}
+                            disabled={busyId === sede.id}
+                          />
+                          {sede.departmentCount === 0 && (
+                            <RowAction
+                              label={`Eliminar ${sede.name}`}
+                              icon={Trash2}
+                              danger
+                              onClick={() => askDelete(sede)}
+                              disabled={busyId === sede.id}
+                            />
+                          )}
+                        </div>
                       </Td>
                     )}
                   </Row>
-                ))}
+                );
+                })}
               </tbody>
             </DataTable>
           )}
@@ -305,7 +472,7 @@ export function SedesPage() {
         />
       )}
 
-      {dialog}
+      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
     </div>
   );
 }

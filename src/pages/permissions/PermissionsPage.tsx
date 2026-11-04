@@ -5,7 +5,11 @@ import { permissionsApi } from "../../api/permissions";
 import { ApiError } from "../../api/client";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
+import { useReceipts } from "../../context/useReceipts";
+import {
+  useConfigNoticeReceipt,
+  useLoadErrorReceipt,
+} from "../../hooks/useNoticeReceipts";
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
@@ -59,9 +63,6 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   const [isSaving, setIsSaving] = useState(false);
   /** Relectura de la matriz sobre una pagina ya pintada: se atenua, no se vacia. */
   const [isRefetching, setIsRefetching] = useState(true);
-  // Contador, no marca de tiempo: el instante nunca se lee, solo hace falta
-  // saber que hubo un guardado y reiniciar el temporizador si hay otro encima.
-  const [saveAck, setSaveAck] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
@@ -71,6 +72,7 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   // muestra entera, pero las celdas no se tocan y no hay nada que guardar.
   const { can } = usePermissions();
   const canWrite = can("roles.write");
+  const receipts = useReceipts();
 
   /**
    * Carga inicial y reintento comparten camino. Si falla no queda nada pintado,
@@ -94,16 +96,17 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
       .finally(() => setIsRefetching(false));
   }, [onMatrixLoaded]);
 
+  useLoadErrorReceipt(error, "permissions-matrix", load);
+  useConfigNoticeReceipt(
+    matrix !== null && !canWrite,
+    "permissions-read-only",
+    "Modo consulta",
+    "Para cambiar los permisos de un rol necesitas el permiso roles.write.",
+  );
+
   useEffect(() => {
     load();
   }, [load]);
-
-  // El aviso de guardado se retira solo: no es un estado, es un acuse.
-  useEffect(() => {
-    if (saveAck === 0) return;
-    const timer = window.setTimeout(() => setSaveAck(0), 4000);
-    return () => window.clearTimeout(timer);
-  }, [saveAck]);
 
   const catalog = useMemo(() => (matrix ? flattenPermissions(matrix.groups) : []), [matrix]);
   const editableRoles = useMemo(
@@ -217,7 +220,7 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
       // ningun permiso cambiado que mostrar. Se vuelve a «Todos» para que el
       // acuse de guardado no llegue junto a una pagina en blanco.
       if (chip === "conCambios") setChip("todos");
-      setSaveAck((previous) => previous + 1);
+      receipts.done({ action: "permissions-save", title: "Cambios guardados" });
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -415,41 +418,10 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
           con scroll despega justamente eso. */}
       <section className="overflow-hidden rounded-card border border-line bg-white shadow-card">
       <div className="px-4 pt-3">
-
-      {error && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="min-w-[240px] flex-1">
-            <Alert variant="error">{error}</Alert>
-          </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={isRefetching}
-            onClick={() => {
-              setError(null);
-              setIsRefetching(true);
-              load();
-            }}
-          >
-            Reintentar
-          </Button>
-        </div>
-      )}
-
-      {saveAck > 0 && (
-        <div className="mb-3">
-          <Alert variant="success">Cambios guardados.</Alert>
-        </div>
-      )}
-
-      {matrix !== null && !canWrite && (
-        <div className="mb-3">
-          <Alert variant="info">
-            Estás viendo la política en modo consulta. Para cambiar los permisos de un rol necesitas
-            el permiso <span className="font-mono text-[11px]">roles.write</span>.
-          </Alert>
-        </div>
-      )}
+      <p className="mb-3 text-[12.5px] leading-relaxed text-subtle">
+        Las capacidades de tickets, tareas y formularios se configuran <span className="font-medium text-zinc-800">solo aquí</span>.
+        Los cambios se aplican a cada rol y al personal cuando renueva sesión; no hace falta desplegar código.
+      </p>
 
       {matrix === null ? (
         // Con un error de carga no queda nada que esperar: el aviso de arriba ya

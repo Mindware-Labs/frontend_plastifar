@@ -8,18 +8,11 @@ interface WithdrawalDecisionModalProps {
   decision: "aprobar" | "rechazar";
   onClose: () => void;
   onSaved: (detail: WithdrawalDetail) => void;
-  /**
-   * 409: la solicitud cambió en el servidor (otro la decidió, la retiró o la
-   * canceló). Quien abre el modal recarga la ficha y muestra el mensaje.
-   */
+  /** 409: la solicitud cambió en el servidor (otro la decidió, la retiró o la canceló). Quie... */
   onConflict?: (message: string) => void;
 }
 
-/**
- * RF-W3: aprobar o rechazar con nota. La nota es obligatoria al rechazar
- * (sección 13). Si quien solicitó puede aprobar lo suyo está abierto
- * (pregunta 9): aquí no se impide, y el servidor tampoco.
- */
+/** RF-W3: aprobar o rechazar con nota. La nota es obligatoria al rechazar (sección 13). Si... */
 export function WithdrawalDecisionModal({ withdrawal, decision, onClose, onSaved, onConflict }: WithdrawalDecisionModalProps) {
   const approving = decision === "aprobar";
 

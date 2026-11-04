@@ -9,7 +9,7 @@ import { Select, type SelectOption } from "../../components/ui/Select";
 import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
-import type { StaffOptionResponse } from "../../types/api";
+import type { EmailNoteResponse, StaffOptionResponse } from "../../types/api";
 
 interface AssignWithNoteModalProps {
   targetStaffName: string;
@@ -33,7 +33,7 @@ function AssignWithNoteModal({
   useEffect(() => {
     setTimeout(() => {
       textareaRef.current?.focus();
-      autoResizeTextarea(textareaRef.current, 64, 220);
+      autoResizeTextarea(textareaRef.current, 64);
     }, 80);
   }, []);
 
@@ -47,6 +47,7 @@ function AssignWithNoteModal({
 
   return (
     <Modal
+      eyebrow="Asignación de conversación"
       title={`Asignar a ${targetStaffName}`}
       onClose={onClose}
       isExiting={isExiting}
@@ -73,7 +74,7 @@ function AssignWithNoteModal({
             value={note}
             onChange={(e) => {
               setNote(e.target.value);
-              autoResizeTextarea(e.target, 64, 220);
+              autoResizeTextarea(e.target, 64);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -114,7 +115,7 @@ interface AssignmentProps {
   assignedStaffId: number | null;
   assignedStaffName: string | null;
   onChanged: (staffId: number | null, name: string | null) => void;
-  onNoteAdded?: () => void;
+  onNoteAdded?: (note: EmailNoteResponse) => void;
 }
 
 /** Quien atiende la conversacion: un selector con el equipo activo y un atajo para tomarla. */
@@ -160,8 +161,8 @@ export function AssignmentControl({
       const result = await emailsApi.assign(emailId, pendingAssignment.staffId);
       const trimmed = noteText.trim();
       if (trimmed) {
-        await emailsApi.addNote(emailId, trimmed);
-        onNoteAdded?.();
+        const newNote = await emailsApi.addNote(emailId, trimmed);
+        onNoteAdded?.(newNote);
       }
       onChanged(result.assignedStaffId, result.assignedStaffName);
       setPendingAssignment(null);

@@ -1,40 +1,36 @@
-import { CheckCircle2, Pencil, Plug, Plus, Power, XCircle } from "lucide-react";
+import { CheckCircle2, Inbox, Pencil, Plug, Plus, Power, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { settingsApi } from "../../api/settings";
-import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
-import { ListBody } from "../../components/ui/ListBody";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { ListPagination } from "../../components/ui/ListPagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
+import { Pagination } from "../../components/ui/Pagination";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
-import { useCatalogActions } from "../../hooks/useCatalogActions";
+import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
-import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import type { DepartmentResponse } from "../../types/api";
 import { providerLabel, type Mailbox } from "../../types/settings";
-import { LoadErrorAlert } from "./catalogSection";
-import { freshCopy, useReferenceData } from "./catalogState";
+import { freshCopy, staleClass, useReferenceData } from "./catalogState";
 import { MailboxModal } from "./MailboxModal";
 import { departmentPath } from "../../lib/departments";
-import { PAGE_SIZES } from "../../lib/pageSizes";
 
-const CHIPS = ["todos", "activos", "inactivos"] as const;
-type ChipKey = (typeof CHIPS)[number];
+type ChipKey = "todos" | "activos" | "inactivos";
 type TestResult = { ok: boolean; message: string };
 
-/** Una prueba de conexión caduca: un visto verde de hace tres minutos ya no
- *  describe el buzón, solo tranquiliza sin motivo. */
+/** El resultado de la prueba de conexión caduca a los 15 segundos. */
 const TEST_RESULT_TTL = 15_000;
 
 const syncFormat = new Intl.DateTimeFormat("es-DO", {
@@ -44,11 +40,7 @@ const syncFormat = new Intl.DateTimeFormat("es-DO", {
   minute: "2-digit",
 });
 
-/**
- * Anillo de espera para la accion de fila. No usa `Spinner` porque aquel lleva
- * su propio `role="status"` y anidarlo dentro de un boton que ya tiene etiqueta
- * hace que el lector de pantalla anuncie dos cosas por un solo control.
- */
+/** Anillo de espera sin role="status" propio para no duplicar anuncios en el botón. */
 function TestingRing({ className = "" }: { className?: string }) {
   return (
     <span
@@ -61,20 +53,21 @@ function TestingRing({ className = "" }: { className?: string }) {
 export function MailboxesSection() {
   const { can } = usePermissions();
   const canWrite = can("settings.write");
+  const receipts = useReceipts();
 
-  const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Mailbox>();
+  const [busyId, setBusyId] = useState<number | null>(null);
 
-  const [search, setSearch] = useUrlState<string>("q", "");
-  const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIPS);
-  const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
+  const [search, setSearch] = useState("");
+  const [chip, setChip] = useState<ChipKey>("todos");
+  const [pageSize, setPageSize] = useState(10);
 
+  const [modal, setModal] = useState<"nuevo" | Mailbox | null>(null);
+  const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
   const [testingId, setTestingId] = useState<number | null>(null);
   const [testResult, setTestResult] = useState<{ id: number; result: TestResult } | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  // Seccion 4.1: la pagina, el filtro, la busqueda y los contadores los resuelve
-  // SQL. La vista solo dibuja lo que llega.
   const { data, isStale, error, page, setPage, refresh } = usePagedList({
     fetch: settingsApi.mailboxes.list,
     criteria: {
@@ -83,51 +76,46 @@ export function MailboxesSection() {
       status: chip === "todos" ? undefined : chip,
     },
     fallbackError: "No se pudieron cargar los buzones",
-    pageKey: "pagina",
   });
 
-  // Los departamentos nombran una columna y llenan el desplegable del dialogo:
-  // es catalogo de apoyo, no el listado que se pagina.
   const departmentsRef = useReferenceData<DepartmentResponse[]>(departmentsApi.list, []);
   const departments = departmentsRef.data;
 
+  useLoadErrorReceipt(error, "settings-mailboxes-list", refresh);
+  useLoadErrorReceipt(
+    departmentsRef.failed ? "No se pudieron cargar los departamentos: la columna queda sin nombre." : null,
+    "settings-mailboxes-departments",
+    departmentsRef.reload,
+  );
+
   const rows = data?.items ?? [];
   const counts = data?.counts;
-  // Sin criterio activo, una pagina vacia significa catalogo vacio; con
-  // criterio, que nada coincide. Los contadores no distinguen ese caso: se
-  // calculan sobre el filtro base, no sobre la tabla entera.
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
 
-  /* El camino completo, no el nombre suelto: hay tres departamentos llamados
-     «Calidad» —el propio, el de Centroamérica y el de otra planta— y en una
-     tabla, «Calidad» a secas no dice a cuál pertenece la fila. */
+  // Muestra la ruta jerárquica para distinguir departamentos homónimos entre sedes.
   function departmentName(id: number) {
     return departmentPath(departments, id) ?? "—";
   }
 
-  // El resultado pertenece a una fila concreta y a un instante concreto: si
-  // cambia lo que se esta mirando, deja de describir nada. Se limpia desde el
-  // gesto que lo invalida, no desde un efecto que persiga a los criterios.
+  // Limpia el resultado de prueba al cambiar filtros o paginación.
   function changeCriteria(apply: () => void) {
     setTestResult(null);
     apply();
   }
 
-  function clearFilters() {
-    changeCriteria(() => {
-      setSearch("");
-      setChip("todos");
-    });
-  }
-
   useEffect(() => {
     if (!testResult) return;
+    if (testResult.result.ok) {
+      receipts.done({ action: "mailbox-test", title: testResult.result.message });
+    } else {
+      receipts.failed({ action: "mailbox-test", title: testResult.result.message });
+    }
     const timer = window.setTimeout(() => setTestResult(null), TEST_RESULT_TTL);
     return () => window.clearTimeout(timer);
-  }, [testResult]);
+  }, [testResult, receipts]);
 
   function askToggle(mailbox: Mailbox) {
-    confirm(mailbox.id, {
+    setConfirmation({
       tone: "warn",
       icon: Power,
       title: mailbox.isActive ? "Desactivar buzón" : "Reactivar buzón",
@@ -144,22 +132,26 @@ export function MailboxesSection() {
       ),
       confirmLabel: mailbox.isActive ? "Desactivar" : "Reactivar",
       onConfirm: async () => {
+        setBusyId(mailbox.id);
         setTestResult(null);
-        const current = await freshCopy(settingsApi.mailboxes.get, mailbox);
-        // La referencia al secreto solo baja a quien puede escribir. Sin ella
-        // el PUT la borraria: mejor detenerse y decirlo.
-        if (current.secretRef === null) {
-          throw new Error("No se pudo leer la referencia al secreto de este buzón.");
+        try {
+          const current = await freshCopy(settingsApi.mailboxes.get, mailbox);
+          // Sin secretRef el PUT borraría la referencia: se detiene si no está disponible.
+          if (current.secretRef === null) {
+            throw new Error("No se pudo leer la referencia al secreto de este buzón.");
+          }
+          await settingsApi.mailboxes.update(current.id, {
+            address: current.address,
+            displayName: current.displayName,
+            provider: current.provider,
+            departmentId: current.departmentId,
+            secretRef: current.secretRef,
+            isActive: !current.isActive,
+          });
+          refresh();
+        } finally {
+          setBusyId(null);
         }
-        await settingsApi.mailboxes.update(current.id, {
-          address: current.address,
-          displayName: current.displayName,
-          provider: current.provider,
-          departmentId: current.departmentId,
-          secretRef: current.secretRef,
-          isActive: !current.isActive,
-        });
-        refresh();
       },
     });
   }
@@ -185,38 +177,43 @@ export function MailboxesSection() {
       <ModuleHeader
         title="Buzones"
         summary={
-          <HeaderCounts counts={counts} loadingLabel="Cargando los buzones configurados…">
-            {(counts) => (
-              <>
-                <HeaderTag
-                  label={counts.all === 1 ? "buzón" : "buzones"}
-                  count={counts.all}
-                  active={chip === "todos"}
-                  onClick={() => changeCriteria(() => { setChip("todos"); setPage(1); })}
-                  tone="neutral"
-                  title="Mostrar todos los buzones"
-                />
-                <HeaderTag
-                  label={counts.active === 1 ? "activo" : "activos"}
-                  count={counts.active}
-                  active={chip === "activos"}
-                  onClick={() => changeCriteria(() => { setChip("activos"); setPage(1); })}
-                  tone="emerald"
-                  dot
-                  title="Filtrar por buzones activos"
-                />
-                <HeaderTag
-                  label={counts.inactive === 1 ? "inactivo" : "inactivos"}
-                  count={counts.inactive}
-                  active={chip === "inactivos"}
-                  onClick={() => changeCriteria(() => { setChip("inactivos"); setPage(1); })}
-                  tone="red"
-                  dot
-                  title="Filtrar por buzones inactivos"
-                />
-              </>
-            )}
-          </HeaderCounts>
+          counts ? (
+            <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+              <HeaderTag
+                label={counts.all === 1 ? "buzón" : "buzones"}
+                count={counts.all}
+                active={chip === "todos"}
+                onClick={() => changeCriteria(() => { setChip("todos"); setPage(1); })}
+                tone="neutral"
+                title="Mostrar todos los buzones"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.active === 1 ? "activo" : "activos"}
+                count={counts.active}
+                active={chip === "activos"}
+                onClick={() => changeCriteria(() => { setChip("activos"); setPage(1); })}
+                tone="emerald"
+                dot
+                title="Filtrar por buzones activos"
+              />
+              <span aria-hidden className="text-zinc-300">·</span>
+              <HeaderTag
+                label={counts.inactive === 1 ? "inactivo" : "inactivos"}
+                count={counts.inactive}
+                active={chip === "inactivos"}
+                onClick={() => changeCriteria(() => { setChip("inactivos"); setPage(1); })}
+                tone="red"
+                dot
+                title="Filtrar por buzones inactivos"
+              />
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
+              Cargando los buzones configurados…
+            </span>
+          )
         }
         action={
           canWrite && (
@@ -231,23 +228,6 @@ export function MailboxesSection() {
           )
         }
       />
-
-      {error && <LoadErrorAlert message={error} onRetry={refresh} />}
-
-      {departmentsRef.failed && (
-        <LoadErrorAlert
-          message="No se pudieron cargar los departamentos: la columna queda sin nombre."
-          onRetry={departmentsRef.reload}
-        />
-      )}
-
-      {testResult && (
-        <div className="mb-3">
-          <Alert variant={testResult.result.ok ? "success" : "error"}>
-            {testResult.result.message}
-          </Alert>
-        </div>
-      )}
 
       <ListPanel
         toolbar={
@@ -267,112 +247,125 @@ export function MailboxesSection() {
           </>
         }
         footer={
-          <ListPagination
-            data={data}
-            page={page}
-            pageSize={pageSize}
-            onPageChange={(next) => changeCriteria(() => setPage(next))}
-            onPageSizeChange={(size) => changeCriteria(() => setPageSize(size))}
-            noun="buzones"
-          />
+          data !== null &&
+          data.total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={data.total}
+              totalPages={data.totalPages}
+              onPageChange={(next) => changeCriteria(() => setPage(next))}
+              onPageSizeChange={(size) => changeCriteria(() => setPageSize(size))}
+              noun="buzones"
+            />
+          )
         }
       >
-        <ListBody
-          data={data}
-          error={error}
-          isStale={isStale}
-          skeletonRows={pageSize}
-          skeletonColumns={6}
-          empty={
-            isFiltering
-              ? "Ningún buzón coincide con este filtro o búsqueda."
-              : "Todavía no hay ningún buzón configurado."
-          }
-          onClear={isFiltering ? clearFilters : undefined}
-        >
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Buzón</Th>
-                <Th>Proveedor</Th>
-                <Th>Departamento</Th>
-                <Th>Última sincronización</Th>
-                <Th>Estado</Th>
-                {canWrite && <Th className="w-24 text-right">Acciones</Th>}
-              </HeadRow>
-            </thead>
+        {data === null ? (
+          error === null && <TableSkeleton rows={pageSize} columns={6} />
+        ) : rows.length === 0 ? (
+          <ListEmptyState
+            icon={Inbox}
+            isFiltered={isFiltering}
+            filteredTitle="Ningún buzón coincide con este filtro o búsqueda."
+            onClearFilters={() => changeCriteria(() => {
+              setSearch("");
+              setChip("todos");
+              setPage(1);
+            })}
+            emptyTitle="Todavía no hay ningún buzón configurado."
+            emptyDescription={
+              canWrite
+                ? "Conecta un buzón con «Nuevo buzón» (IMAP, Gmail u Office 365) para que la bandeja reciba correo."
+                : "Cuando un administrador configure buzones, el correo entrante aparecerá en la bandeja."
+            }
+          />
+        ) : (
+          <div className={staleClass(isStale)}>
+            <DataTable>
+              <thead>
+                <HeadRow>
+                  <Th>Buzón</Th>
+                  <Th>Proveedor</Th>
+                  <Th>Departamento</Th>
+                  <Th>Última sincronización</Th>
+                  <Th>Estado</Th>
+                  {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                </HeadRow>
+              </thead>
 
-            <tbody>
-              {rows.map((mailbox) => (
-                <Row key={mailbox.id} busy={busyId === mailbox.id}>
-                  <Td>
-                    <span className="flex flex-col gap-0.5">
-                      <span className="text-[12.5px] font-medium leading-tight text-ink">
-                        {mailbox.displayName}
-                      </span>
-                      <span className="text-[11px] leading-tight text-faint">{mailbox.address}</span>
-                    </span>
-                  </Td>
-                  <Td>
-                    <Badge>{providerLabel(mailbox.provider)}</Badge>
-                  </Td>
-                  <Td className="text-[12.5px] text-brand-gray">
-                    {departmentName(mailbox.departmentId)}
-                  </Td>
-                  <Td className="text-[12.5px] tabular-nums text-brand-gray">
-                    {mailbox.lastSyncedAt ? (
-                      syncFormat.format(new Date(mailbox.lastSyncedAt))
-                    ) : (
-                      <span className="text-faint">Nunca</span>
-                    )}
-                  </Td>
-                  <Td>
-                    <StatusDot active={mailbox.isActive} />
-                  </Td>
-                  {canWrite && (
+              <tbody>
+                {rows.map((mailbox) => (
+                  <Row key={mailbox.id} busy={busyId === mailbox.id}>
                     <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        <RowAction
-                          label={`Probar conexión de ${mailbox.displayName}`}
-                          icon={
-                            testingId === mailbox.id
-                              ? TestingRing
-                              : testResult?.id === mailbox.id
-                                ? testResult.result.ok
-                                  ? CheckCircle2
-                                  : XCircle
-                                : Plug
-                          }
-                          onClick={() => handleTest(mailbox)}
-                          disabled={testingId === mailbox.id || busyId === mailbox.id}
-                        />
-                        <RowAction
-                          label={`Editar ${mailbox.displayName}`}
-                          icon={Pencil}
-                          onClick={() => {
-                            setTestResult(null);
-                            setModal(mailbox);
-                          }}
-                          disabled={busyId === mailbox.id}
-                        />
-                        <RowAction
-                          label={
-                            mailbox.isActive
-                              ? `Desactivar ${mailbox.displayName}`
-                              : `Reactivar ${mailbox.displayName}`
-                          }
-                          icon={Power}
-                          onClick={() => askToggle(mailbox)}
-                          disabled={busyId === mailbox.id}
-                        />
-                      </div>
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-[12.5px] font-medium leading-tight text-ink">
+                          {mailbox.displayName}
+                        </span>
+                        <span className="text-[11px] leading-tight text-faint">{mailbox.address}</span>
+                      </span>
                     </Td>
-                  )}
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-        </ListBody>
+                    <Td>
+                      <Badge>{providerLabel(mailbox.provider)}</Badge>
+                    </Td>
+                    <Td className="text-[12.5px] text-brand-gray">
+                      {departmentName(mailbox.departmentId)}
+                    </Td>
+                    <Td className="text-[12.5px] tabular-nums text-brand-gray">
+                      {mailbox.lastSyncedAt ? (
+                        syncFormat.format(new Date(mailbox.lastSyncedAt))
+                      ) : (
+                        <span className="text-faint">Nunca</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <StatusDot active={mailbox.isActive} />
+                    </Td>
+                    {canWrite && (
+                      <Td>
+                        <div className="flex items-center justify-end gap-1">
+                          <RowAction
+                            label={`Probar conexión de ${mailbox.displayName}`}
+                            icon={
+                              testingId === mailbox.id
+                                ? TestingRing
+                                : testResult?.id === mailbox.id
+                                  ? testResult.result.ok
+                                    ? CheckCircle2
+                                    : XCircle
+                                  : Plug
+                            }
+                            onClick={() => handleTest(mailbox)}
+                            disabled={testingId === mailbox.id || busyId === mailbox.id}
+                          />
+                          <RowAction
+                            label={`Editar ${mailbox.displayName}`}
+                            icon={Pencil}
+                            onClick={() => {
+                              setTestResult(null);
+                              setModal(mailbox);
+                            }}
+                            disabled={busyId === mailbox.id}
+                          />
+                          <RowAction
+                            label={
+                              mailbox.isActive
+                                ? `Desactivar ${mailbox.displayName}`
+                                : `Reactivar ${mailbox.displayName}`
+                            }
+                            icon={Power}
+                            onClick={() => askToggle(mailbox)}
+                            disabled={busyId === mailbox.id}
+                          />
+                        </div>
+                      </Td>
+                    )}
+                  </Row>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
       </ListPanel>
 
       {modal !== null && (
@@ -384,7 +377,7 @@ export function MailboxesSection() {
         />
       )}
 
-      {dialog}
+      {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
     </>
   );
 }

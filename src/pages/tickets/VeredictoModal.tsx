@@ -1,17 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Gavel, Power } from "lucide-react";
-import React, { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import React, { useMemo, useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { z } from "zod";
+import { ApiError } from "../../api/client";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
 import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
 import { TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
-import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
-import { applyServerError } from "../../lib/formErrors";
 import type { SaveTicketVerdictRequest, TicketVerdictResponse } from "../../types/api";
-import { FormDivider } from "../../components/ui/FormDivider";
 
 const schema = z.object({
   name: z
@@ -23,6 +24,17 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
 
 interface VeredictoModalProps {
   /** Sin veredicto = alta. */
@@ -52,6 +64,20 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
     },
   });
 
+  const veredictoName = useWatch({ control, name: "name" }) ?? "";
+  const veredictoMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "veredicto-name",
+          label: "Falta el nombre del veredicto",
+          short: "el nombre",
+          valid: veredictoName.trim().length >= 2,
+        },
+      ]),
+    [veredictoName],
+  );
+
   function stateOf(field: keyof FormValues): FieldState {
     if (errors[field]) return "error";
     return touchedFields[field] ? "valid" : "idle";
@@ -74,17 +100,13 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
       onSaved();
       requestClose();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setError("name", { message: err.message });
+        setFocus("name");
+        return;
+      }
       const fallback = isEdit ? "No se pudo guardar el veredicto" : "No se pudo crear el veredicto";
-      setFormError(
-        applyServerError(err, {
-          setError,
-          setFocus,
-          rules: [{ field: "name" }],
-          statuses: [409],
-          focusable: ["name"],
-          fallback,
-        }),
-      );
+      setFormError(err instanceof ApiError ? err.message : fallback);
     }
   }
 
@@ -97,7 +119,8 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
 
   return (
     <Modal
-      size="lg"
+      maxWidth="max-w-xl"
+      eyebrow={isEdit ? `Tickets · Veredicto #${verdict.id}` : "Tickets · Veredictos"}
       title={isEdit ? `Editar ${verdict.name}` : "Nuevo veredicto"}
       description={
         isEdit
@@ -108,14 +131,33 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <FormModalFooter
-          shortcut
-          formId="veredicto-form"
-          isEdit={isEdit}
-          createLabel="Crear veredicto"
-          isSubmitting={isSubmitting}
-          onCancel={requestClose}
-        />
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <SubmitValidationButton
+              formId="veredicto-form"
+              ready={veredictoMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={veredictoMissing}
+              onFocusField={focusFormField}
+              hintText="Para guardar el veredicto, completa lo siguiente:"
+            >
+              {isEdit ? "Guardar cambios" : "Crear veredicto"}
+            </SubmitValidationButton>
+          </div>
+        </div>
       }
     >
       <form
@@ -131,6 +173,7 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
         <FormDivider title="Identificación" />
 
         <TextField
+          id="veredicto-name"
           size="sm"
           label="Nombre del veredicto"
           placeholder="Ej. Procedente, Reemplazo de producto, No procede…"

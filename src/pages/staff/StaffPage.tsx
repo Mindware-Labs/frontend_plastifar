@@ -5,7 +5,6 @@ import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -23,6 +22,7 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
 import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
@@ -92,7 +92,7 @@ export function StaffPage() {
       .catch(() => setDepartments([]));
   }, []);
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
+  const { data, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
     fetch: staffApi.list,
     criteria: {
       pageSize,
@@ -105,6 +105,9 @@ export function StaffPage() {
     fallbackError: "No se pudo cargar el personal",
     pageKey: "pagina",
   });
+
+  useLoadErrorReceipt(error, "staff-list", refresh);
+  useActionErrorReceipt(bulkError, "staff-bulk");
 
   const rows = data?.items ?? [];
   const counts = data?.counts;
@@ -417,17 +420,6 @@ export function StaffPage() {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-        {error && (
-          <div className="mb-3">
-            <Alert variant="error">{error}</Alert>
-          </div>
-        )}
-
-        {bulkError && (
-          <div className="mb-3">
-            <Alert variant="error">{bulkError}</Alert>
-          </div>
-        )}
 
         <ListPanel
           selection={
@@ -510,7 +502,7 @@ export function StaffPage() {
               onClear={unfiltered ? undefined : clearFilters}
             />
           ) : (
-            <div className={`plf-results-in transition-opacity ${isStale ? "opacity-60" : ""}`}>
+            <div className="plf-results-in">
               <DataTable>
               <thead>
                 <HeadRow>
@@ -599,7 +591,14 @@ export function StaffPage() {
                     </Td>
                     <Td className="text-[12.5px] text-brand-gray">{member.email}</Td>
                     <Td>
-                      {member.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
+                      <div className="flex flex-wrap items-center gap-1">
+                        {member.primaryRoleName ? (
+                          <Badge>{member.primaryRoleName}</Badge>
+                        ) : (
+                          <Badge tone="slate">Sin rol</Badge>
+                        )}
+                        {member.isAdmin ? <Badge tone="red">Administrador</Badge> : null}
+                      </div>
                     </Td>
                     <Td>
                       <StatusDot active={member.isActive} />

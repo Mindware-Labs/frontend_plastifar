@@ -1,74 +1,42 @@
+import { X } from "lucide-react";
 import { useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
-import { DIALOG_FOOTER, DIALOG_SCRIM, DialogHeader } from "./dialogParts";
-
-export interface ModalHelpers {
-  requestClose: () => void;
-  close: () => void;
-}
-
-export type ModalSize = "sm" | "md" | "lg" | "xl" | "2xl" | "full";
-
-const sizeClasses: Record<ModalSize, string> = {
-  sm: "max-w-md",
-  md: "max-w-lg",
-  lg: "max-w-xl",
-  xl: "max-w-2xl",
-  "2xl": "max-w-3xl",
-  /** Tablas editables a lo ancho: casi toda la ventana, con tope en pantallas enormes. */
-  full: "max-w-[96vw] 2xl:max-w-[1720px]",
-};
+import { dialogHeaderShellMutedClass, dialogHeaderStackClass } from "./dialogHeaderStyles";
 
 export interface ModalProps {
   title: string;
+  /** Línea corta sobre el título: sitúa la acción dentro del módulo. */
+  eyebrow?: string;
   description?: ReactNode;
   onClose: () => void;
   /** Acciones del pie, separadas del cuerpo por un filete. */
-  footer?: ReactNode | ((helpers: ModalHelpers) => ReactNode);
+  footer?: ReactNode | ((helpers: { requestClose: () => void; close: () => void }) => ReactNode);
   children: ReactNode;
   /** Si el padre ya controla la animación de salida (ej: useModalAnimation) */
   isExiting?: boolean;
   onRequestClose?: () => void;
-  /** Ancho del panel: sm 448, md 512 (por defecto), lg 576, xl 672, 2xl 768 px, full casi toda la ventana. */
-  size?: ModalSize;
+  maxWidth?: string;
   /** Asentamiento del modal cuando el envío no prospera: baja 3px y vuelve. */
   settle?: boolean;
   /** Si es false, hacer clic en el telón de fondo no cierra el diálogo. Por defecto true. */
   closeOnBackdropClick?: boolean;
-  /**
-   * Cabecera propia en lugar de la estandar (visores, editores a pantalla completa). El dialogo
-   * pasa a nombrarse con `aria-label={title}`; description se ignora.
-   */
-  header?: ReactNode | ((helpers: ModalHelpers) => ReactNode);
-  /** Sustituye fondo y relleno del telon (por defecto velo con desenfoque y margen). */
-  scrimClassName?: string;
-  /** Sustituye ancho, alto, borde, radio y sombra del panel; `size` deja de aplicarse. */
-  panelClassName?: string;
-  /** Sustituye las clases del cuerpo (por defecto scroll con relleno). */
-  bodyClassName?: string;
-  /** Sustituye las clases del pie (por defecto acciones alineadas a la derecha). */
-  footerClassName?: string;
 }
 
 /** Diálogo modal accesible con animación fluida y soporte para reducción de movimiento. */
 export function Modal({
   title,
+  eyebrow,
   description,
   onClose,
   footer,
   children,
   isExiting: externalIsExiting,
   onRequestClose: externalRequestClose,
-  size = "md",
+  maxWidth = "max-w-lg",
   settle = false,
   closeOnBackdropClick = true,
-  header,
-  scrimClassName,
-  panelClassName,
-  bodyClassName,
-  footerClassName,
 }: ModalProps) {
   const motion = useDialogMotion(onClose, { exiting: externalIsExiting });
   const { isExiting, scrimRef, panelRef } = motion;
@@ -78,15 +46,12 @@ export function Modal({
   const descriptionId = useId();
 
   useDialogBehavior(panelRef, requestClose);
-  const helpers: ModalHelpers = { requestClose, close: requestClose };
 
   return createPortal(
     <div
       ref={scrimRef}
       inert={isExiting ? true : undefined}
-      className={`fixed inset-0 z-50 flex items-center justify-center ${
-        scrimClassName ?? `${DIALOG_SCRIM} px-4 py-8`
-      } ${
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8 backdrop-blur-[2px] ${
         isExiting ? "pointer-events-none" : ""
       }`}
       onMouseDown={(event) => {
@@ -97,35 +62,61 @@ export function Modal({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={header ? title : undefined}
-        aria-labelledby={header ? undefined : titleId}
-        aria-describedby={!header && description ? descriptionId : undefined}
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         className={`${
           isExiting ? "pointer-events-none" : ""
         } ${
           settle ? "animate-plf-settle" : ""
-        } flex flex-col ${
-          panelClassName ??
-          `max-h-full w-full ${sizeClasses[size]} overflow-hidden rounded-xl border border-line bg-white shadow-dialog transition-[max-width] duration-350 ease-[cubic-bezier(0.22,1,0.36,1)]`
-        }`}
+        } flex max-h-full w-full ${maxWidth} flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-[0_12px_36px_rgba(27,27,29,0.14)] transition-[max-width] duration-350 ease-[cubic-bezier(0.22,1,0.36,1)]`}
       >
-        {header ? (
-          typeof header === "function" ? header(helpers) : header
-        ) : (
-          <DialogHeader
-            title={title}
-            titleId={titleId}
-            description={description}
-            descriptionId={descriptionId}
-            onClose={requestClose}
-          />
-        )}
+        {/* Cabecera compacta con borde nítido y buena jerarquía */}
+        <div className={dialogHeaderShellMutedClass}>
+          <div className={dialogHeaderStackClass}>
+            {eyebrow && (
+              <p
+                key={eyebrow}
+                className="animate-plf-header-fade font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400"
+              >
+                {eyebrow}
+              </p>
+            )}
+            <h2
+              key={title}
+              id={titleId}
+              className="animate-plf-header-fade font-heading text-[16px] font-bold leading-snug tracking-tight text-ink"
+            >
+              {title}
+            </h2>
+            {description && (
+              <div
+                key={typeof description === "string" ? description : undefined}
+                id={descriptionId}
+                className="animate-plf-header-fade text-[12px] leading-relaxed text-subtle"
+              >
+                {description}
+              </div>
+            )}
+          </div>
 
-        <div className={bodyClassName ?? "overflow-y-auto px-6 py-5"}>{children}</div>
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Cerrar"
+            title="Cerrar (Esc)"
+            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-subtle outline-none transition-colors hover:bg-zinc-200/60 hover:text-ink active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
+        {/* Cuerpo del modal */}
+        <div className="overflow-y-auto px-6 py-5 overscroll-contain">{children}</div>
+
+        {/* Pie de acción */}
         {footer && (
-          <div className={footerClassName ?? DIALOG_FOOTER}>
-            {typeof footer === "function" ? footer(helpers) : footer}
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-line bg-zinc-50/50 px-6 py-3.5">
+            {typeof footer === "function" ? footer({ requestClose, close: requestClose }) : footer}
           </div>
         )}
       </div>

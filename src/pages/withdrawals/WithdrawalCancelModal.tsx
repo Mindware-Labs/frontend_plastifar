@@ -6,14 +6,11 @@ interface WithdrawalCancelModalProps {
   withdrawal: MerchandiseWithdrawal;
   onClose: () => void;
   onSaved: (detail: WithdrawalDetail) => void;
-  /**
-   * 409: la solicitud cambió en el servidor (otro la decidió, la retiró o la
-   * canceló). Quien abre el modal recarga la ficha y muestra el mensaje.
-   */
+  /** 409: la solicitud cambió en el servidor (otro la decidió, la retiró o la canceló). Quie... */
   onConflict?: (message: string) => void;
 }
 
-/** Cancelar con motivo (8.1). No hay borrado: la solicitud queda visible como cancelada (regla 9). */
+/** Cancelar con motivo (8.1). No hay borrado: la solicitud queda visible como cancelada (r... */
 export function WithdrawalCancelModal({ withdrawal, onClose, onSaved, onConflict }: WithdrawalCancelModalProps) {
   return (
     <ReasonModal

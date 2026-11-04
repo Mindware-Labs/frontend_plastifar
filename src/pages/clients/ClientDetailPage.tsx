@@ -121,7 +121,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   // Pestaña de Contactos
   const {
     data: contactPage,
-    isStale: contactsStale,
+    // transición de página manejada en DataTable
     error: contactsError,
     setPage: setContactPage,
     refresh: refreshContacts,
@@ -138,7 +138,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   // Pestaña de Historial de Tickets
   const {
     data: ticketPage,
-    isStale: ticketsStale,
+    // transición de página manejada en DataTable
     error: ticketsError,
     setPage: setTicketPage,
     refresh: refreshTickets,
@@ -204,7 +204,9 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   }, [id]);
 
   function territoryName(territoryId: number) {
-    return territories.find((territory) => territory.id === territoryId)?.name ?? "—";
+    const territory = territories.find((t) => t.id === territoryId);
+    if (!territory || territory.code === "UNASSIGNED") return "—";
+    return territory.name;
   }
 
   useEffect(() => {
@@ -496,6 +498,13 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   <DetailCard icon={Phone} title="Canales de Contacto y Ubicación">
 
                     <div className="px-4 py-1 divide-y divide-zinc-100">
+                      <div className="flex items-center justify-between py-2 text-[12.5px]">
+                        <span className="text-zinc-500 font-medium">Persona de contacto</span>
+                        <span className="text-zinc-900 font-medium truncate max-w-[55%] text-right">
+                          {client.contactPersonName ?? <span className="text-zinc-400 font-normal">—</span>}
+                        </span>
+                      </div>
+
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
                         <div className="flex items-center gap-2 text-zinc-500 font-medium">
                           <Phone className="h-3.5 w-3.5 text-zinc-400" />
@@ -857,7 +866,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     </p>
                   )
                 ) : (
-                  <div className={`transition-opacity ${contactsStale ? "opacity-60" : ""}`}>
+                  <div className="plf-results-in">
                     <DataTable>
                       <thead>
                         <HeadRow>
@@ -1035,7 +1044,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     </p>
                   </div>
                 ) : (
-                  <div className={`transition-opacity ${ticketsStale ? "opacity-60" : ""}`}>
+                  <div className="plf-results-in">
                     <DataTable>
                       <thead>
                         <HeadRow>

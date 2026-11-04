@@ -1,13 +1,18 @@
-import { ArrowLeft, ArrowRight, Calendar, Plus, UserCheck } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Calendar, FileText, Plus, UserCheck } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { Button } from "../../components/ui/Button";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { DatePicker } from "../../components/ui/DatePicker";
-import { TextField } from "../../components/ui/Field";
+import { TextAreaField, TextField } from "../../components/ui/Field";
 import { Select } from "../../components/ui/Select";
 import { Modal } from "../../components/ui/Modal";
 import { prefersReducedMotion } from "../../hooks/motion";
 import { useSettle } from "../../hooks/useSettle";
-import type { CreateTicketTaskRequest, TicketStaffOptionResponse } from "../../types/api";
+import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
+import { formatBytes } from "../../lib/format";
+import type { TicketStaffOptionResponse } from "../../types/api";
+import { isPastDueDate } from "../tasks/taskSchema";
 
 // Misma curva larga que el resto de paneles: arranca rápido y se asienta con suavidad.
 const STEP_EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
@@ -20,7 +25,7 @@ const STEPS = ["Detalle", "Responsable y fecha"] as const;
 interface CreateTaskModalProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (task: CreateTicketTaskRequest) => Promise<void>;
+  onCreate: (formData: FormData) => Promise<void>;
   assignableStaff: TicketStaffOptionResponse[];
   currentStaffId: number;
 }
@@ -36,29 +41,58 @@ export function CreateTaskModal({
   const [description, setDescription] = useState("");
   const [assignedStaffId, setAssignedStaffId] = useState<string>("");
   const [dueDate, setDueDate] = useState("");
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settle, triggerSettle] = useSettle();
   const [step, setStep] = useState<0 | 1>(0);
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+
+  const dueDateIsPast = dueDate !== "" && isPastDueDate(dueDate);
+
+  const createTaskMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "task-title",
+          label: "Falta el título de la tarea",
+          short: "el título",
+          valid: title.trim().length > 0,
+        },
+        {
+          id: "task-due-date",
+          label: "La fecha límite no puede ser una fecha que ya pasó",
+          short: "una fecha límite válida",
+          valid: !dueDateIsPast,
+        },
+      ]),
+    [title, dueDateIsPast],
+  );
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const transitionRef = useRef<{ fromHeight: number; dir: 1 | -1 } | null>(null);
   const changingRef = useRef(false);
 
-  // Al cerrar, el próximo uso vuelve a empezar por el primer paso (ajuste durante el render).
-  if (!open && step !== 0) setStep(0);
-
-  // Las animaciones pendientes del paso se descartan al cerrar.
+  // Al cerrar (crear, cancelar o clic fuera) el formulario queda en blanco para la próxima tarea.
   useEffect(() => {
     if (!open) {
+      setTitle("");
+      setDescription("");
+      setAssignedStaffId("");
+      setDueDate("");
+      setEvidenceFiles([]);
+      setError(null);
+      setStep(0);
       transitionRef.current = null;
       changingRef.current = false;
     }
   }, [open]);
 
-  // Entrada del paso nuevo: el contenido se desliza desde el lado de avance y la caja
-  // cambia de altura de forma continua, para que el modal no dé un salto.
+  // Desliza el paso nuevo y anima la altura de forma continua para evitar saltos en el modal.
   useLayoutEffect(() => {
     const pending = transitionRef.current;
     const wrap = wrapRef.current;
@@ -144,12 +178,14 @@ export function CreateTaskModal({
     try {
       setSaving(true);
       setError(null);
-      await onCreate({
-        title: title.trim(),
-        description: description.trim() || null,
-        assignedStaffId: assignedStaffId ? Number(assignedStaffId) : null,
-        dueDate: dueDate ? new Date(`${dueDate}T23:59:59`).toISOString() : null,
-      });
+      const formData = new FormData();
+      formData.append("Title", title.trim());
+      if (description.trim()) formData.append("Description", description.trim());
+      if (assignedStaffId) formData.append("AssignedStaffId", assignedStaffId);
+      if (dueDate) formData.append("DueDate", new Date(`${dueDate}T23:59:59`).toISOString());
+      evidenceFiles.forEach((f) => formData.append("EvidenceFiles", f));
+
+      await onCreate(formData);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear la tarea");
@@ -160,6 +196,10 @@ export function CreateTaskModal({
   };
 
   const isSelfAssigned = assignedStaffId === String(currentStaffId);
+  const assigneeLabel =
+    assignedStaffId === ""
+      ? "Sin asignar"
+      : assignableStaff.find((s) => String(s.id) === assignedStaffId)?.fullName ?? "Colaborador";
 
   return (
     <Modal
@@ -169,13 +209,15 @@ export function CreateTaskModal({
       }}
       title="Nueva tarea para este ticket"
       description="Asigna una acción interna (investigación, verificación, reclamo con fábrica) a ti o a otro colaborador."
-      size="lg"
+      eyebrow="Tareas internas"
+      maxWidth="max-w-xl"
       footer={
         <>
           {step === 0 ? (
             <Button
               type="button"
               variant="secondary"
+              size="sm"
               onClick={onClose}
               disabled={saving}
             >
@@ -185,6 +227,7 @@ export function CreateTaskModal({
             <Button
               type="button"
               variant="secondary"
+              size="sm"
               onClick={() => goTo(0)}
               disabled={saving}
             >
@@ -193,26 +236,33 @@ export function CreateTaskModal({
             </Button>
           )}
           {step === 0 ? (
-            <Button
-              type="button"
+            <SubmitValidationButton
+              ready={createTaskMissing.length === 0}
+              busy={false}
+              missingItems={createTaskMissing}
+              onSubmit={handleNext}
+              onFocusField={focusFormField}
               tone={error ? "ink" : "primary"}
               toneLabel={error}
-              onClick={handleNext}
+              hintText="Para continuar, completa lo siguiente:"
             >
               Continuar
               <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
+            </SubmitValidationButton>
           ) : (
-            <Button
-              type="submit"
-              isLoading={saving}
+            <SubmitValidationButton
+              ready={createTaskMissing.length === 0}
+              busy={saving}
+              missingItems={createTaskMissing}
+              onSubmit={() => void handleSubmit({ preventDefault: () => {} } as FormEvent)}
+              onFocusField={focusFormField}
               tone={error ? "ink" : "primary"}
               toneLabel={error}
-              onClick={handleSubmit}
+              hintText="Para crear la tarea en el ticket, completa lo siguiente:"
             >
               <Plus className="h-3.5 w-3.5" />
-              Crear tarea
-            </Button>
+              {saving ? "Creando tarea..." : "Crear tarea"}
+            </SubmitValidationButton>
           )}
         </>
       }
@@ -253,28 +303,80 @@ export function CreateTaskModal({
                   autoFocus
                 />
 
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="task-description"
-                    className="font-heading text-[11px] font-semibold text-zinc-500"
-                  >
-                    Descripción o instrucciones
-                  </label>
-                  <textarea
-                    id="task-description"
-                    rows={9}
-                    placeholder="Detalla qué se necesita averiguar, qué pruebas realizar o qué información recopilar..."
-                    value={description}
-                    onChange={(e) => {
-                      setDescription(e.target.value);
-                      if (error) setError(null);
-                    }}
-                    className="min-h-[180px] w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-[12.5px] leading-relaxed text-zinc-800 shadow-2xs outline-none transition-colors focus:border-brand-red focus:ring-1 focus:ring-brand-red/20 placeholder:text-zinc-400"
-                  />
-                </div>
+                <TextAreaField
+                  id="task-description"
+                  label="Descripción o instrucciones"
+                  placeholder="Detalla qué se necesita averiguar, qué pruebas realizar o qué información recopilar..."
+                  value={description}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    if (error) setError(null);
+                  }}
+                  autoGrow
+                  className="text-[12.5px] shadow-2xs"
+                />
+
+                <TaskEvidenceUpload
+                  files={evidenceFiles}
+                  onFilesChange={setEvidenceFiles}
+                  label="Documentos adjuntos (opcional)"
+                  dropzoneTitle="Haz clic o arrastra documentos de referencia"
+                  dropzoneHint="Instrucciones, fotos del lote, correos o cualquier archivo útil para quien ejecute la tarea."
+                  onReportError={(message) => {
+                    if (message) {
+                      setError(message);
+                      triggerSettle();
+                    } else if (error) setError(null);
+                  }}
+                />
               </>
             ) : (
               <>
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3 space-y-2">
+                  <p className="font-heading text-[10.5px] font-bold uppercase tracking-[0.06em] text-zinc-400">
+                    Vista previa
+                  </p>
+                  <p className="font-heading text-[13px] font-semibold text-zinc-900 leading-tight">{title}</p>
+                  {description.trim() && (
+                    <p className="text-[12px] leading-relaxed text-zinc-600 line-clamp-4 whitespace-pre-line">
+                      {description.trim()}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-zinc-600">
+                    <span>
+                      <span className="text-zinc-400">Asignada a:</span>{" "}
+                      <strong className="font-semibold text-zinc-800">{assigneeLabel}</strong>
+                    </span>
+                    {dueDate && (
+                      <span>
+                        <span className="text-zinc-400">Vence:</span>{" "}
+                        <strong className="font-semibold text-zinc-800 tabular-nums">{dueDate}</strong>
+                      </span>
+                    )}
+                  </div>
+                  {evidenceFiles.length > 0 && (
+                    <div className="pt-1 border-t border-zinc-200/80">
+                      <p className="mt-2 font-heading text-[10.5px] font-bold uppercase tracking-[0.06em] text-zinc-500">
+                        Documentos adjuntos ({evidenceFiles.length})
+                      </p>
+                      <ul className="mt-1.5 space-y-1">
+                        {evidenceFiles.map((file, idx) => (
+                          <li
+                            key={`${file.name}-${idx}`}
+                            className="flex items-center gap-1.5 text-[12px] text-zinc-700"
+                          >
+                            <FileText className="size-3 shrink-0 text-zinc-400" />
+                            <span className="truncate font-medium">{file.name}</span>
+                            <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">
+                              ({formatBytes(file.size)})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
                 {/* Asignación y autoasignación rápida */}
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">
@@ -328,6 +430,7 @@ export function CreateTaskModal({
                   <DatePicker
                     id="task-due-date"
                     value={dueDate}
+                    minDate={todayStr}
                     onChange={(val) => {
                       setDueDate(val);
                       if (error) setError(null);
@@ -335,6 +438,8 @@ export function CreateTaskModal({
                     placeholder="Seleccionar fecha límite..."
                     headerLabel="Fecha límite"
                     align="center"
+                    state={dueDateIsPast ? "error" : "idle"}
+                    error={dueDateIsPast ? "La fecha límite no puede ser una fecha que ya pasó." : undefined}
                   />
                 </div>
               </>

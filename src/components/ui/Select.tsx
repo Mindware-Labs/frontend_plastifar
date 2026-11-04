@@ -14,6 +14,7 @@ export interface SelectOption {
   hint?: string;
   disabled?: boolean;
   hidden?: boolean;
+  icon?: React.ReactNode;
 }
 
 interface SelectProps {
@@ -31,6 +32,10 @@ interface SelectProps {
   searchable?: boolean;
   /** El panel mide lo mismo que el disparador, sin el minimo que se aplica a los compactos. */
   matchTriggerWidth?: boolean;
+  /** Valor en varias líneas: rutas largas y sede sin truncar en columnas estrechas. */
+  wrapValue?: boolean;
+  /** Centra el contenido (icono, etiqueta y flecha) simétricamente en el botón. */
+  centered?: boolean;
   id?: string;
   className?: string;
   buttonClassName?: string;
@@ -72,6 +77,8 @@ export function Select({
   disabled,
   searchable,
   matchTriggerWidth = false,
+  wrapValue = false,
+  centered = false,
   id,
   className = "",
   buttonClassName = "",
@@ -278,9 +285,22 @@ export function Select({
 
   const resolved: FieldState = state;
   const isSubtle = variant === "subtle";
-  const sizeClass = controlSizes[size];
-  const paddingClass =
-    size === "xs"
+  const sizeTypography =
+    size === "xs" ? "text-[11.5px]" : size === "sm" ? "text-[12.5px]" : "text-[13.5px]";
+  const sizeHeight = wrapValue
+    ? size === "xs"
+      ? "min-h-7"
+      : size === "sm"
+        ? "min-h-8"
+        : "min-h-10"
+    : controlSizes[size];
+  const paddingClass = wrapValue
+    ? size === "xs"
+      ? "px-2 py-1 gap-1.5"
+      : size === "sm"
+        ? "pl-2.5 pr-2 py-2 gap-2"
+        : "pl-3 pr-2.5 py-2 gap-2"
+    : size === "xs"
       ? "px-2 py-0.5 gap-1.5"
       : size === "sm"
         ? "pl-2.5 pr-2 gap-2"
@@ -323,19 +343,42 @@ export function Select({
         disabled={disabled}
         onClick={() => (open ? closeList() : openList())}
         onKeyDown={handleKeyDown}
-        className={`w-full rounded-lg border text-left outline-none transition-colors duration-150 cursor-pointer select-none
+        className={`w-full rounded-lg border outline-none transition-colors duration-150 cursor-pointer select-none
           disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-400
-          ${triggerVariantClass} ${sizeClass} ${paddingClass}
-          flex items-center justify-between font-medium
+          ${triggerVariantClass} ${sizeHeight} ${sizeTypography} ${paddingClass} items-center
+          ${centered ? "flex items-center justify-center gap-1.5" : "flex justify-between text-left"} font-medium
           ${selected ? "text-zinc-900" : "text-zinc-400"} ${buttonClassName}`}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden" title={selected?.hint ? `${selected.label} (${selected.hint})` : undefined}>
-          {leftIcon}
-          <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
+        <div
+          className={`flex min-w-0 ${centered ? "flex-none justify-center" : "flex-1"} gap-1.5 ${
+            wrapValue ? "flex-wrap items-center overflow-visible" : "items-center overflow-hidden"
+          }`}
+          title={
+            !wrapValue && selected
+              ? selected.hint
+                ? `${selected.label} (${selected.hint})`
+                : selected.label
+              : undefined
+          }
+        >
+          {selected?.icon ? (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500">
+              {selected.icon}
+            </span>
+          ) : (
+            leftIcon
+          )}
+          <span className={`${wrapValue ? "min-w-0 whitespace-normal break-words" : "min-w-0 truncate"} leading-snug`}>
+            {selected?.label ?? placeholder}
+          </span>
           {selected?.hint && (
-            <span className="inline-flex min-w-0 shrink-[4] items-center gap-1 rounded-[5px] bg-zinc-100 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-600 border border-zinc-200/80">
+            <span
+              className={`inline-flex shrink-0 items-center gap-1 self-center rounded-[5px] bg-zinc-100 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase leading-none tracking-wider text-zinc-600 border border-zinc-200/80 ${
+                wrapValue ? "max-w-full whitespace-normal break-words" : "min-w-0 max-w-[55%] shrink-[4]"
+              }`}
+            >
               <Building className="h-2.5 w-2.5 shrink-0 text-zinc-400" />
-              <span className="truncate">{selected.hint}</span>
+              <span className={wrapValue ? "whitespace-normal break-words" : "truncate"}>{selected.hint}</span>
             </span>
           )}
         </div>
@@ -343,9 +386,7 @@ export function Select({
           aria-hidden
           className={`${
             size === "xs" ? "h-3 w-3" : "h-4 w-4"
-          } shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${
-            open ? "rotate-180 text-zinc-700" : ""
-          }`}
+          } shrink-0 self-center text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-zinc-700" : ""}`}
         />
       </button>
 
@@ -437,7 +478,14 @@ export function Select({
                       } ${isSelected ? (matchTriggerWidth ? "font-semibold text-brand-red" : "font-semibold text-zinc-900") : ""}`}
                     >
                       <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                        <span className="truncate">{option.label}</span>
+                        <div className="flex min-w-0 items-center gap-2">
+                          {option.icon && (
+                            <span className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500">
+                              {option.icon}
+                            </span>
+                          )}
+                          <span className="truncate">{option.label}</span>
+                        </div>
                         {option.hint && (
                           <span className="inline-flex min-w-0 shrink-[4] items-center gap-1 rounded-[5px] bg-zinc-100/90 px-1.5 py-0.5 font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-500 border border-zinc-200/60">
                             <Building className="h-2.5 w-2.5 shrink-0 text-zinc-400" />

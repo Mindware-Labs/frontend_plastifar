@@ -1,20 +1,15 @@
 import {
-  AlertTriangle,
   Check,
-  CheckCheck,
-  CircleDashed,
   CircleDot,
-  Hourglass,
   Search,
   ShieldCheck,
   Slash,
-  X,
 } from "lucide-react";
-import { IconBadge, StatusBadge, type StatusStyles } from "../../components/ui/StatusBadge";
-import type { CreditStatus, HcaStatus, PlanItemStatus } from "../../types/quality";
+import { StatusBadge, type StatusStyles } from "../../components/ui/StatusBadge";
+import type { HcaStatus, PlanItemStatus } from "../../types/quality";
 
 const hcaStyles: StatusStyles<HcaStatus> = {
-  Abierta: { tone: "neutral", icon: CircleDashed },
+  Abierta: { tone: "green", icon: Check },
   "En análisis": { tone: "neutral", icon: Search },
   "En ejecución": { tone: "neutral", icon: CircleDot },
   "En verificación": { tone: "neutral", icon: ShieldCheck },
@@ -22,46 +17,25 @@ const hcaStyles: StatusStyles<HcaStatus> = {
 };
 
 const planStyles: StatusStyles<PlanItemStatus> = {
-  Pendiente: { tone: "neutral", icon: CircleDashed },
+  Pendiente: { tone: "neutral", icon: CircleDot },
   "En curso": { tone: "neutral", icon: CircleDot },
   Cumplida: { tone: "green", icon: Check },
   Anulada: { tone: "neutral", icon: Slash },
 };
 
-const creditStyles: StatusStyles<CreditStatus> = {
-  Solicitada: { tone: "warn", icon: Hourglass },
-  Aprobada: { tone: "green", icon: Check },
-  Rechazada: { tone: "red", icon: X },
-  Aplicada: { tone: "neutral", icon: CheckCheck },
-};
-
-function OverdueBadge() {
+export function HcaStatusBadge({ status }: { status: HcaStatus; overdue?: boolean }) {
+  const displayStatus = status === "Abierta" ? "Registrada" : status;
   return (
-    <IconBadge tone="red" icon={AlertTriangle}>
-      Vencida
-    </IconBadge>
+    <StatusBadge
+      status={displayStatus as any}
+      styles={{
+        ...hcaStyles,
+        Registrada: { tone: "green", icon: Check },
+      }}
+    />
   );
 }
 
-/** El vencimiento no es un estado de la HCA, pero es lo primero que hay que
- *  ver: cuando aplica, sustituye a la pastilla de estado y la deja al lado. */
-export function HcaStatusBadge({ status, overdue }: { status: HcaStatus; overdue?: boolean }) {
-  if (overdue) {
-    return (
-      <span className="inline-flex items-center gap-1.5">
-        <OverdueBadge />
-        <span className="whitespace-nowrap text-[11.5px] text-faint">{status}</span>
-      </span>
-    );
-  }
-
-  return <StatusBadge status={status} styles={hcaStyles} />;
-}
-
-export function PlanItemStatusBadge({ status, overdue }: { status: PlanItemStatus; overdue?: boolean }) {
-  return overdue ? <OverdueBadge /> : <StatusBadge status={status} styles={planStyles} />;
-}
-
-export function CreditStatusBadge({ status }: { status: CreditStatus }) {
-  return <StatusBadge status={status} styles={creditStyles} />;
+export function PlanItemStatusBadge({ status }: { status: PlanItemStatus; overdue?: boolean }) {
+  return <StatusBadge status={status} styles={planStyles} />;
 }
