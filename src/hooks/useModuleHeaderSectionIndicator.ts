@@ -4,7 +4,9 @@ export type ModuleHeaderIndicatorMotion = "travel" | "none";
 
 export interface ModuleHeaderIndicatorRect {
   left: number;
+  top: number;
   width: number;
+  height: number;
   visible: boolean;
 }
 
@@ -22,28 +24,36 @@ function followLayoutDuringAnimation(measure: () => void, durationMs: number) {
   return () => cancelAnimationFrame(frame);
 }
 
-/** Barra inferior que viaja entre pestañas del ModuleHeader (misma curva que el riel). */
+/** Pastilla activa que viaja entre pestañas del ModuleHeader (misma curva que el riel). */
 export function useModuleHeaderSectionIndicator(
   navRef: RefObject<HTMLElement | null>,
   activeKey: string | null,
 ) {
-  const [rect, setRect] = useState<ModuleHeaderIndicatorRect>({ left: 0, width: 0, visible: false });
+  const [rect, setRect] = useState<ModuleHeaderIndicatorRect>({
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    visible: false,
+  });
   const [motion, setMotion] = useState<ModuleHeaderIndicatorMotion>("none");
   const prevKey = useRef<string | null>(null);
 
   const measure = useCallback(() => {
     const nav = navRef.current;
     if (!nav) return;
-    const link = nav.querySelector<HTMLElement>('[aria-current="page"]');
+    const link = nav.querySelector<HTMLElement>('[aria-current="page"], [data-section-active]');
     if (!link) {
-      setRect({ left: 0, width: 0, visible: false });
+      setRect({ left: 0, top: 0, width: 0, height: 0, visible: false });
       return;
     }
     const navRect = nav.getBoundingClientRect();
     const linkRect = link.getBoundingClientRect();
     setRect({
       left: linkRect.left - navRect.left,
+      top: linkRect.top - navRect.top,
       width: linkRect.width,
+      height: linkRect.height,
       visible: true,
     });
   }, [navRef]);
@@ -54,6 +64,17 @@ export function useModuleHeaderSectionIndicator(
     setMotion(travel ? "travel" : "none");
     return followLayoutDuringAnimation(measure, TRAVEL_MS);
   }, [activeKey, measure]);
+
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(nav);
+    for (const child of nav.querySelectorAll<HTMLElement>("[data-section-tab]")) {
+      observer.observe(child);
+    }
+    return () => observer.disconnect();
+  }, [measure, navRef, activeKey]);
 
   useLayoutEffect(() => {
     const onResize = () => measure();

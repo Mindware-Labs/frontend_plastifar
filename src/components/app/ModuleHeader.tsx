@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react";
-import { useMemo, useRef, type ReactNode } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
-import { useModuleHeaderSectionIndicator } from "../../hooks/useModuleHeaderSectionIndicator";
+import { useMemo, type ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { SegmentedTabs, type SegmentedTabItem } from "../ui/SegmentedTabs";
 
 /** Alinea bloques bajo el header con el título cuando hay botón volver (32px + gap-x-3). */
 export const MODULE_HEADER_TITLE_GUTTER_CLASS = "pl-11";
@@ -60,11 +60,21 @@ export function ModuleHeader({
 }: ModuleHeaderProps) {
   const hasHeading = title !== undefined || summary !== undefined || backTo !== undefined || onBack !== undefined;
   const location = useLocation();
-  const sectionsNavRef = useRef<HTMLElement>(null);
+
+  const sectionItems: SegmentedTabItem[] | null = useMemo(() => {
+    if (!sections?.length) return null;
+    return sections.map((section, idx) => ({
+      key: section.to ?? `section-${idx}`,
+      label: section.label,
+      to: section.to,
+      end: section.end,
+      onClick: section.onClick,
+    }));
+  }, [sections]);
 
   const activeSectionKey = useMemo(() => {
     if (!sections?.length) return null;
-    let best: string | null = null;
+    let routeKey: string | null = null;
     for (const section of sections) {
       if (!section.to) continue;
       const end = section.end ?? true;
@@ -72,20 +82,13 @@ export function ModuleHeader({
         ? location.pathname === section.to
         : location.pathname === section.to || location.pathname.startsWith(`${section.to}/`);
       if (!matches) continue;
-      if (!best || section.to.length > best.length) best = section.to;
+      if (!routeKey || section.to.length > routeKey.length) routeKey = section.to;
     }
-    return best;
+    if (routeKey) return routeKey;
+    const activeIdx = sections.findIndex((section) => !section.to && section.active);
+    if (activeIdx >= 0) return `section-${activeIdx}`;
+    return null;
   }, [sections, location.pathname]);
-
-  const { rect: sectionIndicator, motion: sectionIndicatorMotion } = useModuleHeaderSectionIndicator(
-    sectionsNavRef,
-    activeSectionKey,
-  );
-
-  const sectionIndicatorMotionClass =
-    sectionIndicatorMotion === "travel"
-      ? "transition-[left,width] duration-[320ms] ease-plf-spring motion-reduce:transition-none"
-      : "transition-none";
 
   return (
     <div
@@ -137,53 +140,12 @@ export function ModuleHeader({
         ) : null}
 
         <div className="flex h-full items-center gap-3">
-          {sections && sections.length > 0 && (
-            <nav
-              ref={sectionsNavRef}
-              aria-label="Secciones de la ficha"
-              className="relative flex h-full items-center gap-1 self-stretch"
-            >
-              <span
-                aria-hidden
-                className={`pointer-events-none absolute bottom-0 h-0.5 rounded-full bg-brand-red ${sectionIndicatorMotionClass}`}
-                style={{
-                  left: sectionIndicator.left,
-                  width: sectionIndicator.width,
-                  opacity: sectionIndicator.visible ? 1 : 0,
-                }}
-              />
-              {sections.map((section, idx) => {
-                const navClass = (isActive: boolean) =>
-                  `flex h-full items-center border-b-2 border-transparent px-2.5 text-[12.5px] font-medium transition-[color] duration-200 ease-out -mb-px whitespace-nowrap cursor-pointer select-none ` +
-                  (isActive
-                    ? "text-zinc-900 font-semibold"
-                    : "text-zinc-500 hover:text-zinc-900");
-
-                if (section.to) {
-                  return (
-                    <NavLink
-                      key={section.to}
-                      to={section.to}
-                      end={section.end ?? true}
-                      className={({ isActive }) => navClass(isActive)}
-                    >
-                      {section.label}
-                    </NavLink>
-                  );
-                }
-
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={section.onClick}
-                    className={`${navClass(Boolean(section.active))} bg-transparent border-t-0 border-x-0 outline-none`}
-                  >
-                    {section.label}
-                  </button>
-                );
-              })}
-            </nav>
+          {sectionItems && sectionItems.length > 0 && (
+            <SegmentedTabs
+              items={sectionItems}
+              activeKey={activeSectionKey}
+              ariaLabel="Secciones de la ficha"
+            />
           )}
 
           {action && <div className="flex items-center gap-2 shrink-0">{action}</div>}

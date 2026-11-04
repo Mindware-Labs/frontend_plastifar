@@ -25,6 +25,7 @@ import { formatTicketProductsSummary } from "../../lib/ticketProducts";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { SEGMENTED_TAB_COUNT_BADGE_CLASS } from "../../components/ui/SegmentedTabs";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { Button } from "../../components/ui/Button";
 import type { SortDir } from "../../components/ui/DataTable";
@@ -723,9 +724,7 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
               <span className="flex items-center gap-1.5">
                 <span>Actuales</span>
                 {counts != null && (
-                  <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-zinc-600">
-                    {counts.plastifar}
-                  </span>
+                  <span className={SEGMENTED_TAB_COUNT_BADGE_CLASS}>{counts.plastifar}</span>
                 )}
               </span>
             ),
@@ -737,9 +736,7 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
               <span className="flex items-center gap-1.5">
                 <span>Histórico</span>
                 {counts != null && (
-                  <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-zinc-600">
-                    {counts.legacy}
-                  </span>
+                  <span className={SEGMENTED_TAB_COUNT_BADGE_CLASS}>{counts.legacy}</span>
                 )}
               </span>
             ),

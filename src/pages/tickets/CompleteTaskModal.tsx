@@ -5,6 +5,7 @@ import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { Button } from "../../components/ui/Button";
 import { SelectField, TextAreaField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { useSettle } from "../../hooks/useSettle";
 import { ticketsApi } from "../../api/tickets";
 import { buildValidationItems, focusFormField } from "../../lib/validationItems";
@@ -29,40 +30,34 @@ function ModeTabs({
   onModeChange: (mode: UpdateMode) => void;
 }) {
   return (
-    <div
-      role="tablist"
-      aria-label="Tipo de actualización"
-      className="flex h-9 w-full items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
-    >
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "progress"}
-        onClick={() => onModeChange("progress")}
-        className={`inline-flex h-full min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-          mode === "progress"
-            ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-        }`}
-      >
-        <MessageSquarePlus className="h-3.5 w-3.5 shrink-0" />
-        <span>Registrar avance</span>
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "complete"}
-        onClick={() => onModeChange("complete")}
-        className={`inline-flex h-full min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-          mode === "complete"
-            ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-        }`}
-      >
-        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-        <span>Completar tarea</span>
-      </button>
-    </div>
+    <SegmentedTabs
+      fullWidth
+      size="md"
+      ariaLabel="Tipo de actualización"
+      activeKey={mode}
+      items={[
+        {
+          key: "progress",
+          label: (
+            <>
+              <MessageSquarePlus className="h-3.5 w-3.5 shrink-0" />
+              <span>Registrar avance</span>
+            </>
+          ),
+          onClick: () => onModeChange("progress"),
+        },
+        {
+          key: "complete",
+          label: (
+            <>
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              <span>Completar tarea</span>
+            </>
+          ),
+          onClick: () => onModeChange("complete"),
+        },
+      ]}
+    />
   );
 }
 

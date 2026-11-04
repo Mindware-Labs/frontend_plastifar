@@ -18,6 +18,7 @@ import { ApiError } from "../../api/client";
 import { Alert } from "../../components/ui/Alert";
 import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
 import { Button } from "../../components/ui/Button";
+import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { useAuth } from "../../context/useAuth";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import {
@@ -230,40 +231,32 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
 
           <div className="flex items-center gap-2">
             {/* Control segmentado para alternar Redacción / Vista previa */}
-            <div
-              role="tablist"
-              aria-label="Modo de trabajo"
-              className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "compose"}
-                onClick={() => setActiveTab("compose")}
-                className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-                  activeTab === "compose"
-                    ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                    : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-                }`}
-              >
-                <PenLine className="h-3.5 w-3.5" />
-                <span>Redacción</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "preview"}
-                onClick={() => setActiveTab("preview")}
-                className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-                  activeTab === "preview"
-                    ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                    : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-                }`}
-              >
-                <Eye className="h-3.5 w-3.5" />
-                <span>Vista previa</span>
-              </button>
-            </div>
+            <SegmentedTabs
+              ariaLabel="Modo de trabajo"
+              activeKey={activeTab}
+              items={[
+                {
+                  key: "compose",
+                  label: (
+                    <>
+                      <PenLine className="h-3.5 w-3.5" />
+                      <span>Redacción</span>
+                    </>
+                  ),
+                  onClick: () => setActiveTab("compose"),
+                },
+                {
+                  key: "preview",
+                  label: (
+                    <>
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>Vista previa</span>
+                    </>
+                  ),
+                  onClick: () => setActiveTab("preview"),
+                },
+              ]}
+            />
 
             <span aria-hidden className="mx-0.5 h-4 w-px bg-zinc-200" />
 

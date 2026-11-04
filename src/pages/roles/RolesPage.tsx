@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { rolesApi, type RoleQuery } from "../../api/roles";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -206,44 +207,37 @@ export function RolesPage() {
 
   // Selector segmentado de vista (Roles / Matriz de permisos)
   const tabSwitcher = (
-    <div
-      role="tablist"
-      aria-label="Vistas de roles y permisos"
-      className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 shadow-2xs shrink-0"
-    >
-      <button
-        type="button"
-        role="tab"
-        aria-selected={currentTab === "roles"}
-        onClick={() => setTab("roles")}
-        className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-          currentTab === "roles"
-            ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-        }`}
-      >
-        <ShieldCheck
-          className={`h-3.5 w-3.5 ${currentTab === "roles" ? "text-brand-red" : "text-zinc-400"}`}
-        />
-        <span>Roles</span>
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={currentTab === "permisos"}
-        onClick={() => setTab("permisos")}
-        className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-          currentTab === "permisos"
-            ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-            : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-        }`}
-      >
-        <KeyRound
-          className={`h-3.5 w-3.5 ${currentTab === "permisos" ? "text-brand-red" : "text-zinc-400"}`}
-        />
-        <span>Matriz de permisos</span>
-      </button>
-    </div>
+    <SegmentedTabs
+      className="shrink-0 shadow-2xs"
+      ariaLabel="Vistas de roles y permisos"
+      activeKey={currentTab}
+      items={[
+        {
+          key: "roles",
+          label: (
+            <>
+              <ShieldCheck
+                className={`h-3.5 w-3.5 ${currentTab === "roles" ? "text-brand-red" : "text-zinc-400"}`}
+              />
+              <span>Roles</span>
+            </>
+          ),
+          onClick: () => setTab("roles"),
+        },
+        {
+          key: "permisos",
+          label: (
+            <>
+              <KeyRound
+                className={`h-3.5 w-3.5 ${currentTab === "permisos" ? "text-brand-red" : "text-zinc-400"}`}
+              />
+              <span>Matriz de permisos</span>
+            </>
+          ),
+          onClick: () => setTab("permisos"),
+        },
+      ]}
+    />
   );
 
   // Si estamos en la pestaña de matriz de permisos, renderizamos la vista de matriz embebida

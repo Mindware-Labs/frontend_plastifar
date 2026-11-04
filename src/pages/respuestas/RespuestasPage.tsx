@@ -9,6 +9,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { cannedApi, cannedCategoriesApi } from "../../api/canned";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { SEGMENTED_TAB_COUNT_BADGE_CLASS } from "../../components/ui/SegmentedTabs";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -239,9 +240,7 @@ export function RespuestasPage() {
                 <MessageSquareText className="h-3.5 w-3.5" />
                 <span>Plantillas</span>
                 {data !== null && (
-                  <span className="ml-1 rounded-full bg-zinc-100 px-1.5 py-0.2 text-[10.5px] font-semibold text-zinc-600">
-                    {data.total}
-                  </span>
+                  <span className={SEGMENTED_TAB_COUNT_BADGE_CLASS}>{data.total}</span>
                 )}
               </span>
             ),
@@ -254,9 +253,7 @@ export function RespuestasPage() {
                 <Tag className="h-3.5 w-3.5" />
                 <span>Categorías</span>
                 {categories !== null && (
-                  <span className="ml-1 rounded-full bg-zinc-100 px-1.5 py-0.2 text-[10.5px] font-semibold text-zinc-600">
-                    {categories.length}
-                  </span>
+                  <span className={SEGMENTED_TAB_COUNT_BADGE_CLASS}>{categories.length}</span>
                 )}
               </span>
             ),
