@@ -3,7 +3,7 @@ import { prefersReducedMotion } from "./motion";
 
 export type FormCrossfadeLayer = { key: string; role: "enter" | "exit" };
 
-const CROSSFADE_MS = 440;
+export const FORM_CROSSFADE_DURATION_MS = 260;
 
 export function useFormCrossfadeStack(activeKey: string, enabled: boolean): FormCrossfadeLayer[] {
   const [layers, setLayers] = useState<FormCrossfadeLayer[]>([{ key: activeKey, role: "enter" }]);
@@ -28,7 +28,7 @@ export function useFormCrossfadeStack(activeKey: string, enabled: boolean): Form
 
     const timer = window.setTimeout(() => {
       setLayers([{ key: activeKey, role: "enter" }]);
-    }, CROSSFADE_MS);
+    }, FORM_CROSSFADE_DURATION_MS);
 
     return () => window.clearTimeout(timer);
   }, [activeKey, enabled]);

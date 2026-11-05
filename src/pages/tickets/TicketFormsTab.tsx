@@ -385,6 +385,20 @@ export function TicketFormsTab({
       setSheets(foundSheets);
       setHcaPlanBySheetId({});
 
+      // Precargar plan items de HCA en segundo plano para transiciones de tabs instantáneas
+      if (foundSheets.length > 0) {
+        foundSheets.forEach((s) => {
+          qualityApi.planItems
+            .list(s.id, { page: 1, pageSize: 50 })
+            .then((res) => {
+              setHcaPlanBySheetId((prev) => ({ ...prev, [s.id]: res.items }));
+            })
+            .catch(() => {
+              setHcaPlanBySheetId((prev) => ({ ...prev, [s.id]: [] }));
+            });
+        });
+      }
+
       const hasAny = Boolean(foundClaim || foundWith.length > 0 || foundDisc.length > 0 || foundSheets.length > 0);
       onHasFormsChanged?.(hasAny);
     } catch (err) {
@@ -1093,7 +1107,7 @@ export function TicketFormsTab({
                       type="button"
                       {...formLineTabIndexAttr(idx)}
                       onClick={() => selectRegisteredForm(item.key)}
-                      className={`inline-flex shrink-0 whitespace-nowrap items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                      className={`inline-flex shrink-0 whitespace-nowrap items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors duration-150 cursor-pointer ${
                         isSelected
                           ? "bg-brand-red/10 border border-brand-red/30 text-brand-red shadow-2xs font-semibold"
                           : "bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border border-zinc-200"

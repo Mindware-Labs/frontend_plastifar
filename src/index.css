@@ -721,7 +721,7 @@ input::-ms-clear {
 @keyframes plf-form-cross-in-forward {
   from {
     opacity: 0;
-    transform: translate3d(12px, 0, 0);
+    transform: translate3d(6px, 0, 0);
   }
   to {
     opacity: 1;
@@ -736,14 +736,14 @@ input::-ms-clear {
   }
   to {
     opacity: 0;
-    transform: translate3d(-10px, 0, 0);
+    transform: translate3d(-4px, 0, 0);
   }
 }
 
 @keyframes plf-form-cross-in-backward {
   from {
     opacity: 0;
-    transform: translate3d(-12px, 0, 0);
+    transform: translate3d(-6px, 0, 0);
   }
   to {
     opacity: 1;
@@ -758,7 +758,7 @@ input::-ms-clear {
   }
   to {
     opacity: 0;
-    transform: translate3d(10px, 0, 0);
+    transform: translate3d(4px, 0, 0);
   }
 }
 
@@ -946,19 +946,19 @@ input::-ms-clear {
 }
 
 .animate-plf-form-cross-in-forward {
-  animation: plf-form-cross-in-forward 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: plf-form-cross-in-forward 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform, opacity;
 }
 .animate-plf-form-cross-out-forward {
-  animation: plf-form-cross-out-forward 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: plf-form-cross-out-forward 0.18s cubic-bezier(0.4, 0, 1, 1) both;
   will-change: transform, opacity;
 }
 .animate-plf-form-cross-in-backward {
-  animation: plf-form-cross-in-backward 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: plf-form-cross-in-backward 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform, opacity;
 }
 .animate-plf-form-cross-out-backward {
-  animation: plf-form-cross-out-backward 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: plf-form-cross-out-backward 0.18s cubic-bezier(0.4, 0, 1, 1) both;
   will-change: transform, opacity;
 }
 
