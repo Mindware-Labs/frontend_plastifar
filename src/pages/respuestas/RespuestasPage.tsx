@@ -1,5 +1,4 @@
 import {
-  HelpCircle,
   MessageSquareText,
   Pencil,
   Plus,
@@ -33,7 +32,6 @@ import { getCategoryBadgeClasses, parseCanned } from "./cannedHelpers";
 import { CannedPreviewDrawer } from "./CannedPreviewDrawer";
 import { CannedResponseStudio } from "./CannedResponseStudio";
 import { CategoriasTab } from "./CategoriasTab";
-import { RespuestasHelpSheet } from "./RespuestasHelpSheet";
 
 /** Plantillas de correo y categorías con selección múltiple y gestión en lote. */
 export function RespuestasPage() {
@@ -59,7 +57,6 @@ export function RespuestasPage() {
     | null
   >(null);
   const [previewItem, setPreviewItem] = useState<CannedResponseResponse | null>(null);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [pendingNewCategory, setPendingNewCategory] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search).trim();
@@ -337,15 +334,6 @@ export function RespuestasPage() {
                     />
                   )}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setHelpOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-700 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 transition-all cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-red/25"
-                >
-                  <HelpCircle className="h-3.5 w-3.5 text-brand-red" />
-                  <span>¿Para qué sirve?</span>
-                </button>
               </div>
             }
             footer={
@@ -564,17 +552,6 @@ export function RespuestasPage() {
           onSaved={() => {
             reloadAll();
             setStudioState(null);
-          }}
-        />
-      )}
-
-      {/* Hoja de Ayuda */}
-      {helpOpen && (
-        <RespuestasHelpSheet
-          onClose={() => setHelpOpen(false)}
-          onNewResponse={() => {
-            setHelpOpen(false);
-            setStudioState({ mode: "nueva" });
           }}
         />
       )}
