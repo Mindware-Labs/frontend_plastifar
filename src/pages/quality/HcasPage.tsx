@@ -5,7 +5,7 @@ import {
   FileSpreadsheet,
   FileText,
   Layers,
-  Plus,
+
   ShieldCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -15,7 +15,7 @@ import { productLinesApi } from "../../api/productLines";
 import { qualityApi } from "../../api/quality";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Button } from "../../components/ui/Button";
+
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import {
@@ -36,7 +36,7 @@ import { TableSelectionBar, type TableSelectionAction } from "../../components/u
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
-import { usePermissions } from "../../hooks/usePermissions";
+
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { useEnterpriseListReturnRestore } from "../../hooks/useEnterpriseListReturnRestore";
@@ -46,7 +46,7 @@ import { exportHcasListToExcel, exportHcasListToPdf } from "../../lib/hcaListExp
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import type { Plant, ProductLine } from "../../types/settings";
 import type { CorrectiveActionSheet, HcaQuery, SheetListResponse } from "../../types/quality";
-import { HcaFormModal } from "./HcaFormModal";
+
 import { HcaStatusBadge } from "./StatusBadges";
 import { HcaSummaryDrawer } from "./HcaSummaryDrawer";
 
@@ -61,7 +61,7 @@ type SortKey = "fecha" | "numero" | "cliente";
 export function HcasPage() {
   const navigate = useNavigate();
   const receipts = useReceipts();
-  const { can } = usePermissions();
+
 
   const [plants, setPlants] = useState<Plant[]>([]);
   const [productLines, setProductLines] = useState<ProductLine[]>([]);
@@ -78,12 +78,12 @@ export function HcasPage() {
   // Drawer de resumen ejecutivo (igual a Discrepancias)
   const [summarySheetId, setSummarySheetId] = useState<number | null>(null);
 
-  const [creating, setCreating] = useState(false);
+
   const [bulkBusy, setBulkBusy] = useState(false);
   const [selectionCache, setSelectionCache] = useState<Map<number, CorrectiveActionSheet>>(() => new Map());
 
   const debouncedSearch = useDebouncedValue(search).trim();
-  const canWrite = can("quality.write");
+
 
   useEffect(() => {
     fetchAllPages<Plant>((page, size) => settingsApi.plants.list({ page, pageSize: size }))
@@ -286,14 +286,6 @@ export function HcasPage() {
     >
       <ModuleHeader
         title="Acciones Correctivas (HCA)"
-        action={
-          canWrite && (
-            <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              Nueva HCA
-            </Button>
-          )
-        }
         summary={
           counts ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
@@ -422,7 +414,7 @@ export function HcasPage() {
               clearNarrowFilters();
             }}
             emptyTitle="Todavía no hay acciones correctivas (HCA) registradas."
-            emptyDescription="Se pueden crear desde aquí con el botón 'Nueva HCA' o derivadas directamente desde un ticket o reclamación."
+            emptyDescription="Las acciones correctivas se generan y gestionan derivadas directamente desde un ticket o reclamación."
           />
         ) : (
           <div className="plf-results-in">
@@ -527,22 +519,6 @@ export function HcasPage() {
           sheetId={summarySheetId}
           getReturnSnapshot={getReturnSnapshot}
           onClose={() => setSummarySheetId(null)}
-        />
-      )}
-
-      {creating && (
-        <HcaFormModal
-          productLines={productLines}
-          onClose={() => setCreating(false)}
-          onSaved={(newSheet) => {
-            setCreating(false);
-            receipts.done({
-              action: "crear-hca",
-              title: "HCA creada",
-              detail: `Se registró la hoja ${newSheet.number} exitosamente`,
-            });
-            navigate(`/calidad/hca/${newSheet.id}`);
-          }}
         />
       )}
     </div>
