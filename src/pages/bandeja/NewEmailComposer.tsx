@@ -483,7 +483,7 @@ export function NewEmailComposer({ onSent, onCancel, panelExiting = false }: New
             />
             <CannedPicker onPick={insertCanned} variableContext={cannedVariableContext} />
             <span className="truncate text-[11px] font-medium text-zinc-400">
-              Sale de la casilla de soporte, con tu nombre y tu firma.
+              Sale de la casilla de soporte.
             </span>
 
             <div className="ml-auto flex shrink-0 gap-2">

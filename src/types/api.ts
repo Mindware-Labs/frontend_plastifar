@@ -341,11 +341,6 @@ export interface EmailFolderCounts {
   assignedUnseen: number;
 }
 
-/** La firma que se agrega al pie de los correos que envia esta persona. */
-export interface StaffSignatureResponse {
-  signature: string | null;
-}
-
 /** Aviso en vivo de un correo recibido: lo justo para sonar y avisar en el escritorio. */
 export interface InboxArrival {
   emailId: number;
