@@ -1,4 +1,5 @@
 import type { WithdrawalSummary } from "../types/withdrawals";
+import { normalizeWithdrawalStatus } from "../pages/withdrawals/WithdrawalStatusBadge";
 import { formatDay } from "./dates";
 import { formatAmountOrPlain } from "./numbers";
 import { exportPlastifarListToExcel, exportPlastifarListToPdf, type PlastifarListReportOptions } from "./plastifarListReport";
@@ -10,7 +11,7 @@ const HEADERS = [
   "Cliente",
   "Fecha",
   "Motivo",
-  "Vendedor",
+  "Registrado por",
   "Moneda",
   "Valor total",
   "Estado",
@@ -33,7 +34,7 @@ function rowValues(item: WithdrawalSummary): string[] {
     item.requestedByName,
     item.currency ?? "—",
     formatAmountOrPlain(item.totalValue, item.currency),
-    item.status,
+    normalizeWithdrawalStatus(item.status),
   ];
 }
 

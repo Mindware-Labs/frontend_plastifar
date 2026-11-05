@@ -1512,7 +1512,7 @@ export function TicketFormsTab({
 
                         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                            Vendedor & origen
+                            Registrado por & origen
                           </span>
                           <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{w.requestedByName}</p>
                           <span className="text-[10.5px] text-zinc-500">
@@ -1587,7 +1587,7 @@ export function TicketFormsTab({
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="rounded-xl border border-zinc-200 bg-white p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                            Firma Vendedor
+                            Firma Autor / Registrado por
                           </span>
                           <p className="mt-1 text-xs font-semibold text-zinc-900">{w.requestedByName || "—"}</p>
                         </div>

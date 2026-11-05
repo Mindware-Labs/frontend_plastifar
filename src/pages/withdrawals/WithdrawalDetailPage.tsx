@@ -174,7 +174,7 @@ export function WithdrawalDetailPage() {
         </DetailGroup>
 
         <DetailGroup title="Firmas y decisión">
-          <DetailRow label="Vendedor">
+          <DetailRow label="Registrado por">
             {withdrawal.requestedByName}
             <span className="ml-1.5 text-faint">· {formatInstant(withdrawal.createdAt)}</span>
           </DetailRow>

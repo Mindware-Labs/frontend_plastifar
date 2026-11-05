@@ -75,7 +75,7 @@ export function WithdrawalExecutiveSummary({ withdrawal }: WithdrawalExecutiveSu
             <p className="mt-0.5 font-semibold text-zinc-900">{withdrawal.clientName}</p>
           </div>
           <div>
-            <span className={fieldLabelClass}>Vendedor solicitante</span>
+            <span className={fieldLabelClass}>Registrado por</span>
             <p className="mt-0.5 text-zinc-800">{withdrawal.requestedByName}</p>
           </div>
           <div>

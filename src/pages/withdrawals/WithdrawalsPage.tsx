@@ -376,9 +376,9 @@ export function WithdrawalsPage() {
               />
 
               <LookupFilterDropdown
-                title="Seleccionar vendedor"
-                aria-label="Filtrar por vendedor"
-                placeholder="Todos los vendedores"
+                title="Filtrar por autor"
+                aria-label="Filtrar por autor que registró"
+                placeholder="Registrado por (todos)"
                 searchPlaceholder="Buscar colaborador…"
                 defaultIcon={<UserCheck className="h-3.5 w-3.5 text-zinc-500" />}
                 value={sellerId}
@@ -461,7 +461,7 @@ export function WithdrawalsPage() {
                   <Th sort={sortOf("cliente")}>Cliente</Th>
                   <Th sort={sortOf("fecha")}>Fecha</Th>
                   <Th>Motivo</Th>
-                  <Th>Vendedor</Th>
+                  <Th>Registrado por</Th>
                   <Th sort={sortOf("valor")} className="text-right">
                     Valor
                   </Th>
