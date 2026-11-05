@@ -40,7 +40,7 @@ type SortKey = "fecha" | "numero" | "cliente" | "valor";
 
 const CHIPS: { key: ChipKey; label: string; status?: string; countKey: keyof WithdrawalCounts }[] = [
   { key: "todas", label: "Todas", countKey: "all" },
-  { key: "Solicitado", label: "Solicitadas", status: "Solicitado", countKey: "requested" },
+  { key: "Solicitado", label: "Registradas", status: "Solicitado", countKey: "requested" },
   { key: "Aprobado", label: "Aprobadas", status: "Aprobado", countKey: "approved" },
   { key: "Retirado", label: "Retiradas", status: "Retirado", countKey: "withdrawn" },
   { key: "Rechazado", label: "Rechazadas", status: "Rechazado", countKey: "rejected" },
@@ -267,16 +267,16 @@ export function WithdrawalsPage() {
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag
-                label={counts.requested === 1 ? "solicitada" : "solicitadas"}
+                label={counts.requested === 1 ? "registrada" : "registradas"}
                 count={counts.requested}
                 active={chip === "Solicitado"}
                 onClick={() => {
                   setChip("Solicitado");
                   setPage(1);
                 }}
-                tone="amber"
+                tone="blue"
                 dot
-                title="Filtrar por solicitudes pendientes"
+                title="Filtrar por solicitudes registradas"
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag

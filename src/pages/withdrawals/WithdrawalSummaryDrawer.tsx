@@ -12,6 +12,7 @@ import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { EnterpriseFormExecutiveSummarySkeleton } from "../../components/ui/Skeleton";
 import type { WithdrawalDetail } from "../../types/withdrawals";
 import { WithdrawalExecutiveSummary } from "./WithdrawalExecutiveSummary";
+import { normalizeWithdrawalStatus } from "./WithdrawalStatusBadge";
 
 interface WithdrawalSummaryDrawerProps {
   withdrawalId: number;
@@ -56,7 +57,7 @@ export function WithdrawalSummaryDrawer({ withdrawalId, onClose, getReturnSnapsh
       eyebrow="PF-FOR-068 · Retiro de mercancía"
       description={
         detail
-          ? `${detail.withdrawal.clientName} · ${detail.withdrawal.status}`
+          ? `${detail.withdrawal.clientName} · ${normalizeWithdrawalStatus(detail.withdrawal.status)}`
           : "Cargando datos del formulario…"
       }
       maxWidth="max-w-[760px]"

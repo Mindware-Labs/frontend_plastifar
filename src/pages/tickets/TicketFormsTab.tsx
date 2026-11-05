@@ -62,7 +62,7 @@ import { DiscrepancyStatusBadge, normalizeDiscrepancyStatus } from "../discrepan
 import { HcaModal } from "../quality/HcaModal";
 import { HcaStatusBadge, PlanItemStatusBadge } from "../quality/StatusBadges";
 import { WithdrawalFormModal } from "../withdrawals/WithdrawalFormModal";
-import { WithdrawalStatusBadge } from "../withdrawals/WithdrawalStatusBadge";
+import { WithdrawalStatusBadge, normalizeWithdrawalStatus } from "../withdrawals/WithdrawalStatusBadge";
 import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 import { TaskFormHostLinkSubtitle, TaskScopeCodeKpi } from "../../lib/taskFormPresentation";
 import { RegisteredFormCrossfadeShell } from "./RegisteredFormCrossfadeShell";
@@ -446,7 +446,7 @@ export function TicketFormsTab({
         type: "retiro",
         code: "PF-FOR-068",
         title: `Retiro ${w.number}`,
-        badgeText: w.status,
+        badgeText: normalizeWithdrawalStatus(w.status),
         data: w,
       });
     });
