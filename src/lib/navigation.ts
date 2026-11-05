@@ -112,7 +112,7 @@ export const SIDEBAR_NAV: NavGroup[] = [
     icon: TicketCheck,
     section: "Principal",
     children: [
-      { label: "Tickets", to: "/tickets", end: true, icon: TicketIcon, permission: "tickets.read" },
+      { label: "Tickets", to: "/tickets", icon: TicketIcon, permission: "tickets.read" },
       { label: "Tareas", to: "/tareas", icon: ListTodo, permission: "tasks.read" },
       { label: "Reclamaciones", to: "/reclamaciones", icon: FileWarning, permission: "claims.read", subgroup: "Incidencias y Casos" },
       { label: "Discrepancias", to: "/discrepancias", icon: PackageSearch, permission: "discrepancies.read", subgroup: "Incidencias y Casos" },
