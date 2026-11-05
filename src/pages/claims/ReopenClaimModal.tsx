@@ -13,7 +13,7 @@ export function ReopenClaimModal({ claim, onClose, onSaved }: ReopenClaimModalPr
   return (
     <ReasonModal
       title={`Reabrir reclamación de ${claim.ticketNumber}`}
-      description="Vuelve a «En tratamiento» y se puede corregir. El sello de cierre anterior se conserva en la bitácora."
+      description="Vuelve a «Registrada» y se puede corregir. El sello de cierre anterior se conserva en la bitácora."
       field={{
         label: "Motivo",
         placeholder: "El cliente volvió a reportar el faltante tras la reposición",

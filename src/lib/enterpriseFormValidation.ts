@@ -25,12 +25,17 @@ export type ClaimStepValues = {
   description?: string;
   firstCustomerContactAt?: string;
   lines?: Array<{ productId?: string; unitPrice?: string }>;
+  qualityIntent?: string;
+  firstResponseCorrection?: string;
+  requiresCorrectiveAction?: string;
+  customerSatisfied?: string;
 };
 
 export function getClaimStepMissing(
-  step: 1 | 2 | 3 | 4,
+  step: 1 | 2 | 3 | 4 | 5,
   values: ClaimStepValues | undefined,
   topicLabel: string | null | undefined,
+  options?: { canFillQuality?: boolean },
 ): ValidationItem[] {
   const checks: Array<{ id: string; label: string; short: string; valid: boolean }> = [];
   const safe = values ?? {};
@@ -122,6 +127,41 @@ export function getClaimStepMissing(
           "El primer contacto no puede ser anterior a la reclamación",
           "la fecha de primer contacto",
           false,
+        ),
+      );
+    }
+  }
+
+  if (step === 5) {
+    const intent = safe.qualityIntent ?? "";
+    checks.push(
+      check(
+        "qualityIntent",
+        "Indica si completarás el apartado de Calidad ahora o no se requiere",
+        "la decisión sobre Calidad",
+        intent === "fill" || intent === "waive",
+      ),
+    );
+    if (intent === "fill" && options?.canFillQuality !== false) {
+      const first = safe.firstResponseCorrection ?? "";
+      checks.push(
+        check(
+          "firstResponseCorrection",
+          "Escribe la primera respuesta como corrección",
+          "la primera respuesta",
+          first.trim().length > 0,
+        ),
+        check(
+          "requiresCorrectiveAction",
+          "Indica si se requiere acción correctiva",
+          "la decisión sobre acción correctiva",
+          (safe.requiresCorrectiveAction ?? "").trim() !== "",
+        ),
+        check(
+          "customerSatisfied",
+          "Indica si el cliente quedó satisfecho",
+          "la satisfacción del cliente",
+          (safe.customerSatisfied ?? "").trim() !== "",
         ),
       );
     }

@@ -1,6 +1,7 @@
 // Cálculo y texto de la reclamación de clientes (PF-FOR-034), espejo de ClaimRules.Compute.
 
 import type { ClaimStatus } from "../types/claims";
+import type { ClaimQualitySectionStatus } from "./claimQualitySection";
 
 /** Redondeo a dos decimales sin arrastrar el error binario de `toFixed`. */
 function round2(value: number): number {
@@ -34,12 +35,21 @@ export function yesNo(value: boolean | null): string {
 }
 
 /** Lo que cada estado permite, en palabras (8.1). */
-export function describeStatus(status: ClaimStatus): string {
+export function describeStatus(
+  status: ClaimStatus,
+  qualitySectionStatus?: ClaimQualitySectionStatus,
+): string {
   switch (status) {
     case "Registrada":
+      if (qualitySectionStatus === "complete") {
+        return "Registrada; apartado de Calidad completo. Puede cerrarse cuando corresponda.";
+      }
+      if (qualitySectionStatus === "waived") {
+        return "Registrada; Calidad no se completó en el registro inicial.";
+      }
       return "Registrada por quien recibió la reclamación; Calidad todavía no la ha tratado.";
     case "En tratamiento":
-      return "Calidad ya guardó la sección IV; se cierra cuando estén las tres respuestas.";
+      return "Registrada; el avance de Calidad se ve en la sección IV del formulario.";
     default:
       return "Cerrada. Para corregirla, Calidad la reabre con un motivo.";
   }

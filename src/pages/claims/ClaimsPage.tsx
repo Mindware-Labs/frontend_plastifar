@@ -55,7 +55,6 @@ type SortKey = "fecha" | "cliente" | "total" | "ticket";
 const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "registered" | "inTreatment" | "closed" }[] = [
   { key: "todas", label: "Todas", countKey: "all" },
   { key: "Registrada", label: "Registradas", status: "Registrada", countKey: "registered" },
-  { key: "En tratamiento", label: "En tratamiento", status: "En tratamiento", countKey: "inTreatment" },
   { key: "Cerrada", label: "Cerradas", status: "Cerrada", countKey: "closed" },
 ];
 
@@ -320,19 +319,6 @@ export function ClaimsPage() {
                 tone="blue"
                 dot
                 title="Filtrar por reclamaciones registradas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="en tratamiento"
-                count={counts.inTreatment}
-                active={chip === "En tratamiento"}
-                onClick={() => {
-                  setChip("En tratamiento");
-                  setPage(1);
-                }}
-                tone="amber"
-                dot
-                title="Filtrar por reclamaciones en tratamiento"
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag

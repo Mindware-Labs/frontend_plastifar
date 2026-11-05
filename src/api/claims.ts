@@ -67,6 +67,11 @@ export const claimsApi = {
       body: JSON.stringify(data),
     }),
 
+  waiveQualitySection: (id: number) =>
+    apiRequest<ClaimDetail>(`/api/claims/${id}/quality-section/waive`, {
+      method: "POST",
+    }),
+
   close: (id: number, observations: string | null) =>
     apiRequest<ClaimDetail>(`/api/claims/${id}/close`, {
       method: "POST",

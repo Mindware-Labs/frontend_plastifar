@@ -1,3 +1,4 @@
+import { getClaimQualitySectionLabel } from "../../../lib/claimQualitySection";
 import { formatDay } from "../../../lib/dates";
 import { formatAmount } from "../../../lib/numbers";
 import type { CustomerClaim } from "../../../types/claims";
@@ -16,6 +17,7 @@ export function ClaimFormSummary({ claim: c }: { claim: CustomerClaim }) {
         <SummaryField label="Monto Total" valueClassName="font-semibold text-zinc-900">
           {c.currency ? formatAmount(c.totalAmount, c.currency) : c.totalAmount}
         </SummaryField>
+        <SummaryField label="Calidad (IV)">{getClaimQualitySectionLabel(c.qualitySectionStatus)}</SummaryField>
       </dl>
 
       {c.description && <SummaryNote label="Descripción:">{c.description}</SummaryNote>}

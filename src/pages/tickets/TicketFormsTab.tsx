@@ -55,7 +55,8 @@ import type { ActionPlanItem, CorrectiveActionSheet } from "../../types/quality"
 import type { ProductLine } from "../../types/settings";
 import type { MerchandiseWithdrawal } from "../../types/withdrawals";
 import { ClaimFormModal } from "../claims/ClaimFormModal";
-import { ClaimStatusBadge } from "../claims/ClaimStatusBadge";
+import { claimQualitySectionTone, getClaimQualitySectionLabel } from "../../lib/claimQualitySection";
+import { ClaimStatusBadge, normalizeClaimStatus } from "../claims/ClaimStatusBadge";
 import { DiscrepancyFormModal } from "../discrepancies/DiscrepancyFormModal";
 import { DiscrepancyStatusBadge } from "../discrepancies/DiscrepancyStatusBadge";
 import { HcaModal } from "../quality/HcaModal";
@@ -64,6 +65,7 @@ import { WithdrawalFormModal } from "../withdrawals/WithdrawalFormModal";
 import { WithdrawalStatusBadge } from "../withdrawals/WithdrawalStatusBadge";
 import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 import { TaskFormHostLinkSubtitle, TaskScopeCodeKpi } from "../../lib/taskFormPresentation";
+import { RegisteredFormCrossfadeShell } from "./RegisteredFormCrossfadeShell";
 
 export type EnterpriseFormType = "reclamacion" | "retiro" | "discrepancia" | "hca";
 
@@ -419,7 +421,7 @@ export function TicketFormsTab({
         type: "reclamacion",
         code: "PF-FOR-034",
         title: "Reclamación de Clientes",
-        badgeText: claim.status,
+        badgeText: normalizeClaimStatus(claim.status),
         data: claim,
       });
     }
@@ -509,6 +511,19 @@ export function TicketFormsTab({
       registeredForms.findIndex((f) => f.key === activeForm?.key)
     );
   }, [registeredForms, activeForm?.key]);
+
+  const [formSwitchDirection, setFormSwitchDirection] = useState<"forward" | "backward">("forward");
+
+  const selectRegisteredForm = (key: string) => {
+    if (activeForm && key !== activeForm.key && registeredForms.length > 1) {
+      const currentIndex = registeredForms.findIndex((f) => f.key === activeForm.key);
+      const nextIndex = registeredForms.findIndex((f) => f.key === key);
+      if (currentIndex >= 0 && nextIndex >= 0 && nextIndex !== currentIndex) {
+        setFormSwitchDirection(nextIndex > currentIndex ? "forward" : "backward");
+      }
+    }
+    setSelectedSubTabKey(key);
+  };
 
   useEffect(() => {
     if (activeForm?.type !== "hca") return;
@@ -1077,7 +1092,7 @@ export function TicketFormsTab({
                       key={item.key}
                       type="button"
                       {...formLineTabIndexAttr(idx)}
-                      onClick={() => setSelectedSubTabKey(item.key)}
+                      onClick={() => selectRegisteredForm(item.key)}
                       className={`inline-flex shrink-0 whitespace-nowrap items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
                         isSelected
                           ? "bg-brand-red/10 border border-brand-red/30 text-brand-red shadow-2xs font-semibold"
@@ -1100,7 +1115,16 @@ export function TicketFormsTab({
 
           {/* ACTIVE FORM DETAILS */}
           {activeForm && (
-            <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-2xs">
+            <RegisteredFormCrossfadeShell
+              activeKey={activeForm.key}
+              direction={formSwitchDirection}
+              enabled={registeredForms.length > 1}
+              forms={registeredForms}
+            >
+              {(form) => {
+                const activeForm = form;
+                return (
+              <>
               {/* Form Card Header */}
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4">
                 <div>
@@ -1111,7 +1135,26 @@ export function TicketFormsTab({
                     <h3 className="text-sm font-semibold text-zinc-900">{activeForm.title}</h3>
 
                     {activeForm.type === "reclamacion" && (
-                      <ClaimStatusBadge status={(activeForm.data as CustomerClaim).status} />
+                      <>
+                        <ClaimStatusBadge status={(activeForm.data as CustomerClaim).status} />
+                        {(() => {
+                          const q = (activeForm.data as CustomerClaim).qualitySectionStatus;
+                          const tone = claimQualitySectionTone(q);
+                          return (
+                            <span
+                              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${
+                                tone === "emerald"
+                                  ? "border-emerald-200/80 bg-emerald-50 text-emerald-800"
+                                  : tone === "slate"
+                                    ? "border-zinc-200 bg-zinc-100 text-zinc-600"
+                                    : "border-amber-200/80 bg-amber-50 text-amber-900"
+                              }`}
+                            >
+                              {getClaimQualitySectionLabel(q)}
+                            </span>
+                          );
+                        })()}
+                      </>
                     )}
                     {activeForm.type === "retiro" && (
                       <WithdrawalStatusBadge status={(activeForm.data as MerchandiseWithdrawal).status} />
@@ -2033,7 +2076,10 @@ export function TicketFormsTab({
                   );
                 })()}
               </div>
-            </div>
+              </>
+                );
+              }}
+            </RegisteredFormCrossfadeShell>
           )}
         </div>
       )}

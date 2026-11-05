@@ -134,7 +134,7 @@ export function ClaimDetailPage() {
           content={
             canClose
               ? "Todo listo para cerrar"
-              : claim.status === "Registrada"
+              : claim.qualitySectionStatus === "pending"
                 ? "Registra primero el tratamiento de la sección IV"
                 : missing
                   ? `Falta: ${missing.missing}`
@@ -171,7 +171,7 @@ export function ClaimDetailPage() {
     <div className="max-w-[920px] pb-10 animate-plf-apple-tab">
       <ModuleHeader
         title={`Reclamación · ${claim.ticketNumber}`}
-        summary={`${claim.clientName} · ${describeStatus(claim.status)}`}
+        summary={`${claim.clientName} · ${describeStatus(claim.status, claim.qualitySectionStatus)}`}
         action={actions}
       />
 
