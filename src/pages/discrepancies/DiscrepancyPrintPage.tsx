@@ -5,7 +5,7 @@ import { PrintPending } from "../../components/print/PrintSheet";
 import { usePrintRecord } from "../../components/print/usePrintRecord";
 import { DISCREPANCY_FORM_CONTROL } from "../../lib/discrepancies";
 
-/** RF-D8: la investigación con la distribución del PF-FOR-291 en horizontal, el control do... */
+/** RF-D8: la investigación con la distribución del PF-FOR-291 en horizontal, el control documental... */
 export function DiscrepancyPrintPage() {
   const { id } = useParams();
   const discrepancyId = Number(id);
@@ -17,7 +17,9 @@ export function DiscrepancyPrintPage() {
       failed: "No se pudo cargar la investigación.",
     },
   );
-  if (discrepancy === null) return <PrintPending error={error} />;
+  if (discrepancy === null) {
+    return <PrintPending error={error} backLabel="Volver a la discrepancia" orientation="landscape" />;
+  }
 
   return <DiscrepancyDocumentSheet discrepancy={discrepancy} backLabel="Volver a la discrepancia" />;
 }

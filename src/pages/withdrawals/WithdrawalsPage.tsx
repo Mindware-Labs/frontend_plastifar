@@ -524,7 +524,7 @@ export function WithdrawalsPage() {
                           <RowAction
                             label={`Imprimir ${item.number}`}
                             icon={FileText}
-                            onClick={() => window.open(`/retiros/${item.id}/imprimir?mode=pdf`, "_blank")}
+                            onClick={() => window.open(`/retiros/${item.id}/imprimir`, "_blank")}
                           />
                         </div>
                       </Td>

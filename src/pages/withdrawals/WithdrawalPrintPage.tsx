@@ -17,7 +17,9 @@ export function WithdrawalPrintPage() {
     },
   );
 
-  if (detail === null) return <PrintPending error={error} />;
+  if (detail === null) {
+    return <PrintPending error={error} backLabel="Volver al retiro" orientation="landscape" />;
+  }
 
   return <WithdrawalDocumentSheet withdrawal={detail.withdrawal} backLabel="Volver al retiro" />;
 }

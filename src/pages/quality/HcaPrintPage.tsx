@@ -16,7 +16,9 @@ export function HcaPrintPage() {
     failed: "No se pudo cargar la HCA.",
   });
 
-  if (detail === null) return <PrintPending error={error} />;
+  if (detail === null) {
+    return <PrintPending error={error} backLabel="Volver a la HCA" orientation="portrait" />;
+  }
 
   return (
     <HcaDocumentSheet

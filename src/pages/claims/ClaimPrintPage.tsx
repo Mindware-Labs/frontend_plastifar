@@ -18,7 +18,9 @@ export function ClaimPrintPage() {
     },
   );
 
-  if (claim === null) return <PrintPending error={error} />;
+  if (claim === null) {
+    return <PrintPending error={error} backLabel="Volver a la reclamación" orientation="portrait" />;
+  }
 
   return <ClaimDocumentSheet claim={claim} backLabel="Volver a la reclamación" />;
 }
