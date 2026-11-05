@@ -20,7 +20,11 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { ApiError } from "../../api/client";
 import { tasksApi } from "../../api/tasks";
 import { ticketsApi } from "../../api/tickets";
-import { ModuleHeader, type ModuleHeaderSection } from "../../components/app/ModuleHeader";
+import {
+  MODULE_HEADER_TITLE_GUTTER_CLASS,
+  ModuleHeader,
+  type ModuleHeaderSection,
+} from "../../components/app/ModuleHeader";
 import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { Alert } from "../../components/ui/Alert";
 import { TextAreaField } from "../../components/ui/Field";
@@ -588,30 +592,36 @@ export function TaskDetailPage() {
 
       {/* Zona de contenido con scroll vertical */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-8">
-        <div className="mx-auto w-full max-w-6xl">
-          <div className="pt-2">
-            {/* Encabezado: Título y Metadatos */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0 max-w-full lg:max-w-2xl">
-                <h1
-                  className="font-heading text-[18px] sm:text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink truncate"
-                  title={task.title}
-                >
-                  {task.title}
-                </h1>
-              </div>
-
-              <p className="flex flex-wrap items-center gap-x-1.5 text-[12px] text-zinc-500 shrink-0">
-                <span>Creada el {formatDateTime(task.createdAt)} por</span>
-                <span className="font-medium text-zinc-800">{task.createdByName}</span>
-                <span aria-hidden className="text-zinc-300">·</span>
-                <span className="font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">
-                  {task.origin === "Correo" ? "Correo" : "Manual"}
-                </span>
-              </p>
+        <div className="pt-2 pr-3 lg:pr-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Asunto — mismo eje vertical que el código TAR-… del ModuleHeader */}
+            <div className={`min-w-0 max-w-full lg:max-w-2xl ${MODULE_HEADER_TITLE_GUTTER_CLASS}`}>
+              <h1
+                className="font-heading text-[18px] sm:text-[20px] font-bold leading-snug tracking-[-0.02em] text-ink truncate"
+                title={task.title}
+              >
+                {task.title}
+              </h1>
             </div>
 
-            <div className="mt-3.5">
+            <p className="flex shrink-0 flex-wrap items-center gap-x-1.5 text-[12px] text-zinc-500">
+              <span>Creada el {formatDateTime(task.createdAt)} por</span>
+              <span className="font-medium text-zinc-800">{task.createdByName}</span>
+              <span aria-hidden className="text-zinc-300">
+                ·
+              </span>
+              <span className="font-heading text-[9.5px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+                {task.origin === "Correo" ? "Correo" : "Manual"}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div
+          className={`mt-3.5 transition-all duration-200 ${
+            activeTab === "formularios" || activeTab === "reclamacion" ? "w-full" : "mx-auto max-w-6xl"
+          }`}
+        >
               <div key={activeTab} className="animate-plf-apple-tab">
                 {activeTab === "datos" && (
                   <div className="space-y-3.5">
@@ -1171,8 +1181,6 @@ export function TaskDetailPage() {
                 )}
 
               </div>
-            </div>
-          </div>
         </div>
       </div>
         </>
