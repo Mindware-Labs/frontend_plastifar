@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
-import { Mail, RotateCcw } from "lucide-react";
+import { Mail, RotateCcw, UserCheck } from "lucide-react";
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
 import { pickDefaultSlaPolicyId } from "../../lib/slaPolicyUi";
 import { useActiveSlaPolicies } from "../../lib/useActiveSlaPolicies";
@@ -15,6 +15,8 @@ import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { Button } from "../../components/ui/Button";
 import { SelectField, TextAreaField, TextField, type FieldState } from "../../components/ui/Field";
+import { Select } from "../../components/ui/Select";
+import { useAuth } from "../../context/useAuth";
 import { Modal } from "../../components/ui/Modal";
 import { Toast } from "../../components/ui/Toast";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
@@ -139,6 +141,8 @@ export function CreateTicketModal({
   emailDirection = "inbound",
   initialAssignedStaffId,
 }: CreateTicketModalProps) {
+  const { user } = useAuth();
+  const currentStaffId = user?.staffId ?? 0;
   const [catalogs, setCatalogs] = useState<TicketCreateOptionsResponse | null>(() => cachedCatalogs);
   const [loadingCatalogs, setLoadingCatalogs] = useState(() => !cachedCatalogs);
   const [departmentTree, setDepartmentTree] = useState<DepartmentResponse[] | undefined>(
@@ -522,28 +526,66 @@ export function CreateTicketModal({
             <Controller
               control={control}
               name="assignedStaffId"
-              render={({ field }) => (
-                <SelectField
-                  id="ticket-assigned-staff"
-                  label="Asignar a colaborador"
-                  size="sm"
-                  searchable
-                  value={field.value ?? ""}
-                  onChange={(val) => {
-                    field.onChange(val);
-                    if (toastError) setToastError(null);
-                  }}
-                  disabled={loadingCatalogs}
-                  placeholder={loadingCatalogs ? "Cargando colaboradores…" : "Sin asignar, en cola general"}
-                  options={[
-                    { value: "", label: "Sin asignar, en cola general" },
-                    ...(catalogs?.assignableStaff ?? []).map((s) => ({
-                      value: String(s.id),
-                      label: s.fullName,
-                    })),
-                  ]}
-                />
-              )}
+              render={({ field }) => {
+                const assignedValue = field.value ?? "";
+                const isSelfAssigned =
+                  currentStaffId > 0 && assignedValue === String(currentStaffId);
+                const canSelfAssign =
+                  currentStaffId > 0 &&
+                  (catalogs?.assignableStaff ?? []).some((s) => s.id === currentStaffId);
+
+                return (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <label
+                        htmlFor="ticket-assigned-staff"
+                        className="font-heading text-[11.5px] font-semibold text-faint"
+                      >
+                        Asignar a colaborador
+                      </label>
+                      {canSelfAssign && (
+                        <button
+                          type="button"
+                          disabled={loadingCatalogs}
+                          onClick={() => {
+                            field.onChange(String(currentStaffId));
+                            if (toastError) setToastError(null);
+                          }}
+                          className={`inline-flex shrink-0 items-center gap-1 text-[11.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                            isSelfAssigned
+                              ? "cursor-default font-semibold text-brand-red"
+                              : "cursor-pointer text-zinc-500 hover:text-zinc-900 hover:underline"
+                          }`}
+                        >
+                          <UserCheck className="size-3.5 text-brand-red" aria-hidden />
+                          {isSelfAssigned ? "Asignado a mí ✓" : "Autoasignarme a mí"}
+                        </button>
+                      )}
+                    </div>
+                    <Select
+                      id="ticket-assigned-staff"
+                      size="sm"
+                      searchable
+                      value={assignedValue}
+                      onChange={(val) => {
+                        field.onChange(val);
+                        if (toastError) setToastError(null);
+                      }}
+                      disabled={loadingCatalogs}
+                      placeholder={
+                        loadingCatalogs ? "Cargando colaboradores…" : "Sin asignar, en cola general"
+                      }
+                      options={[
+                        { value: "", label: "Sin asignar, en cola general" },
+                        ...(catalogs?.assignableStaff ?? []).map((s) => ({
+                          value: String(s.id),
+                          label: s.id === currentStaffId ? `${s.fullName} (Tú)` : s.fullName,
+                        })),
+                      ]}
+                    />
+                  </div>
+                );
+              }}
             />
 
             <div className="sm:col-span-2">

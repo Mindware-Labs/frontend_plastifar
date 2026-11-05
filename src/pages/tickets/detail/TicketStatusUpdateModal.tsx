@@ -1,7 +1,7 @@
 import { Gavel } from "lucide-react";
 import { AnimatedCheckIcon } from "../../../components/ui/AnimatedCheckIcon";
 import { Button } from "../../../components/ui/Button";
-import { CheckboxField, SelectField } from "../../../components/ui/Field";
+import { CheckboxField, SelectField, TextAreaField } from "../../../components/ui/Field";
 import { FileDropzone } from "../../../components/ui/FileDropzone";
 import { Modal } from "../../../components/ui/Modal";
 import { labelClass, textareaClass } from "./ticketDetailShared";
@@ -83,7 +83,7 @@ export function TicketStatusUpdateModal({
               ? "Elige qué hacer con este ticket."
               : updateStep === 2
                 ? "Paso 2 de 3 · Selecciona el motivo y confirma si deseas notificar al cliente."
-                : "Paso 3 de 3 · Redacta el comentario del veredicto y adjunta archivos de soporte."
+                : "Paso 3 de 3 · Redacta el comentario de cierre y adjunta archivos de soporte."
             : updateStep === 1
               ? "Elige qué hacer con este ticket."
               : "Paso 2 de 2 · Completa los datos para confirmar."
@@ -306,28 +306,24 @@ export function TicketStatusUpdateModal({
 
           {updateStep === 3 && updateCategory === "veredicto" && (
             <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-4">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="update-comment" className={labelClass}>
-                  Comentario del veredicto
-                  <span className="ml-1 text-brand-red">*</span>
-                </label>
-                <textarea
-                  id="update-comment"
-                  rows={3}
-                  value={updateComment}
-                  onChange={(event) => {
-                    setUpdateComment(event.target.value);
-                    if (transitionError) setTransitionError(null);
-                  }}
-                  placeholder="Explica el veredicto y las conclusiones de la reclamación…"
-                  className={`${textareaClass} ${
-                    transitionError && !updateComment.trim()
-                      ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
-                      : ""
-                  }`}
-                  autoFocus
-                />
-              </div>
+              <TextAreaField
+                id="update-comment"
+                label="Comentario de cierre"
+                required
+                autoGrow
+                autoFocus
+                value={updateComment}
+                onChange={(event) => {
+                  setUpdateComment(event.target.value);
+                  if (transitionError) setTransitionError(null);
+                }}
+                placeholder="Explica el veredicto y las conclusiones de la reclamación…"
+                className={`text-[12.5px] py-2 leading-relaxed shadow-2xs ${
+                  transitionError && !updateComment.trim()
+                    ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
+                    : ""
+                }`}
+              />
 
               {/* Carga de evidencias con el mismo diseño que CompleteTaskModal */}
               <FileDropzone
@@ -353,44 +349,36 @@ export function TicketStatusUpdateModal({
 
           {updateStep === 2 && updateCategory !== "veredicto" && (
             <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-3">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="update-comment" className={labelClass}>
-                  {updateCategory === "cancelar"
+              <TextAreaField
+                id="update-comment"
+                label={
+                  updateCategory === "cancelar"
                     ? "Motivo de cancelación"
                     : updateCategory === "pausar"
                       ? "Motivo de la pausa"
-                      : "Comentario"}
-                  {updateCategory === "cancelar" || updateCategory === "pausar" ? (
-                    <span className="ml-1 text-brand-red">*</span>
-                  ) : (
-                    <span className="ml-1 font-normal text-zinc-400">(opcional)</span>
-                  )}
-                </label>
-                <textarea
-                  id="update-comment"
-                  rows={3}
-                  value={updateComment}
-                  onChange={(event) => {
-                    setUpdateComment(event.target.value);
-                    if (transitionError) setTransitionError(null);
-                  }}
-                  placeholder={
-                    updateCategory === "cancelar"
-                      ? "Explica la razón de anulación (creado por error, duplicado, prueba)…"
-                      : updateCategory === "pausar"
-                        ? "Explica por qué se pausa este ticket…"
-                        : "Contexto adicional para el historial del ticket…"
-                  }
-                  className={`${textareaClass} ${
-                    transitionError &&
-                    !updateComment.trim() &&
-                    (updateCategory === "cancelar" || updateCategory === "pausar")
-                      ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
-                      : ""
-                  }`}
-                  autoFocus
-                />
-              </div>
+                      : "Comentario de reapertura"
+                }
+                required
+                autoGrow
+                autoFocus
+                value={updateComment}
+                onChange={(event) => {
+                  setUpdateComment(event.target.value);
+                  if (transitionError) setTransitionError(null);
+                }}
+                placeholder={
+                  updateCategory === "cancelar"
+                    ? "Explica la razón de anulación (creado por error, duplicado, prueba)…"
+                    : updateCategory === "pausar"
+                      ? "Explica por qué se pausa este ticket…"
+                      : "Explica por qué se reabre o reanuda este ticket…"
+                }
+                className={`text-[12.5px] py-2 leading-relaxed shadow-2xs ${
+                  transitionError && !updateComment.trim()
+                    ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
+                    : ""
+                }`}
+              />
 
               {updateCategory === "cancelar" && (
                 <CheckboxField

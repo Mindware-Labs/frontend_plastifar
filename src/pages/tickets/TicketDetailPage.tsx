@@ -64,6 +64,7 @@ import { useSettle } from "../../hooks/useSettle";
 import { useSidePanelMotion } from "../../hooks/useSidePanelMotion";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { prefersReducedMotion } from "../../hooks/motion";
 import { useAuth } from "../../context/useAuth";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useEmailCounts } from "../../context/useEmailCounts";
@@ -101,6 +102,12 @@ import {
   useComposerSendCelebration,
   type ComposerSendCelebrationPayload,
 } from "../bandeja/useComposerSendCelebration";
+import {
+  TICKET_UPDATE_CELEBRATION_MS,
+  TicketStatusUpdateCelebration,
+} from "./detail/TicketStatusUpdateCelebration";
+import { NotifyClientCheckboxDescription } from "./detail/ticketNotifyClient";
+import { TicketUpdateStepNav } from "./detail/TicketUpdateStepNav";
 import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
 import { parseTicketDetailId } from "./ticketLegacy";
 import { TaskCommentsAside, type TaskCommentsAsideHandle } from "./TaskCommentsAside";
@@ -775,12 +782,66 @@ export function TicketDetailPage() {
   } = useUploadFeedback({ duration: 2300, exitDuration: 360 });
   const verdictFileInputRef = useRef<HTMLInputElement>(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [showUpdateCelebration, setShowUpdateCelebration] = useState(false);
+  const [updateCelebrationExiting, setUpdateCelebrationExiting] = useState(false);
   const updateSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const updateCelebrationDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showUpdateCelebrationRef = useRef(showUpdateCelebration);
+  showUpdateCelebrationRef.current = showUpdateCelebration;
   const step2EnteredAtRef = useRef<number>(0);
+  const {
+    isExiting: updateStatusModalExiting,
+    requestClose: requestUpdateStatusModalClose,
+    reset: resetUpdateStatusModalMotion,
+  } = useModalAnimation();
+
+  const finalizeUpdateStatusModal = useCallback(() => {
+    if (updateSuccessTimerRef.current) {
+      clearTimeout(updateSuccessTimerRef.current);
+      updateSuccessTimerRef.current = null;
+    }
+    if (updateCelebrationDismissTimerRef.current) {
+      clearTimeout(updateCelebrationDismissTimerRef.current);
+      updateCelebrationDismissTimerRef.current = null;
+    }
+    setShowUpdateStatusModal(false);
+    setUpdateSuccess(false);
+    setShowUpdateCelebration(false);
+    setUpdateCelebrationExiting(false);
+    resetUpdateStatusModalMotion();
+  }, [resetUpdateStatusModalMotion]);
+
+  const requestUpdateStatusModalDismiss = useCallback(() => {
+    if (updateSuccessTimerRef.current) {
+      clearTimeout(updateSuccessTimerRef.current);
+      updateSuccessTimerRef.current = null;
+    }
+    if (updateCelebrationDismissTimerRef.current) {
+      clearTimeout(updateCelebrationDismissTimerRef.current);
+      updateCelebrationDismissTimerRef.current = null;
+    }
+
+    if (showUpdateCelebrationRef.current && !prefersReducedMotion()) {
+      setUpdateCelebrationExiting(true);
+      updateCelebrationDismissTimerRef.current = setTimeout(() => {
+        updateCelebrationDismissTimerRef.current = null;
+        requestUpdateStatusModalClose();
+      }, 320);
+      return;
+    }
+    requestUpdateStatusModalClose();
+  }, [requestUpdateStatusModalClose]);
+
+  useEffect(() => {
+    if (!showUpdateStatusModal) return;
+    resetUpdateStatusModalMotion();
+    setUpdateCelebrationExiting(false);
+  }, [showUpdateStatusModal, resetUpdateStatusModalMotion]);
 
   useEffect(() => {
     return () => {
       if (updateSuccessTimerRef.current) clearTimeout(updateSuccessTimerRef.current);
+      if (updateCelebrationDismissTimerRef.current) clearTimeout(updateCelebrationDismissTimerRef.current);
     };
   }, []);
 
@@ -818,9 +879,16 @@ export function TicketDetailPage() {
     setVerdictAttachments([]);
     setIsDraggingVerdict(false);
     setUpdateSuccess(false);
+    setShowUpdateCelebration(false);
+    setUpdateCelebrationExiting(false);
+    resetUpdateStatusModalMotion();
     if (updateSuccessTimerRef.current) {
       clearTimeout(updateSuccessTimerRef.current);
       updateSuccessTimerRef.current = null;
+    }
+    if (updateCelebrationDismissTimerRef.current) {
+      clearTimeout(updateCelebrationDismissTimerRef.current);
+      updateCelebrationDismissTimerRef.current = null;
     }
     setTransitionError(null);
     step2EnteredAtRef.current = 0;
@@ -870,8 +938,8 @@ export function TicketDetailPage() {
       buildValidationItems([
         {
           id: "update-comment",
-          label: "Falta el comentario del veredicto",
-          short: "el comentario",
+          label: "Falta el comentario de cierre",
+          short: "el comentario de cierre",
           valid: updateComment.trim().length > 0,
         },
       ]),
@@ -879,15 +947,19 @@ export function TicketDetailPage() {
   );
 
   const updateStatusOtherStep2Missing = useMemo(() => {
-    if (updateCategory !== "cancelar" && updateCategory !== "pausar") return [];
+    if (updateCategory !== "cancelar" && updateCategory !== "pausar" && updateCategory !== "otro") {
+      return [];
+    }
     return buildValidationItems([
       {
         id: "update-comment",
         label:
           updateCategory === "cancelar"
             ? "Falta el motivo de cancelación"
-            : "Falta el motivo de la pausa",
-        short: "el motivo",
+            : updateCategory === "pausar"
+              ? "Falta el motivo de la pausa"
+              : "Falta el comentario de reapertura",
+        short: updateCategory === "otro" ? "el comentario" : "el motivo",
         valid: updateComment.trim().length > 0,
       },
     ]);
@@ -950,6 +1022,11 @@ export function TicketDetailPage() {
       triggerUpdateSettle();
       return;
     }
+    if (updateCategory === "otro" && !updateComment.trim()) {
+      setTransitionError("Comentario de reapertura requerido");
+      triggerUpdateSettle();
+      return;
+    }
     if (updateCategory === "veredicto") {
       if (!updateVerdictId) {
         setTransitionError("Selecciona un veredicto");
@@ -957,7 +1034,7 @@ export function TicketDetailPage() {
         return;
       }
       if (!updateComment.trim()) {
-        setTransitionError("Comentario de veredicto requerido");
+        setTransitionError("Comentario de cierre requerido");
         triggerUpdateSettle();
         return;
       }
@@ -985,11 +1062,11 @@ export function TicketDetailPage() {
       receipts.done({ action: "estado-ticket", title: "Estado del ticket actualizado", detail: ticket?.number });
 
       setUpdateSuccess(true);
+      setShowUpdateCelebration(true);
       if (updateSuccessTimerRef.current) clearTimeout(updateSuccessTimerRef.current);
       updateSuccessTimerRef.current = setTimeout(() => {
-        setShowUpdateStatusModal(false);
-        setUpdateSuccess(false);
-      }, 2200);
+        requestUpdateStatusModalDismiss();
+      }, TICKET_UPDATE_CELEBRATION_MS);
     } catch (err) {
       setTransitionError(err instanceof Error ? err.message : "Error al actualizar");
       triggerUpdateSettle();
@@ -2442,7 +2519,7 @@ export function TicketDetailPage() {
                   ? "Elige qué hacer con este ticket."
                   : updateStep === 2
                     ? "Selecciona el veredicto y confirma si deseas notificar al cliente."
-                    : "Redacta el comentario del veredicto y adjunta archivos de soporte."
+                    : "Redacta el comentario de cierre y adjunta archivos de soporte."
                 : updateStep === 1
                   ? "Elige qué hacer con este ticket."
                   : updateCategory === "pausar"
@@ -2452,16 +2529,11 @@ export function TicketDetailPage() {
                       : "Completa los datos para confirmar la actualización."
           }
           maxWidth="max-w-lg"
-          onClose={() => {
-            if (!transitioning) {
-              if (updateSuccessTimerRef.current) {
-                clearTimeout(updateSuccessTimerRef.current);
-                updateSuccessTimerRef.current = null;
-              }
-              setShowUpdateStatusModal(false);
-              setUpdateSuccess(false);
-            }
+          isExiting={updateStatusModalExiting}
+          onRequestClose={() => {
+            if (!transitioning) requestUpdateStatusModalDismiss();
           }}
+          onClose={finalizeUpdateStatusModal}
           footer={
             updateSuccess ? (
               <Button
@@ -2469,14 +2541,7 @@ export function TicketDetailPage() {
                 type="button"
                 size="sm"
                 variant="primary"
-                onClick={() => {
-                  if (updateSuccessTimerRef.current) {
-                    clearTimeout(updateSuccessTimerRef.current);
-                    updateSuccessTimerRef.current = null;
-                  }
-                  setShowUpdateStatusModal(false);
-                  setUpdateSuccess(false);
-                }}
+                onClick={requestUpdateStatusModalDismiss}
               >
                 Entendido
               </Button>
@@ -2487,7 +2552,7 @@ export function TicketDetailPage() {
                   type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={() => setShowUpdateStatusModal(false)}
+                  onClick={requestUpdateStatusModalDismiss}
                 >
                   Cancelar
                 </Button>
@@ -2639,118 +2704,27 @@ export function TicketDetailPage() {
             )
           }
         >
-          {updateSuccess ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center animate-plf-check-in">
-              <div className="relative mb-4 flex items-center justify-center">
-                <div className="absolute h-16 w-16 rounded-full bg-emerald-500/20 animate-ping opacity-60" />
-                <div className="animate-plf-check-in relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 ring-8 ring-emerald-50 shadow-xs animate-plf-check-breathe">
-                  <AnimatedCheckIcon size={32} strokeWidth={2.8} />
-                </div>
-              </div>
-              <h3 className="text-base font-bold text-zinc-900 font-heading">
-                {updateCategory === "veredicto"
-                  ? "El ticket se completó correctamente"
-                  : updateCategory === "pausar"
-                    ? "El ticket ha sido pausado"
-                    : updateCategory === "cancelar"
-                      ? "El ticket ha sido cancelado"
-                      : "El ticket se actualizó correctamente"}
-              </h3>
-              <p className="mt-1.5 text-xs text-zinc-500 max-w-xs leading-relaxed">
-                {updateCategory === "veredicto"
-                  ? verdictAttachments.length > 0
-                    ? `Se registró el veredicto con ${verdictAttachments.length} ${
-                        verdictAttachments.length === 1
-                          ? "archivo de evidencia adjunto"
-                          : "archivos de evidencia adjuntos"
-                      }.`
-                    : "El veredicto fue registrado exitosamente."
-                  : updateCategory === "pausar"
-                    ? "El cómputo de SLA ha quedado pausado mientras se espera al cliente."
-                    : updateCategory === "cancelar"
-                      ? "El ticket ha sido anulado y registrado en el historial."
-                      : "El ticket ha sido actualizado correctamente."}
-              </p>
-            </div>
-          ) : (
+          <div
+            className={`relative overflow-hidden ${showUpdateCelebration ? "min-h-[min(360px,52vh)]" : ""}`}
+          >
+            <div
+              className={`transition-[opacity,transform,filter] duration-[380ms] ease-plf-spring motion-reduce:transition-none ${
+                showUpdateCelebration
+                  ? "pointer-events-none absolute inset-0 opacity-0 scale-[0.985] blur-[1.5px] motion-reduce:blur-none motion-reduce:scale-100"
+                  : "relative opacity-100"
+              }`}
+            >
             <div>
-              {/* Barra de pasos interactiva y dinámica estilo Apple */}
-              <nav
-                aria-label="Pasos de actualización de ticket"
-                className={`grid ${updateCategory === "veredicto" ? "grid-cols-3" : "grid-cols-2"} gap-2 p-1 rounded-xl bg-zinc-50 border border-zinc-200/80 mb-4 transition-all duration-300 ease-plf-spring`}
-              >
-                {(updateCategory === "veredicto"
-                  ? [
-                      { id: 1 as const, title: "Situación", subtitle: "Seleccionar acción" },
-                      { id: 2 as const, title: "Completar ticket", subtitle: "Elegir veredicto" },
-                      { id: 3 as const, title: "Resolución", subtitle: "Evidencias y notas" },
-                    ]
-                  : [
-                      { id: 1 as const, title: "Situación", subtitle: "Seleccionar acción" },
-                      {
-                        id: 2 as const,
-                        title:
-                          updateCategory === "cancelar"
-                            ? "Cancelar ticket"
-                            : updateCategory === "pausar"
-                              ? "Pausar ticket"
-                              : "Confirmar",
-                        subtitle:
-                          updateCategory === "cancelar"
-                            ? "Motivo de cancelación"
-                            : updateCategory === "pausar"
-                              ? "Motivo de la pausa"
-                              : "Comentarios y motivo",
-                      },
-                    ]
-                ).map((s) => {
-                  const isActive = updateStep === s.id;
-                  const isCompleted = updateStep > s.id;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => {
-                        if (s.id < updateStep) {
-                          setStepDirection("backward");
-                          setUpdateStep(s.id);
-                        } else if (s.id === 2 && updateStep === 1) {
-                          handleContinueUpdateStatus();
-                        } else if (s.id === 3 && updateStep === 2 && updateCategory === "veredicto") {
-                          handleContinueToStep3();
-                        }
-                      }}
-                      className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-all duration-200 ease-out animate-plf-apple-tab ${
-                        isActive
-                          ? "bg-white shadow-2xs border border-zinc-200 text-zinc-900"
-                          : isCompleted
-                            ? "hover:bg-white/60 text-zinc-600 cursor-pointer"
-                            : "opacity-60 cursor-default text-zinc-500"
-                      }`}
-                    >
-                      <span
-                        className={`flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold transition-colors ${
-                          isActive
-                            ? "bg-brand-red text-white shadow-2xs"
-                            : isCompleted
-                              ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                              : "bg-zinc-200/80 text-zinc-500"
-                        }`}
-                      >
-                        {isCompleted ? <Check className="size-3.5" strokeWidth={2.5} /> : s.id}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className={`font-heading text-[11.5px] font-bold leading-tight truncate ${isActive ? "text-zinc-900" : "text-zinc-600"}`}>
-                          {s.title}
-                        </p>
-                        <p className="text-[10px] text-zinc-400 leading-tight truncate hidden sm:block">
-                          {s.subtitle}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </nav>
+              <TicketUpdateStepNav
+                updateCategory={updateCategory}
+                updateStep={updateStep}
+                onStepClick={(step) => {
+                  setStepDirection("backward");
+                  setUpdateStep(step);
+                }}
+                onContinueFromStep1={handleContinueUpdateStatus}
+                onContinueToStep3={handleContinueToStep3}
+              />
 
               <div
                 key={`status-step-${updateStep}`}
@@ -2842,9 +2816,10 @@ export function TicketDetailPage() {
                     <CheckboxField
                       label="Notificar al cliente por correo"
                       description={
-                        recipientEmail
-                          ? `Se le avisará a ${recipientEmail}.`
-                          : "Este ticket no tiene un correo de contacto registrado."
+                        <NotifyClientCheckboxDescription
+                          recipientEmail={recipientEmail}
+                          ticketSubject={ticket?.subject}
+                        />
                       }
                       checked={updateNotifyClient}
                       disabled={!recipientEmail}
@@ -2855,34 +2830,30 @@ export function TicketDetailPage() {
 
                 {updateStep === 3 && updateCategory === "veredicto" && (
                   <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-4">
-                    <div className="flex flex-col gap-1">
-                      <label htmlFor="update-comment" className={labelClass}>
-                        Comentario del veredicto
-                        <span className="ml-1 text-brand-red">*</span>
-                      </label>
-                      <textarea
-                        id="update-comment"
-                        rows={3}
-                        value={updateComment}
-                        onChange={(event) => {
-                          setUpdateComment(event.target.value);
-                          if (transitionError) setTransitionError(null);
-                        }}
-                        onKeyDown={(event) => {
-                          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                            event.preventDefault();
-                            void handleConfirmUpdateStatus();
-                          }
-                        }}
-                        placeholder="Explica el veredicto y las conclusiones de la reclamación…"
-                        className={`${textareaClass} ${
-                          transitionError && !updateComment.trim()
-                            ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
-                            : ""
-                        }`}
-                        autoFocus
-                      />
-                    </div>
+                    <TextAreaField
+                      id="update-comment"
+                      label="Comentario de cierre"
+                      required
+                      autoGrow
+                      autoFocus
+                      value={updateComment}
+                      onChange={(event) => {
+                        setUpdateComment(event.target.value);
+                        if (transitionError) setTransitionError(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                          event.preventDefault();
+                          void handleConfirmUpdateStatus();
+                        }
+                      }}
+                      placeholder="Explica el veredicto y las conclusiones de la reclamación…"
+                      className={`text-[12.5px] py-2 leading-relaxed shadow-2xs ${
+                        transitionError && !updateComment.trim()
+                          ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
+                          : ""
+                      }`}
+                    />
 
                     {/* Carga de evidencias con el mismo diseño que CompleteTaskModal */}
                     <div className="space-y-2">
@@ -2979,60 +2950,53 @@ export function TicketDetailPage() {
 
                 {updateStep === 2 && updateCategory !== "veredicto" && (
                   <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-3">
-                    <div className="flex flex-col gap-1">
-                      <label htmlFor="update-comment" className={labelClass}>
-                        {updateCategory === "cancelar"
+                    <TextAreaField
+                      id="update-comment"
+                      label={
+                        updateCategory === "cancelar"
                           ? "Motivo de cancelación"
                           : updateCategory === "pausar"
                             ? "Motivo de la pausa"
-                            : "Comentario"}
-                        {updateCategory === "cancelar" || updateCategory === "pausar" ? (
-                          <span className="ml-1 text-brand-red">*</span>
-                        ) : (
-                          <span className="ml-1 font-normal text-zinc-400">(opcional)</span>
-                        )}
-                      </label>
-                      <textarea
-                        id="update-comment"
-                        rows={3}
-                        value={updateComment}
-                        onChange={(event) => {
-                          setUpdateComment(event.target.value);
-                          if (transitionError) setTransitionError(null);
-                        }}
-                        onKeyDown={(e) => {
-                          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                            e.preventDefault();
-                            if (updateStatusOtherStep2Missing.length === 0 && !transitioning) {
-                              void handleConfirmUpdateStatus();
-                            }
+                            : "Comentario de reapertura"
+                      }
+                      required
+                      autoGrow
+                      autoFocus
+                      value={updateComment}
+                      onChange={(event) => {
+                        setUpdateComment(event.target.value);
+                        if (transitionError) setTransitionError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                          e.preventDefault();
+                          if (updateStatusOtherStep2Missing.length === 0 && !transitioning) {
+                            void handleConfirmUpdateStatus();
                           }
-                        }}
-                        placeholder={
-                          updateCategory === "cancelar"
-                            ? "Explica la razón de anulación (creado por error, duplicado, prueba)…"
-                            : updateCategory === "pausar"
-                              ? "Explica por qué se pausa este ticket…"
-                              : "Contexto adicional para el historial del ticket…"
                         }
-                        className={`${textareaClass} ${
-                          transitionError &&
-                          !updateComment.trim() &&
-                          (updateCategory === "cancelar" || updateCategory === "pausar")
-                            ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
-                            : ""
-                        }`}
-                        autoFocus
-                      />
-                    </div>
+                      }}
+                      placeholder={
+                        updateCategory === "cancelar"
+                          ? "Explica la razón de anulación (creado por error, duplicado, prueba)…"
+                          : updateCategory === "pausar"
+                            ? "Explica por qué se pausa este ticket…"
+                            : "Explica por qué se reabre o reanuda este ticket…"
+                      }
+                      className={`text-[12.5px] py-2 leading-relaxed shadow-2xs ${
+                        transitionError && !updateComment.trim()
+                          ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
+                          : ""
+                      }`}
+                    />
 
                     {updateCategory === "cancelar" && (
                       <CheckboxField
                         label="Notificar al cliente por correo"
                         description={
-                          recipientEmail
-                            ? `Se le avisará a ${recipientEmail}.`
-                            : "Este ticket no tiene un correo de contacto registrado."
+                          <NotifyClientCheckboxDescription
+                            recipientEmail={recipientEmail}
+                            ticketSubject={ticket?.subject}
+                          />
                         }
                         checked={updateNotifyClient}
                         disabled={!recipientEmail}
@@ -3043,7 +3007,18 @@ export function TicketDetailPage() {
                 )}
               </div>
             </div>
-          )}
+            </div>
+            {showUpdateCelebration ? (
+              <TicketStatusUpdateCelebration
+                category={updateCategory}
+                recipientEmail={recipientEmail}
+                ticketSubject={ticket?.subject}
+                notifyClient={updateNotifyClient}
+                verdictAttachmentsCount={verdictAttachments.length}
+                exiting={updateCelebrationExiting}
+              />
+            ) : null}
+          </div>
         </Modal>
       )}
 

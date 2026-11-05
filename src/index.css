@@ -962,6 +962,27 @@ input::-ms-clear {
   overflow: visible;
 }
 
+/* Tercer paso del asistente de ticket: ancho 0fr ↔ 1fr con la misma curva que las filas. */
+.plf-apple-col-shell {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.plf-apple-col-shell[data-collapsed="true"] {
+  grid-template-columns: 0fr;
+  flex: 0 0 0 !important;
+}
+.plf-apple-col-shell[data-ready="true"] {
+  transition: grid-template-columns 480ms var(--ease-plf-spring), flex 480ms var(--ease-plf-spring);
+  will-change: grid-template-columns;
+}
+.plf-apple-col-shell[data-collapsed="true"][data-ready="true"] {
+  transition-duration: 320ms;
+}
+.plf-apple-col-shell > .plf-apple-row-clip {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .animate-plf-apple-row-in {
   animation: plf-apple-row-in 480ms var(--ease-plf-spring) both;
   will-change: transform, opacity, filter;
