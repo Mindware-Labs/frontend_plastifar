@@ -17,12 +17,13 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
 import { discrepanciesApi } from "../../api/discrepancies";
+import { fetchAllPages } from "../../api/paging";
+import { productLinesApi } from "../../api/productLines";
 import { qualityApi } from "../../api/quality";
 import { withdrawalsApi } from "../../api/withdrawals";
 import { Alert } from "../../components/ui/Alert";
@@ -36,7 +37,6 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { MODULE_HEADER_CONTENT_BAND_CLASS } from "../../components/app/ModuleHeader";
 import { EnterpriseFormDraftLandingView } from "../../components/app/EnterpriseFormDraftLandingView";
 import { EnterpriseFormDraftResumeModal } from "../../components/app/EnterpriseFormDraftResumeModal";
-import { catalogs } from "../../lib/catalogQueries";
 import { formatDay, formatInstant } from "../../lib/dates";
 import {
   ENTERPRISE_FORM_PICKER_META,
@@ -88,19 +88,6 @@ interface TicketFormsTabProps {
   onTicketStatusChanged?: () => void;
   onViewDocument?: (form: RegisteredFormItem) => void;
 }
-
-interface TicketForms {
-  claim: CustomerClaim | null;
-  withdrawals: MerchandiseWithdrawal[];
-  discrepancies: DiscrepancyDetail[];
-  sheets: CorrectiveActionSheet[];
-}
-
-const NO_WITHDRAWALS: MerchandiseWithdrawal[] = [];
-const NO_DISCREPANCIES: DiscrepancyDetail[] = [];
-const NO_SHEETS: CorrectiveActionSheet[] = [];
-const NO_PRODUCT_LINES: ProductLine[] = [];
-const NO_PLAN_ITEMS: ActionPlanItem[] = [];
 
 interface CommonExtractedData {
   invoiceRef: string;
@@ -155,64 +142,14 @@ export function TicketFormsTab({
   const canReadQuality = can("quality.read");
   const canWriteQuality = can("quality.write");
 
-  // Sin permiso no se pide ese formulario; los que fallan cuentan como vacios.
-  const formsQuery = useQuery({
-    queryKey: [
-      "ticket-forms",
-      ticket.id,
-      { canReadClaims, canReadWithdrawals, canReadDiscrepancies, canReadQuality },
-    ],
-    queryFn: async (): Promise<TicketForms> => {
-      const [claimRes, withRes, discRes, sheetRes] = await Promise.allSettled([
-        canReadClaims ? claimsApi.getByTicket(ticket.id) : Promise.reject("no-permission"),
-        canReadWithdrawals ? withdrawalsApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
-        canReadDiscrepancies ? discrepanciesApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
-        canReadQuality ? qualityApi.sheets.listByTicket(ticket.id) : Promise.reject("no-permission"),
-      ]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-      return {
-        claim: claimRes.status === "fulfilled" ? claimRes.value.claim : null,
-        withdrawals: withRes.status === "fulfilled" ? withRes.value.map((d) => d.withdrawal) : [],
-        discrepancies: discRes.status === "fulfilled" ? discRes.value : [],
-        sheets: sheetRes.status === "fulfilled" ? sheetRes.value : [],
-      };
-    },
-  });
-  // Se espera la lectura de este montaje: «Editar datos» siembra el formulario con estos datos.
-  const forms = formsQuery.isFetchedAfterMount ? formsQuery.data : undefined;
-  const claim = forms?.claim ?? null;
-  const withdrawals = forms?.withdrawals ?? NO_WITHDRAWALS;
-  const discrepancies = forms?.discrepancies ?? NO_DISCREPANCIES;
-  const sheets = forms?.sheets ?? NO_SHEETS;
-
-  // Tras guardar se relee con el esqueleto a la vista, como antes.
-  const [reloadingForms, setReloadingForms] = useState(false);
-  const loading = !formsQuery.isFetchedAfterMount || reloadingForms;
-  const error =
-    formsQuery.isFetchedAfterMount && formsQuery.isError
-      ? formsQuery.error instanceof ApiError
-        ? formsQuery.error.message
-        : formScope === "task"
-          ? "Error al cargar los formularios de la tarea"
-          : "Error al cargar los formularios del ticket"
-      : null;
-
-  useEffect(() => {
-    if (!forms) return;
-    const hasAny = Boolean(
-      forms.claim || forms.withdrawals.length > 0 || forms.discrepancies.length > 0 || forms.sheets.length > 0,
-    );
-    onHasFormsChanged?.(hasAny);
-  }, [forms, onHasFormsChanged]);
-
-  // Lineas de producto para HCA: solo desde que hay hojas HCA, y ya no se sueltan.
-  const [productLinesWanted, setProductLinesWanted] = useState(false);
-  if (sheets.length > 0 && !productLinesWanted) setProductLinesWanted(true);
-  const productLinesQuery = useQuery({ ...catalogs.productLines(), enabled: productLinesWanted });
-  const productLines =
-    productLinesWanted && !productLinesQuery.isError
-      ? (productLinesQuery.data ?? NO_PRODUCT_LINES)
-      : NO_PRODUCT_LINES;
+  const [claim, setClaim] = useState<CustomerClaim | null>(null);
+  const [withdrawals, setWithdrawals] = useState<MerchandiseWithdrawal[]>([]);
+  const [discrepancies, setDiscrepancies] = useState<DiscrepancyDetail[]>([]);
+  const [sheets, setSheets] = useState<CorrectiveActionSheet[]>([]);
+  const [productLines, setProductLines] = useState<ProductLine[]>([]);
 
   // Selected sub-tab when forms exist
   const [selectedSubTabKey, setSelectedSubTabKey] = useState<string | null>(null);
@@ -295,6 +232,7 @@ export function TicketFormsTab({
   const [hcaModalOpen, setHcaModalOpen] = useState(false);
   const [editingHca, setEditingHca] = useState<CorrectiveActionSheet | undefined>(undefined);
   const [hcaInitialDefaults, setHcaInitialDefaults] = useState<{ clientId: number; ticketId: number | null; description?: string } | undefined>(undefined);
+  const [hcaPlanBySheetId, setHcaPlanBySheetId] = useState<Record<number, ActionPlanItem[] | undefined>>({});
 
   // Helpers to start new forms
   const handleOpenNewClaim = (initData?: typeof claimInitialData) => {
@@ -415,6 +353,55 @@ export function TicketFormsTab({
   const [migrationTargetType, setMigrationTargetType] = useState<EnterpriseFormType>("reclamacion");
   const [migrateCommonFields, setMigrateCommonFields] = useState(true);
 
+  // Load product lines for HCA only when HCA sheets exist
+  useEffect(() => {
+    if (sheets.length === 0 || productLines.length > 0) return;
+    fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize }))
+      .then(setProductLines)
+      .catch(() => setProductLines([]));
+  }, [sheets.length, productLines.length]);
+
+  const fetchAllForms = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [claimRes, withRes, discRes, sheetRes] = await Promise.allSettled([
+        canReadClaims ? claimsApi.getByTicket(ticket.id) : Promise.reject("no-permission"),
+        canReadWithdrawals ? withdrawalsApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
+        canReadDiscrepancies ? discrepanciesApi.listByTicket(ticket.id) : Promise.reject("no-permission"),
+        canReadQuality ? qualityApi.sheets.listByTicket(ticket.id) : Promise.reject("no-permission"),
+      ]);
+
+      const foundClaim = claimRes.status === "fulfilled" ? claimRes.value.claim : null;
+      const foundWith = withRes.status === "fulfilled" ? withRes.value.map((d) => d.withdrawal) : [];
+      const foundDisc = discRes.status === "fulfilled" ? discRes.value : [];
+      const foundSheets = sheetRes.status === "fulfilled" ? sheetRes.value : [];
+
+      setClaim(foundClaim);
+      setWithdrawals(foundWith);
+      setDiscrepancies(foundDisc);
+      setSheets(foundSheets);
+      setHcaPlanBySheetId({});
+
+      const hasAny = Boolean(foundClaim || foundWith.length > 0 || foundDisc.length > 0 || foundSheets.length > 0);
+      onHasFormsChanged?.(hasAny);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : formScope === "task"
+            ? "Error al cargar los formularios de la tarea"
+            : "Error al cargar los formularios del ticket",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllForms();
+  }, [ticket.id]);
+
   // Build the list of active forms for navigation
   const registeredForms = useMemo(() => {
     const list: Array<{
@@ -506,26 +493,29 @@ export function TicketFormsTab({
     );
   }, [registeredForms, activeForm?.key]);
 
-  // Plan de accion de la hoja HCA a la vista; si falla, se muestra vacio.
-  const activeHcaSheetId =
-    activeForm?.type === "hca" ? (activeForm.data as CorrectiveActionSheet).id : null;
-  const hcaPlanQuery = useQuery({
-    queryKey: ["quality-plan-items", activeHcaSheetId, { page: 1, pageSize: 50 }],
-    queryFn: () => qualityApi.planItems.list(activeHcaSheetId as number, { page: 1, pageSize: 50 }),
-    enabled: activeHcaSheetId !== null,
-  });
-  const activeHcaPlanItems: ActionPlanItem[] | undefined = hcaPlanQuery.isError
-    ? NO_PLAN_ITEMS
-    : hcaPlanQuery.data?.items;
+  useEffect(() => {
+    if (activeForm?.type !== "hca") return;
+    const sheetId = (activeForm.data as CorrectiveActionSheet).id;
+    if (hcaPlanBySheetId[sheetId] !== undefined) return;
 
-  const { refetch: refetchForms } = formsQuery;
-  const { refetch: refetchHcaPlan } = hcaPlanQuery;
-  /** Relee los formularios (y el plan HCA a la vista) tras guardar uno. */
-  function reloadForms() {
-    setReloadingForms(true);
-    void refetchForms().finally(() => setReloadingForms(false));
-    if (activeHcaSheetId !== null) void refetchHcaPlan();
-  }
+    let cancelled = false;
+    qualityApi.planItems
+      .list(sheetId, { page: 1, pageSize: 50 })
+      .then((res) => {
+        if (!cancelled) {
+          setHcaPlanBySheetId((prev) => ({ ...prev, [sheetId]: res.items }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHcaPlanBySheetId((prev) => ({ ...prev, [sheetId]: [] }));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeForm?.key, activeForm?.type, hcaPlanBySheetId]);
 
   const getPrintPath = (form: NonNullable<typeof activeForm>): string => {
     if (form.type === "reclamacion") {
@@ -826,7 +816,7 @@ export function TicketFormsTab({
             setEditingClaim(undefined);
             setClaimInitialData(undefined);
             handleReturnFromInlineForm();
-            reloadForms();
+            fetchAllForms();
             onTicketStatusChanged?.();
           }}
         />
@@ -861,7 +851,7 @@ export function TicketFormsTab({
             setEditingWithdrawal(undefined);
             setWithdrawalInitialLines(undefined);
             handleReturnFromInlineForm();
-            reloadForms();
+            fetchAllForms();
             onTicketStatusChanged?.();
           }}
         />
@@ -897,7 +887,7 @@ export function TicketFormsTab({
             setEditingDiscrepancy(undefined);
             setDiscrepancyInitialData(undefined);
             handleReturnFromInlineForm();
-            reloadForms();
+            fetchAllForms();
             onTicketStatusChanged?.();
           }}
         />
@@ -932,7 +922,7 @@ export function TicketFormsTab({
             setEditingHca(undefined);
             setHcaInitialDefaults(undefined);
             handleReturnFromInlineForm();
-            reloadForms();
+            fetchAllForms();
           }}
         />
       </div>
@@ -1772,7 +1762,7 @@ export function TicketFormsTab({
                 {/* 4. HCA DETAILS — resumen ejecutivo (mismo lenguaje que discrepancia) */}
                 {activeForm.type === "hca" && (() => {
                   const s = activeForm.data as CorrectiveActionSheet;
-                  const planItems = activeHcaPlanItems;
+                  const planItems = hcaPlanBySheetId[s.id];
                   const causes = [...(s.causes ?? [])].sort((a, b) => a.position - b.position);
                   const participants = s.participants ?? [];
                   const acknowledgedCount = participants.filter((p) => p.acknowledgedAt).length;

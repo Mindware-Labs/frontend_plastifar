@@ -1,7 +1,7 @@
 import { Building2, Check, Flag, ListTodo, Plus, Slash, Timer, UserCheck } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { departmentsApi } from "../../api/departments";
 import { tasksApi, type TaskQuery } from "../../api/tasks";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Avatar } from "../../components/ui/Avatar";
@@ -23,7 +23,6 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
-import { catalogs } from "../../lib/catalogQueries";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
@@ -75,6 +74,8 @@ export function TasksPage() {
   const canWrite = canCreate || canEdit;
   const canClose = can("tasks.close");
 
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [departmentId, setDepartmentId] = useState("todos");
   const [priority, setPriority] = useState("todos");
@@ -94,21 +95,17 @@ export function TasksPage() {
     return visibleColumns.includes(id);
   }
 
-  // Catalogo compartido de departamentos (mismo `departmentsApi.list()` sin opciones).
-  const departmentsQuery = useQuery(catalogs.departments());
-  const { refetch: refetchDepartments } = departmentsQuery;
-  const departments = useMemo<DepartmentResponse[]>(
-    () => (departmentsQuery.data ?? []).filter((row) => row.isActive),
-    [departmentsQuery.data],
-  );
-  const referenceError =
-    departmentsQuery.isError && !departmentsQuery.isFetching
-      ? "No se pudieron cargar los departamentos: el filtro de área queda vacío."
-      : null;
-
   function loadDepartments() {
-    return refetchDepartments();
+    setReferenceError(null);
+    return departmentsApi
+      .list()
+      .then((rows) => setDepartments(rows.filter((row) => row.isActive)))
+      .catch(() => setReferenceError("No se pudieron cargar los departamentos: el filtro de área queda vacío."));
   }
+
+  useEffect(() => {
+    void loadDepartments();
+  }, []);
 
   const departmentOptions = useMemo(
     () => buildDepartmentFilterOptions(departments),
@@ -120,7 +117,6 @@ export function TasksPage() {
   );
 
   const { data, error, setPage, refresh } = usePagedList<TaskQuery, TaskListResponse>({
-    queryKey: ["tasks"],
     fetch: tasksApi.list,
     criteria: {
       pageSize,

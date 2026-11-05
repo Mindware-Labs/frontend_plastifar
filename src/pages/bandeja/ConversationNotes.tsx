@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Plus, StickyNote, X } from "lucide-react";
 import {
   forwardRef,
@@ -37,7 +36,6 @@ export interface ConversationNotesHandle {
 }
 
 const POPOVER_ADD_FORM_KEY = "popover-add-form";
-const NO_NOTES: EmailNoteResponse[] = [];
 const ADD_NOTE_PANEL_FORM_KEY = "add-note-panel-form";
 
 function mergeNotes(
@@ -78,36 +76,7 @@ function formatNoteTime(iso: string): string {
 export const ConversationNotes = forwardRef<ConversationNotesHandle, ConversationNotesProps>(
   function ConversationNotes({ emailId, onNotesCountChange }, ref) {
   const { user } = useAuth();
-  const notesQuery = useQuery({
-    queryKey: ["emails", emailId, "notes"],
-    queryFn: () => emailsApi.notes(emailId),
-  });
-
-  // Notas creadas desde aqui: se suman a lo leido aunque la lectura llegue despues. Se vacian al cambiar de correo.
-  const [localNotes, setLocalNotes] = useState<EmailNoteResponse[]>([]);
-  const [localFor, setLocalFor] = useState(emailId);
-  if (localFor !== emailId) {
-    setLocalFor(emailId);
-    setLocalNotes([]);
-  }
-
-  // Un fallo de carga cuenta como «sin notas», igual que antes.
-  const fetchedNotes = notesQuery.isError ? NO_NOTES : (notesQuery.data ?? null);
-  const notes = useMemo(
-    () =>
-      fetchedNotes === null && localNotes.length === 0 ? null : mergeNotes(fetchedNotes ?? [], localNotes),
-    [fetchedNotes, localNotes],
-  );
-
-  const addLocalNote = useCallback((note: EmailNoteResponse) => {
-    setLocalNotes((prev) => (prev.some((item) => item.id === note.id) ? prev : [...prev, note]));
-  }, []);
-
-  const notesCount = notes?.length ?? null;
-  useEffect(() => {
-    if (notesCount !== null) onNotesCountChange?.(notesCount);
-  }, [notesCount, onNotesCountChange]);
-
+  const [notes, setNotes] = useState<EmailNoteResponse[] | null>(null);
   const [open, setOpen] = useState(false);
   const [originX, setOriginX] = useState(0);
   const [draft, setDraft] = useState("");
@@ -129,9 +98,17 @@ export const ConversationNotes = forwardRef<ConversationNotesHandle, Conversatio
   useImperativeHandle(
     ref,
     () => ({
-      appendNote: addLocalNote,
+      appendNote(note) {
+        setNotes((prev) => {
+          const list = prev ?? [];
+          if (list.some((item) => item.id === note.id)) return prev;
+          const next = [...list, note];
+          onNotesCountChange?.(next.length);
+          return next;
+        });
+      },
     }),
-    [addLocalNote],
+    [onNotesCountChange],
   );
 
   const closeAddForm = useCallback(() => {
@@ -153,6 +130,30 @@ export const ConversationNotes = forwardRef<ConversationNotesHandle, Conversatio
     setShowAddForm(false);
     setOpen(true);
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    emailsApi
+      .notes(emailId)
+      .then((list) => {
+        if (!cancelled) {
+          setNotes((prev) => {
+            const merged = mergeNotes(list, prev);
+            onNotesCountChange?.(merged.length);
+            return merged;
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNotes([]);
+          onNotesCountChange?.(0);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [emailId, onNotesCountChange]);
 
   // Cierra al hacer clic fuera
   useEffect(() => {
@@ -198,7 +199,9 @@ export const ConversationNotes = forwardRef<ConversationNotesHandle, Conversatio
     setError(null);
     try {
       const newNote = await emailsApi.addNote(emailId, body);
-      addLocalNote(newNote);
+      const nextNotes = [...(notes ?? []), newNote];
+      setNotes(nextNotes);
+      onNotesCountChange?.(nextNotes.length);
       closeAddForm();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");
@@ -353,7 +356,12 @@ export const ConversationNotes = forwardRef<ConversationNotesHandle, Conversatio
               canReply={Boolean(user)}
               onReply={async (parentId, body) => {
                 const created = await emailsApi.addNote(emailId, body, parentId);
-                addLocalNote(created);
+                setNotes((prev) => {
+                  const list = prev ?? [];
+                  const next = mergeNotes(list, [created]);
+                  onNotesCountChange?.(next.length);
+                  return next;
+                });
               }}
             />
           </div>

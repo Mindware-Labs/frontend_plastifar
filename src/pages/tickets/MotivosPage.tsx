@@ -12,9 +12,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
+import { departmentsApi } from "../../api/departments";
 import { ticketTopicsApi, type TicketTopicQuery } from "../../api/ticketTopics";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Button } from "../../components/ui/Button";
@@ -35,7 +35,6 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPaths } from "../../lib/departments";
-import { catalogs } from "../../lib/catalogQueries";
 import { formatDateTime } from "../../lib/format";
 import type {
   DepartmentResponse,
@@ -46,8 +45,6 @@ import { MotivoModal } from "./MotivoModal";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 
 type StatusFilter = "todos" | "activos" | "inactivos";
-
-const NO_DEPARTMENTS: DepartmentResponse[] = [];
 
 /** El tono no decora: dice cuánta prisa mete cada motivo en el SLA del ticket. */
 const priorityClass: Record<string, string> = {
@@ -62,8 +59,7 @@ export function MotivosPage() {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
 
-  // Si fallan, filtros y modal quedan sin departamentos, como antes.
-  const departments = useQuery(catalogs.departments()).data ?? NO_DEPARTMENTS;
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
   const [priority, setPriority] = useState<string>("todas");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -81,7 +77,6 @@ export function MotivosPage() {
     TicketTopicQuery,
     TicketTopicListResponse
   >({
-    queryKey: ["ticket-topics"],
     fetch: ticketTopicsApi.list,
     criteria: {
       pageSize,
@@ -95,6 +90,10 @@ export function MotivosPage() {
 
   useLoadErrorReceipt(error, "motivos-list", refresh);
   useActionErrorReceipt(actionError, "motivos-action");
+
+  useEffect(() => {
+    departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
+  }, []);
 
   const rows = useMemo(() => data?.items ?? [], [data?.items]);
   const counts = data?.counts;

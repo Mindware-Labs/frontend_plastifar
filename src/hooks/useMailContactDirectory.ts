@@ -1,28 +1,57 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { emailsApi } from "../api/emails";
-import { queryClient } from "../lib/queryClient";
 import type { ContactResponse } from "../types/api";
 
 const DIRECTORY_TTL_MS = 60 * 60 * 1000;
-const DIRECTORY_KEY = ["emails", "contact-directory"] as const;
-const EMPTY: ContactResponse[] = [];
 
-/** Tras escribir a alguien nuevo: el siguiente montaje vuelve a pedir la libreta. */
+let cached: { loadedAt: number; items: ContactResponse[] } | null = null;
+let inflight: Promise<ContactResponse[]> | null = null;
+
 export function invalidateMailContactDirectory() {
-  void queryClient.invalidateQueries({ queryKey: DIRECTORY_KEY, refetchType: "none" });
+  cached = null;
+}
+
+async function fetchDirectory(): Promise<ContactResponse[]> {
+  if (inflight) return inflight;
+  inflight = emailsApi.contactDirectory().finally(() => {
+    inflight = null;
+  });
+  const items = await inflight;
+  cached = { loadedAt: Date.now(), items };
+  return items;
 }
 
 /** Libreta de correos con actividad en bandeja; se refresca cada hora. */
 export function useMailContactDirectory() {
-  // Un fallo conserva la ultima libreta buena: TanStack no borra `data` al fallar.
-  const query = useQuery({
-    queryKey: DIRECTORY_KEY,
-    queryFn: () => emailsApi.contactDirectory(),
-    staleTime: DIRECTORY_TTL_MS,
-    refetchInterval: DIRECTORY_TTL_MS,
-  });
+  const [directory, setDirectory] = useState<ContactResponse[]>(() => cached?.items ?? []);
 
-  return query.data ?? EMPTY;
+  useEffect(() => {
+    let cancelled = false;
+
+    async function ensureFresh(force = false) {
+      const now = Date.now();
+      if (!force && cached && now - cached.loadedAt < DIRECTORY_TTL_MS) {
+        if (!cancelled) setDirectory(cached.items);
+        return;
+      }
+
+      try {
+        const items = await fetchDirectory();
+        if (!cancelled) setDirectory(items);
+      } catch {
+        if (!cancelled && cached) setDirectory(cached.items);
+      }
+    }
+
+    void ensureFresh(false);
+    const timer = window.setInterval(() => void ensureFresh(true), DIRECTORY_TTL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  return directory;
 }
 
 export function filterMailContactDirectory(

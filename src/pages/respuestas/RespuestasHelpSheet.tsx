@@ -4,8 +4,7 @@ import {
   FileText,
   Lightbulb,
   MessageSquareText,
-  Plus,
-  Users,
+  Sparkles,
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
@@ -82,6 +81,24 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5 text-ink">
+          <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-4 shadow-2xs">
+            <div className="flex items-start gap-3.5">
+              <span
+                aria-hidden
+                className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-red/10 text-brand-red"
+              >
+                <Sparkles className="size-4" strokeWidth={2.25} />
+              </span>
+              <div>
+                <h3 className="font-heading text-[13.5px] font-bold text-ink">Para qué sirve</h3>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-subtle">
+                  Sirve para no escribir lo mismo una y otra vez: datos de pago, plazos de entrega, garantías…
+                  Eliges la respuesta en el editor, completas lo que falte y envías.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <section className="space-y-3">
             <div className="flex items-center gap-2">
               <span
@@ -147,7 +164,7 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
               </li>
               <li className="rounded-lg border border-zinc-200/80 bg-white p-3 shadow-2xs">
                 <div className="flex items-center gap-2">
-                  <Users className="size-3.5 text-brand-red" strokeWidth={2.25} />
+                  <Sparkles className="size-3.5 text-brand-red" strokeWidth={2.25} />
                   <span className="font-heading text-[12px] font-bold text-ink">Mismo tono</span>
                 </div>
                 <p className="mt-1.5 text-[11.5px] leading-relaxed text-subtle">Todo el equipo suena alineado con Plastifar.</p>
@@ -230,7 +247,7 @@ export function RespuestasHelpSheet({ onClose, onNewResponse }: RespuestasHelpSh
                 }}
                 className="gap-1.5"
               >
-                <Plus className="size-3.5" />
+                <Sparkles className="size-3.5" />
                 <span>Crear plantilla</span>
               </Button>
             )}

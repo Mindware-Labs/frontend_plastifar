@@ -16,7 +16,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "../../api/client";
@@ -285,8 +284,6 @@ function getThreadMessageBadge(message: { direction: string; subject?: string })
 type ComposerMode = "reply" | "forward";
 
 /** Primer renglon con contenido: es el resumen que cabe en una linea de la lista. */
-const NO_LINKED_TASKS: EmailLinkedTask[] = [];
-
 function firstLine(text: string) {
   return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
 }
@@ -302,25 +299,8 @@ export function EmailDetailPane({
   onClose,
 }: EmailDetailPaneProps) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  // Al cambiar de correo se sigue viendo el anterior hasta que llega el nuevo, como antes.
-  const emailQuery = useQuery({
-    queryKey: ["emails", emailId],
-    queryFn: () => emailsApi.get(emailId),
-    placeholderData: keepPreviousData,
-  });
-  const email = emailQuery.data ?? null;
-  const error = emailQuery.isError
-    ? emailQuery.error instanceof ApiError
-      ? emailQuery.error.message
-      : "No se pudo cargar el correo"
-    : null;
-  // Los cambios locales (estrella, hilo, asignacion…) se escriben en la cache del correo abierto.
-  const setEmail = useCallback(
-    (next: EmailDetailResponse) => queryClient.setQueryData(["emails", emailId], next),
-    [queryClient, emailId],
-  );
-  const { refetch: refetchEmail } = emailQuery;
+  const [email, setEmail] = useState<EmailDetailResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isCreateTicketModalOpen, setIsCreateTicketModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const permissions = usePermissions();
@@ -333,16 +313,8 @@ export function EmailDetailPane({
     permissions.can("tasks.create") ||
     permissions.can("tasks.edit");
   const [justCreatedTicketId, setJustCreatedTicketId] = useState<number | null>(null);
-  // Sin permiso o con fallo de carga la lista queda vacia, como antes.
-  const linkedTasksQuery = useQuery({
-    queryKey: ["emails", emailId, "tasks"],
-    queryFn: () => emailsApi.linkedTasks(emailId),
-    enabled: canSeeLinkedTasks,
-    placeholderData: keepPreviousData,
-  });
-  const linkedTasks: EmailLinkedTask[] =
-    !canSeeLinkedTasks || linkedTasksQuery.isError ? NO_LINKED_TASKS : (linkedTasksQuery.data ?? NO_LINKED_TASKS);
-  const { refetch: refetchLinkedTasks } = linkedTasksQuery;
+  const [linkedTasks, setLinkedTasks] = useState<EmailLinkedTask[]>([]);
+  const [linkedTasksKey, setLinkedTasksKey] = useState(0);
   const [justCreatedTaskId, setJustCreatedTaskId] = useState<number | null>(null);
   const [moving, setMoving] = useState(false);
   const [starring, setStarring] = useState(false);
@@ -445,6 +417,7 @@ export function EmailDetailPane({
 
   // Lo escrito, en texto plano: sirve para el aviso de vacio y para el cuerpo sin formato.
   const replyText = blocksToText(replyBlocks);
+  const [reloadKey, setReloadKey] = useState(0);
   const conversationNotesRef = useRef<ConversationNotesHandle>(null);
   const handleNoteAdded = useCallback((note: EmailNoteResponse) => {
     conversationNotesRef.current?.appendNote(note);
@@ -488,8 +461,45 @@ export function EmailDetailPane({
     }
   }
 
-  // Cualquier cambio en la bandeja relee el correo abierto.
-  useEffect(() => onInboxChanged(() => void refetchEmail()), [onInboxChanged, refetchEmail]);
+  useEffect(() => {
+    let cancelled = false;
+    emailsApi
+      .get(emailId)
+      .then((data) => {
+        if (!cancelled) setEmail(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : "No se pudo cargar el correo");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emailId, reloadKey]);
+
+  useEffect(() => {
+    if (!canSeeLinkedTasks) {
+      setLinkedTasks([]);
+      return;
+    }
+
+    let cancelled = false;
+    emailsApi
+      .linkedTasks(emailId)
+      .then((items) => {
+        if (!cancelled) setLinkedTasks(items);
+      })
+      .catch(() => {
+        if (!cancelled) setLinkedTasks([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emailId, linkedTasksKey, canSeeLinkedTasks]);
+
+  useEffect(() => onInboxChanged(() => setReloadKey((current) => current + 1)), [onInboxChanged]);
 
   // Quien mas esta escribiendo aqui: lo que ya estaba en curso al abrir, y lo que avise despues.
   useEffect(() => {
@@ -1799,7 +1809,7 @@ export function EmailDetailPane({
           onSaved={(task) => {
             setIsCreateTaskModalOpen(false);
             setJustCreatedTaskId(task.id);
-            if (canSeeLinkedTasks) void refetchLinkedTasks();
+            setLinkedTasksKey((k) => k + 1);
             receipts.done({
               action: "crear-tarea",
               title: "Tarea creada",

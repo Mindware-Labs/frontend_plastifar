@@ -1,4 +1,3 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { MessageSquareText, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
@@ -11,8 +10,6 @@ import {
 } from "../../lib/cannedVariables";
 import { getCategoryBadgeClasses, parseCanned } from "../respuestas/cannedHelpers";
 
-const NO_ITEMS: CannedResponseResponse[] = [];
-
 interface CannedPickerProps {
   /** Texto elegido y asunto sugerido opcional: quien lo recibe lo inserta en el editor. */
   onPick: (body: string, suggestedSubject?: string) => void;
@@ -22,6 +19,7 @@ interface CannedPickerProps {
 /** Botón «Insertar plantilla» del editor: lista con filtro y orden por uso. */
 export function CannedPicker({ onPick, variableContext }: CannedPickerProps) {
   const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<CannedResponseResponse[] | null>(null);
   const [filter, setFilter] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [originX, setOriginX] = useState(0);
@@ -31,20 +29,26 @@ export function CannedPicker({ onPick, variableContext }: CannedPickerProps) {
 
   const debouncedFilter = useDebouncedValue(filter, 250).trim();
 
-  // Solo con el panel abierto; mientras llega otra busqueda se ve la anterior. Un fallo deja la lista vacia.
-  const cannedQuery = useQuery({
-    queryKey: ["canned", "picker", debouncedFilter],
-    queryFn: () =>
-      cannedApi.list({
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    cannedApi
+      .list({
         page: 1,
         pageSize: 100,
         search: debouncedFilter || undefined,
         sort: "usage",
-      }),
-    enabled: open,
-    placeholderData: keepPreviousData,
-  });
-  const items: CannedResponseResponse[] | null = cannedQuery.isError ? NO_ITEMS : (cannedQuery.data?.items ?? null);
+      })
+      .then((data) => {
+        if (!cancelled) setItems(data.items);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, debouncedFilter]);
 
   useEffect(() => {
     if (!open) {

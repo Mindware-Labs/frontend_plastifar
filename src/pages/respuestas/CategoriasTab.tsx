@@ -50,7 +50,6 @@ export function CategoriasTab({
   const debouncedSearch = useDebouncedValue(search).trim();
 
   const { data, error, setPage, refresh } = usePagedList({
-    queryKey: ["canned-categories"],
     fetch: cannedCategoriesApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined },
     fallbackError: "No se pudieron cargar las categorías.",

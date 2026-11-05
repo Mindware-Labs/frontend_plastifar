@@ -6,6 +6,7 @@ import {
   Mail,
   Play,
   RotateCcw,
+  Sparkles,
   Ticket,
   TriangleAlert,
   UserRoundCheck,
@@ -134,7 +135,8 @@ export function NotificationsLabPage() {
         {/* Panel rápido de textos de prueba */}
         <section className="rounded-xl border border-zinc-200/90 bg-white p-4 shadow-2xs">
           <div className="mb-3 flex items-center justify-between">
-            <span className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-zinc-500">
+            <span className="inline-flex items-center gap-1.5 font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-zinc-500">
+              <Sparkles className="size-3.5 text-brand-red" />
               Textos de prueba en vivo (edítalos para probar longitudes y mensajes)
             </span>
           </div>

@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "../../api/client";
@@ -9,8 +8,6 @@ import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import { Button } from "../ui/Button";
 import { SelectField, TextAreaField } from "../ui/Field";
 import { Modal } from "../ui/Modal";
-
-const NO_VERDICTS: Array<{ id: number; name: string }> = [];
 
 export interface EnterpriseFormCloseTicketModalProps {
   open: boolean;
@@ -52,6 +49,7 @@ export function EnterpriseFormCloseTicketModal({
   const receipts = useReceipts();
   const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
   const [closing, setClosing] = useState(false);
+  const [verdicts, setVerdicts] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedVerdictId, setSelectedVerdictId] = useState<string>("");
   const [closeReason, setCloseReason] = useState<string>("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -59,31 +57,6 @@ export function EnterpriseFormCloseTicketModal({
   const initialReason =
     defaultReason ||
     `Cerrado tras completar ${recordNumber}`;
-
-  // Veredictos activos; se piden de nuevo cada vez que se abre el modal.
-  const verdictsQuery = useQuery({
-    queryKey: ["ticket-verdicts", "list", { page: 1, pageSize: 100, status: "activos" }],
-    queryFn: async () => {
-      const res = await ticketVerdictsApi.list({ page: 1, pageSize: 100, status: "activos" });
-      return res.items.map((v) => ({ id: v.id, name: v.name }));
-    },
-    enabled: open,
-  });
-  const verdicts = verdictsQuery.isError ? NO_VERDICTS : (verdictsQuery.data ?? NO_VERDICTS);
-
-  // Cada lectura nueva (no la copia de la cache) preselecciona el primer veredicto.
-  const [seededAt, setSeededAt] = useState(0);
-  if (
-    open &&
-    verdictsQuery.isFetchedAfterMount &&
-    verdictsQuery.data &&
-    verdictsQuery.dataUpdatedAt !== seededAt
-  ) {
-    setSeededAt(verdictsQuery.dataUpdatedAt);
-    if (verdictsQuery.data.length > 0) {
-      setSelectedVerdictId(String(verdictsQuery.data[0].id));
-    }
-  }
 
   useEffect(() => {
     if (!open) return;
@@ -94,6 +67,17 @@ export function EnterpriseFormCloseTicketModal({
         autoResizeTextarea(textareaRef.current, 52);
       }
     });
+
+    ticketVerdictsApi
+      .list({ page: 1, pageSize: 100, status: "activos" })
+      .then((res) => {
+        const active = res.items.map((v) => ({ id: v.id, name: v.name }));
+        setVerdicts(active);
+        if (active.length > 0) {
+          setSelectedVerdictId(String(active[0].id));
+        }
+      })
+      .catch(() => setVerdicts([]));
   }, [open, initialReason]);
 
   if (!open) return null;

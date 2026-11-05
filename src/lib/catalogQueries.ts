@@ -7,9 +7,7 @@ import { settingsApi } from "../api/settings";
 import { staffApi } from "../api/staff";
 import { territoriesApi } from "../api/territories";
 import { ticketTopicsApi } from "../api/ticketTopics";
-import type { SlaPolicyType } from "../types/settings";
 import { queryClient } from "./queryClient";
-import { sortSlaPolicies } from "./slaPolicyUi";
 
 /**
  * Catalogos acotados compartidos por toda la app.
@@ -99,18 +97,6 @@ export const catalogs = {
       queryFn: () =>
         fetchAllPages((page, pageSize) =>
           staffApi.list({ page, pageSize, status: "activos", sort: "nombre", dir: "asc" }),
-        ),
-      staleTime: CATALOG_STALE_TIME,
-    }),
-
-  activeSlaPolicies: (type: SlaPolicyType) =>
-    queryOptions({
-      queryKey: ["catalog", "sla-policies", "activas", type] as const,
-      queryFn: async () =>
-        sortSlaPolicies(
-          await fetchAllPages((page, pageSize) =>
-            settingsApi.slaPolicies.list({ page, pageSize, status: "activas", type }),
-          ),
         ),
       staleTime: CATALOG_STALE_TIME,
     }),

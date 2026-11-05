@@ -1,5 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { staffApi } from "../../api/staff";
 import { useReceipts } from "../../context/useReceipts";
@@ -44,21 +43,24 @@ export function SignatureModal({ onClose }: { onClose: () => void }) {
   const receipts = useReceipts();
   const { isExiting, requestClose } = useModalAnimation();
 
-  const signatureQuery = useQuery({
-    queryKey: ["staff", "me", "signature"],
-    queryFn: () => staffApi.getSignature(),
-  });
+  useEffect(() => {
+    let cancelled = false;
 
-  // El formulario se siembra una sola vez, con la lectura de este montaje (nunca con la cache).
-  if (fields === null && signatureQuery.isFetchedAfterMount) {
-    if (signatureQuery.isError) {
-      const err = signatureQuery.error;
-      setError(err instanceof ApiError ? err.message : "No se pudo cargar la firma");
-      setFields(EMPTY_FIELDS);
-    } else if (signatureQuery.data) {
-      setFields(splitSignature(signatureQuery.data.signature ?? ""));
-    }
-  }
+    staffApi
+      .getSignature()
+      .then((data) => {
+        if (!cancelled) setFields(splitSignature(data.signature ?? ""));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : "No se pudo cargar la firma");
+        setFields(EMPTY_FIELDS);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const signature = useMemo(() => (fields ? joinSignature(fields) : ""), [fields]);
 

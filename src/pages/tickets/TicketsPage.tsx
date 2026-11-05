@@ -11,7 +11,6 @@ import {
   Ticket as TicketIcon,
   X,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { animateCardGridPageTurn, consumePageDirection } from "../../hooks/motion";
@@ -23,7 +22,7 @@ import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions"
 import { departmentPaths } from "../../lib/departments";
 import { priorityFilterDefaultIcon, priorityFilterOptions } from "../../lib/priorityFilterOptions";
 import { formatTicketProductsSummary } from "../../lib/ticketProducts";
-import { catalogs } from "../../lib/catalogQueries";
+import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { SEGMENTED_TAB_COUNT_BADGE_CLASS } from "../../components/ui/SegmentedTabs";
@@ -478,8 +477,6 @@ function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: 
   );
 }
 
-const NO_DEPARTMENTS: DepartmentResponse[] = [];
-
 interface TicketsPageProps {
   origin?: TicketOriginFilter;
 }
@@ -492,8 +489,7 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
   const { can, isAdmin } = usePermissions();
   const canReadAllDepartments = isAdmin || can("tickets.read_all");
 
-  // Si fallan, el filtro queda sin departamentos, como antes.
-  const departments = useQuery(catalogs.departments()).data ?? NO_DEPARTMENTS;
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<TicketFilterKey>("todos");
   const [departmentId, setDepartmentId] = useState<number | "todos">("todos");
@@ -512,6 +508,10 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
   const prevOriginRef = useRef(origin);
   const [listMotionKey, setListMotionKey] = useState(0);
   const [listEnterMotion, setListEnterMotion] = useState<"forward" | "back">("forward");
+
+  useEffect(() => {
+    departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
+  }, []);
 
   useLayoutEffect(() => {
     if (prevOriginRef.current === origin) return;
@@ -532,7 +532,6 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
   const canCreateTicket = can("tickets.create");
 
   const { data, isStale, error, setPage, refresh } = usePagedList<TicketQuery, TicketListResponse>({
-    queryKey: ["tickets"],
     fetch: ticketsApi.list,
     criteria: {
       pageSize,

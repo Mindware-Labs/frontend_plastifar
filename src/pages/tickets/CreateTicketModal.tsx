@@ -1,5 +1,4 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { createPortal } from "react-dom";
@@ -65,8 +64,6 @@ interface CreateTicketModalProps {
 }
 
 const FORM_ID = "create-ticket-form";
-
-const NO_CONTACTS: TicketContactOption[] = [];
 
 /** Una línea inicial; crece con el contenido (reclamaciones / tareas). */
 const INITIAL_MESSAGE_LINE_MIN_PX = 42;
@@ -134,34 +131,14 @@ export function CreateTicketModal({
   emailDirection = "inbound",
   initialAssignedStaffId,
 }: CreateTicketModalProps) {
-  // Se espera la lectura de este montaje: la copia de la cache podria
-  // autoseleccionar contacto, departamento o SLA con catalogos ya cambiados.
-  const optionsQuery = useQuery({
-    queryKey: ["tickets", "create-options"],
-    queryFn: () => ticketsApi.createOptions(),
-  });
-  const catalogs: TicketCreateOptionsResponse | null = optionsQuery.isFetchedAfterMount
-    ? (optionsQuery.data ?? null)
-    : null;
-  const loadingCatalogs = !optionsQuery.isFetchedAfterMount;
-  const catalogsError =
-    optionsQuery.isFetchedAfterMount && optionsQuery.isError
-      ? optionsQuery.error instanceof Error
-        ? optionsQuery.error.message
-        : "Error al cargar catálogos"
-      : null;
-
-  // Árbol completo de departamentos (incluidos inactivos) para resolver rutas jerárquicas de nombres repetidos.
-  const departmentTreeQuery = useQuery({
-    queryKey: ["departments", "tree", { includeInactive: true }],
-    queryFn: () => departmentsApi.list({ includeInactive: true }),
-  });
-  const departmentTree: DepartmentResponse[] | undefined = departmentTreeQuery.isError
-    ? undefined
-    : departmentTreeQuery.data;
+  const [catalogs, setCatalogs] = useState<TicketCreateOptionsResponse | null>(null);
+  const [loadingCatalogs, setLoadingCatalogs] = useState(true);
+  const [catalogsError, setCatalogsError] = useState<string | null>(null);
+  const [departmentTree, setDepartmentTree] = useState<DepartmentResponse[] | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
   const [ticketProducts, setTicketProducts] = useState<TicketProductDraft[]>([]);
   const [createAttachments, setCreateAttachments] = useState<File[]>([]);
+  const [fetchedContacts, setFetchedContacts] = useState<TicketContactOption[]>([]);
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
   const normalizedInitialMessage = useMemo(
@@ -231,46 +208,66 @@ export function CreateTicketModal({
     autoResizeTextarea(messageTextareaRef.current, INITIAL_MESSAGE_LINE_MIN_PX);
   }, [currentMessage]);
 
+  useEffect(() => {
+    ticketsApi
+      .createOptions()
+      .then((data) => {
+        setCatalogs(data);
+      })
+      .catch((err) => {
+        setCatalogsError(err instanceof Error ? err.message : "Error al cargar catálogos");
+      })
+      .finally(() => setLoadingCatalogs(false));
+  }, []);
+
+  // Carga el árbol completo de departamentos (incluidos inactivos) para resolver rutas jerárquicas de nombres repetidos.
+  useEffect(() => {
+    departmentsApi
+      .list({ includeInactive: true })
+      .then(setDepartmentTree)
+      .catch(() => setDepartmentTree(undefined));
+  }, []);
+
   // Al cambiar de cliente, poblar contactos
   const selectedClient = catalogs?.clients.find((c) => String(c.id) === selectedClientId);
   const catalogContacts = selectedClient?.contacts ?? [];
-
-  // Solo se piden a la ficha del cliente si el catalogo no los trae.
-  const contactsClientId =
-    selectedClientId && catalogContacts.length === 0 ? Number(selectedClientId) : null;
-  const clientQuery = useQuery({
-    queryKey: ["clients", contactsClientId],
-    queryFn: () => clientsApi.get(contactsClientId as number),
-    enabled: contactsClientId !== null,
-  });
-  // Solo la lectura de este cliente en este montaje: los contactos autoseleccionan uno.
-  const clientFetched = clientQuery.isFetchedAfterMount;
-  const clientError = clientQuery.isError;
-  const clientData = clientQuery.data;
-  const freshContacts = useMemo<TicketContactOption[] | undefined>(() => {
-    if (!clientFetched) return undefined;
-    if (clientError || !clientData) return NO_CONTACTS;
-    return clientData.contacts.map((c) => ({
-      id: c.id,
-      fullName: `${c.firstName} ${c.lastName}`.trim(),
-      email: c.email,
-      phone: c.phone,
-      position: c.position,
-      isPrimary: c.isPrimary,
-    }));
-  }, [clientFetched, clientError, clientData]);
-
-  // Como antes: mientras llegan los del cliente nuevo se ven los del anterior;
-  // sin cliente, o si el catalogo ya los trae, se vacian al instante.
-  const [shownContacts, setShownContacts] = useState<TicketContactOption[]>(NO_CONTACTS);
-  const nextContacts = contactsClientId === null ? NO_CONTACTS : freshContacts;
-  if (nextContacts !== undefined && nextContacts !== shownContacts) setShownContacts(nextContacts);
-  const fetchedContacts = nextContacts ?? shownContacts;
-
   const contactOptions: TicketContactOption[] = useMemo(
     () => (catalogContacts.length > 0 ? catalogContacts : fetchedContacts),
     [catalogContacts, fetchedContacts],
   );
+
+  useEffect(() => {
+    if (!selectedClientId) {
+      setFetchedContacts([]);
+      return;
+    }
+    if (catalogContacts.length > 0) {
+      setFetchedContacts([]);
+      return;
+    }
+    let cancelled = false;
+    clientsApi
+      .get(Number(selectedClientId))
+      .then(({ contacts }) => {
+        if (cancelled) return;
+        setFetchedContacts(
+          contacts.map((c) => ({
+            id: c.id,
+            fullName: `${c.firstName} ${c.lastName}`.trim(),
+            email: c.email,
+            phone: c.phone,
+            position: c.position,
+            isPrimary: c.isPrimary,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedContacts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedClientId, catalogContacts.length]);
 
   useEffect(() => {
     if (selectedClient && contactOptions.length > 0) {

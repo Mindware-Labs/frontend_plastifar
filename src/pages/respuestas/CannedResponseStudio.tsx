@@ -7,12 +7,12 @@ import {
   PenLine,
   Plus,
   Send,
+  Sparkles,
   Tag,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useQuery } from "@tanstack/react-query";
 import { cannedApi, cannedCategoriesApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
 import { Alert } from "../../components/ui/Alert";
@@ -43,8 +43,6 @@ import {
 import { CannedTemplateInline } from "./CannedTemplateInline";
 import { CannedVariableChips } from "./CannedVariableChips";
 
-const NO_CATEGORIES: CategoriaResponseItem[] = [];
-
 interface CannedResponseStudioProps {
   /** Presente = edición; ausente = nueva respuesta rápida. */
   item?: CannedResponseResponse;
@@ -69,6 +67,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
     return parseCanned(rawTitle, rawBody, item?.categoryName);
   }, [item, initialData]);
 
+  const [dbCategories, setDbCategories] = useState<CategoriaResponseItem[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
     item?.categoryId ?? initialData?.categoryId ?? null,
   );
@@ -97,38 +96,27 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
     [user],
   );
 
-  // Categorías del catálogo; misma clave que la lista de plantillas, así se comparte la petición.
-  const categoriesQuery = useQuery({
-    queryKey: ["canned-categories", "all"],
-    queryFn: () => cannedCategoriesApi.listAll(),
-  });
-  const dbCategories = categoriesQuery.data ?? NO_CATEGORIES;
-  const { refetch: refetchCategories } = categoriesQuery;
-
-  // Cada lectura nueva de este montaje ajusta la categoría elegida; la copia de la cache no.
-  const [syncedAt, setSyncedAt] = useState(0);
-  if (
-    categoriesQuery.isFetchedAfterMount &&
-    categoriesQuery.data &&
-    categoriesQuery.dataUpdatedAt !== syncedAt
-  ) {
-    const data = categoriesQuery.data;
-    setSyncedAt(categoriesQuery.dataUpdatedAt);
-    if (selectedCategoryId) {
-      const match = data.find((c) => c.id === selectedCategoryId);
-      if (match) setCategoryName(match.name);
-    } else if (rawInit.category && rawInit.category !== "General") {
-      const match = data.find((c) => c.name.toLowerCase() === rawInit.category.toLowerCase());
-      if (match) {
-        setSelectedCategoryId(match.id);
-        setCategoryName(match.name);
-      }
-    }
-  }
-
+  // Cargar categorías del catálogo de base de datos
   function loadCategories() {
-    void refetchCategories();
+    cannedCategoriesApi
+      .listAll()
+      .then((data) => {
+        setDbCategories(data);
+        if (selectedCategoryId) {
+          const match = data.find((c) => c.id === selectedCategoryId);
+          if (match) setCategoryName(match.name);
+        } else if (rawInit.category && rawInit.category !== "General") {
+          const match = data.find((c) => c.name.toLowerCase() === rawInit.category.toLowerCase());
+          if (match) {
+            setSelectedCategoryId(match.id);
+            setCategoryName(match.name);
+          }
+        }
+      })
+      .catch(() => {});
   }
+
+  useEffect(loadCategories, []);
 
   // Estilo del distintivo
   const currentCategoryColor = useMemo(() => {
@@ -496,7 +484,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                   <p className="text-[11.5px] text-subtle">
                     {previewMode === "simulated"
                       ? "Simulación con datos reales del destinatario (cliente@empresa.com)."
-                      : "Visualización de las etiquetas de variables en la plantilla."}
+                      : "Visualización de las etiquetas de variables inteligentes en la plantilla."}
                   </p>
                 </div>
 
@@ -511,6 +499,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
                           : "text-zinc-500 hover:text-ink"
                       }`}
                     >
+                      <Sparkles className="size-3" />
                       <span>Simular envío</span>
                     </button>
                     <button
@@ -620,7 +609,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
 
                 {/* Banner inferior de la vista previa */}
                 <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50/80 px-4 py-2.5 text-[11.5px] text-subtle">
-                  <span className="font-medium text-ink">Variables activas</span>
+                  <span className="font-medium text-ink">Variables inteligentes activas</span>
                   <span>
                     Al usar la plantilla en un correo, las variables se sustituyen por los datos reales del destinatario
                   </span>
