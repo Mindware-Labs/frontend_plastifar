@@ -1,5 +1,5 @@
-import { ArrowLeft, ArrowRight, Calendar, FileText, Plus, UserCheck } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { ArrowLeft, ArrowRight, Calendar, Check, FileText, Plus, UserCheck } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { Button } from "../../components/ui/Button";
 import { buildValidationItems, focusFormField } from "../../lib/validationItems";
@@ -20,7 +20,10 @@ const STEP_OUT_MS = 160;
 const STEP_IN_MS = 420;
 const STEP_SHIFT_PX = 28;
 
-const STEPS = ["Detalle", "Responsable y fecha"] as const;
+const STEPS = [
+  { id: 0 as const, title: "Detalle", subtitle: "Título e instrucciones" },
+  { id: 1 as const, title: "Asignación y fecha", subtitle: "Responsable y plazo" },
+] as const;
 
 interface CreateTaskModalProps {
   open: boolean;
@@ -161,13 +164,7 @@ export function CreateTaskModal({
     if (error) setError(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Enter en el primer paso avanza al siguiente; solo el último paso crea la tarea.
-    if (step === 0) {
-      handleNext();
-      return;
-    }
+  const executeSave = async () => {
     if (!title.trim()) {
       setError("Título requerido");
       triggerSettle();
@@ -195,6 +192,23 @@ export function CreateTaskModal({
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Enter en el primer paso avanza al siguiente; solo el último paso crea la tarea.
+    if (step === 0) {
+      handleNext();
+      return;
+    }
+    void executeSave();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      void executeSave();
+    }
+  };
+
   const isSelfAssigned = assignedStaffId === String(currentStaffId);
   const assigneeLabel =
     assignedStaffId === ""
@@ -212,78 +226,122 @@ export function CreateTaskModal({
       eyebrow="Tareas internas"
       maxWidth="max-w-xl"
       footer={
-        <>
-          {step === 0 ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={onClose}
-              disabled={saving}
-            >
-              Cancelar
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => goTo(0)}
-              disabled={saving}
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Atrás
-            </Button>
-          )}
-          {step === 0 ? (
-            <SubmitValidationButton
-              ready={createTaskMissing.length === 0}
-              busy={false}
-              missingItems={createTaskMissing}
-              onSubmit={handleNext}
-              onFocusField={focusFormField}
-              tone={error ? "ink" : "primary"}
-              toneLabel={error}
-              hintText="Para continuar, completa lo siguiente:"
-            >
-              Continuar
-              <ArrowRight className="h-3.5 w-3.5" />
-            </SubmitValidationButton>
-          ) : (
-            <SubmitValidationButton
-              ready={createTaskMissing.length === 0}
-              busy={saving}
-              missingItems={createTaskMissing}
-              onSubmit={() => void handleSubmit({ preventDefault: () => {} } as FormEvent)}
-              onFocusField={focusFormField}
-              tone={error ? "ink" : "primary"}
-              toneLabel={error}
-              hintText="Para crear la tarea en el ticket, completa lo siguiente:"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {saving ? "Creando tarea..." : "Crear tarea"}
-            </SubmitValidationButton>
-          )}
-        </>
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            {step === 0 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={onClose}
+                disabled={saving}
+              >
+                Cancelar
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => goTo(0)}
+                disabled={saving}
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Atrás
+              </Button>
+            )}
+            {step === 0 ? (
+              <SubmitValidationButton
+                ready={createTaskMissing.length === 0}
+                busy={false}
+                missingItems={createTaskMissing}
+                onSubmit={handleNext}
+                onFocusField={focusFormField}
+                tone={error ? "ink" : "primary"}
+                toneLabel={error}
+                hintText="Para continuar, completa lo siguiente:"
+              >
+                Continuar
+                <ArrowRight className="h-3.5 w-3.5" />
+              </SubmitValidationButton>
+            ) : (
+              <SubmitValidationButton
+                ready={createTaskMissing.length === 0}
+                busy={saving}
+                missingItems={createTaskMissing}
+                onSubmit={() => void executeSave()}
+                onFocusField={focusFormField}
+                tone={error ? "ink" : "primary"}
+                toneLabel={error}
+                hintText="Para crear la tarea en el ticket, completa lo siguiente:"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {saving ? "Creando tarea..." : "Crear tarea"}
+              </SubmitValidationButton>
+            )}
+          </div>
+        </div>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Indicador de progreso: dos segmentos, el activo se rellena. */}
-        <div className="flex items-center gap-3" aria-label={`Paso ${step + 1} de ${STEPS.length}`}>
-          <div className="flex flex-1 gap-1.5" aria-hidden>
-            {STEPS.map((label, index) => (
-              <span
-                key={label}
-                className={`h-1 flex-1 rounded-full transition-colors duration-500 ${
-                  index <= step ? "bg-brand-red" : "bg-zinc-200"
+      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
+        {/* Barra de pasos interactiva y clara */}
+        <nav aria-label="Pasos de creación de tarea" className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-zinc-50 border border-zinc-200/80">
+          {STEPS.map((s) => {
+            const isActive = step === s.id;
+            const isCompleted = step > s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  if (s.id === 0) {
+                    goTo(0);
+                  } else if (title.trim()) {
+                    goTo(1);
+                  } else {
+                    setError("Título requerido");
+                    triggerSettle();
+                  }
+                }}
+                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-all ${
+                  isActive
+                    ? "bg-white shadow-2xs border border-zinc-200 text-zinc-900"
+                    : "hover:bg-white/60 text-zinc-600 cursor-pointer"
                 }`}
-              />
-            ))}
-          </div>
-          <span className="shrink-0 font-heading text-[10.5px] font-semibold uppercase tracking-wider text-zinc-400">
-            Paso {step + 1} de {STEPS.length} · {STEPS[step]}
-          </span>
-        </div>
+              >
+                <span
+                  className={`flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold transition-colors ${
+                    isActive
+                      ? "bg-brand-red text-white shadow-2xs"
+                      : isCompleted
+                        ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                        : "bg-zinc-200/80 text-zinc-500"
+                  }`}
+                >
+                  {isCompleted ? <Check className="size-3.5" strokeWidth={2.5} /> : s.id + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className={`font-heading text-[12px] font-bold leading-tight truncate ${isActive ? "text-zinc-900" : "text-zinc-600"}`}>
+                    {s.title}
+                  </p>
+                  <p className="text-[10.5px] text-zinc-400 leading-tight truncate hidden sm:block">
+                    {s.subtitle}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </nav>
 
         <div ref={wrapRef} className="-mx-1 -mb-1 px-1 pb-1">
           <div ref={panelRef} className="space-y-4">
