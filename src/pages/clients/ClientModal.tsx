@@ -25,7 +25,7 @@ import {
 import { Modal } from "../../components/ui/Modal";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatPhoneNumber } from "../../lib/format";
-import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
+import { resolveStaffLabel, searchSalesRepStaff } from "../../lib/lookups";
 import type { Client, ClientType, SaveClientRequest } from "../../types/clients";
 import { fieldForServerError, type FieldRule } from "../../lib/serverFieldErrors";
 
@@ -355,7 +355,7 @@ export function ClientModal({ client, onClose, onSaved }: ClientModalProps) {
                 placeholder="Sin vendedor asignado"
                 searchPlaceholder="Buscar vendedor…"
                 clearLabel="Sin vendedor asignado"
-                search={searchActiveStaff}
+                search={searchSalesRepStaff}
                 resolveSelectedLabel={resolveStaffLabel}
                 state={stateOf("salesRepStaffId")}
                 error={errors.salesRepStaffId?.message}

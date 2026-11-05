@@ -31,7 +31,7 @@ import { useSort } from "../../hooks/useSort";
 import { idParam } from "../../lib/idParam";
 import {
   resolveStaffLabel,
-  searchActiveStaff,
+  searchSalesRepStaff,
 } from "../../lib/lookups";
 import type { Client, ClientListResponse } from "../../types/clients";
 import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
@@ -464,7 +464,7 @@ export function ClientsPage() {
               value={salesRepId === "todos" ? "" : salesRepId}
               selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
               resolveSelectedLabel={resolveStaffLabel}
-              search={searchActiveStaff}
+              search={searchSalesRepStaff}
               onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
             />
 

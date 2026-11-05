@@ -152,6 +152,7 @@ export interface StaffDetail {
   phoneExt: string | null;
   isAdmin: boolean;
   isActive: boolean;
+  isSalesRep: boolean;
   lastLoginAt: string | null;
   accesses: DepartmentAccess[];
   /** Usuario en el sistema anterior, si lo tiene (RF-O9). No sirve para entrar. */

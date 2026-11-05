@@ -14,6 +14,7 @@ import { useAuth } from "../../context/useAuth";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { departmentPathOptions } from "../../lib/departments";
 import type { DepartmentResponse, RoleResponse, StaffResponse } from "../../types/api";
+import { StaffSalesRepClientModal } from "./StaffSalesRepClientModal";
 
 const schema = z.object({
   firstName: z
@@ -32,6 +33,7 @@ const schema = z.object({
   primaryRoleId: z.string().min(1, "Elige el rol para el colaborador"),
   isAdmin: z.boolean(),
   isActive: z.boolean(),
+  isSalesRep: z.boolean(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -55,6 +57,8 @@ interface StaffModalProps {
 export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalProps) {
   const { user } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
+  const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [pendingValues, setPendingValues] = useState<FormValues | null>(null);
   const [roles, setRoles] = useState<RoleResponse[]>([]);
   // Nace cargando: el catalogo se pide al montar
   const [loadingRoles, setLoadingRoles] = useState(true);
@@ -81,6 +85,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
       primaryRoleId: staff?.primaryRoleId ? String(staff.primaryRoleId) : "",
       isAdmin: staff?.isAdmin ?? false,
       isActive: staff?.isActive ?? true,
+      isSalesRep: staff?.isSalesRep ?? false,
     },
   });
 
@@ -138,7 +143,7 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
     }
   }
 
-  async function onSubmit(values: FormValues) {
+  async function saveStaff(values: FormValues, assignClientId?: number) {
     setFormError(null);
     const primaryDepartmentId = Number(values.primaryDepartmentId);
     const primaryRoleId = Number(values.primaryRoleId);
@@ -153,6 +158,8 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           primaryRoleId,
           isAdmin: values.isAdmin,
           isActive: values.isActive,
+          isSalesRep: values.isSalesRep,
+          assignClientId: assignClientId ?? null,
           legacyUsername: staff.legacyUsername,
         });
 
@@ -183,6 +190,8 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           primaryDepartmentId,
           primaryRoleId,
           isAdmin: values.isAdmin,
+          isSalesRep: values.isSalesRep,
+          assignClientId: assignClientId ?? null,
         });
         onSaved(saved);
       }
@@ -202,7 +211,25 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
     }
   }
 
+  async function onSubmit(values: FormValues) {
+    const needsClient = values.isSalesRep && (!isEdit || !staff?.isSalesRep);
+    if (needsClient) {
+      setPendingValues(values);
+      setClientModalOpen(true);
+      return;
+    }
+    await saveStaff(values);
+  }
+
+  const displayName =
+    pendingValues != null
+      ? `${pendingValues.firstName} ${pendingValues.lastName}`.trim()
+      : staff
+        ? `${staff.firstName} ${staff.lastName}`
+        : "Colaborador";
+
   return (
+    <>
     <Modal
       size="lg"
       title={isEdit ? `Editar ${staff.firstName} ${staff.lastName}` : "Nuevo colaborador"}
@@ -333,7 +360,12 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           />
         </div>
 
-        <div className="pt-0.5">
+        <div className="pt-0.5 flex flex-col gap-2">
+          <CheckboxField
+            label="Es vendedor"
+            description="Aparece en selectores de vendedor y puede tener clientes en cartera."
+            {...register("isSalesRep")}
+          />
           <CheckboxField
             label="Perfil de administrador"
             description="Concede acceso total e irrestricto a todos los departamentos, módulos y configuraciones del panel."
@@ -362,5 +394,22 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
         )}
       </form>
     </Modal>
+
+    {clientModalOpen && pendingValues && (
+      <StaffSalesRepClientModal
+        staffName={displayName}
+        onClose={() => {
+          setClientModalOpen(false);
+          setPendingValues(null);
+        }}
+        onConfirm={(clientId) => {
+          setClientModalOpen(false);
+          const values = pendingValues;
+          setPendingValues(null);
+          void saveStaff(values, clientId);
+        }}
+      />
+    )}
+    </>
   );
 }

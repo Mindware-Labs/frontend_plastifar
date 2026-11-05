@@ -6,6 +6,7 @@ import {
   resolveClientLabel,
   resolveStaffLabel,
   searchActiveStaff,
+  searchSalesRepStaff,
   searchClients,
 } from "../../lib/lookups";
 import {
@@ -207,7 +208,7 @@ export function ReportFilters({
           placeholder="Todos los vendedores"
           searchPlaceholder="Buscar vendedor…"
           clearLabel="Todos los vendedores"
-          search={searchActiveStaff}
+          search={searchSalesRepStaff}
           resolveSelectedLabel={resolveStaffLabel}
         />
       )}

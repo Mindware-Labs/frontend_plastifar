@@ -71,8 +71,9 @@ export function StaffKpiTiles({
         </StatTile>
 
         <StatTile label="Perfil" indicator={<ShieldCheck className="h-3.5 w-3.5 text-zinc-400" />}>
-          <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {staff.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
+            {staff.isSalesRep && <Badge tone="green">Vendedor</Badge>}
             {staff.isLastAdmin && (
               <span className="truncate text-[11px] font-medium text-amber-600">Único admin</span>
             )}

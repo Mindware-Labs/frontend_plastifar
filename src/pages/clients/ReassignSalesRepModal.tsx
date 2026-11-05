@@ -8,7 +8,7 @@ import { Button } from "../../components/ui/Button";
 import { LookupField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
-import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
+import { resolveStaffLabel, searchSalesRepStaff } from "../../lib/lookups";
 import type { Client } from "../../types/clients";
 
 function FormDivider({ title }: { title: string }) {
@@ -168,7 +168,7 @@ export function ReassignSalesRepModal({ client, onClose, onSaved }: ReassignSale
               placeholder="Sin vendedor asignado"
               searchPlaceholder="Buscar vendedor…"
               clearLabel="Sin vendedor asignado"
-              search={searchActiveStaff}
+              search={searchSalesRepStaff}
               resolveSelectedLabel={resolveStaffLabel}
               hint="El vendedor seleccionado debe ser personal activo de Plastifar."
             />

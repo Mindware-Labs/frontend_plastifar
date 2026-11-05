@@ -26,6 +26,8 @@ export interface StaffQuery {
   departmentId?: number;
   /** todos | activos | inactivos | administradores */
   status?: string;
+  /** Solo colaboradores marcados como vendedor (activos). */
+  salesRepOnly?: boolean;
   /** nombre | correo | departamento | rol | estado */
   sort?: string;
   dir?: "asc" | "desc";
