@@ -169,7 +169,7 @@ export function TicketCardsSkeleton({ count = 9 }: { count?: number }) {
 /** Lista de conversaciones en la bandeja (columna izquierda). */
 export function InboxListSkeleton({ rows = 8 }: { rows?: number }) {
   return (
-    <div role="status" aria-label="Cargando conversaciones" className="flex flex-col gap-1 p-3 pt-0">
+    <div role="status" aria-label="Cargando conversaciones" className="flex flex-col gap-1 p-3 pt-0 overflow-hidden">
       {Array.from({ length: rows }).map((_, row) => (
         <div
           key={row}
@@ -193,13 +193,13 @@ export function InboxListSkeleton({ rows = 8 }: { rows?: number }) {
 /** Panel de lectura mientras llega el hilo seleccionado. */
 export function MailReadingPaneSkeleton() {
   return (
-    <div role="status" aria-label="Cargando mensaje" className="flex h-full flex-col p-6">
+    <div role="status" aria-label="Cargando mensaje" className="flex h-full flex-col overflow-hidden p-6">
       <div className="space-y-3 border-b border-line pb-5">
         <Skeleton className="h-5 w-[70%]" />
         <Skeleton className="h-3 w-[45%]" />
         <Skeleton className="h-3 w-[32%]" delay={80} />
       </div>
-      <div className="mt-6 space-y-3 flex-1">
+      <div className="mt-6 space-y-3 flex-1 overflow-hidden">
         {Array.from({ length: 6 }).map((_, row) => (
           <Skeleton key={row} className="h-3 w-full" delay={120 + row * 45} />
         ))}
