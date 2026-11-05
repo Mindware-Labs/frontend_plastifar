@@ -7,7 +7,7 @@ import {
   FileText,
   Tag,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { claimsApi, type ClaimListResponse, type ClaimQuery } from "../../api/claims";
 import { fetchAllPages } from "../../api/paging";
@@ -37,6 +37,8 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
+import { useEnterpriseListReturnRestore } from "../../hooks/useEnterpriseListReturnRestore";
+import { captureListScrollY } from "../../lib/enterpriseListReturn";
 import { exportClaimsListToExcel, exportClaimsListToPdf } from "../../lib/claimExcelExport";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
@@ -70,7 +72,7 @@ export function ClaimsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
-  const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
+  const { sort, sortOf, setSort } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
 
   // Resumen modal/drawer
@@ -109,7 +111,7 @@ export function ClaimsPage() {
     dir: sort.dir,
   };
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<ClaimQuery, ClaimListResponse>({
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<ClaimQuery, ClaimListResponse>({
     fetch: claimsApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las reclamaciones. Vuelve a intentarlo.",
@@ -135,6 +137,70 @@ export function ClaimsPage() {
       return next;
     });
   }, [rows, selectedIds]);
+
+  const applyListState = useCallback(
+    (state: Record<string, unknown>) => {
+      if (typeof state.search === "string") setSearch(state.search);
+      if (typeof state.reason === "string") setReason(state.reason);
+      if (typeof state.plantId === "string") setPlantId(state.plantId);
+      if (typeof state.clientId === "string") setClientId(state.clientId);
+      if (typeof state.from === "string") setFrom(state.from);
+      if (typeof state.to === "string") setTo(state.to);
+      if (typeof state.chip === "string") setChip(state.chip as ChipKey);
+      if (typeof state.pageSize === "number") setPageSize(state.pageSize);
+      if (typeof state.sortKey === "string" && (state.sortDir === "asc" || state.sortDir === "desc")) {
+        setSort({ key: state.sortKey as SortKey, dir: state.sortDir });
+      }
+    },
+    [setSort],
+  );
+
+  const getReturnSnapshot = useCallback(() => {
+    if (summaryClaimId === null) return null;
+    const row = selectionCache.get(summaryClaimId) ?? rows.find((r) => r.id === summaryClaimId);
+    return {
+      listPath: "/reclamaciones",
+      scrollY: captureListScrollY(),
+      bannerTitle: "Reclamaciones",
+      bannerDetail: row ? `${row.ticketNumber} · ${row.clientName}` : undefined,
+      listState: {
+        search,
+        reason,
+        plantId,
+        clientId,
+        from,
+        to,
+        chip,
+        pageSize,
+        page,
+        sortKey: sort.key,
+        sortDir: sort.dir,
+        summaryId: summaryClaimId,
+      },
+    };
+  }, [
+    summaryClaimId,
+    selectionCache,
+    rows,
+    search,
+    reason,
+    plantId,
+    clientId,
+    from,
+    to,
+    chip,
+    pageSize,
+    page,
+    sort.key,
+    sort.dir,
+  ]);
+
+  const { listEnterMotion } = useEnterpriseListReturnRestore({
+    applyListState,
+    setPage,
+    openSummary: setSummaryClaimId,
+    listReady: !listLoading && data !== null,
+  });
 
   const selectedClaims = useMemo(
     () =>
@@ -221,7 +287,11 @@ export function ClaimsPage() {
   ];
 
   return (
-    <div>
+    <div
+      className={`flex h-full min-h-0 flex-col ${
+        listEnterMotion === "back" ? "animate-plf-side-panel-back motion-reduce:animate-none" : ""
+      }`}
+    >
       <ModuleHeader
         title="Reclamaciones"
         summary={
@@ -503,7 +573,11 @@ export function ClaimsPage() {
 
       {/** Drawer con el Resumen Ejecutivo al hacer clic */}
       {summaryClaimId !== null && (
-        <ClaimSummaryDrawer claimId={summaryClaimId} onClose={() => setSummaryClaimId(null)} />
+        <ClaimSummaryDrawer
+          claimId={summaryClaimId}
+          getReturnSnapshot={getReturnSnapshot}
+          onClose={() => setSummaryClaimId(null)}
+        />
       )}
     </div>
   );

@@ -1,6 +1,10 @@
 import { ArrowUpRight, Printer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  navigateToTicketFullView,
+  type EnterpriseListReturnRecord,
+} from "../../lib/enterpriseListReturn";
 import { claimsApi } from "../../api/claims";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
@@ -12,9 +16,10 @@ import { ClaimExecutiveSummary } from "./ClaimExecutiveSummary";
 interface ClaimSummaryDrawerProps {
   claimId: number;
   onClose: () => void;
+  getReturnSnapshot?: () => Omit<EnterpriseListReturnRecord, "ticketId"> | null;
 }
 
-export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps) {
+export function ClaimSummaryDrawer({ claimId, onClose, getReturnSnapshot }: ClaimSummaryDrawerProps) {
   const navigate = useNavigate();
   const [detail, setDetail] = useState<ClaimDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,10 +82,14 @@ export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps
               disabled={!detail}
               onClick={() => {
                 if (!detail) return;
+                const url = `/tickets/${detail.claim.ticketId}?tab=formularios&form=claim-${detail.claim.id}&openForm=1`;
+                const snapshot = getReturnSnapshot?.() ?? null;
                 onClose();
-                navigate(
-                  `/tickets/${detail.claim.ticketId}?tab=formularios&form=claim-${detail.claim.id}&openForm=1`,
-                );
+                if (snapshot) {
+                  navigateToTicketFullView(navigate, url, detail.claim.ticketId, snapshot);
+                } else {
+                  navigate(url);
+                }
               }}
             >
               <span>Ver ficha completa</span>

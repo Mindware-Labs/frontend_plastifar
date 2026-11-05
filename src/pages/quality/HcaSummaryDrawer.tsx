@@ -1,6 +1,10 @@
 import { ArrowUpRight, Printer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  navigateToTicketFullView,
+  type EnterpriseListReturnRecord,
+} from "../../lib/enterpriseListReturn";
 import { qualityApi, type SheetDetailResponse } from "../../api/quality";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
@@ -11,9 +15,10 @@ import { HcaExecutiveSummary } from "./HcaExecutiveSummary";
 interface HcaSummaryDrawerProps {
   sheetId: number;
   onClose: () => void;
+  getReturnSnapshot?: () => Omit<EnterpriseListReturnRecord, "ticketId"> | null;
 }
 
-export function HcaSummaryDrawer({ sheetId, onClose }: HcaSummaryDrawerProps) {
+export function HcaSummaryDrawer({ sheetId, onClose, getReturnSnapshot }: HcaSummaryDrawerProps) {
   const navigate = useNavigate();
   const [detail, setDetail] = useState<SheetDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,12 +81,16 @@ export function HcaSummaryDrawer({ sheetId, onClose }: HcaSummaryDrawerProps) {
               disabled={!detail}
               onClick={() => {
                 if (!detail) return;
-                onClose();
                 const ticketId = detail.sheet.ticketId;
+                onClose();
                 if (ticketId != null) {
-                  navigate(
-                    `/tickets/${ticketId}?tab=formularios&form=sheet-${detail.sheet.id}&openForm=1`,
-                  );
+                  const url = `/tickets/${ticketId}?tab=formularios&form=sheet-${detail.sheet.id}&openForm=1`;
+                  const snapshot = getReturnSnapshot?.() ?? null;
+                  if (snapshot) {
+                    navigateToTicketFullView(navigate, url, ticketId, snapshot);
+                  } else {
+                    navigate(url);
+                  }
                 } else {
                   navigate(`/calidad/hca/${sheetId}`);
                 }

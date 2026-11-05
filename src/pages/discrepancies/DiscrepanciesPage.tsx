@@ -1,5 +1,5 @@
 import { Building2, Eye, FileSpreadsheet, FileText, ShieldAlert, Truck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { discrepanciesApi, type DiscrepancyListResponse, type DiscrepancyQuery } from "../../api/discrepancies";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -26,6 +26,8 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
+import { useEnterpriseListReturnRestore } from "../../hooks/useEnterpriseListReturnRestore";
+import { captureListScrollY } from "../../lib/enterpriseListReturn";
 import { exportDiscrepanciesListToExcel, exportDiscrepanciesListToPdf } from "../../lib/discrepancyListExport";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
@@ -55,7 +57,7 @@ export function DiscrepanciesPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
-  const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
+  const { sort, sortOf, setSort } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
   const [summaryId, setSummaryId] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -76,7 +78,7 @@ export function DiscrepanciesPage() {
     dir: sort.dir,
   };
 
-  const { data, isStale, error, setPage, refresh } = usePagedList<DiscrepancyQuery, DiscrepancyListResponse>({
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<DiscrepancyQuery, DiscrepancyListResponse>({
     fetch: discrepanciesApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las investigaciones. Vuelve a intentarlo.",
@@ -108,6 +110,67 @@ export function DiscrepanciesPage() {
         .filter((item): item is DiscrepancySummary => item !== undefined),
     [selectedIds, selectionCache],
   );
+
+  const applyListState = useCallback(
+    (state: Record<string, unknown>) => {
+      if (typeof state.search === "string") setSearch(state.search);
+      if (typeof state.clientId === "string") setClientId(state.clientId);
+      if (typeof state.dispatcher === "string") setDispatcher(state.dispatcher);
+      if (typeof state.from === "string") setFrom(state.from);
+      if (typeof state.to === "string") setTo(state.to);
+      if (typeof state.chip === "string") setChip(state.chip as ChipKey);
+      if (typeof state.pageSize === "number") setPageSize(state.pageSize);
+      if (typeof state.sortKey === "string" && (state.sortDir === "asc" || state.sortDir === "desc")) {
+        setSort({ key: state.sortKey as SortKey, dir: state.sortDir });
+      }
+    },
+    [setSort],
+  );
+
+  const getReturnSnapshot = useCallback(() => {
+    if (summaryId === null) return null;
+    const row = selectionCache.get(summaryId) ?? rows.find((r) => r.id === summaryId);
+    return {
+      listPath: "/discrepancias",
+      scrollY: captureListScrollY(),
+      bannerTitle: "Discrepancias",
+      bannerDetail: row ? `${row.number} · ${row.clientName}` : undefined,
+      listState: {
+        search,
+        clientId,
+        dispatcher,
+        from,
+        to,
+        chip,
+        pageSize,
+        page,
+        sortKey: sort.key,
+        sortDir: sort.dir,
+        summaryId,
+      },
+    };
+  }, [
+    summaryId,
+    selectionCache,
+    rows,
+    search,
+    clientId,
+    dispatcher,
+    from,
+    to,
+    chip,
+    pageSize,
+    page,
+    sort.key,
+    sort.dir,
+  ]);
+
+  const { listEnterMotion } = useEnterpriseListReturnRestore({
+    applyListState,
+    setPage,
+    openSummary: setSummaryId,
+    listReady: !listLoading && data !== null,
+  });
 
   const filtrosPuestos = (clientId !== "todos" ? 1 : 0) + (dispatcher !== "" ? 1 : 0) + (from !== "" ? 1 : 0) + (to !== "" ? 1 : 0);
   const unfiltered = chip === "todas" && filtrosPuestos === 0 && !debouncedSearch;
@@ -172,7 +235,11 @@ export function DiscrepanciesPage() {
   ];
 
   return (
-    <div>
+    <div
+      className={`flex h-full min-h-0 flex-col ${
+        listEnterMotion === "back" ? "animate-plf-side-panel-back motion-reduce:animate-none" : ""
+      }`}
+    >
       <ModuleHeader
         title="Discrepancias"
         summary={
@@ -460,7 +527,11 @@ export function DiscrepanciesPage() {
       </ListPanel>
 
       {summaryId !== null && (
-        <DiscrepancySummaryDrawer discrepancyId={summaryId} onClose={() => setSummaryId(null)} />
+        <DiscrepancySummaryDrawer
+          discrepancyId={summaryId}
+          getReturnSnapshot={getReturnSnapshot}
+          onClose={() => setSummaryId(null)}
+        />
       )}
     </div>
   );

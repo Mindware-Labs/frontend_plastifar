@@ -1,6 +1,10 @@
 import { ArrowUpRight, Printer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  navigateToTicketFullView,
+  type EnterpriseListReturnRecord,
+} from "../../lib/enterpriseListReturn";
 import { discrepanciesApi } from "../../api/discrepancies";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
@@ -12,9 +16,10 @@ import { DiscrepancyExecutiveSummary } from "./DiscrepancyExecutiveSummary";
 interface DiscrepancySummaryDrawerProps {
   discrepancyId: number;
   onClose: () => void;
+  getReturnSnapshot?: () => Omit<EnterpriseListReturnRecord, "ticketId"> | null;
 }
 
-export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: DiscrepancySummaryDrawerProps) {
+export function DiscrepancySummaryDrawer({ discrepancyId, onClose, getReturnSnapshot }: DiscrepancySummaryDrawerProps) {
   const navigate = useNavigate();
   const [detail, setDetail] = useState<DiscrepancyDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,10 +81,14 @@ export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: Discrepancy
               disabled={!detail}
               onClick={() => {
                 if (!detail) return;
+                const url = `/tickets/${detail.discrepancy.ticketId}?tab=formularios&form=discrepancy-${detail.discrepancy.id}&openForm=1`;
+                const snapshot = getReturnSnapshot?.() ?? null;
                 onClose();
-                navigate(
-                  `/tickets/${detail.discrepancy.ticketId}?tab=formularios&form=discrepancy-${detail.discrepancy.id}&openForm=1`,
-                );
+                if (snapshot) {
+                  navigateToTicketFullView(navigate, url, detail.discrepancy.ticketId, snapshot);
+                } else {
+                  navigate(url);
+                }
               }}
             >
               <span>Ver ficha completa</span>

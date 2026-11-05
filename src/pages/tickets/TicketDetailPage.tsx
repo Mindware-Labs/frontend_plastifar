@@ -28,13 +28,16 @@ import {
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ComponentType,
   type ReactNode,
 } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ReturnToOriginBanner } from "../../components/app/ReturnToOriginBanner";
+import type { PlfListLocationState } from "../../lib/enterpriseListReturn";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
@@ -375,8 +378,20 @@ function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }
 
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const ticketId = parseTicketDetailId(id);
+  const [detailEnterMotion, setDetailEnterMotion] = useState(false);
+  const ticketEnterConsumedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (ticketEnterConsumedRef.current) return;
+    const state = location.state as PlfListLocationState | null;
+    if (state?.plfTicketEnter !== "enterprise-list") return;
+    ticketEnterConsumedRef.current = true;
+    setDetailEnterMotion(true);
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [location.pathname, location.search, location.state, navigate]);
 
   const [ticket, setTicket] = useState<TicketDetailResponse | null>(null);
   const [loading, setLoading] = useState(ticketId != null);
@@ -1363,7 +1378,11 @@ export function TicketDetailPage() {
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden print:block print:h-auto print:min-h-0 print:overflow-visible">
+    <div
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden print:block print:h-auto print:min-h-0 print:overflow-visible ${
+        detailEnterMotion ? "animate-plf-side-panel-in motion-reduce:animate-none" : ""
+      }`}
+    >
       {viewingDocumentForm ? (
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in print:block print:h-auto print:min-h-0 print:overflow-visible print:animate-none">
           <TicketFormDocumentView form={viewingDocumentForm} onBack={() => setViewingDocumentForm(null)} />
@@ -3275,6 +3294,8 @@ export function TicketDetailPage() {
           onSelectTab={setActiveTab}
         />
       )}
+
+      {ticketId != null && <ReturnToOriginBanner ticketId={ticketId} />}
     </div>
   );
 }

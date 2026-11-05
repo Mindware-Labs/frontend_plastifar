@@ -1,6 +1,10 @@
 import { ArrowUpRight, Printer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  navigateToTicketFullView,
+  type EnterpriseListReturnRecord,
+} from "../../lib/enterpriseListReturn";
 import { withdrawalsApi } from "../../api/withdrawals";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
@@ -12,9 +16,10 @@ import { WithdrawalExecutiveSummary } from "./WithdrawalExecutiveSummary";
 interface WithdrawalSummaryDrawerProps {
   withdrawalId: number;
   onClose: () => void;
+  getReturnSnapshot?: () => Omit<EnterpriseListReturnRecord, "ticketId"> | null;
 }
 
-export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSummaryDrawerProps) {
+export function WithdrawalSummaryDrawer({ withdrawalId, onClose, getReturnSnapshot }: WithdrawalSummaryDrawerProps) {
   const navigate = useNavigate();
   const [detail, setDetail] = useState<WithdrawalDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,10 +81,14 @@ export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSum
               disabled={!detail}
               onClick={() => {
                 if (!detail) return;
+                const url = `/tickets/${detail.withdrawal.ticketId}?tab=formularios&form=withdrawal-${detail.withdrawal.id}&openForm=1`;
+                const snapshot = getReturnSnapshot?.() ?? null;
                 onClose();
-                navigate(
-                  `/tickets/${detail.withdrawal.ticketId}?tab=formularios&form=withdrawal-${detail.withdrawal.id}&openForm=1`,
-                );
+                if (snapshot) {
+                  navigateToTicketFullView(navigate, url, detail.withdrawal.ticketId, snapshot);
+                } else {
+                  navigate(url);
+                }
               }}
             >
               <span>Ver ficha completa</span>
