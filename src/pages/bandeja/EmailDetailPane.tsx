@@ -6,6 +6,7 @@ import {
   ChevronDown,
   CornerUpLeft,
   Download,
+  FileText,
   Forward,
   LoaderCircle,
   Paperclip,
@@ -13,6 +14,7 @@ import {
   RotateCcw,
   ShieldAlert,
   Star,
+  StickyNote,
   Ticket as TicketIcon,
   Trash2,
   X,
@@ -389,9 +391,32 @@ export function EmailDetailPane({
   const [composers, setComposers] = useState<ComposingPresence[]>([]);
   const [editorKey, setEditorKey] = useState(0);
   const [exporting, setExporting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [notesCount, setNotesCount] = useState(0);
   const [dangerousToDownload, setDangerousToDownload] = useState<EmailAttachmentResponse | null>(null);
   const { user } = useAuth();
   const prevVarCtxRef = useRef<CannedVariableContext | undefined>(undefined);
+
+  // Garantiza que la modal de exportar PDF se cierre al hacer clic fuera o presionar Escape
+  useEffect(() => {
+    if (!exportOpen) return;
+    function handlePointerDown(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("[data-slot='popover-content']") || target?.closest("[data-slot='popover-trigger']")) {
+        return;
+      }
+      setExportOpen(false);
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setExportOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [exportOpen]);
 
   const cannedVariableContext = useMemo(() => {
     if (!email) return undefined;
@@ -493,6 +518,15 @@ export function EmailDetailPane({
       .catch((err) => {
         if (cancelled) return;
         setError(err instanceof ApiError ? err.message : "No se pudo cargar el correo");
+      });
+
+    emailsApi
+      .notes(emailId)
+      .then((notes) => {
+        if (!cancelled) setNotesCount(notes.length);
+      })
+      .catch(() => {
+        if (!cancelled) setNotesCount(0);
       });
 
     return () => {
@@ -766,17 +800,17 @@ export function EmailDetailPane({
     prevVarCtxRef.current = cannedVariableContext;
   }
 
-  async function handleExport() {
+  async function handleExport(includeNotes: boolean = true) {
     if (!email || exporting) return;
     setExporting(true);
+    setExportOpen(false);
     try {
-      const { blob, fileName } = await emailsApi.exportConversation(email.id);
+      const { blob, fileName } = await emailsApi.exportConversation(email.id, includeNotes);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = fileName ?? `conversacion-${email.id}.pdf`;
       anchor.click();
-      // Revocar de inmediato corta la descarga en algunos navegadores: se libera pasado un minuto.
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 
       receipts.done({
@@ -1061,14 +1095,94 @@ export function EmailDetailPane({
 
           <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-line" />
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className={toolButtonClass} disabled={exporting} onClick={handleExport}>
-                {exporting ? <LoaderCircle className="animate-spin" /> : <Download />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{exporting ? "Exportando…" : "Exportar conversación (PDF)"}</TooltipContent>
-          </Tooltip>
+          {notesCount > 0 ? (
+            <Popover open={exportOpen} onOpenChange={setExportOpen}>
+              <Tooltip open={exportOpen ? false : undefined}>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={toolButtonClass}
+                      disabled={exporting}
+                      aria-label="Exportar conversación (PDF)"
+                    >
+                      {exporting ? <LoaderCircle className="size-4 animate-spin text-brand-red" /> : <Download className="size-4" />}
+                    </Button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                {!exportOpen && (
+                  <TooltipContent>Exportar conversación (PDF)</TooltipContent>
+                )}
+              </Tooltip>
+
+              <PopoverContent
+                align="end"
+                sideOffset={6}
+                className="w-68 p-1.5 shadow-lg border-zinc-200/90 rounded-xl"
+                onPointerDownOutside={() => setExportOpen(false)}
+                onInteractOutside={() => setExportOpen(false)}
+                onEscapeKeyDown={() => setExportOpen(false)}
+              >
+                <div className="px-2.5 py-1.5 border-b border-zinc-100">
+                  <p className="text-[11px] font-semibold text-zinc-900">Exportar PDF</p>
+                  <p className="text-[10.5px] text-zinc-500">Elige qué incluir en el documento</p>
+                </div>
+
+                <div className="p-1 space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => void handleExport(true)}
+                    disabled={exporting}
+                    className="group flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left outline-none transition-colors hover:bg-zinc-100/70 focus-visible:bg-zinc-100 cursor-pointer disabled:opacity-50"
+                  >
+                    <StickyNote className="size-4 mt-0.5 shrink-0 text-amber-600" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] font-medium text-zinc-800 group-hover:text-zinc-900">
+                        Con notas internas
+                      </p>
+                      <p className="text-[10.5px] text-zinc-400 leading-tight mt-0.5">
+                        Incluye mensajes y {notesCount} {notesCount === 1 ? "nota interna" : "notas internas"}.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleExport(false)}
+                    disabled={exporting}
+                    className="group flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left outline-none transition-colors hover:bg-zinc-100/70 focus-visible:bg-zinc-100 cursor-pointer disabled:opacity-50"
+                  >
+                    <FileText className="size-4 mt-0.5 shrink-0 text-zinc-500" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] font-medium text-zinc-800 group-hover:text-zinc-900">
+                        Sin notas internas
+                      </p>
+                      <p className="text-[10.5px] text-zinc-400 leading-tight mt-0.5">
+                        Solo correos oficiales, ideal para clientes o externos.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={toolButtonClass}
+                  disabled={exporting}
+                  onClick={() => void handleExport(false)}
+                  aria-label="Exportar conversación (PDF)"
+                >
+                  {exporting ? <LoaderCircle className="size-4 animate-spin text-brand-red" /> : <Download className="size-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{exporting ? "Exportando…" : "Exportar conversación (PDF)"}</TooltipContent>
+            </Tooltip>
+          )}
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -1112,7 +1226,7 @@ export function EmailDetailPane({
           </div>
 
           <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
-            <ConversationNotes ref={conversationNotesRef} emailId={email.id} />
+            <ConversationNotes ref={conversationNotesRef} emailId={email.id} onNotesCountChange={setNotesCount} />
             <span className="whitespace-nowrap text-[11px] font-medium text-zinc-400">
               {formatDateTime(email.createdAt)}
             </span>
@@ -1528,7 +1642,7 @@ export function EmailDetailPane({
         )}
 
         {email.bodyHtml ? (
-          <EmailBodyFrame key={email.id} html={email.bodyHtml} title="Cuerpo del correo" className="min-h-0 flex-1" />
+          <EmailBodyFrame key={email.id} html={email.bodyHtml} title="Cuerpo del correo" className={`min-h-0 flex-1 ${exportOpen ? "pointer-events-none" : ""}`} />
         ) : email.bodyText ? (
           <pre className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap p-4 text-[13px] leading-relaxed text-ink">
             {email.bodyText}
