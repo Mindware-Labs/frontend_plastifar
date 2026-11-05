@@ -58,7 +58,7 @@ import { ClaimFormModal } from "../claims/ClaimFormModal";
 import { claimQualitySectionTone, getClaimQualitySectionLabel } from "../../lib/claimQualitySection";
 import { ClaimStatusBadge, normalizeClaimStatus } from "../claims/ClaimStatusBadge";
 import { DiscrepancyFormModal } from "../discrepancies/DiscrepancyFormModal";
-import { DiscrepancyStatusBadge } from "../discrepancies/DiscrepancyStatusBadge";
+import { DiscrepancyStatusBadge, normalizeDiscrepancyStatus } from "../discrepancies/DiscrepancyStatusBadge";
 import { HcaModal } from "../quality/HcaModal";
 import { HcaStatusBadge, PlanItemStatusBadge } from "../quality/StatusBadges";
 import { WithdrawalFormModal } from "../withdrawals/WithdrawalFormModal";
@@ -457,7 +457,7 @@ export function TicketFormsTab({
         type: "discrepancia",
         code: "PF-FOR-291",
         title: `Discrepancia ${d.discrepancy.number}`,
-        badgeText: d.discrepancy.status,
+        badgeText: normalizeDiscrepancyStatus(d.discrepancy.status),
         data: d,
       });
     });

@@ -12,6 +12,7 @@ import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { EnterpriseFormExecutiveSummarySkeleton } from "../../components/ui/Skeleton";
 import type { DiscrepancyDetail } from "../../types/discrepancies";
 import { DiscrepancyExecutiveSummary } from "./DiscrepancyExecutiveSummary";
+import { normalizeDiscrepancyStatus } from "./DiscrepancyStatusBadge";
 
 interface DiscrepancySummaryDrawerProps {
   discrepancyId: number;
@@ -19,7 +20,11 @@ interface DiscrepancySummaryDrawerProps {
   getReturnSnapshot?: () => Omit<EnterpriseListReturnRecord, "ticketId"> | null;
 }
 
-export function DiscrepancySummaryDrawer({ discrepancyId, onClose, getReturnSnapshot }: DiscrepancySummaryDrawerProps) {
+export function DiscrepancySummaryDrawer({
+  discrepancyId,
+  onClose,
+  getReturnSnapshot,
+}: DiscrepancySummaryDrawerProps) {
   const navigate = useNavigate();
   const [detail, setDetail] = useState<DiscrepancyDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +61,7 @@ export function DiscrepancySummaryDrawer({ discrepancyId, onClose, getReturnSnap
       eyebrow="PF-FOR-291 · Discrepancia de carga"
       description={
         detail
-          ? `${detail.discrepancy.clientName ?? "Sin cliente"} · ${detail.discrepancy.status}`
+          ? `${detail.discrepancy.clientName ?? "Sin cliente"} · ${normalizeDiscrepancyStatus(detail.discrepancy.status)}`
           : "Cargando datos del formulario…"
       }
       maxWidth="max-w-[760px]"

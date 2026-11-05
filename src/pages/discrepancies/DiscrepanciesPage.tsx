@@ -1,4 +1,4 @@
-import { Building2, Eye, FileSpreadsheet, FileText, ShieldAlert, Truck } from "lucide-react";
+import { Building2, Eye, FileSpreadsheet, FileText, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { discrepanciesApi, type DiscrepancyListResponse, type DiscrepancyQuery } from "../../api/discrepancies";
@@ -8,7 +8,6 @@ import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import {
   ClearFiltersButton,
   DateRangeFilterDropdown,
-  InputFilterDropdown,
   LookupFilterDropdown,
 } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
@@ -40,7 +39,7 @@ type SortKey = "fecha" | "numero" | "ticket" | "cliente";
 
 const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "investigating" | "completed" | "approved" | "returned" | "withFinding" }[] = [
   { key: "todas", label: "Todas", countKey: "all" },
-  { key: "En investigación", label: "En investigación", status: "En investigación", countKey: "investigating" },
+  { key: "En investigación", label: "Registradas", status: "En investigación", countKey: "investigating" },
   { key: "Completada", label: "Completadas", status: "Completada", countKey: "completed" },
   { key: "Aprobada", label: "Aprobadas", status: "Aprobada", countKey: "approved" },
   { key: "Devuelta", label: "Devueltas", status: "Devuelta", countKey: "returned" },
@@ -53,7 +52,6 @@ export function DiscrepanciesPage() {
 
   const [search, setSearch] = useState("");
   const [clientId, setClientId] = useState("todos");
-  const [dispatcher, setDispatcher] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
@@ -64,13 +62,11 @@ export function DiscrepanciesPage() {
   const [selectionCache, setSelectionCache] = useState<Map<number, DiscrepancySummary>>(() => new Map());
 
   const debouncedSearch = useDebouncedValue(search).trim();
-  const debouncedDispatcher = useDebouncedValue(dispatcher).trim();
 
   const criteria: Omit<DiscrepancyQuery, "page"> = {
     pageSize,
     search: debouncedSearch || undefined,
     clientId: clientId === "todos" ? undefined : Number(clientId),
-    dispatcher: debouncedDispatcher || undefined,
     from: from || undefined,
     to: to || undefined,
     status: CHIPS.find((c) => c.key === chip)?.status,
@@ -115,7 +111,6 @@ export function DiscrepanciesPage() {
     (state: Record<string, unknown>) => {
       if (typeof state.search === "string") setSearch(state.search);
       if (typeof state.clientId === "string") setClientId(state.clientId);
-      if (typeof state.dispatcher === "string") setDispatcher(state.dispatcher);
       if (typeof state.from === "string") setFrom(state.from);
       if (typeof state.to === "string") setTo(state.to);
       if (typeof state.chip === "string") setChip(state.chip as ChipKey);
@@ -138,7 +133,6 @@ export function DiscrepanciesPage() {
       listState: {
         search,
         clientId,
-        dispatcher,
         from,
         to,
         chip,
@@ -155,7 +149,6 @@ export function DiscrepanciesPage() {
     rows,
     search,
     clientId,
-    dispatcher,
     from,
     to,
     chip,
@@ -172,12 +165,11 @@ export function DiscrepanciesPage() {
     listReady: !listLoading && data !== null,
   });
 
-  const filtrosPuestos = (clientId !== "todos" ? 1 : 0) + (dispatcher !== "" ? 1 : 0) + (from !== "" ? 1 : 0) + (to !== "" ? 1 : 0);
+  const filtrosPuestos = (clientId !== "todos" ? 1 : 0) + (from !== "" ? 1 : 0) + (to !== "" ? 1 : 0);
   const unfiltered = chip === "todas" && filtrosPuestos === 0 && !debouncedSearch;
 
   function clearNarrowFilters() {
     setClientId("todos");
-    setDispatcher("");
     setFrom("");
     setTo("");
     setPage(1);
@@ -258,16 +250,16 @@ export function DiscrepanciesPage() {
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag
-                label="en investigación"
+                label={counts.investigating === 1 ? "registrada" : "registradas"}
                 count={counts.investigating}
                 active={chip === "En investigación"}
                 onClick={() => {
                   setChip("En investigación");
                   setPage(1);
                 }}
-                tone="amber"
+                tone="blue"
                 dot
-                title="Filtrar por investigaciones en curso"
+                title="Filtrar por discrepancias registradas"
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag
@@ -280,7 +272,7 @@ export function DiscrepanciesPage() {
                 }}
                 tone="blue"
                 dot
-                title="Filtrar por investigaciones completadas"
+                title="Filtrar por discrepancias completadas"
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag
@@ -351,7 +343,7 @@ export function DiscrepanciesPage() {
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder="Número, ticket, cliente, factura, despachador o producto…"
+                placeholder="Número, ticket, cliente, factura o producto…"
                 className="w-[300px]"
               />
 
@@ -365,17 +357,6 @@ export function DiscrepanciesPage() {
                 onChange={(value) => setClientId(value === "" ? "todos" : value)}
                 search={searchClients}
                 resolveSelectedLabel={resolveClientLabel}
-              />
-
-              <InputFilterDropdown
-                title="Filtrar por despachador"
-                aria-label="Filtrar por despachador"
-                placeholder="Todos los despachadores"
-                inputPlaceholder="Nombre del despachador…"
-                defaultIcon={<Truck className="h-3.5 w-3.5 text-zinc-500" />}
-                value={dispatcher}
-                onChange={setDispatcher}
-                formatActiveLabel={(val) => `Despachador: ${val}`}
               />
 
               <DateRangeFilterDropdown
