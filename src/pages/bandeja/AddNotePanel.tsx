@@ -50,25 +50,25 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
   }
 
   return (
-    <div className="shrink-0 border-t border-zinc-200/80 bg-zinc-50/50">
+    <div className="shrink-0 border-t border-zinc-100 bg-white">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="group flex w-full items-center gap-2.5 px-4 py-2 text-left outline-none transition-colors hover:bg-zinc-100/70 select-none cursor-pointer"
+        className="group flex w-full items-center justify-between px-4 py-2 text-left outline-none transition-colors hover:bg-zinc-50/80 select-none cursor-pointer"
       >
-        <div className="flex size-5.5 shrink-0 items-center justify-center rounded-md bg-amber-100/90 text-amber-700 shadow-2xs">
-          <StickyNote className="h-3 w-3" />
+        <div className="flex items-center gap-2 text-zinc-500 group-hover:text-zinc-800 transition-colors">
+          <StickyNote className="size-3.5 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+          <span className="text-[12px] font-medium">
+            {open ? "Cerrar nota interna" : "Agregar nota interna…"}
+          </span>
         </div>
-        <span className="font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-600 group-hover:text-zinc-900 transition-colors">
-          Agregar nota interna
-        </span>
-        <span className="ml-auto rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-zinc-600 shadow-2xs group-hover:border-zinc-300 group-hover:text-zinc-900 transition-all">
-          {open ? "Ocultar" : "Mostrar"}
+        <span className="text-[11px] font-medium text-zinc-400 group-hover:text-zinc-600 transition-colors">
+          {open ? "Ocultar" : "Ctrl+Enter"}
         </span>
       </button>
 
       {open && (
-        <div className="flex flex-col gap-2.5 px-4 pb-3.5 pt-1">
+        <div className="flex flex-col gap-2 px-4 pb-3 pt-0">
           <textarea
             ref={textareaRef}
             value={draft}

@@ -1,6 +1,7 @@
 import {
   Archive,
   ArchiveRestore,
+  ArrowDownLeft,
   ArrowUpRight,
   ChevronDown,
   CornerUpLeft,
@@ -260,8 +261,9 @@ const THREAD_HISTORY_COLLAPSED_VISIBLE = 2;
 function getThreadMessageBadge(message: { direction: string; subject?: string }) {
   if (message.direction !== "Outbound") {
     return {
-      label: "Recibido por",
-      className: "bg-zinc-100 text-zinc-700 border border-zinc-200/90",
+      type: "inbound" as const,
+      label: "Recibido",
+      className: "bg-zinc-100/80 text-zinc-600 border border-zinc-200/60",
     };
   }
 
@@ -270,22 +272,42 @@ function getThreadMessageBadge(message: { direction: string; subject?: string })
 
   if (isReply) {
     return {
-      label: "Respondido a",
-      className: "bg-brand-red/10 text-brand-red-dark border border-brand-red/20",
+      type: "reply" as const,
+      label: "Respuesta",
+      className: "bg-zinc-100/80 text-zinc-600 border border-zinc-200/60",
     };
   }
 
   return {
-    label: "Enviado a",
-    className: "bg-sky-500/10 text-sky-800 border border-sky-500/25",
+    type: "forward" as const,
+    label: "Enviado",
+    className: "bg-zinc-100/80 text-zinc-600 border border-zinc-200/60",
   };
 }
 
 type ComposerMode = "reply" | "forward";
 
-/** Primer renglon con contenido: es el resumen que cabe en una linea de la lista. */
-function firstLine(text: string) {
-  return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
+/** Limpia y normaliza el extracto del mensaje para una visualización sobria y sin ruido de cabeceras */
+function cleanSnippet(text: string | null | undefined, fallbackSubject?: string | null): string {
+  if (!text) return fallbackSubject || "";
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(
+      (l) =>
+        l &&
+        !l.startsWith(">") &&
+        !l.startsWith("On ") &&
+        !l.startsWith("El ") &&
+        !l.startsWith("De:") &&
+        !l.startsWith("From:") &&
+        !l.startsWith("Sent:") &&
+        !l.startsWith("Para:") &&
+        !l.startsWith("To:"),
+    );
+  const first = lines[0] ?? "";
+  const clean = first.replace(/\s+/g, " ").trim();
+  return clean || fallbackSubject || "";
 }
 
 /** El cuerpo del correo viene de un remitente externo: se muestra siempre via EmailBodyFrame, nunca inyectado. */
@@ -1567,115 +1589,119 @@ export function EmailDetailPane({
         <AddNotePanel emailId={email.id} onNoteAdded={handleNoteAdded} />
       )}
 
-      <Separator className="bg-line" />
+      <Separator className="bg-zinc-100" />
 
-      <div className="shrink-0 px-4 py-2.5">
+      <div className="shrink-0 px-4 py-2">
         {others.length > 0 && (
           <div className="mb-2">
-            {threadHistoryCollapsible && (
-              <div className="mb-1 flex items-center justify-between gap-2 px-1.5">
-                <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
-                  {others.length} {others.length === 1 ? "acción" : "acciones"} en el hilo
-                </span>
+            <div className="mb-1.5 flex items-center justify-between px-1">
+              <span className="text-[11px] font-medium text-zinc-500">
+                Historial del hilo ({others.length})
+              </span>
+              {threadHistoryCollapsible && (
                 <button
                   type="button"
                   onClick={() => setThreadHistoryExpanded((open) => !open)}
                   aria-expanded={threadHistoryExpanded}
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-heading text-[11px] font-semibold text-brand-red outline-none transition-colors hover:bg-brand-red/8 focus-visible:ring-2 focus-visible:ring-brand-red/20"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-800 transition-colors cursor-pointer"
                 >
-                  {threadHistoryExpanded ? "Ocultar" : "Mostrar"}
+                  <span>{threadHistoryExpanded ? "Ver menos" : `Ver anteriores (${threadHistoryHiddenCount})`}</span>
                   <ChevronDown
-                    className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                    className={`size-3 transition-transform duration-150 ${
                       threadHistoryExpanded ? "rotate-180" : ""
                     }`}
                     aria-hidden
                   />
                 </button>
-              </div>
-            )}
+              )}
+            </div>
+
             <div
-              className={`pr-0.5 ${
-                threadHistoryExpanded ? "max-h-72 overflow-y-auto" : threadHistoryCollapsible ? "" : "max-h-40 overflow-y-auto"
+              className={`space-y-0.5 pr-0.5 ${
+                threadHistoryExpanded ? "max-h-64 overflow-y-auto" : threadHistoryCollapsible ? "" : "max-h-40 overflow-y-auto"
               }`}
             >
-            {visibleThreadOthers.map((reply) => {
-              const badge = getThreadMessageBadge(reply);
-              const contactName =
-                reply.direction === "Outbound"
-                  ? reply.toEmails.join(", ") || reply.fromEmail || reply.authorName
-                  : reply.fromName ?? reply.fromEmail;
-              const authorNote =
-                reply.direction === "Outbound" && reply.authorName && reply.authorName !== contactName
-                  ? reply.authorName
-                  : null;
+              {visibleThreadOthers.map((reply) => {
+                const badge = getThreadMessageBadge(reply);
+                const contactName =
+                  reply.direction === "Outbound"
+                    ? reply.toEmails.join(", ") || reply.fromEmail || reply.authorName
+                    : reply.fromName ?? reply.fromEmail;
+                const authorNote =
+                  reply.direction === "Outbound" && reply.authorName && reply.authorName !== contactName
+                    ? reply.authorName
+                    : null;
+                const snippet = cleanSnippet(reply.bodyText, reply.subject);
 
-              return (
-                <button
-                  key={reply.id}
-                  type="button"
-                  onClick={() => setOpenReplyId(reply.id === openReplyId ? null : reply.id)}
-                  data-open={reply.id === openReplyId}
-                  className="flex w-full items-center gap-2 rounded-edge px-1.5 py-1 text-left
-                    outline-none transition-colors hover:bg-fill
-                    focus-visible:ring-3 focus-visible:ring-brand-red/12
-                    data-[open=true]:bg-brand-red/[0.06]"
-                >
-                  <span
-                    className={`inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 font-heading
-                      text-[9px] font-bold uppercase tracking-[0.05em] ${badge.className}`}
+                return (
+                  <button
+                    key={reply.id}
+                    type="button"
+                    onClick={() => setOpenReplyId(reply.id === openReplyId ? null : reply.id)}
+                    data-open={reply.id === openReplyId}
+                    className="group flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left
+                      outline-none transition-all hover:bg-zinc-100/70
+                      focus-visible:ring-2 focus-visible:ring-zinc-400/20
+                      data-[open=true]:bg-zinc-100/90 cursor-pointer"
                   >
-                    {badge.label}
-                  </span>
-                  {reply.origin === "Tickets" && (
-                    <span
-                      title={ticketsNote(reply) ?? undefined}
-                      className="inline-flex shrink-0 items-center rounded-full border border-brand-red/20
-                        bg-brand-red/8 px-1.5 py-0.5 font-heading text-[9px] font-bold uppercase
-                        tracking-[0.05em] text-brand-red-dark"
-                    >
-                      Tickets
+                    {/* Indicador sutil de tipo con icono */}
+                    <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-zinc-500">
+                      {badge.type === "inbound" ? (
+                        <ArrowDownLeft className="size-3 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                      ) : badge.type === "reply" ? (
+                        <CornerUpLeft className="size-3 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                      ) : (
+                        <ArrowUpRight className="size-3 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+                      )}
+                      <span className="text-zinc-600">{badge.label}</span>
                     </span>
-                  )}
-                  {/* Cede antes que la fila: una direccion larga no puede empujar la hora fuera de vista. */}
-                  <span className="max-w-[45%] truncate text-[11.5px] font-semibold text-ink">
-                    {contactName}
-                  </span>
-                  {authorNote && (
-                    <span className="shrink-0 text-[10.5px] text-faint">
-                      por {authorNote}
+
+                    {reply.origin === "Tickets" && (
+                      <span
+                        title={ticketsNote(reply) ?? undefined}
+                        className="inline-flex shrink-0 items-center rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500"
+                      >
+                        Ticket
+                      </span>
+                    )}
+
+                    <span className="shrink-0 text-zinc-300">·</span>
+
+                    {/* Contacto / autor */}
+                    <span className="shrink-0 max-w-[130px] sm:max-w-[170px] truncate text-[11.5px] font-medium text-zinc-800">
+                      {contactName}
                     </span>
-                  )}
-                  <span className="truncate text-[11.5px] text-subtle">
-                    {firstLine(reply.bodyText)}
-                  </span>
-                  {reply.deliveryStatus && deliveryTone[reply.deliveryStatus] && (
-                    <span
-                      className={`ml-auto shrink-0 text-[10.5px] font-semibold
-                        ${deliveryTone[reply.deliveryStatus]}`}
-                    >
-                      {DELIVERY_LABELS[reply.deliveryStatus]}
+
+                    {authorNote && (
+                      <span className="hidden md:inline shrink-0 text-[10.5px] text-zinc-400">
+                        ({authorNote})
+                      </span>
+                    )}
+
+                    <span className="shrink-0 text-zinc-300">·</span>
+
+                    {/* Extracto limpio */}
+                    <span className="min-w-0 flex-1 truncate text-[11.5px] text-zinc-500">
+                      {snippet}
                     </span>
-                  )}
-                  <span
-                    className={`shrink-0 text-[10.5px] font-medium text-faint ${
-                      reply.deliveryStatus && deliveryTone[reply.deliveryStatus] ? "" : "ml-auto"
-                    }`}
-                  >
-                    {formatEmailListDate(reply.createdAt)}
-                  </span>
-                </button>
-              );
-            })}
+
+                    {/* Estado de entrega si aplica */}
+                    {reply.deliveryStatus && deliveryTone[reply.deliveryStatus] && (
+                      <span
+                        className={`shrink-0 text-[10.5px] font-medium ${deliveryTone[reply.deliveryStatus]}`}
+                      >
+                        {DELIVERY_LABELS[reply.deliveryStatus]}
+                      </span>
+                    )}
+
+                    {/* Fecha */}
+                    <span className="shrink-0 text-[11px] tabular-nums font-normal text-zinc-400">
+                      {formatEmailListDate(reply.createdAt)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-            {threadHistoryCollapsible && !threadHistoryExpanded && threadHistoryHiddenCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setThreadHistoryExpanded(true)}
-                className="mt-0.5 w-full rounded-edge px-1.5 py-1 text-left text-[11px] font-medium text-subtle outline-none transition-colors hover:bg-fill hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/15"
-              >
-                y {threadHistoryHiddenCount} {threadHistoryHiddenCount === 1 ? "acción más" : "acciones más"}…
-              </button>
-            )}
           </div>
         )}
 
