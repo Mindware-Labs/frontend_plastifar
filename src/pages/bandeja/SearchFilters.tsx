@@ -47,7 +47,9 @@ export function FilterButton({ value, onChange }: FilterButtonProps) {
         triggerRef.current?.focus();
       }
     }
-    function handleViewportChange() {
+    function handleViewportChange(event: Event) {
+      const target = event.target;
+      if (target instanceof Node && panelRef.current?.contains(target)) return;
       close();
       snap();
     }

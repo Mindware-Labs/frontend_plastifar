@@ -50,7 +50,9 @@ export function ClientViewMenu({
         triggerRef.current?.focus();
       }
     }
-    function handleViewportChange() {
+    function handleViewportChange(event: Event) {
+      const target = event.target;
+      if (target instanceof Node && panelRef.current?.contains(target)) return;
       setOpen(false);
       snap();
     }
@@ -128,7 +130,7 @@ export function ClientViewMenu({
               width: MENU_WIDTH,
               transformOrigin: `${anchor.originX}px top`,
             }}
-            className={`z-[60] flex max-h-[min(24rem,calc(100vh-1rem))] flex-col gap-0.5 overflow-y-auto rounded-lg border border-zinc-200/90
+            className={`z-[60] flex max-h-[min(24rem,calc(100vh-1rem))] flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200/90
               bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] ${
                 exiting ? "pointer-events-none" : ""
               }`}
