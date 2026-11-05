@@ -5,15 +5,20 @@ import { ticketsApi } from "../../api/tickets";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
+import {
+  navigateToTicketFullView,
+  type EnterpriseListReturnRecord,
+} from "../../lib/enterpriseListReturn";
 import type { TicketDetailResponse } from "../../types/api";
 import { TicketExecutiveSummary, TicketExecutiveSummarySkeleton } from "./TicketExecutiveSummary";
 
 interface TicketSummaryDrawerProps {
   ticketId: number;
   onClose: () => void;
+  getReturnSnapshot?: () => Omit<EnterpriseListReturnRecord, "ticketId"> | null;
 }
 
-export function TicketSummaryDrawer({ ticketId, onClose }: TicketSummaryDrawerProps) {
+export function TicketSummaryDrawer({ ticketId, onClose, getReturnSnapshot }: TicketSummaryDrawerProps) {
   const navigate = useNavigate();
   const [ticket, setTicket] = useState<TicketDetailResponse | null>(null);
   const [tasksCount, setTasksCount] = useState(0);
@@ -24,40 +29,43 @@ export function TicketSummaryDrawer({ ticketId, onClose }: TicketSummaryDrawerPr
     setLoading(true);
     setError(null);
     return Promise.all([
-      ticketsApi.getById(ticketId),
-      ticketsApi.getTasks(ticketId).then((items) => items.length).catch(() => 0),
+      ticketsApi.getById(ticketId).catch(() => null),
+      ticketsApi.getTasks(ticketId).catch(() => []),
     ])
-      .then(([detail, tasks]) => {
-        setTicket(detail);
-        setTasksCount(tasks);
+      .then(([t, tasks]) => {
+        if (!t) {
+          setError("No se pudo cargar el ticket.");
+          setTicket(null);
+          return;
+        }
+        setTicket(t);
+        setTasksCount(Array.isArray(tasks) ? tasks.length : 0);
       })
-      .catch(() => {
-        setError("No se pudo cargar el resumen del ticket.");
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Error inesperado al cargar el resumen.");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+      });
   }
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
-    Promise.all([
-      ticketsApi.getById(ticketId),
-      ticketsApi.getTasks(ticketId).then((items) => items.length).catch(() => 0),
-    ])
-      .then(([detail, tasks]) => {
-        if (!active) return;
-        setTicket(detail);
-        setTasksCount(tasks);
-      })
-      .catch(() => {
-        if (!active) return;
-        setError("No se pudo cargar el resumen del ticket.");
-      })
-      .finally(() => {
-        if (!active) return;
+    void Promise.all([
+      ticketsApi.getById(ticketId).catch(() => null),
+      ticketsApi.getTasks(ticketId).catch(() => []),
+    ]).then(([t, tasks]) => {
+      if (!active) return;
+      if (!t) {
+        setError("No se pudo cargar el ticket.");
+        setTicket(null);
         setLoading(false);
-      });
+        return;
+      }
+      setTicket(t);
+      setTasksCount(Array.isArray(tasks) ? tasks.length : 0);
+      setLoading(false);
+    });
     return () => {
       active = false;
     };
@@ -65,8 +73,8 @@ export function TicketSummaryDrawer({ ticketId, onClose }: TicketSummaryDrawerPr
 
   return (
     <Drawer
-      title={ticket ? `Ticket · ${ticket.number}` : "Resumen del ticket"}
-      eyebrow="Bandeja de tickets"
+      title={ticket?.number || "Ticket"}
+      eyebrow="Resumen Ejecutivo"
       description={
         loading
           ? undefined
@@ -86,8 +94,14 @@ export function TicketSummaryDrawer({ ticketId, onClose }: TicketSummaryDrawerPr
             variant="primary"
             disabled={!ticket}
             onClick={() => {
+              const url = `/tickets/${ticketId}`;
+              const snapshot = getReturnSnapshot?.() ?? null;
               onClose();
-              navigate(`/tickets/${ticketId}`);
+              if (snapshot) {
+                navigateToTicketFullView(navigate, url, ticketId, snapshot);
+              } else {
+                navigate(url);
+              }
             }}
           >
             <span>Ver ficha completa</span>

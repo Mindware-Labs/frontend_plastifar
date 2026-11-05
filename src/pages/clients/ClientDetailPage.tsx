@@ -18,8 +18,8 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import {
   clientsApi,
@@ -56,6 +56,8 @@ import type { TicketListResponse, TicketQuery } from "../../types/api";
 import type { Client, Contact } from "../../types/clients";
 import { PriorityCell, StatusCell } from "../tickets/ticketCells";
 import { TicketSummaryDrawer } from "../tickets/TicketSummaryDrawer";
+import { useEnterpriseListReturnRestore } from "../../hooks/useEnterpriseListReturnRestore";
+import { captureListScrollY, navigateToTicketFullView } from "../../lib/enterpriseListReturn";
 import { ClientModal } from "./ClientModal";
 import { ContactModal } from "./ContactModal";
 
@@ -160,6 +162,62 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const ticketRows = ticketsStale ? [] : (ticketPage?.items ?? []);
   const ticketCounts = ticketPage?.counts;
   const totalTickets = ticketCounts?.all ?? ticketPage?.total ?? client?.ticketCount ?? 0;
+
+  const navigate = useNavigate();
+
+  const applyTicketListState = useCallback((state: Record<string, unknown>) => {
+    if (typeof state.ticketSearch === "string") setTicketSearch(state.ticketSearch);
+    if (state.ticketChip === "todos" || state.ticketChip === "abiertos" || state.ticketChip === "cerrados") {
+      setTicketChip(state.ticketChip);
+    }
+    if (typeof state.ticketPageSize === "number") setTicketPageSize(state.ticketPageSize);
+  }, []);
+
+  const getReturnSnapshot = useCallback(() => {
+    if (summaryTicketId === null) return null;
+    const ticket = ticketRows.find((t) => t.id === summaryTicketId);
+    return {
+      listPath: `/clientes/${clientId}/historial`,
+      scrollY: captureListScrollY(),
+      bannerTitle: `Historial de ${client?.name ?? "cliente"}`,
+      bannerDetail: ticket ? `${ticket.number || formatTicketCode(ticket.id)} · ${ticket.subject}` : undefined,
+      listState: {
+        page: ticketPage?.page ?? 1,
+        summaryId: summaryTicketId,
+        ticketSearch,
+        ticketChip,
+        ticketPageSize,
+      },
+    };
+  }, [summaryTicketId, ticketRows, clientId, client?.name, ticketPage?.page, ticketSearch, ticketChip, ticketPageSize]);
+
+  useEnterpriseListReturnRestore({
+    applyListState: applyTicketListState,
+    setPage: setTicketPage,
+    openSummary: setSummaryTicketId,
+    listReady: !ticketsLoading && ticketPage !== null,
+  });
+
+  function handleDirectTicketClick(event: React.MouseEvent, ticket: (typeof ticketRows)[number]) {
+    event.stopPropagation();
+    event.preventDefault();
+    const url = `/tickets/${ticket.id}`;
+    const snapshot = {
+      listPath: `/clientes/${clientId}/historial`,
+      scrollY: captureListScrollY(),
+      bannerTitle: `Historial de ${client?.name ?? "cliente"}`,
+      bannerDetail: `${ticket.number || formatTicketCode(ticket.id)} · ${ticket.subject}`,
+      listState: {
+        page: ticketPage?.page ?? 1,
+        ticketSearch,
+        ticketChip,
+        ticketPageSize,
+      },
+    };
+    navigateToTicketFullView(navigate, url, ticket.id, snapshot);
+  }
+
+
 
   function reload() {
     return clientsApi.get(clientId).then(({ client: loaded, contacts }) => {
@@ -1031,7 +1089,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                               <Link
                                 to={`/tickets/${ticket.id}`}
                                 className="text-brand-red hover:underline"
-                                onClick={(event) => event.stopPropagation()}
+                                onClick={(event) => handleDirectTicketClick(event, ticket)}
                               >
                                 {ticket.number || formatTicketCode(ticket.id)}
                               </Link>
@@ -1040,7 +1098,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                               <Link
                                 to={`/tickets/${ticket.id}`}
                                 className="hover:text-brand-red transition-colors line-clamp-1"
-                                onClick={(event) => event.stopPropagation()}
+                                onClick={(event) => handleDirectTicketClick(event, ticket)}
                               >
                                 {ticket.subject}
                               </Link>
@@ -1098,6 +1156,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       {summaryTicketId !== null && (
         <TicketSummaryDrawer
           ticketId={summaryTicketId}
+          getReturnSnapshot={getReturnSnapshot}
           onClose={() => setSummaryTicketId(null)}
         />
       )}

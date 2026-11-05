@@ -19,6 +19,9 @@ export const ticketsApi = {
   getById: (id: number) =>
     apiRequest<TicketDetailResponse>(`/api/tickets/${id}`),
 
+  get: (id: number) =>
+    apiRequest<TicketDetailResponse>(`/api/tickets/${id}`),
+
   createMessage: (id: number, form: FormData) =>
     apiRequest<TicketMessageResponse>(`/api/tickets/${id}/messages`, {
       method: "POST",
@@ -112,6 +115,9 @@ export const ticketsApi = {
 
   // Tareas del ticket
   getTasks: (ticketId: number) =>
+    apiRequest<import("../types/api").TicketTaskResponse[]>(`/api/tickets/${ticketId}/tasks`),
+
+  tasks: (ticketId: number) =>
     apiRequest<import("../types/api").TicketTaskResponse[]>(`/api/tickets/${ticketId}/tasks`),
 
   createTask: (ticketId: number, form: FormData) =>
