@@ -203,8 +203,8 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
         {
           target: "Solucionado",
           category: "veredicto",
-          label: "Marcar veredicto",
-          description: "Cierra el caso como resuelto.",
+          label: "Completar ticket",
+          description: "Cierra el caso como resuelto con su veredicto correspondiente.",
           icon: Gavel,
         },
         CANCEL_TRANSITION,
@@ -225,8 +225,8 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
         {
           target: "Solucionado",
           category: "veredicto",
-          label: "Marcar veredicto",
-          description: "Cierra el caso como resuelto.",
+          label: "Completar ticket",
+          description: "Cierra el caso como resuelto con su veredicto correspondiente.",
           icon: Gavel,
         },
         CANCEL_TRANSITION,
@@ -933,8 +933,8 @@ export function TicketDetailPage() {
     triggerVerdictAttachedFeedback();
   };
 
-  const handleConfirmUpdateStatus = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleConfirmUpdateStatus = async (event?: React.FormEvent) => {
+    event?.preventDefault();
     if (ticketId == null) return;
     // Previene envíos accidentales disparados inmediatamente al avanzar de paso (doble clic o activación residual)
     if (Date.now() - step2EnteredAtRef.current < 400) {
@@ -1986,9 +1986,7 @@ export function TicketDetailPage() {
 
                 {/* TAB: CONVERSACIÓN */}
                 {activeTab === "conversacion" && (
-                  <div
-                    className={`space-y-2.5 ${conversationReveal ? "animate-plf-receipt-in" : ""}`}
-                  >
+                  <div className="space-y-2.5">
                     {/* La accion encabeza el hilo; el editor se pide, no esta siempre puesto. */}
                     <div className="flex items-center gap-3">
                       <span className="shrink-0 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
@@ -2417,11 +2415,7 @@ export function TicketDetailPage() {
           eyebrow={
             updateSuccess
               ? undefined
-              : updateCategory === "veredicto"
-                ? `${ticket.number} · Paso ${updateStep} de 3`
-                : updateStep === 2
-                  ? `${ticket.number} · Paso 2 de 2`
-                  : ticket.number
+              : `${ticket.number} · Paso ${updateStep} de ${updateCategory === "veredicto" ? 3 : 2}`
           }
           title={
             updateSuccess
@@ -2430,13 +2424,15 @@ export function TicketDetailPage() {
                 ? updateStep === 1
                   ? "Actualizar ticket"
                   : updateStep === 2
-                    ? "Marcar veredicto"
+                    ? "Completar ticket"
                     : "Resolución y evidencias"
                 : updateStep === 1
                   ? "Actualizar ticket"
                   : updateCategory === "cancelar"
                     ? "Cancelar ticket"
-                    : "Pausar ticket"
+                    : updateCategory === "pausar"
+                      ? "Pausar ticket"
+                      : "Confirmar acción"
           }
           description={
             updateSuccess
@@ -2445,13 +2441,17 @@ export function TicketDetailPage() {
                 ? updateStep === 1
                   ? "Elige qué hacer con este ticket."
                   : updateStep === 2
-                    ? "Selecciona el motivo y confirma si deseas notificar al cliente."
+                    ? "Selecciona el veredicto y confirma si deseas notificar al cliente."
                     : "Redacta el comentario del veredicto y adjunta archivos de soporte."
                 : updateStep === 1
                   ? "Elige qué hacer con este ticket."
-                  : "Completa los datos para confirmar."
+                  : updateCategory === "pausar"
+                    ? "Especifica el motivo de la pausa en la atención del ticket."
+                    : updateCategory === "cancelar"
+                      ? "Indica el motivo por el cual se cancela el ticket."
+                      : "Completa los datos para confirmar la actualización."
           }
-          maxWidth={updateCategory === "veredicto" && updateStep === 3 ? "max-w-lg" : "max-w-md"}
+          maxWidth="max-w-lg"
           onClose={() => {
             if (!transitioning) {
               if (updateSuccessTimerRef.current) {
@@ -2534,69 +2534,107 @@ export function TicketDetailPage() {
                 </SubmitValidationButton>
               </div>
             ) : updateStep === 3 && updateCategory === "veredicto" ? (
-              <div key="status-step-3-verdict" className="animate-plf-header-fade flex items-center justify-end gap-2">
-                <Button
-                  key="btn-status-back-2"
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => {
-                    setTransitionError(null);
-                    setStepDirection("backward");
-                    setUpdateStep(2);
-                  }}
-                >
-                  Atrás
-                </Button>
-                <SubmitValidationButton
-                  key="btn-status-confirm-verdict"
-                  formId="update-status-form"
-                  ready={updateStatusVerdictStep3Missing.length === 0}
-                  busy={transitioning}
-                  missingItems={updateStatusVerdictStep3Missing}
-                  onFocusField={focusFormField}
-                  tone={transitionError ? "ink" : "primary"}
-                  toneLabel={transitionError}
-                  hintText="Para confirmar el veredicto, completa lo siguiente:"
-                  className={
-                    transitionError ? "" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"
-                  }
-                >
-                  <Gavel className="h-3.5 w-3.5" />
-                  Confirmar veredicto
-                </SubmitValidationButton>
+              <div key="status-step-3-verdict" className="animate-plf-header-fade flex w-full items-center justify-between gap-3">
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+                  <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                    Ctrl
+                  </kbd>
+                  <span>+</span>
+                  <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                    Enter
+                  </kbd>
+                  <span className="ml-0.5">para completar</span>
+                </span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button
+                    key="btn-status-back-2"
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={transitioning}
+                    onClick={() => {
+                      setTransitionError(null);
+                      setStepDirection("backward");
+                      setUpdateStep(2);
+                    }}
+                  >
+                    Atrás
+                  </Button>
+                  <SubmitValidationButton
+                    key="btn-status-confirm-verdict"
+                    formId="update-status-form"
+                    ready={updateStatusVerdictStep3Missing.length === 0}
+                    busy={transitioning}
+                    missingItems={updateStatusVerdictStep3Missing}
+                    onFocusField={focusFormField}
+                    tone={transitionError ? "ink" : "primary"}
+                    toneLabel={transitionError}
+                    hintText="Para completar el ticket, completa lo siguiente:"
+                    className={
+                      transitionError ? "" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"
+                    }
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Completar ticket
+                  </SubmitValidationButton>
+                </div>
               </div>
             ) : (
-              <div key="status-step-2-other" className="animate-plf-header-fade flex items-center justify-end gap-2">
-                <Button
-                  key="btn-status-back-other"
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => {
-                    setTransitionError(null);
-                    setStepDirection("backward");
-                    setUpdateStep(1);
-                  }}
-                >
-                  Atrás
-                </Button>
-                <SubmitValidationButton
-                  key="btn-status-confirm-other"
-                  formId="update-status-form"
-                  ready={updateStatusOtherStep2Missing.length === 0}
-                  busy={transitioning}
-                  missingItems={updateStatusOtherStep2Missing}
-                  onFocusField={focusFormField}
-                  variant={updateCategory === "cancelar" ? "danger" : "primary"}
-                  tone={transitionError ? "ink" : "primary"}
-                  toneLabel={transitionError}
-                  hintText="Para confirmar el cambio, completa lo siguiente:"
-                >
-                  {updateCategory === "cancelar" ? "Cancelar ticket" : "Confirmar"}
-                </SubmitValidationButton>
+              <div key="status-step-2-other" className="animate-plf-header-fade flex w-full items-center justify-between gap-3">
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+                  <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                    Ctrl
+                  </kbd>
+                  <span>+</span>
+                  <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                    Enter
+                  </kbd>
+                  <span className="ml-0.5">
+                    para {updateCategory === "cancelar" ? "cancelar" : updateCategory === "pausar" ? "pausar" : "confirmar"}
+                  </span>
+                </span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button
+                    key="btn-status-back-other"
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={transitioning}
+                    onClick={() => {
+                      setTransitionError(null);
+                      setStepDirection("backward");
+                      setUpdateStep(1);
+                    }}
+                  >
+                    Atrás
+                  </Button>
+                  <SubmitValidationButton
+                    key="btn-status-confirm-other"
+                    formId="update-status-form"
+                    ready={updateStatusOtherStep2Missing.length === 0}
+                    busy={transitioning}
+                    missingItems={updateStatusOtherStep2Missing}
+                    onFocusField={focusFormField}
+                    variant={updateCategory === "cancelar" ? "danger" : "primary"}
+                    tone={transitionError ? "ink" : "primary"}
+                    toneLabel={transitionError}
+                    hintText="Para confirmar el cambio, completa lo siguiente:"
+                  >
+                    {updateCategory === "pausar" ? (
+                      <>
+                        <Clock className="h-3.5 w-3.5" />
+                        Pausar ticket
+                      </>
+                    ) : updateCategory === "cancelar" ? (
+                      <>
+                        <X className="h-3.5 w-3.5" />
+                        Cancelar ticket
+                      </>
+                    ) : (
+                      "Confirmar"
+                    )}
+                  </SubmitValidationButton>
+                </div>
               </div>
             )
           }
@@ -2610,7 +2648,13 @@ export function TicketDetailPage() {
                 </div>
               </div>
               <h3 className="text-base font-bold text-zinc-900 font-heading">
-                El ticket se cerró correctamente
+                {updateCategory === "veredicto"
+                  ? "El ticket se completó correctamente"
+                  : updateCategory === "pausar"
+                    ? "El ticket ha sido pausado"
+                    : updateCategory === "cancelar"
+                      ? "El ticket ha sido cancelado"
+                      : "El ticket se actualizó correctamente"}
               </h3>
               <p className="mt-1.5 text-xs text-zinc-500 max-w-xs leading-relaxed">
                 {updateCategory === "veredicto"
@@ -2621,14 +2665,97 @@ export function TicketDetailPage() {
                           : "archivos de evidencia adjuntos"
                       }.`
                     : "El veredicto fue registrado exitosamente."
-                  : "El ticket ha sido actualizado correctamente."}
+                  : updateCategory === "pausar"
+                    ? "El cómputo de SLA ha quedado pausado mientras se espera al cliente."
+                    : updateCategory === "cancelar"
+                      ? "El ticket ha sido anulado y registrado en el historial."
+                      : "El ticket ha sido actualizado correctamente."}
               </p>
             </div>
           ) : (
-            <div
-              key={`status-step-${updateStep}`}
-              className={stepDirection === "forward" ? "animate-plf-step-forward" : "animate-plf-step-backward"}
-            >
+            <div>
+              {/* Barra de pasos interactiva y dinámica estilo Apple */}
+              <nav
+                aria-label="Pasos de actualización de ticket"
+                className={`grid ${updateCategory === "veredicto" ? "grid-cols-3" : "grid-cols-2"} gap-2 p-1 rounded-xl bg-zinc-50 border border-zinc-200/80 mb-4 transition-all duration-300 ease-plf-spring`}
+              >
+                {(updateCategory === "veredicto"
+                  ? [
+                      { id: 1 as const, title: "Situación", subtitle: "Seleccionar acción" },
+                      { id: 2 as const, title: "Completar ticket", subtitle: "Elegir veredicto" },
+                      { id: 3 as const, title: "Resolución", subtitle: "Evidencias y notas" },
+                    ]
+                  : [
+                      { id: 1 as const, title: "Situación", subtitle: "Seleccionar acción" },
+                      {
+                        id: 2 as const,
+                        title:
+                          updateCategory === "cancelar"
+                            ? "Cancelar ticket"
+                            : updateCategory === "pausar"
+                              ? "Pausar ticket"
+                              : "Confirmar",
+                        subtitle:
+                          updateCategory === "cancelar"
+                            ? "Motivo de cancelación"
+                            : updateCategory === "pausar"
+                              ? "Motivo de la pausa"
+                              : "Comentarios y motivo",
+                      },
+                    ]
+                ).map((s) => {
+                  const isActive = updateStep === s.id;
+                  const isCompleted = updateStep > s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        if (s.id < updateStep) {
+                          setStepDirection("backward");
+                          setUpdateStep(s.id);
+                        } else if (s.id === 2 && updateStep === 1) {
+                          handleContinueUpdateStatus();
+                        } else if (s.id === 3 && updateStep === 2 && updateCategory === "veredicto") {
+                          handleContinueToStep3();
+                        }
+                      }}
+                      className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-all duration-200 ease-out animate-plf-apple-tab ${
+                        isActive
+                          ? "bg-white shadow-2xs border border-zinc-200 text-zinc-900"
+                          : isCompleted
+                            ? "hover:bg-white/60 text-zinc-600 cursor-pointer"
+                            : "opacity-60 cursor-default text-zinc-500"
+                      }`}
+                    >
+                      <span
+                        className={`flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold transition-colors ${
+                          isActive
+                            ? "bg-brand-red text-white shadow-2xs"
+                            : isCompleted
+                              ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                              : "bg-zinc-200/80 text-zinc-500"
+                        }`}
+                      >
+                        {isCompleted ? <Check className="size-3.5" strokeWidth={2.5} /> : s.id}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className={`font-heading text-[11.5px] font-bold leading-tight truncate ${isActive ? "text-zinc-900" : "text-zinc-600"}`}>
+                          {s.title}
+                        </p>
+                        <p className="text-[10px] text-zinc-400 leading-tight truncate hidden sm:block">
+                          {s.subtitle}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </nav>
+
+              <div
+                key={`status-step-${updateStep}`}
+                className={stepDirection === "forward" ? "animate-plf-step-forward" : "animate-plf-step-backward"}
+              >
               {updateStep === 1 && (
                 <div className="space-y-3">
                   <div
@@ -2695,7 +2822,8 @@ export function TicketDetailPage() {
                       label="Veredicto"
                       size="sm"
                       required
-                      placeholder={loadingVerdicts ? "Cargando…" : "Selecciona un veredicto"}
+                      searchable
+                      placeholder={loadingVerdicts ? "Cargando…" : "Buscar o seleccionar un veredicto"}
                       value={updateVerdictId}
                       onChange={(val) => {
                         setUpdateVerdictId(val);
@@ -2739,6 +2867,12 @@ export function TicketDetailPage() {
                         onChange={(event) => {
                           setUpdateComment(event.target.value);
                           if (transitionError) setTransitionError(null);
+                        }}
+                        onKeyDown={(event) => {
+                          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                            event.preventDefault();
+                            void handleConfirmUpdateStatus();
+                          }
                         }}
                         placeholder="Explica el veredicto y las conclusiones de la reclamación…"
                         className={`${textareaClass} ${
@@ -2866,6 +3000,14 @@ export function TicketDetailPage() {
                           setUpdateComment(event.target.value);
                           if (transitionError) setTransitionError(null);
                         }}
+                        onKeyDown={(e) => {
+                          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                            e.preventDefault();
+                            if (updateStatusOtherStep2Missing.length === 0 && !transitioning) {
+                              void handleConfirmUpdateStatus();
+                            }
+                          }
+                        }}
                         placeholder={
                           updateCategory === "cancelar"
                             ? "Explica la razón de anulación (creado por error, duplicado, prueba)…"
@@ -2900,7 +3042,8 @@ export function TicketDetailPage() {
                   </form>
                 )}
               </div>
-            )}
+            </div>
+          )}
         </Modal>
       )}
 

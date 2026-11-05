@@ -67,7 +67,7 @@ export function TicketStatusUpdateModal({
             ? updateStep === 1
               ? "Actualizar ticket"
               : updateStep === 2
-                ? "Marcar veredicto"
+                ? "Completar ticket"
                 : "Resolución y evidencias"
             : updateStep === 1
               ? "Actualizar ticket"
@@ -273,7 +273,8 @@ export function TicketStatusUpdateModal({
                 label="Veredicto"
                 size="sm"
                 required
-                placeholder={loadingVerdicts ? "Cargando…" : "Selecciona un veredicto"}
+                searchable
+                placeholder={loadingVerdicts ? "Cargando…" : "Buscar o seleccionar un veredicto"}
                 value={updateVerdictId}
                 onChange={(val) => {
                   setUpdateVerdictId(val);
