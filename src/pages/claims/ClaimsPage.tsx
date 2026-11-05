@@ -386,6 +386,8 @@ export function ClaimsPage() {
                 aria-label="Filtrar por motivo del reclamo"
                 value={reason}
                 onChange={setReason}
+                searchable
+                searchPlaceholder="Buscar motivo…"
                 defaultIcon={<Tag className="h-3.5 w-3.5 text-zinc-500" />}
                 options={[
                   { value: "todos", label: "Todos los motivos" },
@@ -398,6 +400,8 @@ export function ClaimsPage() {
                 aria-label="Filtrar por planta involucrada"
                 value={plantId}
                 onChange={setPlantId}
+                searchable
+                searchPlaceholder="Buscar planta…"
                 defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
                 options={[
                   { value: "todas", label: "Todas las plantas" },
