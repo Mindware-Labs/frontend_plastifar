@@ -32,9 +32,9 @@ export function HcaExecutiveSummary({
           <div className="min-w-0 flex-1 text-left">
             <div className="flex flex-wrap items-center justify-start gap-2">
               <h3 className="text-base font-bold text-zinc-900">Acción Correctiva (HCA)</h3>
-              <span className="font-mono text-sm font-semibold text-brand-red bg-brand-red/5 px-2 py-0.5 rounded border border-brand-red/20">
-                {sheet.number}
-              </span>
+
+
+
               <HcaStatusBadge status={sheet.status} />
             </div>
             <p className="mt-1.5 text-[11.5px] text-zinc-500">
