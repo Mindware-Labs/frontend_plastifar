@@ -1,52 +1,51 @@
 import { Lock } from "lucide-react";
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
+import { Alert } from "../../../components/ui/Alert";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
-import { FileDropzone } from "../../../components/ui/FileDropzone";
+import { FormDivider } from "../../../components/ui/FormDivider";
 import { Modal } from "../../../components/ui/Modal";
-import { SAVE_SHORTCUT, pickFiles, textareaClass, validateAttachments } from "./ticketDetailShared";
+import { TextAreaField } from "../../../components/ui/Field";
+import { TaskEvidenceUpload } from "../../../components/app/TaskEvidenceUpload";
+import { autoResizeTextarea } from "../../../lib/autoResizeTextarea";
 
 interface TicketNoteModalProps {
-  settle: boolean;
+  settle?: boolean;
+  eyebrow?: string;
   body: string;
   setBody: Dispatch<SetStateAction<string>>;
   attachments: File[];
   setAttachments: Dispatch<SetStateAction<File[]>>;
-  isDragging: boolean;
-  setIsDragging: Dispatch<SetStateAction<boolean>>;
-  fileInputRef: RefObject<HTMLInputElement | null>;
-  showAttachedFeedback: boolean;
-  attachedExiting: boolean;
-  triggerAttachedFeedback: () => void;
   sending: boolean;
   sendError: string | null;
   setSendError: Dispatch<SetStateAction<string | null>>;
   onClose: () => void;
   onSave: () => Promise<void>;
+  isExiting?: boolean;
+  onRequestClose?: () => void;
 }
 
 /** Escribir una nota es un acto aparte: se pide, se escribe y se cierra. El borrador sobrevive si se cierra sin guardar. */
 export function TicketNoteModal({
   settle,
+  eyebrow,
   body,
   setBody,
   attachments,
   setAttachments,
-  isDragging,
-  setIsDragging,
-  fileInputRef,
-  showAttachedFeedback,
-  attachedExiting,
-  triggerAttachedFeedback,
   sending,
   sendError,
   setSendError,
   onClose,
   onSave,
+  isExiting,
+  onRequestClose,
 }: TicketNoteModalProps) {
   return (
     <Modal
+      maxWidth="max-w-xl"
       settle={settle}
+      eyebrow={eyebrow}
       title="Añadir nota interna"
       description={
         <span className="inline-flex flex-wrap items-center gap-2">
@@ -60,80 +59,89 @@ export function TicketNoteModal({
       onClose={() => {
         if (!sending) onClose();
       }}
+      isExiting={isExiting}
+      onRequestClose={onRequestClose ?? onClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" disabled={sending} onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            isLoading={sending}
-            disabled={!body.trim() && !sendError}
-            tone={sendError ? "ink" : "primary"}
-            toneLabel={sendError}
-            onClick={() => void onSave()}
-          >
-            Guardar nota
-          </Button>
-        </>
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={sending}
+              onClick={onRequestClose ?? onClose}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              isLoading={sending}
+              disabled={!body.trim()}
+              onClick={() => void onSave()}
+            >
+              Guardar nota
+            </Button>
+          </div>
+        </div>
       }
     >
-      <div className="space-y-3">
-        <textarea
+      <div className="flex flex-col gap-3 text-left">
+        {sendError && <Alert variant="error">{sendError}</Alert>}
+
+        <FormDivider title="Nota de seguimiento" />
+
+        <TextAreaField
+          label="Mensaje interno"
+          required
           autoFocus
-          rows={7}
+          rows={1}
+          maxLength={4000}
           value={body}
-          onChange={(event) => {
-            setBody(event.target.value);
+          placeholder="Lo que el equipo debe saber sobre este caso…"
+          onChange={(e) => {
+            setBody(e.target.value);
             if (sendError) setSendError(null);
+            autoResizeTextarea(e.target, 52);
           }}
-          onKeyDown={(event) => {
-            // Escribir y guardar sin soltar el teclado: es el gesto de cualquier campo de notas.
-            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-              event.preventDefault();
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.preventDefault();
               void onSave();
             }
           }}
-          placeholder="Lo que el equipo debe saber sobre este caso…"
-          className={`${textareaClass} ${
-            sendError ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red" : ""
-          }`}
+          className="min-h-0 resize-none overflow-hidden text-[12.5px] py-2 leading-relaxed [field-sizing:content]"
+          hint={
+            body.length > 0 ? (
+              <span
+                className={`block text-right text-[11px] tabular-nums text-zinc-400 ${
+                  body.length > 3800 ? "text-brand-red font-medium" : ""
+                }`}
+              >
+                {body.length} / 4000
+              </span>
+            ) : undefined
+          }
         />
 
-        {/* Carga de archivos adjuntos */}
-        <FileDropzone
-          label="Archivos adjuntos (opcional)"
-          idleTitle="Haz clic para adjuntar archivos a la nota"
-          idleHint="Imágenes (PNG, JPG), documentos PDF, hojas de Excel o reportes internos"
-          inputRef={fileInputRef}
-          inputId="note-attachment-input"
-          onInputChange={(event) => {
-            pickFiles(event.target, attachments, setAttachments, setSendError, () => triggerAttachedFeedback());
-          }}
-          onDropFiles={(files) => {
-            if (files) {
-              const chosen = Array.from(files);
-              const problem = validateAttachments(chosen, attachments);
-              if (problem) {
-                setSendError(problem);
-                return;
-              }
-              setSendError(null);
-              setAttachments((prev) => [...prev, ...chosen]);
-              triggerAttachedFeedback();
-            }
-          }}
-          isDragging={isDragging}
-          onDraggingChange={setIsDragging}
-          feedbackShowing={showAttachedFeedback}
-          feedbackExiting={attachedExiting}
+        <TaskEvidenceUpload
           files={attachments}
-          onRemoveFile={(idx) => setAttachments((prev) => prev.filter((_, i) => i !== idx))}
-        >
-          <div className="flex items-center justify-between pt-0.5">
-            <span className="text-[11px] text-zinc-400">{SAVE_SHORTCUT} para guardar</span>
-          </div>
-        </FileDropzone>
+          onFilesChange={setAttachments}
+          onReportError={setSendError}
+          label="Adjuntos (opcional)"
+          dropzoneTitle="Adjuntar archivos"
+          dropzoneHint="Máx. 10 MB por archivo"
+        />
       </div>
     </Modal>
   );

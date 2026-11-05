@@ -28,7 +28,6 @@ import {
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -46,6 +45,7 @@ import {
 } from "../../components/app/ModuleHeader";
 import { TicketPendingFileList } from "../../components/app/TicketPendingFileList";
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
+import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { TicketProductsField } from "../../components/app/TicketProductsField";
 import { Alert } from "../../components/ui/Alert";
@@ -53,7 +53,8 @@ import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
-import { CheckboxField, SelectField, TEXTAREA_AUTO_GROW_CLASS, TextField } from "../../components/ui/Field";
+import { CheckboxField, SelectField, TextAreaField, TextField } from "../../components/ui/Field";
+import { FormDivider } from "../../components/ui/FormDivider";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
@@ -62,6 +63,7 @@ import { openOverlay } from "../../hooks/overlayStack";
 import { useSettle } from "../../hooks/useSettle";
 import { useSidePanelMotion } from "../../hooks/useSidePanelMotion";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { useAuth } from "../../context/useAuth";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useEmailCounts } from "../../context/useEmailCounts";
@@ -250,9 +252,6 @@ const textareaClass =
   "w-full resize-none rounded-lg border border-zinc-200/80 bg-white px-3 py-2 text-[12.5px] leading-relaxed " +
   "text-zinc-900 outline-none transition-all placeholder:text-zinc-400 hover:border-zinc-300 " +
   "focus:border-brand-red focus:ring-2 focus:ring-brand-red/15";
-
-/** Una línea con `py-2` y `text-[12.5px]`; crece con el texto sin scroll interno. */
-const TICKET_NOTE_TEXTAREA_MIN_PX = 40;
 
 const attachLabelClass =
   "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 " +
@@ -522,28 +521,25 @@ export function TicketDetailPage() {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteBody, setNoteBody] = useState("");
   const [noteAttachments, setNoteAttachments] = useState<File[]>([]);
-  const [isDraggingNote, setIsDraggingNote] = useState(false);
-  const {
-    isShowing: showNoteAttachedFeedback,
-    isExiting: noteAttachedExiting,
-    trigger: triggerNoteAttachedFeedback,
-  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [noteSending, setNoteSending] = useState(false);
   const [noteSendError, setNoteSendError] = useState<string | null>(null);
-  const noteFileInputRef = useRef<HTMLInputElement>(null);
-  const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const {
+    isExiting: noteModalExiting,
+    requestClose: requestNoteModalClose,
+    reset: resetNoteModalMotion,
+  } = useModalAnimation();
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     if (!showNoteModal) return;
-    const id = window.setTimeout(() => {
-      noteTextareaRef.current?.focus();
-      autoResizeTextarea(noteTextareaRef.current, TICKET_NOTE_TEXTAREA_MIN_PX);
-    }, 120);
-    return () => window.clearTimeout(id);
-  }, [showNoteModal]);
+    resetNoteModalMotion();
+    setNoteSendError(null);
+  }, [showNoteModal, resetNoteModalMotion]);
 
-  useLayoutEffect(() => {
-    if (showNoteModal) autoResizeTextarea(noteTextareaRef.current, TICKET_NOTE_TEXTAREA_MIN_PX);
+  useEffect(() => {
+    if (showNoteModal && noteTextareaRef.current) {
+      autoResizeTextarea(noteTextareaRef.current, 52);
+    }
   }, [showNoteModal, noteBody]);
 
   // Que adjunto se esta mirando y con que vecinos, para poder saltar entre ellos.
@@ -747,6 +743,7 @@ export function TicketDetailPage() {
       setNoteBody("");
       setNoteAttachments([]);
       setShowNoteModal(false);
+      resetNoteModalMotion();
       await refreshTicket();
       receipts.done({ action: "nota-ticket", title: "Nota interna guardada", detail: ticket?.number });
     } catch (err) {
@@ -2303,6 +2300,7 @@ export function TicketDetailPage() {
       {/* Escribir una nota es un acto aparte: se pide, se escribe y se cierra. El borrador sobrevive si se cierra sin guardar. */}
       {showNoteModal && canEditTicket && (
         <Modal
+          maxWidth="max-w-xl"
           settle={noteSettle}
           eyebrow={ticket.number}
           title="Añadir nota interna"
@@ -2316,169 +2314,98 @@ export function TicketDetailPage() {
             </span>
           }
           onClose={() => {
-            if (!noteSending) setShowNoteModal(false);
+            if (!noteSending) {
+              setShowNoteModal(false);
+              resetNoteModalMotion();
+            }
           }}
+          isExiting={noteModalExiting}
+          onRequestClose={requestNoteModalClose}
           footer={
-            <>
-              <Button type="button" variant="secondary" disabled={noteSending} onClick={() => setShowNoteModal(false)}>
-                Cancelar
-              </Button>
-              <SubmitValidationButton
-                ready={noteBody.trim().length > 0}
-                busy={noteSending}
-                missingItems={buildValidationItems([
-                  {
-                    id: "ticket-note-body",
-                    label: "Falta el texto de la nota",
-                    short: "el texto de la nota",
-                    valid: noteBody.trim().length > 0,
-                  },
-                ])}
-                onSubmit={() => void saveNote()}
-                onFocusField={focusFormField}
-                tone={noteSendError ? "ink" : "primary"}
-                toneLabel={noteSendError}
-                hintText="Para guardar la nota interna, completa lo siguiente:"
-              >
-                Guardar nota
-              </SubmitValidationButton>
-            </>
+            <div className="flex w-full items-center justify-between gap-3">
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+                <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                  Ctrl
+                </kbd>
+                <span>+</span>
+                <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                  Enter
+                </kbd>
+                <span className="ml-0.5">para guardar</span>
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={noteSending}
+                  onClick={requestNoteModalClose}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  isLoading={noteSending}
+                  disabled={!noteBody.trim()}
+                  onClick={() => void saveNote()}
+                >
+                  Guardar nota
+                </Button>
+              </div>
+            </div>
           }
         >
-          <div className="space-y-3">
-            <textarea
-              ref={noteTextareaRef}
-              id="ticket-note-body"
+          <div className="flex flex-col gap-3 text-left">
+            {noteSendError && <Alert variant="error">{noteSendError}</Alert>}
+
+            <FormDivider title="Nota de seguimiento" />
+
+            <TextAreaField
+              label="Mensaje interno"
+              required
               autoFocus
               rows={1}
+              maxLength={4000}
               value={noteBody}
-              onChange={(event) => {
-                setNoteBody(event.target.value);
+              placeholder="Lo que el equipo debe saber sobre este caso…"
+              onChange={(e) => {
+                setNoteBody(e.target.value);
                 if (noteSendError) setNoteSendError(null);
-                autoResizeTextarea(event.target, TICKET_NOTE_TEXTAREA_MIN_PX);
+                autoResizeTextarea(e.target, 52);
               }}
-              onKeyDown={(event) => {
-                // Escribir y guardar sin soltar el teclado: es el gesto de cualquier campo de notas.
-                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                  event.preventDefault();
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
                   void saveNote();
                 }
               }}
-              placeholder="Lo que el equipo debe saber sobre este caso…"
-              className={`${textareaClass} ${TEXTAREA_AUTO_GROW_CLASS} ${
-                noteSendError ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red" : ""
-              }`}
-            />
-
-            {/* Carga de archivos adjuntos */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-heading text-[11px] font-semibold text-zinc-500">
-                  Archivos adjuntos (opcional)
-                </span>
-                <span className="text-[11px] text-zinc-400">Máx. 10 MB por archivo</span>
-              </div>
-
-              <input
-                ref={noteFileInputRef}
-                id="note-attachment-input"
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(event) => {
-                  pickFiles(
-                    event.target,
-                    noteAttachments,
-                    setNoteAttachments,
-                    setNoteSendError,
-                    () => triggerNoteAttachedFeedback(),
-                  );
-                }}
-              />
-
-              <button
-                type="button"
-                onClick={() => noteFileInputRef.current?.click()}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDraggingNote(true);
-                }}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDraggingNote(false);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDraggingNote(false);
-                  if (e.dataTransfer.files) {
-                    const chosen = Array.from(e.dataTransfer.files);
-                    const problem = validateAttachments(chosen, noteAttachments);
-                    if (problem) {
-                      setNoteSendError(problem);
-                      return;
-                    }
-                    setNoteSendError(null);
-                    setNoteAttachments((prev) => [...prev, ...chosen]);
-                    triggerNoteAttachedFeedback();
-                  }
-                }}
-                className={`group relative flex h-[106px] min-h-[106px] w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-3 transition-colors duration-300 outline-none ${
-                  showNoteAttachedFeedback
-                    ? noteAttachedExiting
-                      ? "border-emerald-200 bg-emerald-50/25"
-                      : "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-100/80"
-                    : isDraggingNote
-                      ? "border-brand-red bg-brand-red/5 ring-2 ring-brand-red/20"
-                      : "border-zinc-200 bg-zinc-50/50 hover:border-brand-red/40 hover:bg-brand-red/5"
-                }`}
-              >
-                {showNoteAttachedFeedback ? (
-                  <div
-                    className={`flex flex-col items-center justify-center text-center ${
-                      noteAttachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+              className="min-h-0 resize-none overflow-hidden text-[12.5px] py-2 leading-relaxed [field-sizing:content]"
+              hint={
+                noteBody.length > 0 ? (
+                  <span
+                    className={`block text-right text-[11px] tabular-nums text-zinc-400 ${
+                      noteBody.length > 3800 ? "text-brand-red font-medium" : ""
                     }`}
                   >
-                    <div className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-2 ring-emerald-200/70 shadow-3xs animate-plf-check-breathe">
-                      <AnimatedCheckIcon size={16} strokeWidth={2.8} />
-                    </div>
-                    <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-bold text-emerald-700 leading-tight">
-                      ¡{noteAttachments.length === 1 ? "Archivo adjuntado correctamente" : `${noteAttachments.length} archivos adjuntados correctamente`}!
-                    </p>
-                    <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-emerald-600/80 leading-tight">
-                      Haz clic o arrastra para añadir más si lo deseas
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-center transition-opacity duration-300">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-transform group-hover:scale-105">
-                      <Upload className="size-4" />
-                    </div>
-                    <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-semibold text-zinc-700 leading-tight">
-                      Haz clic para adjuntar archivos a la nota
-                    </p>
-                    <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-zinc-400 leading-tight">
-                      Imágenes (PNG, JPG), documentos PDF, hojas de Excel o reportes internos
-                    </p>
-                  </div>
-                )}
-              </button>
+                    {noteBody.length} / 4000
+                  </span>
+                ) : undefined
+              }
+              ref={(el) => {
+                noteTextareaRef.current = el;
+                if (el) autoResizeTextarea(el, 52);
+              }}
+            />
 
-              <div className="flex items-center justify-between pt-0.5">
-                <span className="text-[11px] text-zinc-400">{SAVE_SHORTCUT} para guardar</span>
-              </div>
-
-              <TicketPendingFileList
-                files={noteAttachments}
-                onChange={setNoteAttachments}
-                className="pt-1"
-                onRemove={() => {
-                  if (noteSendError) setNoteSendError(null);
-                }}
-              />
-            </div>
+            <TaskEvidenceUpload
+              files={noteAttachments}
+              onFilesChange={setNoteAttachments}
+              onReportError={setNoteSendError}
+              label="Adjuntos (opcional)"
+              dropzoneTitle="Adjuntar archivos"
+              dropzoneHint="Máx. 10 MB por archivo"
+            />
           </div>
         </Modal>
       )}
