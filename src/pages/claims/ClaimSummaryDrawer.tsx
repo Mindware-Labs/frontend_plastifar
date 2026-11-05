@@ -66,7 +66,10 @@ export function ClaimSummaryDrawer({ claimId, onClose, getReturnSnapshot }: Clai
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => window.open(`/reclamaciones/${claimId}/imprimir`, "_blank")}
+            onClick={() => {
+              onClose();
+              navigate(`/reclamaciones/${claimId}?documento=1`);
+            }}
           >
             <Printer className="h-3.5 w-3.5 mr-1" />
             Imprimir

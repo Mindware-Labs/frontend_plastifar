@@ -1,6 +1,6 @@
 import { Building2, Eye, FileSpreadsheet, FileText, PackageMinus, Tag, UserCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { withdrawalsApi, type WithdrawalCounts, type WithdrawalListResponse, type WithdrawalQuery } from "../../api/withdrawals";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -53,6 +53,7 @@ const searchSellers = searchStaff();
 
 /** RF-W6: listado paginado con selección múltiple, exportación y resumen en drawer. */
 export function WithdrawalsPage() {
+  const navigate = useNavigate();
   const receipts = useReceipts();
 
   const [search, setSearch] = useState("");
@@ -522,9 +523,9 @@ export function WithdrawalsPage() {
                             onClick={() => setSummaryId(item.id)}
                           />
                           <RowAction
-                            label={`Imprimir ${item.number}`}
+                            label={`Documento oficial ${item.number}`}
                             icon={FileText}
-                            onClick={() => window.open(`/retiros/${item.id}/imprimir`, "_blank")}
+                            onClick={() => navigate(`/retiros/${item.id}`)}
                           />
                         </div>
                       </Td>

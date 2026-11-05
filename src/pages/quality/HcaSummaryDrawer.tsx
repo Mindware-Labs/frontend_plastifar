@@ -65,7 +65,10 @@ export function HcaSummaryDrawer({ sheetId, onClose, getReturnSnapshot }: HcaSum
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => window.open(`/calidad/hca/${sheetId}/imprimir`, "_blank")}
+            onClick={() => {
+              onClose();
+              navigate(`/calidad/hca/${sheetId}?documento=1`);
+            }}
           >
             <Printer className="h-3.5 w-3.5 mr-1" />
             Imprimir

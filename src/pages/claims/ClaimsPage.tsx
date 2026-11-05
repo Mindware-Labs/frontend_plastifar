@@ -8,7 +8,7 @@ import {
   Tag,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { claimsApi, type ClaimListResponse, type ClaimQuery } from "../../api/claims";
 import { fetchAllPages } from "../../api/paging";
 import { settingsApi } from "../../api/settings";
@@ -60,6 +60,7 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
 
 /** RF-R8: listado paginado de reclamaciones con selección múltiple, exportación en común (... */
 export function ClaimsPage() {
+  const navigate = useNavigate();
   const receipts = useReceipts();
   const [plants, setPlants] = useState<Plant[]>([]);
   const [topics, setTopics] = useState<TicketTopicResponse[]>([]);
@@ -546,9 +547,9 @@ export function ClaimsPage() {
                             onClick={() => setSummaryClaimId(claim.id)}
                           />
                           <RowAction
-                            label={`Imprimir la reclamación de ${claim.ticketNumber}`}
+                            label={`Documento oficial de ${claim.ticketNumber}`}
                             icon={FileText}
-                            onClick={() => window.open(`/reclamaciones/${claim.id}/imprimir`, "_blank")}
+                            onClick={() => navigate(`/reclamaciones/${claim.id}`)}
                           />
                         </div>
                       </Td>

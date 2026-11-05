@@ -9,7 +9,6 @@ import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ClaimDetailPage } from "./pages/claims/ClaimDetailPage";
 import { TaskDetailPage } from "./pages/tasks/TaskDetailPage";
 import { TasksPage } from "./pages/tasks/TasksPage";
-import { ClaimPrintPage } from "./pages/claims/ClaimPrintPage";
 import { ClaimsPage } from "./pages/claims/ClaimsPage";
 import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
 import { ClientsPage } from "./pages/clients/ClientsPage";
@@ -17,13 +16,10 @@ import { CXDashboard } from "./features/cx-dashboard";
 import { DashboardPage } from "./pages/dashboard/DashboardPage";
 import { DiscrepanciesPage } from "./pages/discrepancies/DiscrepanciesPage";
 import { DiscrepancyDetailPage } from "./pages/discrepancies/DiscrepancyDetailPage";
-import { DiscrepancyPrintPage } from "./pages/discrepancies/DiscrepancyPrintPage";
 import { WithdrawalDetailPage } from "./pages/withdrawals/WithdrawalDetailPage";
-import { WithdrawalPrintPage } from "./pages/withdrawals/WithdrawalPrintPage";
 import { WithdrawalsPage } from "./pages/withdrawals/WithdrawalsPage";
 import { HcasPage } from "./pages/quality/HcasPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
-import { HcaPrintPage } from "./pages/quality/HcaPrintPage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { DepartmentsPage } from "./pages/departments/DepartmentsPage";
 import { SedesPage } from "./pages/sedes/SedesPage";
@@ -44,6 +40,11 @@ import { NotificationsLabPage } from "./pages/dev/NotificationsLabPage";
 import { TicketDetailPage } from "./pages/tickets/TicketDetailPage";
 import { TicketsListLayout } from "./pages/tickets/TicketsListLayout";
 import { ticketDetailReservedRedirect } from "./pages/tickets/ticketLegacy";
+
+function RedirectToDocument({ basePath }: { basePath: string }) {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`${basePath}/${id}?documento=1`} replace />;
+}
 
 function TicketDetailRoute() {
   const { id } = useParams<{ id: string }>();
@@ -231,38 +232,10 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route
-          path="/reclamaciones/:id/imprimir"
-          element={
-            <PermissionRoute permission="claims.read">
-              <ClaimPrintPage />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/calidad/hca/:id/imprimir"
-          element={
-            <PermissionRoute permission="quality.read">
-              <HcaPrintPage />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/discrepancias/:id/imprimir"
-          element={
-            <PermissionRoute permission="discrepancies.read">
-              <DiscrepancyPrintPage />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/retiros/:id/imprimir"
-          element={
-            <PermissionRoute permission="withdrawals.read">
-              <WithdrawalPrintPage />
-            </PermissionRoute>
-          }
-        />
+        <Route path="/reclamaciones/:id/imprimir" element={<RedirectToDocument basePath="/reclamaciones" />} />
+        <Route path="/calidad/hca/:id/imprimir" element={<RedirectToDocument basePath="/calidad/hca" />} />
+        <Route path="/discrepancias/:id/imprimir" element={<RedirectToDocument basePath="/discrepancias" />} />
+        <Route path="/retiros/:id/imprimir" element={<RedirectToDocument basePath="/retiros" />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

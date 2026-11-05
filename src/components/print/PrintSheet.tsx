@@ -30,7 +30,6 @@ export function PrintSheet({
   orientation,
   filename,
   onExportExcel,
-  extraActions,
   title,
   backLabel = "Volver",
   onBack,
@@ -39,7 +38,6 @@ export function PrintSheet({
   orientation: Orientation;
   filename?: string;
   onExportExcel?: () => void | Promise<void>;
-  extraActions?: ReactNode;
   title?: string;
   backLabel?: string;
   onBack?: () => void;
@@ -183,7 +181,7 @@ export function PrintSheet({
   return (
     <div
       data-print-sheet-root="true"
-      className="flex min-h-screen flex-col overflow-hidden font-sans text-zinc-900 print:block print:h-auto print:min-h-0 print:overflow-visible print:bg-white print:p-0"
+      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden font-sans text-zinc-900 print:block print:h-auto print:min-h-0 print:overflow-visible print:bg-white print:p-0"
     >
       <style>{`
         @page { ${layout.page} }
@@ -303,7 +301,6 @@ export function PrintSheet({
             </Button>
           )}
 
-          {extraActions}
 
           <Button
             type="button"

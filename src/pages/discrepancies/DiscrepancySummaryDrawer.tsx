@@ -71,7 +71,10 @@ export function DiscrepancySummaryDrawer({
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => window.open(`/discrepancias/${discrepancyId}/imprimir`, "_blank")}
+            onClick={() => {
+              onClose();
+              navigate(`/discrepancias/${discrepancyId}?documento=1`);
+            }}
           >
             <Printer className="mr-1 h-3.5 w-3.5" />
             Imprimir

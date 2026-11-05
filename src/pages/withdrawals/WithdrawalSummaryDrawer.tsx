@@ -67,7 +67,10 @@ export function WithdrawalSummaryDrawer({ withdrawalId, onClose, getReturnSnapsh
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => window.open(`/retiros/${withdrawalId}/imprimir`, "_blank")}
+            onClick={() => {
+              onClose();
+              navigate(`/retiros/${withdrawalId}?documento=1`);
+            }}
           >
             <Printer className="mr-1 h-3.5 w-3.5" />
             Imprimir

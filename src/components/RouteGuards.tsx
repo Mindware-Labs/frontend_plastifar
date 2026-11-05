@@ -41,7 +41,8 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   if (isLoading) {
-    const isPrintRoute = location.pathname.includes("/imprimir");
+    const isPrintRoute =
+      location.pathname.includes("/imprimir") || location.search.includes("documento=1");
     const isLandscape =
       location.pathname.includes("/discrepancias") || location.pathname.includes("/retiros");
     return <RestoringSession isPrintRoute={isPrintRoute} isLandscape={isLandscape} />;

@@ -1,6 +1,6 @@
 import { Building2, Eye, FileSpreadsheet, FileText, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { discrepanciesApi, type DiscrepancyListResponse, type DiscrepancyQuery } from "../../api/discrepancies";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -48,6 +48,7 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
 
 /** RF-D9: listado paginado con selección múltiple, exportación y resumen en drawer. */
 export function DiscrepanciesPage() {
+  const navigate = useNavigate();
   const receipts = useReceipts();
 
   const [search, setSearch] = useState("");
@@ -492,9 +493,9 @@ export function DiscrepanciesPage() {
                             onClick={() => setSummaryId(item.id)}
                           />
                           <RowAction
-                            label={`Imprimir ${item.number}`}
+                            label={`Documento oficial ${item.number}`}
                             icon={FileText}
-                            onClick={() => window.open(`/discrepancias/${item.id}/imprimir`, "_blank")}
+                            onClick={() => navigate(`/discrepancias/${item.id}`)}
                           />
                         </div>
                       </Td>

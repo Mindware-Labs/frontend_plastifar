@@ -20,7 +20,7 @@ export function PrintSheetSkeleton({
   return (
     <div
       data-print-sheet-root="true"
-      className="flex min-h-screen flex-col overflow-hidden font-sans text-zinc-900 bg-zinc-100/70 animate-plf-fade"
+      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden font-sans text-zinc-900 bg-zinc-100/70 animate-plf-fade"
     >
       {/* Topbar ejecutiva en estado Skeleton */}
       <header className="sticky top-0 z-30 flex h-14 w-full shrink-0 items-center justify-between border-b border-zinc-200/90 bg-white/95 px-4 sm:px-6 backdrop-blur-md shadow-2xs">

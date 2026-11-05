@@ -33,6 +33,7 @@ export interface ClaimDocumentSheetProps {
   claim: CustomerClaim;
   onBack?: () => void;
   backLabel?: string;
+  extraActions?: ReactNode;
   /** Sustituye el código del ticket en cabecera e impresión (p. ej. TAR-… desde una tarea). */
   contextCodeOverride?: string;
 }
@@ -41,6 +42,7 @@ export function ClaimDocumentSheet({
   claim,
   onBack,
   backLabel = "Volver",
+  extraActions,
   contextCodeOverride,
 }: ClaimDocumentSheetProps) {
   const caseCode = contextCodeOverride?.trim() || claim.ticketNumber || String(claim.id);
@@ -68,6 +70,7 @@ export function ClaimDocumentSheet({
       title={`${CLAIM_FORM_CONTROL.code} · ${caseCode}`}
       backLabel={backLabel}
       onBack={onBack}
+      extraActions={extraActions}
       filename={`${CLAIM_FORM_CONTROL.code}_${caseCode}.pdf`}
       onExportExcel={() => exportClaimToExcel(claim)}
     >
