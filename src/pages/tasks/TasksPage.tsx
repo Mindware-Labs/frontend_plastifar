@@ -24,6 +24,7 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
+import { priorityFilterDefaultIcon, priorityFilterOptions } from "../../lib/priorityFilterOptions";
 import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
 import { useReceipts } from "../../context/useReceipts";
@@ -325,14 +326,8 @@ export function TasksPage() {
                 aria-label="Filtrar por prioridad"
                 value={priority}
                 onChange={setPriority}
-                defaultIcon={<Flag className="h-3.5 w-3.5 text-zinc-500" />}
-                options={[
-                  { value: "todos", label: "Todas las prioridades" },
-                  { value: "Emergencia", label: "Emergencia" },
-                  { value: "Alta", label: "Alta" },
-                  { value: "Normal", label: "Normal" },
-                  { value: "Baja", label: "Baja" },
-                ]}
+                defaultIcon={priorityFilterDefaultIcon}
+                options={priorityFilterOptions("h-3.5 w-3.5", "todos")}
               />
               <FilterDropdown
                 title="Seleccionar estado"
