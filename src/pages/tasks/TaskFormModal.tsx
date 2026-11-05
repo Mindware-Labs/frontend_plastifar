@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertCircle, UserCheck } from "lucide-react";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
 import { pickDefaultSlaPolicyId, sortSlaPolicies } from "../../lib/slaPolicyUi";
@@ -23,6 +24,8 @@ import {
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { LookupSelect } from "../../components/ui/LookupSelect";
+import { useAuth } from "../../context/useAuth";
 import type { SelectOption } from "../../components/ui/Select";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -89,7 +92,9 @@ function bindAutoResizeTextarea(
 
 export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModalProps) {
   const isEdit = task !== undefined;
+  const { user } = useAuth();
   const { can, isAdmin } = usePermissions();
+  const currentStaffId = user?.staffId ?? 0;
   const [formError, setFormError] = useState<string | null>(null);
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [contacts, setContacts] = useState<Contact[]>(() => {
@@ -422,6 +427,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
     if (contact != null) form.set("ContactId", String(contact));
     const due = dueDateToApi(values.dueDate, values.dueTime);
     if (due) form.set("DueDate", due);
+    form.set("Status", values.status);
     if (prefill) {
       form.set("EmailId", String(prefill.emailId));
       for (const id of inherited) form.append("EmailAttachmentIds", String(id));
@@ -453,7 +459,7 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
 
   return (
     <Modal
-      maxWidth="max-w-xl"
+      maxWidth="max-w-2xl"
       eyebrow={isEdit ? `Tarea #${task.id} · ${task.number}` : prefill ? "Desde bandeja de entrada" : "Gestión operativa"}
       title={isEdit ? `Editar ${task.title}` : "Nueva tarea"}
       description={
@@ -576,25 +582,63 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
           <Controller
             control={control}
             name="assignedStaffId"
-            render={({ field }) => (
-              <LookupField
-                size="sm"
-                label="Asignado a"
-                value={field.value}
-                onChange={(value) => {
-                  field.onChange(value);
-                  void suggestDepartment(value);
-                }}
-                onBlur={field.onBlur}
-                search={searchActiveStaff}
-                resolveSelectedLabel={resolveStaffLabel}
-                placeholder="Sin asignar"
-                searchPlaceholder="Buscar colaborador…"
-                clearLabel="Sin asignar"
-                state={stateOf("assignedStaffId")}
-                error={errors.assignedStaffId?.message}
-              />
-            )}
+            render={({ field }) => {
+              const isSelfAssigned = currentStaffId > 0 && field.value === String(currentStaffId);
+              const assigneeState = errors.assignedStaffId ? "error" : stateOf("assignedStaffId");
+
+              return (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label
+                      htmlFor="task-assigned-staff"
+                      className="font-heading text-[11.5px] font-semibold text-faint"
+                    >
+                      Asignado a
+                    </label>
+                    {currentStaffId > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          field.onChange(String(currentStaffId));
+                          void suggestDepartment(String(currentStaffId));
+                        }}
+                        className={`inline-flex shrink-0 items-center gap-1 text-[11.5px] font-medium transition-colors ${
+                          isSelfAssigned
+                            ? "cursor-default font-semibold text-brand-red"
+                            : "cursor-pointer text-zinc-500 hover:text-zinc-900 hover:underline"
+                        }`}
+                      >
+                        <UserCheck className="size-3.5 text-brand-red" aria-hidden />
+                        {isSelfAssigned ? "Asignado a mí ✓" : "Autoasignarme a mí"}
+                      </button>
+                    )}
+                  </div>
+                  <LookupSelect
+                    id="task-assigned-staff"
+                    size="sm"
+                    value={field.value}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      void suggestDepartment(value);
+                    }}
+                    onBlur={field.onBlur}
+                    search={searchActiveStaff}
+                    resolveSelectedLabel={resolveStaffLabel}
+                    placeholder="Sin asignar"
+                    searchPlaceholder="Buscar colaborador…"
+                    clearLabel="Sin asignar"
+                    state={assigneeState}
+                    aria-invalid={assigneeState === "error"}
+                  />
+                  {errors.assignedStaffId?.message && (
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium leading-none text-brand-red-dark">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span className="truncate">{errors.assignedStaffId.message}</span>
+                    </p>
+                  )}
+                </div>
+              );
+            }}
           />
 
           <Controller
@@ -652,30 +696,30 @@ export function TaskFormModal({ task, prefill, onClose, onSaved }: TaskFormModal
             )}
           />
 
-          {isEdit ? (
-            <Controller
-              control={control}
-              name="status"
-              render={({ field }) => (
-                <SelectField
-                  size="sm"
-                  label="Estado de la tarea"
-                  required
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  options={TASK_STATUS_EDIT_OPTIONS}
-                  hint={<span className="block whitespace-nowrap">Completar o cancelar se hace desde la ficha</span>}
-                  state={stateOf("status")}
-                  error={errors.status?.message}
-                />
-              )}
-            />
-          ) : (
-            <div className="flex flex-col justify-center rounded-lg border border-dashed border-zinc-200/90 bg-zinc-50/50 p-2.5 text-[11px] text-zinc-500 leading-relaxed">
-              Al crear la tarea, se inicia en estado <strong className="font-semibold text-zinc-700">Pendiente</strong> y se notifica al responsable.
-            </div>
-          )}
+          <Controller
+            control={control}
+            name="status"
+            render={({ field }) => (
+              <SelectField
+                size="sm"
+                label={isEdit ? "Estado de la tarea" : "Estado inicial"}
+                required
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                options={TASK_STATUS_EDIT_OPTIONS}
+                hint={
+                  isEdit ? (
+                    <span className="block whitespace-nowrap">Completar o cancelar se hace desde la ficha</span>
+                  ) : (
+                    <span className="block whitespace-nowrap">Por defecto Pendiente. Se notifica al responsable.</span>
+                  )
+                }
+                state={stateOf("status")}
+                error={errors.status?.message}
+              />
+            )}
+          />
         </div>
 
         {/* 5. VINCULACIÓN COMERCIAL */}
